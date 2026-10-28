@@ -23,6 +23,7 @@
   import Power from 'lucide-svelte/icons/power';
   import Scaling from 'lucide-svelte/icons/scaling';
   import Ruler from 'lucide-svelte/icons/ruler';
+  import Wifi from 'lucide-svelte/icons/wifi';
   import Info from 'lucide-svelte/icons/info';
   import Layers from 'lucide-svelte/icons/layers';
   import ArrowUpDown from 'lucide-svelte/icons/arrow-up-down';
@@ -113,6 +114,16 @@
   let effectivePluginName = $derived((exportSettings.pluginName?.trim()) || panel?.name || 'CEditor Panel');
   // 'ask' | 'always' | 'never'. A panel saved before the key existed reads as 'ask', matching
   // Player/RestorePolicy.h's parse so the editor and the plugin cannot disagree about the default.
+  let oscSettings = $derived({
+    port: Number.isInteger(panel?.osc?.port) ? panel.osc.port : 8000,
+    network: panel?.osc?.network === true,
+    targets: typeof panel?.osc?.targets === 'string' ? panel.osc.targets : '',
+  });
+  function setOscSetting(key, value) {
+    if (!panel) return;
+    updatePanel(panel.id, { osc: { ...(panel.osc ?? {}), [key]: value } });
+  }
+  let spareDawParameters = $derived(Math.max(0, Math.min(32, Math.floor(Number(exportSettings.spareDawParameters) || 0))));
   let restoreHardwareMode = $derived(['ask', 'always', 'never'].includes(exportSettings.restoreHardware)
     ? exportSettings.restoreHardware : 'ask');
 
@@ -554,6 +565,22 @@
       <PropertyCell label="Max H" span={2} compact hint="Maximum height when resizable. 0 = no limit." disabled={!panel.resizable}>
         <NumberCell label="Max H" value={panel.resizable ? panel.maxHeight : panel.height} step={1} min={0}
                     onchange={(v) => updatePanel(panel.id, { maxHeight: v })} />
+      </PropertyCell>
+    </PropertySection>
+    <!-- OSC learn (docs/design/ce-osc-module.md, "Panel side"): where a panel with OSC bindings
+         listens, and the destinations its bindings and scripts send to by name. -->
+    <PropertySection title="OSC" icon={Wifi} collapsed={$sectionCollapse['core-osc'] ?? true} ontoggle={(v) => setCollapsed('core-osc', v)}>
+      <PropertyCell label="OSC port" span={2} hint="The port the panel listens on when a control has an OSC binding. A second copy of the panel takes the next free one.">
+        <NumberCell label="OSC port" value={oscSettings.port} step={1} min={1024} max={65535}
+                    onchange={(v) => setOscSetting('port', Math.max(1024, Math.min(65535, Math.round(Number(v) || 8000))))} />
+      </PropertyCell>
+      <PropertyCell label="From the network" span={2} hint="Receive from other computers, such as a tablet. The user is asked once, on each computer, before the network is used.">
+        <PropertyToggle value={oscSettings.network} onchange={() => setOscSetting('network', !oscSettings.network)} />
+      </PropertyCell>
+      <PropertyCell label="Targets" span={4} hint="Named destinations, one per line, such as: tablet = 192.168.1.20:9000. A binding's Send to and a script's ce.osc.send() can use the names.">
+        <textarea class="osc-targets" rows="3" value={oscSettings.targets}
+                  placeholder="tablet = 192.168.1.20:9000"
+                  onchange={(e) => setOscSetting('targets', e.target.value)}></textarea>
       </PropertyCell>
     </PropertySection>
     <PropertySection title="Info" icon={Info} collapsed={$sectionCollapse['core-info'] ?? true} ontoggle={(v) => setCollapsed('core-info', v)}>
@@ -1055,6 +1082,17 @@
       </PropertyCell>
     </PropertySection>
 
+    <!-- ce.daw (docs/design/ce-daw-module.md). The list a DAW automates is fixed at export; spare
+         parameters are places in it a script fills later (ce.daw.assign), added at the end so no
+         parameter moves. -->
+    <PropertySection title="DAW Parameters" icon={Scale}>
+      <PropertyCell label="Spare parameters" span={4}
+                    hint="Extra DAW parameters, Spare 1 onwards, that a script puts a control on with ce.daw.assign. For a panel with more controls than it gives the DAW, or one whose page decides what the knobs are. 0 to 32.">
+        <NumberCell value={spareDawParameters} step={1} min={0} max={32}
+                    onchange={(v) => setExportSetting('spareDawParameters', Math.max(0, Math.min(32, Math.floor(Number(v) || 0))))} />
+      </PropertyCell>
+    </PropertySection>
+
     <PropertySection title="Scripting Runtime" icon={Cpu}>
       <PropertyCell label="Python" span={4}
                     hint="Embed the CPython runtime so Python scripts run window-closed and offline. Auto = only when this panel uses Python.">
@@ -1538,4 +1576,5 @@
     cursor: pointer;
   }
   .set-manage-link:hover { text-decoration: underline; }
+  .osc-targets { box-sizing: border-box; width: 100%; min-height: 54px; padding: 4px 6px; background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font: 11px ui-monospace, monospace; resize: vertical; }
 </style>

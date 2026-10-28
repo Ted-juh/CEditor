@@ -296,6 +296,66 @@ int main()
                "and it is as fine as the range calls for: 0.5000 on -1..1, 440 on 20..20000 Hz");
     }
 
+    // ---------------------------------------------------------------- ce.daw
+    //
+    // Groups are folders in the DAW's list; spare parameters are added at the end; a name can
+    // change after export. None of it may move a parameter: a DAW keys automation by id and place.
+    {
+        const auto params = roundTrip (R"JSON(
+          { "id": "a.value", "path": "a.value", "label": "A", "group": "Filter" },
+          { "id": "b.value", "path": "b.value", "label": "B", "group": "Filter" },
+          { "id": "c.value", "path": "c.value", "label": "C" },
+          { "id": "d.value", "path": "d.value", "label": "D", "group": "Filter" },
+          { "id": "e.value", "path": "e.value", "label": "E", "group": "Amp" }
+        )JSON");
+        check (params.size() == 5 && params[0].group == "Filter" && params[2].group.isEmpty(),
+               "a control's DAW group is read, and none is none");
+        Dummy dummy (ce::buildParameterLayout (params, 3));
+        juce::StringArray order;
+        for (auto* parameter : dummy.getParameters())
+            if (auto* withId = dynamic_cast<juce::AudioProcessorParameterWithID*> (parameter))
+                order.add (withId->paramID);
+        check (order.joinIntoString (",") == "a.value,b.value,c.value,d.value,e.value,spare1,spare2,spare3",
+               "groups keep the list's order, and spare parameters come after it ("
+                   + order.joinIntoString (",") + ")");
+        juce::StringArray folders;
+        for (auto* node : dummy.getParameterTree())
+            if (auto* group = node->getGroup())
+                folders.add (group->getName() + ":" + juce::String (group->getParameters (true).size()));
+        check (folders.joinIntoString (",") == "Filter:2,Filter:1,Amp:1",
+               "a run of one group is one folder; a later run is a folder of the same name ("
+                   + folders.joinIntoString (",") + ")");
+
+        auto* a = dummy.getParameters()[0];
+        check (a->getName (64) == "A", "a parameter is named as exported");
+        check (ce::renameParameter (a, "Sync amount") && a->getName (64) == "Sync amount" && a->getName (4) == "Sync",
+               "renamed, it says the new name, cut to what the host asks for");
+        check (ce::renameParameter (a, {}) && a->getName (64) == "A", "an empty name goes back to the exported one");
+
+        auto* spare = dynamic_cast<ce::SpareParameter*> (dummy.getParameters()[5]);
+        check (spare != nullptr && spare->slot == 1 && spare->getName (64) == "Spare 1", "a spare is named Spare 1");
+        if (spare != nullptr)
+        {
+            ce::SpareDisplay d;
+            d.assigned = true; d.min = 20.0f; d.max = 20000.0f; d.unit = "Hz";
+            spare->setDisplay (d);
+            check (spare->getText (0.0210210f, 0) == "440 Hz", "an assigned spare shows the control's value: "
+                                                                 + spare->getText (0.0210210f, 0));
+            check (std::abs (spare->getValueForText ("440 Hz") - 0.0210210f) < 0.0001f, "and reads it back");
+            d.min = 0.0f; d.max = 2.0f; d.unit = {}; d.choices = juce::StringArray { "Saw", "Square", "Sine" };
+            spare->setDisplay (d);
+            check (spare->getText (0.5f, 0) == "Square" && spare->getValueForText ("Sine") == 1.0f,
+                   "a list control on a spare shows its texts");
+        }
+    }
+    {
+        check (ce::readSpareParameterCount (juce::JSON::parse (R"({"exportSettings":{"spareDawParameters":4}})")) == 4
+                   && ce::readSpareParameterCount (juce::JSON::parse (R"({"exportSettings":{"spareDawParameters":99}})")) == 32
+                   && ce::readSpareParameterCount (juce::JSON::parse (R"({"exportSettings":{}})")) == 0
+                   && ce::readSpareParameterCount (juce::JSON::parse (R"({"exportSettings":{"spareDawParameters":"4"}})")) == 0,
+               "the spare count is 0 to 32, and absent is none");
+    }
+
     if (failures == 0)
     {
         std::cout << "--------------------\nALL PASS" << std::endl;

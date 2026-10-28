@@ -1359,6 +1359,28 @@ const OPTION_ANSWER_CASES = [
   ['devicePorts', [{ dir: 'in' }]], ['checksum', ['roland', [1, 2], { ofset: 1 }]],
   ['panic', [{ reset: false }]], ['encodeJson', [{ a: 1 }, { indnt: 2 }]],
   ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]],
+  ['formatNumber', [1, { decimal: 2 }]], ['formatHz', [440, { flats: true }]], ['formatTime', [5, { scal: 's' }]],
+  ['formatDb', [-6, { fromgain: true }]], ['formatPercent', [0.5, { mx: 2 }]], ['formatPan', [0, { sign: 'always' }]],
+  ['formatRatio', [4, { stile: 'x' }]], ['formatClock', [1000, { hour: true }]], ['formatNote', [60, { middlec: 3 }]],
+  ['formatDivision', [1, { tol: 0.1 }]], ['formatTable', [0, ['a'], { strt: 1 }]], ['formatFit', ['a', 4, { allign: 'right' }]],
+  ['formatLine', ['a', 'b', 8, { gaps: 2 }]], ['formatParse', ['5', { knd: 'hz' }]],
+  ['formatParameter', ['cutoff', 5, { rol: 'mainSynth' }]],
+  ['patchCurrent', ['voice', { grups: ['x'] }]], ['patchRead', ['voice', 'fn', { tmeout: 5 }]],
+  ['patchLoad', ['x', { rle: 'a' }]], ['patchMorph', [{}, {}, 0.5, { switchat: 0.5 }]],
+  ['patchBlend', [[{}, {}], [1, 1], { onlly: ['x'] }]], ['patchRandom', [{ sed: 1 }]],
+  ['patchMutate', [{}, 0.1, { sed: 1 }]], ['patchMerge', [{}, {}, { grups: ['x'] }]],
+  ['patchDiff', [{}, {}, { exept: ['x'] }]], ['patchEqual', [{}, {}, { lok: ['x'] }]],
+  ['patchApply', [{}, { sned: 'none' }]], ['patchSave', ['x', {}, { replce: true }]],
+  ['patchList', [{ scpe: 'voice' }]], ['patchForget', ['x', { rle: 'a' }]], ['patchWrite', [{}, 1, { rle: 'a' }]],
+  ['verifyCoverage', [{ grop: 'x' }]], ['verifyCheck', [{ idz: ['x'] }, 'fn']], ['verifyDump', ['common', { tims: 2 }, 'fn']],
+  ['verifyWrite', ['x', 1, { setleMs: 5 }, 'fn']], ['verifyProbe', ['x', { valus: [1] }, 'fn']],
+  ['verifyPatch', [{ vai: 'dump' }, 'fn']], ['verifySummary', [{}, { widht: 8 }]],
+  ['ciDiscover', [{ timeout: 5 }, 'fn']], ['ciGet', [7, 'R', { resid: 'a' }, 'fn']], ['ciSet', [7, 'R', {}, { partal: true }, 'fn']],
+  ['ciSubscribe', [7, 'R', { resid: 'a' }, 'fn']], ['ciSetProfile', [7, 'X', true, { chanel: 1 }]],
+  ['mpeZone', [{ membrs: 7 }]], ['mpeNoteOn', [60, 100, { bnd: 1 }]], ['mpeExpress', [1, { presure: 1 }]],
+  ['mpeListen', [{ form: 'controller' }]], ['dawAssign', [1, 'x.value', { nmae: 'x' }]],
+  ['oscListen', [{ prot: 9000 }]], ['oscBundle', ['127.0.0.1:9000', [{ address: '/a' }], { tme: 1 }]],
+  ['fileSyxSplit', [[0xF0, 0xF7], { partal: true }]], ['fileMidiRead', [[1], { trak: 1 }]], ['fileMidiWrite', [[], { tempoo: 90 }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {
@@ -1942,6 +1964,76 @@ g["requestDump"]("common", lambda values, info: heard.append([info["kind"], info
 g["__resolveDumps"]("system", "mainSynth", {}, None)
 g["__resolveDumps"]("common", "mainSynth", {}, None)
 sys.stdout.write(json.dumps(heard))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
+// Left out, requestDump's timeout is what the profile's request deserves (the plug-in's
+// "answerWaitMs" query): a fixed 3000 ms reported an AN1x request, whose own timeout is 4000 ms, as
+// unanswered while its reply was on the way. A given timeout still wins, and a kind that is no
+// request keeps the 3000 ms.
+test('requestDump waits as long as the profile asks, in every prelude', async (t) => {
+  const query = (kind, payload) => (kind === 'answerWaitMs' && payload?.request === 'requestVoice' ? 4500 : undefined);
+  const want = [4500, 3000, 50];
+  {
+    const waits = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, { get: (_t, prop) => (prop === 'deviceQuery' ? query : () => undefined) });
+    sandbox.after = (ms) => { waits.push(ms); };
+    sandbox.requestDump('requestVoice', () => {});
+    sandbox.requestDump('voiceCommon', () => {});
+    sandbox.requestDump('requestVoice', () => {}, { timeout: 50 });
+    assert.deepEqual(waits, want, 'JS prelude');
+  }
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'startTimer', 'stopTimer', '__transportState', '__requestDump', 'on']) {
+        lua.global.set(name, () => {});
+      }
+      lua.global.set('__deviceQuery', (kind, payload) => query(kind, payload));
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const waits = [];
+      lua.global.set('after', (ms) => { waits.push(Number(ms)); });
+      await lua.doString(`requestDump("requestVoice", function() end)
+requestDump("voiceCommon", function() end)
+requestDump("requestVoice", function() end, { timeout = 50 })`);
+      assert.deepEqual(waits, want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its wait was not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name):
+        if name == "deviceQuery":
+            return lambda kind, payload=None: 4500 if kind == "answerWaitMs" and (payload or {}).get("request") == "requestVoice" else None
+        return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "logWarn", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+waits = []
+g["after"] = lambda ms, fn: waits.append(ms)
+g["requestDump"]("requestVoice", lambda values, info: None)
+g["requestDump"]("voiceCommon", lambda values, info: None)
+g["requestDump"]("requestVoice", lambda values, info: None, { "timeout": 50 })
+sys.stdout.write(json.dumps(waits))
 `;
   const run = spawnSync(python, ['-c', driver], {
     input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),

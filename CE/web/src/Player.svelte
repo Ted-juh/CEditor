@@ -11,8 +11,10 @@
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
   import { hostWindowShown } from './CE_Application/stores/hostWindow.js';
   import { installHostKeyForwarding } from './CE_Application/utils/hostKeys.js';
+  import { paramEvents, endOpenGestures } from './CE_Application/utils/playerParamEvents.js';
   import { DEFAULT_PANIC_SHORTCUT, isPanicShortcut } from './CE_Application/utils/panicLayout.js';
-  import { initPanelRuntime, setRuntimeHost } from './CE_Application/scripting/panelRuntime.js';
+  import { initPanelRuntime, setRuntimeHost, setDawStateSink, setDawRestoreForNextStart, raiseDawRestoreState,
+    setDawInfo, setDawCommandSink, setDawParamSink, noteHostValue, raiseAutomationIn, raiseDawProgramIn, dawSpareMoved } from './CE_Application/scripting/panelRuntime.js';
   import { createInstanceStorage, createPlayerHost } from './CE_Application/scripting/playerScriptHost.js';
   import { buildSolidStyle, buildGradientStyle, buildLayerStyle } from './CE_Application/utils/backgroundCSS.js';
   import { buildGridStyle } from './CE_Application/utils/gridCSS.js';
@@ -194,15 +196,25 @@
   // through the surface's patchSession (the same path a user drag uses) so the device binding
   // actually sends MIDI on playback. The lastParamValue guard stops this from echoing back into a
   // recorded value (set BEFORE the patch, so the session watcher sees no change to re-emit).
-  function applyParamSync(parameterId, value) {
-    const m = controlByParam[parameterId];
+  function applyParamSync(parameterId, value, fromHost = true) {
     const v = Number(value);
+    // A spare parameter (ce.daw.assign) stands for whichever control a script put on it.
+    if (/^spare\d+$/.test(String(parameterId)) && Number.isFinite(v)) {
+      const seed = hostSeeds.isSeed(parameterId);
+      if (lastParamValue[parameterId] === v) return;
+      lastParamValue[parameterId] = v;
+      if (seed || fromHost) dawSpareMoved(Number(String(parameterId).slice(5)), v, seed ? 'load' : 'host');
+      return;
+    }
+    const m = controlByParam[parameterId];
     if (!m || !Number.isFinite(v)) return;
     // Marked before the duplicate check: a saved value equal to what the control already shows is
     // still this parameter's seed, and leaving it unmarked would swallow the first real automation.
     const seed = hostSeeds.isSeed(parameterId);
     if (lastParamValue[parameterId] === v) return;
     lastParamValue[parameterId] = v;
+    // origin(): the scripts hear this move as the project's (the seed) or the DAW's, not a hand's.
+    if (seed || fromHost) noteHostValue(m.controlId, seed ? 'load' : 'host');
     // Store-by-name selector: the host index maps back to a choice name to write.
     const writeValue = m.choiceParam ? choiceValueAt(m.choiceParam, v) : v;
     // 1. Move the on-screen control (silent — no echo back into the recorded value). Three
@@ -210,6 +222,7 @@
     //    CustomComponent value channel, or the plain Behavior value.
     const patch = hostValuePatch(m, v, writeValue, get(panelPreviewSessions)?.[m.controlId]);
     updatePanelPreviewSession(m.controlId, patch);
+    if (!seed && fromHost) raiseAutomationIn(parameterId, writeValue);
     // The first value after the panel loads is the saved or current state, pushed so the controls
     // show it. It is not an instruction to the synth: sending it is what used to push a reopened
     // project at the hardware on window open, whatever the restore policy said. The processor's
@@ -229,15 +242,15 @@
     }
   }
 
-  // The user moved a control -> tell C++ to drive the matching host parameter (records automation).
+  // The user moved a control -> tell C++ to drive the matching host parameter (records automation),
+  // with a drag held as one DAW gesture (utils/playerParamEvents.js says why).
+  const openGestures = new Set();
   function emitChangedParams(sessions, backend) {
-    for (const parameterId in controlByParam) {
-      const { controlId, leaf, choiceParam, sectionField } = controlByParam[parameterId];
-      const v = controlParamValue(sessions?.[controlId], leaf, choiceParam, sectionField);
-      if (v === undefined || lastParamValue[parameterId] === v) continue;
-      lastParamValue[parameterId] = v;
-      if (paramSyncReady) backend.emitEvent('paramChanged', { id: parameterId, value: v });
-    }
+    const events = paramEvents(sessions, controlByParam, {
+      lastParamValue, openGestures, ready: paramSyncReady,
+      valueOf: (session, { leaf, choiceParam, sectionField }) => controlParamValue(session, leaf, choiceParam, sectionField),
+    });
+    for (const [name, payload] of events) backend.emitEvent(name, payload);
     paramSyncReady = true;  // first pass only seeds lastParamValue, never emits
   }
 
@@ -517,6 +530,13 @@
       instanceStorage = session?.storage && backendForStorage
         ? createInstanceStorage(session.storage, (change) => backendForStorage.emitEvent('scriptSetting', change))
         : null;
+      // The DAW-state hooks, window open (panelRuntime.js, setDawStateSink): the scripts start from
+      // what the instance last saved, and what they would save now goes back to it, so the project
+      // saves the state of the scripts that are running. Only a plug-in instance has a dawState to
+      // give; the CEditor Player app has none and raises neither hook, as before.
+      const instanceHasState = Boolean(session && backendForStorage && Object.hasOwn(session, 'dawState'));
+      setDawStateSink(instanceHasState ? (store) => backendForStorage.emitEvent('scriptDawState', { state: store }) : null);
+      setDawRestoreForNextStart(instanceHasState ? session.dawState : null);
     }
     const storage = instanceStorage;
     setRuntimeHost(createPlayerHost(
@@ -610,9 +630,12 @@
     let sysexUnsub = null;
     let sessionsUnsub = null;
     let paramSyncToken = null;
+    let dawInfoToken = null;
+    let dawProgramToken = null;
     let deviceUnsub = null;
     let restoreToken = null;
     let sessionToken = null;
+    let dawRestoreToken = null;
     let hostWindowToken = null;
     let stopHostKeys = null;
     if (backend) {
@@ -635,7 +658,12 @@
       // Host parameter <-> control (M2 two-way): user moves a control -> emitChangedParams records
       // automation; DAW automation -> applyParamSync moves the control.
       sessionsUnsub = panelPreviewSessions.subscribe((sessions) => emitChangedParams(sessions, backend));
-      paramSyncToken = backend.addEventListener('paramSync', (p) => applyParamSync(p?.id, p?.value));
+      paramSyncToken = backend.addEventListener('paramSync', (p) => applyParamSync(p?.id, p?.value, p?.host !== false));
+      // ce.daw, window open: the processor's picture of the DAW, and the scripts' changes back to it.
+      dawInfoToken = backend.addEventListener('dawInfo', (info) => setDawInfo(info));
+      dawProgramToken = backend.addEventListener('dawProgram', (program) => raiseDawProgramIn(program));
+      setDawCommandSink((command) => backend.emitEvent('dawCommand', command));
+      setDawParamSink((id, value) => backend.emitEvent('paramChanged', { id, value }));
       loadToken = backend.addEventListener('loadPanel', (payload) => {
         loadPanelDocument(payload?.panel ?? payload?.json ?? payload);
       });
@@ -649,6 +677,11 @@
       // Whether the host's window is showing ours (stores/hostWindow.js): a plug-in's page is not
       // told by the browser, so PlayerHost looks and says.
       hostWindowToken = backend.addEventListener('hostWindow', (payload) => hostWindowShown.set(payload?.shown !== false));
+      // A project restored while the window is open: the page's scripts hear it as the window-shut
+      // engines do (the processor sends the store after its own engines have had it).
+      dawRestoreToken = backend.addEventListener('scriptDawRestore', (payload) => {
+        if (payload?.state && typeof payload.state === 'object') raiseDawRestoreState(payload.state);
+      });
       sessionToken = backend.addEventListener('sessionRestored', () => {
         sessionRestored = true;
         if (synthSyncTimer) { clearTimeout(synthSyncTimer); synthSyncTimer = 0; startupReadPort = null; }
@@ -679,8 +712,15 @@
       if (window.__CE_LOAD_PANEL__ === loadPanel) delete window.__CE_LOAD_PANEL__;
       if (backend && loadToken != null) backend.removeEventListener(loadToken);
       if (backend && paramSyncToken != null) backend.removeEventListener(paramSyncToken);
+      if (backend && dawInfoToken != null) backend.removeEventListener(dawInfoToken);
+      if (backend && dawProgramToken != null) backend.removeEventListener(dawProgramToken);
+      setDawInfo(null);
+      setDawCommandSink(null);
+      setDawParamSink(null);
       if (backend && restoreToken != null) backend.removeEventListener(restoreToken);
       if (backend && sessionToken != null) backend.removeEventListener(sessionToken);
+      if (backend && dawRestoreToken != null) backend.removeEventListener(dawRestoreToken);
+      setDawStateSink(null);
       if (backend && hostWindowToken != null) backend.removeEventListener(hostWindowToken);
       hostWindowShown.set(true);
       if (stopHostKeys) stopHostKeys();
@@ -689,6 +729,9 @@
       if (inMsgUnsub) inMsgUnsub();
       if (sysexUnsub) sysexUnsub();
       if (sessionsUnsub) sessionsUnsub();
+      // A press the page never finished must not hold a DAW parameter in touch mode (the processor
+      // ends any it still has when the window closes, too).
+      for (const [name, payload] of endOpenGestures(openGestures)) backend?.emitEvent(name, payload);
       if (deviceUnsub) deviceUnsub();
       setPreviewModeEnabled(false);
       setRuntimeHost(null);

@@ -183,6 +183,13 @@ function legacyParam(p) {
   // shortLabel takes the INSTANCED name: two scenes of the same 110 parameters put "VCF Cutoff"
   // twice in every picker otherwise, and the short label is the one the UI shows.
   out.display = { mode: p.valueType === 'enum' ? 'choice' : isText ? 'text' : 'number', shortLabel: out.name };
+  // How the synth's own display writes it (dpd.schema.json parameterDisplay): ce.format.parameter
+  // and the readouts read these from the descriptor. The two above are the emitter's and stay.
+  if (p.display && typeof p.display === 'object') {
+    for (const key of ['format', 'table', 'min', 'max', 'unit', 'precision', 'middleC']) {
+      if (p.display[key] !== undefined) out.display[key] = structuredClone(p.display[key]);
+    }
+  }
   // A string has no normalized position — there is no 0..1 to put it on.
   if (!isText) out.normalization = { mode: p.valueType === 'enum' ? 'choiceIndex' : 'linear' };
   // DPD value-codec type -> the engine's single-parameter encoder vocabulary. s7 degrades to u7 (the
@@ -381,6 +388,11 @@ export function buildLegacyProfile(resolved, { legacyId, name, embedDpdModel, lo
       };
     }
   }
+
+  // The profile-wide display defaults (middleC): the engine hands them to each parameter.
+  if (resolved.display && typeof resolved.display === 'object') legacy.display = structuredClone(resolved.display);
+  // What a patch of this synth is (ce.patch): read from the document as the author wrote it.
+  if (resolved.patch && typeof resolved.patch === 'object') legacy.patch = structuredClone(resolved.patch);
 
   if (embedDpdModel) legacy.dpdModel = embedDpdModel;
   return legacy;

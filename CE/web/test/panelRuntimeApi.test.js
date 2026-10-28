@@ -543,6 +543,23 @@ test('ce.device.profile reports what is mapped to the role', () => {
   });
 });
 
+test('ce.device.parameters filters by access with the words the plug-in takes', () => {
+  // The panel view used to match access as text, and a profile's access is an object, so every
+  // value filtered every parameter out; the plug-in ignored "readwrite" and returned them all.
+  const fixture = structuredClone(DEVICE_FIXTURE);
+  const [cutoff, resonance, attack] = fixture.params['test-cc-synth'];
+  cutoff.access = { canRead: true, canWrite: true, realtimeSafe: true };
+  resonance.access = { canRead: true, canWrite: false };
+  attack.access = { canWrite: true, realtimeSafe: false };
+  withDevice(fixture, () => {
+    const api = scriptApiForTesting('', 'dev-access');
+    assert.deepEqual(api.deviceParameters({ access: 'writable' }).map((p) => p.id), ['cutoff', 'attack']);
+    assert.deepEqual(api.deviceParameters({ access: 'readonly' }).map((p) => p.id), ['resonance']);
+    assert.deepEqual(api.deviceParameters({ access: 'realtimeWarning' }).map((p) => p.id), ['attack']);
+    assert.equal(api.deviceParameters({ access: 'readwrite' }).length, 3, 'an unknown word filters nothing');
+  });
+});
+
 test('ce.device.connected answers per role', () => {
   withDevice(DEVICE_FIXTURE, () => {
     const api = scriptApiForTesting('', 'dev-2');

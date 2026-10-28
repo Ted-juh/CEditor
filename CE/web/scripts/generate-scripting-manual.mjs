@@ -65,6 +65,125 @@ const MODULE_INTROS = {
     + '- A number outside its range: the nearest end, with a console warning, the first time only.\n'
     + '- A number that is not one: the fallback in its row, with a console warning, the first time only.\n'
     + '- Number arguments also accept text that is a number, such as "500"; a timer\'s interval or delay does not.',
+  'ce.format': 'A value written as the text a person reads, and typed text read back as a value. Each command gives the same text in every language and on every computer: rounding is half away from zero, the decimal point is always a point, and a missing value is "--", never 0. The text is plain ASCII by default, because LCD fonts have no minus sign, infinity or sharp sign; `unicode = true` gives the typographic forms for a label in a normal font.\n\n'
+    + 'Most commands take the same options: `decimals`, `digits` (significant digits, 3 by default), `sign` ("always" for a plus too), `unit` (false for none, or a unit of your own), `space`, `width`, `placeholder` and `unicode`. A command lists the ones it takes, and an option it does not take refuses the call with a console line naming it.\n\n'
+    + '```lua\n'
+    + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
+    + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
+    + '```',
+  'ce.osc': 'Open Sound Control lets a panel talk to a tablet running TouchOSC or Lemur, to Max or Pure Data, to a DAW or a lighting desk. A message is an address, such as `/fader/1`, and its values.\n\n'
+    + 'Nothing opens until asked: `listen` opens a port, on this computer only unless `network` is on, and the network is used only after the user says yes, once for the panel. `on` runs a function for the messages to an address, with OSC\'s wildcards; `oscIn` is raised for every one. `send` and `bundle` send, to a name `target` gave, to `"host:port"`, or back to a message\'s `from`. Every common OSC type is read and written, both ways; a number goes out as a decimal unless `types` says otherwise.\n\n'
+    + 'A change a message makes is from `"osc"`, as `origin()` says, so a panel can send its values to the tablet without sending a tablet\'s own move back to it.\n\n'
+    + '```lua\n'
+    + '-- Lua: eight faders on a tablet move the eight sliders on the panel\n'
+    + 'function onPanelReady()\n'
+    + '  ce.osc.listen({ port = 8000, network = true })\n'
+    + '  ce.osc.on("/fader/[1-8]", function(msg)\n'
+    + '    local n = tonumber(msg.address:match("(%d)$"))\n'
+    + '    set("Slider" .. n .. ".value", msg.args[1] * 127)\n'
+    + '  end)\n'
+    + 'end\n'
+    + '```',
+  'ce.daw': 'For a panel exported as a plug-in: what the DAW is, its parameters and programs, and the changes a script may make to what the DAW sees. In the editor there is no DAW; the questions that need one answer nothing, and `parameters` gives the list the next export would bake, so a panel can be tested.\n\n'
+    + 'A DAW keys automation by a parameter\'s id and its place in the list, so the list is fixed at export. A script can rename a parameter, and fill the spare parameters the author reserved in the export settings (`assign`); it cannot add or remove one. A parameter is named by its control\'s path, such as `"Cutoff.value"`, and its values are the control\'s own, as `set` and `get` give them.\n\n'
+    + '`origin()`, beside this module, says who made the change a handler is running for: a hand, a script, the DAW, the synth, or a project being opened. `automationIn` is raised when the DAW moved a parameter, and never for a change a script or a hand made.\n\n'
+    + '```lua\n'
+    + '-- Lua: a button starts a two-second sweep, written to the DAW as one move\n'
+    + 'function onClick()\n'
+    + '  state.step = 0\n'
+    + '  ce.daw.beginGesture("Cutoff.value")\n'
+    + '  startTimer("sweep", 20)\n'
+    + 'end\n\n'
+    + 'function onTimer(info)\n'
+    + '  if info.id ~= "sweep" then return end\n'
+    + '  state.step = state.step + 1\n'
+    + '  set("Cutoff.value", state.step * 127 / 100)\n'
+    + '  if state.step == 100 then\n'
+    + '    ce.time.stopTimer("sweep")\n'
+    + '    ce.daw.endGesture("Cutoff.value")\n'
+    + '  end\n'
+    + 'end\n'
+    + '```',
+  'ce.mpe': 'MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself: pitch bend for pitch, channel pressure for pressure, controller 74 for timbre. A zone is one manager channel and the member channels its notes use.\n\n'
+    + 'A script plays notes by id: `noteOn` picks a free member channel, sends the note\'s starting bend, timbre and pressure there, and gives back the id; `express` moves one note; `noteOff` ends it and frees its channel. `zone` sets the zone up and tells the synth; without it, the first note sets up a lower zone of 15.\n\n'
+    + 'MPE coming in is the other half: `listen` reads an MPE controller\'s notes back, so `noteIn` carries each note\'s id and `expressionIn` says how it moves.\n\n'
+    + '```lua\n'
+    + '-- Lua: an MPE controller\'s notes, played on the synth through MPE\n'
+    + 'function onPanelLoad()\n'
+    + '  state.out = {}\n'
+    + '  ce.mpe.listen({ from = "controller" })\n'
+    + 'end\n\n'
+    + 'function onNoteIn(note)\n'
+    + '  if note.from == "controller" then state.out[note.id] = ce.mpe.noteOn(note.note, note.velocity) end\n'
+    + 'end\n\n'
+    + 'function onExpressionIn(e)\n'
+    + '  local out = state.out[e.id]\n'
+    + '  if out then ce.mpe.express(out, { bend = e.bend, pressure = e.pressure, timbre = e.timbre }) end\n'
+    + 'end\n\n'
+    + 'function onNoteOffIn(note)\n'
+    + '  local out = state.out[note.id]\n'
+    + '  if out then ce.mpe.noteOff(out); state.out[note.id] = nil end\n'
+    + 'end\n'
+    + '```',
+  'ce.ci': 'MIDI-CI lets a script ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Most synths do not speak MIDI-CI, and say nothing: an empty answer to `discover` is the usual one.\n\n'
+    + 'A device is found by `discover`, and named by its `muid`, a number it keeps until it is switched off. `get`, `set` and `subscribe` work on its named resources (property exchange): `DeviceInfo`, `ResourceList`, controller and program lists, and resources of its own whose names start with `X-`. `profiles` and `setProfile` work on its MIDI-CI profiles, agreed ways for a device to behave, which are not CEditor\'s device profiles.\n\n'
+    + 'Nothing waits: every command that talks to a device returns at once and calls its function when the answer comes, or when it does not, after a timeout. The talking is done once, in the device layer, so the editor, the player and an exported plug-in, window open or shut, see the same devices and answers. It goes out on the role\'s own MIDI ports. Not yet tried against a real MIDI-CI device.\n\n'
+    + '```lua\n'
+    + '-- Lua: find the synth, and show the first four of its program names\n'
+    + 'function onPanelReady()\n'
+    + '  ce.ci.discover(function(found)\n'
+    + '    for _, d in ipairs(found) do\n'
+    + '      if d.matchesProfile then\n'
+    + '        ce.ci.get(d.muid, "ProgramList", function(result)\n'
+    + '          if not result.ok then return end\n'
+    + '          for row = 1, 4 do ce.components.lcd.text("Programs", row, result.body[row] and result.body[row].title or "") end\n'
+    + '        end)\n'
+    + '      end\n'
+    + '    end\n'
+    + '  end)\n'
+    + 'end\n'
+    + '```',
+  'ce.file': 'Librarian files: `.syx` banks, `.mid` files, JSON and text. A script never names a path. Every file comes from a dialog the person answered: `open` or `save` for one file, `folder` for a folder. The script gets a file value back, a table holding the file\'s `name`, `type`, `size`, `canWrite` and `isFolder` but never its folder, and passes it to `read`, `write`, `list` and `saveIn`.\n\n'
+    + 'The rules no option turns off: only the types syx, mid, json, txt and csv; writing only where the person saved, or opened a file or chose a folder `writable`; a folder and nothing above or inside it; up to 8 MB a file; and every file value gone when the panel closes.\n\n'
+    + 'The dialogs need the panel window: in the editor, and in an exported plug-in while its window is open. `syxSplit`, `syxJoin`, `midiRead` and `midiWrite` work on bytes the script already holds, and run everywhere.\n\n'
+    + '```lua\n'
+    + '-- Lua: import a bank and send it to the synth, message by message\n'
+    + 'ce.file.open({ types = {"syx"}, title = "Import a bank" }, function(file, bytes)\n'
+    + '  if not file then return end\n'
+    + '  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end\n'
+    + 'end)\n'
+    + '```',
+  'ce.verify': 'Asking the synth whether it holds what was sent. `coverage` says which parameters can be read back at all, and why not the rest, without sending anything. `check` compares the synth with the panel, `dump` asks for one dump twice to find values the synth changes by itself, and `write`, `probe` and `patch` send first and then read back: one value, one parameter at several values, or the whole sound.\n\n'
+    + 'Every check returns at once and calls its function with a report when it is done; the same report is raised as onVerifyDone. A report names every parameter that matched, every one that differed, with both values, and every one that could not be checked, with the reason. The read-back is always a dump the synth sent after the check asked for it, never what the panel last sent.\n\n'
+    + 'Only `write`, `probe` and `patch` change the synth, and `probe` puts the old value back. One check runs on a device at a time, and only the main synth can be asked.\n\n'
+    + '```lua\n'
+    + '-- Lua: a "Check" button that shows the result on an LCD\n'
+    + 'function onClick()\n'
+    + '  ce.verify.check(function(report)\n'
+    + '    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width = 16 }))\n'
+    + '  end)\n'
+    + 'end\n'
+    + '```',
+  'ce.patch': 'A synth\'s sound as one value you can hold, change, compare, send and keep. `current` captures it, `morph`, `blend`, `random`, `mutate` and `merge` make new ones without sending anything, `diff` and `equal` compare two, and `apply` puts one on the panel and sends it the way the synth takes a patch.\n\n'
+    + 'A patch is a table: `device` (the device profile\'s id), `role`, `scope` (which part of the synth: "voice" unless the profile names others), `name`, `values` (parameter id to value, in the parameter\'s own units; a choice is its id), `missing` (ids nothing is known for) and `source`.\n\n'
+    + 'Every command that works on parameters takes the same choosing options: `groups`, `only`, `except`, `lock` and `include`. The transforms leave the patch name and the parameters the synth cannot be sent alone unless `include` names them. A profile can describe its patches in a `patch` section: which scopes a patch can hold and the dumps that read and send each, how `apply` sends one (`deliver`), and how `write` stores a slot.\n\n'
+    + '```lua\n'
+    + '-- Lua: a knob morphs from the patch kept as A to the one kept as B\n'
+    + 'function onValueChange(value)\n'
+    + '  ce.patch.apply(ce.patch.morph(ce.patch.load("A"), ce.patch.load("B"), value / 127), { live = true })\n'
+    + 'end\n'
+    + '```',
+  'ce.keys': 'The computer keyboard on a panel: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. In the panel view only, the editor\'s preview and an exported plug-in with its window open; with the window shut there is no keyboard.\n\n'
+    + 'Who gets a key, in order; a kept key goes no further: (1) typing into a text box or an LCD keeps every key; (2) the panic key; (3) shortcuts, those with a modifier at once and those without after the focused control; (4) the piano, when it is on; (5) the focused control\'s own keys, the arrows on a knob and Space on a button; (6) keyDown, for any script that listens, which keeps the key by returning true; (7) whatever is around the panel, the DAW or the editor. When the panel loses the keyboard (the window loses focus or is hidden, or the panel closes) every held key gets its keyUp and every piano note its note-off.\n\n'
+    + '```lua\n'
+    + '-- Lua: Ctrl+G picks a random voice; a help LCD shows every key the panel uses\n'
+    + 'function onPanelReady()\n'
+    + '  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })\n'
+    + '  for row, s in ipairs(ce.keys.list()) do\n'
+    + '    ce.components.lcd.text("Help", row, s.keys .. "  " .. (s.description or ""))\n'
+    + '  end\n'
+    + 'end\n'
+    + '```',
   'ce.math': 'Helper functions for working out values: scaling a value from one range to another, curves, snapping, decibels, random numbers you can repeat, and colours. They only calculate — nothing changes on the panel until you pass the result to `set`.\n\n'
     + '**Colours that every colour command reads**\n'
     + '\n'
@@ -140,9 +259,18 @@ const MODULE_TITLES = {
   'ce.music': 'notes, scales and chords',
   'ce.time': 'timers and musical time',
   'ce.math': 'numbers, ranges and colours',
+  'ce.format': 'a value as text',
   'ce.anim': 'smooth movement',
   'ce.panel': 'building and arranging the panel',
   'ce.storage': 'remembering things',
+  'ce.patch': 'the synth\'s sound as a value',
+  'ce.verify': 'checking what the synth holds',
+  'ce.file': 'files, through the person\'s own dialogs',
+  'ce.daw': 'The DAW',
+  'ce.osc': 'OSC',
+  'ce.mpe': 'MPE',
+  'ce.ci': 'MIDI-CI',
+  'ce.keys': 'the computer keyboard',
   'ce.draw': 'drawing',
   'ce.image': 'images and icons',
   'ce.text': 'fonts and lettering',

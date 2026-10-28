@@ -160,7 +160,7 @@ test('the animation verbs agree about the timing options they share', () => {
 const CAPITALISED = new Set([
   'MIDI', 'CC', 'NRPN', 'RPN', 'DAW', 'JSON', 'SYSEX', 'ASCII', 'LCD', 'GM', 'CRC', 'DPD', 'GUI',
   'VST3', 'API', 'UI', 'RGB', 'AARRGGBB', 'RRGGBB', 'RRGGBBAA', 'LFO', 'GCD', 'XY', 'ADSR', 'OK', 'ID', 'IDS',
-  'CPU', 'HSL', 'MSB', 'LSB', 'URL', 'URLS', 'A', 'I',
+  'CPU', 'HSL', 'MSB', 'LSB', 'URL', 'URLS', 'A', 'I', 'CI', 'MPE', 'OSC',
 ]);
 
 /** A summary with its quoted values and code spans removed — the parts prose rules apply to. */

@@ -185,8 +185,10 @@
     </div>
     {#if ciProfiles.length}
       <ul class="list">
-        {#each ciProfiles as profile (profile.muid ?? profile.profileId)}
-          <li>{profile.name ?? profile.profileId} <span class="dim">{profile.muid ?? ''}</span></li>
+        <!-- Each entry is a found device and the draft profile made from it ({ muid, profile, error }),
+             named as the Discovery screen names it; it has no name or profileId of its own. -->
+        {#each ciProfiles as entry (entry.muid)}
+          <li>{entry.profile?.label ?? (entry.error ? 'MIDI-CI device (could not be read)' : 'MIDI-CI device')} <span class="dim">{entry.muid ?? ''}</span></li>
         {/each}
       </ul>
     {/if}

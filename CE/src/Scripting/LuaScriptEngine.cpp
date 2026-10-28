@@ -108,6 +108,11 @@ sol::object varToSol (sol::state_view lua, const juce::var& v)
 }
 
 const char* kPrelude = R"LUA(
+-- @module ce.core
+-- origin(): who made the change the running handler is for ("user", "script", "host", "device",
+-- "load"); nil outside a handler. The plug-in knows, and answers the "origin" device query.
+function origin() return __deviceQuery("origin", {}) end
+
 -- @module ce.math
 -- Pure-math helpers (no host). Keep in sync with the JS prelude + panelApi.js.
 -- A whole number prints as one ("9", not Lua's "9.0" for a float), as it does in the other runtimes.
@@ -1184,6 +1189,3796 @@ function hslToHex(hue, sat, light)
     return l - a * math.max(-1, math.min(k - 3, 9 - k, 1))
   end
   return rgbToHex(math.floor(f(0) * 255 + 0.5), math.floor(f(8) * 255 + 0.5), math.floor(f(4) * 255 + 0.5))
+end
+
+-- @module ce.format
+-- ce.format, ported line for line from formatCore.js (the panel view's; the JavaScript prelude runs
+-- that file itself). The same text in every language is the point, so nothing here uses
+-- string.format's own rounding: fixedText rounds half away from zero and writes the digits. Held to
+-- the panel view's answers by test/formatParity.test.js and the table in test/support/formatCases.mjs.
+-- Lua tables count from 1; the table a script hands formatTable is still read as "first entry is 0".
+do
+  local PLACEHOLDER = "--"
+  local INF = math.huge
+  local DIVISIONS = {
+    { "1/1", 4 }, { "1/2", 2 }, { "1/4", 1 }, { "1/8", 0.5 }, { "1/16", 0.25 }, { "1/32", 0.125 },
+    { "1/2D", 3 }, { "1/4D", 1.5 }, { "1/8D", 0.75 }, { "1/16D", 0.375 },
+    { "1/2T", 4 / 3 }, { "1/4T", 2 / 3 }, { "1/8T", 1 / 3 }, { "1/16T", 1 / 6 },
+  }
+  local ABBREVIATIONS = {
+    { "Amount", "Amt" }, { "Attack", "Atk" }, { "Balance", "Bal" }, { "Bandwidth", "BW" }, { "Channel", "Ch" },
+    { "Chorus", "Chor" }, { "Coarse", "Crs" }, { "Control", "Ctrl" }, { "Controller", "Ctrl" }, { "Decay", "Dcy" },
+    { "Delay", "Dly" }, { "Depth", "Dpth" }, { "Destination", "Dest" }, { "Distortion", "Dist" }, { "Effect", "FX" },
+    { "Effects", "FX" }, { "Envelope", "Env" }, { "Feedback", "Fdbk" }, { "Frequency", "Freq" }, { "Keyboard", "Kbd" },
+    { "Length", "Len" }, { "Level", "Lvl" }, { "Master", "Mstr" }, { "Maximum", "Max" }, { "Minimum", "Min" },
+    { "Modulation", "Mod" }, { "Number", "Num" }, { "Octave", "Oct" }, { "Oscillator", "Osc" }, { "Parameter", "Param" },
+    { "Pattern", "Pat" }, { "Portamento", "Porta" }, { "Position", "Pos" }, { "Pressure", "Press" }, { "Program", "Prog" },
+    { "Random", "Rnd" }, { "Release", "Rel" }, { "Resonance", "Reso" }, { "Reverb", "Rvb" }, { "Sample", "Smp" },
+    { "Semitone", "Semi" }, { "Sequence", "Seq" }, { "Sequencer", "Seq" }, { "Source", "Src" }, { "Sustain", "Sus" },
+    { "Transpose", "Trans" }, { "Tremolo", "Trem" }, { "Velocity", "Vel" }, { "Vibrato", "Vib" }, { "Volume", "Vol" },
+    { "Waveform", "Wave" }, { "Width", "Wdth" },
+  }
+  local SHARPS = { "C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B" }
+  local FLATS = { "C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B" }
+  local MINUS, INFINITY, SHARP, FLAT = "\u{2212}", "\u{221E}", "\u{266F}", "\u{266D}"
+
+  local function say(level, text) if level == "warn" then logWarn(text) else logError(text) end end
+  local function isNaN(x) return x ~= x end
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function optNumber(opts, key, fallback)
+    local v = toNumber(opt(opts, key))
+    if finite(v) then return v end
+    return fallback
+  end
+  local function clampInt(v, lo, hi)
+    local r = math.floor(v + 0.5)
+    if r < lo then return lo elseif r > hi then return hi end
+    return r
+  end
+  local function len(s) return utf8.len(s) or #s end
+
+  local function fixedText(x, d)
+    local neg = x < 0
+    local p = 10 ^ d
+    local r = math.floor(math.abs(x) * p + 0.5 + 1e-9)
+    local s = string.format("%.0f", r)
+    while #s < d + 1 do s = "0" .. s end
+    local body = s
+    if d > 0 then body = s:sub(1, #s - d) .. "." .. s:sub(#s - d + 1) end
+    if neg and r ~= 0 then return "-" .. body end
+    return body
+  end
+  local function significantDecimals(a, digits)
+    if a == 0 then return 0 end
+    local e = math.floor(math.log(a, 10))
+    if 10 ^ (e + 1) <= a then e = e + 1 end
+    if 10 ^ e > a then e = e - 1 end
+    local d = digits - 1 - e
+    if d < 0 then return 0 elseif d > 6 then return 6 end
+    return d
+  end
+  local function stripZeros(s)
+    if not s:find(".", 1, true) then return s end
+    local t = s
+    while t:sub(-1) == "0" do t = t:sub(1, -2) end
+    if t:sub(-1) == "." then t = t:sub(1, -2) end
+    return t
+  end
+  local function numberText(v, opts, fallback)
+    local decimals = toNumber(opt(opts, "decimals"))
+    local s
+    if finite(decimals) then s = fixedText(v, clampInt(decimals, 0, 6))
+    elseif fallback ~= nil then s = fixedText(v, fallback)
+    else s = stripZeros(fixedText(v, significantDecimals(math.abs(v), clampInt(optNumber(opts, "digits", 3), 1, 6)))) end
+    if s == "-0" then s = "0" end
+    if opt(opts, "sign") == "always" and s:sub(1, 1) ~= "-" and s:find("[1-9]") then s = "+" .. s end
+    return s
+  end
+  local function withUnit(text, unit, opts)
+    local u = opt(opts, "unit")
+    if u == false then return text end
+    local name = type(u) == "string" and u or unit
+    if name == nil or name == "" then return text end
+    local space = " "
+    if opt(opts, "space") == false or (name == "%" and type(u) ~= "string") then space = "" end
+    return text .. space .. name
+  end
+  local function finish(text, opts)
+    local t = text
+    if opt(opts, "unicode") == true and t:sub(1, 1) == "-" then t = MINUS .. t:sub(2) end
+    local width = toNumber(opt(opts, "width"))
+    if finite(width) then
+      local w = clampInt(width, 0, 200)
+      while len(t) < w do t = " " .. t end
+    end
+    return t
+  end
+  local function placeholder(opts)
+    local p = opt(opts, "placeholder")
+    if type(p) == "string" then return p end
+    return PLACEHOLDER
+  end
+  local function asText(v)
+    if type(v) == "number" then
+      if finite(v) then return numberText(v, {}) end
+      return PLACEHOLDER
+    end
+    if type(v) == "boolean" then return v and "true" or "false" end
+    if v == nil then return "" end
+    return tostring(v)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatNumber(v, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    return finish(withUnit(numberText(n, opts), "", opts), opts)
+  end
+
+  local function scaled(v, opts, verb, small, large, factor, what)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    if n < 0 then
+      say("error", "ce.format." .. verb .. ": " .. what .. " below 0 is not one, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local scale = string.lower(tostring(opt(opts, "scale") or "auto"))
+    local big = scale == string.lower(large) or (scale ~= string.lower(small) and n >= factor)
+    local value, unit = n, small
+    if big then value, unit = n / factor, large end
+    return finish(withUnit(numberText(value, opts), unit, opts), opts)
+  end
+-- (global; at the line start, where the option check looks for it)
+function formatHz(v, opts) return scaled(v, opts, "hz", "Hz", "kHz", 1000, "a frequency") end
+-- (global; at the line start, where the option check looks for it)
+function formatTime(ms, opts) return scaled(ms, opts, "time", "ms", "s", 1000, "a duration") end
+
+-- (global; at the line start, where the option check looks for it)
+function formatDb(v, opts)
+    local n = toNumber(v)
+    if isNaN(n) then return placeholder(opts) end
+    if opt(opts, "fromGain") == true then
+      if n <= 0 then n = -144 else n = 20 * math.log(n, 10) end
+      if n < -144 then n = -144 end
+    end
+    local floor = optNumber(opts, "floor", -144)
+    local text
+    if n <= floor then text = opt(opts, "unicode") == true and ("-" .. INFINITY) or "-inf"
+    elseif n == INF then text = opt(opts, "unicode") == true and INFINITY or "inf"
+    else text = numberText(n, opts, 1) end
+    return finish(withUnit(text, "dB", opts), opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatPercent(v, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    local min, max = optNumber(opts, "min", 0), optNumber(opts, "max", 1)
+    if max == min then
+      say("error", "ce.format.percent: min and max are the same, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    return finish(withUnit(numberText(((n - min) / (max - min)) * 100, opts, 0), "%", opts), opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatPan(v, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    local custom = opt(opts, "min") ~= nil or opt(opts, "max") ~= nil
+    local min, max = optNumber(opts, "min", -1), optNumber(opts, "max", 1)
+    if max == min then
+      say("error", "ce.format.pan: min and max are the same, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local center = optNumber(opts, "center", (min + max) / 2)
+    local steps = optNumber(opts, "steps", 50)
+    local amount
+    if custom then amount = n - center else amount = ((n - center) / ((max - min) / 2)) * steps end
+    local t = numberText(math.abs(amount), { decimals = opt(opts, "decimals") }, 0)
+    if not t:find("[1-9]") then return finish("C", opts) end
+    local left = amount < 0
+    local style = tostring(opt(opts, "style") or "L50")
+    local text
+    if style == "50L" then text = t .. (left and "L" or "R")
+    elseif style == "<50" then text = (left and "<" or ">") .. t
+    elseif style == "50>" then text = t .. (left and "<" or ">")
+    else text = (left and "L" or "R") .. t end
+    return finish(text, opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatRatio(v, opts)
+    local n = toNumber(v)
+    if isNaN(n) then return placeholder(opts) end
+    if n <= 0 then
+      say("error", "ce.format.ratio: a ratio must be above 0, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local x = opt(opts, "style") == "x"
+    local text
+    if n == INF then text = opt(opts, "unicode") == true and INFINITY or "inf"
+    else text = numberText(n, opts, x and 2 or nil) end
+    if x then return finish("x" .. text, opts) end
+    return finish(text .. ":1", opts)
+  end
+
+  local function pad2(n)
+    local s = string.format("%.0f", n)
+    if #s < 2 then return "0" .. s end
+    return s
+  end
+-- (global; at the line start, where the option check looks for it)
+function formatClock(ms, opts)
+    local n = toNumber(ms)
+    if not finite(n) then return placeholder(opts) end
+    local d = clampInt(optNumber(opts, "decimals", 1), 0, 3)
+    local p = 10 ^ d
+    -- Cut, not rounded: a clock shows the tenth that has passed, never one still to come.
+    local units = math.floor(math.abs(n) * p / 1000 + 1e-9)
+    local secs = math.floor(units / p)
+    local frac = units - secs * p
+    local h = math.floor(secs / 3600)
+    local m = math.floor((secs % 3600) / 60)
+    local s = secs % 60
+    local text
+    if h > 0 or opt(opts, "hours") == true then text = string.format("%.0f", h) .. ":" .. pad2(m) .. ":" .. pad2(s)
+    else text = string.format("%.0f", m) .. ":" .. pad2(s) end
+    if d > 0 then
+      local f = string.format("%.0f", frac)
+      while #f < d do f = "0" .. f end
+      text = text .. "." .. f
+    end
+    if n < 0 and units > 0 then text = "-" .. text end
+    return finish(text, opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatNote(n, opts)
+    local v = toNumber(n)
+    if not finite(v) then return placeholder(opts) end
+    local note
+    if v < 0 then note = -math.floor(-v + 0.5) else note = math.floor(v + 0.5) end
+    if note < 0 or note > 127 then
+      say("error", "ce.format.note: a MIDI note is 0 to 127, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local middleC = clampInt(optNumber(opts, "middleC", 4), -2, 9)
+    local name = (opt(opts, "flats") == true and FLATS or SHARPS)[note % 12 + 1]
+    if opt(opts, "unicode") == true then
+      local rest = name:sub(2):gsub("#", SHARP):gsub("b", FLAT)
+      name = name:sub(1, 1) .. rest
+    end
+    if opt(opts, "octave") == false then return finish(name, { width = opt(opts, "width") }) end
+    local octave = math.floor(note / 12) - 5 + middleC
+    return finish(name .. string.format("%.0f", octave), { width = opt(opts, "width") })
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatDivision(beats, opts)
+    local n = toNumber(beats)
+    if not finite(n) then return placeholder(opts) end
+    if n <= 0 then
+      say("error", "ce.format.division: a length must be above 0 beats, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local tolerance = math.min(0.5, math.max(0, optNumber(opts, "tolerance", 0.02)))
+    local best, bestError = nil, INF
+    for _, entry in ipairs(DIVISIONS) do
+      local err = math.abs(n - entry[2]) / entry[2]
+      if err < bestError then best, bestError = entry[1], err end
+    end
+    if bestError <= tolerance + 1e-12 then return finish(best, opts) end
+    return finish(numberText(n, opts) .. " beats", opts)
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatTable(v, list, opts)
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(opts) end
+    if type(list) ~= "table" or #list == 0 then
+      say("error", "ce.format.table: the table must be a list of texts, or of { upTo, text } ranges, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local first = list[1]
+    if type(first) == "table" and first.upTo ~= nil then
+      for _, entry in ipairs(list) do
+        local upTo = toNumber(type(entry) == "table" and entry.upTo or nil)
+        if finite(upTo) and n <= upTo then return finish(asText(entry.text), opts) end
+      end
+      say("warn", "ce.format.table: " .. numberText(n, {}) .. " is past the last range, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    local start = math.floor(optNumber(opts, "start", 0) + 0.5)
+    local index
+    if n < 0 then index = -math.floor(-n + 0.5) else index = math.floor(n + 0.5) end
+    index = index - start
+    if index < 0 or index >= #list then
+      say("warn", "ce.format.table: " .. numberText(n, {}) .. " is past the end of the table, so \"" .. placeholder(opts) .. "\" is shown.")
+      return placeholder(opts)
+    end
+    return finish(asText(list[index + 1]), opts)
+  end
+
+  local VOWELS = "aeiouAEIOU"
+  local function isVowel(c) return VOWELS:find(c, 1, true) ~= nil end
+  local function abbreviationMap(extra)
+    local map = {}
+    for _, pair in ipairs(ABBREVIATIONS) do map[string.lower(pair[1])] = pair[2] end
+    if type(extra) == "table" then
+      for key, value in pairs(extra) do
+        if type(key) == "string" then map[string.lower(key)] = tostring(value) end
+      end
+    end
+    return map
+  end
+  local function shorten(text, width, steps, extra)
+    if len(text) <= width then return text end
+    local words = {}
+    for w in text:gmatch("[^ ]+") do words[#words + 1] = w end
+    local function join() return table.concat(words, " ") end
+    if steps >= 1 then
+      local map = abbreviationMap(extra)
+      for i, w in ipairs(words) do
+        local short = map[string.lower(w)]
+        if short ~= nil then words[i] = short end
+      end
+      if len(join()) <= width then return join() end
+    end
+    if steps >= 2 then
+      while len(join()) > width do
+        local pick = -1
+        for i, w in ipairs(words) do
+          local removable = false
+          for k = 2, #w do if isVowel(w:sub(k, k)) then removable = true end end
+          if removable and (pick < 0 or #w > #words[pick]) then pick = i end
+        end
+        if pick < 0 then break end
+        local w = words[pick]
+        local k = #w
+        while k >= 2 and not isVowel(w:sub(k, k)) do k = k - 1 end
+        words[pick] = w:sub(1, k - 1) .. w:sub(k + 1)
+      end
+      if len(join()) <= width then return join() end
+    end
+    if steps >= 3 then
+      while len(join()) > width and #words > 1 do
+        local last = table.remove(words)
+        words[#words] = words[#words] .. last
+      end
+      if len(join()) <= width then return join() end
+    end
+    return join():sub(1, width)
+  end
+  local function padTo(text, width, align)
+    local t = text
+    if align == "right" then
+      while len(t) < width do t = " " .. t end
+      return t
+    end
+    if align == "center" then
+      local before = math.floor((width - len(t)) / 2)
+      for _ = 1, before do t = " " .. t end
+    end
+    while len(t) < width do t = t .. " " end
+    return t
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatFit(text, width, opts)
+    local w = toNumber(width)
+    if not finite(w) or w < 1 then
+      say("error", "ce.format.fit: the width must be 1 character or more, so nothing is shown.")
+      return ""
+    end
+    local width0 = math.floor(w)
+    local steps = clampInt(optNumber(opts, "steps", 4), 1, 4)
+    local short = shorten(asText(text), width0, steps, opt(opts, "abbreviations"))
+    if opt(opts, "pad") == false then return short end
+    return padTo(short, width0, tostring(opt(opts, "align") or "left"))
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatLine(left, right, width, opts)
+    local w = toNumber(width)
+    if not finite(w) or w < 1 then
+      say("error", "ce.format.line: the width must be 1 character or more, so nothing is shown.")
+      return ""
+    end
+    local width0 = math.floor(w)
+    local gap = clampInt(optNumber(opts, "gap", 1), 0, width0)
+    local r = asText(right)
+    if #r >= width0 then return r:sub(#r - width0 + 1) end
+    local room = width0 - gap - #r
+    if room <= 0 then return padTo(r, width0, "right") end
+    local l = asText(left)
+    if len(l) > room then l = shorten(l, room, 4, opt(opts, "abbreviations")) end
+    local spaces = ""
+    while len(l) + #spaces + len(r) < width0 do spaces = spaces .. " " end
+    return l .. spaces .. r
+  end
+
+  local NOTE_BASE = { c = 0, d = 2, e = 4, f = 5, g = 7, a = 9, b = 11 }
+  local function readNumber(s)
+    if s == "inf" or s == "+inf" then return INF end
+    if s == "-inf" then return -INF end
+    if s:match("^[+-]?%d+%.?%d*$") or s:match("^[+-]?%.%d+$") then return tonumber(s) end
+    return 0 / 0
+  end
+  local UNIT_SUFFIXES = { { "khz", "hz", 1000 }, { "hz", "hz", 1 }, { "ms", "time", 1 }, { "db", "db", 1 },
+    { "%", "percent", 0.01 }, { "s", "time", 1000 }, { "k", "", 1000 } }
+  local function parseNote(s, opts)
+    local letter = s:sub(1, 1)
+    local pc = NOTE_BASE[letter]
+    if pc == nil then return 0 / 0 end
+    local rest = s:sub(2)
+    if rest:sub(1, 1) == "#" then pc = pc + 1; rest = rest:sub(2)
+    elseif rest:sub(1, 1) == "b" and #rest > 1 then pc = pc - 1; rest = rest:sub(2) end
+    if not rest:match("^%-?%d+$") then return 0 / 0 end
+    local middleC = clampInt(optNumber(opts, "middleC", 4), -2, 9)
+    local n = pc + (tonumber(rest) - middleC + 5) * 12
+    if n >= 0 and n <= 127 then return n end
+    return 0 / 0
+  end
+  local function parsePan(s, opts)
+    if s == "c" then return optNumber(opts, "center", (optNumber(opts, "min", -1) + optNumber(opts, "max", 1)) / 2) end
+    local side, digits = "", s
+    local head, tail = s:sub(1, 1), s:sub(-1)
+    if head == "l" or head == "<" then side, digits = "l", s:sub(2)
+    elseif head == "r" or head == ">" then side, digits = "r", s:sub(2)
+    elseif tail == "l" or tail == "<" then side, digits = "l", s:sub(1, -2)
+    elseif tail == "r" or tail == ">" then side, digits = "r", s:sub(1, -2) end
+    local amount = readNumber(digits)
+    if side == "" or not finite(amount) then return 0 / 0 end
+    local custom = opt(opts, "min") ~= nil or opt(opts, "max") ~= nil
+    local min, max = optNumber(opts, "min", -1), optNumber(opts, "max", 1)
+    local center = optNumber(opts, "center", (min + max) / 2)
+    local steps = optNumber(opts, "steps", 50)
+    local signed = side == "l" and -amount or amount
+    if custom then return center + signed end
+    return center + (signed / steps) * ((max - min) / 2)
+  end
+  local function parseKind(s, kind, opts)
+    if kind == "note" then return parseNote(s, opts) end
+    if kind == "division" then
+      for _, entry in ipairs(DIVISIONS) do if string.lower(entry[1]) == s then return entry[2] end end
+      return 0 / 0
+    end
+    if kind == "pan" then return parsePan(s, opts) end
+    if kind == "ratio" then
+      if #s > 2 and s:sub(-2) == ":1" then return readNumber(s:sub(1, -3)) end
+      if s:sub(1, 1) == "x" then return readNumber(s:sub(2)) end
+    end
+    return 0 / 0
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function formatParse(text, opts)
+    if type(text) ~= "string" and type(text) ~= "number" then return nil end
+    local s = string.lower(tostring(text)):gsub("%s+", "")
+    s = s:gsub(MINUS, "-"):gsub(SHARP, "#"):gsub(FLAT, "b"):gsub(INFINITY, "inf")
+    if s == "" then return nil end
+    local kind = tostring(opt(opts, "kind") or "auto")
+    local value = parseKind(s, kind, opts)
+    if isNaN(value) then
+      local factor, unitKind = 1, ""
+      for _, entry in ipairs(UNIT_SUFFIXES) do
+        local suffix = entry[1]
+        if #s > #suffix and s:sub(-#suffix) == suffix then
+          s = s:sub(1, #s - #suffix)
+          factor, unitKind = entry[3], entry[2]
+          break
+        end
+      end
+      if unitKind ~= "" and kind ~= "auto" and unitKind ~= kind then return nil end
+      value = readNumber(s)
+      if isNaN(value) then return nil end
+      if unitKind == "" and factor == 1 and kind == "percent" then factor = 0.01 end
+      value = value * factor
+    end
+    local min, max = toNumber(opt(opts, "min")), toNumber(opt(opts, "max"))
+    if finite(min) and value < min then value = min end
+    if finite(max) and value > max then value = max end
+    return value
+  end
+
+  -- As the synth shows it: formatCore.js formatDescribed, from the parameter the profile describes.
+  -- The commands as defined above, before the option check wraps the globals: formatDescribed hands
+  -- them options of its own (a note's middleC beside a frequency) that a script's call would not.
+  local RAW = {
+    number = formatNumber, hz = formatHz, time = formatTime, db = formatDb, percent = formatPercent,
+    pan = formatPan, ratio = formatRatio, note = formatNote, division = formatDivision, table = formatTable,
+  }
+  local function describedOptions(d, kind, opts)
+    local o = {}
+    local precision = toNumber(d.precision)
+    if finite(precision) then o.decimals = precision end
+    if type(d.unit) == "string" and d.unit ~= "" and (kind == "" or kind == "number") then o.unit = d.unit end
+    local middleC = toNumber(d.middleC)
+    if finite(middleC) then o.middleC = middleC end
+    if type(opts) == "table" then
+      for key, value in pairs(opts) do if key ~= "role" then o[key] = value end end
+    end
+    return o
+  end
+  local function withOptions(base, extra)
+    local o = {}
+    for key, value in pairs(base) do o[key] = value end
+    for key, value in pairs(extra) do if o[key] == nil then o[key] = value end end
+    return o
+  end
+  local function formatDescribed(desc, v, opts)
+    local p = type(desc) == "table" and desc or {}
+    local d = type(p.display) == "table" and p.display or {}
+    local kind = type(d.format) == "string" and d.format or ""
+    local o = describedOptions(d, kind, opts)
+
+    if d.mode == "text" or p.type == "text" then return finish(asText(v), o) end
+
+    if type(p.choices) == "table" then
+      local wanted = toNumber(v)
+      for _, c in ipairs(p.choices) do
+        if type(c) == "table" then
+          local value = toNumber(c.value)
+          if (finite(wanted) and value == wanted) or (type(v) == "string" and c.id == v) then
+            local label = c.label
+            if label == nil then label = c.id end
+            return finish(asText(label), o)
+          end
+        end
+      end
+    end
+
+    local n = toNumber(v)
+    if not finite(n) then return placeholder(o) end
+    local range = type(p.range) == "table" and p.range or {}
+    local lo, hi = toNumber(range.min), toNumber(range.max)
+    local wireMin = finite(lo) and lo or 0
+    local wireMax = finite(hi) and hi or 127
+
+    if type(d.table) == "table" and #d.table > 0 then return RAW.table(n, d.table, withOptions(o, { start = wireMin })) end
+
+    local dmin, dmax = toNumber(d.min), toNumber(d.max)
+    local scaledRange = finite(dmin) and finite(dmax) and wireMax ~= wireMin
+    local shown = n
+    if scaledRange then shown = dmin + ((n - wireMin) / (wireMax - wireMin)) * (dmax - dmin) end
+
+    if kind == "hz" then return RAW.hz(shown, o) end
+    if kind == "time" then return RAW.time(shown, o) end
+    if kind == "db" then return RAW.db(shown, o) end
+    if kind == "ratio" then return RAW.ratio(shown, o) end
+    if kind == "note" then return RAW.note(shown, o) end
+    if kind == "division" then return RAW.division(shown, o) end
+    if kind == "percent" then return RAW.percent(n, withOptions(o, { min = wireMin, max = wireMax })) end
+    if kind == "pan" then
+      local a, b = wireMin, wireMax
+      if scaledRange then a, b = dmin, dmax end
+      local center = math.floor((a + b) / 2 + 0.5)
+      if a < 0 and b > 0 then center = 0 end
+      return RAW.pan(shown, withOptions(o, { min = a, max = b, center = center }))
+    end
+    return RAW.number(shown, o)
+  end
+  __fmtDescribed = formatDescribed
+
+-- (global; at the line start, where the option check looks for it)
+function formatParameter(id, v, opts)
+    -- The host query itself, not deviceParameter: that is ce.device's, and gated when a script
+    -- does not use ce.device.
+    local role = nil
+    if type(opts) == "table" then role = opts.role end
+    if role == nil or role == "" then role = "mainSynth" else role = tostring(role) end
+    local d = __deviceQuery("parameter", { role = role, id = tostring(id) })
+    if type(d) ~= "table" then
+      local shown = placeholder(opts)
+      say("error", "ce.format.parameter: the device profile has no parameter \"" .. tostring(id) .. "\", so \"" .. shown .. "\" is shown.")
+      return shown
+    end
+    return formatDescribed(d, v, opts)
+  end
+end
+
+-- @module ce.patch
+-- ce.patch, ported line for line from patchCore.js (the panel view's; the JavaScript prelude runs
+-- that file itself). Held to the panel view's answers by test/patchParity.test.js and the scenario in
+-- test/support/patchScenario.mjs. ce.patch requires ce.device, ce.panel, ce.math and ce.storage, so
+-- the globals the host below calls are live whenever a script can reach ce.patch.
+do
+  local LEAVE_OUT_GROUPS = { "system", "global", "utility", "performance" }
+  local DEFAULT_SEED = 0x9E3779B9
+  local SEND_MODES = { "auto", "parameters", "dump", "none" }
+  local LIVE_BUDGET = 32
+  local DEFINE_FIELDS = { "name", "groups", "only", "except", "dumps", "read", "transform" }
+  local STORE_PREFIX = "ce.patch:"
+  local INF = math.huge
+
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function isList(v)
+    if type(v) ~= "table" then return false end
+    local n = 0
+    for _ in pairs(v) do n = n + 1 end
+    return n == #v
+  end
+  local function names(v)
+    if type(v) == "string" then if v == "" then return {} end return { v } end
+    if type(v) ~= "table" then return {} end
+    local out = {}
+    for _, x in ipairs(v) do if type(x) == "string" and x ~= "" then out[#out + 1] = x end end
+    return out
+  end
+  local function lower(s) if s == nil then return "" end return string.lower(tostring(s)) end
+  local function contains(list, value)
+    for _, x in ipairs(list) do if x == value then return true end end
+    return false
+  end
+  local function hasValue(values, id) return type(values) == "table" and values[id] ~= nil end
+  local function copyValues(values)
+    local out = {}
+    if type(values) == "table" then for k, v in pairs(values) do out[k] = v end end
+    return out
+  end
+  local function sortedKeys(t)
+    local out = {}
+    if type(t) == "table" then for k in pairs(t) do out[#out + 1] = tostring(k) end end
+    table.sort(out)
+    return out
+  end
+  local function roundHalfAway(x)
+    if x < 0 then return -math.floor(-x + 0.5) end
+    return math.floor(x + 0.5)
+  end
+  local function join(list, sep)
+    local parts = {}
+    for i, x in ipairs(list) do parts[i] = tostring(x) end
+    return table.concat(parts, sep)
+  end
+  local function str(v) if v == nil then return "" end return tostring(v) end
+
+  local function kindOf(desc)
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if t == "action" or t == "momentary" or t == "trigger" then return "action" end
+    if t == "text" then return "text" end
+    if t == "choice" or t == "boolean" or t == "enum" or t == "bool" then return "choice" end
+    if type(desc) == "table" and type(desc.choices) == "table" and #desc.choices > 0 then return "choice" end
+    return "number"
+  end
+  local function writable(desc)
+    local access = type(desc) == "table" and desc.access or nil
+    if type(access) == "string" then return string.find(lower(access), "write", 1, true) ~= nil end
+    if type(access) == "table" and access.canWrite == false then return false end
+    return true
+  end
+  local function isWhole(desc) return not (type(desc) == "table" and desc.type == "float") end
+  local function rangeOf(desc)
+    local range = type(desc) == "table" and type(desc.range) == "table" and desc.range or {}
+    local lo, hi = toNumber(range.min), toNumber(range.max)
+    local a = finite(lo) and lo or 0
+    local b = finite(hi) and hi or 127
+    if a <= b then return a, b end
+    return b, a
+  end
+  local function choicesOf(desc)
+    local out = {}
+    if type(desc) == "table" and type(desc.choices) == "table" then
+      for _, c in ipairs(desc.choices) do
+        if type(c) == "table" then
+          if c.id ~= nil then out[#out + 1] = c.id elseif c.value ~= nil then out[#out + 1] = c.value end
+        elseif c ~= nil then
+          out[#out + 1] = c
+        end
+      end
+    end
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if #out == 0 and (t == "boolean" or t == "bool") then out[1] = false; out[2] = true end
+    return out
+  end
+  local function settle(desc, v)
+    local x = v
+    if isWhole(desc) then x = roundHalfAway(x) end
+    local lo, hi = rangeOf(desc)
+    if x < lo then x = lo end
+    if x > hi then x = hi end
+    return x
+  end
+  local function trimEnd(s) return (tostring(s):gsub("%s+$", "")) end
+  local function sameValue(desc, a, b)
+    local x, y = toNumber(a), toNumber(b)
+    if type(a) ~= "boolean" and type(b) ~= "boolean" and finite(x) and finite(y) then
+      local step = isWhole(desc) and 0.5 or 1e-9
+      return math.abs(x - y) < step
+    end
+    if a == b then return true end
+    if a == nil or b == nil then return false end
+    if type(a) == "boolean" or type(b) == "boolean" then return tostring(a) == tostring(b) end
+    return trimEnd(a) == trimEnd(b)
+  end
+
+  local function leftOutGroup(desc) return contains(LEAVE_OUT_GROUPS, lower(type(desc) == "table" and desc.group or nil)) end
+  local function matchesNameList(desc, list)
+    local group = lower(desc.group)
+    for _, name in ipairs(list) do
+      if name == desc.id then return true end
+      if group ~= "" and lower(name) == group then return true end
+    end
+    return false
+  end
+
+  local function scopeParams(params, scope, defs)
+    local list = type(params) == "table" and params or {}
+    local id = scope == nil and "voice" or tostring(scope)
+    local def = type(defs) == "table" and defs[id] or nil
+    local out = {}
+    if type(def) == "table" then
+      local groups, only, except = names(def.groups), names(def.only), names(def.except)
+      for _, desc in ipairs(list) do
+        if kindOf(desc) ~= "action"
+          and not ((#groups > 0 or #only > 0) and not matchesNameList(desc, groups) and not contains(only, desc.id))
+          and not matchesNameList(desc, except) then
+          out[#out + 1] = desc
+        end
+      end
+      return out
+    end
+    if id == "voice" then
+      for _, desc in ipairs(list) do if kindOf(desc) ~= "action" and not leftOutGroup(desc) then out[#out + 1] = desc end end
+      return out
+    end
+    if id == "system" then
+      for _, desc in ipairs(list) do if kindOf(desc) ~= "action" and leftOutGroup(desc) then out[#out + 1] = desc end end
+      return out
+    end
+    return nil
+  end
+
+  local function nameParameter(scoped)
+    local found = ""
+    for _, desc in ipairs(scoped) do
+      if kindOf(desc) == "text" then
+        if found ~= "" then return "" end
+        found = tostring(desc.id)
+      end
+    end
+    return found
+  end
+
+  local function warnUnknown(scoped, list, what, verb, say, words)
+    for _, name in ipairs(list) do
+      if not (words and contains(words, name)) then
+        local known = false
+        for _, desc in ipairs(scoped) do
+          if desc.id == name or (lower(desc.group) ~= "" and lower(desc.group) == lower(name)) then known = true; break end
+        end
+        if not known then
+          say("warn", "ce.patch." .. verb .. ": the profile has no parameter or group \"" .. name .. "\" in this scope, in " .. what .. "; the rest goes ahead.")
+        end
+      end
+    end
+  end
+
+  local function choose(scoped, opts, say, verb, forApply)
+    local groups, only, except, include = names(opt(opts, "groups")), names(opt(opts, "only")), names(opt(opts, "except")), names(opt(opts, "include"))
+    warnUnknown(scoped, groups, "groups", verb, say, nil)
+    warnUnknown(scoped, only, "only", verb, say, nil)
+    warnUnknown(scoped, except, "except", verb, say, nil)
+    warnUnknown(scoped, include, "include", verb, say, { "name", "readOnly", "leaveOut" })
+    warnUnknown(scoped, names(opt(opts, "lock")), "lock", verb, say, nil)
+    local chosen = {}
+    for _, desc in ipairs(scoped) do
+      local included = matchesNameList(desc, include)
+      local skip = false
+      if not forApply and not included then
+        if kindOf(desc) == "text" and not contains(include, "name") then skip = true end
+        if not skip and not writable(desc) and not contains(include, "readOnly") then skip = true end
+      end
+      if not skip and (#groups > 0 or #only > 0) and not matchesNameList(desc, groups) and not contains(only, desc.id) then skip = true end
+      if not skip and matchesNameList(desc, except) then skip = true end
+      if not skip then chosen[#chosen + 1] = tostring(desc.id) end
+    end
+    if #chosen == 0 and (#groups > 0 or #only > 0) then
+      say("error", "ce.patch." .. verb .. ": groups and only leave no parameter chosen, so nothing was done.")
+      return nil
+    end
+    return chosen
+  end
+
+  local function lockedIds(scoped, opts)
+    local lock = names(opt(opts, "lock"))
+    local out = {}
+    for _, desc in ipairs(scoped) do if matchesNameList(desc, lock) then out[#out + 1] = tostring(desc.id) end end
+    return out
+  end
+  local function byId(scoped)
+    local map = {}
+    for _, desc in ipairs(scoped) do map[tostring(desc.id)] = desc end
+    return map
+  end
+
+  local function isPatch(p) return type(p) == "table" and type(p.values) == "table" end
+
+  local function make(base, values, scoped, source)
+    local missing = {}
+    for _, desc in ipairs(scoped) do
+      if kindOf(desc) ~= "action" and not hasValue(values, tostring(desc.id)) then missing[#missing + 1] = tostring(desc.id) end
+    end
+    local nameId = nameParameter(scoped)
+    local patch = {
+      device = str(type(base) == "table" and base.device or nil),
+      role = type(base) == "table" and base.role ~= nil and tostring(base.role) or "mainSynth",
+      scope = type(base) == "table" and base.scope ~= nil and tostring(base.scope) or "voice",
+      values = values,
+      missing = missing,
+      source = source,
+    }
+    if nameId ~= "" and hasValue(values, nameId) then patch.name = tostring(values[nameId])
+    elseif type(base) == "table" and type(base.name) == "string" then patch.name = base.name end
+    return patch
+  end
+
+  local function samePatches(a, b, verb, what, say)
+    if not isPatch(a) or not isPatch(b) then
+      say("error", "ce.patch." .. verb .. ": " .. what .. " must be patches, as ce.patch.current() gives them, so nothing was done.")
+      return false
+    end
+    if str(a.device) ~= str(b.device) or str(a.scope) ~= str(b.scope) then
+      say("error", "ce.patch." .. verb .. ": a patch of " .. str(b.device) .. " (" .. str(b.scope) .. ") cannot be used with one of " .. str(a.device) .. " (" .. str(a.scope) .. "), so nothing was done.")
+      return false
+    end
+    return true
+  end
+
+  local function clamp01(v)
+    local n = toNumber(v)
+    if not finite(n) then return 0 / 0 end
+    if n < 0 then return 0 elseif n > 1 then return 1 end
+    return n
+  end
+  local function isNaN(x) return x ~= x end
+
+  local function morph(a, b, t, scoped, opts, say)
+    if not samePatches(a, b, "morph", "a and b", say) then return nil end
+    local at = clamp01(t)
+    if isNaN(at) then say("error", "ce.patch.morph: t must be a number from 0 to 1, so nothing was done."); return nil end
+    local switchAt = clamp01(opt(opts, "switchAt"))
+    if isNaN(switchAt) then switchAt = 0.5 end
+    local ids = choose(scoped, opts, say, "morph", false)
+    if ids == nil then return nil end
+    local locked, descs, out = lockedIds(scoped, opts), byId(scoped), copyValues(a.values)
+    for k, v in pairs(b.values) do if out[k] == nil then out[k] = v end end
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) and hasValue(a.values, id) and hasValue(b.values, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local x, y = toNumber(a.values[id]), toNumber(b.values[id])
+          if finite(x) and finite(y) then out[id] = settle(desc, x + (y - x) * at) end
+        elseif kind == "choice" then
+          if at < switchAt then out[id] = a.values[id] else out[id] = b.values[id] end
+        end
+      end
+    end
+    return make(a, out, scoped, "made")
+  end
+
+  local function blend(patches, weights, scoped, opts, say)
+    if type(patches) ~= "table" or #patches < 2 then
+      say("error", "ce.patch.blend: patches must be a list of two or more patches, so nothing was done.")
+      return nil
+    end
+    for i = 2, #patches do if not samePatches(patches[1], patches[i], "blend", "patches", say) then return nil end end
+    local w, total = {}, 0
+    for i = 1, #patches do
+      local n = type(weights) == "table" and toNumber(weights[i]) or 0 / 0
+      local v = (finite(n) and n > 0) and n or 0
+      w[i] = v
+      total = total + v
+    end
+    if not (total > 0) then say("error", "ce.patch.blend: the weights add up to 0 or less, so nothing was done."); return nil end
+    local ids = choose(scoped, opts, say, "blend", false)
+    if ids == nil then return nil end
+    local locked, descs, out = lockedIds(scoped, opts), byId(scoped), copyValues(patches[1].values)
+    for i = 2, #patches do for k, v in pairs(patches[i].values) do if out[k] == nil then out[k] = v end end end
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local sum, weight = 0, 0
+          for i = 1, #patches do
+            local x = toNumber(patches[i].values[id])
+            if finite(x) and w[i] > 0 then sum = sum + x * w[i]; weight = weight + w[i] end
+          end
+          if weight > 0 then out[id] = settle(desc, sum / weight) end
+        elseif kind == "choice" then
+          local best = 0
+          for i = 1, #patches do
+            if hasValue(patches[i].values, id) and w[i] > 0 and (best == 0 or w[i] > w[best]) then best = i end
+          end
+          if best > 0 then out[id] = patches[best].values[id] end
+        end
+      end
+    end
+    return make(patches[1], out, scoped, "made")
+  end
+
+  local function randomSource(seed)
+    local n = toNumber(seed)
+    local x = 0
+    if finite(n) then x = math.floor(n) % 4294967296 end
+    x = math.tointeger(x) or 0
+    if x == 0 then x = DEFAULT_SEED end
+    return function()
+      x = x ~ ((x << 13) & 0xFFFFFFFF)
+      x = x ~ (x >> 17)
+      x = x ~ ((x << 5) & 0xFFFFFFFF)
+      return x / 4294967296
+    end
+  end
+
+  local function withinRange(desc, within)
+    local lo, hi = rangeOf(desc)
+    local narrow = type(within) == "table" and within[tostring(desc.id)] or nil
+    if type(narrow) == "table" and #narrow >= 2 then
+      local a, b = toNumber(narrow[1]), toNumber(narrow[2])
+      if finite(a) and finite(b) then
+        local low, high = math.max(lo, math.min(a, b)), math.min(hi, math.max(a, b))
+        if low <= high then lo, hi = low, high end
+      end
+    end
+    return lo, hi
+  end
+
+  local function randomPatch(from, scoped, opts, next, say)
+    if not isPatch(from) then
+      say("error", "ce.patch.random: from must be a patch, as ce.patch.current() gives them, so nothing was done.")
+      return nil
+    end
+    local ids = choose(scoped, opts, say, "random", false)
+    if ids == nil then return nil end
+    local locked, descs, within, out = lockedIds(scoped, opts), byId(scoped), opt(opts, "within"), copyValues(from.values)
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local lo, hi = withinRange(desc, within)
+          local r = next()
+          if isWhole(desc) then
+            out[id] = math.min(math.floor(hi), math.ceil(lo) + math.floor(r * (math.floor(hi) - math.ceil(lo) + 1)))
+          else
+            out[id] = lo + r * (hi - lo)
+          end
+        elseif kind == "choice" then
+          local choices = choicesOf(desc)
+          local r = next()
+          if #choices > 0 then out[id] = choices[math.min(#choices - 1, math.floor(r * #choices)) + 1] end
+        end
+      end
+    end
+    return make(from, out, scoped, "made")
+  end
+
+  local function mutate(patch, amount, scoped, opts, next, say)
+    if not isPatch(patch) then
+      say("error", "ce.patch.mutate: patch must be a patch, as ce.patch.current() gives them, so nothing was done.")
+      return nil
+    end
+    local by = clamp01(amount)
+    if isNaN(by) then say("error", "ce.patch.mutate: amount must be a number from 0 to 1, so nothing was done."); return nil end
+    local ids = choose(scoped, opts, say, "mutate", false)
+    if ids == nil then return nil end
+    local locked, descs, out = lockedIds(scoped, opts), byId(scoped), copyValues(patch.values)
+    for _, id in ipairs(ids) do
+      if not contains(locked, id) and hasValue(out, id) then
+        local desc = descs[id]
+        local kind = kindOf(desc)
+        if kind == "number" then
+          local x = toNumber(out[id])
+          if finite(x) then
+            local lo, hi = rangeOf(desc)
+            local r1 = next()
+            local r2 = next()
+            out[id] = settle(desc, x + (r1 - r2) * by * (hi - lo))
+          end
+        elseif kind == "choice" then
+          local r1 = next()
+          local r2 = next()
+          if r1 < by then
+            local others = {}
+            for _, c in ipairs(choicesOf(desc)) do if not sameValue(desc, c, out[id]) then others[#others + 1] = c end end
+            if #others > 0 then out[id] = others[math.min(#others - 1, math.floor(r2 * #others)) + 1] end
+          end
+        end
+      end
+    end
+    return make(patch, out, scoped, "made")
+  end
+
+  local function merge(base, other, scoped, opts, say)
+    if not samePatches(base, other, "merge", "base and other", say) then return nil end
+    if #names(opt(opts, "groups")) == 0 and #names(opt(opts, "only")) == 0 then
+      say("error", "ce.patch.merge: name the parameters to take, with groups or only; taking every value is other itself, so nothing was done.")
+      return nil
+    end
+    local ids = choose(scoped, opts, say, "merge", false)
+    if ids == nil then return nil end
+    local locked, out = lockedIds(scoped, opts), copyValues(base.values)
+    for _, id in ipairs(ids) do if not contains(locked, id) and hasValue(other.values, id) then out[id] = other.values[id] end end
+    return make(base, out, scoped, "made")
+  end
+
+  local function diff(a, b, scoped, opts, say)
+    if not samePatches(a, b, "diff", "a and b", say) then return nil end
+    local ids = choose(scoped, opts, say, "diff", false)
+    if ids == nil then return nil end
+    local descs, out = byId(scoped), {}
+    for _, id in ipairs(ids) do
+      local inA, inB = hasValue(a.values, id), hasValue(b.values, id)
+      if (inA or inB) and not (inA and inB and sameValue(descs[id], a.values[id], b.values[id])) then
+        local desc = descs[id]
+        local entry = { id = id, name = desc.name ~= nil and tostring(desc.name) or id, group = str(desc.group) }
+        if inA then entry.from = a.values[id] end
+        if inB then entry.to = b.values[id] end
+        out[#out + 1] = entry
+      end
+    end
+    return out
+  end
+
+  local function applyPlan(patch, known, scoped, opts, say)
+    local ids = choose(scoped, opts, say, "apply", true)
+    if ids == nil then return nil end
+    local descs = byId(scoped)
+    local changedOnly = opt(opts, "changedOnly") ~= false
+    local send, values, skipped = {}, {}, {}
+    for _, id in ipairs(ids) do
+      if hasValue(patch.values, id) then
+        local value = patch.values[id]
+        values[id] = value
+        if not writable(descs[id]) then
+          skipped[#skipped + 1] = { id = id, why = "the synth cannot be sent it" }
+        elseif not (changedOnly and hasValue(known, id) and sameValue(descs[id], known[id], value)) then
+          send[#send + 1] = { id, value }
+        end
+      end
+    end
+    for _, key in ipairs(sortedKeys(patch.values)) do
+      if descs[key] == nil then skipped[#skipped + 1] = { id = key, why = "not a parameter of this scope" } end
+    end
+    return { send = send, values = values, skipped = skipped }
+  end
+
+  local function livePlan(send, known, scoped, budget)
+    local descs, moved = byId(scoped), {}
+    for i, entry in ipairs(send) do
+      local id, value = entry[1], entry[2]
+      local lo, hi = rangeOf(descs[id])
+      local x, y = toNumber(value), toNumber(known[id])
+      local delta = 2
+      if finite(x) and finite(y) then
+        local span = hi - lo
+        if span == 0 then span = 1 end
+        delta = math.abs(x - y) / span
+      end
+      moved[#moved + 1] = { delta, i }
+    end
+    table.sort(moved, function(p, q)
+      if p[1] ~= q[1] then return p[1] > q[1] end
+      return p[2] < q[2]
+    end)
+    local now, later = {}, {}
+    for k, m in ipairs(moved) do
+      if k <= budget then now[#now + 1] = send[m[2]] else later[#later + 1] = send[m[2]] end
+    end
+    return now, later
+  end
+
+  local function listOfScopes(section)
+    local out = {}
+    local scopes = type(section) == "table" and section.scopes or nil
+    if type(scopes) == "table" then
+      for _, s in ipairs(scopes) do if type(s) == "table" and type(s.id) == "string" and s.id ~= "" then out[#out + 1] = s end end
+    end
+    return out
+  end
+
+  -- The commands over a host, as patchCore.js's patchCommands.
+  local function commands(host)
+    local say = host.say
+    local defined, waiting = {}, {}
+
+    local function context(role)
+      local r = (type(role) == "string" and role ~= "") and role or "mainSynth"
+      local profile = host.profile(r)
+      if type(profile) ~= "table" or type(profile.id) ~= "string" or profile.id == "" then
+        return { role = r, device = "panel", params = nil, section = nil, panel = true }
+      end
+      local params = host.parameters(r)
+      local section = host.patchSection(r)
+      return { role = r, device = profile.id, params = type(params) == "table" and params or {}, section = type(section) == "table" and section or nil, panel = false }
+    end
+    local function scopeDefs(ctx)
+      local defs = {}
+      for _, s in ipairs(listOfScopes(ctx.section)) do defs[s.id] = s end
+      local own = defined[ctx.role]
+      if own then for id, s in pairs(own) do defs[id] = s end end
+      return defs
+    end
+    local function panelDescriptors(values)
+      local out = {}
+      for _, name in ipairs(sortedKeys(values)) do
+        local v = values[name]
+        local t = "text"
+        if type(v) == "number" then t = "float" elseif type(v) == "boolean" then t = "boolean" end
+        out[#out + 1] = { id = name, name = name, group = "", type = t }
+      end
+      return out
+    end
+    local function scoped(ctx, scope, verb)
+      if ctx.panel then
+        if scope ~= "voice" then
+          say("error", "ce.patch." .. verb .. ": a panel without a device profile has one scope, \"voice\", so nothing was done.")
+          return nil
+        end
+        return panelDescriptors(host.snapshot())
+      end
+      local list = scopeParams(ctx.params, scope, scopeDefs(ctx))
+      if list == nil then say("error", "ce.patch." .. verb .. ": \"" .. tostring(scope) .. "\" is not a scope of " .. ctx.device .. ", so nothing was done. ce.patch.scopes() lists them.") end
+      return list
+    end
+    local function forPatch(patch, verb)
+      if not isPatch(patch) then
+        say("error", "ce.patch." .. verb .. ": that is not a patch, as ce.patch.current() gives them, so nothing was done.")
+        return nil
+      end
+      local ctx = context(type(patch.role) == "string" and patch.role or "mainSynth")
+      if str(patch.device) ~= ctx.device then
+        say("error", "ce.patch." .. verb .. ": the patch is one of " .. str(patch.device) .. ", and this panel's synth is " .. ctx.device .. ", so nothing was done.")
+        return nil
+      end
+      local list = scoped(ctx, patch.scope ~= nil and tostring(patch.scope) or "voice", verb)
+      if list == nil then return nil end
+      return { ctx = ctx, list = list }
+    end
+    local function scopeOf(scope, opts)
+      if type(scope) == "string" and scope ~= "" then return scope end
+      local fromOpts = opt(opts, "scope")
+      if type(fromOpts) == "string" and fromOpts ~= "" then return fromOpts end
+      return "voice"
+    end
+
+    local function current(scope, opts)
+      local ctx = context(opt(opts, "role"))
+      local id = scopeOf(scope, opts)
+      local list = scoped(ctx, id, "current")
+      if list == nil then return nil end
+      local narrowed = #names(opt(opts, "groups")) > 0 or #names(opt(opts, "only")) > 0 or #names(opt(opts, "except")) > 0
+      local ids = nil
+      if narrowed then
+        ids = choose(list, opts, say, "current", true)
+        if ids == nil then return nil end
+      end
+      local values
+      if ctx.panel then
+        values = copyValues(host.snapshot())
+        if ids ~= nil then for _, key in ipairs(sortedKeys(values)) do if not contains(ids, key) then values[key] = nil end end end
+      else
+        values = {}
+        for _, desc in ipairs(list) do
+          if ids == nil or contains(ids, tostring(desc.id)) then
+            local v = host.read(tostring(desc.id), ctx.role)
+            if v ~= nil then values[tostring(desc.id)] = v end
+          end
+        end
+      end
+      return make({ device = ctx.device, role = ctx.role, scope = id }, values, list, "panel")
+    end
+
+    local function seeded(opts, verb)
+      local seed = opt(opts, "seed")
+      if seed ~= nil then
+        if not finite(toNumber(seed)) then say("error", "ce.patch." .. verb .. ": seed must be a number, so nothing was done."); return nil end
+        return randomSource(seed)
+      end
+      return randomSource(math.floor(host.random() * 4294967296))
+    end
+
+    local function knownValues(ctx, list)
+      local known = {}
+      if ctx.panel then return known end
+      for _, desc in ipairs(list) do
+        local v = host.read(tostring(desc.id), ctx.role)
+        if v ~= nil then known[tostring(desc.id)] = v end
+      end
+      return known
+    end
+    local function scopeDumps(ctx, scope)
+      local def = scopeDefs(ctx)[scope]
+      if def then return names(def.dumps) end
+      return {}
+    end
+    local function refusedApply() return { ok = false, via = "none", applied = 0, sent = 0, skipped = {} } end
+    local function countKeys(t) local n = 0 for _ in pairs(t) do n = n + 1 end return n end
+
+    local function apply(patch, opts)
+      local at = forPatch(patch, "apply")
+      if at == nil then return refusedApply() end
+      local ctx, list = at.ctx, at.list
+      local scope = patch.scope ~= nil and tostring(patch.scope) or "voice"
+      local send = opt(opts, "send")
+      if send == nil then send = "auto" end
+      if not contains(SEND_MODES, send) then
+        say("error", "ce.patch.apply: send \"" .. tostring(send) .. "\" is not one of \"auto\", \"parameters\", \"dump\" or \"none\", so nothing was done.")
+        return refusedApply()
+      end
+      local known = knownValues(ctx, list)
+      local plan = applyPlan(patch, known, list, opts, say)
+      if plan == nil then return refusedApply() end
+      local applied = countKeys(plan.values)
+      if ctx.panel then
+        host.restore(plan.values)
+        return { ok = true, via = "none", applied = applied, sent = 0, skipped = plan.skipped }
+      end
+      local dumps = scopeDumps(ctx, scope)
+      local deliver = (ctx.section and type(ctx.section.deliver) == "string") and ctx.section.deliver or ""
+      local via = send
+      if send == "auto" then
+        if deliver == "dump" and #dumps > 0 then via = "dump" else via = "parameters" end
+      end
+      if via == "dump" and #dumps == 0 then
+        say("error", "ce.patch.apply: " .. ctx.device .. " has no dumps for the \"" .. scope .. "\" scope, so it cannot take a patch as a dump, and nothing was done.")
+        return refusedApply()
+      end
+      host.fill(plan.values)
+      if via == "none" then return { ok = true, via = via, applied = applied, sent = 0, skipped = plan.skipped } end
+      if via == "dump" then
+        for _, kind in ipairs(dumps) do host.sendDump(kind) end
+        return { ok = true, via = via, applied = applied, sent = #dumps, skipped = plan.skipped }
+      end
+      local key = ctx.role .. "\0" .. scope
+      local toSend = plan.send
+      if opt(opts, "live") == true then
+        local now, later = livePlan(plan.send, known, list, LIVE_BUDGET)
+        toSend = now
+        waiting[key] = later
+      else
+        local later = waiting[key] or {}
+        waiting[key] = nil
+        local planned = {}
+        for _, entry in ipairs(toSend) do planned[entry[1]] = true end
+        local combined = {}
+        for _, entry in ipairs(toSend) do combined[#combined + 1] = entry end
+        for _, entry in ipairs(later) do if not planned[entry[1]] then combined[#combined + 1] = entry end end
+        toSend = combined
+      end
+      local sent = 0
+      local skipped = {}
+      for _, s in ipairs(plan.skipped) do skipped[#skipped + 1] = s end
+      for _, entry in ipairs(toSend) do
+        if host.write(entry[1], entry[2], ctx.role) == true then sent = sent + 1
+        else skipped[#skipped + 1] = { id = entry[1], why = "not sent" } end
+      end
+      return { ok = true, via = via, applied = applied, sent = sent, skipped = skipped }
+    end
+
+    local function read(scope, fn, opts)
+      local ctx = context(opt(opts, "role"))
+      local id = (type(scope) == "string" and scope ~= "") and scope or "voice"
+      if type(fn) ~= "function" then
+        say("error", "ce.patch.read: fn must be a function to call with the patch, so nothing was asked.")
+        return false
+      end
+      if scoped(ctx, id, "read") == nil then return false end
+      local dumps = ctx.panel and {} or scopeDumps(ctx, id)
+      if #dumps == 0 then
+        say("error", "ce.patch.read: the \"" .. id .. "\" scope has no dumps to ask the synth for, so it cannot be read. ce.patch.define() can name them.")
+        return false
+      end
+      local ok = true
+      local timeout = toNumber(opt(opts, "timeout"))
+      local dumpOpts = nil
+      if finite(timeout) and timeout > 0 then dumpOpts = { timeout = timeout } end
+      local at = 0
+      local next
+      next = function()
+        if at >= #dumps then
+          local patch = current(id, { role = ctx.role })
+          fn(patch, { ok = ok, missing = patch and patch.missing or {} })
+          return
+        end
+        at = at + 1
+        local asked = host.requestDump(dumps[at], function(values, answer)
+          if type(answer) ~= "table" or answer.ok ~= true then ok = false end
+          next()
+        end, dumpOpts)
+        if asked == false then ok = false; next() end
+      end
+      next()
+      return true
+    end
+
+    local function scopes(role)
+      local ctx = context(role)
+      if ctx.panel then
+        return { { id = "voice", name = "Voice", parameters = countKeys(host.snapshot() or {}), canRead = false, canSend = true, via = "none" } }
+      end
+      local defs = scopeDefs(ctx)
+      local ids = {}
+      if not defs.voice then ids[1] = "voice" end
+      local listed = {}
+      for _, s in ipairs(listOfScopes(ctx.section)) do if not listed[s.id] then ids[#ids + 1] = s.id; listed[s.id] = true end end
+      local ownIds = sortedKeys(defined[ctx.role])
+      for _, sid in ipairs(ownIds) do if not listed[sid] then ids[#ids + 1] = sid; listed[sid] = true end end
+      local deliver = (ctx.section and type(ctx.section.deliver) == "string") and ctx.section.deliver or ""
+      local out = {}
+      for _, sid in ipairs(ids) do
+        local list = scopeParams(ctx.params, sid, defs)
+        if list ~= nil and not (#list == 0 and not defs[sid]) then
+          local dumps = defs[sid] and names(defs[sid].dumps) or {}
+          local name = (defs[sid] and type(defs[sid].name) == "string") and defs[sid].name or (string.upper(string.sub(sid, 1, 1)) .. string.sub(sid, 2))
+          out[#out + 1] = { id = sid, name = name, parameters = #list, canRead = #dumps > 0, canSend = true,
+                            via = (deliver == "dump" and #dumps > 0) and "dump" or "parameters" }
+        end
+      end
+      if not defs.system then
+        local system = scopeParams(ctx.params, "system", defs)
+        if system ~= nil and #system > 0 then
+          out[#out + 1] = { id = "system", name = "System", parameters = #system, canRead = false, canSend = true, via = "parameters" }
+        end
+      end
+      return out
+    end
+
+    local function define(scope, spec, role)
+      if type(scope) ~= "string" or scope == "" then
+        say("error", "ce.patch.define: scope must be a name, such as \"voice\", so nothing was defined.")
+        return false
+      end
+      if type(spec) ~= "table" or (isList(spec) and #spec > 0) then
+        say("error", "ce.patch.define: spec must be a table of groups, only, except and dumps, so nothing was defined.")
+        return false
+      end
+      for _, key in ipairs(sortedKeys(spec)) do
+        if not contains(DEFINE_FIELDS, key) then
+          say("error", "ce.patch.define: \"" .. key .. "\" is not one of the fields a scope takes (" .. join(DEFINE_FIELDS, ", ") .. "), so nothing was defined.")
+          return false
+        end
+      end
+      for _, key in ipairs({ "groups", "only", "except", "dumps" }) do
+        local v = spec[key]
+        if v ~= nil and type(v) ~= "string" and type(v) ~= "table" then
+          say("error", "ce.patch.define: " .. key .. " must be a list of names, so nothing was defined.")
+          return false
+        end
+      end
+      local r = (type(role) == "string" and role ~= "") and role or "mainSynth"
+      local def = { id = scope }
+      for k, v in pairs(spec) do def[k] = v end
+      defined[r] = defined[r] or {}
+      defined[r][scope] = def
+      return true
+    end
+
+    local function storeKey(device, name) return STORE_PREFIX .. device .. ":" .. lower(name) end
+
+    local function save(name, patch, opts)
+      if type(name) ~= "string" or name:match("^%s*$") or (utf8.len(name) or #name) > 64 then
+        say("error", "ce.patch.save: name must be text of 1 to 64 characters, so nothing was kept.")
+        return false
+      end
+      if not isPatch(patch) then
+        say("error", "ce.patch.save: that is not a patch, as ce.patch.current() gives them, so nothing was kept.")
+        return false
+      end
+      local key = storeKey(str(patch.device), name)
+      if opt(opts, "replace") == false and host.store.get(key) ~= nil then
+        say("error", "ce.patch.save: a patch called \"" .. name .. "\" is already kept, and replace is off, so nothing was kept.")
+        return false
+      end
+      return host.store.set(key, {
+        name = name, device = str(patch.device), role = patch.role ~= nil and tostring(patch.role) or "mainSynth",
+        scope = patch.scope ~= nil and tostring(patch.scope) or "voice", savedAt = str(host.now()), values = copyValues(patch.values),
+      }) ~= false
+    end
+
+    local function load(name, opts)
+      local ctx = context(opt(opts, "role"))
+      local record = host.store.get(storeKey(ctx.device, str(name)))
+      if type(record) ~= "table" then
+        local keys = host.store.keys() or {}
+        local sorted = {}
+        for _, k in ipairs(keys) do sorted[#sorted + 1] = k end
+        table.sort(sorted)
+        for _, key in ipairs(sorted) do
+          if string.sub(key, 1, #STORE_PREFIX) == STORE_PREFIX and string.match(key, ":([^:]*)$") == lower(name) then
+            local other = host.store.get(key)
+            if type(other) == "table" then
+              say("error", "ce.patch.load: \"" .. str(name) .. "\" was kept for " .. str(other.device) .. ", and this panel's synth is " .. ctx.device .. ", so there is no patch.")
+              return nil
+            end
+          end
+        end
+        say("error", "ce.patch.load: no patch called \"" .. str(name) .. "\" is kept for " .. ctx.device .. ", so there is no patch.")
+        return nil
+      end
+      local scope = type(record.scope) == "string" and record.scope or "voice"
+      local list = scoped(ctx, scope, "load") or {}
+      local patch = make({ device = ctx.device, role = ctx.role, scope = scope, name = record.name }, copyValues(record.values), list, "library")
+      patch.name = record.name ~= nil and tostring(record.name) or str(name)
+      return patch
+    end
+
+    local function listKept(opts)
+      local ctx = context(opt(opts, "role"))
+      local scope = opt(opts, "scope")
+      local prefix = STORE_PREFIX .. ctx.device .. ":"
+      local out = {}
+      for _, key in ipairs(host.store.keys() or {}) do
+        if string.sub(key, 1, #prefix) == prefix then
+          local record = host.store.get(key)
+          if type(record) == "table" and not (type(scope) == "string" and scope ~= "" and record.scope ~= scope) then
+            out[#out + 1] = { name = str(record.name), scope = record.scope ~= nil and tostring(record.scope) or "voice", savedAt = str(record.savedAt) }
+          end
+        end
+      end
+      table.sort(out, function(a, b)
+        if a.savedAt ~= b.savedAt then return a.savedAt > b.savedAt end
+        return a.name < b.name
+      end)
+      return out
+    end
+
+    local function forget(name, opts)
+      local ctx = context(opt(opts, "role"))
+      local key = storeKey(ctx.device, str(name))
+      if host.store.get(key) == nil then return false end
+      host.store.remove(key)
+      return true
+    end
+
+    local function write(patch, slot, opts)
+      local at = forPatch(patch, "write")
+      if at == nil then return { ok = false, slot = slot, error = "not a patch of this synth" } end
+      local how = (at.ctx.section and type(at.ctx.section.write) == "table") and at.ctx.section.write or nil
+      local n = toNumber(slot)
+      if not finite(n) or n < 0 or math.floor(n) ~= n then
+        say("error", "ce.patch.write: slot must be a whole number from 0, so nothing was stored.")
+        return { ok = false, slot = slot, error = "not a slot" }
+      end
+      n = math.tointeger(n) or n
+      if not how or how.via ~= "dump" or type(how.dump) ~= "string" or how.dump == "" then
+        local why = (how and how.via == "command")
+          and "its profile stores a slot with a write command, which ce.patch cannot send yet"
+          or "its profile does not say how to store a slot (patch.write)"
+        say("error", "ce.patch.write: " .. at.ctx.device .. " cannot be written to: " .. why .. ", so nothing was stored.")
+        return { ok = false, slot = n, error = why }
+      end
+      host.setVariable("slot", n, at.ctx.role)
+      host.fill(copyValues(patch.values))
+      host.sendDump(how.dump)
+      return { ok = true, slot = n }
+    end
+
+    return {
+      current = current, read = read, load = load, apply = apply, save = save, list = listKept, forget = forget,
+      write = write, scopes = scopes, define = define,
+      morph = function(a, b, t, opts)
+        local at = forPatch(a, "morph"); if at == nil then return nil end
+        return morph(a, b, t, at.list, opts, say)
+      end,
+      blend = function(patches, weights, opts)
+        local first = type(patches) == "table" and patches[1] or nil
+        local at = forPatch(first, "blend"); if at == nil then return nil end
+        return blend(patches, weights, at.list, opts, say)
+      end,
+      random = function(opts)
+        local from = opt(opts, "from")
+        local base = from
+        if base == nil then base = current(opt(opts, "scope"), { role = opt(opts, "role") }) end
+        if base == nil then return nil end
+        local at = forPatch(base, "random"); if at == nil then return nil end
+        if at.ctx.panel then
+          say("error", "ce.patch.random: a panel without a device profile does not say each control's range, so nothing was drawn.")
+          return nil
+        end
+        local next = seeded(opts, "random"); if next == nil then return nil end
+        return randomPatch(base, at.list, opts, next, say)
+      end,
+      mutate = function(patch, amount, opts)
+        local at = forPatch(patch, "mutate"); if at == nil then return nil end
+        if at.ctx.panel then
+          say("error", "ce.patch.mutate: a panel without a device profile does not say each control's range, so nothing was changed.")
+          return nil
+        end
+        local next = seeded(opts, "mutate"); if next == nil then return nil end
+        return mutate(patch, amount, at.list, opts, next, say)
+      end,
+      merge = function(base, other, opts)
+        local at = forPatch(base, "merge"); if at == nil then return nil end
+        return merge(base, other, at.list, opts, say)
+      end,
+      diff = function(a, b, opts)
+        local at = forPatch(a, "diff"); if at == nil then return nil end
+        return diff(a, b, at.list, opts, say)
+      end,
+      equal = function(a, b, opts)
+        local at = forPatch(a, "equal"); if at == nil then return nil end
+        local d = diff(a, b, at.list, opts, say)
+        if d == nil then return nil end
+        return #d == 0
+      end,
+    }
+  end
+
+  local P = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    profile = function(role) return __deviceQuery("profile", { role = role }) end,
+    parameters = function(role) return __deviceQuery("parameters", { role = role }) or {} end,
+    read = function(id, role) return __deviceQuery("read", { role = role, id = tostring(id) }) end,
+    write = function(id, value, role) return deviceWrite(id, value, role) == true end,
+    fill = function(values) return applyDump(values) end,
+    snapshot = function() return panelSnapshot() or {} end,
+    restore = function(values) return panelRestore(values) end,
+    requestDump = function(kind, fn, opts) return requestDump(kind, fn, opts) end,
+    sendDump = function(kind) return sendDump(kind) end,
+    setVariable = function(name, value, role) return deviceSetVariable(name, value, role) end,
+    patchSection = function(role) return __deviceQuery("patch", { role = role }) end,
+    random = function() return random() end,
+    now = function() local t = __deviceQuery("now", nil); if type(t) == "string" then return t end return "" end,
+    store = {
+      get = function(key) return loadSetting(key) end,
+      set = function(key, value) return saveSetting(key, value) end,
+      keys = function() return listSettings() or {} end,
+      remove = function(key) return forgetSetting(key) end,
+    },
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function patchCurrent(scope, opts) return P.current(scope, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchRead(scope, fn, opts) return P.read(scope, fn, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchLoad(name, opts) return P.load(name, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchMorph(a, b, t, opts) return P.morph(a, b, t, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchBlend(patches, weights, opts) return P.blend(patches, weights, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchRandom(opts) return P.random(opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchMutate(patch, amount, opts) return P.mutate(patch, amount, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchMerge(base, other, opts) return P.merge(base, other, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchDiff(a, b, opts) return P.diff(a, b, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchEqual(a, b, opts) return P.equal(a, b, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchApply(patch, opts) return P.apply(patch, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchSave(name, patch, opts) return P.save(name, patch, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchList(opts) return P.list(opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchForget(name, opts) return P.forget(name, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchWrite(patch, slot, opts) return P.write(patch, slot, opts) end
+-- (global; at the line start, where the option check looks for it)
+function patchScopes(role) return P.scopes(role) end
+-- (global; at the line start, where the option check looks for it)
+function patchDefine(scope, spec, role) return P.define(scope, spec, role) end
+end
+
+-- @module ce.verify
+-- ce.verify, ported line for line from verifyCore.js (the panel view's; the JavaScript prelude runs
+-- that file itself). Held to the panel view's answers by test/verifyParity.test.js and the scenario
+-- in test/support/verifyScenario.mjs. ce.verify requires ce.device and ce.time, so the globals the
+-- host below calls are live whenever a script can reach ce.verify. The prelude runs once for every
+-- script on the panel, so the checks below are every script's: one script can cancel another's.
+do
+  local WHY_WORDS = {
+    notInDump = "not in a dump", noRequest = "no request", noReply = "no reply", badChecksum = "bad checksum",
+    notWritable = "not writable", moved = "moved", cancelled = "cancelled",
+  }
+  local AVOIDABLE = { "noReply", "badChecksum", "moved", "cancelled" }
+  local MAIN_ROLE = "mainSynth"
+  local TEXT_SAMPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
+  local INF = math.huge
+
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function lower(s) if s == nil then return "" end return string.lower(tostring(s)) end
+  local function str(v) if v == nil then return "" end return tostring(v) end
+  local function contains(list, value)
+    for _, x in ipairs(list) do if x == value then return true end end
+    return false
+  end
+  local function listOf(v) if type(v) == "table" then return v end return {} end
+  local function textList(v)
+    if type(v) == "string" then if v == "" then return {} end return { v } end
+    local out = {}
+    for _, x in ipairs(listOf(v)) do if type(x) == "string" and x ~= "" then out[#out + 1] = x end end
+    return out
+  end
+  local function roleOf(v) if type(v) == "string" and v ~= "" then return v end return MAIN_ROLE end
+  local function roundHalfAway(x)
+    if x < 0 then return -math.floor(-x + 0.5) end
+    return math.floor(x + 0.5)
+  end
+  local function present(v) return v ~= nil end
+  local function intOr(v, fallback)
+    local n = toNumber(v)
+    if finite(n) then return math.floor(n) end
+    return fallback
+  end
+
+  local function kindOf(desc)
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if t == "action" or t == "momentary" or t == "trigger" then return "action" end
+    if t == "text" then return "text" end
+    if t == "choice" or t == "boolean" or t == "enum" or t == "bool" then return "choice" end
+    if type(desc) == "table" and type(desc.choices) == "table" and #desc.choices > 0 then return "choice" end
+    return "number"
+  end
+  local function writable(desc)
+    local access = type(desc) == "table" and desc.access or nil
+    if type(access) == "string" then return string.find(lower(access), "write", 1, true) ~= nil end
+    if type(access) == "table" and access.canWrite == false then return false end
+    return true
+  end
+  local function isWhole(desc) return not (type(desc) == "table" and desc.type == "float") end
+  local function rangeOf(desc)
+    local range = type(desc) == "table" and type(desc.range) == "table" and desc.range or {}
+    local lo, hi = toNumber(range.min), toNumber(range.max)
+    local a = finite(lo) and lo or 0
+    local b = finite(hi) and hi or 127
+    if a <= b then return a, b end
+    return b, a
+  end
+  local function choicesOf(desc)
+    local out = {}
+    for _, c in ipairs(type(desc) == "table" and listOf(desc.choices) or {}) do
+      if type(c) == "table" then
+        if c.id ~= nil then out[#out + 1] = c.id elseif c.value ~= nil then out[#out + 1] = c.value end
+      elseif c ~= nil then
+        out[#out + 1] = c
+      end
+    end
+    local t = type(desc) == "table" and str(desc.type) or ""
+    if #out == 0 and (t == "boolean" or t == "bool") then out[1] = false; out[2] = true end
+    return out
+  end
+  local function floatStep(desc)
+    local lo, hi = rangeOf(desc)
+    return (hi - lo) / 16383
+  end
+  local function trimPad(s) return (tostring(s):gsub("[%s\0]+$", "")) end
+
+  local function same(desc, a, b)
+    if a == nil or b == nil then return false end
+    if type(a) == "boolean" or type(b) == "boolean" then
+      local x, y
+      if type(a) == "boolean" then x = a else x = toNumber(a) ~= 0 end
+      if type(b) == "boolean" then y = b else y = toNumber(b) ~= 0 end
+      return x == y
+    end
+    if type(a) == "number" and type(b) == "number" and finite(a) and finite(b) then
+      if isWhole(desc) then return roundHalfAway(a) == roundHalfAway(b) end
+      return math.abs(a - b) <= floatStep(desc) / 2 + 1e-9
+    end
+    return trimPad(a) == trimPad(b)
+  end
+  local function rawOf(desc, got)
+    if kindOf(desc) ~= "choice" or got == nil or type(got) == "boolean" then return nil end
+    local choices = choicesOf(desc)
+    if #choices == 0 then return nil end
+    for _, c in ipairs(choices) do if c == got then return nil end end
+    return got
+  end
+
+  local function byteWidth(encoding)
+    local e = type(encoding) == "table" and encoding or {}
+    local t = e.type == nil and "u7" or tostring(e.type)
+    local length, nibbles = toNumber(e.length), toNumber(e.nibbles)
+    if t == "text-ascii" or t == "ascii" or t == "fixed-ascii" then
+      if finite(length) and length > 0 then return length end
+      return 1
+    end
+    if t == "text-nibbled-ascii" or t == "nibbled-ascii" or t == "packed-nibbled-ascii" then
+      if finite(nibbles) and nibbles > 0 then return nibbles end
+      if finite(length) and length > 0 then return length * 2 end
+      return 2
+    end
+    if t == "u14" or t == "u14-msb-lsb" or t == "u14-lsb-msb" then return 2 end
+    if t == "nibbled" then if finite(nibbles) and nibbles > 0 then return nibbles end return 2 end
+    return 1
+  end
+
+  local function dumpsOf(layout)
+    local requests = listOf(type(layout) == "table" and layout.requests or nil)
+    local encodings = type(layout) == "table" and type(layout.encodings) == "table" and layout.encodings or {}
+    local out = {}
+    for _, d in ipairs(listOf(type(layout) == "table" and layout.dumps or nil)) do
+      if type(d) == "table" and type(d.id) == "string" and d.id ~= "" then
+        local request, timeoutMs, retries = "", 2000, 0
+        for _, r in ipairs(requests) do
+          if type(r) == "table" then
+            local answer = ""
+            if type(r.response) == "table" and type(r.response.dump) == "string" then answer = r.response.dump
+            elseif type(r.expectedDump) == "string" then answer = r.expectedDump end
+            if answer == d.id and type(r.id) == "string" and r.id ~= "" then
+              request = r.id
+              timeoutMs = intOr(r.timeoutMs, 2000)
+              retries = intOr(r.retries, 0)
+              break
+            end
+          end
+        end
+        local matcher = type(d.matcher) == "table" and d.matcher or {}
+        local prefix, suffix = #listOf(matcher.prefix), #listOf(matcher.suffix)
+        local payload = type(d.payload) == "table" and d.payload or {}
+        local payloadOffset = intOr(payload.offset, prefix)
+        local payloadSize = intOr(payload.size, 0)
+        local pack = type(payload.pack) == "table" and payload.pack or nil
+        local wire = payloadSize
+        if pack ~= nil and pack.type == "packed8to7" and payloadSize > 0 then
+          local group = math.max(1, intOr(pack.groupSize, 7))
+          wire = payloadSize + (payloadSize + group - 1) // group
+        end
+        local stop = payloadOffset + wire
+        local checksum = type(d.checksum) == "table" and d.checksum or nil
+        if checksum ~= nil and finite(toNumber(checksum.byteOffset)) then
+          stop = math.max(stop, intOr(checksum.byteOffset, 0) + math.max(1, intOr(checksum.byteCount, 1)))
+        end
+        local completion = type(d.completion) == "table" and d.completion or {}
+        local expected = toNumber(completion.expectedBytes)
+        local mappings = {}
+        for _, m in ipairs(listOf(d.mappings)) do
+          if type(m) == "table" and type(m.parameter) == "string" then
+            local codec = type(m.codec) == "table" and m.codec or encodings[m.parameter]
+            mappings[#mappings + 1] = { parameter = m.parameter, offset = intOr(m.offset, 0), size = byteWidth(codec) }
+          end
+        end
+        out[#out + 1] = {
+          id = d.id,
+          name = (type(d.name) == "string" and d.name ~= "") and d.name or d.id,
+          request = request, timeoutMs = timeoutMs, retries = retries,
+          expectedBytes = finite(expected) and math.floor(expected) or nil,
+          layoutBytes = stop + suffix,
+          payloadSize = payloadSize,
+          mappings = mappings,
+        }
+      end
+    end
+    return out
+  end
+
+  local function unreadOf(dump)
+    local read = {}
+    for i = 0, dump.payloadSize - 1 do read[i] = false end
+    for _, m in ipairs(dump.mappings) do
+      for i = m.offset, m.offset + m.size - 1 do if i >= 0 and i < dump.payloadSize then read[i] = true end end
+    end
+    local out = {}
+    local from = -1
+    for i = 0, dump.payloadSize - 1 do
+      if not read[i] and from < 0 then from = i end
+      if read[i] and from >= 0 then
+        out[#out + 1] = { from = from, to = i - 1 }
+        from = -1
+      end
+    end
+    if from >= 0 then out[#out + 1] = { from = from, to = dump.payloadSize - 1 } end
+    return out
+  end
+
+  local function dumpIndex(dumps)
+    local index = {}
+    for _, d in ipairs(dumps) do
+      for _, m in ipairs(d.mappings) do if index[m.parameter] == nil then index[m.parameter] = d end end
+    end
+    return index
+  end
+
+  local function choose(params, opts, say, verb)
+    local ids = textList(opt(opts, "ids"))
+    local group = opt(opts, "group")
+    local out = {}
+    if #ids > 0 then
+      local known = {}
+      for _, desc in ipairs(params) do known[tostring(desc.id)] = true end
+      for _, id in ipairs(ids) do
+        if not known[id] then say("warn", "ce.verify." .. verb .. ": \"" .. id .. "\" is not a parameter of the synth, so it was left out.") end
+      end
+      for _, desc in ipairs(params) do if contains(ids, tostring(desc.id)) then out[#out + 1] = desc end end
+      return out
+    end
+    if type(group) == "string" and group ~= "" then
+      for _, desc in ipairs(params) do if lower(desc.group) == lower(group) then out[#out + 1] = desc end end
+      if #out == 0 then say("warn", "ce.verify." .. verb .. ": the synth has no parameters in the group \"" .. group .. "\".") end
+      return out
+    end
+    for _, desc in ipairs(params) do if kindOf(desc) ~= "action" then out[#out + 1] = desc end end
+    return out
+  end
+
+  local function nameOf(desc) if desc.name ~= nil then return tostring(desc.name) end return tostring(desc.id) end
+
+  local function coverageOf(list, dumps, role)
+    local index = dumpIndex(dumps)
+    local unchecked, used = {}, {}
+    local checkable = 0
+    for _, desc in ipairs(list) do
+      local id = tostring(desc.id)
+      local d = index[id]
+      if d == nil then unchecked[#unchecked + 1] = { id = id, name = nameOf(desc), why = "notInDump" }
+      elseif d.request == "" then unchecked[#unchecked + 1] = { id = id, name = nameOf(desc), why = "noRequest" }
+      else checkable = checkable + 1 end
+      if d ~= nil and not contains(used, d) then used[#used + 1] = d end
+    end
+    local out = {}
+    for _, d in ipairs(dumps) do
+      if contains(used, d) then
+        out[#out + 1] = { kind = d.id, expectedBytes = d.expectedBytes, layoutBytes = d.layoutBytes, unread = unreadOf(d) }
+      end
+    end
+    return { role = role, total = #list, checkable = checkable, unchecked = unchecked, dumps = out }
+  end
+
+  local function isReport(r)
+    return type(r) == "table" and type(r.kind) == "string" and type(r.matched) == "table"
+      and type(r.differed) == "table" and type(r.unchecked) == "table"
+  end
+
+  local function shortWhy(report)
+    for _, d in ipairs(listOf(report.dumps)) do
+      if type(d) == "table" and d.status ~= "ok" then
+        return (WHY_WORDS[d.status] or str(d.status)) .. ": " .. str(d.kind)
+      end
+    end
+    local counts = {}
+    local best, avoidable = "", ""
+    for _, u in ipairs(report.unchecked) do
+      local why = type(u) == "table" and str(u.why) or ""
+      counts[why] = (counts[why] or 0) + 1
+      if best == "" or counts[why] > counts[best] then best = why end
+      if contains(AVOIDABLE, why) and (avoidable == "" or counts[why] > counts[avoidable]) then avoidable = why end
+    end
+    if avoidable ~= "" then best = avoidable end
+    if best == "" then return "" end
+    return WHY_WORDS[best] or best
+  end
+
+  local function summaryOf(report, opts)
+    local total = toNumber(report.total)
+    if not finite(total) then total = #report.matched + #report.differed + #report.unchecked end
+    local lead = report.cancelled == true and "cancelled: " or ""
+    local why = shortWhy(report)
+    local base = lead .. #report.matched .. " of " .. string.format("%d", total) .. " match, " .. #report.differed .. " differ, "
+      .. #report.unchecked .. " unchecked"
+    local full = base
+    if why ~= "" then full = base .. " (" .. why .. ")" end
+    local width = toNumber(opt(opts, "width"))
+    if not finite(width) or width <= 0 then return full end
+    local w = math.floor(width)
+    if #full <= w then return full end
+    if #base <= w then return base end
+    local short = (report.cancelled == true and "cancel " or "") .. #report.matched .. "/" .. string.format("%d", total) .. " ok "
+      .. #report.differed .. " diff " .. #report.unchecked .. " unchk"
+    if #short <= w then return short end
+    return short:sub(1, w)
+  end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local running = type(host.jobs) == "table" and host.jobs or {}
+
+    local function finish(job)
+      if job.finished then return end
+      job.finished = true
+      if running[job.role] == job then running[job.role] = nil end
+      local r = job.report
+      local ok = #r.differed == 0 and r.cancelled ~= true
+      for _, u in ipairs(r.unchecked) do if contains(AVOIDABLE, u.why) then ok = false end end
+      for _, d in ipairs(r.dumps) do if d.status ~= "ok" then ok = false end end
+      r.ok = ok
+      r.ms = math.max(0, math.floor(host.clock() - job.start))
+      local fine, err = pcall(job.fn, r)
+      if not fine then say("error", "ce.verify." .. r.kind .. ": the function given to it failed: " .. tostring(err)) end
+      host.emit(r)
+    end
+
+    local function newJob(kind, role, fn, total, steps)
+      local job = {
+        kind = kind, role = role, fn = fn, steps = steps, at = 0, finished = false, cancelled = false, step = nil,
+        start = host.clock(),
+        report = { kind = kind, role = role, ok = false, total = total, matched = {}, differed = {}, unchecked = {},
+                   dumps = {}, probes = {}, ms = 0, cancelled = false },
+        onCancel = nil,
+      }
+      running[role] = job
+      return job
+    end
+
+    local function mayStart(verb, role, fn)
+      if type(fn) ~= "function" then
+        say("error", "ce.verify." .. verb .. ": fn must be a function to call with the report, so nothing was checked.")
+        return false
+      end
+      if role ~= MAIN_ROLE then
+        say("error", "ce.verify." .. verb .. ": only the main synth can be asked for a dump, and \"" .. role .. "\" is not it, so nothing was checked.")
+        return false
+      end
+      if running[role] ~= nil then return false end
+      return host.connected(role) == true
+    end
+
+    local function ask(job, dump, done)
+      local step = { settled = false }
+      job.step = step
+      local function answer(values, info)
+        if step.settled or job.finished then return end
+        step.settled = true
+        job.step = nil
+        local ok = type(info) == "table" and info.ok == true and type(values) == "table"
+        if ok then done(values) else done(nil) end
+      end
+      local asked = host.requestDump(dump.request, answer)
+      if asked == false then answer(nil, { ok = false }) end
+    end
+
+    local function later(job, ms, fn)
+      host.after(math.max(1, math.floor(ms)), function()
+        if not job.finished then fn() end
+      end)
+    end
+
+    local function context(role)
+      local params = host.parameters(role)
+      if type(params) ~= "table" then params = {} end
+      local layout = host.layout(role)
+      local dumps = dumpsOf(layout)
+      local gap = toNumber(type(layout) == "table" and layout.gapMs or nil)
+      return {
+        role = role, params = params, dumps = dumps, index = dumpIndex(dumps),
+        gapMs = (finite(gap) and gap > 0) and gap or 0,
+        encodings = type(layout) == "table" and type(layout.encodings) == "table" and layout.encodings or {},
+      }
+    end
+
+    local function leave(job, desc, why)
+      local u = job.report.unchecked
+      u[#u + 1] = { id = tostring(desc.id), name = nameOf(desc), why = why }
+    end
+
+    local function judge(job, desc, expected, got)
+      if same(desc, expected, got) then
+        local m = job.report.matched
+        m[#m + 1] = tostring(desc.id)
+      else
+        local d = job.report.differed
+        d[#d + 1] = { id = tostring(desc.id), name = nameOf(desc), expected = expected, got = got, raw = rawOf(desc, got) }
+      end
+    end
+
+    local function plan(job, ctx, list)
+      local steps = {}
+      for _, d in ipairs(ctx.dumps) do
+        if d.request ~= "" then
+          local held = {}
+          for _, desc in ipairs(list) do if ctx.index[tostring(desc.id)] == d then held[#held + 1] = desc end end
+          if #held > 0 then steps[#steps + 1] = { dump = d, params = held } end
+        end
+      end
+      for _, desc in ipairs(list) do
+        local d = ctx.index[tostring(desc.id)]
+        if d == nil then leave(job, desc, "notInDump")
+        elseif d.request == "" then leave(job, desc, "noRequest") end
+      end
+      return steps
+    end
+
+    local function pushDump(job, d, values)
+      local list = job.report.dumps
+      list[#list + 1] = { kind = d.id, status = values ~= nil and "ok" or "noReply", expectedBytes = d.expectedBytes }
+    end
+
+    local function compareSteps(job, ctx, steps, before)
+      job.steps = steps
+      job.at = 0
+      job.onCancel = function()
+        for i = job.at + 1, #steps do for _, desc in ipairs(steps[i].params) do leave(job, desc, "cancelled") end end
+      end
+      local next
+      next = function()
+        if job.at >= #steps then finish(job); return end
+        local step = steps[job.at + 1]
+        local expected = {}
+        for _, desc in ipairs(step.params) do expected[tostring(desc.id)] = host.read(tostring(desc.id), ctx.role) end
+        ask(job, step.dump, function(values)
+          job.at = job.at + 1
+          pushDump(job, step.dump, values)
+          for _, desc in ipairs(step.params) do
+            local id = tostring(desc.id)
+            if values == nil then leave(job, desc, "noReply")
+            elseif not same(desc, before[id], expected[id]) and (before[id] ~= nil or expected[id] ~= nil) then leave(job, desc, "moved")
+            elseif values[id] == nil then leave(job, desc, "noReply")
+            else judge(job, desc, expected[id], values[id]) end
+          end
+          if job.at >= #steps then finish(job) else later(job, ctx.gapMs, next) end
+        end)
+      end
+      next()
+    end
+
+    local function snapshot(ctx, list)
+      local out = {}
+      for _, desc in ipairs(list) do out[tostring(desc.id)] = host.read(tostring(desc.id), ctx.role) end
+      return out
+    end
+
+    local function splitArgs(a, b)
+      if type(a) == "function" then return nil, a end
+      return a, b
+    end
+
+    local function coverage(opts)
+      local ctx = context(roleOf(opt(opts, "role")))
+      return coverageOf(choose(ctx.params, opts, say, "coverage"), ctx.dumps, ctx.role)
+    end
+
+    local function check(a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if not mayStart("check", role, fn) then return false end
+      local ctx = context(role)
+      local list = choose(ctx.params, opts, say, "check")
+      local job = newJob("check", role, fn, #list, {})
+      compareSteps(job, ctx, plan(job, ctx, list), snapshot(ctx, list))
+      return true
+    end
+
+    local function dump(kind, a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if type(kind) ~= "string" or kind == "" then
+        say("error", "ce.verify.dump: kind must be the id of a dump in the profile, so nothing was checked.")
+        return false
+      end
+      if not mayStart("dump", role, fn) then return false end
+      local ctx = context(role)
+      local d = nil
+      for _, x in ipairs(ctx.dumps) do
+        if x.id == kind or (x.request ~= "" and x.request == kind) then d = x; break end
+      end
+      if d == nil or d.request == "" then
+        say("error", "ce.verify.dump: the profile has " .. (d == nil and "no dump" or "no request for the dump") .. " \"" .. kind .. "\", so nothing was checked.")
+        return false
+      end
+      local timesGiven = toNumber(opt(opts, "times"))
+      local times = 2
+      if finite(timesGiven) then times = math.min(10, math.max(2, math.floor(timesGiven))) end
+      local gapGiven = toNumber(opt(opts, "gapMs"))
+      local gapMs = 500
+      if finite(gapGiven) and gapGiven >= 0 then gapMs = gapGiven end
+      local list = {}
+      for _, desc in ipairs(ctx.params) do if ctx.index[tostring(desc.id)] == d then list[#list + 1] = desc end end
+      local job = newJob("dump", role, fn, #list, {})
+      local replies = {}
+      local asked = 0
+      job.onCancel = function() for _, desc in ipairs(list) do leave(job, desc, "cancelled") end end
+      local function stop()
+        if #replies < times then
+          for _, desc in ipairs(list) do leave(job, desc, "noReply") end
+        else
+          local first, last = replies[1], replies[#replies]
+          for _, desc in ipairs(list) do
+            local id = tostring(desc.id)
+            if first[id] == nil or last[id] == nil then leave(job, desc, "noReply")
+            else judge(job, desc, first[id], last[id]) end
+          end
+        end
+        finish(job)
+      end
+      local next
+      next = function()
+        asked = asked + 1
+        ask(job, d, function(values)
+          pushDump(job, d, values)
+          job.at = asked
+          if values == nil then stop(); return end
+          replies[#replies + 1] = values
+          if asked >= times then stop() else later(job, gapMs, next) end
+        end)
+      end
+      job.steps = {}
+      for i = 1, times do job.steps[i] = d end
+      next()
+      return true
+    end
+
+    local function findParam(ctx, id, verb)
+      for _, desc in ipairs(ctx.params) do if tostring(desc.id) == id then return desc end end
+      say("error", "ce.verify." .. verb .. ": \"" .. id .. "\" is not a parameter of the synth, so nothing was checked.")
+      return nil
+    end
+
+    local function settleOf(opts)
+      local given = toNumber(opt(opts, "settleMs"))
+      if finite(given) and given >= 0 then return given end
+      return 100
+    end
+
+    local function writeAndRead(job, ctx, desc, value, settleMs, done)
+      local id = tostring(desc.id)
+      local d = ctx.index[id]
+      host.write(id, value, ctx.role)
+      if d == nil then done(nil, "notInDump"); return end
+      if d.request == "" then done(nil, "noRequest"); return end
+      later(job, settleMs, function()
+        local now = host.read(id, ctx.role)
+        if now ~= nil and not same(desc, now, value) then done(nil, "moved"); return end
+        ask(job, d, function(values)
+          pushDump(job, d, values)
+          if values == nil or values[id] == nil then done(nil, "noReply") else done(values[id], "") end
+        end)
+      end)
+    end
+
+    local function write(id, value, a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if not mayStart("write", role, fn) then return false end
+      local ctx = context(role)
+      local desc = findParam(ctx, id == nil and "" or tostring(id), "write")
+      if desc == nil then return false end
+      if value == nil then
+        say("error", "ce.verify.write: value must be given, so nothing was checked.")
+        return false
+      end
+      local job = newJob("write", role, fn, 1, { ctx.index[tostring(desc.id)] or false })
+      job.onCancel = function() leave(job, desc, "cancelled") end
+      if not writable(desc) then
+        leave(job, desc, "notWritable")
+        finish(job)
+        return true
+      end
+      writeAndRead(job, ctx, desc, value, settleOf(opts), function(got, why)
+        job.at = 1
+        if why ~= "" then leave(job, desc, why) else judge(job, desc, value, got) end
+        finish(job)
+      end)
+      return true
+    end
+
+    local function probeValues(desc, ctx)
+      local kind = kindOf(desc)
+      local out = {}
+      local function add(v)
+        for _, x in ipairs(out) do if x == v then return end end
+        out[#out + 1] = v
+      end
+      if kind == "choice" then
+        local choices = choicesOf(desc)
+        if #choices <= 16 then
+          for _, c in ipairs(choices) do add(c) end
+        else
+          add(choices[1])
+          add(choices[#choices // 2 + 1])
+          add(choices[#choices])
+        end
+        return out
+      end
+      if kind == "text" then
+        local enc = ctx.encodings[tostring(desc.id)]
+        local length = toNumber(type(enc) == "table" and enc.length or nil)
+        local n = 8
+        if finite(length) and length > 0 then n = math.min(#TEXT_SAMPLE, math.floor(length)) end
+        add(TEXT_SAMPLE:sub(1, n))
+        add("")
+        return out
+      end
+      local lo, hi = rangeOf(desc)
+      local step = isWhole(desc) and 1 or (hi - lo) / 100
+      local mid = lo + (hi - lo) / 2
+      if isWhole(desc) then mid = roundHalfAway(mid) end
+      for _, v in ipairs({ lo, lo + step, mid, hi - step, hi }) do if v >= lo and v <= hi then add(v) end end
+      return out
+    end
+
+    local function probe(id, a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      if not mayStart("probe", role, fn) then return false end
+      local ctx = context(role)
+      local desc = findParam(ctx, id == nil and "" or tostring(id), "probe")
+      if desc == nil then return false end
+      local given = opt(opts, "values")
+      if given ~= nil and (type(given) ~= "table" or #given == 0) then
+        say("error", "ce.verify.probe: values must be a list of values to try, so nothing was checked.")
+        return false
+      end
+      local values = {}
+      if given ~= nil then for i, v in ipairs(given) do values[i] = v end else values = probeValues(desc, ctx) end
+      local settleMs = settleOf(opts)
+      local pid = tostring(desc.id)
+      local old = host.read(pid, role)
+      local job = newJob("probe", role, fn, 1, values)
+      job.report.restored = false
+      local held = ctx.index[pid]
+      local cannot = ""
+      if not writable(desc) then cannot = "notWritable"
+      elseif held == nil then cannot = "notInDump"
+      elseif held.request == "" then cannot = "noRequest" end
+      if cannot ~= "" then
+        leave(job, desc, cannot)
+        finish(job)
+        return true
+      end
+      local failed = false
+      local why = ""
+      local function restore(andThen)
+        if old == nil then andThen(); return end
+        writeAndRead(job, ctx, desc, old, settleMs, function(got, reason)
+          job.report.restored = reason == "" and same(desc, old, got)
+          andThen()
+        end)
+      end
+      job.onCancel = function()
+        if old ~= nil then host.write(pid, old, role) end
+        if #job.report.matched == 0 and #job.report.differed == 0 then leave(job, desc, "cancelled") end
+      end
+      local function stop()
+        if why ~= "" then leave(job, desc, why)
+        elseif not failed then job.report.matched[#job.report.matched + 1] = pid end
+        restore(function() finish(job) end)
+      end
+      local next
+      next = function()
+        if job.at >= #values then stop(); return end
+        local value = values[job.at + 1]
+        writeAndRead(job, ctx, desc, value, settleMs, function(got, reason)
+          job.at = job.at + 1
+          if reason ~= "" then why = reason; stop(); return end
+          local ok = same(desc, value, got)
+          local p = job.report.probes
+          p[#p + 1] = { id = pid, value = value, got = got, same = ok }
+          if not ok then
+            failed = true
+            local d = job.report.differed
+            d[#d + 1] = { id = pid, name = nameOf(desc), expected = value, got = got, raw = rawOf(desc, got) }
+          end
+          next()
+        end)
+      end
+      next()
+      return true
+    end
+
+    local function patch(a, b)
+      local opts, fn = splitArgs(a, b)
+      local role = roleOf(opt(opts, "role"))
+      local via = opt(opts, "via")
+      if via ~= nil and via ~= "dump" and via ~= "parameters" then
+        say("error", "ce.verify.patch: via \"" .. tostring(via) .. "\" is not \"dump\" or \"parameters\", so nothing was checked.")
+        return false
+      end
+      if not mayStart("patch", role, fn) then return false end
+      local ctx = context(role)
+      local list = choose(ctx.params, opts, say, "patch")
+      local job = newJob("patch", role, fn, #list, {})
+      local chosen = {}
+      for _, desc in ipairs(list) do
+        if writable(desc) then chosen[#chosen + 1] = desc else leave(job, desc, "notWritable") end
+      end
+      local before = snapshot(ctx, chosen)
+      local steps = plan(job, ctx, chosen)
+      if opt(opts, "send") ~= false then
+        local section = host.patchSection(role)
+        local deliver = (type(section) == "table" and type(section.deliver) == "string") and section.deliver or ""
+        local how = via
+        if how == nil then how = deliver == "dump" and "dump" or "parameters" end
+        if how == "dump" then
+          for _, step in ipairs(steps) do host.sendDump(step.dump.id) end
+        else
+          for _, desc in ipairs(chosen) do
+            local v = before[tostring(desc.id)]
+            if v ~= nil then host.write(tostring(desc.id), v, role) end
+          end
+        end
+      end
+      if #steps == 0 then
+        finish(job)
+        return true
+      end
+      later(job, settleOf(opts), function() compareSteps(job, ctx, steps, before) end)
+      return true
+    end
+
+    local function summary(report, opts)
+      if not isReport(report) then
+        say("error", "ce.verify.summary: that is not a report, as a check gives them, so there is nothing to say.")
+        return nil
+      end
+      return summaryOf(report, opts)
+    end
+
+    local function runningNow(role)
+      local job = running[roleOf(role)]
+      if job == nil then return nil end
+      return { kind = job.kind, role = job.role, done = job.at, total = #job.steps, ms = math.max(0, math.floor(host.clock() - job.start)) }
+    end
+
+    local function cancel(role)
+      local job = running[roleOf(role)]
+      if job == nil then return false end
+      job.cancelled = true
+      job.report.cancelled = true
+      if job.step ~= nil then job.step.settled = true end
+      if job.onCancel ~= nil then job.onCancel() end
+      finish(job)
+      return true
+    end
+
+    return { coverage = coverage, check = check, dump = dump, write = write, probe = probe, patch = patch,
+             summary = summary, running = runningNow, cancel = cancel }
+  end
+
+  local V = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    parameters = function(role) return __deviceQuery("parameters", { role = role }) or {} end,
+    layout = function(role) return __deviceQuery("dumpLayout", { role = role }) end,
+    read = function(id, role) return __deviceQuery("read", { role = role, id = tostring(id) }) end,
+    write = function(id, value, role) return deviceWrite(id, value, role) == true end,
+    sendDump = function(kind) return sendDump(kind) end,
+    patchSection = function(role) return __deviceQuery("patch", { role = role }) end,
+    connected = function(role) return deviceConnected(role) == true end,
+    requestDump = function(kind, fn) return requestDump(kind, fn) end,
+    after = function(ms, fn) return after(ms, fn) end,
+    clock = function() return nowMs() end,
+    emit = function(report) emit("onVerifyDone", report) end,
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function verifyCoverage(opts) return V.coverage(opts) end
+-- (global; at the line start, where the option check looks for it)
+function verifyCheck(opts, fn) return V.check(opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyDump(kind, opts, fn) return V.dump(kind, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyWrite(id, value, opts, fn) return V.write(id, value, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyProbe(id, opts, fn) return V.probe(id, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifyPatch(opts, fn) return V.patch(opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function verifySummary(report, opts) return V.summary(report, opts) end
+-- (global; at the line start, where the option check looks for it)
+function verifyRunning(role) return V.running(role) end
+-- (global; at the line start, where the option check looks for it)
+function verifyCancel(role) return V.cancel(role) end
+end
+
+-- @module ce.file
+-- ce.file's byte commands, ported line for line from fileCore.js (the panel view's; the JavaScript
+-- prelude runs that file itself). Held to the panel view's answers by test/fileParity.test.js and the
+-- scenario in test/support/fileScenario.mjs. The dialogs are the panel view's alone: with the window
+-- shut there is nobody to answer one. ce.file requires ce.time, whose tempo and transport give
+-- midiWrite the tempo and beats per bar when a song carries neither.
+do
+  local DEFAULT_TICKS = 480
+  local INF = math.huge
+
+  local function finite(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function clampInt(v, lo, hi, fallback)
+    if not finite(v) then return fallback end
+    local x = math.floor(v + 0.5)
+    if x < lo then return lo end
+    if x > hi then return hi end
+    return x
+  end
+  -- A number as JavaScript writes it: no ".0" on a whole number, and the shortest digits that read
+  -- back as the same number.
+  local function numText(x)
+    if type(x) ~= "number" then return tostring(x) end
+    if x == math.floor(x) and math.abs(x) < 1e15 then return string.format("%d", math.floor(x)) end
+    for digits = 15, 17 do
+      local s = string.format("%." .. digits .. "g", x)
+      if tonumber(s) == x then return s end
+    end
+    return tostring(x)
+  end
+  local function isList(v)
+    if type(v) ~= "table" then return false end
+    local n = 0
+    for _ in pairs(v) do n = n + 1 end
+    return n == #v
+  end
+
+  local function bytesOf(v)
+    if type(v) == "string" then
+      local text = v:gsub("%s+", "")
+      text = text:gsub("^0[xX]", "")
+      if #text % 2 ~= 0 or text:find("[^0-9a-fA-F]") then return nil end
+      local out = {}
+      for i = 1, #text, 2 do out[#out + 1] = tonumber(text:sub(i, i + 1), 16) end
+      return out
+    end
+    if not isList(v) then return nil end
+    local out = {}
+    for i, b in ipairs(v) do
+      if not finite(b) or b < 0 or b > 255 or math.floor(b) ~= b then return nil end
+      out[i] = math.floor(b)
+    end
+    return out
+  end
+
+  local function startsWith(list, prefix)
+    if #list < #prefix then return false end
+    for i = 1, #prefix do if list[i] ~= prefix[i] then return false end end
+    return true
+  end
+
+  local function syxSplit(bytes, opts, say)
+    local data = bytesOf(bytes)
+    if data == nil then
+      say("error", "ce.file.syxSplit: bytes must be a list of numbers 0 to 255, or hex text, so nothing was split.")
+      return {}
+    end
+    local prefix = {}
+    local givenPrefix = opt(opts, "prefix")
+    if givenPrefix ~= nil then
+      local p = bytesOf(givenPrefix)
+      if p == nil then
+        say("error", "ce.file.syxSplit: prefix must be bytes, a list or hex text, so nothing was split.")
+        return {}
+      end
+      prefix = p
+    end
+    local out = {}
+    local current = nil
+    local start, stray, firstStray = 0, 0, -1
+    for i = 1, #data do
+      local b = data[i]
+      if b == 0xF0 then
+        if current ~= nil then say("warn", "ce.file.syxSplit: the message at byte " .. start .. " has no F7 before the next F0, so it was left out.") end
+        current = { b }
+        start = i - 1
+      elseif current == nil then
+        stray = stray + 1
+        if firstStray < 0 then firstStray = i - 1 end
+      else
+        current[#current + 1] = b
+        if b == 0xF7 then
+          if startsWith(current, prefix) then out[#out + 1] = current end
+          current = nil
+        end
+      end
+    end
+    if current ~= nil then
+      if opt(opts, "partial") == true then
+        if startsWith(current, prefix) then out[#out + 1] = current end
+      else
+        say("warn", "ce.file.syxSplit: the last message, from byte " .. start .. ", has no F7, so it was left out.")
+      end
+    end
+    if stray > 0 then
+      say("warn", "ce.file.syxSplit: " .. stray .. " " .. (stray == 1 and "byte" or "bytes") .. " outside any message "
+        .. (stray == 1 and "was" or "were") .. " left out, the first at byte " .. firstStray .. ".")
+    end
+    return out
+  end
+
+  local function syxJoin(messages, say)
+    if not isList(messages) then
+      say("error", "ce.file.syxJoin: messages must be a list of messages, so nothing was joined.")
+      return nil
+    end
+    local out = {}
+    for i, raw in ipairs(messages) do
+      local m = bytesOf(raw)
+      if m == nil or #m < 2 or m[1] ~= 0xF0 or m[#m] ~= 0xF7 then
+        say("error", "ce.file.syxJoin: message " .. i .. " does not start with F0 and end with F7, so nothing was joined.")
+        return nil
+      end
+      for _, b in ipairs(m) do out[#out + 1] = b end
+    end
+    return out
+  end
+
+  -- d is 1-based; `at` below is a 0-based place in the file, as fileCore.js counts.
+  local function byte(d, at) return d[at + 1] end
+  local function u16(d, at) return byte(d, at) * 256 + byte(d, at + 1) end
+  local function u32(d, at) return ((byte(d, at) * 256 + byte(d, at + 1)) * 256 + byte(d, at + 2)) * 256 + byte(d, at + 3) end
+  local function latin1(d, from, to)
+    local parts = {}
+    for i = from, to - 1 do parts[#parts + 1] = utf8.char(byte(d, i)) end
+    return table.concat(parts)
+  end
+  local function textOf(d, from, to)
+    local parts = {}
+    for i = from, to - 1 do parts[#parts + 1] = string.char(byte(d, i)) end
+    local s = table.concat(parts)
+    if utf8.len(s) == nil then return latin1(d, from, to) end
+    -- Lua's utf8 accepts what UTF-8 does not: surrogates, and longer forms than needed.
+    for _, cp in utf8.codes(s) do if cp >= 0xD800 and cp <= 0xDFFF then return latin1(d, from, to) end end
+    for i = from, to - 1 do
+      local b = byte(d, i)
+      if b == 0xC0 or b == 0xC1 or b >= 0xF5 then return latin1(d, from, to) end
+      if b == 0xE0 and i + 1 < to and byte(d, i + 1) < 0xA0 then return latin1(d, from, to) end
+      if b == 0xF0 and i + 1 < to and byte(d, i + 1) < 0x90 then return latin1(d, from, to) end
+    end
+    return s
+  end
+  local function varLen(d, at, stop)
+    local value, i = 0, at
+    for _ = 1, 4 do
+      if i >= stop then return nil end
+      local b = byte(d, i)
+      i = i + 1
+      value = value * 128 + (b & 0x7F)
+      if (b & 0x80) == 0 then return value, i end
+    end
+    return nil
+  end
+  local function midiRefuse(say, why)
+    say("error", "ce.file.midiRead: " .. why .. ", so nothing was read.")
+    return nil
+  end
+
+  local function readTrack(d, from, to, tpb, index, song, say)
+    local track = { name = "", notes = {}, events = {} }
+    local open, openKeys = {}, {}
+    local at, tick, status, endTick = from, 0, 0, 0
+    while at < to do
+      local delta, nextAt = varLen(d, at, to)
+      if delta == nil then return nil end
+      tick = tick + delta
+      at = nextAt
+      if at >= to then return nil end
+      local b = byte(d, at)
+      if b == 0xFF then
+        if at + 1 >= to then return nil end
+        local kind = byte(d, at + 1)
+        local len, body = varLen(d, at + 2, to)
+        if len == nil or body + len > to then return nil end
+        local bodyEnd = body + len
+        local stop = false
+        if kind == 0x03 and track.name == "" then track.name = textOf(d, body, bodyEnd)
+        elseif kind == 0x51 and len == 3 then
+          local micro = (byte(d, body) * 256 + byte(d, body + 1)) * 256 + byte(d, body + 2)
+          if micro > 0 then song.tempos[#song.tempos + 1] = { beat = tick / tpb, bpm = 60000000 / micro } end
+        elseif kind == 0x58 and len >= 2 and song.timeSignature == nil then
+          song.timeSignature = { byte(d, body), 1 << byte(d, body + 1) }
+        elseif kind == 0x2F then
+          stop = true
+        end
+        at = bodyEnd
+        endTick = tick
+        if stop then break end
+      elseif b == 0xF0 or b == 0xF7 then
+        local len, body = varLen(d, at + 1, to)
+        if len == nil or body + len > to then return nil end
+        local bytes = {}
+        if b == 0xF0 then bytes[1] = 0xF0 end
+        for i = body, body + len - 1 do bytes[#bytes + 1] = byte(d, i) end
+        track.events[#track.events + 1] = { beat = tick / tpb, bytes = bytes }
+        at = body + len
+        endTick = tick
+      else
+        if b < 0x80 then
+          if status == 0 then return nil end
+          b = status
+        else
+          status = b
+          at = at + 1
+        end
+        local kind = b & 0xF0
+        local size = (kind == 0xC0 or kind == 0xD0) and 1 or 2
+        if at + size > to then return nil end
+        local x = byte(d, at)
+        local y = size == 2 and byte(d, at + 1) or 0
+        at = at + size
+        endTick = tick
+        local channel = (b & 0x0F) + 1
+        if kind == 0x90 and y > 0 then
+          local note = { beat = tick / tpb, note = x, velocity = y, length = 0, channel = channel }
+          track.notes[#track.notes + 1] = note
+          local key = channel .. ":" .. x
+          if open[key] == nil then open[key] = {}; openKeys[#openKeys + 1] = key end
+          local list = open[key]
+          list[#list + 1] = { note = note, tick = tick }
+        elseif kind == 0x80 or kind == 0x90 then
+          local list = open[channel .. ":" .. x]
+          if list ~= nil and #list > 0 then
+            local first = table.remove(list, 1)
+            first.note.length = (tick - first.tick) / tpb
+          end
+        else
+          local bytes = size == 2 and { b, x, y } or { b, x }
+          track.events[#track.events + 1] = { beat = tick / tpb, bytes = bytes }
+        end
+      end
+    end
+    table.sort(openKeys)
+    for _, key in ipairs(openKeys) do
+      for _, w in ipairs(open[key]) do
+        w.note.length = (endTick - w.tick) / tpb
+        say("warn", "ce.file.midiRead: note " .. w.note.note .. " on channel " .. w.note.channel .. " at beat "
+          .. numText(w.note.beat) .. " in track " .. index .. " never ends, so it lasts to the end of its track.")
+      end
+    end
+    return track
+  end
+
+  local function midiRead(bytes, opts, say)
+    local d = bytesOf(bytes)
+    if d == nil then return midiRefuse(say, "bytes must be a list of numbers 0 to 255, or hex text") end
+    if #d < 14 or latin1(d, 0, 4) ~= "MThd" then return midiRefuse(say, "that is not a MIDI file (it does not start with \"MThd\")") end
+    local headerLen = u32(d, 4)
+    local format, count, division = u16(d, 8), u16(d, 10), u16(d, 12)
+    if format == 2 then return midiRefuse(say, "it is a type 2 file (separate songs in one file), which is not read") end
+    if format > 2 then return midiRefuse(say, "it says it is a type " .. format .. " file, which does not exist") end
+    if division >= 0x8000 then return midiRefuse(say, "its times are in SMPTE frames, not beats") end
+    if division == 0 then return midiRefuse(say, "it gives 0 ticks per beat") end
+    local only = opt(opts, "track")
+    if only ~= nil and (not finite(only) or math.floor(only) ~= only or only < 1 or only > count) then
+      return midiRefuse(say, "track " .. numText(only) .. " is not a track of the file, which has " .. count)
+    end
+    local song = { ticksPerBeat = division, tempo = 120, tempos = {}, timeSignature = nil, tracks = {} }
+    local at, index = 8 + headerLen, 0
+    while at + 8 <= #d and index < count do
+      local id = latin1(d, at, at + 4)
+      local len = u32(d, at + 4)
+      local from = at + 8
+      local to = math.min(#d, from + len)
+      at = from + len
+      if id == "MTrk" then
+        index = index + 1
+        local track = readTrack(d, from, to, division, index, song, say)
+        if track == nil then return midiRefuse(say, "track " .. index .. " is cut short or damaged") end
+        if only == nil or only == index then song.tracks[#song.tracks + 1] = track end
+      end
+    end
+    -- A stable sort: table.sort is not, so the order a file gives equal beats in is kept by hand.
+    for i = 2, #song.tempos do
+      local j, item = i, song.tempos[i]
+      while j > 1 and song.tempos[j - 1].beat > item.beat do song.tempos[j] = song.tempos[j - 1]; j = j - 1 end
+      song.tempos[j] = item
+    end
+    if #song.tempos > 0 and song.tempos[1].beat == 0 then song.tempo = song.tempos[1].bpm end
+    if song.timeSignature == nil then song.timeSignature = { 4, 4 } end
+    return song
+  end
+
+  local function pushVarLen(out, value)
+    local v = math.max(0, math.floor(value))
+    local groups = { v & 0x7F }
+    v = v // 128
+    while v > 0 do
+      groups[#groups + 1] = (v & 0x7F) | 0x80
+      v = v // 128
+    end
+    for i = #groups, 1, -1 do out[#out + 1] = groups[i] end
+  end
+  local function pushU32(out, v)
+    out[#out + 1] = (v // 16777216) % 256
+    out[#out + 1] = (v // 65536) % 256
+    out[#out + 1] = (v // 256) % 256
+    out[#out + 1] = v % 256
+  end
+
+  local function noteFrom(n, channel, index, say)
+    if type(n) ~= "table" or not finite(n.beat) or n.beat < 0 or not finite(n.note) then
+      say("error", "ce.file.midiWrite: note " .. index .. " needs a beat of 0 or more and a note number, so nothing was written.")
+      return nil
+    end
+    return {
+      beat = n.beat,
+      note = clampInt(n.note, 0, 127, 60),
+      velocity = clampInt(n.velocity, 1, 127, 100),
+      length = (finite(n.length) and n.length > 0) and n.length or 0.25,
+      channel = clampInt(n.channel, 1, 16, channel),
+    }
+  end
+
+  local function songFrom(song, opts, clock, say)
+    local channel = clampInt(opt(opts, "channel"), 1, 16, 1)
+    if isList(song) then
+      local notes = {}
+      for i, raw in ipairs(song) do
+        local n = noteFrom(raw, channel, i, say)
+        if n == nil then return nil end
+        notes[#notes + 1] = n
+      end
+      return { ticksPerBeat = DEFAULT_TICKS, tempo = nil, tempos = {}, timeSignature = nil, tracks = { { name = "", notes = notes, events = {} } } }
+    end
+    if type(song) == "table" and isList(song.tracks) then
+      local tracks = {}
+      for _, t in ipairs(song.tracks) do
+        local notes, events = {}, {}
+        local list = (type(t) == "table" and isList(t.notes)) and t.notes or {}
+        for i, raw in ipairs(list) do
+          local n = noteFrom(raw, channel, i, say)
+          if n == nil then return nil end
+          notes[#notes + 1] = n
+        end
+        for _, e in ipairs((type(t) == "table" and isList(t.events)) and t.events or {}) do
+          local bytes = type(e) == "table" and bytesOf(e.bytes) or nil
+          if bytes == nil or #bytes == 0 or not finite(e.beat) or e.beat < 0 then
+            say("error", "ce.file.midiWrite: an event needs a beat of 0 or more and its bytes, so nothing was written.")
+            return nil
+          end
+          events[#events + 1] = { beat = e.beat, bytes = bytes }
+        end
+        tracks[#tracks + 1] = { name = (type(t) == "table" and type(t.name) == "string") and t.name or "", notes = notes, events = events }
+      end
+      local tpb = clampInt(song.ticksPerBeat, 1, 32767, DEFAULT_TICKS)
+      local sig = (isList(song.timeSignature) and #song.timeSignature >= 2) and song.timeSignature or nil
+      return { ticksPerBeat = tpb, tempo = (finite(song.tempo) and song.tempo > 0) and song.tempo or nil,
+               tempos = isList(song.tempos) and song.tempos or {}, timeSignature = sig, tracks = tracks }
+    end
+    if type(song) == "table" and type(song.take) == "table" and isList(song.take.events) then
+      local perBar = clampInt(clock.beatsPerBar, 1, 32, 4)
+      local loop = clampInt(song.bars, 1, 16, 2) * perBar
+      local notes = {}
+      local own = clampInt(song.channel, 1, 16, channel)
+      for _, e in ipairs(song.take.events) do
+        if type(e) == "table" and finite(e.t) and finite(e.note) then
+          notes[#notes + 1] = {
+            beat = e.t * loop,
+            note = clampInt(e.note, 0, 127, 60),
+            velocity = clampInt(e.velocity, 1, 127, 100),
+            length = ((finite(e.dur) and e.dur > 0) and e.dur or 0.1) * loop,
+            channel = own,
+          }
+        end
+      end
+      return { ticksPerBeat = DEFAULT_TICKS, tempo = nil, tempos = {}, timeSignature = { perBar, 4 }, tracks = { { name = "", notes = notes, events = {} } } }
+    end
+    say("error", "ce.file.midiWrite: song must be a song as midiRead gives it, a list of notes, or a Phrase Recorder's section, so nothing was written.")
+    return nil
+  end
+
+  local function trackChunk(track, tpb, metas)
+    local items = {}
+    local function add(tick, order, bytes)
+      items[#items + 1] = { tick = math.max(0, math.floor(tick + 0.5)), order = order, seq = #items, bytes = bytes }
+    end
+    for _, m in ipairs(metas) do add(m.tick, 0, m.bytes) end
+    if track.name ~= "" then
+      local name = { 0xFF, 0x03 }
+      pushVarLen(name, #track.name)
+      for i = 1, #track.name do name[#name + 1] = string.byte(track.name, i) end
+      add(0, 0, name)
+    end
+    for _, e in ipairs(track.events) do
+      local bytes
+      if e.bytes[1] == 0xF0 then
+        bytes = { 0xF0 }
+        pushVarLen(bytes, #e.bytes - 1)
+        for i = 2, #e.bytes do bytes[#bytes + 1] = e.bytes[i] end
+      else
+        bytes = {}
+        for i, b in ipairs(e.bytes) do bytes[i] = b end
+      end
+      add(e.beat * tpb, 2, bytes)
+    end
+    for _, n in ipairs(track.notes) do
+      add(n.beat * tpb, 3, { 0x90 + n.channel - 1, n.note, n.velocity })
+      add((n.beat + n.length) * tpb, 1, { 0x80 + n.channel - 1, n.note, 0 })
+    end
+    table.sort(items, function(a, b)
+      if a.tick ~= b.tick then return a.tick < b.tick end
+      if a.order ~= b.order then return a.order < b.order end
+      return a.seq < b.seq
+    end)
+    local body = {}
+    local last = 0
+    for _, item in ipairs(items) do
+      pushVarLen(body, item.tick - last)
+      last = item.tick
+      for _, b in ipairs(item.bytes) do body[#body + 1] = b end
+    end
+    for _, b in ipairs({ 0x00, 0xFF, 0x2F, 0x00 }) do body[#body + 1] = b end
+    local out = { 0x4D, 0x54, 0x72, 0x6B }
+    pushU32(out, #body)
+    for _, b in ipairs(body) do out[#out + 1] = b end
+    return out
+  end
+
+  local function tempoMeta(tick, bpm)
+    local micro = math.max(1, math.min(16777215, math.floor(60000000 / bpm + 0.5)))
+    return { tick = tick, bytes = { 0xFF, 0x51, 0x03, (micro // 65536) % 256, (micro // 256) % 256, micro % 256 } }
+  end
+
+  local function midiWrite(song, opts, clock, say)
+    clock = type(clock) == "table" and clock or {}
+    local s = songFrom(song, opts, clock, say)
+    if s == nil then return nil end
+    local given = opt(opts, "tempo")
+    local bpm = 120
+    if finite(given) and given > 0 then bpm = given
+    elseif s.tempo ~= nil then bpm = s.tempo
+    elseif finite(clock.tempo) and clock.tempo > 0 then bpm = clock.tempo end
+    local name = opt(opts, "name")
+    if type(name) == "string" and name ~= "" then s.tracks[1].name = name end
+    local tpb = s.ticksPerBeat
+    local sig = s.timeSignature or { clampInt(clock.beatsPerBar, 1, 32, 4), 4 }
+    local denomPower = 0
+    local denom = clampInt(sig[2], 1, 64, 4)
+    while denom > 1 do denom = denom // 2; denomPower = denomPower + 1 end
+    local metas = { tempoMeta(0, bpm), { tick = 0, bytes = { 0xFF, 0x58, 0x04, clampInt(sig[1], 1, 32, 4), denomPower, 24, 8 } } }
+    for _, t in ipairs(s.tempos) do
+      if type(t) == "table" and finite(t.beat) and t.beat > 0 and finite(t.bpm) and t.bpm > 0 then
+        metas[#metas + 1] = tempoMeta(t.beat * tpb, t.bpm)
+      end
+    end
+    local out = { 0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, #s.tracks > 1 and 1 or 0 }
+    for _, b in ipairs({ (#s.tracks // 256) % 256, #s.tracks % 256, (tpb // 256) % 256, tpb % 256 }) do out[#out + 1] = b end
+    for i, track in ipairs(s.tracks) do
+      for _, b in ipairs(trackChunk(track, tpb, i == 1 and metas or {})) do out[#out + 1] = b end
+    end
+    return out
+  end
+
+  local function say(level, text) if level == "warn" then logWarn(text) else logError(text) end end
+  local function clock()
+    local t = transportInfo()
+    return { tempo = tempo(), beatsPerBar = (type(t) == "table" and t.beatsPerBar) or 4 }
+  end
+
+-- (global; at the line start, where the option check looks for it)
+function fileSyxSplit(bytes, opts) return syxSplit(bytes, opts, say) end
+-- (global; at the line start, where the option check looks for it)
+function fileSyxJoin(messages) return syxJoin(messages, say) end
+-- (global; at the line start, where the option check looks for it)
+function fileMidiRead(bytes, opts) return midiRead(bytes, opts, say) end
+-- (global; at the line start, where the option check looks for it)
+function fileMidiWrite(song, opts) return midiWrite(song, opts, clock(), say) end
+end
+
+-- @module ce.ci
+-- ce.ci, ported line for line from ciCore.js (the panel view's; the JavaScript prelude runs that file
+-- itself). Held to the panel view's answers by test/ciParity.test.js and the scenario in
+-- test/support/ciScenario.mjs. Every command goes to the device layer's one MIDI-CI session
+-- (__deviceQuery "ci"); the device's answers come back as "__ciReply" events.
+do
+  local INF = math.huge
+  local function finite(x) return type(x) == "number" and x == x and x ~= INF and x ~= -INF end
+  local function isNumberText(s)
+    local base = s:match("^(.-)[eE][+-]?%d+$") or s
+    return base:match("^[+-]?%d+%.?%d*$") ~= nil or base:match("^[+-]?%.%d+$") ~= nil
+  end
+  local function toNumber(v)
+    if type(v) == "number" then return v end
+    if type(v) == "string" then
+      local t = v:match("^%s*(.-)%s*$")
+      if isNumberText(t) then return tonumber(t) end
+    end
+    return 0 / 0
+  end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function passOn(opts, keys)
+    local out = {}
+    for _, key in ipairs(keys) do
+      local v = opt(opts, key)
+      if v ~= nil then out[key] = v end
+    end
+    return out
+  end
+  -- A whole number as JavaScript writes it, so a token is the same key in every language.
+  local function key(v)
+    if type(v) == "number" and v == math.floor(v) then return string.format("%d", v) end
+    return tostring(v)
+  end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+
+    local function muidOf(verb, muid)
+      local n = toNumber(muid)
+      if finite(n) and n >= 0 and math.floor(n) == n then return math.floor(n) end
+      say("error", "ce.ci." .. verb .. ": muid must be a device's number, as discover or devices give it, so nothing was sent.")
+      return nil
+    end
+    local function needFn(verb, fn)
+      if type(fn) == "function" then return true end
+      say("error", "ce.ci." .. verb .. ": fn must be a function to call with the answer, so nothing was sent.")
+      return false
+    end
+    local function needResource(verb, resource)
+      if type(resource) == "string" and resource ~= "" then return true end
+      say("error", "ce.ci." .. verb .. ": resource must be a resource's name, such as \"ProgramList\", so nothing was sent.")
+      return false
+    end
+    local function start(verb, fields, fn)
+      local answer = host.ask(fields)
+      if type(answer) ~= "table" or answer.ok ~= true or answer.token == nil then
+        local why = "MIDI-CI is not available here"
+        if type(answer) == "table" and type(answer.error) == "string" and answer.error ~= "" then why = answer.error end
+        say("error", "ce.ci." .. verb .. ": " .. why .. ", so nothing was sent.")
+        return false
+      end
+      host.waiters()[key(answer.token)] = { fn = fn }
+      return answer.token
+    end
+
+    local function discover(a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      if not needFn("discover", fn) then return false end
+      local role = opt(opts, "role")
+      local fields = { op = "discover", role = (type(role) == "string" and role ~= "") and role or "mainSynth" }
+      local timeout = toNumber(opt(opts, "timeoutMs"))
+      if finite(timeout) and timeout > 0 then fields.timeoutMs = timeout end
+      return start("discover", fields, fn) ~= false
+    end
+
+    local function devices(role)
+      local fields = { op = "devices" }
+      if type(role) == "string" and role ~= "" then fields.role = role end
+      local list = host.query(fields)
+      if type(list) == "table" then return list end
+      return {}
+    end
+
+    local function get(muid, resource, a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      local m = muidOf("get", muid)
+      if m == nil or not needResource("get", resource) or not needFn("get", fn) then return false end
+      return start("get", { op = "get", muid = m, resource = resource, opts = passOn(opts, { "resId", "offset", "limit", "timeoutMs" }) }, fn) ~= false
+    end
+
+    local function set(muid, resource, body, a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      local m = muidOf("set", muid)
+      if m == nil or not needResource("set", resource) or not needFn("set", fn) then return false end
+      if body == nil then
+        say("error", "ce.ci.set: body must be given: a table, text or bytes, so nothing was sent.")
+        return false
+      end
+      return start("set", { op = "set", muid = m, resource = resource, body = body, opts = passOn(opts, { "resId", "partial", "mediaType", "timeoutMs" }) }, fn) ~= false
+    end
+
+    local function subscribe(muid, resource, a, b)
+      local opts, fn = a, b
+      if type(a) == "function" then opts, fn = nil, a end
+      local m = muidOf("subscribe", muid)
+      if m == nil or not needResource("subscribe", resource) or not needFn("subscribe", fn) then return nil end
+      local token = start("subscribe", { op = "subscribe", muid = m, resource = resource, opts = passOn(opts, { "resId" }) }, fn)
+      if token == false then return nil end
+      return token
+    end
+
+    local function unsubscribe(id)
+      if id == nil then return false end
+      host.waiters()[key(id)] = nil
+      return host.query({ op = "unsubscribe", id = key(id) }) == true
+    end
+
+    local function profiles(muid, fn)
+      local m = muidOf("profiles", muid)
+      if m == nil then return {} end
+      local list = host.query({ op = "profiles", muid = m })
+      if fn ~= nil then
+        if needFn("profiles", fn) then start("profiles", { op = "profiles", muid = m, ask = true }, fn) end
+      end
+      if type(list) == "table" then return list end
+      return {}
+    end
+
+    local function setProfile(muid, id, on, opts)
+      local m = muidOf("setProfile", muid)
+      if m == nil then return false end
+      if type(id) ~= "string" or id == "" then
+        say("error", "ce.ci.setProfile: id must be a profile, as profiles gives it (\"7E 21 09 01 00\"), so nothing was sent.")
+        return false
+      end
+      if type(on) ~= "boolean" then
+        say("error", "ce.ci.setProfile: on must be true or false, so nothing was sent.")
+        return false
+      end
+      local channel = 0
+      local given = opt(opts, "channel")
+      if given ~= nil then
+        local c = toNumber(given)
+        if not finite(c) or math.floor(c) ~= c or c < 1 or c > 16 then
+          say("error", "ce.ci.setProfile: channel must be 1 to 16, so nothing was sent.")
+          return false
+        end
+        channel = math.floor(c)
+      end
+      local answer = host.query({ op = "setProfile", muid = m, id = id, on = on, channel = channel })
+      if answer == true then return true end
+      local why = "MIDI-CI is not available here"
+      if type(answer) == "table" and type(answer.error) == "string" and answer.error ~= "" then why = answer.error end
+      say("error", "ce.ci.setProfile: " .. why .. ", so nothing was sent.")
+      return false
+    end
+
+    local function receive(reply)
+      if type(reply) ~= "table" or reply.token == nil then return end
+      local waiters = host.waiters()
+      local k = key(reply.token)
+      local w = waiters[k]
+      if w == nil then return end
+      if reply.final == true then waiters[k] = nil end
+      host.call(w.fn, reply.result)
+    end
+
+    return { discover = discover, devices = devices, get = get, set = set, subscribe = subscribe,
+             unsubscribe = unsubscribe, profiles = profiles, setProfile = setProfile, receive = receive }
+  end
+
+  -- One Lua state serves every script on the panel, and a function keeps the script it was made in,
+  -- so one table of waiters serves them all.
+  local waiting = {}
+  local C = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    ask = function(fields) return __deviceQuery("ci", fields) end,
+    query = function(fields) return __deviceQuery("ci", fields) end,
+    waiters = function() return waiting end,
+    call = function(fn, value)
+      local fine, err = pcall(fn, value)
+      if not fine then logError("ce.ci: the function given to it failed: " .. tostring(err)) end
+    end,
+  })
+  on("*", "__ciReply", function(reply) C.receive(reply) end)
+
+-- (global; at the line start, where the option check looks for it)
+function ciDiscover(opts, fn) return C.discover(opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciDevices(role) return C.devices(role) end
+-- (global; at the line start, where the option check looks for it)
+function ciGet(muid, resource, opts, fn) return C.get(muid, resource, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciSet(muid, resource, body, opts, fn) return C.set(muid, resource, body, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciSubscribe(muid, resource, opts, fn) return C.subscribe(muid, resource, opts, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciUnsubscribe(id) return C.unsubscribe(id) end
+-- (global; at the line start, where the option check looks for it)
+function ciProfiles(muid, fn) return C.profiles(muid, fn) end
+-- (global; at the line start, where the option check looks for it)
+function ciSetProfile(muid, id, on, opts) return C.setProfile(muid, id, on, opts) end
+end
+
+-- @module ce.mpe
+-- ce.mpe, ported line for line from mpeCore.js (the panel view's; the JavaScript prelude runs that
+-- file itself). Held to the panel view's answers by test/mpeParity.test.js and the scenario in
+-- test/support/mpeScenario.mjs. Reading MPE back in is the input decoder's; listen only tells it how.
+do
+  local ZONES = { "lower", "upper" }
+  local INF = math.huge
+  local function finite(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function held(x, lo, hi) if x < lo then return lo end if x > hi then return hi end return x end
+  local function roundHalfAway(x) if x < 0 then return -math.floor(-x + 0.5) end return math.floor(x + 0.5) end
+  local function contains(list, v) for _, x in ipairs(list) do if x == v then return true end end return false end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local zone = nil
+    local sounding = {}
+    local released = {}
+    local releases = 0
+    local nextId = 1
+    local warnedFull = false
+
+    local function members()
+      local out = {}
+      for i = 0, zone.members - 1 do out[#out + 1] = zone.upper and (15 - i) or (2 + i) end
+      return out
+    end
+    local function send(bytes) host.send(bytes, zone.role) end
+    local function rpn(channel, msb, lsb, value)
+      local status = 0xB0 + channel - 1
+      send({ status, 101, msb }); send({ status, 100, lsb }); send({ status, 6, value })
+      send({ status, 38, 0 }); send({ status, 101, 127 }); send({ status, 100, 127 })
+    end
+    local function bendBytes(channel, semitones)
+      local v = held(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383)
+      return { 0xE0 + channel - 1, v % 128, v // 128 }
+    end
+    local function amount7(x) return held(roundHalfAway(held(x, 0, 1) * 127), 0, 127) end
+    local function release(n, velocity)
+      send({ 0x80 + n.channel - 1, n.note, velocity })
+      local keep = {}
+      for _, x in ipairs(sounding) do if x ~= n then keep[#keep + 1] = x end end
+      sounding = keep
+      releases = releases + 1
+      released[n.channel] = releases
+    end
+    local function allOff()
+      if zone == nil then return 0 end
+      local count = #sounding
+      local copy = {}
+      for i, x in ipairs(sounding) do copy[i] = x end
+      for _, n in ipairs(copy) do release(n, 64) end
+      for _, channel in ipairs(members()) do send({ 0xE0 + channel - 1, 0, 64 }) end
+      return count
+    end
+    local function semitones(verb, value, name)
+      if not finite(value) then
+        say("error", "ce.mpe." .. verb .. ": " .. name .. " must be a number of semitones, so nothing was done.")
+        return nil
+      end
+      return value
+    end
+    local function isWhole(v) return finite(v) and math.floor(v) == v end
+
+    local function setZone(opts)
+      local which = opt(opts, "zone")
+      if which == nil then which = "lower" end
+      if not contains(ZONES, which) then
+        say("error", "ce.mpe.zone: zone must be \"lower\" or \"upper\", so nothing was done.")
+        return false
+      end
+      local count = opt(opts, "members")
+      if count == nil then count = 15 end
+      if not isWhole(count) or count < 1 or count > 15 then
+        say("error", "ce.mpe.zone: members must be a whole number from 1 to 15, so nothing was done.")
+        return false
+      end
+      local bendRange = 48
+      if opt(opts, "bendRange") ~= nil then bendRange = semitones("zone", opt(opts, "bendRange"), "bendRange") end
+      if bendRange == nil then return false end
+      local managerBendRange = 2
+      if opt(opts, "managerBendRange") ~= nil then managerBendRange = semitones("zone", opt(opts, "managerBendRange"), "managerBendRange") end
+      if managerBendRange == nil then return false end
+      if bendRange <= 0 or bendRange > 96 or managerBendRange <= 0 or managerBendRange > 96 then
+        say("error", "ce.mpe.zone: a bend range must be above 0 and at most 96 semitones, so nothing was done.")
+        return false
+      end
+      local role = opt(opts, "role")
+      allOff()
+      zone = { upper = which == "upper", members = math.floor(count), bendRange = bendRange, managerBendRange = managerBendRange,
+               role = (type(role) == "string" and role ~= "") and role or "mainSynth" }
+      sounding = {}
+      released = {}
+      if opt(opts, "send") ~= false then
+        local manager = zone.upper and 16 or 1
+        rpn(manager, 0, 6, zone.members)
+        rpn(manager, 0, 0, roundHalfAway(managerBendRange))
+        for _, channel in ipairs(members()) do rpn(channel, 0, 0, roundHalfAway(bendRange)) end
+      end
+      return true
+    end
+
+    local function startValues(verb, values)
+      local out = { bend = 0, pressure = 0, timbre = 0.5 }
+      if values == nil then return out end
+      if type(values) ~= "table" then
+        say("error", "ce.mpe." .. verb .. ": values must be a table of bend, pressure and timbre, so nothing was sent.")
+        return nil
+      end
+      for _, key in ipairs({ "bend", "pressure", "timbre" }) do
+        local v = values[key]
+        if v ~= nil then
+          if not finite(v) then
+            say("error", "ce.mpe." .. verb .. ": " .. key .. " must be a number, so nothing was sent.")
+            return nil
+          end
+          out[key] = v
+        end
+      end
+      return out
+    end
+
+    local function noteOn(note, velocity, opts)
+      local n = host.note(note)
+      if n == nil then
+        say("error", "ce.mpe.noteOn: note must be 0 to 127 or a name such as \"C4\", so nothing was sent.")
+        return nil
+      end
+      if not isWhole(velocity) or velocity < 1 or velocity > 127 then
+        say("error", "ce.mpe.noteOn: velocity must be a whole number from 1 to 127, so nothing was sent.")
+        return nil
+      end
+      local start = startValues("noteOn", opts)
+      if start == nil then return nil end
+      if zone == nil then setZone({}) end
+      local busy = {}
+      for _, x in ipairs(sounding) do busy[x.channel] = true end
+      local channel, best = 0, INF
+      for _, c in ipairs(members()) do
+        if not busy[c] then
+          local when = released[c] or 0
+          if when < best then best = when; channel = c end
+        end
+      end
+      if channel == 0 then
+        local oldest = sounding[1]
+        if not warnedFull then
+          warnedFull = true
+          say("warn", "ce.mpe.noteOn: every member channel is busy, so the oldest note was ended. More members, or fewer notes at once, avoid it.")
+        end
+        channel = oldest.channel
+        release(oldest, 64)
+      end
+      local bend = held(start.bend, -zone.bendRange, zone.bendRange)
+      send(bendBytes(channel, bend))
+      send({ 0xB0 + channel - 1, 74, amount7(start.timbre) })
+      send({ 0xD0 + channel - 1, amount7(start.pressure) })
+      send({ 0x90 + channel - 1, n, math.floor(velocity) })
+      local id = nextId
+      nextId = nextId + 1
+      sounding[#sounding + 1] = { id = id, note = n, channel = channel, velocity = math.floor(velocity), bend = bend,
+                                  pressure = held(start.pressure, 0, 1), timbre = held(start.timbre, 0, 1) }
+      return id
+    end
+
+    local function find(id)
+      for _, n in ipairs(sounding) do if n.id == id then return n end end
+      return nil
+    end
+
+    local function express(id, values)
+      local n = find(id)
+      if n == nil then return false end
+      if type(values) ~= "table" then
+        say("error", "ce.mpe.express: values must be a table of bend, pressure and timbre, so nothing was sent.")
+        return false
+      end
+      if startValues("express", values) == nil then return false end
+      if values.bend ~= nil then
+        n.bend = held(values.bend, -zone.bendRange, zone.bendRange)
+        send(bendBytes(n.channel, n.bend))
+      end
+      if values.pressure ~= nil then
+        n.pressure = held(values.pressure, 0, 1)
+        send({ 0xD0 + n.channel - 1, amount7(n.pressure) })
+      end
+      if values.timbre ~= nil then
+        n.timbre = held(values.timbre, 0, 1)
+        send({ 0xB0 + n.channel - 1, 74, amount7(n.timbre) })
+      end
+      return true
+    end
+
+    local function noteOff(id, velocity)
+      local n = find(id)
+      if n == nil then return false end
+      local v = 64
+      if velocity ~= nil then
+        if not isWhole(velocity) or velocity < 0 or velocity > 127 then
+          say("error", "ce.mpe.noteOff: velocity must be a whole number from 0 to 127, so the note was ended at 64.")
+        else
+          v = math.floor(velocity)
+        end
+      end
+      release(n, v)
+      return true
+    end
+
+    local function notes()
+      local out = {}
+      for i, n in ipairs(sounding) do
+        out[i] = { id = n.id, note = n.note, channel = n.channel, velocity = n.velocity, bend = n.bend, pressure = n.pressure, timbre = n.timbre }
+      end
+      return out
+    end
+
+    local function listen(opts)
+      local from = opt(opts, "from")
+      local role = type(from) == "string" and from or ""
+      if opt(opts, "off") == true then
+        host.listen(role, nil)
+        return true
+      end
+      local which = opt(opts, "zone")
+      if which == nil then which = "lower" end
+      if not contains(ZONES, which) then
+        say("error", "ce.mpe.listen: zone must be \"lower\" or \"upper\", so nothing was done.")
+        return false
+      end
+      local count = opt(opts, "members")
+      if count == nil then count = 15 end
+      if not isWhole(count) or count < 1 or count > 15 then
+        say("error", "ce.mpe.listen: members must be a whole number from 1 to 15, so nothing was done.")
+        return false
+      end
+      local bendRange = 48
+      if opt(opts, "bendRange") ~= nil then bendRange = semitones("listen", opt(opts, "bendRange"), "bendRange") end
+      if bendRange == nil then return false end
+      if bendRange <= 0 or bendRange > 96 then
+        say("error", "ce.mpe.listen: bendRange must be above 0 and at most 96 semitones, so nothing was done.")
+        return false
+      end
+      host.listen(role, { zone = which, members = math.floor(count), bendRange = bendRange })
+      return true
+    end
+
+    return { zone = setZone, noteOn = noteOn, express = express, noteOff = noteOff, allOff = allOff, notes = notes, listen = listen }
+  end
+
+  local M = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    send = function(bytes, role)
+      if role ~= nil and role ~= "mainSynth" then routeMidi(role, function() sendMidi(bytes) end) else sendMidi(bytes) end
+    end,
+    -- A note as sendNote reads it: a number, rounded, or a name such as "C4".
+    note = function(v)
+      local n = nil
+      if type(v) == "string" then n = noteNumber(v)
+      elseif finite(v) then n = math.floor(v + 0.5) end
+      if n ~= nil and n >= 0 and n <= 127 then return n end
+      return nil
+    end,
+    listen = function(role, opts) __deviceQuery("mpeListen", { role = role, opts = opts }) end,
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function mpeZone(opts) return M.zone(opts) end
+-- (global; at the line start, where the option check looks for it)
+function mpeNoteOn(note, velocity, opts) return M.noteOn(note, velocity, opts) end
+-- (global; at the line start, where the option check looks for it)
+function mpeExpress(id, values) return M.express(id, values) end
+-- (global; at the line start, where the option check looks for it)
+function mpeNoteOff(id, velocity) return M.noteOff(id, velocity) end
+-- (global; at the line start, where the option check looks for it)
+function mpeAllOff() return M.allOff() end
+-- (global; at the line start, where the option check looks for it)
+function mpeNotes() return M.notes() end
+-- (global; at the line start, where the option check looks for it)
+function mpeListen(opts) return M.listen(opts) end
+end
+
+-- @module ce.daw
+-- ce.daw, ported line for line from dawCore.js (the panel view's; the JavaScript prelude runs that
+-- file itself). Held to the panel view's answers by test/dawParity.test.js and the scenario in
+-- test/support/dawScenario.mjs. Everything is asked of the plug-in, as the "daw" device query.
+do
+  local function present(v) return v ~= nil end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local function needPath(verb, path, what)
+      if type(path) == "string" and path ~= "" then return true end
+      say("error", "ce.daw." .. verb .. ": path must be a control's path, such as \"Cutoff.value\", so " .. what .. ".")
+      return false
+    end
+    local function list(op)
+      local answer = host.query(op, {})
+      if type(answer) == "table" then return answer end
+      return {}
+    end
+    local function tbl(op)
+      local answer = host.query(op, {})
+      if type(answer) == "table" then return answer end
+      return nil
+    end
+    local C = {}
+    function C.host() return tbl("host") end
+    function C.parameters() return list("parameters") end
+    function C.parameter(path)
+      if not needPath("parameter", path, "there is nothing to give") then return nil end
+      for _, p in ipairs(C.parameters()) do
+        if type(p) == "table" and p.path == path then return p end
+      end
+      return nil
+    end
+    function C.program() return tbl("program") end
+    function C.programs() return list("programs") end
+    local function gesture(verb, path)
+      if not needPath(verb, path, "nothing was done") then return false end
+      return host.query(verb, { path = path }) == true
+    end
+    function C.beginGesture(path) return gesture("beginGesture", path) end
+    function C.endGesture(path) return gesture("endGesture", path) end
+    function C.rename(path, name)
+      if not needPath("rename", path, "nothing was renamed") then return false end
+      if present(name) and type(name) ~= "string" then
+        say("error", "ce.daw.rename: name must be text, or nothing for the name it was exported with, so nothing was renamed.")
+        return false
+      end
+      return host.query("rename", { path = path, name = name or "" }) == true
+    end
+    function C.assign(slot, path, opts)
+      if type(slot) ~= "number" or slot ~= slot or slot == math.huge or slot == -math.huge
+          or math.floor(slot) ~= slot or slot < 1 then
+        say("error", "ce.daw.assign: slot must be a whole number from 1, so nothing was assigned.")
+        return false
+      end
+      if present(path) and (type(path) ~= "string" or path == "") then
+        say("error", "ce.daw.assign: path must be a control's path, such as \"Cutoff.value\", or nothing to empty the slot, so nothing was assigned.")
+        return false
+      end
+      local name = nil
+      if type(opts) == "table" then name = opts.name end
+      if present(name) and type(name) ~= "string" then
+        say("error", "ce.daw.assign: name must be text, so nothing was assigned.")
+        return false
+      end
+      return host.query("assign", { slot = slot, path = path or "", name = name or "" }) == true
+    end
+    function C.markChanged() return host.query("markChanged", {}) == true end
+    return C
+  end
+
+  local D = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    query = function(op, fields)
+      local q = {}
+      for k, v in pairs(fields) do q[k] = v end
+      q.op = op
+      return __deviceQuery("daw", q)
+    end,
+  })
+
+-- (global; at the line start, where the option check looks for it)
+function dawHost() return D.host() end
+-- (global; at the line start, where the option check looks for it)
+function dawParameters() return D.parameters() end
+-- (global; at the line start, where the option check looks for it)
+function dawParameter(path) return D.parameter(path) end
+-- (global; at the line start, where the option check looks for it)
+function dawProgram() return D.program() end
+-- (global; at the line start, where the option check looks for it)
+function dawPrograms() return D.programs() end
+-- (global; at the line start, where the option check looks for it)
+function dawBeginGesture(path) return D.beginGesture(path) end
+-- (global; at the line start, where the option check looks for it)
+function dawEndGesture(path) return D.endGesture(path) end
+-- (global; at the line start, where the option check looks for it)
+function dawRename(path, name) return D.rename(path, name) end
+-- (global; at the line start, where the option check looks for it)
+function dawAssign(slot, path, opts) return D.assign(slot, path, opts) end
+-- (global; at the line start, where the option check looks for it)
+function dawMarkChanged() return D.markChanged() end
+end
+
+-- @module ce.osc
+-- ce.osc, ported line for line from oscCore.js (the panel view's; the JavaScript prelude runs that
+-- file itself). Held to the panel view's answers by test/oscParity.test.js and the scenario in
+-- test/support/oscScenario.mjs. The port, the reading and writing of OSC and the user's yes live in
+-- the transport (__deviceQuery "osc"); what arrives comes back as "__oscIn" events.
+do
+  local PORT_MIN, PORT_MAX = 1024, 65535
+  local TAGS = "ihfdsSTFNIbrmtc"
+  local INF = math.huge
+  local function present(v) return v ~= nil end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function whole(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF and math.floor(v) == v end
+  local function isList(t) return type(t) == "table" and (#t > 0 or next(t) == nil) end
+  local function isBytes(v, count)
+    if not isList(v) or (count >= 0 and #v ~= count) then return false end
+    for _, b in ipairs(v) do if not whole(b) or b < 0 or b > 255 then return false end end
+    return true
+  end
+  local function fits(tag, v)
+    local number = type(v) == "number" and v == v and v ~= INF and v ~= -INF
+    if tag == "i" then return whole(v) and v >= -2147483648 and v <= 2147483647 end
+    if tag == "h" then return whole(v) end
+    if tag == "f" or tag == "d" or tag == "t" then return number end
+    if tag == "s" or tag == "S" then return type(v) == "string" end
+    if tag == "c" then return type(v) == "string" and v ~= "" end
+    if tag == "b" then return isBytes(v, -1) end
+    if tag == "m" then return isBytes(v, 4) end
+    if tag == "r" then
+      return type(v) == "string" and (v:match("^#%x%x%x%x%x%x$") ~= nil or v:match("^#%x%x%x%x%x%x%x%x$") ~= nil)
+    end
+    return tag ~= "" and TAGS:find(tag, 1, true) ~= nil
+  end
+  local WHAT = {
+    i = "a whole number", h = "a whole number", f = "a number", d = "a number", t = "a number", s = "text", S = "text",
+    c = "one character of text", b = "a list of bytes", m = "a list of four bytes", r = "a colour such as \"#FF8000\"",
+  }
+
+  -- One part of an address against one part of a pattern: * ? [a-z] [!a] {one,two}. Positions from 1.
+  local function partMatches(p, pi, s, si)
+    while pi <= #p do
+      local c = p:sub(pi, pi)
+      if c == "*" then
+        for k = #s + 1, si, -1 do if partMatches(p, pi + 1, s, k) then return true end end
+        return false
+      end
+      if c == "?" then
+        if si > #s then return false end
+        pi = pi + 1; si = si + 1
+      elseif c == "[" then
+        local close = p:find("]", pi + 1, true)
+        if close == nil or si > #s then return false end
+        local set = p:sub(pi + 1, close - 1)
+        local negate = set:sub(1, 1) == "!"
+        if negate then set = set:sub(2) end
+        local ch = s:sub(si, si)
+        local found = false
+        local k = 1
+        while k <= #set do
+          if k + 2 <= #set and set:sub(k + 1, k + 1) == "-" then
+            if ch >= set:sub(k, k) and ch <= set:sub(k + 2, k + 2) then found = true end
+            k = k + 3
+          else
+            if ch == set:sub(k, k) then found = true end
+            k = k + 1
+          end
+        end
+        if found == negate then return false end
+        pi = close + 1; si = si + 1
+      elseif c == "{" then
+        local close = p:find("}", pi + 1, true)
+        if close == nil then return false end
+        local alts = p:sub(pi + 1, close - 1)
+        for alt in (alts .. ","):gmatch("([^,]*),") do
+          if s:sub(si, si + #alt - 1) == alt and partMatches(p, close + 1, s, si + #alt) then return true end
+        end
+        return false
+      else
+        if si > #s or s:sub(si, si) ~= c then return false end
+        pi = pi + 1; si = si + 1
+      end
+    end
+    return si == #s + 1
+  end
+
+  local function split(text)
+    local parts = {}
+    for part in (text .. "/"):gmatch("([^/]*)/") do parts[#parts + 1] = part end
+    return parts
+  end
+
+  local function matches(pattern, address)
+    if type(pattern) ~= "string" or type(address) ~= "string" then return false end
+    local p, a = split(pattern), split(address)
+    if #p ~= #a then return false end
+    for i = 1, #p do if not partMatches(p[i], 1, a[i], 1) then return false end end
+    return true
+  end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local nextId = 1
+
+    local function answered(verb, answer, what)
+      if answer == true or (type(answer) == "table" and answer.ok == true) then return true end
+      local why = "OSC is not available here"
+      if type(answer) == "table" and type(answer.why) == "string" and answer.why ~= "" then why = answer.why end
+      say("error", "ce.osc." .. verb .. ": " .. why .. ", so " .. what .. ".")
+      return false
+    end
+
+    local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+
+    local function destination(verb, to)
+      if type(to) == "string" and trim(to) ~= "" then return trim(to) end
+      if type(to) == "table" and type(to.host) == "string" and whole(to.port) then return { host = to.host, port = to.port } end
+      say("error", "ce.osc." .. verb .. ": to must be a target's name, \"host:port\", or a message's from, so nothing was sent.")
+      return nil
+    end
+
+    local function message(verb, address, args, types, which)
+      local where = ""
+      if which ~= 0 then where = "message " .. which .. ": " end
+      if type(address) ~= "string" or address:sub(1, 1) ~= "/" then
+        say("error", "ce.osc." .. verb .. ": " .. where .. "address must be text starting with /, such as \"/fader/1\", so nothing was sent.")
+        return nil
+      end
+      local values
+      if args == nil then values = {}
+      elseif type(args) == "table" then values = args
+      else values = { args } end
+      local n = #values
+      local tags = ""
+      if types ~= nil then
+        local okTypes = type(types) == "string" and #types == n
+        if okTypes then
+          for i = 1, #types do if not TAGS:find(types:sub(i, i), 1, true) then okTypes = false end end
+        end
+        if not okTypes then
+          say("error", "ce.osc." .. verb .. ": " .. where .. "types must be text with one OSC type for each value, such as \"if\", so nothing was sent.")
+          return nil
+        end
+        tags = types
+      else
+        for i = 1, n do
+          local v = values[i]
+          if type(v) == "number" then tags = tags .. "f"
+          elseif type(v) == "string" then tags = tags .. "s"
+          elseif type(v) == "boolean" then tags = tags .. (v and "T" or "F")
+          elseif v == nil then tags = tags .. "N"
+          elseif isBytes(v, -1) then tags = tags .. "b"
+          else
+            say("error", "ce.osc." .. verb .. ": " .. where .. "value " .. i .. " is not a number, text, true or false, or a list of bytes, so nothing was sent.")
+            return nil
+          end
+        end
+      end
+      for i = 1, n do
+        local tag = tags:sub(i, i)
+        if not fits(tag, values[i]) then
+          say("error", "ce.osc." .. verb .. ": " .. where .. "value " .. i .. " is not " .. (WHAT[tag] or "what its type needs")
+            .. ", as type \"" .. tag .. "\" needs, so nothing was sent.")
+          return nil
+        end
+      end
+      local out = {}
+      for i = 1, n do out[i] = values[i] end
+      return { address = address, args = out, types = tags }
+    end
+
+    local C = {}
+    function C.listen(opts)
+      local port = opt(opts, "port")
+      if port == nil then port = 8000 end
+      if not whole(port) or port < PORT_MIN or port > PORT_MAX then
+        say("error", "ce.osc.listen: port must be a whole number from " .. PORT_MIN .. " to " .. PORT_MAX .. ", so it is not listening.")
+        return false
+      end
+      return answered("listen", host.query("listen", { port = port, network = opt(opts, "network") == true,
+        nextFree = opt(opts, "nextFree") == true }), "it is not listening")
+    end
+    function C.stop() return host.query("stop", {}) == true end
+    function C.on(pattern, fn)
+      if type(pattern) ~= "string" or pattern:sub(1, 1) ~= "/" then
+        say("error", "ce.osc.on: pattern must be an address starting with /, such as \"/fader/*\", so nothing will run.")
+        return nil
+      end
+      if type(fn) ~= "function" then
+        say("error", "ce.osc.on: fn must be a function to call with each message, so nothing will run.")
+        return nil
+      end
+      local id = nextId
+      nextId = nextId + 1
+      local list = host.listeners()
+      list[#list + 1] = { id = id, pattern = pattern, fn = fn }
+      return id
+    end
+    function C.off(id)
+      local list = host.listeners()
+      for i = 1, #list do
+        if list[i].id == id then table.remove(list, i) return true end
+      end
+      return false
+    end
+    function C.target(name, address)
+      if type(name) ~= "string" or name == "" then
+        say("error", "ce.osc.target: name must be text, such as \"tablet\", so nothing was set.")
+        return false
+      end
+      if address == nil then return answered("target", host.query("target", { name = name, host = "", port = 0 }), "nothing was set") end
+      local where = nil
+      if type(address) == "string" then
+        local at = nil
+        for i = #address, 1, -1 do if address:sub(i, i) == ":" then at = i break end end
+        local port = at and tonumber(address:sub(at + 1)) or nil
+        if at ~= nil and at > 1 and whole(port) and port >= 1 and port <= PORT_MAX then
+          where = { host = trim(address:sub(1, at - 1)), port = port }
+        end
+      elseif type(address) == "table" and type(address.host) == "string" and whole(address.port)
+          and address.port >= 1 and address.port <= PORT_MAX then
+        where = { host = address.host, port = address.port }
+      end
+      if where == nil or where.host == "" then
+        say("error", "ce.osc.target: address must be \"host:port\", { host, port } or a message's from, so nothing was set.")
+        return false
+      end
+      return answered("target", host.query("target", { name = name, host = where.host, port = where.port }), "nothing was set")
+    end
+    function C.send(to, address, args, types)
+      local where = destination("send", to)
+      if where == nil then return false end
+      local m = message("send", address, args, types, 0)
+      if m == nil then return false end
+      return answered("send", host.query("send", { to = where, address = m.address, args = m.args, types = m.types }), "nothing was sent")
+    end
+    function C.bundle(to, messages, opts)
+      local where = destination("bundle", to)
+      if where == nil then return false end
+      if type(messages) ~= "table" or #messages == 0 then
+        say("error", "ce.osc.bundle: messages must be a list of { address, args, types }, so nothing was sent.")
+        return false
+      end
+      local out = {}
+      for i = 1, #messages do
+        local x = messages[i]
+        local m
+        if type(x) == "table" then m = message("bundle", x.address, x.args, x.types, i)
+        else m = message("bundle", nil, nil, nil, i) end
+        if m == nil then return false end
+        out[i] = m
+      end
+      local time = opt(opts, "time")
+      if time ~= nil and not (type(time) == "number" and time == time and time ~= INF and time >= 0) then
+        say("error", "ce.osc.bundle: time must be a number of seconds, so nothing was sent.")
+        return false
+      end
+      return answered("bundle", host.query("bundle", { to = where, messages = out, time = time or 0 }), "nothing was sent")
+    end
+    function C.status()
+      local s = host.query("status", {})
+      if type(s) == "table" then return s end
+      return { listening = false, waiting = false, received = 0, sent = 0, dropped = 0 }
+    end
+    function C.receive(msg)
+      if type(msg) ~= "table" or type(msg.address) ~= "string" then return end
+      local list = host.listeners()
+      local copy = {}
+      for i = 1, #list do copy[i] = list[i] end
+      for _, l in ipairs(copy) do
+        if matches(l.pattern, msg.address) then host.call(l.fn, msg) end
+      end
+    end
+    return C
+  end
+
+  -- One Lua state serves every script on the panel, and a function keeps the script it was made in,
+  -- so one list of patterns serves them all.
+  local listening = {}
+  local O = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    query = function(op, fields)
+      local q = {}
+      for k, v in pairs(fields) do q[k] = v end
+      q.op = op
+      return __deviceQuery("osc", q)
+    end,
+    listeners = function() return listening end,
+    call = function(fn, value)
+      local fine, err = pcall(fn, value)
+      if not fine then logError("ce.osc: the function given to on failed: " .. tostring(err)) end
+    end,
+  })
+  on("*", "__oscIn", function(msg) O.receive(msg) end)
+
+-- (global; at the line start, where the option check looks for it)
+function oscListen(opts) return O.listen(opts) end
+-- (global; at the line start, where the option check looks for it)
+function oscStop() return O.stop() end
+-- (global; at the line start, where the option check looks for it)
+function oscOn(pattern, fn) return O.on(pattern, fn) end
+-- (global; at the line start, where the option check looks for it)
+function oscOff(id) return O.off(id) end
+-- (global; at the line start, where the option check looks for it)
+function oscTarget(name, address) return O.target(name, address) end
+-- (global; at the line start, where the option check looks for it)
+function oscSend(to, address, args, types) return O.send(to, address, args, types) end
+-- (global; at the line start, where the option check looks for it)
+function oscBundle(to, messages, opts) return O.bundle(to, messages, opts) end
+-- (global; at the line start, where the option check looks for it)
+function oscStatus() return O.status() end
 end
 
 -- @module ce.music
@@ -2397,6 +6192,13 @@ local WEBVIEW_ONLY = {
 -- @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+-- @module ce.ci
+  "ciDraftProfile",
+-- @module ce.file
+  "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
+-- @module ce.keys
+  "keysShortcut","keysRemove","keysList","keysIsDown","keysHeld","keysPiano","keysPianoInfo",
+  "keysFocus","keysFocused",
 -- @module ce.text
   "textFonts","textFont","textStyle","textAxis","textRead","textMeasure","textFit",
 -- @module ce.components.split
@@ -3514,7 +7316,10 @@ end
 function requestDump(kind, fn, opts)
   kind = tostring(kind or "")
   if type(fn) == "function" then
-    local ms = 3000
+    -- Left out, the wait the profile's request deserves: its timeout for every try it allows.
+    -- Held in a local first: a query that returns nothing gives tonumber no value at all, which it refuses.
+    local wait = __deviceQuery("answerWaitMs", { role = "mainSynth", request = kind })
+    local ms = tonumber(wait) or 3000
     if opts ~= nil and tonumber(opts.timeout) ~= nil and tonumber(opts.timeout) > 0 then ms = tonumber(opts.timeout) end
     -- A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     -- so that is what the callback waits for; waiting for the request's own id, it heard only the
@@ -4022,6 +7827,43 @@ local __CE_OPTIONS = {
   ["animateTo"] = { path = "ce.anim.to", at = 3, refusal = "false", names = { "duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done" } },
   ["animateSpring"] = { path = "ce.anim.spring", at = 3, refusal = "false", names = { "duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
   ["animateEnvelope"] = { path = "ce.anim.envelope", at = 3, refusal = "false", names = { "from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done" } },
+  ["patchCurrent"] = { path = "ce.patch.current", at = 2, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "scope" } },
+  ["patchRead"] = { path = "ce.patch.read", at = 3, refusal = "false", names = { "timeout", "role" } },
+  ["patchLoad"] = { path = "ce.patch.load", at = 2, refusal = "nothing", names = { "role" } },
+  ["patchMorph"] = { path = "ce.patch.morph", at = 4, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "switchAt" } },
+  ["patchBlend"] = { path = "ce.patch.blend", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchRandom"] = { path = "ce.patch.random", at = 1, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "scope", "seed", "from", "within" } },
+  ["patchMutate"] = { path = "ce.patch.mutate", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role", "seed" } },
+  ["patchMerge"] = { path = "ce.patch.merge", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchDiff"] = { path = "ce.patch.diff", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchEqual"] = { path = "ce.patch.equal", at = 3, refusal = "nothing", names = { "groups", "only", "except", "lock", "include", "role" } },
+  ["patchApply"] = { path = "ce.patch.apply", at = 2, refusal = "result", names = { "groups", "only", "except", "lock", "include", "role", "send", "changedOnly", "live" } },
+  ["patchSave"] = { path = "ce.patch.save", at = 3, refusal = "false", names = { "replace" } },
+  ["patchList"] = { path = "ce.patch.list", at = 1, refusal = "empty list", names = { "role", "scope" } },
+  ["patchForget"] = { path = "ce.patch.forget", at = 2, refusal = "false", names = { "role" } },
+  ["patchWrite"] = { path = "ce.patch.write", at = 3, refusal = "result", names = { "role" } },
+  ["ciDiscover"] = { path = "ce.ci.discover", at = 1, refusal = "false", names = { "role", "timeoutMs" } },
+  ["ciGet"] = { path = "ce.ci.get", at = 3, refusal = "false", names = { "resId", "timeoutMs", "offset", "limit" } },
+  ["ciSet"] = { path = "ce.ci.set", at = 4, refusal = "false", names = { "resId", "timeoutMs", "partial", "mediaType" } },
+  ["ciSubscribe"] = { path = "ce.ci.subscribe", at = 3, refusal = "nothing", names = { "resId" } },
+  ["ciSetProfile"] = { path = "ce.ci.setProfile", at = 4, refusal = "false", names = { "channel" } },
+  ["oscListen"] = { path = "ce.osc.listen", at = 1, refusal = "false", names = { "port", "network", "nextFree" } },
+  ["oscBundle"] = { path = "ce.osc.bundle", at = 3, refusal = "false", names = { "time" } },
+  ["dawAssign"] = { path = "ce.daw.assign", at = 3, refusal = "false", names = { "name" } },
+  ["mpeZone"] = { path = "ce.mpe.zone", at = 1, refusal = "false", names = { "zone", "members", "bendRange", "managerBendRange", "send", "role" } },
+  ["mpeNoteOn"] = { path = "ce.mpe.noteOn", at = 3, refusal = "nothing", names = { "bend", "pressure", "timbre" } },
+  ["mpeExpress"] = { path = "ce.mpe.express", at = 2, refusal = "false", names = { "bend", "pressure", "timbre" } },
+  ["mpeListen"] = { path = "ce.mpe.listen", at = 1, refusal = "false", names = { "from", "zone", "members", "bendRange", "off" } },
+  ["fileSyxSplit"] = { path = "ce.file.syxSplit", at = 2, refusal = "empty list", names = { "partial", "prefix" } },
+  ["fileMidiRead"] = { path = "ce.file.midiRead", at = 2, refusal = "nothing", names = { "track" } },
+  ["fileMidiWrite"] = { path = "ce.file.midiWrite", at = 2, refusal = "nothing", names = { "tempo", "name", "channel" } },
+  ["verifyCoverage"] = { path = "ce.verify.coverage", at = 1, refusal = "nothing", names = { "role", "ids", "group" } },
+  ["verifyCheck"] = { path = "ce.verify.check", at = 1, refusal = "false", names = { "role", "ids", "group" } },
+  ["verifyDump"] = { path = "ce.verify.dump", at = 2, refusal = "false", names = { "role", "times", "gapMs" } },
+  ["verifyWrite"] = { path = "ce.verify.write", at = 3, refusal = "false", names = { "role", "settleMs" } },
+  ["verifyProbe"] = { path = "ce.verify.probe", at = 2, refusal = "false", names = { "role", "settleMs", "values" } },
+  ["verifyPatch"] = { path = "ce.verify.patch", at = 1, refusal = "false", names = { "role", "ids", "group", "settleMs", "via", "send" } },
+  ["verifySummary"] = { path = "ce.verify.summary", at = 2, refusal = "nothing", names = { "width" } },
   ["syncTimer"] = { path = "ce.time.syncTimer", at = 3, refusal = "nothing", names = { "follow" } },
   ["deviceParameters"] = { path = "ce.device.parameters", at = 1, refusal = "empty list", names = { "role", "query", "group", "type", "access", "limit" } },
   ["deviceDefineParameter"] = { path = "ce.device.defineParameter", at = 2, refusal = "false", names = { "name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad" }, nested = { ["nrpn"] = { names = { "msb", "lsb" } } } },
@@ -4030,6 +7872,21 @@ local __CE_OPTIONS = {
   ["checksum"] = { path = "ce.midi.checksum", at = 3, refusal = "nothing", names = { "offset" } },
   ["panic"] = { path = "ce.midi.panic", at = 1, refusal = "nothing", names = { "channel", "resetControllers" } },
   ["encodeJson"] = { path = "ce.storage.encode", at = 2, refusal = "nothing", names = { "indent" } },
+  ["formatNumber"] = { path = "ce.format.number", at = 2, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode" } },
+  ["formatHz"] = { path = "ce.format.hz", at = 2, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale" } },
+  ["formatTime"] = { path = "ce.format.time", at = 2, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale" } },
+  ["formatDb"] = { path = "ce.format.db", at = 2, refusal = "nothing", names = { "decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "fromGain", "floor" } },
+  ["formatPercent"] = { path = "ce.format.percent", at = 2, refusal = "nothing", names = { "decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "min", "max" } },
+  ["formatPan"] = { path = "ce.format.pan", at = 2, refusal = "nothing", names = { "decimals", "width", "placeholder", "min", "max", "center", "steps", "style" } },
+  ["formatRatio"] = { path = "ce.format.ratio", at = 2, refusal = "nothing", names = { "decimals", "digits", "width", "placeholder", "unicode", "style" } },
+  ["formatClock"] = { path = "ce.format.clock", at = 2, refusal = "nothing", names = { "width", "placeholder", "unicode", "decimals", "hours" } },
+  ["formatNote"] = { path = "ce.format.note", at = 2, refusal = "nothing", names = { "width", "placeholder", "unicode", "middleC", "flats", "octave" } },
+  ["formatDivision"] = { path = "ce.format.division", at = 2, refusal = "nothing", names = { "decimals", "digits", "width", "placeholder", "tolerance" } },
+  ["formatParameter"] = { path = "ce.format.parameter", at = 3, refusal = "nothing", names = { "decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "role" } },
+  ["formatTable"] = { path = "ce.format.table", at = 3, refusal = "nothing", names = { "width", "placeholder", "start" } },
+  ["formatFit"] = { path = "ce.format.fit", at = 3, refusal = "nothing", names = { "abbreviations", "align", "pad", "steps" } },
+  ["formatLine"] = { path = "ce.format.line", at = 4, refusal = "nothing", names = { "abbreviations", "gap" } },
+  ["formatParse"] = { path = "ce.format.parse", at = 2, refusal = "nothing", names = { "kind", "min", "max", "center", "steps", "middleC" } },
   ["bytesRead"] = { path = "ce.midi.read", at = 4, refusal = "nothing", names = { "bits", "order" } },
   ["bytesWrite"] = { path = "ce.midi.write", at = 5, refusal = "nothing", names = { "bits", "order" } },
 }
@@ -4112,10 +7969,11 @@ end
 -- on top. ce.core is global: its members are never namespaced, so they appear here only for
 -- discoverability (ce.core.set is the same function as set).
 local __CE_MODULES = {
-  ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
+  ["ce.core"] = { action = "defineAction", compute = "compute", emit = "emit", error = "logError", get = "get", intercept = "intercept", log = "log", noTransmit = "noTransmit", off = "off", on = "on", origin = "origin", run = "run", set = "set", transmit = "transmit", warn = "logWarn", watch = "watch" },
   ["ce.midi"] = { checksum = "checksum", denibblize = "denibblize", feed = "feedMidi", find = "bytesFind", from14bit = "from14bit", from7bit = "from7bit", fromAscii = "fromAscii", fromBase64 = "bytesFromBase64", fromHex = "bytesFromHex", fromNibbles = "fromNibbles", fromOffset = "fromOffset", fromSigned = "fromSigned", getBits = "getBits", interceptIn = "interceptMidiIn", interceptOut = "interceptMidiOut", nibblize = "nibblize", panic = "panic", put = "bytesPut", read = "bytesRead", route = "routeMidi", sendAftertouch = "sendAftertouch", sendCC = "sendCC", sendClock = "sendClock", sendMidi = "sendMidi", sendNRPN = "sendNRPN", sendNote = "sendNote", sendNoteOff = "sendNoteOff", sendPitchBend = "sendPitchBend", sendProgramChange = "sendProgramChange", sendRPN = "sendRPN", sendSongPosition = "sendSongPosition", sendSysex = "sendSysex", sendTransport = "sendTransport", setBits = "setBits", slice = "bytesSlice", to14bit = "to14bit", to7bit = "to7bit", toAscii = "toAscii", toBase64 = "bytesToBase64", toHex = "bytesToHex", toNibbles = "toNibbles", toOffset = "toOffset", toSigned = "toSigned", write = "bytesWrite" },
   ["ce.device"] = { applyDump = "applyDump", bind = "deviceBind", buildDump = "buildDump", connected = "deviceConnected", coverage = "deviceCoverage", defineDump = "deviceDefineDump", defineParameter = "deviceDefineParameter", parameter = "deviceParameter", parameters = "deviceParameters", ports = "devicePorts", preset = "preset", profile = "deviceProfile", read = "deviceRead", recallPreset = "recallPreset", recipes = "deviceRecipes", requestDump = "requestDump", requests = "deviceRequests", sendDump = "sendDump", setTiming = "deviceSetTiming", setVariable = "deviceSetVariable", timing = "deviceTiming", unbind = "deviceUnbind", variables = "deviceVariables", write = "deviceWrite" },
   ["ce.math"] = { almost = "almost", alpha = "colourAlpha", angle = "angleOf", approach = "approach", bipolar = "bipolar", blend = "blend", blendBy = "blendBy", chance = "randomBool", choice = "randomChoice", clamp = "clamp", crossfade = "crossfade", curve = "curve", darken = "darken", dbPosition = "dbPosition", dbToGain = "dbToGain", deadzone = "deadzone", degrees = "toDegrees", denorm = "denorm", distance = "distance", euclid = "euclid", fold = "fold", fromARGB = "colourFromArgb", fromHsl = "hslToHex", fromRGBA = "colourFromRgba", gainToDb = "gainToDb", gaussian = "randomGaussian", hex = "rgbToHex", hsl = "hexToHsl", hysteresis = "hysteresis", index = "indexOfRange", lerp = "lerp", lighten = "lighten", map = "mapCurve", max = "maxOf", mean = "meanOf", median = "median", min = "minOf", mix = "mixColour", norm = "norm", polar = "polar", quantize = "quantizeTo", radians = "toRadians", random = "random", randomFloat = "randomFloat", rgb = "hexToRgb", round = "round", roundTo = "roundTo", scale = "scale", seed = "randomSeed", shape = "shapeCurve", shuffle = "shuffle", smooth = "smooth", snap = "snap", stream = "randomStream", sum = "sumOf", ticks = "tickStops", unipolar = "unipolar", unshape = "unshape", walk = "randomWalk", weights = "weightsFor", wrap = "wrap" },
+  ["ce.format"] = { clock = "formatClock", db = "formatDb", division = "formatDivision", fit = "formatFit", hz = "formatHz", line = "formatLine", note = "formatNote", number = "formatNumber", pan = "formatPan", parameter = "formatParameter", parse = "formatParse", percent = "formatPercent", ratio = "formatRatio", table = "formatTable", time = "formatTime" },
   ["ce.music"] = { arp = "arpOrder", chord = "chordNotes", degree = "scaleDegree", degreeChord = "degreeChord", inScale = "inScale", lead = "voiceLead", name = "noteName", number = "noteNumber", octaves = "expandOctaves", quality = "chordQuality", quantize = "quantizeNote", scale = "scaleNotes", spelling = "noteSpelling" },
   ["ce.time"] = { after = "after", afterBeats = "afterBeats", beatsToMs = "beatsToMs", clockTempo = "clockTempo", cycle = "cycleAt", division = "beatsPerDivision", divisions = "divisionNames", looped = "loopedBeats", msToBeats = "msToBeats", now = "nowMs", playing = "isPlaying", position = "barBeatAt", startTimer = "startTimer", step = "stepAt", steps = "stepsBetween", stopTimer = "stopTimer", swing = "swingOffset", syncTimer = "syncTimer", tap = "tapTempo", tempo = "tempo", timers = "runningTimers", transport = "transportInfo" },
   ["ce.anim"] = { envelope = "animateEnvelope", finish = "animateFinish", list = "animateList", pause = "animatePause", play = "animatePlay", resume = "animateResume", reverse = "animateReverse", running = "animateRunning", spring = "animateSpring", stop = "animateStop", to = "animateTo", value = "animateValue" },
@@ -4124,6 +7982,14 @@ local __CE_MODULES = {
   ["ce.panel"] = { align = "panelAlign", batch = "panelBatch", circle = "panelCircle", clone = "panelClone", create = "panelCreate", define = "panelDefine", destroy = "panelDestroy", distribute = "panelDistribute", each = "panelEach", entries = "panelEntries", entry = "panelEntry", find = "panelFind", flip = "panelFlip", grid = "panelGrid", info = "panelInfo", keep = "panelKeep", match = "panelMatch", order = "panelOrder", parent = "panelParent", patch = "panelPatch", rect = "panelRect", restore = "panelRestore", snapshot = "panelSnapshot", types = "panelTypes", undefine = "panelUndefine" },
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
+  ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.osc"] = { bundle = "oscBundle", listen = "oscListen", off = "oscOff", on = "oscOn", send = "oscSend", status = "oscStatus", stop = "oscStop", target = "oscTarget" },
+  ["ce.daw"] = { assign = "dawAssign", beginGesture = "dawBeginGesture", endGesture = "dawEndGesture", host = "dawHost", markChanged = "dawMarkChanged", parameter = "dawParameter", parameters = "dawParameters", program = "dawProgram", programs = "dawPrograms", rename = "dawRename" },
+  ["ce.mpe"] = { allOff = "mpeAllOff", express = "mpeExpress", listen = "mpeListen", noteOff = "mpeNoteOff", noteOn = "mpeNoteOn", notes = "mpeNotes", zone = "mpeZone" },
+  ["ce.ci"] = { devices = "ciDevices", discover = "ciDiscover", draftProfile = "ciDraftProfile", get = "ciGet", profiles = "ciProfiles", set = "ciSet", setProfile = "ciSetProfile", subscribe = "ciSubscribe", unsubscribe = "ciUnsubscribe" },
+  ["ce.file"] = { folder = "fileFolder", list = "fileList", midiRead = "fileMidiRead", midiWrite = "fileMidiWrite", open = "fileOpen", read = "fileRead", save = "fileSave", saveIn = "fileSaveIn", syxJoin = "fileSyxJoin", syxSplit = "fileSyxSplit", write = "fileWrite" },
+  ["ce.verify"] = { cancel = "verifyCancel", check = "verifyCheck", coverage = "verifyCoverage", dump = "verifyDump", patch = "verifyPatch", probe = "verifyProbe", running = "verifyRunning", summary = "verifySummary", write = "verifyWrite" },
+  ["ce.keys"] = { focus = "keysFocus", focused = "keysFocused", held = "keysHeld", isDown = "keysIsDown", list = "keysList", piano = "keysPiano", pianoInfo = "keysPianoInfo", remove = "keysRemove", shortcut = "keysShortcut" },
   ["ce.text"] = { axis = "textAxis", fit = "textFit", font = "textFont", fonts = "textFonts", measure = "textMeasure", read = "textRead", style = "textStyle" },
   ["ce.components.split"] = { channel = "splitChannel", mute = "splitMute", point = "splitPoint", preset = "splitPreset", read = "splitRead", transpose = "splitTranspose" },
   ["ce.components.phrase"] = { cell = "phraseCell", clear = "phraseClear", direction = "phraseDirection", key = "phraseKey", read = "phraseRead", run = "phraseRun", scale = "phraseScale", seed = "phraseSeed", transpose = "phraseTranspose" },
@@ -4154,12 +8020,13 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", layout = "lcdLayout", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix", zoneAt = "lcdZoneAt", zoneKind = "lcdZoneKind", zoneLabel = "lcdZoneLabel", zoneShow = "lcdZoneShow", zoneSource = "lcdZoneSource", zoneText = "lcdZoneText" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", kind = "pixelKind", label = "pixelLabel", layout = "pixelLayout", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", source = "pixelSource", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.osc", "ce.daw", "ce.mpe", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
   { id = "ce.device", version = "1.3", runtime = "any" },
   { id = "ce.math", version = "1.8", runtime = "any" },
+  { id = "ce.format", version = "1.1", runtime = "any" },
   { id = "ce.music", version = "1.2", runtime = "any" },
   { id = "ce.time", version = "1.3", runtime = "any" },
   { id = "ce.anim", version = "1.1", runtime = "any" },
@@ -4168,6 +8035,14 @@ local __CE_META = {
   { id = "ce.panel", version = "1.4", runtime = "any" },
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
+  { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.osc", version = "1.0", runtime = "any" },
+  { id = "ce.daw", version = "1.0", runtime = "any" },
+  { id = "ce.mpe", version = "1.0", runtime = "any" },
+  { id = "ce.ci", version = "1.0", runtime = "any" },
+  { id = "ce.file", version = "1.0", runtime = "any" },
+  { id = "ce.verify", version = "1.0", runtime = "any" },
+  { id = "ce.keys", version = "1.0", runtime = "webview" },
   { id = "ce.text", version = "1.0", runtime = "webview" },
   { id = "ce.components.split", version = "1.0", runtime = "webview" },
   { id = "ce.components.phrase", version = "1.0", runtime = "webview" },

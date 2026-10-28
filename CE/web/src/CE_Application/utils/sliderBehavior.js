@@ -1,5 +1,6 @@
 import { numberOr, clamp } from './primitives.js';
 import { displayPrecision, displayScale, fromDisplay, toDisplay } from './valueDisplayScale.js';
+import { formatBehaviorDisplay, parseBehaviorDisplay } from './parameterDisplay.js';
 
 // Re-exported so existing `from './sliderBehavior.js'` importers keep working.
 export { numberOr, clamp };
@@ -345,12 +346,17 @@ export function formatSliderNumericValue(behavior = null, value = 0) {
   const snapped = snapSliderValue(behavior, value);
   // Snap in WIRE space, then map. The other order snaps to display steps, which for a 0..127
   // parameter shown as 0..100 lands on values the wire cannot hold.
+  const prefix = String(behavior?.prefix ?? '');
+  const suffix = String(behavior?.suffix ?? '');
+  // A profile that says how the synth writes this value (Hz, a pan, a table: parameterDisplay.js)
+  // wins over the plain number. It carries its own unit and sign, so only the prefix and suffix,
+  // which are the author's, are added.
+  const described = formatBehaviorDisplay(behavior, getSliderMin(behavior), getSliderMax(behavior), snapped);
+  if (described !== null) return `${prefix}${described}${suffix}`.trim();
   const scale = sliderDisplayScale(behavior);
   const shown = toDisplay(scale, snapped);
   const precision = displayPrecision(scale, defaultPrecisionFor(behavior));
   const showSign = behavior?.showSign === true && shown > 0;
-  const prefix = String(behavior?.prefix ?? '');
-  const suffix = String(behavior?.suffix ?? '');
   const unit = String(behavior?.unit ?? '');
   // A FIXED decimal point and NO grouping, deliberately — see the note on parseSliderInputValue.
   //
@@ -411,6 +417,10 @@ export function parseSliderInputValue(behavior = null, input = '') {
 
   if (prefix && normalized.startsWith(prefix)) normalized = normalized.slice(prefix.length).trim();
   if (suffix && normalized.endsWith(suffix)) normalized = normalized.slice(0, normalized.length - suffix.length).trim();
+  // Typed as the readout writes it ("1.2 kHz", "L25", "Fast"): read back the same way. Text that
+  // reading cannot take falls through to the plain number below.
+  const described = parseBehaviorDisplay(behavior, getSliderMin(behavior), getSliderMax(behavior), normalized);
+  if (described !== null) return snapSliderValue(behavior, described);
   if (unit && normalized.endsWith(unit)) normalized = normalized.slice(0, normalized.length - unit.length).trim();
   // A comma is accepted as a DECIMAL separator, not stripped as a thousands separator. Stripping
   // was the other half of the locale bug above: it turned "64,5" into 645. Nothing formats with

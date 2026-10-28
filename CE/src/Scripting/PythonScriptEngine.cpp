@@ -2266,6 +2266,3530 @@ def hslToHex(hue=None, sat=None, light=None):
     import math
     return rgbToHex(math.floor(f(0) * 255 + 0.5), math.floor(f(8) * 255 + 0.5), math.floor(f(4) * 255 + 0.5))
 
+# @module ce.format
+# ce.format, ported line for line from formatCore.js (the panel view's; the JavaScript prelude runs
+# that file itself). The same text in every language is the point, so nothing here uses Python's
+# own number formatting or round(): _fmt_fixed rounds half away from zero and writes the digits.
+# Held to the panel view's answers by test/formatParity.test.js and test/support/formatCases.mjs.
+import math as _fmt_math
+import re as _fmt_re
+
+_FMT_PLACEHOLDER = "--"
+_FMT_INF = float("inf")
+_FMT_DIVISIONS = [
+    ("1/1", 4), ("1/2", 2), ("1/4", 1), ("1/8", 0.5), ("1/16", 0.25), ("1/32", 0.125),
+    ("1/2D", 3), ("1/4D", 1.5), ("1/8D", 0.75), ("1/16D", 0.375),
+    ("1/2T", 4 / 3), ("1/4T", 2 / 3), ("1/8T", 1 / 3), ("1/16T", 1 / 6),
+]
+_FMT_ABBREVIATIONS = [
+    ("Amount", "Amt"), ("Attack", "Atk"), ("Balance", "Bal"), ("Bandwidth", "BW"), ("Channel", "Ch"),
+    ("Chorus", "Chor"), ("Coarse", "Crs"), ("Control", "Ctrl"), ("Controller", "Ctrl"), ("Decay", "Dcy"),
+    ("Delay", "Dly"), ("Depth", "Dpth"), ("Destination", "Dest"), ("Distortion", "Dist"), ("Effect", "FX"),
+    ("Effects", "FX"), ("Envelope", "Env"), ("Feedback", "Fdbk"), ("Frequency", "Freq"), ("Keyboard", "Kbd"),
+    ("Length", "Len"), ("Level", "Lvl"), ("Master", "Mstr"), ("Maximum", "Max"), ("Minimum", "Min"),
+    ("Modulation", "Mod"), ("Number", "Num"), ("Octave", "Oct"), ("Oscillator", "Osc"), ("Parameter", "Param"),
+    ("Pattern", "Pat"), ("Portamento", "Porta"), ("Position", "Pos"), ("Pressure", "Press"), ("Program", "Prog"),
+    ("Random", "Rnd"), ("Release", "Rel"), ("Resonance", "Reso"), ("Reverb", "Rvb"), ("Sample", "Smp"),
+    ("Semitone", "Semi"), ("Sequence", "Seq"), ("Sequencer", "Seq"), ("Source", "Src"), ("Sustain", "Sus"),
+    ("Transpose", "Trans"), ("Tremolo", "Trem"), ("Velocity", "Vel"), ("Vibrato", "Vib"), ("Volume", "Vol"),
+    ("Waveform", "Wave"), ("Width", "Wdth"),
+]
+_FMT_SHARPS = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"]
+_FMT_FLATS = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"]
+_FMT_NUMBER_TEXT = _fmt_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+_FMT_PLAIN_NUMBER = _fmt_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)")
+
+def _fmt_say(level, text):
+    if level == "warn":
+        logWarn(text)
+    else:
+        logError(text)
+
+def _fmt_finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and _fmt_math.isfinite(x)
+
+def _fmt_num(v):
+    if isinstance(v, bool):
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, str) and _FMT_NUMBER_TEXT.fullmatch(v.strip()):
+        return float(v.strip())
+    return float("nan")
+
+def _fmt_opt(opts, key):
+    if isinstance(opts, dict):
+        return opts.get(key)
+    return None
+
+def _fmt_opt_number(opts, key, fallback):
+    v = _fmt_num(_fmt_opt(opts, key))
+    return v if _fmt_math.isfinite(v) else fallback
+
+def _fmt_clamp_int(v, lo, hi):
+    r = _fmt_math.floor(v + 0.5)
+    return lo if r < lo else hi if r > hi else r
+
+def _fmt_fixed(x, d):
+    neg = x < 0
+    p = 10 ** d
+    r = _fmt_math.floor(abs(x) * p + 0.5 + 1e-9)
+    s = "%.0f" % r
+    while len(s) < d + 1:
+        s = "0" + s
+    body = s[:len(s) - d] + "." + s[len(s) - d:] if d > 0 else s
+    return "-" + body if neg and r != 0 else body
+
+def _fmt_sig_decimals(a, digits):
+    if a == 0:
+        return 0
+    e = _fmt_math.floor(_fmt_math.log10(a))
+    if 10 ** (e + 1) <= a:
+        e += 1
+    if 10 ** e > a:
+        e -= 1
+    d = digits - 1 - e
+    return 0 if d < 0 else 6 if d > 6 else d
+
+def _fmt_strip(s):
+    if "." not in s:
+        return s
+    t = s
+    while t.endswith("0"):
+        t = t[:-1]
+    if t.endswith("."):
+        t = t[:-1]
+    return t
+
+def _fmt_number_text(v, opts, fallback=None):
+    decimals = _fmt_num(_fmt_opt(opts, "decimals"))
+    if _fmt_math.isfinite(decimals):
+        s = _fmt_fixed(v, _fmt_clamp_int(decimals, 0, 6))
+    elif fallback is not None:
+        s = _fmt_fixed(v, fallback)
+    else:
+        s = _fmt_strip(_fmt_fixed(v, _fmt_sig_decimals(abs(v), _fmt_clamp_int(_fmt_opt_number(opts, "digits", 3), 1, 6))))
+    if s == "-0":
+        s = "0"
+    if _fmt_opt(opts, "sign") == "always" and not s.startswith("-") and _fmt_re.search(r"[1-9]", s):
+        s = "+" + s
+    return s
+
+def _fmt_with_unit(text, unit, opts):
+    u = _fmt_opt(opts, "unit")
+    if u is False:
+        return text
+    name = u if isinstance(u, str) else unit
+    if not name:
+        return text
+    space = "" if _fmt_opt(opts, "space") is False or (name == "%" and not isinstance(u, str)) else " "
+    return text + space + name
+
+def _fmt_finish(text, opts):
+    t = text
+    if _fmt_opt(opts, "unicode") is True and t.startswith("-"):
+        t = "−" + t[1:]
+    width = _fmt_num(_fmt_opt(opts, "width"))
+    if _fmt_math.isfinite(width):
+        w = _fmt_clamp_int(width, 0, 200)
+        while len(t) < w:
+            t = " " + t
+    return t
+
+def _fmt_placeholder(opts):
+    p = _fmt_opt(opts, "placeholder")
+    return p if isinstance(p, str) else _FMT_PLACEHOLDER
+
+def _fmt_as_text(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, (int, float)):
+        return _fmt_number_text(float(v), {}) if _fmt_math.isfinite(v) else _FMT_PLACEHOLDER
+    if v is None:
+        return ""
+    return str(v)
+
+def formatNumber(v, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    return _fmt_finish(_fmt_with_unit(_fmt_number_text(n, opts), "", opts), opts)
+
+def _fmt_scaled(v, opts, verb, small, large, factor, what):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    if n < 0:
+        _fmt_say("error", "ce.format." + verb + ": " + what + " below 0 is not one, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    scale = str(_fmt_opt(opts, "scale") if _fmt_opt(opts, "scale") is not None else "auto").lower()
+    big = scale == large.lower() or (scale != small.lower() and n >= factor)
+    return _fmt_finish(_fmt_with_unit(_fmt_number_text(n / factor if big else n, opts), large if big else small, opts), opts)
+
+def formatHz(v, opts=None):
+    return _fmt_scaled(v, opts, "hz", "Hz", "kHz", 1000, "a frequency")
+
+def formatTime(ms, opts=None):
+    return _fmt_scaled(ms, opts, "time", "ms", "s", 1000, "a duration")
+
+def formatDb(v, opts=None):
+    n = _fmt_num(v)
+    if _fmt_math.isnan(n):
+        return _fmt_placeholder(opts)
+    if _fmt_opt(opts, "fromGain") is True:
+        n = -144.0 if n <= 0 else 20 * _fmt_math.log10(n)
+        if n < -144:
+            n = -144.0
+    floor = _fmt_opt_number(opts, "floor", -144)
+    unicode = _fmt_opt(opts, "unicode") is True
+    if n <= floor:
+        text = "-∞" if unicode else "-inf"
+    elif n == _FMT_INF:
+        text = "∞" if unicode else "inf"
+    else:
+        text = _fmt_number_text(n, opts, 1)
+    return _fmt_finish(_fmt_with_unit(text, "dB", opts), opts)
+
+def formatPercent(v, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    lo = _fmt_opt_number(opts, "min", 0)
+    hi = _fmt_opt_number(opts, "max", 1)
+    if hi == lo:
+        _fmt_say("error", "ce.format.percent: min and max are the same, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    return _fmt_finish(_fmt_with_unit(_fmt_number_text(((n - lo) / (hi - lo)) * 100, opts, 0), "%", opts), opts)
+
+def formatPan(v, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    custom = _fmt_opt(opts, "min") is not None or _fmt_opt(opts, "max") is not None
+    lo = _fmt_opt_number(opts, "min", -1)
+    hi = _fmt_opt_number(opts, "max", 1)
+    if hi == lo:
+        _fmt_say("error", "ce.format.pan: min and max are the same, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    center = _fmt_opt_number(opts, "center", (lo + hi) / 2)
+    steps = _fmt_opt_number(opts, "steps", 50)
+    amount = n - center if custom else ((n - center) / ((hi - lo) / 2)) * steps
+    t = _fmt_number_text(abs(amount), {"decimals": _fmt_opt(opts, "decimals")}, 0)
+    if not _fmt_re.search(r"[1-9]", t):
+        return _fmt_finish("C", opts)
+    left = amount < 0
+    style = str(_fmt_opt(opts, "style") if _fmt_opt(opts, "style") is not None else "L50")
+    if style == "50L":
+        text = t + ("L" if left else "R")
+    elif style == "<50":
+        text = ("<" if left else ">") + t
+    elif style == "50>":
+        text = t + ("<" if left else ">")
+    else:
+        text = ("L" if left else "R") + t
+    return _fmt_finish(text, opts)
+
+def formatRatio(v, opts=None):
+    n = _fmt_num(v)
+    if _fmt_math.isnan(n):
+        return _fmt_placeholder(opts)
+    if n <= 0:
+        _fmt_say("error", "ce.format.ratio: a ratio must be above 0, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    x = _fmt_opt(opts, "style") == "x"
+    if n == _FMT_INF:
+        text = "∞" if _fmt_opt(opts, "unicode") is True else "inf"
+    else:
+        text = _fmt_number_text(n, opts, 2 if x else None)
+    return _fmt_finish("x" + text if x else text + ":1", opts)
+
+def _fmt_pad2(n):
+    s = "%.0f" % n
+    return "0" + s if len(s) < 2 else s
+
+def formatClock(ms, opts=None):
+    n = _fmt_num(ms)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    d = _fmt_clamp_int(_fmt_opt_number(opts, "decimals", 1), 0, 3)
+    p = 10 ** d
+    # Cut, not rounded: a clock shows the tenth that has passed, never one still to come.
+    units = _fmt_math.floor(abs(n) * p / 1000 + 1e-9)
+    secs = _fmt_math.floor(units / p)
+    frac = units - secs * p
+    h = _fmt_math.floor(secs / 3600)
+    m = _fmt_math.floor((secs % 3600) / 60)
+    s = secs % 60
+    if h > 0 or _fmt_opt(opts, "hours") is True:
+        text = ("%.0f" % h) + ":" + _fmt_pad2(m) + ":" + _fmt_pad2(s)
+    else:
+        text = ("%.0f" % m) + ":" + _fmt_pad2(s)
+    if d > 0:
+        f = "%.0f" % frac
+        while len(f) < d:
+            f = "0" + f
+        text += "." + f
+    return _fmt_finish(("-" if n < 0 and units > 0 else "") + text, opts)
+
+def formatNote(n, opts=None):
+    v = _fmt_num(n)
+    if not _fmt_math.isfinite(v):
+        return _fmt_placeholder(opts)
+    note = -_fmt_math.floor(-v + 0.5) if v < 0 else _fmt_math.floor(v + 0.5)
+    if note < 0 or note > 127:
+        _fmt_say("error", "ce.format.note: a MIDI note is 0 to 127, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    middle_c = _fmt_clamp_int(_fmt_opt_number(opts, "middleC", 4), -2, 9)
+    name = (_FMT_FLATS if _fmt_opt(opts, "flats") is True else _FMT_SHARPS)[note % 12]
+    if _fmt_opt(opts, "unicode") is True:
+        name = name[:1] + name[1:].replace("#", "♯", 1).replace("b", "♭", 1)
+    if _fmt_opt(opts, "octave") is False:
+        return _fmt_finish(name, {"width": _fmt_opt(opts, "width")})
+    octave = _fmt_math.floor(note / 12) - 5 + middle_c
+    return _fmt_finish(name + ("%.0f" % octave), {"width": _fmt_opt(opts, "width")})
+
+def formatDivision(beats, opts=None):
+    n = _fmt_num(beats)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    if n <= 0:
+        _fmt_say("error", "ce.format.division: a length must be above 0 beats, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    tolerance = min(0.5, max(0, _fmt_opt_number(opts, "tolerance", 0.02)))
+    best, best_error = None, _FMT_INF
+    for name, b in _FMT_DIVISIONS:
+        error = abs(n - b) / b
+        if error < best_error:
+            best, best_error = name, error
+    if best_error <= tolerance + 1e-12:
+        return _fmt_finish(best, opts)
+    return _fmt_finish(_fmt_number_text(n, opts) + " beats", opts)
+
+def _fmt_entry_field(entry, key):
+    if isinstance(entry, dict):
+        return entry.get(key)
+    return getattr(entry, key, None)
+
+def formatTable(v, table, opts=None):
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(opts)
+    if not isinstance(table, (list, tuple)) or len(table) == 0:
+        _fmt_say("error", "ce.format.table: the table must be a list of texts, or of { upTo, text } ranges, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    first = table[0]
+    if not isinstance(first, (str, int, float)) and _fmt_entry_field(first, "upTo") is not None:
+        for entry in table:
+            up_to = _fmt_num(_fmt_entry_field(entry, "upTo"))
+            if _fmt_math.isfinite(up_to) and n <= up_to:
+                return _fmt_finish(_fmt_as_text(_fmt_entry_field(entry, "text")), opts)
+        _fmt_say("warn", "ce.format.table: " + _fmt_number_text(n, {}) + " is past the last range, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    start = _fmt_math.floor(_fmt_opt_number(opts, "start", 0) + 0.5)
+    index = (-_fmt_math.floor(-n + 0.5) if n < 0 else _fmt_math.floor(n + 0.5)) - start
+    if index < 0 or index >= len(table):
+        _fmt_say("warn", "ce.format.table: " + _fmt_number_text(n, {}) + " is past the end of the table, so \"" + _fmt_placeholder(opts) + "\" is shown.")
+        return _fmt_placeholder(opts)
+    return _fmt_finish(_fmt_as_text(table[index]), opts)
+
+_FMT_VOWELS = "aeiouAEIOU"
+
+def _fmt_abbreviations(extra):
+    out = {}
+    for word, short in _FMT_ABBREVIATIONS:
+        out[word.lower()] = short
+    if isinstance(extra, dict):
+        for key, value in extra.items():
+            out[str(key).lower()] = str(value)
+    return out
+
+def _fmt_shorten(text, width, steps, extra):
+    if len(text) <= width:
+        return text
+    words = [w for w in text.split(" ") if w != ""]
+    join = lambda: " ".join(words)
+    if steps >= 1:
+        table = _fmt_abbreviations(extra)
+        words = [table.get(w.lower(), w) for w in words]
+        if len(join()) <= width:
+            return join()
+    if steps >= 2:
+        while len(join()) > width:
+            pick = -1
+            for i, w in enumerate(words):
+                removable = any(c in _FMT_VOWELS for c in w[1:])
+                if removable and (pick < 0 or len(w) > len(words[pick])):
+                    pick = i
+            if pick < 0:
+                break
+            w = words[pick]
+            k = len(w) - 1
+            while k >= 1 and w[k] not in _FMT_VOWELS:
+                k -= 1
+            words[pick] = w[:k] + w[k + 1:]
+        if len(join()) <= width:
+            return join()
+    if steps >= 3:
+        while len(join()) > width and len(words) > 1:
+            last = words.pop()
+            words[-1] += last
+        if len(join()) <= width:
+            return join()
+    return join()[:width]
+
+def _fmt_pad_to(text, width, align):
+    t = text
+    if align == "right":
+        while len(t) < width:
+            t = " " + t
+        return t
+    if align == "center":
+        t = " " * _fmt_math.floor((width - len(t)) / 2) + t
+    while len(t) < width:
+        t += " "
+    return t
+
+def formatFit(text, width, opts=None):
+    w = _fmt_num(width)
+    if not _fmt_math.isfinite(w) or w < 1:
+        _fmt_say("error", "ce.format.fit: the width must be 1 character or more, so nothing is shown.")
+        return ""
+    width0 = _fmt_math.floor(w)
+    steps = _fmt_clamp_int(_fmt_opt_number(opts, "steps", 4), 1, 4)
+    short = _fmt_shorten(_fmt_as_text(text), width0, steps, _fmt_opt(opts, "abbreviations"))
+    if _fmt_opt(opts, "pad") is False:
+        return short
+    return _fmt_pad_to(short, width0, str(_fmt_opt(opts, "align") if _fmt_opt(opts, "align") is not None else "left"))
+
+def formatLine(left, right, width, opts=None):
+    w = _fmt_num(width)
+    if not _fmt_math.isfinite(w) or w < 1:
+        _fmt_say("error", "ce.format.line: the width must be 1 character or more, so nothing is shown.")
+        return ""
+    width0 = _fmt_math.floor(w)
+    gap = _fmt_clamp_int(_fmt_opt_number(opts, "gap", 1), 0, width0)
+    r = _fmt_as_text(right)
+    if len(r) >= width0:
+        return r[len(r) - width0:]
+    room = width0 - gap - len(r)
+    if room <= 0:
+        return _fmt_pad_to(r, width0, "right")
+    l = _fmt_as_text(left)
+    if len(l) > room:
+        l = _fmt_shorten(l, room, 4, _fmt_opt(opts, "abbreviations"))
+    return l + " " * (width0 - len(l) - len(r)) + r
+
+_FMT_NOTE_BASE = {"c": 0, "d": 2, "e": 4, "f": 5, "g": 7, "a": 9, "b": 11}
+_FMT_UNIT_SUFFIXES = [("khz", "hz", 1000), ("hz", "hz", 1), ("ms", "time", 1), ("db", "db", 1),
+                      ("%", "percent", 0.01), ("s", "time", 1000), ("k", "", 1000)]
+
+def _fmt_read_number(s):
+    if s in ("inf", "+inf"):
+        return _FMT_INF
+    if s == "-inf":
+        return -_FMT_INF
+    return float(s) if _FMT_PLAIN_NUMBER.fullmatch(s) else float("nan")
+
+def _fmt_parse_note(s, opts):
+    letter = s[:1]
+    if letter not in _FMT_NOTE_BASE:
+        return float("nan")
+    rest = s[1:]
+    pc = _FMT_NOTE_BASE[letter]
+    if rest.startswith("#"):
+        pc += 1
+        rest = rest[1:]
+    elif rest.startswith("b") and len(rest) > 1:
+        pc -= 1
+        rest = rest[1:]
+    if not _fmt_re.fullmatch(r"-?\d+", rest):
+        return float("nan")
+    middle_c = _fmt_clamp_int(_fmt_opt_number(opts, "middleC", 4), -2, 9)
+    n = pc + (int(rest) - middle_c + 5) * 12
+    return float(n) if 0 <= n <= 127 else float("nan")
+
+def _fmt_parse_pan(s, opts):
+    if s == "c":
+        return _fmt_opt_number(opts, "center", (_fmt_opt_number(opts, "min", -1) + _fmt_opt_number(opts, "max", 1)) / 2)
+    side, digits = "", s
+    head, tail = s[:1], s[-1:]
+    if head in ("l", "<"):
+        side, digits = "l", s[1:]
+    elif head in ("r", ">"):
+        side, digits = "r", s[1:]
+    elif tail in ("l", "<"):
+        side, digits = "l", s[:-1]
+    elif tail in ("r", ">"):
+        side, digits = "r", s[:-1]
+    amount = _fmt_read_number(digits)
+    if not side or not _fmt_math.isfinite(amount):
+        return float("nan")
+    custom = _fmt_opt(opts, "min") is not None or _fmt_opt(opts, "max") is not None
+    lo = _fmt_opt_number(opts, "min", -1)
+    hi = _fmt_opt_number(opts, "max", 1)
+    center = _fmt_opt_number(opts, "center", (lo + hi) / 2)
+    steps = _fmt_opt_number(opts, "steps", 50)
+    signed = -amount if side == "l" else amount
+    return center + signed if custom else center + (signed / steps) * ((hi - lo) / 2)
+
+def _fmt_parse_kind(s, kind, opts):
+    if kind == "note":
+        return _fmt_parse_note(s, opts)
+    if kind == "division":
+        for name, b in _FMT_DIVISIONS:
+            if name.lower() == s:
+                return b
+        return float("nan")
+    if kind == "pan":
+        return _fmt_parse_pan(s, opts)
+    if kind == "ratio":
+        if len(s) > 2 and s.endswith(":1"):
+            return _fmt_read_number(s[:-2])
+        if s.startswith("x"):
+            return _fmt_read_number(s[1:])
+    return float("nan")
+
+def formatParse(text, opts=None):
+    if isinstance(text, bool) or not isinstance(text, (str, int, float)):
+        return None
+    s = _fmt_re.sub(r"\s+", "", str(text).lower())
+    s = s.replace("−", "-").replace("♯", "#").replace("♭", "b").replace("∞", "inf")
+    if s == "":
+        return None
+    kind = str(_fmt_opt(opts, "kind") if _fmt_opt(opts, "kind") is not None else "auto")
+    value = _fmt_parse_kind(s, kind, opts)
+    if _fmt_math.isnan(value):
+        factor, unit_kind = 1, ""
+        for suffix, k, f in _FMT_UNIT_SUFFIXES:
+            if len(s) > len(suffix) and s.endswith(suffix):
+                s = s[:len(s) - len(suffix)]
+                factor, unit_kind = f, k
+                break
+        if unit_kind and kind != "auto" and unit_kind != kind:
+            return None
+        value = _fmt_read_number(s)
+        if _fmt_math.isnan(value):
+            return None
+        if not unit_kind and factor == 1 and kind == "percent":
+            factor = 0.01
+        value = value * factor
+    lo = _fmt_num(_fmt_opt(opts, "min"))
+    hi = _fmt_num(_fmt_opt(opts, "max"))
+    if _fmt_math.isfinite(lo) and value < lo:
+        value = lo
+    if _fmt_math.isfinite(hi) and value > hi:
+        value = hi
+    return value
+
+# As the synth shows it: formatCore.js formatDescribed, from the parameter the profile describes.
+# The commands as defined above, before the option check wraps the globals: formatDescribed hands
+# them options of its own (a note's middleC beside a frequency) that a script's call would not.
+_FMT_RAW = {
+    "number": formatNumber, "hz": formatHz, "time": formatTime, "db": formatDb, "percent": formatPercent,
+    "pan": formatPan, "ratio": formatRatio, "note": formatNote, "division": formatDivision, "table": formatTable,
+}
+
+def _fmt_described_options(d, kind, opts):
+    o = {}
+    precision = _fmt_num(d.get("precision"))
+    if _fmt_math.isfinite(precision):
+        o["decimals"] = precision
+    unit = d.get("unit")
+    if isinstance(unit, str) and unit != "" and kind in ("", "number"):
+        o["unit"] = unit
+    middle_c = _fmt_num(d.get("middleC"))
+    if _fmt_math.isfinite(middle_c):
+        o["middleC"] = middle_c
+    if isinstance(opts, dict):
+        for key, value in opts.items():
+            if key != "role":
+                o[key] = value
+    return o
+
+def _fmt_with_options(base, extra):
+    o = dict(base)
+    for key, value in extra.items():
+        if o.get(key) is None:
+            o[key] = value
+    return o
+
+def _fmt_described(desc, v, opts):
+    p = desc if isinstance(desc, dict) else {}
+    d = p.get("display") if isinstance(p.get("display"), dict) else {}
+    kind = d.get("format") if isinstance(d.get("format"), str) else ""
+    o = _fmt_described_options(d, kind, opts)
+
+    if d.get("mode") == "text" or p.get("type") == "text":
+        return _fmt_finish(_fmt_as_text(v), o)
+
+    choices = p.get("choices")
+    if isinstance(choices, (list, tuple)):
+        wanted = _fmt_num(v)
+        for c in choices:
+            if not isinstance(c, dict):
+                continue
+            value = _fmt_num(c.get("value"))
+            if (_fmt_math.isfinite(wanted) and value == wanted) or (isinstance(v, str) and c.get("id") == v):
+                label = c.get("label")
+                return _fmt_finish(_fmt_as_text(label if label is not None else c.get("id")), o)
+
+    n = _fmt_num(v)
+    if not _fmt_math.isfinite(n):
+        return _fmt_placeholder(o)
+    rng = p.get("range") if isinstance(p.get("range"), dict) else {}
+    lo = _fmt_num(rng.get("min"))
+    hi = _fmt_num(rng.get("max"))
+    wire_min = lo if _fmt_math.isfinite(lo) else 0
+    wire_max = hi if _fmt_math.isfinite(hi) else 127
+
+    table = d.get("table")
+    if isinstance(table, (list, tuple)) and len(table) > 0:
+        return _FMT_RAW["table"](n, table, _fmt_with_options(o, {"start": wire_min}))
+
+    dmin = _fmt_num(d.get("min"))
+    dmax = _fmt_num(d.get("max"))
+    scaled = _fmt_math.isfinite(dmin) and _fmt_math.isfinite(dmax) and wire_max != wire_min
+    shown = dmin + ((n - wire_min) / (wire_max - wire_min)) * (dmax - dmin) if scaled else n
+
+    if kind == "hz":
+        return _FMT_RAW["hz"](shown, o)
+    if kind == "time":
+        return _FMT_RAW["time"](shown, o)
+    if kind == "db":
+        return _FMT_RAW["db"](shown, o)
+    if kind == "ratio":
+        return _FMT_RAW["ratio"](shown, o)
+    if kind == "note":
+        return _FMT_RAW["note"](shown, o)
+    if kind == "division":
+        return _FMT_RAW["division"](shown, o)
+    if kind == "percent":
+        return _FMT_RAW["percent"](n, _fmt_with_options(o, {"min": wire_min, "max": wire_max}))
+    if kind == "pan":
+        a, b = (dmin, dmax) if scaled else (wire_min, wire_max)
+        center = 0 if a < 0 and b > 0 else _fmt_math.floor((a + b) / 2 + 0.5)
+        return _FMT_RAW["pan"](shown, _fmt_with_options(o, {"min": a, "max": b, "center": center}))
+    return _FMT_RAW["number"](shown, o)
+
+def formatParameter(id, v, opts=None):
+    # The host query itself, not deviceParameter: that is ce.device's, and gated when a script
+    # does not use ce.device.
+    role = opts.get("role") if isinstance(opts, dict) else None
+    role = "mainSynth" if role is None or role == "" else str(role)
+    d = __deviceQuery("parameter", { "role": role, "id": str(id) })
+    if not isinstance(d, dict):
+        shown = _fmt_placeholder(opts)
+        _fmt_say("error", "ce.format.parameter: the device profile has no parameter \"" + str(id) + "\", so \"" + shown + "\" is shown.")
+        return shown
+    return _fmt_described(d, v, opts)
+
+# @module ce.patch
+# ce.patch, ported line for line from patchCore.js (the panel view's; the JavaScript prelude runs
+# that file itself). Held to the panel view's answers by test/patchParity.test.js and the scenario in
+# test/support/patchScenario.mjs. ce.patch requires ce.device, ce.panel, ce.math and ce.storage, so
+# the globals the host below calls are live whenever a script can reach ce.patch.
+import math as _patch_math
+import re as _patch_re
+
+_PATCH_LEAVE_OUT_GROUPS = ["system", "global", "utility", "performance"]
+_PATCH_DEFAULT_SEED = 0x9E3779B9
+_PATCH_SEND_MODES = ["auto", "parameters", "dump", "none"]
+_PATCH_LIVE_BUDGET = 32
+_PATCH_DEFINE_FIELDS = ["name", "groups", "only", "except", "dumps", "read", "transform"]
+_PATCH_STORE_PREFIX = "ce.patch:"
+_PATCH_NUMBER_TEXT = _patch_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+def _patch_num(v):
+    if isinstance(v, bool):
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str) and _PATCH_NUMBER_TEXT.fullmatch(v.strip()):
+        t = float(v.strip())
+        return int(t) if t.is_integer() and "." not in v and "e" not in v.lower() else t
+    return float("nan")
+
+def _patch_finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and _patch_math.isfinite(x)
+
+def _patch_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _patch_names(v):
+    if isinstance(v, str):
+        return [] if v == "" else [v]
+    if not isinstance(v, (list, tuple)):
+        return []
+    return [x for x in v if isinstance(x, str) and x != ""]
+
+def _patch_lower(s):
+    return "" if s is None else str(s).lower()
+
+def _patch_str(v):
+    return "" if v is None else (v if isinstance(v, str) else _patch_text(v))
+
+def _patch_text(v):
+    if isinstance(v, bool):
+        return "true" if v else "false"
+    if isinstance(v, float) and v.is_integer():
+        return str(int(v))
+    return str(v)
+
+def _patch_has(values, key):
+    return isinstance(values, dict) and values.get(key) is not None
+
+def _patch_copy(values):
+    return {k: v for k, v in values.items() if v is not None} if isinstance(values, dict) else {}
+
+def _patch_round(x):
+    return -_patch_math.floor(-x + 0.5) if x < 0 else _patch_math.floor(x + 0.5)
+
+def _patch_kind(desc):
+    t = _patch_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if t in ("action", "momentary", "trigger"):
+        return "action"
+    if t == "text":
+        return "text"
+    if t in ("choice", "boolean", "enum", "bool"):
+        return "choice"
+    if isinstance(desc, dict) and isinstance(desc.get("choices"), (list, tuple)) and len(desc.get("choices")) > 0:
+        return "choice"
+    return "number"
+
+def _patch_writable(desc):
+    access = desc.get("access") if isinstance(desc, dict) else None
+    if isinstance(access, str):
+        return "write" in access.lower()
+    if isinstance(access, dict) and access.get("canWrite") is False:
+        return False
+    return True
+
+def _patch_whole(desc):
+    return not (isinstance(desc, dict) and desc.get("type") == "float")
+
+def _patch_range(desc):
+    rng = desc.get("range") if isinstance(desc, dict) and isinstance(desc.get("range"), dict) else {}
+    lo = _patch_num(rng.get("min"))
+    hi = _patch_num(rng.get("max"))
+    a = lo if _patch_finite(lo) else 0
+    b = hi if _patch_finite(hi) else 127
+    return (a, b) if a <= b else (b, a)
+
+def _patch_choices(desc):
+    out = []
+    if isinstance(desc, dict) and isinstance(desc.get("choices"), (list, tuple)):
+        for c in desc["choices"]:
+            if isinstance(c, dict):
+                if c.get("id") is not None:
+                    out.append(c["id"])
+                elif c.get("value") is not None:
+                    out.append(c["value"])
+            elif c is not None:
+                out.append(c)
+    t = _patch_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if len(out) == 0 and t in ("boolean", "bool"):
+        out = [False, True]
+    return out
+
+def _patch_settle(desc, v):
+    x = v
+    if _patch_whole(desc):
+        x = _patch_round(x)
+    lo, hi = _patch_range(desc)
+    if x < lo:
+        x = lo
+    if x > hi:
+        x = hi
+    return x
+
+def _patch_same(desc, a, b):
+    x = _patch_num(a)
+    y = _patch_num(b)
+    if not isinstance(a, bool) and not isinstance(b, bool) and _patch_finite(x) and _patch_finite(y):
+        return abs(x - y) < (0.5 if _patch_whole(desc) else 1e-9)
+    if a is b or (type(a) == type(b) and a == b):
+        return True
+    if a is None or b is None:
+        return False
+    if isinstance(a, bool) or isinstance(b, bool):
+        return _patch_text(a) == _patch_text(b)
+    return str(a).rstrip() == str(b).rstrip()
+
+def _patch_left_out(desc):
+    return _patch_lower(desc.get("group") if isinstance(desc, dict) else None) in _PATCH_LEAVE_OUT_GROUPS
+
+def _patch_matches(desc, names):
+    group = _patch_lower(desc.get("group"))
+    for name in names:
+        if name == desc.get("id"):
+            return True
+        if group != "" and name.lower() == group:
+            return True
+    return False
+
+def _patch_scope_params(params, scope, defs):
+    lst = params if isinstance(params, (list, tuple)) else []
+    sid = "voice" if scope is None else str(scope)
+    d = defs.get(sid) if isinstance(defs, dict) else None
+    out = []
+    if isinstance(d, dict):
+        groups = _patch_names(d.get("groups"))
+        only = _patch_names(d.get("only"))
+        exc = _patch_names(d.get("except"))
+        for desc in lst:
+            if _patch_kind(desc) == "action":
+                continue
+            if (groups or only) and not _patch_matches(desc, groups) and desc.get("id") not in only:
+                continue
+            if _patch_matches(desc, exc):
+                continue
+            out.append(desc)
+        return out
+    if sid == "voice":
+        return [desc for desc in lst if _patch_kind(desc) != "action" and not _patch_left_out(desc)]
+    if sid == "system":
+        return [desc for desc in lst if _patch_kind(desc) != "action" and _patch_left_out(desc)]
+    return None
+
+def _patch_name_parameter(scoped):
+    found = ""
+    for desc in scoped:
+        if _patch_kind(desc) != "text":
+            continue
+        if found != "":
+            return ""
+        found = str(desc.get("id"))
+    return found
+
+def _patch_warn_unknown(scoped, names, what, verb, say, words):
+    for name in names:
+        if words is not None and name in words:
+            continue
+        known = False
+        for desc in scoped:
+            if desc.get("id") == name or (_patch_lower(desc.get("group")) != "" and _patch_lower(desc.get("group")) == name.lower()):
+                known = True
+                break
+        if not known:
+            say("warn", "ce.patch." + verb + ": the profile has no parameter or group \"" + name + "\" in this scope, in " + what + "; the rest goes ahead.")
+
+def _patch_choose(scoped, opts, say, verb, for_apply):
+    groups = _patch_names(_patch_opt(opts, "groups"))
+    only = _patch_names(_patch_opt(opts, "only"))
+    exc = _patch_names(_patch_opt(opts, "except"))
+    include = _patch_names(_patch_opt(opts, "include"))
+    _patch_warn_unknown(scoped, groups, "groups", verb, say, None)
+    _patch_warn_unknown(scoped, only, "only", verb, say, None)
+    _patch_warn_unknown(scoped, exc, "except", verb, say, None)
+    _patch_warn_unknown(scoped, include, "include", verb, say, ["name", "readOnly", "leaveOut"])
+    _patch_warn_unknown(scoped, _patch_names(_patch_opt(opts, "lock")), "lock", verb, say, None)
+    chosen = []
+    for desc in scoped:
+        included = _patch_matches(desc, include)
+        if not for_apply and not included:
+            if _patch_kind(desc) == "text" and "name" not in include:
+                continue
+            if not _patch_writable(desc) and "readOnly" not in include:
+                continue
+        if (groups or only) and not _patch_matches(desc, groups) and desc.get("id") not in only:
+            continue
+        if _patch_matches(desc, exc):
+            continue
+        chosen.append(str(desc.get("id")))
+    if not chosen and (groups or only):
+        say("error", "ce.patch." + verb + ": groups and only leave no parameter chosen, so nothing was done.")
+        return None
+    return chosen
+
+def _patch_locked(scoped, opts):
+    lock = _patch_names(_patch_opt(opts, "lock"))
+    return [str(desc.get("id")) for desc in scoped if _patch_matches(desc, lock)]
+
+def _patch_by_id(scoped):
+    return {str(desc.get("id")): desc for desc in scoped}
+
+def _patch_is(p):
+    return isinstance(p, dict) and isinstance(p.get("values"), dict)
+
+def _patch_make(base, values, scoped, source):
+    missing = [str(desc.get("id")) for desc in scoped if _patch_kind(desc) != "action" and not _patch_has(values, str(desc.get("id")))]
+    name_id = _patch_name_parameter(scoped)
+    b = base if isinstance(base, dict) else {}
+    patch = {
+        "device": _patch_str(b.get("device")),
+        "role": _patch_str(b.get("role")) if b.get("role") is not None else "mainSynth",
+        "scope": _patch_str(b.get("scope")) if b.get("scope") is not None else "voice",
+        "values": values,
+        "missing": missing,
+        "source": source,
+    }
+    if name_id != "" and _patch_has(values, name_id):
+        patch["name"] = _patch_text(values[name_id])
+    elif isinstance(b.get("name"), str):
+        patch["name"] = b["name"]
+    return patch
+
+def _patch_same_patches(a, b, verb, what, say):
+    if not _patch_is(a) or not _patch_is(b):
+        say("error", "ce.patch." + verb + ": " + what + " must be patches, as ce.patch.current() gives them, so nothing was done.")
+        return False
+    if _patch_str(a.get("device")) != _patch_str(b.get("device")) or _patch_str(a.get("scope")) != _patch_str(b.get("scope")):
+        say("error", "ce.patch." + verb + ": a patch of " + _patch_str(b.get("device")) + " (" + _patch_str(b.get("scope")) + ") cannot be used with one of " + _patch_str(a.get("device")) + " (" + _patch_str(a.get("scope")) + "), so nothing was done.")
+        return False
+    return True
+
+def _patch_clamp01(v):
+    n = _patch_num(v)
+    if not _patch_finite(n):
+        return float("nan")
+    return 0 if n < 0 else 1 if n > 1 else n
+
+def _patch_morph(a, b, t, scoped, opts, say):
+    if not _patch_same_patches(a, b, "morph", "a and b", say):
+        return None
+    at = _patch_clamp01(t)
+    if _patch_math.isnan(at):
+        say("error", "ce.patch.morph: t must be a number from 0 to 1, so nothing was done.")
+        return None
+    switch_at = _patch_clamp01(_patch_opt(opts, "switchAt"))
+    if _patch_math.isnan(switch_at):
+        switch_at = 0.5
+    ids = _patch_choose(scoped, opts, say, "morph", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    out = _patch_copy(a["values"])
+    for k, v in b["values"].items():
+        if not _patch_has(out, k) and v is not None:
+            out[k] = v
+    for i in ids:
+        if i in locked or not _patch_has(a["values"], i) or not _patch_has(b["values"], i):
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            x = _patch_num(a["values"][i])
+            y = _patch_num(b["values"][i])
+            if _patch_finite(x) and _patch_finite(y):
+                out[i] = _patch_settle(desc, x + (y - x) * at)
+        elif kind == "choice":
+            out[i] = a["values"][i] if at < switch_at else b["values"][i]
+    return _patch_make(a, out, scoped, "made")
+
+def _patch_blend(patches, weights, scoped, opts, say):
+    if not isinstance(patches, (list, tuple)) or len(patches) < 2:
+        say("error", "ce.patch.blend: patches must be a list of two or more patches, so nothing was done.")
+        return None
+    for i in range(1, len(patches)):
+        if not _patch_same_patches(patches[0], patches[i], "blend", "patches", say):
+            return None
+    w = []
+    total = 0
+    for i in range(len(patches)):
+        n = _patch_num(weights[i]) if isinstance(weights, (list, tuple)) and i < len(weights) else float("nan")
+        v = n if _patch_finite(n) and n > 0 else 0
+        w.append(v)
+        total += v
+    if not total > 0:
+        say("error", "ce.patch.blend: the weights add up to 0 or less, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "blend", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    out = _patch_copy(patches[0]["values"])
+    for p in patches[1:]:
+        for k, v in p["values"].items():
+            if not _patch_has(out, k) and v is not None:
+                out[k] = v
+    for i in ids:
+        if i in locked:
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            total_v = 0
+            weight = 0
+            for j, p in enumerate(patches):
+                x = _patch_num(p["values"].get(i))
+                if not _patch_finite(x) or w[j] <= 0:
+                    continue
+                total_v += x * w[j]
+                weight += w[j]
+            if weight > 0:
+                out[i] = _patch_settle(desc, total_v / weight)
+        elif kind == "choice":
+            best = -1
+            for j, p in enumerate(patches):
+                if not _patch_has(p["values"], i) or w[j] <= 0:
+                    continue
+                if best < 0 or w[j] > w[best]:
+                    best = j
+            if best >= 0:
+                out[i] = patches[best]["values"][i]
+    return _patch_make(patches[0], out, scoped, "made")
+
+def _patch_random_source(seed):
+    n = _patch_num(seed)
+    x = int(_patch_math.floor(n)) % 4294967296 if _patch_finite(n) else 0
+    if x == 0:
+        x = _PATCH_DEFAULT_SEED
+    state = [x]
+    def nxt():
+        s = state[0]
+        s = (s ^ ((s << 13) & 0xFFFFFFFF)) & 0xFFFFFFFF
+        s = (s ^ (s >> 17)) & 0xFFFFFFFF
+        s = (s ^ ((s << 5) & 0xFFFFFFFF)) & 0xFFFFFFFF
+        state[0] = s
+        return s / 4294967296
+    return nxt
+
+def _patch_within(desc, within):
+    lo, hi = _patch_range(desc)
+    narrow = within.get(str(desc.get("id"))) if isinstance(within, dict) else None
+    if isinstance(narrow, (list, tuple)) and len(narrow) >= 2:
+        a = _patch_num(narrow[0])
+        b = _patch_num(narrow[1])
+        if _patch_finite(a) and _patch_finite(b):
+            low = max(lo, min(a, b))
+            high = min(hi, max(a, b))
+            if low <= high:
+                lo, hi = low, high
+    return lo, hi
+
+def _patch_random(frm, scoped, opts, nxt, say):
+    if not _patch_is(frm):
+        say("error", "ce.patch.random: from must be a patch, as ce.patch.current() gives them, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "random", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    within = _patch_opt(opts, "within")
+    out = _patch_copy(frm["values"])
+    for i in ids:
+        if i in locked:
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            lo, hi = _patch_within(desc, within)
+            r = nxt()
+            if _patch_whole(desc):
+                out[i] = min(_patch_math.floor(hi), _patch_math.ceil(lo) + _patch_math.floor(r * (_patch_math.floor(hi) - _patch_math.ceil(lo) + 1)))
+            else:
+                out[i] = lo + r * (hi - lo)
+        elif kind == "choice":
+            choices = _patch_choices(desc)
+            r = nxt()
+            if choices:
+                out[i] = choices[min(len(choices) - 1, _patch_math.floor(r * len(choices)))]
+    return _patch_make(frm, out, scoped, "made")
+
+def _patch_mutate(patch, amount, scoped, opts, nxt, say):
+    if not _patch_is(patch):
+        say("error", "ce.patch.mutate: patch must be a patch, as ce.patch.current() gives them, so nothing was done.")
+        return None
+    by = _patch_clamp01(amount)
+    if _patch_math.isnan(by):
+        say("error", "ce.patch.mutate: amount must be a number from 0 to 1, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "mutate", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    descs = _patch_by_id(scoped)
+    out = _patch_copy(patch["values"])
+    for i in ids:
+        if i in locked or not _patch_has(out, i):
+            continue
+        desc = descs.get(i)
+        kind = _patch_kind(desc)
+        if kind == "number":
+            x = _patch_num(out[i])
+            if not _patch_finite(x):
+                continue
+            lo, hi = _patch_range(desc)
+            r1 = nxt()
+            r2 = nxt()
+            out[i] = _patch_settle(desc, x + (r1 - r2) * by * (hi - lo))
+        elif kind == "choice":
+            r1 = nxt()
+            r2 = nxt()
+            if r1 >= by:
+                continue
+            others = [c for c in _patch_choices(desc) if not _patch_same(desc, c, out[i])]
+            if others:
+                out[i] = others[min(len(others) - 1, _patch_math.floor(r2 * len(others)))]
+    return _patch_make(patch, out, scoped, "made")
+
+def _patch_merge(base, other, scoped, opts, say):
+    if not _patch_same_patches(base, other, "merge", "base and other", say):
+        return None
+    if not _patch_names(_patch_opt(opts, "groups")) and not _patch_names(_patch_opt(opts, "only")):
+        say("error", "ce.patch.merge: name the parameters to take, with groups or only; taking every value is other itself, so nothing was done.")
+        return None
+    ids = _patch_choose(scoped, opts, say, "merge", False)
+    if ids is None:
+        return None
+    locked = _patch_locked(scoped, opts)
+    out = _patch_copy(base["values"])
+    for i in ids:
+        if i not in locked and _patch_has(other["values"], i):
+            out[i] = other["values"][i]
+    return _patch_make(base, out, scoped, "made")
+
+def _patch_diff(a, b, scoped, opts, say):
+    if not _patch_same_patches(a, b, "diff", "a and b", say):
+        return None
+    ids = _patch_choose(scoped, opts, say, "diff", False)
+    if ids is None:
+        return None
+    descs = _patch_by_id(scoped)
+    out = []
+    for i in ids:
+        in_a = _patch_has(a["values"], i)
+        in_b = _patch_has(b["values"], i)
+        if not in_a and not in_b:
+            continue
+        if in_a and in_b and _patch_same(descs.get(i), a["values"][i], b["values"][i]):
+            continue
+        desc = descs.get(i) or {}
+        entry = {"id": i, "name": _patch_str(desc.get("name")) if desc.get("name") is not None else i, "group": _patch_str(desc.get("group"))}
+        if in_a:
+            entry["from"] = a["values"][i]
+        if in_b:
+            entry["to"] = b["values"][i]
+        out.append(entry)
+    return out
+
+def _patch_apply_plan(patch, known, scoped, opts, say):
+    ids = _patch_choose(scoped, opts, say, "apply", True)
+    if ids is None:
+        return None
+    descs = _patch_by_id(scoped)
+    changed_only = _patch_opt(opts, "changedOnly") is not False
+    send = []
+    values = {}
+    skipped = []
+    for i in ids:
+        if not _patch_has(patch["values"], i):
+            continue
+        value = patch["values"][i]
+        values[i] = value
+        if not _patch_writable(descs.get(i)):
+            skipped.append({"id": i, "why": "the synth cannot be sent it"})
+            continue
+        if changed_only and _patch_has(known, i) and _patch_same(descs.get(i), known[i], value):
+            continue
+        send.append([i, value])
+    for key in sorted(patch["values"].keys()):
+        if key not in descs:
+            skipped.append({"id": key, "why": "not a parameter of this scope"})
+    return {"send": send, "values": values, "skipped": skipped}
+
+def _patch_live_plan(send, known, scoped, budget):
+    descs = _patch_by_id(scoped)
+    moved = []
+    for i, entry in enumerate(send):
+        pid, value = entry[0], entry[1]
+        lo, hi = _patch_range(descs.get(pid))
+        x = _patch_num(value)
+        y = _patch_num(known.get(pid))
+        delta = abs(x - y) / ((hi - lo) or 1) if _patch_finite(x) and _patch_finite(y) else 2
+        moved.append((delta, i))
+    moved.sort(key=lambda m: (-m[0], m[1]))
+    now = [send[m[1]] for k, m in enumerate(moved) if k < budget]
+    later = [send[m[1]] for k, m in enumerate(moved) if k >= budget]
+    return now, later
+
+def _patch_list_of_scopes(section):
+    scopes = section.get("scopes") if isinstance(section, dict) else None
+    if not isinstance(scopes, (list, tuple)):
+        return []
+    return [s for s in scopes if isinstance(s, dict) and isinstance(s.get("id"), str) and s.get("id") != ""]
+
+class _PatchCommands:
+    """The commands over a host, as patchCore.js's patchCommands."""
+
+    def __init__(self, host):
+        self.host = host
+        self.say = host["say"]
+        self.defined = {}
+        self.waiting = {}
+
+    def context(self, role):
+        r = role if isinstance(role, str) and role != "" else "mainSynth"
+        profile = self.host["profile"](r)
+        if not isinstance(profile, dict) or not isinstance(profile.get("id"), str) or profile.get("id") == "":
+            return {"role": r, "device": "panel", "params": None, "section": None}
+        params = self.host["parameters"](r)
+        section = self.host["patchSection"](r)
+        return {"role": r, "device": profile["id"], "params": params if isinstance(params, (list, tuple)) else [],
+                "section": section if isinstance(section, dict) else None}
+
+    def scope_defs(self, ctx):
+        defs = {}
+        for s in _patch_list_of_scopes(ctx["section"]):
+            defs[s["id"]] = s
+        own = self.defined.get(ctx["role"])
+        if own:
+            for k, v in own.items():
+                defs[k] = v
+        return defs
+
+    def panel_descriptors(self, values):
+        out = []
+        for name in sorted((values or {}).keys()):
+            v = values[name]
+            t = "boolean" if isinstance(v, bool) else "float" if isinstance(v, (int, float)) else "text"
+            out.append({"id": name, "name": name, "group": "", "type": t})
+        return out
+
+    def scoped(self, ctx, scope, verb):
+        if ctx["params"] is None:
+            if scope != "voice":
+                self.say("error", "ce.patch." + verb + ": a panel without a device profile has one scope, \"voice\", so nothing was done.")
+                return None
+            return self.panel_descriptors(self.host["snapshot"]())
+        lst = _patch_scope_params(ctx["params"], scope, self.scope_defs(ctx))
+        if lst is None:
+            self.say("error", "ce.patch." + verb + ": \"" + str(scope) + "\" is not a scope of " + ctx["device"] + ", so nothing was done. ce.patch.scopes() lists them.")
+        return lst
+
+    def for_patch(self, patch, verb):
+        if not _patch_is(patch):
+            self.say("error", "ce.patch." + verb + ": that is not a patch, as ce.patch.current() gives them, so nothing was done.")
+            return None
+        ctx = self.context(patch.get("role") if isinstance(patch.get("role"), str) else "mainSynth")
+        if _patch_str(patch.get("device")) != ctx["device"]:
+            self.say("error", "ce.patch." + verb + ": the patch is one of " + _patch_str(patch.get("device")) + ", and this panel's synth is " + ctx["device"] + ", so nothing was done.")
+            return None
+        lst = self.scoped(ctx, _patch_str(patch.get("scope")) if patch.get("scope") is not None else "voice", verb)
+        if lst is None:
+            return None
+        return ctx, lst
+
+    @staticmethod
+    def scope_of(scope, opts):
+        if isinstance(scope, str) and scope != "":
+            return scope
+        from_opts = _patch_opt(opts, "scope")
+        return from_opts if isinstance(from_opts, str) and from_opts != "" else "voice"
+
+    def current(self, scope=None, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        sid = self.scope_of(scope, opts)
+        lst = self.scoped(ctx, sid, "current")
+        if lst is None:
+            return None
+        narrowed = bool(_patch_names(_patch_opt(opts, "groups")) or _patch_names(_patch_opt(opts, "only")) or _patch_names(_patch_opt(opts, "except")))
+        ids = None
+        if narrowed:
+            ids = _patch_choose(lst, opts, self.say, "current", True)
+            if ids is None:
+                return None
+        if ctx["params"] is None:
+            values = _patch_copy(self.host["snapshot"]())
+            if ids is not None:
+                values = {k: v for k, v in values.items() if k in ids}
+        else:
+            values = {}
+            for desc in lst:
+                pid = str(desc.get("id"))
+                if ids is not None and pid not in ids:
+                    continue
+                v = self.host["read"](pid, ctx["role"])
+                if v is not None:
+                    values[pid] = v
+        return _patch_make({"device": ctx["device"], "role": ctx["role"], "scope": sid}, values, lst, "panel")
+
+    def seeded(self, opts, verb):
+        seed = _patch_opt(opts, "seed")
+        if seed is not None:
+            if not _patch_finite(_patch_num(seed)):
+                self.say("error", "ce.patch." + verb + ": seed must be a number, so nothing was done.")
+                return None
+            return _patch_random_source(seed)
+        return _patch_random_source(_patch_math.floor(self.host["random"]() * 4294967296))
+
+    def known_values(self, ctx, lst):
+        known = {}
+        if ctx["params"] is None:
+            return known
+        for desc in lst:
+            v = self.host["read"](str(desc.get("id")), ctx["role"])
+            if v is not None:
+                known[str(desc.get("id"))] = v
+        return known
+
+    def scope_dumps(self, ctx, scope):
+        d = self.scope_defs(ctx).get(scope)
+        return _patch_names(d.get("dumps")) if d else []
+
+    def apply(self, patch, opts=None):
+        refused = {"ok": False, "via": "none", "applied": 0, "sent": 0, "skipped": []}
+        at = self.for_patch(patch, "apply")
+        if at is None:
+            return refused
+        ctx, lst = at
+        scope = _patch_str(patch.get("scope")) if patch.get("scope") is not None else "voice"
+        send = _patch_opt(opts, "send")
+        if send is None:
+            send = "auto"
+        if send not in _PATCH_SEND_MODES:
+            self.say("error", "ce.patch.apply: send \"" + _patch_str(send) + "\" is not one of \"auto\", \"parameters\", \"dump\" or \"none\", so nothing was done.")
+            return refused
+        known = self.known_values(ctx, lst)
+        plan = _patch_apply_plan(patch, known, lst, opts, self.say)
+        if plan is None:
+            return refused
+        applied = len(plan["values"])
+        if ctx["params"] is None:
+            self.host["restore"](plan["values"])
+            return {"ok": True, "via": "none", "applied": applied, "sent": 0, "skipped": plan["skipped"]}
+        dumps = self.scope_dumps(ctx, scope)
+        section = ctx["section"]
+        deliver = section.get("deliver") if isinstance(section, dict) and isinstance(section.get("deliver"), str) else ""
+        via = send
+        if send == "auto":
+            via = "dump" if deliver == "dump" and dumps else "parameters"
+        if via == "dump" and not dumps:
+            self.say("error", "ce.patch.apply: " + ctx["device"] + " has no dumps for the \"" + scope + "\" scope, so it cannot take a patch as a dump, and nothing was done.")
+            return refused
+        self.host["fill"](plan["values"])
+        if via == "none":
+            return {"ok": True, "via": via, "applied": applied, "sent": 0, "skipped": plan["skipped"]}
+        if via == "dump":
+            for kind in dumps:
+                self.host["sendDump"](kind)
+            return {"ok": True, "via": via, "applied": applied, "sent": len(dumps), "skipped": plan["skipped"]}
+        key = ctx["role"] + "\0" + scope
+        to_send = plan["send"]
+        if _patch_opt(opts, "live") is True:
+            now, later = _patch_live_plan(plan["send"], known, lst, _PATCH_LIVE_BUDGET)
+            to_send = now
+            self.waiting[key] = later
+        else:
+            later = self.waiting.pop(key, [])
+            planned = {entry[0] for entry in to_send}
+            to_send = list(to_send) + [entry for entry in later if entry[0] not in planned]
+        sent = 0
+        skipped = list(plan["skipped"])
+        for pid, value in to_send:
+            if self.host["write"](pid, value, ctx["role"]) is True:
+                sent += 1
+            else:
+                skipped.append({"id": pid, "why": "not sent"})
+        return {"ok": True, "via": via, "applied": applied, "sent": sent, "skipped": skipped}
+
+    def read(self, scope, fn, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        sid = scope if isinstance(scope, str) and scope != "" else "voice"
+        if not callable(fn):
+            self.say("error", "ce.patch.read: fn must be a function to call with the patch, so nothing was asked.")
+            return False
+        if self.scoped(ctx, sid, "read") is None:
+            return False
+        dumps = [] if ctx["params"] is None else self.scope_dumps(ctx, sid)
+        if not dumps:
+            self.say("error", "ce.patch.read: the \"" + sid + "\" scope has no dumps to ask the synth for, so it cannot be read. ce.patch.define() can name them.")
+            return False
+        state = {"ok": True, "at": 0}
+        timeout = _patch_num(_patch_opt(opts, "timeout"))
+        dump_opts = {"timeout": timeout} if _patch_finite(timeout) and timeout > 0 else None
+
+        def nxt():
+            if state["at"] >= len(dumps):
+                patch = self.current(sid, {"role": ctx["role"]})
+                fn(patch, {"ok": state["ok"], "missing": patch["missing"] if patch else []})
+                return
+            kind = dumps[state["at"]]
+            state["at"] += 1
+
+            def answered(values=None, answer=None):
+                if not isinstance(answer, dict) or answer.get("ok") is not True:
+                    state["ok"] = False
+                nxt()
+            asked = self.host["requestDump"](kind, answered, dump_opts)
+            if asked is False:
+                state["ok"] = False
+                nxt()
+        nxt()
+        return True
+
+    def scopes(self, role=None):
+        ctx = self.context(role)
+        if ctx["params"] is None:
+            return [{"id": "voice", "name": "Voice", "parameters": len(self.host["snapshot"]() or {}), "canRead": False, "canSend": True, "via": "none"}]
+        defs = self.scope_defs(ctx)
+        ids = [] if "voice" in defs else ["voice"]
+        for s in _patch_list_of_scopes(ctx["section"]):
+            if s["id"] not in ids:
+                ids.append(s["id"])
+        for sid in sorted((self.defined.get(ctx["role"]) or {}).keys()):
+            if sid not in ids:
+                ids.append(sid)
+        section = ctx["section"]
+        deliver = section.get("deliver") if isinstance(section, dict) and isinstance(section.get("deliver"), str) else ""
+        out = []
+        for sid in ids:
+            lst = _patch_scope_params(ctx["params"], sid, defs)
+            if lst is None or (len(lst) == 0 and sid not in defs):
+                continue
+            dumps = _patch_names(defs[sid].get("dumps")) if sid in defs else []
+            name = defs[sid]["name"] if sid in defs and isinstance(defs[sid].get("name"), str) else sid[:1].upper() + sid[1:]
+            out.append({"id": sid, "name": name, "parameters": len(lst), "canRead": len(dumps) > 0, "canSend": True,
+                        "via": "dump" if deliver == "dump" and dumps else "parameters"})
+        if "system" not in defs:
+            system = _patch_scope_params(ctx["params"], "system", defs)
+            if system:
+                out.append({"id": "system", "name": "System", "parameters": len(system), "canRead": False, "canSend": True, "via": "parameters"})
+        return out
+
+    def define(self, scope, spec, role=None):
+        if not isinstance(scope, str) or scope == "":
+            self.say("error", "ce.patch.define: scope must be a name, such as \"voice\", so nothing was defined.")
+            return False
+        if not isinstance(spec, dict):
+            self.say("error", "ce.patch.define: spec must be a table of groups, only, except and dumps, so nothing was defined.")
+            return False
+        for key in sorted(spec.keys()):
+            if key not in _PATCH_DEFINE_FIELDS:
+                self.say("error", "ce.patch.define: \"" + key + "\" is not one of the fields a scope takes (" + ", ".join(_PATCH_DEFINE_FIELDS) + "), so nothing was defined.")
+                return False
+        for key in ("groups", "only", "except", "dumps"):
+            v = spec.get(key)
+            if v is not None and not isinstance(v, (str, list, tuple)):
+                self.say("error", "ce.patch.define: " + key + " must be a list of names, so nothing was defined.")
+                return False
+        r = role if isinstance(role, str) and role != "" else "mainSynth"
+        d = {"id": scope}
+        d.update(spec)
+        self.defined.setdefault(r, {})[scope] = d
+        return True
+
+    @staticmethod
+    def store_key(device, name):
+        return _PATCH_STORE_PREFIX + device + ":" + _patch_lower(name)
+
+    def save(self, name, patch, opts=None):
+        if not isinstance(name, str) or name.strip() == "" or len(name) > 64:
+            self.say("error", "ce.patch.save: name must be text of 1 to 64 characters, so nothing was kept.")
+            return False
+        if not _patch_is(patch):
+            self.say("error", "ce.patch.save: that is not a patch, as ce.patch.current() gives them, so nothing was kept.")
+            return False
+        key = self.store_key(_patch_str(patch.get("device")), name)
+        if _patch_opt(opts, "replace") is False and self.host["store"]["get"](key) is not None:
+            self.say("error", "ce.patch.save: a patch called \"" + name + "\" is already kept, and replace is off, so nothing was kept.")
+            return False
+        return self.host["store"]["set"](key, {
+            "name": name, "device": _patch_str(patch.get("device")),
+            "role": _patch_str(patch.get("role")) if patch.get("role") is not None else "mainSynth",
+            "scope": _patch_str(patch.get("scope")) if patch.get("scope") is not None else "voice",
+            "savedAt": _patch_str(self.host["now"]()), "values": _patch_copy(patch.get("values")),
+        }) is not False
+
+    def load(self, name, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        record = self.host["store"]["get"](self.store_key(ctx["device"], _patch_str(name)))
+        if not isinstance(record, dict):
+            for key in sorted(self.host["store"]["keys"]() or []):
+                if not key.startswith(_PATCH_STORE_PREFIX) or key[key.rfind(":") + 1:] != _patch_lower(name):
+                    continue
+                other = self.host["store"]["get"](key)
+                if isinstance(other, dict):
+                    self.say("error", "ce.patch.load: \"" + _patch_str(name) + "\" was kept for " + _patch_str(other.get("device")) + ", and this panel's synth is " + ctx["device"] + ", so there is no patch.")
+                    return None
+            self.say("error", "ce.patch.load: no patch called \"" + _patch_str(name) + "\" is kept for " + ctx["device"] + ", so there is no patch.")
+            return None
+        scope = record["scope"] if isinstance(record.get("scope"), str) else "voice"
+        lst = self.scoped(ctx, scope, "load") or []
+        patch = _patch_make({"device": ctx["device"], "role": ctx["role"], "scope": scope, "name": record.get("name")}, _patch_copy(record.get("values")), lst, "library")
+        patch["name"] = _patch_str(record.get("name")) if record.get("name") is not None else _patch_str(name)
+        return patch
+
+    def list(self, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        scope = _patch_opt(opts, "scope")
+        prefix = _PATCH_STORE_PREFIX + ctx["device"] + ":"
+        out = []
+        for key in self.host["store"]["keys"]() or []:
+            if not key.startswith(prefix):
+                continue
+            record = self.host["store"]["get"](key)
+            if not isinstance(record, dict):
+                continue
+            if isinstance(scope, str) and scope != "" and record.get("scope") != scope:
+                continue
+            out.append({"name": _patch_str(record.get("name")), "scope": _patch_str(record.get("scope")) if record.get("scope") is not None else "voice", "savedAt": _patch_str(record.get("savedAt"))})
+        out.sort(key=lambda e: e["name"])
+        out.sort(key=lambda e: e["savedAt"], reverse=True)
+        return out
+
+    def forget(self, name, opts=None):
+        ctx = self.context(_patch_opt(opts, "role"))
+        key = self.store_key(ctx["device"], _patch_str(name))
+        if self.host["store"]["get"](key) is None:
+            return False
+        self.host["store"]["remove"](key)
+        return True
+
+    def write(self, patch, slot, opts=None):
+        at = self.for_patch(patch, "write")
+        if at is None:
+            return {"ok": False, "slot": slot, "error": "not a patch of this synth"}
+        ctx = at[0]
+        section = ctx["section"]
+        how = section.get("write") if isinstance(section, dict) and isinstance(section.get("write"), dict) else None
+        n = _patch_num(slot)
+        if not _patch_finite(n) or n < 0 or _patch_math.floor(n) != n:
+            self.say("error", "ce.patch.write: slot must be a whole number from 0, so nothing was stored.")
+            return {"ok": False, "slot": slot, "error": "not a slot"}
+        n = int(n)
+        if not how or how.get("via") != "dump" or not isinstance(how.get("dump"), str) or how.get("dump") == "":
+            why = ("its profile stores a slot with a write command, which ce.patch cannot send yet"
+                   if how and how.get("via") == "command" else "its profile does not say how to store a slot (patch.write)")
+            self.say("error", "ce.patch.write: " + ctx["device"] + " cannot be written to: " + why + ", so nothing was stored.")
+            return {"ok": False, "slot": n, "error": why}
+        self.host["setVariable"]("slot", n, ctx["role"])
+        self.host["fill"](_patch_copy(patch.get("values")))
+        self.host["sendDump"](how["dump"])
+        return {"ok": True, "slot": n}
+
+    def morph(self, a, b, t, opts=None):
+        at = self.for_patch(a, "morph")
+        return None if at is None else _patch_morph(a, b, t, at[1], opts, self.say)
+
+    def blend(self, patches, weights, opts=None):
+        first = patches[0] if isinstance(patches, (list, tuple)) and patches else None
+        at = self.for_patch(first, "blend")
+        return None if at is None else _patch_blend(patches, weights, at[1], opts, self.say)
+
+    def random(self, opts=None):
+        frm = _patch_opt(opts, "from")
+        base = frm if frm is not None else self.current(_patch_opt(opts, "scope"), {"role": _patch_opt(opts, "role")})
+        if base is None:
+            return None
+        at = self.for_patch(base, "random")
+        if at is None:
+            return None
+        if at[0]["params"] is None:
+            self.say("error", "ce.patch.random: a panel without a device profile does not say each control's range, so nothing was drawn.")
+            return None
+        nxt = self.seeded(opts, "random")
+        return None if nxt is None else _patch_random(base, at[1], opts, nxt, self.say)
+
+    def mutate(self, patch, amount, opts=None):
+        at = self.for_patch(patch, "mutate")
+        if at is None:
+            return None
+        if at[0]["params"] is None:
+            self.say("error", "ce.patch.mutate: a panel without a device profile does not say each control's range, so nothing was changed.")
+            return None
+        nxt = self.seeded(opts, "mutate")
+        return None if nxt is None else _patch_mutate(patch, amount, at[1], opts, nxt, self.say)
+
+    def merge(self, base, other, opts=None):
+        at = self.for_patch(base, "merge")
+        return None if at is None else _patch_merge(base, other, at[1], opts, self.say)
+
+    def diff(self, a, b, opts=None):
+        at = self.for_patch(a, "diff")
+        return None if at is None else _patch_diff(a, b, at[1], opts, self.say)
+
+    def equal(self, a, b, opts=None):
+        at = self.for_patch(a, "equal")
+        if at is None:
+            return None
+        d = _patch_diff(a, b, at[1], opts, self.say)
+        return None if d is None else len(d) == 0
+
+def _patch_now():
+    t = __deviceQuery("now", None)
+    return t if isinstance(t, str) else ""
+
+# The host looks each global up when it is called, so the real one answers whatever replaced it.
+_PATCH = _PatchCommands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "profile": lambda role: __deviceQuery("profile", {"role": role}),
+    "parameters": lambda role: __deviceQuery("parameters", {"role": role}) or [],
+    "read": lambda pid, role: __deviceQuery("read", {"role": role, "id": str(pid)}),
+    "write": lambda pid, value, role: deviceWrite(pid, value, role) is True,
+    "fill": lambda values: applyDump(values),
+    "snapshot": lambda: panelSnapshot() or {},
+    "restore": lambda values: panelRestore(values),
+    "requestDump": lambda kind, fn, opts: requestDump(kind, fn, opts),
+    "sendDump": lambda kind: sendDump(kind),
+    "setVariable": lambda name, value, role: deviceSetVariable(name, value, role),
+    "patchSection": lambda role: __deviceQuery("patch", {"role": role}),
+    "random": lambda: random(),
+    "now": lambda: _patch_now(),
+    "store": {
+        "get": lambda key: loadSetting(key),
+        "set": lambda key, value: saveSetting(key, value),
+        "keys": lambda: listSettings() or [],
+        "remove": lambda key: forgetSetting(key),
+    },
+})
+
+def patchCurrent(scope=None, opts=None):
+    return _PATCH.current(scope, opts)
+def patchRead(scope, fn, opts=None):
+    return _PATCH.read(scope, fn, opts)
+def patchLoad(name, opts=None):
+    return _PATCH.load(name, opts)
+def patchMorph(a, b, t, opts=None):
+    return _PATCH.morph(a, b, t, opts)
+def patchBlend(patches, weights, opts=None):
+    return _PATCH.blend(patches, weights, opts)
+def patchRandom(opts=None):
+    return _PATCH.random(opts)
+def patchMutate(patch, amount, opts=None):
+    return _PATCH.mutate(patch, amount, opts)
+def patchMerge(base, other, opts=None):
+    return _PATCH.merge(base, other, opts)
+def patchDiff(a, b, opts=None):
+    return _PATCH.diff(a, b, opts)
+def patchEqual(a, b, opts=None):
+    return _PATCH.equal(a, b, opts)
+def patchApply(patch, opts=None):
+    return _PATCH.apply(patch, opts)
+def patchSave(name, patch, opts=None):
+    return _PATCH.save(name, patch, opts)
+def patchList(opts=None):
+    return _PATCH.list(opts)
+def patchForget(name, opts=None):
+    return _PATCH.forget(name, opts)
+def patchWrite(patch, slot, opts=None):
+    return _PATCH.write(patch, slot, opts)
+def patchScopes(role=None):
+    return _PATCH.scopes(role)
+def patchDefine(scope, spec, role=None):
+    return _PATCH.define(scope, spec, role)
+
+# @module ce.verify
+# ce.verify, ported line for line from verifyCore.js (the panel view's; the JavaScript prelude runs
+# that file itself). Held to the panel view's answers by test/verifyParity.test.js and the scenario in
+# test/support/verifyScenario.mjs. ce.verify requires ce.device and ce.time, so the globals the host
+# below calls are live whenever a script can reach ce.verify. Every Python script runs this prelude
+# for itself, so a check is the script's own: ce.verify.running and cancel see the checks this
+# script started, where in Lua and JavaScript they see every script's.
+import math as _verify_math
+import re as _verify_re
+
+_VERIFY_WHY_WORDS = {
+    "notInDump": "not in a dump", "noRequest": "no request", "noReply": "no reply", "badChecksum": "bad checksum",
+    "notWritable": "not writable", "moved": "moved", "cancelled": "cancelled",
+}
+_VERIFY_AVOIDABLE = ["noReply", "badChecksum", "moved", "cancelled"]
+_VERIFY_MAIN_ROLE = "mainSynth"
+_VERIFY_TEXT_SAMPLE = "ABCDEFGHIJKLMNOPQRSTUVWXYZ012345"
+_VERIFY_NUMBER_TEXT = _verify_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+def _v_isnum(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool)
+
+def _v_num(v):
+    if isinstance(v, bool):
+        return float("nan")
+    if isinstance(v, (int, float)):
+        return v
+    if isinstance(v, str) and _VERIFY_NUMBER_TEXT.fullmatch(v.strip()):
+        return float(v.strip())
+    return float("nan")
+
+def _v_finite(x):
+    return _v_isnum(x) and _verify_math.isfinite(x)
+
+def _v_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _v_lower(s):
+    return "" if s is None else str(s).lower()
+
+def _v_str(v):
+    if v is None: return ""
+    if v is True: return "true"
+    if v is False: return "false"
+    return str(v)
+
+def _v_eq(a, b):
+    # JavaScript's ===: an on/off is never a number, and a number never text.
+    if isinstance(a, bool) or isinstance(b, bool):
+        return isinstance(a, bool) and isinstance(b, bool) and a == b
+    if _v_isnum(a) and _v_isnum(b):
+        return a == b
+    return type(a) is type(b) and a == b
+
+def _v_contains(lst, value):
+    for x in lst:
+        if _v_eq(x, value): return True
+    return False
+
+def _v_list(v):
+    return v if isinstance(v, (list, tuple)) else []
+
+def _v_texts(v):
+    if isinstance(v, str):
+        return [] if v == "" else [v]
+    return [x for x in _v_list(v) if isinstance(x, str) and x != ""]
+
+def _v_role(v):
+    return v if isinstance(v, str) and v != "" else _VERIFY_MAIN_ROLE
+
+def _v_round(x):
+    return -_verify_math.floor(-x + 0.5) if x < 0 else _verify_math.floor(x + 0.5)
+
+def _v_int_or(v, fallback):
+    n = _v_num(v)
+    return _verify_math.floor(n) if _v_finite(n) else fallback
+
+def _v_kind(desc):
+    t = _v_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if t in ("action", "momentary", "trigger"): return "action"
+    if t == "text": return "text"
+    if t in ("choice", "boolean", "enum", "bool"): return "choice"
+    if isinstance(desc, dict) and isinstance(desc.get("choices"), list) and len(desc["choices"]) > 0: return "choice"
+    return "number"
+
+def _v_writable(desc):
+    access = desc.get("access") if isinstance(desc, dict) else None
+    if isinstance(access, str): return "write" in access.lower()
+    if isinstance(access, dict) and access.get("canWrite") is False: return False
+    return True
+
+def _v_whole(desc):
+    return not (isinstance(desc, dict) and desc.get("type") == "float")
+
+def _v_range(desc):
+    rng = desc.get("range") if isinstance(desc, dict) and isinstance(desc.get("range"), dict) else {}
+    lo, hi = _v_num(rng.get("min")), _v_num(rng.get("max"))
+    a = lo if _v_finite(lo) else 0
+    b = hi if _v_finite(hi) else 127
+    return (a, b) if a <= b else (b, a)
+
+def _v_choices(desc):
+    out = []
+    for c in _v_list(desc.get("choices") if isinstance(desc, dict) else None):
+        if isinstance(c, dict):
+            if c.get("id") is not None: out.append(c["id"])
+            elif c.get("value") is not None: out.append(c["value"])
+        elif c is not None:
+            out.append(c)
+    t = _v_str(desc.get("type")) if isinstance(desc, dict) else ""
+    if len(out) == 0 and t in ("boolean", "bool"):
+        out = [False, True]
+    return out
+
+def _v_float_step(desc):
+    lo, hi = _v_range(desc)
+    return (hi - lo) / 16383
+
+def _v_trim(s):
+    return _verify_re.sub(r"[\s\x00]+$", "", _v_str(s))
+
+def _v_same(desc, a, b):
+    if a is None or b is None: return False
+    if isinstance(a, bool) or isinstance(b, bool):
+        x = a if isinstance(a, bool) else _v_num(a) != 0
+        y = b if isinstance(b, bool) else _v_num(b) != 0
+        return x == y
+    if _v_isnum(a) and _v_isnum(b) and _v_finite(a) and _v_finite(b):
+        if _v_whole(desc): return _v_round(a) == _v_round(b)
+        return abs(a - b) <= _v_float_step(desc) / 2 + 1e-9
+    return _v_trim(a) == _v_trim(b)
+
+def _v_raw(desc, got):
+    if _v_kind(desc) != "choice" or got is None or isinstance(got, bool): return None
+    choices = _v_choices(desc)
+    if len(choices) == 0: return None
+    for c in choices:
+        if _v_eq(c, got): return None
+    return got
+
+def _v_width(encoding):
+    e = encoding if isinstance(encoding, dict) else {}
+    t = "u7" if e.get("type") is None else _v_str(e.get("type"))
+    length, nibbles = _v_num(e.get("length")), _v_num(e.get("nibbles"))
+    if t in ("text-ascii", "ascii", "fixed-ascii"):
+        return int(length) if _v_finite(length) and length > 0 else 1
+    if t in ("text-nibbled-ascii", "nibbled-ascii", "packed-nibbled-ascii"):
+        if _v_finite(nibbles) and nibbles > 0: return int(nibbles)
+        return int(length) * 2 if _v_finite(length) and length > 0 else 2
+    if t in ("u14", "u14-msb-lsb", "u14-lsb-msb"): return 2
+    if t == "nibbled": return int(nibbles) if _v_finite(nibbles) and nibbles > 0 else 2
+    return 1
+
+def _v_dumps(layout):
+    lay = layout if isinstance(layout, dict) else {}
+    requests = _v_list(lay.get("requests"))
+    encodings = lay.get("encodings") if isinstance(lay.get("encodings"), dict) else {}
+    out = []
+    for d in _v_list(lay.get("dumps")):
+        if not isinstance(d, dict) or not isinstance(d.get("id"), str) or d["id"] == "": continue
+        request, timeout_ms, retries = "", 2000, 0
+        for r in requests:
+            if not isinstance(r, dict): continue
+            resp = r.get("response")
+            if isinstance(resp, dict) and isinstance(resp.get("dump"), str): answer = resp["dump"]
+            elif isinstance(r.get("expectedDump"), str): answer = r["expectedDump"]
+            else: answer = ""
+            if answer == d["id"] and isinstance(r.get("id"), str) and r["id"] != "":
+                request = r["id"]
+                timeout_ms = _v_int_or(r.get("timeoutMs"), 2000)
+                retries = _v_int_or(r.get("retries"), 0)
+                break
+        matcher = d.get("matcher") if isinstance(d.get("matcher"), dict) else {}
+        prefix, suffix = len(_v_list(matcher.get("prefix"))), len(_v_list(matcher.get("suffix")))
+        payload = d.get("payload") if isinstance(d.get("payload"), dict) else {}
+        payload_offset = _v_int_or(payload.get("offset"), prefix)
+        payload_size = _v_int_or(payload.get("size"), 0)
+        pack = payload.get("pack") if isinstance(payload.get("pack"), dict) else None
+        wire = payload_size
+        if pack is not None and pack.get("type") == "packed8to7" and payload_size > 0:
+            group = max(1, _v_int_or(pack.get("groupSize"), 7))
+            wire = payload_size + (payload_size + group - 1) // group
+        end = payload_offset + wire
+        checksum = d.get("checksum") if isinstance(d.get("checksum"), dict) else None
+        if checksum is not None and _v_finite(_v_num(checksum.get("byteOffset"))):
+            end = max(end, _v_int_or(checksum.get("byteOffset"), 0) + max(1, _v_int_or(checksum.get("byteCount"), 1)))
+        completion = d.get("completion") if isinstance(d.get("completion"), dict) else {}
+        expected = _v_num(completion.get("expectedBytes"))
+        mappings = []
+        for m in _v_list(d.get("mappings")):
+            if not isinstance(m, dict) or not isinstance(m.get("parameter"), str): continue
+            codec = m["codec"] if isinstance(m.get("codec"), dict) else encodings.get(m["parameter"])
+            mappings.append({"parameter": m["parameter"], "offset": _v_int_or(m.get("offset"), 0), "size": _v_width(codec)})
+        out.append({
+            "id": d["id"],
+            "name": d["name"] if isinstance(d.get("name"), str) and d["name"] != "" else d["id"],
+            "request": request, "timeoutMs": timeout_ms, "retries": retries,
+            "expectedBytes": _verify_math.floor(expected) if _v_finite(expected) else None,
+            "layoutBytes": end + suffix,
+            "payloadSize": payload_size,
+            "mappings": mappings,
+        })
+    return out
+
+def _v_unread(dump):
+    size = dump["payloadSize"]
+    read = [False] * max(0, size)
+    for m in dump["mappings"]:
+        for i in range(m["offset"], m["offset"] + m["size"]):
+            if 0 <= i < size: read[i] = True
+    out = []
+    start = -1
+    for i in range(size):
+        if not read[i] and start < 0: start = i
+        if read[i] and start >= 0:
+            out.append({"from": start, "to": i - 1})
+            start = -1
+    if start >= 0: out.append({"from": start, "to": size - 1})
+    return out
+
+def _v_index(dumps):
+    index = {}
+    for d in dumps:
+        for m in d["mappings"]:
+            if m["parameter"] not in index: index[m["parameter"]] = d
+    return index
+
+def _v_name(desc):
+    return _v_str(desc.get("name")) if desc.get("name") is not None else _v_str(desc.get("id"))
+
+def _v_choose(params, opts, say, verb):
+    ids = _v_texts(_v_opt(opts, "ids"))
+    group = _v_opt(opts, "group")
+    out = []
+    if len(ids) > 0:
+        known = {_v_str(desc.get("id")) for desc in params}
+        for pid in ids:
+            if pid not in known: say("warn", "ce.verify." + verb + ": \"" + pid + "\" is not a parameter of the synth, so it was left out.")
+        return [desc for desc in params if _v_str(desc.get("id")) in ids]
+    if isinstance(group, str) and group != "":
+        out = [desc for desc in params if _v_lower(desc.get("group")) == _v_lower(group)]
+        if len(out) == 0: say("warn", "ce.verify." + verb + ": the synth has no parameters in the group \"" + group + "\".")
+        return out
+    return [desc for desc in params if _v_kind(desc) != "action"]
+
+def _v_coverage(lst, dumps, role):
+    index = _v_index(dumps)
+    unchecked, used = [], []
+    checkable = 0
+    for desc in lst:
+        pid = _v_str(desc.get("id"))
+        d = index.get(pid)
+        if d is None: unchecked.append({"id": pid, "name": _v_name(desc), "why": "notInDump"})
+        elif d["request"] == "": unchecked.append({"id": pid, "name": _v_name(desc), "why": "noRequest"})
+        else: checkable += 1
+        if d is not None and not any(x is d for x in used): used.append(d)
+    out = []
+    for d in dumps:
+        if any(x is d for x in used):
+            out.append({"kind": d["id"], "expectedBytes": d["expectedBytes"], "layoutBytes": d["layoutBytes"], "unread": _v_unread(d)})
+    return {"role": role, "total": len(lst), "checkable": checkable, "unchecked": unchecked, "dumps": out}
+
+def _v_is_report(r):
+    return isinstance(r, dict) and isinstance(r.get("kind"), str) and isinstance(r.get("matched"), list) \
+        and isinstance(r.get("differed"), list) and isinstance(r.get("unchecked"), list)
+
+def _v_short_why(report):
+    for d in _v_list(report.get("dumps")):
+        if isinstance(d, dict) and d.get("status") != "ok":
+            return _VERIFY_WHY_WORDS.get(d.get("status"), _v_str(d.get("status"))) + ": " + _v_str(d.get("kind"))
+    counts = {}
+    best, avoidable = "", ""
+    for u in report["unchecked"]:
+        why = _v_str(u.get("why")) if isinstance(u, dict) else ""
+        counts[why] = counts.get(why, 0) + 1
+        if best == "" or counts[why] > counts[best]: best = why
+        if why in _VERIFY_AVOIDABLE and (avoidable == "" or counts[why] > counts[avoidable]): avoidable = why
+    if avoidable != "": best = avoidable
+    return "" if best == "" else _VERIFY_WHY_WORDS.get(best, best)
+
+def _v_summary(report, opts):
+    total = _v_num(report.get("total"))
+    total = int(total) if _v_finite(total) else len(report["matched"]) + len(report["differed"]) + len(report["unchecked"])
+    lead = "cancelled: " if report.get("cancelled") is True else ""
+    why = _v_short_why(report)
+    base = lead + str(len(report["matched"])) + " of " + str(total) + " match, " + str(len(report["differed"])) + " differ, " \
+        + str(len(report["unchecked"])) + " unchecked"
+    full = base if why == "" else base + " (" + why + ")"
+    width = _v_num(_v_opt(opts, "width"))
+    if not _v_finite(width) or width <= 0: return full
+    w = _verify_math.floor(width)
+    if len(full) <= w: return full
+    if len(base) <= w: return base
+    short = ("cancel " if report.get("cancelled") is True else "") + str(len(report["matched"])) + "/" + str(total) + " ok " \
+        + str(len(report["differed"])) + " diff " + str(len(report["unchecked"])) + " unchk"
+    return short if len(short) <= w else short[:w]
+
+def _verify_commands(host):
+    def say(level, text): host["say"](level, text)
+    running = host["jobs"] if isinstance(host.get("jobs"), dict) else {}
+
+    def finish(job):
+        if job["finished"]: return
+        job["finished"] = True
+        if running.get(job["role"]) is job: del running[job["role"]]
+        r = job["report"]
+        ok = len(r["differed"]) == 0 and r["cancelled"] is not True
+        for u in r["unchecked"]:
+            if u["why"] in _VERIFY_AVOIDABLE: ok = False
+        for d in r["dumps"]:
+            if d["status"] != "ok": ok = False
+        r["ok"] = ok
+        r["ms"] = max(0, _verify_math.floor(host["clock"]() - job["start"]))
+        try:
+            job["fn"](r)
+        except Exception as e:
+            say("error", "ce.verify." + r["kind"] + ": the function given to it failed: " + str(e))
+        host["emit"](r)
+
+    def new_job(kind, role, fn, total, steps):
+        job = {
+            "kind": kind, "role": role, "fn": fn, "steps": steps, "at": 0, "finished": False, "cancelled": False,
+            "step": None, "start": host["clock"](),
+            "report": {"kind": kind, "role": role, "ok": False, "total": total, "matched": [], "differed": [], "unchecked": [],
+                       "dumps": [], "probes": [], "ms": 0, "cancelled": False},
+            "onCancel": None,
+        }
+        running[role] = job
+        return job
+
+    def may_start(verb, role, fn):
+        if not callable(fn):
+            say("error", "ce.verify." + verb + ": fn must be a function to call with the report, so nothing was checked.")
+            return False
+        if role != _VERIFY_MAIN_ROLE:
+            say("error", "ce.verify." + verb + ": only the main synth can be asked for a dump, and \"" + role + "\" is not it, so nothing was checked.")
+            return False
+        if running.get(role) is not None: return False
+        return host["connected"](role) is True
+
+    def ask(job, dump, done):
+        step = {"settled": False}
+        job["step"] = step
+        def answer(values, info=None):
+            if step["settled"] or job["finished"]: return
+            step["settled"] = True
+            job["step"] = None
+            ok = isinstance(info, dict) and info.get("ok") is True and isinstance(values, dict)
+            done(values if ok else None)
+        asked = host["requestDump"](dump["request"], answer)
+        if asked is False: answer(None, {"ok": False})
+
+    def later(job, ms, fn):
+        def run():
+            if not job["finished"]: fn()
+        host["after"](max(1, _verify_math.floor(ms)), run)
+
+    def context(role):
+        params = host["parameters"](role)
+        if not isinstance(params, list): params = []
+        layout = host["layout"](role)
+        dumps = _v_dumps(layout)
+        gap = _v_num(layout.get("gapMs") if isinstance(layout, dict) else None)
+        return {
+            "role": role, "params": params, "dumps": dumps, "index": _v_index(dumps),
+            "gapMs": gap if _v_finite(gap) and gap > 0 else 0,
+            "encodings": layout["encodings"] if isinstance(layout, dict) and isinstance(layout.get("encodings"), dict) else {},
+        }
+
+    def leave(job, desc, why):
+        job["report"]["unchecked"].append({"id": _v_str(desc.get("id")), "name": _v_name(desc), "why": why})
+
+    def judge(job, desc, expected, got):
+        if _v_same(desc, expected, got):
+            job["report"]["matched"].append(_v_str(desc.get("id")))
+        else:
+            job["report"]["differed"].append({"id": _v_str(desc.get("id")), "name": _v_name(desc), "expected": expected, "got": got, "raw": _v_raw(desc, got)})
+
+    def plan(job, ctx, lst):
+        steps = []
+        for d in ctx["dumps"]:
+            if d["request"] == "": continue
+            held = [desc for desc in lst if ctx["index"].get(_v_str(desc.get("id"))) is d]
+            if len(held) > 0: steps.append({"dump": d, "params": held})
+        for desc in lst:
+            d = ctx["index"].get(_v_str(desc.get("id")))
+            if d is None: leave(job, desc, "notInDump")
+            elif d["request"] == "": leave(job, desc, "noRequest")
+        return steps
+
+    def push_dump(job, d, values):
+        job["report"]["dumps"].append({"kind": d["id"], "status": "ok" if values is not None else "noReply", "expectedBytes": d["expectedBytes"]})
+
+    def compare_steps(job, ctx, steps, before):
+        job["steps"] = steps
+        job["at"] = 0
+        def on_cancel():
+            for i in range(job["at"], len(steps)):
+                for desc in steps[i]["params"]: leave(job, desc, "cancelled")
+        job["onCancel"] = on_cancel
+        def next_step():
+            if job["at"] >= len(steps):
+                finish(job)
+                return
+            step = steps[job["at"]]
+            expected = {}
+            for desc in step["params"]: expected[_v_str(desc.get("id"))] = host["read"](_v_str(desc.get("id")), ctx["role"])
+            def got(values):
+                job["at"] += 1
+                push_dump(job, step["dump"], values)
+                for desc in step["params"]:
+                    pid = _v_str(desc.get("id"))
+                    if values is None: leave(job, desc, "noReply")
+                    elif not _v_same(desc, before.get(pid), expected.get(pid)) and (before.get(pid) is not None or expected.get(pid) is not None): leave(job, desc, "moved")
+                    elif values.get(pid) is None: leave(job, desc, "noReply")
+                    else: judge(job, desc, expected.get(pid), values[pid])
+                if job["at"] >= len(steps): finish(job)
+                else: later(job, ctx["gapMs"], next_step)
+            ask(job, step["dump"], got)
+        next_step()
+
+    def snapshot(ctx, lst):
+        return {_v_str(desc.get("id")): host["read"](_v_str(desc.get("id")), ctx["role"]) for desc in lst}
+
+    def split_args(a, b):
+        return (None, a) if callable(a) else (a, b)
+
+    def coverage(opts=None):
+        ctx = context(_v_role(_v_opt(opts, "role")))
+        return _v_coverage(_v_choose(ctx["params"], opts, say, "coverage"), ctx["dumps"], ctx["role"])
+
+    def check(a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not may_start("check", role, fn): return False
+        ctx = context(role)
+        lst = _v_choose(ctx["params"], opts, say, "check")
+        job = new_job("check", role, fn, len(lst), [])
+        compare_steps(job, ctx, plan(job, ctx, lst), snapshot(ctx, lst))
+        return True
+
+    def dump(kind, a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not isinstance(kind, str) or kind == "":
+            say("error", "ce.verify.dump: kind must be the id of a dump in the profile, so nothing was checked.")
+            return False
+        if not may_start("dump", role, fn): return False
+        ctx = context(role)
+        d = None
+        for x in ctx["dumps"]:
+            if x["id"] == kind or (x["request"] != "" and x["request"] == kind):
+                d = x
+                break
+        if d is None or d["request"] == "":
+            say("error", "ce.verify.dump: the profile has " + ("no dump" if d is None else "no request for the dump") + " \"" + kind + "\", so nothing was checked.")
+            return False
+        times_given = _v_num(_v_opt(opts, "times"))
+        times = min(10, max(2, _verify_math.floor(times_given))) if _v_finite(times_given) else 2
+        gap_given = _v_num(_v_opt(opts, "gapMs"))
+        gap_ms = gap_given if _v_finite(gap_given) and gap_given >= 0 else 500
+        lst = [desc for desc in ctx["params"] if ctx["index"].get(_v_str(desc.get("id"))) is d]
+        job = new_job("dump", role, fn, len(lst), [])
+        replies = []
+        asked = [0]
+        def on_cancel():
+            for desc in lst: leave(job, desc, "cancelled")
+        job["onCancel"] = on_cancel
+        def end():
+            if len(replies) < times:
+                for desc in lst: leave(job, desc, "noReply")
+            else:
+                first, last = replies[0], replies[-1]
+                for desc in lst:
+                    pid = _v_str(desc.get("id"))
+                    if first.get(pid) is None or last.get(pid) is None: leave(job, desc, "noReply")
+                    else: judge(job, desc, first[pid], last[pid])
+            finish(job)
+        def next_ask():
+            asked[0] += 1
+            def got(values):
+                push_dump(job, d, values)
+                job["at"] = asked[0]
+                if values is None:
+                    end()
+                    return
+                replies.append(values)
+                if asked[0] >= times: end()
+                else: later(job, gap_ms, next_ask)
+            ask(job, d, got)
+        job["steps"] = [d] * times
+        next_ask()
+        return True
+
+    def find_param(ctx, pid, verb):
+        for desc in ctx["params"]:
+            if _v_str(desc.get("id")) == pid: return desc
+        say("error", "ce.verify." + verb + ": \"" + pid + "\" is not a parameter of the synth, so nothing was checked.")
+        return None
+
+    def settle_of(opts):
+        given = _v_num(_v_opt(opts, "settleMs"))
+        return given if _v_finite(given) and given >= 0 else 100
+
+    def write_and_read(job, ctx, desc, value, settle_ms, done):
+        pid = _v_str(desc.get("id"))
+        d = ctx["index"].get(pid)
+        host["write"](pid, value, ctx["role"])
+        if d is None:
+            done(None, "notInDump")
+            return
+        if d["request"] == "":
+            done(None, "noRequest")
+            return
+        def settled():
+            now = host["read"](pid, ctx["role"])
+            if now is not None and not _v_same(desc, now, value):
+                done(None, "moved")
+                return
+            def got(values):
+                push_dump(job, d, values)
+                if values is None or values.get(pid) is None: done(None, "noReply")
+                else: done(values[pid], "")
+            ask(job, d, got)
+        later(job, settle_ms, settled)
+
+    def write(pid, value, a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not may_start("write", role, fn): return False
+        ctx = context(role)
+        desc = find_param(ctx, "" if pid is None else _v_str(pid), "write")
+        if desc is None: return False
+        if value is None:
+            say("error", "ce.verify.write: value must be given, so nothing was checked.")
+            return False
+        job = new_job("write", role, fn, 1, [ctx["index"].get(_v_str(desc.get("id")))])
+        job["onCancel"] = lambda: leave(job, desc, "cancelled")
+        if not _v_writable(desc):
+            leave(job, desc, "notWritable")
+            finish(job)
+            return True
+        def done(got, why):
+            job["at"] = 1
+            if why != "": leave(job, desc, why)
+            else: judge(job, desc, value, got)
+            finish(job)
+        write_and_read(job, ctx, desc, value, settle_of(opts), done)
+        return True
+
+    def probe_values(desc, ctx):
+        kind = _v_kind(desc)
+        out = []
+        def add(v):
+            if not _v_contains(out, v): out.append(v)
+        if kind == "choice":
+            choices = _v_choices(desc)
+            if len(choices) <= 16:
+                for c in choices: add(c)
+            else:
+                add(choices[0])
+                add(choices[len(choices) // 2])
+                add(choices[-1])
+            return out
+        if kind == "text":
+            enc = ctx["encodings"].get(_v_str(desc.get("id")))
+            length = _v_num(enc.get("length") if isinstance(enc, dict) else None)
+            n = min(len(_VERIFY_TEXT_SAMPLE), _verify_math.floor(length)) if _v_finite(length) and length > 0 else 8
+            add(_VERIFY_TEXT_SAMPLE[:n])
+            add("")
+            return out
+        lo, hi = _v_range(desc)
+        step = 1 if _v_whole(desc) else (hi - lo) / 100
+        mid = lo + (hi - lo) / 2
+        if _v_whole(desc): mid = _v_round(mid)
+        for v in [lo, lo + step, mid, hi - step, hi]:
+            if lo <= v <= hi: add(v)
+        return out
+
+    def probe(pid, a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        if not may_start("probe", role, fn): return False
+        ctx = context(role)
+        desc = find_param(ctx, "" if pid is None else _v_str(pid), "probe")
+        if desc is None: return False
+        given = _v_opt(opts, "values")
+        if given is not None and (not isinstance(given, list) or len(given) == 0):
+            say("error", "ce.verify.probe: values must be a list of values to try, so nothing was checked.")
+            return False
+        values = list(given) if given is not None else probe_values(desc, ctx)
+        settle_ms = settle_of(opts)
+        key = _v_str(desc.get("id"))
+        old = host["read"](key, role)
+        job = new_job("probe", role, fn, 1, values)
+        job["report"]["restored"] = False
+        held = ctx["index"].get(key)
+        cannot = "notWritable" if not _v_writable(desc) else ("notInDump" if held is None else ("noRequest" if held["request"] == "" else ""))
+        if cannot != "":
+            leave(job, desc, cannot)
+            finish(job)
+            return True
+        state = {"failed": False, "why": ""}
+        def restore(then):
+            if old is None:
+                then()
+                return
+            def back(got, reason):
+                job["report"]["restored"] = reason == "" and _v_same(desc, old, got)
+                then()
+            write_and_read(job, ctx, desc, old, settle_ms, back)
+        def on_cancel():
+            if old is not None: host["write"](key, old, role)
+            if len(job["report"]["matched"]) == 0 and len(job["report"]["differed"]) == 0: leave(job, desc, "cancelled")
+        job["onCancel"] = on_cancel
+        def end():
+            if state["why"] != "": leave(job, desc, state["why"])
+            elif not state["failed"]: job["report"]["matched"].append(key)
+            restore(lambda: finish(job))
+        def next_value():
+            if job["at"] >= len(values):
+                end()
+                return
+            value = values[job["at"]]
+            def got(answer, reason):
+                job["at"] += 1
+                if reason != "":
+                    state["why"] = reason
+                    end()
+                    return
+                ok = _v_same(desc, value, answer)
+                job["report"]["probes"].append({"id": key, "value": value, "got": answer, "same": ok})
+                if not ok:
+                    state["failed"] = True
+                    job["report"]["differed"].append({"id": key, "name": _v_name(desc), "expected": value, "got": answer, "raw": _v_raw(desc, answer)})
+                next_value()
+            write_and_read(job, ctx, desc, value, settle_ms, got)
+        next_value()
+        return True
+
+    def patch(a=None, b=None):
+        opts, fn = split_args(a, b)
+        role = _v_role(_v_opt(opts, "role"))
+        via = _v_opt(opts, "via")
+        if via is not None and via != "dump" and via != "parameters":
+            say("error", "ce.verify.patch: via \"" + _v_str(via) + "\" is not \"dump\" or \"parameters\", so nothing was checked.")
+            return False
+        if not may_start("patch", role, fn): return False
+        ctx = context(role)
+        lst = _v_choose(ctx["params"], opts, say, "patch")
+        job = new_job("patch", role, fn, len(lst), [])
+        chosen = []
+        for desc in lst:
+            if _v_writable(desc): chosen.append(desc)
+            else: leave(job, desc, "notWritable")
+        before = snapshot(ctx, chosen)
+        steps = plan(job, ctx, chosen)
+        if _v_opt(opts, "send") is not False:
+            section = host["patchSection"](role)
+            deliver = section["deliver"] if isinstance(section, dict) and isinstance(section.get("deliver"), str) else ""
+            how = via if via is not None else ("dump" if deliver == "dump" else "parameters")
+            if how == "dump":
+                for step in steps: host["sendDump"](step["dump"]["id"])
+            else:
+                for desc in chosen:
+                    v = before.get(_v_str(desc.get("id")))
+                    if v is not None: host["write"](_v_str(desc.get("id")), v, role)
+        if len(steps) == 0:
+            finish(job)
+            return True
+        later(job, settle_of(opts), lambda: compare_steps(job, ctx, steps, before))
+        return True
+
+    def summary(report, opts=None):
+        if not _v_is_report(report):
+            say("error", "ce.verify.summary: that is not a report, as a check gives them, so there is nothing to say.")
+            return None
+        return _v_summary(report, opts)
+
+    def running_now(role=None):
+        job = running.get(_v_role(role))
+        if job is None: return None
+        return {"kind": job["kind"], "role": job["role"], "done": job["at"], "total": len(job["steps"]),
+                "ms": max(0, _verify_math.floor(host["clock"]() - job["start"]))}
+
+    def cancel(role=None):
+        job = running.get(_v_role(role))
+        if job is None: return False
+        job["cancelled"] = True
+        job["report"]["cancelled"] = True
+        if job["step"] is not None: job["step"]["settled"] = True
+        if job["onCancel"] is not None: job["onCancel"]()
+        finish(job)
+        return True
+
+    return {"coverage": coverage, "check": check, "dump": dump, "write": write, "probe": probe, "patch": patch,
+            "summary": summary, "running": running_now, "cancel": cancel}
+
+_VERIFY = _verify_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "parameters": lambda role: __deviceQuery("parameters", {"role": role}) or [],
+    "layout": lambda role: __deviceQuery("dumpLayout", {"role": role}),
+    "read": lambda pid, role: __deviceQuery("read", {"role": role, "id": str(pid)}),
+    "write": lambda pid, value, role: deviceWrite(pid, value, role) is True,
+    "sendDump": lambda kind: sendDump(kind),
+    "patchSection": lambda role: __deviceQuery("patch", {"role": role}),
+    "connected": lambda role: deviceConnected(role) is True,
+    "requestDump": lambda kind, fn: requestDump(kind, fn),
+    "after": lambda ms, fn: after(ms, fn),
+    "clock": lambda: nowMs(),
+    "emit": lambda report: emit("onVerifyDone", report),
+})
+
+def verifyCoverage(opts=None):
+    return _VERIFY["coverage"](opts)
+def verifyCheck(opts=None, fn=None):
+    return _VERIFY["check"](opts, fn)
+def verifyDump(kind, opts=None, fn=None):
+    return _VERIFY["dump"](kind, opts, fn)
+def verifyWrite(id, value, opts=None, fn=None):
+    return _VERIFY["write"](id, value, opts, fn)
+def verifyProbe(id, opts=None, fn=None):
+    return _VERIFY["probe"](id, opts, fn)
+def verifyPatch(opts=None, fn=None):
+    return _VERIFY["patch"](opts, fn)
+def verifySummary(report, opts=None):
+    return _VERIFY["summary"](report, opts)
+def verifyRunning(role=None):
+    return _VERIFY["running"](role)
+def verifyCancel(role=None):
+    return _VERIFY["cancel"](role)
+
+# @module ce.file
+# ce.file's byte commands, ported line for line from fileCore.js (the panel view's; the JavaScript
+# prelude runs that file itself). Held to the panel view's answers by test/fileParity.test.js and the
+# scenario in test/support/fileScenario.mjs. The dialogs are the panel view's alone: with the window
+# shut there is nobody to answer one. ce.file requires ce.time, whose tempo and transport give
+# midiWrite the tempo and beats per bar when a song carries neither.
+import math as _file_math
+import re as _file_re
+
+_FILE_DEFAULT_TICKS = 480
+_FILE_HEX = _file_re.compile(r"([0-9a-fA-F]{2})*")
+
+def _f_finite(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and _file_math.isfinite(v)
+
+def _f_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _f_clamp(v, lo, hi, fallback):
+    if not _f_finite(v): return fallback
+    x = _file_math.floor(v + 0.5)
+    return lo if x < lo else (hi if x > hi else x)
+
+def _f_num(x):
+    # A number as JavaScript writes it: no ".0" on a whole number.
+    if isinstance(x, bool): return "true" if x else "false"
+    if isinstance(x, float) and x.is_integer() and abs(x) < 1e15: return str(int(x))
+    return str(x) if isinstance(x, (int, float)) else str(x)
+
+def _f_bytes(v):
+    if isinstance(v, str):
+        text = _file_re.sub(r"\s+", "", v)
+        text = _file_re.sub(r"^0[xX]", "", text)
+        if not _FILE_HEX.fullmatch(text): return None
+        return [int(text[i:i + 2], 16) for i in range(0, len(text), 2)]
+    if not isinstance(v, list): return None
+    out = []
+    for b in v:
+        if not _f_finite(b) or b < 0 or b > 255 or _file_math.floor(b) != b: return None
+        out.append(int(b))
+    return out
+
+def _f_starts(lst, prefix):
+    return len(lst) >= len(prefix) and lst[:len(prefix)] == prefix
+
+def _f_syx_split(data_in, opts, say):
+    data = _f_bytes(data_in)
+    if data is None:
+        say("error", "ce.file.syxSplit: bytes must be a list of numbers 0 to 255, or hex text, so nothing was split.")
+        return []
+    prefix = []
+    given = _f_opt(opts, "prefix")
+    if given is not None:
+        p = _f_bytes(given)
+        if p is None:
+            say("error", "ce.file.syxSplit: prefix must be bytes, a list or hex text, so nothing was split.")
+            return []
+        prefix = p
+    out = []
+    current = None
+    start, stray, first_stray = 0, 0, -1
+    for i, b in enumerate(data):
+        if b == 0xF0:
+            if current is not None: say("warn", "ce.file.syxSplit: the message at byte " + str(start) + " has no F7 before the next F0, so it was left out.")
+            current = [b]
+            start = i
+        elif current is None:
+            stray += 1
+            if first_stray < 0: first_stray = i
+        else:
+            current.append(b)
+            if b == 0xF7:
+                if _f_starts(current, prefix): out.append(current)
+                current = None
+    if current is not None:
+        if _f_opt(opts, "partial") is True:
+            if _f_starts(current, prefix): out.append(current)
+        else:
+            say("warn", "ce.file.syxSplit: the last message, from byte " + str(start) + ", has no F7, so it was left out.")
+    if stray > 0:
+        say("warn", "ce.file.syxSplit: " + str(stray) + " " + ("byte" if stray == 1 else "bytes") + " outside any message "
+            + ("was" if stray == 1 else "were") + " left out, the first at byte " + str(first_stray) + ".")
+    return out
+
+def _f_syx_join(messages, say):
+    if not isinstance(messages, list):
+        say("error", "ce.file.syxJoin: messages must be a list of messages, so nothing was joined.")
+        return None
+    out = []
+    for i, raw in enumerate(messages):
+        m = _f_bytes(raw)
+        if m is None or len(m) < 2 or m[0] != 0xF0 or m[-1] != 0xF7:
+            say("error", "ce.file.syxJoin: message " + str(i + 1) + " does not start with F0 and end with F7, so nothing was joined.")
+            return None
+        out.extend(m)
+    return out
+
+def _f_u16(d, at): return d[at] * 256 + d[at + 1]
+def _f_u32(d, at): return ((d[at] * 256 + d[at + 1]) * 256 + d[at + 2]) * 256 + d[at + 3]
+def _f_latin1(d, start, stop): return "".join(chr(b) for b in d[start:stop])
+def _f_text(d, start, stop):
+    try:
+        return bytes(d[start:stop]).decode("utf-8")
+    except UnicodeDecodeError:
+        return _f_latin1(d, start, stop)
+
+def _f_varlen(d, at, stop):
+    value, i = 0, at
+    for _ in range(4):
+        if i >= stop: return None
+        b = d[i]
+        i += 1
+        value = value * 128 + (b & 0x7F)
+        if (b & 0x80) == 0: return (value, i)
+    return None
+
+def _f_midi_refuse(say, why):
+    say("error", "ce.file.midiRead: " + why + ", so nothing was read.")
+    return None
+
+def _f_read_track(d, start, stop, tpb, index, song, say):
+    track = {"name": "", "notes": [], "events": []}
+    opened = {}
+    at, tick, status, end_tick = start, 0, 0, 0
+    while at < stop:
+        delta = _f_varlen(d, at, stop)
+        if delta is None: return None
+        tick += delta[0]
+        at = delta[1]
+        if at >= stop: return None
+        b = d[at]
+        if b == 0xFF:
+            if at + 1 >= stop: return None
+            kind = d[at + 1]
+            ln = _f_varlen(d, at + 2, stop)
+            if ln is None or ln[1] + ln[0] > stop: return None
+            body = ln[1]
+            body_end = body + ln[0]
+            finished = False
+            if kind == 0x03 and track["name"] == "": track["name"] = _f_text(d, body, body_end)
+            elif kind == 0x51 and ln[0] == 3:
+                micro = (d[body] * 256 + d[body + 1]) * 256 + d[body + 2]
+                if micro > 0: song["tempos"].append({"beat": tick / tpb, "bpm": 60000000 / micro})
+            elif kind == 0x58 and ln[0] >= 2 and song["timeSignature"] is None:
+                song["timeSignature"] = [d[body], 2 ** d[body + 1]]
+            elif kind == 0x2F:
+                finished = True
+            at = body_end
+            end_tick = tick
+            if finished: break
+            continue
+        if b == 0xF0 or b == 0xF7:
+            ln = _f_varlen(d, at + 1, stop)
+            if ln is None or ln[1] + ln[0] > stop: return None
+            data = [0xF0] if b == 0xF0 else []
+            data.extend(d[ln[1]:ln[1] + ln[0]])
+            track["events"].append({"beat": tick / tpb, "bytes": data})
+            at = ln[1] + ln[0]
+            end_tick = tick
+            continue
+        if b < 0x80:
+            if status == 0: return None
+            b = status
+        else:
+            status = b
+            at += 1
+        kind = b & 0xF0
+        size = 1 if kind in (0xC0, 0xD0) else 2
+        if at + size > stop: return None
+        x = d[at]
+        y = d[at + 1] if size == 2 else 0
+        at += size
+        end_tick = tick
+        channel = (b & 0x0F) + 1
+        if kind == 0x90 and y > 0:
+            note = {"beat": tick / tpb, "note": x, "velocity": y, "length": 0, "channel": channel}
+            track["notes"].append(note)
+            opened.setdefault(str(channel) + ":" + str(x), []).append({"note": note, "tick": tick})
+        elif kind in (0x80, 0x90):
+            waiting = opened.get(str(channel) + ":" + str(x))
+            if waiting:
+                first = waiting.pop(0)
+                first["note"]["length"] = (tick - first["tick"]) / tpb
+        else:
+            track["events"].append({"beat": tick / tpb, "bytes": [b, x, y] if size == 2 else [b, x]})
+    for key in sorted(opened.keys()):
+        for w in opened[key]:
+            w["note"]["length"] = (end_tick - w["tick"]) / tpb
+            say("warn", "ce.file.midiRead: note " + str(w["note"]["note"]) + " on channel " + str(w["note"]["channel"]) + " at beat "
+                + _f_num(w["note"]["beat"]) + " in track " + str(index) + " never ends, so it lasts to the end of its track.")
+    return track
+
+def _f_midi_read(data_in, opts, say):
+    d = _f_bytes(data_in)
+    if d is None: return _f_midi_refuse(say, "bytes must be a list of numbers 0 to 255, or hex text")
+    if len(d) < 14 or _f_latin1(d, 0, 4) != "MThd": return _f_midi_refuse(say, "that is not a MIDI file (it does not start with \"MThd\")")
+    header_len = _f_u32(d, 4)
+    fmt, count, division = _f_u16(d, 8), _f_u16(d, 10), _f_u16(d, 12)
+    if fmt == 2: return _f_midi_refuse(say, "it is a type 2 file (separate songs in one file), which is not read")
+    if fmt > 2: return _f_midi_refuse(say, "it says it is a type " + str(fmt) + " file, which does not exist")
+    if division >= 0x8000: return _f_midi_refuse(say, "its times are in SMPTE frames, not beats")
+    if division == 0: return _f_midi_refuse(say, "it gives 0 ticks per beat")
+    only = _f_opt(opts, "track")
+    if only is not None and (not _f_finite(only) or _file_math.floor(only) != only or only < 1 or only > count):
+        return _f_midi_refuse(say, "track " + _f_num(only) + " is not a track of the file, which has " + str(count))
+    song = {"ticksPerBeat": division, "tempo": 120, "tempos": [], "timeSignature": None, "tracks": []}
+    at, index = 8 + header_len, 0
+    while at + 8 <= len(d) and index < count:
+        ident = _f_latin1(d, at, at + 4)
+        ln = _f_u32(d, at + 4)
+        start = at + 8
+        stop = min(len(d), start + ln)
+        at = start + ln
+        if ident != "MTrk": continue
+        index += 1
+        track = _f_read_track(d, start, stop, division, index, song, say)
+        if track is None: return _f_midi_refuse(say, "track " + str(index) + " is cut short or damaged")
+        if only is None or only == index: song["tracks"].append(track)
+    song["tempos"].sort(key=lambda t: t["beat"])
+    if len(song["tempos"]) > 0 and song["tempos"][0]["beat"] == 0: song["tempo"] = song["tempos"][0]["bpm"]
+    if song["timeSignature"] is None: song["timeSignature"] = [4, 4]
+    return song
+
+def _f_push_varlen(out, value):
+    v = max(0, _file_math.floor(value))
+    groups = [v & 0x7F]
+    v //= 128
+    while v > 0:
+        groups.append((v & 0x7F) | 0x80)
+        v //= 128
+    out.extend(reversed(groups))
+
+def _f_push_u32(out, v):
+    out.extend([(v // 16777216) % 256, (v // 65536) % 256, (v // 256) % 256, v % 256])
+
+def _f_note(n, channel, index, say):
+    if not isinstance(n, dict) or not _f_finite(n.get("beat")) or n["beat"] < 0 or not _f_finite(n.get("note")):
+        say("error", "ce.file.midiWrite: note " + str(index) + " needs a beat of 0 or more and a note number, so nothing was written.")
+        return None
+    return {
+        "beat": n["beat"],
+        "note": _f_clamp(n["note"], 0, 127, 60),
+        "velocity": _f_clamp(n.get("velocity"), 1, 127, 100),
+        "length": n["length"] if _f_finite(n.get("length")) and n["length"] > 0 else 0.25,
+        "channel": _f_clamp(n.get("channel"), 1, 16, channel),
+    }
+
+def _f_song(song, opts, clock, say):
+    channel = _f_clamp(_f_opt(opts, "channel"), 1, 16, 1)
+    if isinstance(song, list):
+        notes = []
+        for i, raw in enumerate(song):
+            n = _f_note(raw, channel, i + 1, say)
+            if n is None: return None
+            notes.append(n)
+        return {"ticksPerBeat": _FILE_DEFAULT_TICKS, "tempo": None, "tempos": [], "timeSignature": None, "tracks": [{"name": "", "notes": notes, "events": []}]}
+    if isinstance(song, dict) and isinstance(song.get("tracks"), list):
+        tracks = []
+        for t in song["tracks"]:
+            notes, events = [], []
+            lst = t["notes"] if isinstance(t, dict) and isinstance(t.get("notes"), list) else []
+            for i, raw in enumerate(lst):
+                n = _f_note(raw, channel, i + 1, say)
+                if n is None: return None
+                notes.append(n)
+            for e in (t["events"] if isinstance(t, dict) and isinstance(t.get("events"), list) else []):
+                data = _f_bytes(e.get("bytes")) if isinstance(e, dict) else None
+                if data is None or len(data) == 0 or not _f_finite(e.get("beat")) or e["beat"] < 0:
+                    say("error", "ce.file.midiWrite: an event needs a beat of 0 or more and its bytes, so nothing was written.")
+                    return None
+                events.append({"beat": e["beat"], "bytes": data})
+            tracks.append({"name": t["name"] if isinstance(t, dict) and isinstance(t.get("name"), str) else "", "notes": notes, "events": events})
+        tpb = _f_clamp(song.get("ticksPerBeat"), 1, 32767, _FILE_DEFAULT_TICKS)
+        sig = song["timeSignature"] if isinstance(song.get("timeSignature"), list) and len(song["timeSignature"]) >= 2 else None
+        tempo = song["tempo"] if _f_finite(song.get("tempo")) and song["tempo"] > 0 else None
+        return {"ticksPerBeat": tpb, "tempo": tempo, "tempos": song["tempos"] if isinstance(song.get("tempos"), list) else [], "timeSignature": sig, "tracks": tracks}
+    if isinstance(song, dict) and isinstance(song.get("take"), dict) and isinstance(song["take"].get("events"), list):
+        per_bar = _f_clamp(clock.get("beatsPerBar"), 1, 32, 4)
+        loop = _f_clamp(song.get("bars"), 1, 16, 2) * per_bar
+        own = _f_clamp(song.get("channel"), 1, 16, channel)
+        notes = []
+        for e in song["take"]["events"]:
+            if not isinstance(e, dict) or not _f_finite(e.get("t")) or not _f_finite(e.get("note")): continue
+            dur = e["dur"] if _f_finite(e.get("dur")) and e["dur"] > 0 else 0.1
+            notes.append({"beat": e["t"] * loop, "note": _f_clamp(e["note"], 0, 127, 60), "velocity": _f_clamp(e.get("velocity"), 1, 127, 100),
+                          "length": dur * loop, "channel": own})
+        return {"ticksPerBeat": _FILE_DEFAULT_TICKS, "tempo": None, "tempos": [], "timeSignature": [per_bar, 4], "tracks": [{"name": "", "notes": notes, "events": []}]}
+    say("error", "ce.file.midiWrite: song must be a song as midiRead gives it, a list of notes, or a Phrase Recorder's section, so nothing was written.")
+    return None
+
+def _f_track_chunk(track, tpb, metas):
+    items = []
+    def add(tick, order, data):
+        items.append({"tick": max(0, _file_math.floor(tick + 0.5)), "order": order, "seq": len(items), "bytes": data})
+    for m in metas: add(m["tick"], 0, m["bytes"])
+    if track["name"] != "":
+        text = list(track["name"].encode("utf-8"))
+        name = [0xFF, 0x03]
+        _f_push_varlen(name, len(text))
+        name.extend(text)
+        add(0, 0, name)
+    for e in track["events"]:
+        if e["bytes"][0] == 0xF0:
+            data = [0xF0]
+            _f_push_varlen(data, len(e["bytes"]) - 1)
+            data.extend(e["bytes"][1:])
+        else:
+            data = list(e["bytes"])
+        add(e["beat"] * tpb, 2, data)
+    for n in track["notes"]:
+        add(n["beat"] * tpb, 3, [0x90 + n["channel"] - 1, n["note"], n["velocity"]])
+        add((n["beat"] + n["length"]) * tpb, 1, [0x80 + n["channel"] - 1, n["note"], 0])
+    items.sort(key=lambda it: (it["tick"], it["order"], it["seq"]))
+    body = []
+    last = 0
+    for it in items:
+        _f_push_varlen(body, it["tick"] - last)
+        last = it["tick"]
+        body.extend(it["bytes"])
+    body.extend([0x00, 0xFF, 0x2F, 0x00])
+    out = [0x4D, 0x54, 0x72, 0x6B]
+    _f_push_u32(out, len(body))
+    out.extend(body)
+    return out
+
+def _f_tempo_meta(tick, bpm):
+    micro = max(1, min(16777215, _file_math.floor(60000000 / bpm + 0.5)))
+    return {"tick": tick, "bytes": [0xFF, 0x51, 0x03, (micro // 65536) % 256, (micro // 256) % 256, micro % 256]}
+
+def _f_midi_write(song, opts, clock, say):
+    clock = clock if isinstance(clock, dict) else {}
+    s = _f_song(song, opts, clock, say)
+    if s is None: return None
+    given = _f_opt(opts, "tempo")
+    bpm = 120
+    if _f_finite(given) and given > 0: bpm = given
+    elif s["tempo"] is not None: bpm = s["tempo"]
+    elif _f_finite(clock.get("tempo")) and clock["tempo"] > 0: bpm = clock["tempo"]
+    name = _f_opt(opts, "name")
+    if isinstance(name, str) and name != "": s["tracks"][0]["name"] = name
+    tpb = s["ticksPerBeat"]
+    sig = s["timeSignature"] if s["timeSignature"] is not None else [_f_clamp(clock.get("beatsPerBar"), 1, 32, 4), 4]
+    denom_power = 0
+    denom = _f_clamp(sig[1], 1, 64, 4)
+    while denom > 1:
+        denom //= 2
+        denom_power += 1
+    metas = [_f_tempo_meta(0, bpm), {"tick": 0, "bytes": [0xFF, 0x58, 0x04, _f_clamp(sig[0], 1, 32, 4), denom_power, 24, 8]}]
+    for t in s["tempos"]:
+        if isinstance(t, dict) and _f_finite(t.get("beat")) and t["beat"] > 0 and _f_finite(t.get("bpm")) and t["bpm"] > 0:
+            metas.append(_f_tempo_meta(t["beat"] * tpb, t["bpm"]))
+    count = len(s["tracks"])
+    out = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1 if count > 1 else 0, (count // 256) % 256, count % 256, (tpb // 256) % 256, tpb % 256]
+    for i, track in enumerate(s["tracks"]):
+        out.extend(_f_track_chunk(track, tpb, metas if i == 0 else []))
+    return out
+
+def _f_say(level, text):
+    if level == "warn": logWarn(text)
+    else: logError(text)
+
+def _f_clock():
+    t = transportInfo()
+    return {"tempo": tempo(), "beatsPerBar": t.get("beatsPerBar") if isinstance(t, dict) and t.get("beatsPerBar") else 4}
+
+def fileSyxSplit(bytes, opts=None):
+    return _f_syx_split(bytes, opts, _f_say)
+def fileSyxJoin(messages):
+    return _f_syx_join(messages, _f_say)
+def fileMidiRead(bytes, opts=None):
+    return _f_midi_read(bytes, opts, _f_say)
+def fileMidiWrite(song, opts=None):
+    return _f_midi_write(song, opts, _f_clock(), _f_say)
+
+# @module ce.ci
+# ce.ci, ported line for line from ciCore.js (the panel view's; the JavaScript prelude runs that file
+# itself). Held to the panel view's answers by test/ciParity.test.js and the scenario in
+# test/support/ciScenario.mjs. Every command goes to the device layer's one MIDI-CI session
+# (__deviceQuery "ci"); the device's answers come back as "__ciReply" events. Every Python script
+# runs this prelude for itself, so its waiters are its own.
+import math as _ci_math
+import re as _ci_re
+
+_CI_NUMBER_TEXT = _ci_re.compile(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?")
+
+def _ci_num(v):
+    if isinstance(v, bool): return float("nan")
+    if isinstance(v, (int, float)): return v
+    if isinstance(v, str) and _CI_NUMBER_TEXT.fullmatch(v.strip()): return float(v.strip())
+    return float("nan")
+
+def _ci_finite(x):
+    return isinstance(x, (int, float)) and not isinstance(x, bool) and _ci_math.isfinite(x)
+
+def _ci_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _ci_pass_on(opts, keys):
+    out = {}
+    for k in keys:
+        v = _ci_opt(opts, k)
+        if v is not None: out[k] = v
+    return out
+
+def _ci_key(v):
+    if isinstance(v, float) and v.is_integer(): return str(int(v))
+    if v is True: return "true"
+    if v is False: return "false"
+    return str(v)
+
+def _ci_commands(host):
+    def say(level, text): host["say"](level, text)
+
+    def muid_of(verb, muid):
+        n = _ci_num(muid)
+        if _ci_finite(n) and n >= 0 and _ci_math.floor(n) == n: return int(n)
+        say("error", "ce.ci." + verb + ": muid must be a device's number, as discover or devices give it, so nothing was sent.")
+        return None
+
+    def need_fn(verb, fn):
+        if callable(fn): return True
+        say("error", "ce.ci." + verb + ": fn must be a function to call with the answer, so nothing was sent.")
+        return False
+
+    def need_resource(verb, resource):
+        if isinstance(resource, str) and resource != "": return True
+        say("error", "ce.ci." + verb + ": resource must be a resource's name, such as \"ProgramList\", so nothing was sent.")
+        return False
+
+    def start(verb, fields, fn):
+        answer = host["ask"](fields)
+        if not isinstance(answer, dict) or answer.get("ok") is not True or answer.get("token") is None:
+            why = answer["error"] if isinstance(answer, dict) and isinstance(answer.get("error"), str) and answer["error"] != "" else "MIDI-CI is not available here"
+            say("error", "ce.ci." + verb + ": " + why + ", so nothing was sent.")
+            return False
+        host["waiters"]()[_ci_key(answer["token"])] = {"fn": fn}
+        return answer["token"]
+
+    def discover(a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        if not need_fn("discover", fn): return False
+        role = _ci_opt(opts, "role")
+        fields = {"op": "discover", "role": role if isinstance(role, str) and role != "" else "mainSynth"}
+        timeout = _ci_num(_ci_opt(opts, "timeoutMs"))
+        if _ci_finite(timeout) and timeout > 0: fields["timeoutMs"] = timeout
+        return start("discover", fields, fn) is not False
+
+    def devices(role=None):
+        fields = {"op": "devices"}
+        if isinstance(role, str) and role != "": fields["role"] = role
+        lst = host["query"](fields)
+        return lst if isinstance(lst, list) else []
+
+    def get(muid, resource, a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        m = muid_of("get", muid)
+        if m is None or not need_resource("get", resource) or not need_fn("get", fn): return False
+        return start("get", {"op": "get", "muid": m, "resource": resource, "opts": _ci_pass_on(opts, ["resId", "offset", "limit", "timeoutMs"])}, fn) is not False
+
+    def set_(muid, resource, body, a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        m = muid_of("set", muid)
+        if m is None or not need_resource("set", resource) or not need_fn("set", fn): return False
+        if body is None:
+            say("error", "ce.ci.set: body must be given: a table, text or bytes, so nothing was sent.")
+            return False
+        return start("set", {"op": "set", "muid": m, "resource": resource, "body": body, "opts": _ci_pass_on(opts, ["resId", "partial", "mediaType", "timeoutMs"])}, fn) is not False
+
+    def subscribe(muid, resource, a=None, b=None):
+        opts, fn = (None, a) if callable(a) else (a, b)
+        m = muid_of("subscribe", muid)
+        if m is None or not need_resource("subscribe", resource) or not need_fn("subscribe", fn): return None
+        token = start("subscribe", {"op": "subscribe", "muid": m, "resource": resource, "opts": _ci_pass_on(opts, ["resId"])}, fn)
+        return None if token is False else token
+
+    def unsubscribe(sid):
+        if sid is None: return False
+        host["waiters"]().pop(_ci_key(sid), None)
+        return host["query"]({"op": "unsubscribe", "id": _ci_key(sid)}) is True
+
+    def profiles(muid, fn=None):
+        m = muid_of("profiles", muid)
+        if m is None: return []
+        lst = host["query"]({"op": "profiles", "muid": m})
+        if fn is not None:
+            if need_fn("profiles", fn): start("profiles", {"op": "profiles", "muid": m, "ask": True}, fn)
+        return lst if isinstance(lst, list) else []
+
+    def set_profile(muid, pid, on, opts=None):
+        m = muid_of("setProfile", muid)
+        if m is None: return False
+        if not isinstance(pid, str) or pid == "":
+            say("error", "ce.ci.setProfile: id must be a profile, as profiles gives it (\"7E 21 09 01 00\"), so nothing was sent.")
+            return False
+        if not isinstance(on, bool):
+            say("error", "ce.ci.setProfile: on must be true or false, so nothing was sent.")
+            return False
+        channel = 0
+        given = _ci_opt(opts, "channel")
+        if given is not None:
+            c = _ci_num(given)
+            if not _ci_finite(c) or _ci_math.floor(c) != c or c < 1 or c > 16:
+                say("error", "ce.ci.setProfile: channel must be 1 to 16, so nothing was sent.")
+                return False
+            channel = int(c)
+        answer = host["query"]({"op": "setProfile", "muid": m, "id": pid, "on": on, "channel": channel})
+        if answer is True: return True
+        why = answer["error"] if isinstance(answer, dict) and isinstance(answer.get("error"), str) and answer["error"] != "" else "MIDI-CI is not available here"
+        say("error", "ce.ci.setProfile: " + why + ", so nothing was sent.")
+        return False
+
+    def receive(reply):
+        if not isinstance(reply, dict) or reply.get("token") is None: return
+        waiters = host["waiters"]()
+        k = _ci_key(reply["token"])
+        w = waiters.get(k)
+        if w is None: return
+        if reply.get("final") is True: waiters.pop(k, None)
+        host["call"](w["fn"], reply.get("result"))
+
+    return {"discover": discover, "devices": devices, "get": get, "set": set_, "subscribe": subscribe,
+            "unsubscribe": unsubscribe, "profiles": profiles, "setProfile": set_profile, "receive": receive}
+
+_CI_WAITERS = {}
+
+def _ci_call(fn, value):
+    try:
+        fn(value)
+    except Exception as e:
+        logError("ce.ci: the function given to it failed: " + str(e))
+
+_CI = _ci_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "ask": lambda fields: __deviceQuery("ci", fields),
+    "query": lambda fields: __deviceQuery("ci", fields),
+    "waiters": lambda: _CI_WAITERS,
+    "call": _ci_call,
+})
+on("*", "__ciReply", lambda reply: _CI["receive"](reply))
+
+def ciDiscover(opts=None, fn=None):
+    return _CI["discover"](opts, fn)
+def ciDevices(role=None):
+    return _CI["devices"](role)
+def ciGet(muid, resource, opts=None, fn=None):
+    return _CI["get"](muid, resource, opts, fn)
+def ciSet(muid, resource, body, opts=None, fn=None):
+    return _CI["set"](muid, resource, body, opts, fn)
+def ciSubscribe(muid, resource, opts=None, fn=None):
+    return _CI["subscribe"](muid, resource, opts, fn)
+def ciUnsubscribe(id=None):
+    return _CI["unsubscribe"](id)
+def ciProfiles(muid, fn=None):
+    return _CI["profiles"](muid, fn)
+def ciSetProfile(muid, id, on, opts=None):
+    return _CI["setProfile"](muid, id, on, opts)
+
+# @module ce.mpe
+# ce.mpe, ported line for line from mpeCore.js (the panel view's; the JavaScript prelude runs that file
+# itself). Held to the panel view's answers by test/mpeParity.test.js and the scenario in
+# test/support/mpeScenario.mjs. Reading MPE back in is the input decoder's; listen only tells it how.
+# Every Python script runs this prelude for itself, so its zone and notes are its own.
+import math as _mpe_math
+
+_MPE_ZONES = ["lower", "upper"]
+
+def _mpe_finite(v):
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and _mpe_math.isfinite(v)
+
+def _mpe_opt(opts, key):
+    return opts.get(key) if isinstance(opts, dict) else None
+
+def _mpe_clamp(x, lo, hi):
+    return lo if x < lo else (hi if x > hi else x)
+
+def _mpe_round(x):
+    return -_mpe_math.floor(-x + 0.5) if x < 0 else _mpe_math.floor(x + 0.5)
+
+def _mpe_whole(v):
+    return _mpe_finite(v) and _mpe_math.floor(v) == v
+
+def _mpe_commands(host):
+    def say(level, text): host["say"](level, text)
+    st = {"zone": None, "sounding": [], "released": {}, "releases": 0, "nextId": 1, "warnedFull": False}
+
+    def members():
+        z = st["zone"]
+        return [(15 - i) if z["upper"] else (2 + i) for i in range(z["members"])]
+
+    def send(data): host["send"](data, st["zone"]["role"])
+
+    def rpn(channel, msb, lsb, value):
+        status = 0xB0 + channel - 1
+        for b in ([status, 101, msb], [status, 100, lsb], [status, 6, value], [status, 38, 0], [status, 101, 127], [status, 100, 127]):
+            send(b)
+
+    def bend_bytes(channel, semitones):
+        v = int(_mpe_clamp(_mpe_round(8192 + (semitones / st["zone"]["bendRange"]) * 8192), 0, 16383))
+        return [0xE0 + channel - 1, v % 128, v // 128]
+
+    def amount7(x): return int(_mpe_clamp(_mpe_round(_mpe_clamp(x, 0, 1) * 127), 0, 127))
+
+    def release(n, velocity):
+        send([0x80 + n["channel"] - 1, n["note"], velocity])
+        st["sounding"] = [x for x in st["sounding"] if x is not n]
+        st["releases"] += 1
+        st["released"][n["channel"]] = st["releases"]
+
+    def all_off():
+        if st["zone"] is None: return 0
+        count = len(st["sounding"])
+        for n in list(st["sounding"]): release(n, 64)
+        for channel in members(): send([0xE0 + channel - 1, 0, 64])
+        return count
+
+    def semitones(verb, value, name):
+        if not _mpe_finite(value):
+            say("error", "ce.mpe." + verb + ": " + name + " must be a number of semitones, so nothing was done.")
+            return None
+        return value
+
+    def set_zone(opts=None):
+        which = _mpe_opt(opts, "zone")
+        if which is None: which = "lower"
+        if which not in _MPE_ZONES:
+            say("error", "ce.mpe.zone: zone must be \"lower\" or \"upper\", so nothing was done.")
+            return False
+        count = _mpe_opt(opts, "members")
+        if count is None: count = 15
+        if not _mpe_whole(count) or count < 1 or count > 15:
+            say("error", "ce.mpe.zone: members must be a whole number from 1 to 15, so nothing was done.")
+            return False
+        bend_range = semitones("zone", _mpe_opt(opts, "bendRange"), "bendRange") if _mpe_opt(opts, "bendRange") is not None else 48
+        if bend_range is None: return False
+        manager_range = semitones("zone", _mpe_opt(opts, "managerBendRange"), "managerBendRange") if _mpe_opt(opts, "managerBendRange") is not None else 2
+        if manager_range is None: return False
+        if bend_range <= 0 or bend_range > 96 or manager_range <= 0 or manager_range > 96:
+            say("error", "ce.mpe.zone: a bend range must be above 0 and at most 96 semitones, so nothing was done.")
+            return False
+        role = _mpe_opt(opts, "role")
+        all_off()
+        st["zone"] = {"upper": which == "upper", "members": int(count), "bendRange": bend_range, "managerBendRange": manager_range,
+                      "role": role if isinstance(role, str) and role != "" else "mainSynth"}
+        st["sounding"] = []
+        st["released"] = {}
+        if _mpe_opt(opts, "send") is not False:
+            manager = 16 if st["zone"]["upper"] else 1
+            rpn(manager, 0, 6, int(count))
+            rpn(manager, 0, 0, int(_mpe_round(manager_range)))
+            for channel in members(): rpn(channel, 0, 0, int(_mpe_round(bend_range)))
+        return True
+
+    def start_values(verb, values):
+        out = {"bend": 0, "pressure": 0, "timbre": 0.5}
+        if values is None: return out
+        if not isinstance(values, dict):
+            say("error", "ce.mpe." + verb + ": values must be a table of bend, pressure and timbre, so nothing was sent.")
+            return None
+        for key in ("bend", "pressure", "timbre"):
+            v = values.get(key)
+            if v is None: continue
+            if not _mpe_finite(v):
+                say("error", "ce.mpe." + verb + ": " + key + " must be a number, so nothing was sent.")
+                return None
+            out[key] = v
+        return out
+
+    def note_on(note, velocity, opts=None):
+        n = host["note"](note)
+        if n is None:
+            say("error", "ce.mpe.noteOn: note must be 0 to 127 or a name such as \"C4\", so nothing was sent.")
+            return None
+        if not _mpe_whole(velocity) or velocity < 1 or velocity > 127:
+            say("error", "ce.mpe.noteOn: velocity must be a whole number from 1 to 127, so nothing was sent.")
+            return None
+        start = start_values("noteOn", opts)
+        if start is None: return None
+        if st["zone"] is None: set_zone({})
+        busy = {x["channel"] for x in st["sounding"]}
+        channel, best = 0, float("inf")
+        for c in members():
+            if c in busy: continue
+            when = st["released"].get(c, 0)
+            if when < best:
+                best = when
+                channel = c
+        if channel == 0:
+            oldest = st["sounding"][0]
+            if not st["warnedFull"]:
+                st["warnedFull"] = True
+                say("warn", "ce.mpe.noteOn: every member channel is busy, so the oldest note was ended. More members, or fewer notes at once, avoid it.")
+            channel = oldest["channel"]
+            release(oldest, 64)
+        z = st["zone"]
+        bend = _mpe_clamp(start["bend"], -z["bendRange"], z["bendRange"])
+        send(bend_bytes(channel, bend))
+        send([0xB0 + channel - 1, 74, amount7(start["timbre"])])
+        send([0xD0 + channel - 1, amount7(start["pressure"])])
+        send([0x90 + channel - 1, n, int(velocity)])
+        nid = st["nextId"]
+        st["nextId"] += 1
+        st["sounding"].append({"id": nid, "note": n, "channel": channel, "velocity": int(velocity), "bend": bend,
+                               "pressure": _mpe_clamp(start["pressure"], 0, 1), "timbre": _mpe_clamp(start["timbre"], 0, 1)})
+        return nid
+
+    def find(nid):
+        for n in st["sounding"]:
+            if n["id"] == nid and not isinstance(nid, bool): return n
+        return None
+
+    def express(nid, values=None):
+        n = find(nid)
+        if n is None: return False
+        if not isinstance(values, dict):
+            say("error", "ce.mpe.express: values must be a table of bend, pressure and timbre, so nothing was sent.")
+            return False
+        if start_values("express", values) is None: return False
+        z = st["zone"]
+        if values.get("bend") is not None:
+            n["bend"] = _mpe_clamp(values["bend"], -z["bendRange"], z["bendRange"])
+            send(bend_bytes(n["channel"], n["bend"]))
+        if values.get("pressure") is not None:
+            n["pressure"] = _mpe_clamp(values["pressure"], 0, 1)
+            send([0xD0 + n["channel"] - 1, amount7(n["pressure"])])
+        if values.get("timbre") is not None:
+            n["timbre"] = _mpe_clamp(values["timbre"], 0, 1)
+            send([0xB0 + n["channel"] - 1, 74, amount7(n["timbre"])])
+        return True
+
+    def note_off(nid, velocity=None):
+        n = find(nid)
+        if n is None: return False
+        v = 64
+        if velocity is not None:
+            if not _mpe_whole(velocity) or velocity < 0 or velocity > 127:
+                say("error", "ce.mpe.noteOff: velocity must be a whole number from 0 to 127, so the note was ended at 64.")
+            else:
+                v = int(velocity)
+        release(n, v)
+        return True
+
+    def notes():
+        return [{"id": n["id"], "note": n["note"], "channel": n["channel"], "velocity": n["velocity"], "bend": n["bend"],
+                 "pressure": n["pressure"], "timbre": n["timbre"]} for n in st["sounding"]]
+
+    def listen(opts=None):
+        frm = _mpe_opt(opts, "from")
+        role = frm if isinstance(frm, str) else ""
+        if _mpe_opt(opts, "off") is True:
+            host["listen"](role, None)
+            return True
+        which = _mpe_opt(opts, "zone")
+        if which is None: which = "lower"
+        if which not in _MPE_ZONES:
+            say("error", "ce.mpe.listen: zone must be \"lower\" or \"upper\", so nothing was done.")
+            return False
+        count = _mpe_opt(opts, "members")
+        if count is None: count = 15
+        if not _mpe_whole(count) or count < 1 or count > 15:
+            say("error", "ce.mpe.listen: members must be a whole number from 1 to 15, so nothing was done.")
+            return False
+        bend_range = semitones("listen", _mpe_opt(opts, "bendRange"), "bendRange") if _mpe_opt(opts, "bendRange") is not None else 48
+        if bend_range is None: return False
+        if bend_range <= 0 or bend_range > 96:
+            say("error", "ce.mpe.listen: bendRange must be above 0 and at most 96 semitones, so nothing was done.")
+            return False
+        host["listen"](role, {"zone": which, "members": int(count), "bendRange": bend_range})
+        return True
+
+    return {"zone": set_zone, "noteOn": note_on, "express": express, "noteOff": note_off, "allOff": all_off, "notes": notes, "listen": listen}
+
+def _mpe_send(data, role):
+    if role is not None and role != "mainSynth":
+        routeMidi(role, lambda: sendMidi(data))
+    else:
+        sendMidi(data)
+
+def _mpe_note(v):
+    n = None
+    if isinstance(v, str): n = noteNumber(v)
+    elif _mpe_finite(v): n = int(_mpe_math.floor(v + 0.5))
+    return n if n is not None and 0 <= n <= 127 else None
+
+_MPE = _mpe_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "send": _mpe_send,
+    "note": _mpe_note,
+    "listen": lambda role, opts: __deviceQuery("mpeListen", {"role": role, "opts": opts}),
+})
+
+def mpeZone(opts=None):
+    return _MPE["zone"](opts)
+def mpeNoteOn(note, velocity=None, opts=None):
+    return _MPE["noteOn"](note, velocity, opts)
+def mpeExpress(id, values=None):
+    return _MPE["express"](id, values)
+def mpeNoteOff(id, velocity=None):
+    return _MPE["noteOff"](id, velocity)
+def mpeAllOff():
+    return _MPE["allOff"]()
+def mpeNotes():
+    return _MPE["notes"]()
+def mpeListen(opts=None):
+    return _MPE["listen"](opts)
+
+# @module ce.daw
+# ce.daw, ported line for line from dawCore.js (the panel view's; the JavaScript prelude runs that
+# file itself). Held to the panel view's answers by test/dawParity.test.js and the scenario in
+# test/support/dawScenario.mjs. Everything is asked of the plug-in, as the "daw" device query.
+def _daw_commands(host):
+    def say(level, text):
+        host["say"](level, text)
+
+    def need_path(verb, path, what):
+        if isinstance(path, str) and path != "":
+            return True
+        say("error", "ce.daw." + verb + ": path must be a control's path, such as \"Cutoff.value\", so " + what + ".")
+        return False
+
+    def as_list(op):
+        answer = host["query"](op, {})
+        return answer if isinstance(answer, list) else []
+
+    def as_table(op):
+        answer = host["query"](op, {})
+        return answer if isinstance(answer, dict) else None
+
+    def parameters():
+        return as_list("parameters")
+
+    def parameter(path):
+        if not need_path("parameter", path, "there is nothing to give"):
+            return None
+        for p in parameters():
+            if isinstance(p, dict) and p.get("path") == path:
+                return p
+        return None
+
+    def gesture(verb, path):
+        if not need_path(verb, path, "nothing was done"):
+            return False
+        return host["query"](verb, {"path": path}) is True
+
+    def rename(path, name=None):
+        if not need_path("rename", path, "nothing was renamed"):
+            return False
+        if name is not None and not isinstance(name, str):
+            say("error", "ce.daw.rename: name must be text, or nothing for the name it was exported with, so nothing was renamed.")
+            return False
+        return host["query"]("rename", {"path": path, "name": name if name is not None else ""}) is True
+
+    def assign(slot, path=None, opts=None):
+        whole = isinstance(slot, (int, float)) and not isinstance(slot, bool) and slot == slot \
+            and slot not in (float("inf"), float("-inf")) and int(slot) == slot and slot >= 1
+        if not whole:
+            say("error", "ce.daw.assign: slot must be a whole number from 1, so nothing was assigned.")
+            return False
+        if path is not None and (not isinstance(path, str) or path == ""):
+            say("error", "ce.daw.assign: path must be a control's path, such as \"Cutoff.value\", or nothing to empty the slot, so nothing was assigned.")
+            return False
+        name = opts.get("name") if isinstance(opts, dict) else None
+        if name is not None and not isinstance(name, str):
+            say("error", "ce.daw.assign: name must be text, so nothing was assigned.")
+            return False
+        return host["query"]("assign", {"slot": slot, "path": path if path is not None else "",
+                                        "name": name if name is not None else ""}) is True
+
+    return {
+        "host": lambda: as_table("host"),
+        "parameters": parameters,
+        "parameter": parameter,
+        "program": lambda: as_table("program"),
+        "programs": lambda: as_list("programs"),
+        "beginGesture": lambda path=None: gesture("beginGesture", path),
+        "endGesture": lambda path=None: gesture("endGesture", path),
+        "rename": rename,
+        "assign": assign,
+        "markChanged": lambda: host["query"]("markChanged", {}) is True,
+    }
+
+def _daw_query(op, fields):
+    q = dict(fields)
+    q["op"] = op
+    return __deviceQuery("daw", q)
+
+_DAW = _daw_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "query": lambda op, fields: _daw_query(op, fields),
+})
+
+def dawHost():
+    return _DAW["host"]()
+
+def dawParameters():
+    return _DAW["parameters"]()
+
+def dawParameter(path=None):
+    return _DAW["parameter"](path)
+
+def dawProgram():
+    return _DAW["program"]()
+
+def dawPrograms():
+    return _DAW["programs"]()
+
+def dawBeginGesture(path=None):
+    return _DAW["beginGesture"](path)
+
+def dawEndGesture(path=None):
+    return _DAW["endGesture"](path)
+
+def dawRename(path=None, name=None):
+    return _DAW["rename"](path, name)
+
+def dawAssign(slot=None, path=None, opts=None):
+    return _DAW["assign"](slot, path, opts)
+
+def dawMarkChanged():
+    return _DAW["markChanged"]()
+
+# @module ce.osc
+# ce.osc, ported line for line from oscCore.js (the panel view's; the JavaScript prelude runs that
+# file itself). Held to the panel view's answers by test/oscParity.test.js and the scenario in
+# test/support/oscScenario.mjs. The port, the reading and writing of OSC and the user's yes live in
+# the transport (__deviceQuery "osc"); what arrives comes back as "__oscIn" events. Every Python
+# script runs this prelude for itself, so its patterns are its own.
+_OSC_TAGS = "ihfdsSTFNIbrmtc"
+_OSC_WHAT = {
+    "i": "a whole number", "h": "a whole number", "f": "a number", "d": "a number", "t": "a number", "s": "text", "S": "text",
+    "c": "one character of text", "b": "a list of bytes", "m": "a list of four bytes", "r": "a colour such as \"#FF8000\"",
+}
+
+def _osc_number(v):
+    import math
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+def _osc_whole(v):
+    return _osc_number(v) and int(v) == v
+
+def _osc_bytes(v, count):
+    if not isinstance(v, (list, tuple)) or (count >= 0 and len(v) != count):
+        return False
+    return all(_osc_whole(b) and 0 <= b <= 255 for b in v)
+
+def _osc_fits(tag, v):
+    import re
+    if tag == "i": return _osc_whole(v) and -2147483648 <= v <= 2147483647
+    if tag == "h": return _osc_whole(v)
+    if tag in ("f", "d", "t"): return _osc_number(v)
+    if tag in ("s", "S"): return isinstance(v, str)
+    if tag == "c": return isinstance(v, str) and v != ""
+    if tag == "b": return _osc_bytes(v, -1)
+    if tag == "m": return _osc_bytes(v, 4)
+    if tag == "r": return isinstance(v, str) and re.fullmatch(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})", v) is not None
+    return tag != "" and tag in _OSC_TAGS
+
+def _osc_part(p, pi, s, si):
+    while pi < len(p):
+        c = p[pi]
+        if c == "*":
+            for k in range(len(s), si - 1, -1):
+                if _osc_part(p, pi + 1, s, k): return True
+            return False
+        if c == "?":
+            if si >= len(s): return False
+            pi += 1; si += 1
+            continue
+        if c == "[":
+            close = p.find("]", pi + 1)
+            if close < 0 or si >= len(s): return False
+            chars = p[pi + 1:close]
+            negate = chars.startswith("!")
+            if negate: chars = chars[1:]
+            found = False
+            k = 0
+            while k < len(chars):
+                if k + 2 < len(chars) and chars[k + 1] == "-":
+                    if chars[k] <= s[si] <= chars[k + 2]: found = True
+                    k += 3
+                else:
+                    if s[si] == chars[k]: found = True
+                    k += 1
+            if found == negate: return False
+            pi = close + 1; si += 1
+            continue
+        if c == "{":
+            close = p.find("}", pi + 1)
+            if close < 0: return False
+            for alt in p[pi + 1:close].split(","):
+                if s.startswith(alt, si) and _osc_part(p, close + 1, s, si + len(alt)): return True
+            return False
+        if si >= len(s) or s[si] != c: return False
+        pi += 1; si += 1
+    return si == len(s)
+
+def _osc_matches(pattern, address):
+    if not isinstance(pattern, str) or not isinstance(address, str): return False
+    p, a = pattern.split("/"), address.split("/")
+    if len(p) != len(a): return False
+    return all(_osc_part(p[i], 0, a[i], 0) for i in range(len(p)))
+
+def _osc_commands(host):
+    state = {"next": 1}
+
+    def say(level, text):
+        host["say"](level, text)
+
+    def answered(verb, answer, what):
+        if answer is True or (isinstance(answer, dict) and answer.get("ok") is True): return True
+        why = answer.get("why") if isinstance(answer, dict) and isinstance(answer.get("why"), str) and answer.get("why") != "" else "OSC is not available here"
+        say("error", "ce.osc." + verb + ": " + why + ", so " + what + ".")
+        return False
+
+    def destination(verb, to):
+        if isinstance(to, str) and to.strip() != "": return to.strip()
+        if isinstance(to, dict) and isinstance(to.get("host"), str) and _osc_whole(to.get("port")):
+            return {"host": to["host"], "port": to["port"]}
+        say("error", "ce.osc." + verb + ": to must be a target's name, \"host:port\", or a message's from, so nothing was sent.")
+        return None
+
+    def message(verb, address, args, types, which):
+        where = ("message " + str(which) + ": ") if which else ""
+        if not isinstance(address, str) or not address.startswith("/"):
+            say("error", "ce.osc." + verb + ": " + where + "address must be text starting with /, such as \"/fader/1\", so nothing was sent.")
+            return None
+        values = [] if args is None else (list(args) if isinstance(args, (list, tuple)) else [args])
+        if types is not None:
+            if not isinstance(types, str) or len(types) != len(values) or any(t not in _OSC_TAGS for t in types):
+                say("error", "ce.osc." + verb + ": " + where + "types must be text with one OSC type for each value, such as \"if\", so nothing was sent.")
+                return None
+            tags = types
+        else:
+            tags = ""
+            for i, v in enumerate(values):
+                if isinstance(v, bool): tags += "T" if v else "F"
+                elif isinstance(v, (int, float)): tags += "f"
+                elif isinstance(v, str): tags += "s"
+                elif v is None: tags += "N"
+                elif _osc_bytes(v, -1): tags += "b"
+                else:
+                    say("error", "ce.osc." + verb + ": " + where + "value " + str(i + 1) + " is not a number, text, true or false, or a list of bytes, so nothing was sent.")
+                    return None
+        for i, v in enumerate(values):
+            if not _osc_fits(tags[i], v):
+                say("error", "ce.osc." + verb + ": " + where + "value " + str(i + 1) + " is not " + _OSC_WHAT.get(tags[i], "what its type needs")
+                    + ", as type \"" + tags[i] + "\" needs, so nothing was sent.")
+                return None
+        return {"address": address, "args": values, "types": tags}
+
+    def opt(opts, key):
+        return opts.get(key) if isinstance(opts, dict) else None
+
+    def listen(opts=None):
+        port = opt(opts, "port")
+        if port is None: port = 8000
+        if not _osc_whole(port) or port < 1024 or port > 65535:
+            say("error", "ce.osc.listen: port must be a whole number from 1024 to 65535, so it is not listening.")
+            return False
+        return answered("listen", host["query"]("listen", {"port": port, "network": opt(opts, "network") is True,
+                                                           "nextFree": opt(opts, "nextFree") is True}), "it is not listening")
+
+    def on(pattern=None, fn=None):
+        if not isinstance(pattern, str) or not pattern.startswith("/"):
+            say("error", "ce.osc.on: pattern must be an address starting with /, such as \"/fader/*\", so nothing will run.")
+            return None
+        if not callable(fn):
+            say("error", "ce.osc.on: fn must be a function to call with each message, so nothing will run.")
+            return None
+        oid = state["next"]
+        state["next"] += 1
+        host["listeners"]().append({"id": oid, "pattern": pattern, "fn": fn})
+        return oid
+
+    def off(oid=None):
+        lst = host["listeners"]()
+        for i, l in enumerate(lst):
+            if l["id"] == oid:
+                del lst[i]
+                return True
+        return False
+
+    def target(name=None, address=None):
+        if not isinstance(name, str) or name == "":
+            say("error", "ce.osc.target: name must be text, such as \"tablet\", so nothing was set.")
+            return False
+        if address is None:
+            return answered("target", host["query"]("target", {"name": name, "host": "", "port": 0}), "nothing was set")
+        where = None
+        if isinstance(address, str):
+            at = address.rfind(":")
+            try:
+                port = float(address[at + 1:]) if at > 0 else None
+            except ValueError:
+                port = None
+            if at > 0 and port is not None and _osc_whole(port) and 1 <= port <= 65535:
+                where = {"host": address[:at].strip(), "port": int(port)}
+        elif isinstance(address, dict) and isinstance(address.get("host"), str) and _osc_whole(address.get("port")) \
+                and 1 <= address["port"] <= 65535:
+            where = {"host": address["host"], "port": address["port"]}
+        if where is None or where["host"] == "":
+            say("error", "ce.osc.target: address must be \"host:port\", { host, port } or a message's from, so nothing was set.")
+            return False
+        return answered("target", host["query"]("target", {"name": name, "host": where["host"], "port": where["port"]}), "nothing was set")
+
+    def send(to=None, address=None, args=None, types=None):
+        where = destination("send", to)
+        if where is None: return False
+        m = message("send", address, args, types, 0)
+        if m is None: return False
+        return answered("send", host["query"]("send", {"to": where, "address": m["address"], "args": m["args"], "types": m["types"]}), "nothing was sent")
+
+    def bundle(to=None, messages=None, opts=None):
+        where = destination("bundle", to)
+        if where is None: return False
+        if not isinstance(messages, (list, tuple)) or len(messages) == 0:
+            say("error", "ce.osc.bundle: messages must be a list of { address, args, types }, so nothing was sent.")
+            return False
+        out = []
+        for i, x in enumerate(messages):
+            d = x if isinstance(x, dict) else {}
+            m = message("bundle", d.get("address"), d.get("args"), d.get("types"), i + 1)
+            if m is None: return False
+            out.append(m)
+        time = opt(opts, "time")
+        if time is not None and not (_osc_number(time) and time >= 0):
+            say("error", "ce.osc.bundle: time must be a number of seconds, so nothing was sent.")
+            return False
+        return answered("bundle", host["query"]("bundle", {"to": where, "messages": out, "time": time if time is not None else 0}), "nothing was sent")
+
+    def status():
+        s = host["query"]("status", {})
+        return s if isinstance(s, dict) else {"listening": False, "waiting": False, "received": 0, "sent": 0, "dropped": 0}
+
+    def receive(msg):
+        if not isinstance(msg, dict) or not isinstance(msg.get("address"), str): return
+        for l in list(host["listeners"]()):
+            if _osc_matches(l["pattern"], msg["address"]): host["call"](l["fn"], msg)
+
+    return {"listen": listen, "stop": lambda: host["query"]("stop", {}) is True, "on": on, "off": off,
+            "target": target, "send": send, "bundle": bundle, "status": status, "receive": receive}
+
+_OSC_LISTENERS = []
+
+def _osc_query(op, fields):
+    q = dict(fields)
+    q["op"] = op
+    return __deviceQuery("osc", q)
+
+def _osc_call(fn, value):
+    try:
+        fn(value)
+    except Exception as e:
+        logError("ce.osc: the function given to on failed: " + str(e))
+
+_OSC = _osc_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "query": lambda op, fields: _osc_query(op, fields),
+    "listeners": lambda: _OSC_LISTENERS,
+    "call": _osc_call,
+})
+on("*", "__oscIn", lambda msg: _OSC["receive"](msg))
+
+def oscListen(opts=None):
+    return _OSC["listen"](opts)
+
+def oscStop():
+    return _OSC["stop"]()
+
+def oscOn(pattern=None, fn=None):
+    return _OSC["on"](pattern, fn)
+
+def oscOff(id=None):
+    return _OSC["off"](id)
+
+def oscTarget(name=None, address=None):
+    return _OSC["target"](name, address)
+
+def oscSend(to=None, address=None, args=None, types=None):
+    return _OSC["send"](to, address, args, types)
+
+def oscBundle(to=None, messages=None, opts=None):
+    return _OSC["bundle"](to, messages, opts)
+
+def oscStatus():
+    return _OSC["status"]()
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -3305,6 +6829,13 @@ __WEBVIEW_ONLY = [
 # @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+# @module ce.ci
+  "ciDraftProfile",
+# @module ce.file
+  "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
+# @module ce.keys
+  "keysShortcut","keysRemove","keysList","keysIsDown","keysHeld","keysPiano","keysPianoInfo",
+  "keysFocus","keysFocused",
 # @module ce.text
   "textFonts","textFont","textStyle","textAxis","textRead","textMeasure","textFit",
 # @module ce.components.split
@@ -3477,6 +7008,10 @@ def uiDialog(opts=None, onChoice=None):
 # sibling engine, and the flat names have to be the same in every language.
 def logWarn(message, value=None):  return __api.logAt("warn", str(message), value)
 def logError(message, value=None): return __api.logAt("error", str(message), value)
+# origin(): who made the change the running handler is for ("user", "script", "host", "device",
+# "load"); None outside a handler. The plug-in knows, and answers the "origin" device query.
+def origin():
+    return __deviceQuery("origin", {})
 
 # @module ce.midi
 def sendMidi(b):                  return __api.sendMidi(b)
@@ -3866,7 +7401,9 @@ def __resolveDumps(kind, role, values, err):
 def requestDump(kind, fn=None, opts=None):
     kind = str(kind if kind is not None else "")
     if callable(fn):
-        ms = 3000
+        # Left out, the wait the profile's request deserves: its timeout for every try it allows.
+        wait = __deviceQuery("answerWaitMs", { "role": "mainSynth", "request": kind })
+        ms = float(wait) if isinstance(wait, (int, float)) and wait > 0 else 3000
         if opts is not None and opts.get("timeout") is not None and float(opts.get("timeout")) > 0:
             ms = float(opts.get("timeout"))
         # A request's answer arrives under the dump it answers with ("requestSystem" brings
@@ -4242,6 +7779,43 @@ __CE_OPTIONS = {
     "animateTo": { "path": "ce.anim.to", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
     "animateSpring": { "path": "ce.anim.spring", "at": 2, "param": "opts", "refusal": "false", "names": ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
     "animateEnvelope": { "path": "ce.anim.envelope", "at": 2, "param": "opts", "refusal": "false", "names": ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+    "patchCurrent": { "path": "ce.patch.current", "at": 1, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "scope"] },
+    "patchRead": { "path": "ce.patch.read", "at": 2, "param": "opts", "refusal": "false", "names": ["timeout", "role"] },
+    "patchLoad": { "path": "ce.patch.load", "at": 1, "param": "opts", "refusal": "nothing", "names": ["role"] },
+    "patchMorph": { "path": "ce.patch.morph", "at": 3, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "switchAt"] },
+    "patchBlend": { "path": "ce.patch.blend", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchRandom": { "path": "ce.patch.random", "at": 0, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "scope", "seed", "from", "within"] },
+    "patchMutate": { "path": "ce.patch.mutate", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role", "seed"] },
+    "patchMerge": { "path": "ce.patch.merge", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchDiff": { "path": "ce.patch.diff", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchEqual": { "path": "ce.patch.equal", "at": 2, "param": "opts", "refusal": "nothing", "names": ["groups", "only", "except", "lock", "include", "role"] },
+    "patchApply": { "path": "ce.patch.apply", "at": 1, "param": "opts", "refusal": "result", "names": ["groups", "only", "except", "lock", "include", "role", "send", "changedOnly", "live"] },
+    "patchSave": { "path": "ce.patch.save", "at": 2, "param": "opts", "refusal": "false", "names": ["replace"] },
+    "patchList": { "path": "ce.patch.list", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "scope"] },
+    "patchForget": { "path": "ce.patch.forget", "at": 1, "param": "opts", "refusal": "false", "names": ["role"] },
+    "patchWrite": { "path": "ce.patch.write", "at": 2, "param": "opts", "refusal": "result", "names": ["role"] },
+    "ciDiscover": { "path": "ce.ci.discover", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "timeoutMs"] },
+    "ciGet": { "path": "ce.ci.get", "at": 2, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "offset", "limit"] },
+    "ciSet": { "path": "ce.ci.set", "at": 3, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "partial", "mediaType"] },
+    "ciSubscribe": { "path": "ce.ci.subscribe", "at": 2, "param": "opts", "refusal": "nothing", "names": ["resId"] },
+    "ciSetProfile": { "path": "ce.ci.setProfile", "at": 3, "param": "opts", "refusal": "false", "names": ["channel"] },
+    "oscListen": { "path": "ce.osc.listen", "at": 0, "param": "opts", "refusal": "false", "names": ["port", "network", "nextFree"] },
+    "oscBundle": { "path": "ce.osc.bundle", "at": 2, "param": "opts", "refusal": "false", "names": ["time"] },
+    "dawAssign": { "path": "ce.daw.assign", "at": 2, "param": "opts", "refusal": "false", "names": ["name"] },
+    "mpeZone": { "path": "ce.mpe.zone", "at": 0, "param": "opts", "refusal": "false", "names": ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
+    "mpeNoteOn": { "path": "ce.mpe.noteOn", "at": 2, "param": "opts", "refusal": "nothing", "names": ["bend", "pressure", "timbre"] },
+    "mpeExpress": { "path": "ce.mpe.express", "at": 1, "param": "values", "refusal": "false", "names": ["bend", "pressure", "timbre"] },
+    "mpeListen": { "path": "ce.mpe.listen", "at": 0, "param": "opts", "refusal": "false", "names": ["from", "zone", "members", "bendRange", "off"] },
+    "fileSyxSplit": { "path": "ce.file.syxSplit", "at": 1, "param": "opts", "refusal": "empty list", "names": ["partial", "prefix"] },
+    "fileMidiRead": { "path": "ce.file.midiRead", "at": 1, "param": "opts", "refusal": "nothing", "names": ["track"] },
+    "fileMidiWrite": { "path": "ce.file.midiWrite", "at": 1, "param": "opts", "refusal": "nothing", "names": ["tempo", "name", "channel"] },
+    "verifyCoverage": { "path": "ce.verify.coverage", "at": 0, "param": "opts", "refusal": "nothing", "names": ["role", "ids", "group"] },
+    "verifyCheck": { "path": "ce.verify.check", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "ids", "group"] },
+    "verifyDump": { "path": "ce.verify.dump", "at": 1, "param": "opts", "refusal": "false", "names": ["role", "times", "gapMs"] },
+    "verifyWrite": { "path": "ce.verify.write", "at": 2, "param": "opts", "refusal": "false", "names": ["role", "settleMs"] },
+    "verifyProbe": { "path": "ce.verify.probe", "at": 1, "param": "opts", "refusal": "false", "names": ["role", "settleMs", "values"] },
+    "verifyPatch": { "path": "ce.verify.patch", "at": 0, "param": "opts", "refusal": "false", "names": ["role", "ids", "group", "settleMs", "via", "send"] },
+    "verifySummary": { "path": "ce.verify.summary", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width"] },
     "syncTimer": { "path": "ce.time.syncTimer", "at": 2, "param": "opts", "refusal": "nothing", "names": ["follow"] },
     "deviceParameters": { "path": "ce.device.parameters", "at": 0, "param": "opts", "refusal": "empty list", "names": ["role", "query", "group", "type", "access", "limit"] },
     "deviceDefineParameter": { "path": "ce.device.defineParameter", "at": 1, "param": "spec", "refusal": "false", "names": ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], "nested": { "nrpn": { "names": ["msb", "lsb"] } } },
@@ -4250,6 +7824,21 @@ __CE_OPTIONS = {
     "checksum": { "path": "ce.midi.checksum", "at": 2, "param": "opts", "refusal": "nothing", "names": ["offset"] },
     "panic": { "path": "ce.midi.panic", "at": 0, "param": "opts", "refusal": "nothing", "names": ["channel", "resetControllers"] },
     "encodeJson": { "path": "ce.storage.encode", "at": 1, "param": "opts", "refusal": "nothing", "names": ["indent"] },
+    "formatNumber": { "path": "ce.format.number", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode"] },
+    "formatHz": { "path": "ce.format.hz", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale"] },
+    "formatTime": { "path": "ce.format.time", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale"] },
+    "formatDb": { "path": "ce.format.db", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "fromGain", "floor"] },
+    "formatPercent": { "path": "ce.format.percent", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "min", "max"] },
+    "formatPan": { "path": "ce.format.pan", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "width", "placeholder", "min", "max", "center", "steps", "style"] },
+    "formatRatio": { "path": "ce.format.ratio", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "width", "placeholder", "unicode", "style"] },
+    "formatClock": { "path": "ce.format.clock", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "unicode", "decimals", "hours"] },
+    "formatNote": { "path": "ce.format.note", "at": 1, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "unicode", "middleC", "flats", "octave"] },
+    "formatDivision": { "path": "ce.format.division", "at": 1, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "width", "placeholder", "tolerance"] },
+    "formatParameter": { "path": "ce.format.parameter", "at": 2, "param": "opts", "refusal": "nothing", "names": ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "role"] },
+    "formatTable": { "path": "ce.format.table", "at": 2, "param": "opts", "refusal": "nothing", "names": ["width", "placeholder", "start"] },
+    "formatFit": { "path": "ce.format.fit", "at": 2, "param": "opts", "refusal": "nothing", "names": ["abbreviations", "align", "pad", "steps"] },
+    "formatLine": { "path": "ce.format.line", "at": 3, "param": "opts", "refusal": "nothing", "names": ["abbreviations", "gap"] },
+    "formatParse": { "path": "ce.format.parse", "at": 1, "param": "opts", "refusal": "nothing", "names": ["kind", "min", "max", "center", "steps", "middleC"] },
     "bytesRead": { "path": "ce.midi.read", "at": 3, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
     "bytesWrite": { "path": "ce.midi.write", "at": 4, "param": "opts", "refusal": "nothing", "names": ["bits", "order"] },
 }
@@ -4315,10 +7904,11 @@ del __ceOptionId
 # discoverability (ce.core.set is the same function as set).
 import types as __ce_types
 __CE_MODULES = {
-    "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
+    "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "origin": "origin", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
     "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
     "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
     "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+    "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parameter": "formatParameter", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
     "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
     "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
     "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -4327,6 +7917,14 @@ __CE_MODULES = {
     "ce.panel": { "align": "panelAlign", "batch": "panelBatch", "circle": "panelCircle", "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "distribute": "panelDistribute", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "flip": "panelFlip", "grid": "panelGrid", "info": "panelInfo", "keep": "panelKeep", "match": "panelMatch", "order": "panelOrder", "parent": "panelParent", "patch": "panelPatch", "rect": "panelRect", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
+    "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.osc": { "bundle": "oscBundle", "listen": "oscListen", "off": "oscOff", "on": "oscOn", "send": "oscSend", "status": "oscStatus", "stop": "oscStop", "target": "oscTarget" },
+    "ce.daw": { "assign": "dawAssign", "beginGesture": "dawBeginGesture", "endGesture": "dawEndGesture", "host": "dawHost", "markChanged": "dawMarkChanged", "parameter": "dawParameter", "parameters": "dawParameters", "program": "dawProgram", "programs": "dawPrograms", "rename": "dawRename" },
+    "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
+    "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
+    "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
+    "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
+    "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
     "ce.text": { "axis": "textAxis", "fit": "textFit", "font": "textFont", "fonts": "textFonts", "measure": "textMeasure", "read": "textRead", "style": "textStyle" },
     "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "read": "splitRead", "transpose": "splitTranspose" },
     "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "read": "phraseRead", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
@@ -4357,12 +7955,13 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "layout": "lcdLayout", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix", "zoneAt": "lcdZoneAt", "zoneKind": "lcdZoneKind", "zoneLabel": "lcdZoneLabel", "zoneShow": "lcdZoneShow", "zoneSource": "lcdZoneSource", "zoneText": "lcdZoneText" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "kind": "pixelKind", "label": "pixelLabel", "layout": "pixelLayout", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "source": "pixelSource", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.osc","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
     { "id": "ce.device", "version": "1.3", "runtime": "any" },
     { "id": "ce.math", "version": "1.8", "runtime": "any" },
+    { "id": "ce.format", "version": "1.1", "runtime": "any" },
     { "id": "ce.music", "version": "1.2", "runtime": "any" },
     { "id": "ce.time", "version": "1.3", "runtime": "any" },
     { "id": "ce.anim", "version": "1.1", "runtime": "any" },
@@ -4371,6 +7970,14 @@ __CE_META = [
     { "id": "ce.panel", "version": "1.4", "runtime": "any" },
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
+    { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.osc", "version": "1.0", "runtime": "any" },
+    { "id": "ce.daw", "version": "1.0", "runtime": "any" },
+    { "id": "ce.mpe", "version": "1.0", "runtime": "any" },
+    { "id": "ce.ci", "version": "1.0", "runtime": "any" },
+    { "id": "ce.file", "version": "1.0", "runtime": "any" },
+    { "id": "ce.verify", "version": "1.0", "runtime": "any" },
+    { "id": "ce.keys", "version": "1.0", "runtime": "webview" },
     { "id": "ce.text", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.split", "version": "1.0", "runtime": "webview" },
     { "id": "ce.components.phrase", "version": "1.0", "runtime": "webview" },

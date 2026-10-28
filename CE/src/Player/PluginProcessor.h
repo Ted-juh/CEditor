@@ -7,6 +7,7 @@
 #include <set>
 #include <vector>
 #include "PlayerHost.h"
+#include "Osc/OscQuestion.h"
 
 #include "PlayerPanelFile.h"
 #include "StateLoadReport.h"
@@ -33,6 +34,7 @@
  #include "SharedPropertiesFile.h"
  #include "Scripting/BridgeScriptHost.h"
  #include "Scripting/TimerManager.h"
+ #include "Scripting/MidiInDecoder.h"
 #endif
 
 /**
@@ -83,7 +85,7 @@ private:
               .withOutput ("Output", juce::AudioChannelSet::stereo(), true))
 #if CEDITOR_VALUE_LAYER
         , panelParams (ce::parseExportParameters (panel->doc))
-        , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams))
+        , apvts (*this, nullptr, "CEDITOR_PARAMS", ce::buildParameterLayout (panelParams, ce::readSpareParameterCount (panel->doc)))
 #endif
     {
         const juce::var& panelDocument = panel->doc;
@@ -97,6 +99,9 @@ private:
         // setting existed pushed nothing at all.
         restorePolicy = ce::readPanelRestorePolicy (panelDocument);
         programBank = ce::parseProgramBank (panelDocument);
+        spareCount = ce::readSpareParameterCount (panelDocument);
+        // ce.osc asks the user before the network is used, with the window open or shut.
+        deviceService.askAboutNetwork = ceditor::osc::askAboutNetworkWithDialog;
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -163,6 +168,7 @@ public:
             // end of the scripts, as distinct from the window closing (onPanelClose), which they
             // survive.
             if (scriptRuntime != nullptr) scriptRuntime->onPanelDestroy();
+            endScriptGestures (false, "the plug-in closed");
            #endif
             stopTimer();
            #if CEDITOR_SCRIPTING
@@ -174,7 +180,16 @@ public:
     }
 #endif
 
-    void prepareToPlay (double, int) override {}
+    // Kept for ce.daw.host(): nothing here plays audio, but a script may want to know.
+    void prepareToPlay (double sampleRate, int blockSize) override
+    {
+       #if CEDITOR_VALUE_LAYER
+        hostSampleRate.store (sampleRate);
+        hostBlockSize.store (blockSize);
+       #else
+        juce::ignoreUnused (sampleRate, blockSize);
+       #endif
+    }
     void releaseResources() override {}
     // The plugin PRODUCES MIDI on its output bus; the DAW routes that track to the synth's port (the
     // standard VST3 path — no in-plugin port picker). Drain whatever the panel queued on the message
@@ -396,6 +411,13 @@ public:
         // rides along and the two agree either way.
         if (currentProgram != 0)
             root.createNewChildElement ("CurrentProgram")->addTextElement (juce::String (currentProgram));
+        // ce.daw: the names scripts gave parameters and the controls on the spare parameters, so a
+        // reopened project's automation lands on the control it was written for.
+        {
+            const juce::SpinLock::ScopedLockType lock (dawStateLock);
+            if (dawStateJson.isNotEmpty())
+                root.createNewChildElement ("DawState")->addTextElement (dawStateJson);
+        }
 
         // S3: the whole patch, as bytes, beside the automation list.
         //
@@ -434,6 +456,10 @@ public:
             // "local" scope, per machine (localSettingsForState).
             root.createNewChildElement ("ScriptLocal")->addTextElement (localJson);
         }
+        // OSC learn: the port this instance listens on, so a reopened project's instances each find
+        // their own again rather than taking turns on the panel's.
+        if (const auto oscPort = oscPortInUse.load(); oscPort > 0)
+            root.createNewChildElement ("OscPort")->addTextElement (juce::String (oscPort));
        #endif
         copyXmlToBinary (root, destData);
 #else
@@ -461,6 +487,14 @@ public:
             // whole patch back; a program change on top of it would recall a slot over the top of
             // the patch that was just restored, which is the wrong sound and the wrong order. A
             // change the host asked for before this state arrived goes with the state it preceded.
+            {
+                const juce::SpinLock::ScopedLockType lock (dawStateLock);
+                auto* daw = xml->getChildByName ("DawState");
+                pendingDawStateJson = daw != nullptr ? daw->getAllSubText() : juce::String();
+                dawStateJson = pendingDawStateJson;
+            }
+            dawStateRestorePending.store (true);
+            loadPending.store (true);
             const auto recall = ce::readSessionRecall (*xml, ce::hostProgramCount (programBank));
             setRestoreAnswer (recall.restoreAnswer);
             currentProgram = recall.program;
@@ -494,11 +528,24 @@ public:
                     pendingScriptLocalJson = sloc->getAllSubText();
                     pendingScriptLocalPresent = true;
                 }
+                if (auto* op = xml->getChildByName ("OscPort"))
+                    oscPortRestored.store (op->getAllSubText().getIntValue());
                 if (auto* sx = xml->getChildByName ("ScriptState"))
                 {
                     pendingScriptStateJson = sx->getAllSubText();
                     pendingScriptStatePresent = true;
                 }
+                // Until the timer hands this to the scripts, a save writes what was just loaded,
+                // not what the scripts held before. A host may save straight after loading (an
+                // undo snapshot, a save as the project opens), and the restore and the refresh
+                // after it wait for the message thread, which is busy while a project loads. The
+                // timer applies the restore before it refreshes, so nothing older replaces these.
+                // Written again as a save writes JSON, not as read: the XML reader turns the
+                // "\r\n" JUCE writes into "\n", and a host may compare the two saves byte by byte.
+                const auto asSaved = [] (const juce::String& json) { return juce::JSON::toString (juce::JSON::parse (json)); };
+                if (pendingScriptSettingsPresent) cachedScriptSettingsJson = asSaved (pendingScriptSettingsJson);
+                if (pendingScriptLocalPresent)    cachedScriptLocalJson    = asSaved (pendingScriptLocalJson);
+                if (pendingScriptStatePresent)    cachedScriptStateJson    = asSaved (pendingScriptStateJson);
             }
             scriptRestorePending.store (true);
            #endif
@@ -510,6 +557,7 @@ public:
             currentProgram = 0;
             programChangePending.store (false);
             apvts.replaceState (juce::ValueTree::fromXml (*xml));
+            loadPending.store (true);
             markSessionRestored();
         }
         else
@@ -540,14 +588,60 @@ public:
 
     // The panel UI moved a control -> drive the matching host parameter with a gesture so the DAW
     // records the automation. Called on the message thread from the editor.
+    //
+    // A value inside a press (beginUiGesture .. endUiGesture) is part of that one gesture. Every
+    // value used to be a gesture of its own, so a drag of 200 steps was 200 gestures and a DAW
+    // writing in touch or latch mode saw the knob let go 200 times.
     void setParamFromUi (const juce::String& parameterId, float value)
     {
         if (auto* p = apvts.getParameter (parameterId))
         {
-            p->beginChangeGesture();
+            // Inside a hand's press, or a gesture a script began (ce.daw.beginGesture): one move.
+            const auto inGesture = uiGestures.count (parameterId) > 0 || scriptGestures.count (parameterId) > 0
+                                || pageScriptGestures.count (parameterId) > 0;
+            if (! inGesture) p->beginChangeGesture();
             p->setValueNotifyingHost (p->convertTo0to1 (value));
-            p->endChangeGesture();
+            if (! inGesture) p->endChangeGesture();
+            // The panel's own value: when the DAW reads it back, it is not the DAW's move.
+            if (auto* raw = apvts.getRawParameterValue (parameterId)) ownValue[parameterId] = raw->load();
         }
+    }
+
+    // --- ce.daw, for the window ------------------------------------------------------------------
+    std::function<void()> onDawInfoChanged;                      // the picture changed: push it
+    std::function<void (const juce::var& program)> onDawProgramForPage;
+    juce::var dawInfoNow() const { return dawInfoForPage(); }
+    void applyDawCommandFromPage (const juce::var& command) { dawQuery (command, true); }
+    /** Whether `value` is what the panel itself last set this parameter to: then it is not news. */
+    bool valueIsOwn (const juce::String& parameterId, float value) const
+    {
+        const auto it = ownValue.find (parameterId);
+        return it != ownValue.end() && it->second == value;
+    }
+    int spareParameterCount() const { return spareCount; }
+    /** The gestures a script in the window left open end with the window. */
+    void endPageScriptGestures() { endScriptGestures (true, "the window closed"); }
+
+    void beginUiGesture (const juce::String& parameterId)
+    {
+        if (auto* p = apvts.getParameter (parameterId))
+            if (uiGestures.insert (parameterId).second)
+                p->beginChangeGesture();
+    }
+
+    void endUiGesture (const juce::String& parameterId)
+    {
+        if (uiGestures.erase (parameterId) > 0)
+            if (auto* p = apvts.getParameter (parameterId))
+                p->endChangeGesture();
+    }
+
+    /** Ends every open press: the window is closing, and a gesture left open holds the DAW's
+        parameter in touch mode until the project is closed. */
+    void endAllUiGestures()
+    {
+        for (const auto& id : std::vector<juce::String> (uiGestures.begin(), uiGestures.end()))
+            endUiGesture (id);
     }
 
     // The processor owns the MIDI engine so it survives the editor window closing. The editor's
@@ -557,6 +651,9 @@ public:
 
 private:
 #if CEDITOR_VALUE_LAYER
+    // Parameters the page holds a press on (beginUiGesture .. endUiGesture). Message thread only.
+    std::set<juce::String> uiGestures;
+
     // Window-closed automation -> MIDI. While the editor is open the WebView/JS sends (and we skip,
     // to avoid double-sends); when it closes we re-send current values then stream changes.
    #if CEDITOR_SCRIPTING
@@ -583,7 +680,9 @@ private:
         auto settingsJson = juce::JSON::toString (settingsToVar (scriptSettings));
         auto localJson = juce::JSON::toString (localSettingsForState());
         const juce::SpinLock::ScopedLockType lock (scriptStateLock);
-        cachedScriptStateJson = std::move (stateJson);
+        // With the window open the page's scripts are the running ones; their state stands.
+        if (! pageOwnsScriptState)
+            cachedScriptStateJson = std::move (stateJson);
         cachedScriptSettingsJson = std::move (settingsJson);
         cachedScriptLocalJson = std::move (localJson);
     }
@@ -613,7 +712,19 @@ private:
         if (hasSettings) settingsFromVar (scriptSettings, juce::JSON::parse (settingsJson));
         if (hasLocal)    localSettingsFromState (juce::JSON::parse (localJson));
         if (hasState)
-            scriptRuntime->onDawRestoreState (juce::JSON::parse (stateJson));
+        {
+            const auto state = juce::JSON::parse (stateJson);
+            scriptRuntime->onDawRestoreState (state);
+            // The window is open: its scripts are the ones running, so they are told as well, and
+            // until they answer, the restored state is what a save would write.
+            if (pageOwnsScriptState)
+            {
+                const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+                cachedScriptStateJson = stateJson;
+            }
+            if (onDawRestoreForPage != nullptr)
+                onDawRestoreForPage (state);
+        }
         refreshScriptStateCache();
     }
 
@@ -675,14 +786,34 @@ private:
     void timerCallback() override
     {
         applyStagedRestore();
+        servicePendingDawState();   // before any value is read, so automation lands where it was written
         const bool windowOpen = getActiveEditor() != nullptr;
+        const bool loading = loadPending.exchange (false);
+        juce::ignoreUnused (loading);
        #if CEDITOR_SCRIPTING
         servicePendingScriptRestore();
         if (scriptRuntime != nullptr)
         {
             // GUI lifecycle edges: scripts keep running window-closed; these fire only on open/close.
             if (windowOpen && ! scriptWindowWasOpen)      { scriptRuntime->onPanelReady (! scriptReadyFired); scriptReadyFired = true; }
-            else if (! windowOpen && scriptWindowWasOpen) { scriptRuntime->onPanelClose(); installScriptDeviceCallback(); } // PlayerHost nulled it on close — reclaim
+            else if (! windowOpen && scriptWindowWasOpen)
+            {
+               #if CEDITOR_VALUE_LAYER
+                // The page's scripts ran while the window was open; the window-shut engines carry on
+                // from what they last saved, rather than from where they stopped when it opened.
+                if (pageOwnsScriptState)
+                {
+                    pageOwnsScriptState = false;
+                    scriptRuntime->onDawRestoreState (scriptDawStateForPage());
+                    refreshScriptStateCache();
+                }
+               #endif
+                scriptRuntime->onPanelClose();
+                installScriptDeviceCallback();   // PlayerHost nulled it on close — reclaim
+                // The window's panel may have closed the OSC port, or moved it, as it went: the
+                // bindings listen again on this instance's port, and name their targets again.
+                listenForOscBindings (oscPortInUse.load());
+            }
             scriptWindowWasOpen = windowOpen;
             // A host can construct and destroy an editor to query it between timer ticks.
             // PlayerHost then clears the callback without an observable open/close edge.
@@ -690,6 +821,10 @@ private:
         }
         if (scriptStateDirty.exchange (false))
             refreshScriptStateCache();
+        // A project's OSC port, once the scripts are up: listen there again.
+        if (scriptRuntime != nullptr)
+            if (const auto oscPort = oscPortRestored.exchange (0); oscPort > 0 && oscPort != oscPortInUse.load())
+                listenForOscBindings (oscPort);
        #endif
         // The service's existing callback routes to the WebView while open and to the native
         // script runtime while closed. Use that same path for DAW input and device input.
@@ -710,6 +845,18 @@ private:
             // parameter on close, which pushed a reopened project at the synth after the user had
             // answered "Not now" or "Never" — the restore decision is the only thing that may do that.
             rebaselineSentMidi();
+           #if CEDITOR_SCRIPTING
+            // The window's scripts heard what moved while it was open; the window-shut ones take the
+            // values as they are now, rather than hearing them again as the DAW's.
+            for (const auto& desc : panelParams)
+                if (auto* raw = apvts.getRawParameterValue (desc.id))
+                {
+                    lastScriptValue[desc.id] = raw->load();
+                    if (desc.path.isNotEmpty()) scriptValues.setValue (desc.path, raw->load());
+                }
+            for (int slot = 1; slot <= spareCount; ++slot)
+                if (auto* spare = spareParameter (slot)) lastSpareValue[slot] = spare->position();
+           #endif
             wasWindowOpen = false;
         }
         for (const auto& desc : panelParams)
@@ -737,10 +884,13 @@ private:
         if (scriptRuntime != nullptr)
             scriptRuntime->tickAnimations ((double) juce::Time::getMillisecondCounterHiRes());
         dispatchScriptTimeEvents();
-        // Window-closed value events: when a bound parameter changes (DAW automation), update the
-        // mirror and dispatch onValueChanged so scripts react with the GUI closed (window-open the JS
-        // runtime does this). Change-detected so it fires once per move, not every tick.
+        // Window-closed value events: when a parameter changes, update the mirror and raise the value
+        // events the window raises, with origin() saying who moved it: "host" for the DAW, which
+        // also raises automationIn, and "load" for a project's values arriving. The panel's own
+        // change (a script's set(), a hand while the window was open) is not news, and used to come
+        // back here as if the DAW had made it. Change-detected, so once per move, not every tick.
         if (scriptRuntime != nullptr)
+        {
             for (const auto& desc : panelParams)
             {
                 if (desc.path.isEmpty()) continue;
@@ -751,10 +901,661 @@ private:
                 if (it != lastScriptValue.end() && it->second == v) continue;
                 lastScriptValue[desc.id] = v;
                 scriptValues.setValue (desc.path, v);
-                scriptRuntime->dispatchEvent ("onValueChanged", desc.path.upToFirstOccurrenceOf (".", false, false), juce::var (v));
+                if (! loading && valueIsOwn (desc.id, v)) continue;
+                followSpare (desc.path);
+                dispatchValueEvents (desc.path, juce::var (v), loading ? "load" : "host", desc.id);
             }
+            for (int slot = 1; slot <= spareCount; ++slot)
+            {
+                auto* spare = spareParameter (slot);
+                if (spare == nullptr) continue;
+                const float v = spare->position();
+                const auto it = lastSpareValue.find (slot);
+                if (it != lastSpareValue.end() && it->second == v) continue;
+                lastSpareValue[slot] = v;
+                if (! loading && valueIsOwn (spare->paramID, v)) continue;
+                spareMovedByHost (slot, v, loading ? "load" : "host");
+            }
+        }
        #endif
     }
+
+    // --- ce.daw (docs/design/ce-daw-module.md) ---------------------------------------------------
+    //
+    // What a script sees of the DAW, and the changes it may make to what the DAW sees. Everything
+    // here is the message thread's except what the host reads from its own threads: the names
+    // (the parameters hold them behind a lock of their own), and the saved picture of names and
+    // assignments (dawStateJson, behind dawStateLock).
+
+    std::atomic<double> hostSampleRate { 0.0 };
+    std::atomic<int> hostBlockSize { 0 };
+    int spareCount = 0;
+    std::map<juce::String, float> ownValue;          // id -> the value the panel itself last set it to
+    std::set<juce::String> scriptGestures;           // ids a window-shut script holds a gesture on
+    std::set<juce::String> pageScriptGestures;       // ids a script in the window holds one on
+    std::map<juce::String, juce::String> dawNames;   // id -> the name a script gave it
+    struct SpareAssignment { juce::String path, name; ce::SpareDisplay display; };
+    std::map<int, SpareAssignment> spareAssignments; // slot -> the control on it
+    std::map<int, float> lastSpareValue;
+    juce::SpinLock dawStateLock;
+    juce::String dawStateJson;                       // names and assignments as a save writes them
+    juce::String pendingDawStateJson;                // as a load read them, until the timer applies them
+    std::atomic<bool> dawStateRestorePending { false };
+    std::atomic<bool> loadPending { false };         // a project's values are arriving: origin "load"
+
+    static juce::String controlPath (const juce::String& path)
+    {
+        return path.containsChar ('.') ? path : path + ".value";
+    }
+
+    static juce::String controlNameOf (const juce::String& path)
+    {
+        return path.upToFirstOccurrenceOf (".", false, false);
+    }
+
+    const ce::PanelParameter* descForPath (const juce::String& path) const
+    {
+        const auto wanted = controlPath (path);
+        for (const auto& desc : panelParams)
+            if (desc.path == wanted) return &desc;
+        return nullptr;
+    }
+
+    ce::SpareParameter* spareParameter (int slot) const
+    {
+        return dynamic_cast<ce::SpareParameter*> (apvts.getParameter ("spare" + juce::String (slot)));
+    }
+
+    /** "vst3", "clap", "lv2", "au" or "standalone". The CLAP wrapper leaves JUCE's wrapper type
+        undefined (clap-juce-extensions' README says so), and is the only one here that does. */
+    juce::String pluginFormat() const
+    {
+        switch (wrapperType)
+        {
+            case wrapperType_VST3:        return "vst3";
+            case wrapperType_LV2:         return "lv2";
+            case wrapperType_AudioUnit:
+            case wrapperType_AudioUnitv3: return "au";
+            case wrapperType_Standalone:  return "standalone";
+            case wrapperType_Undefined:   return "clap";
+            default:                      return "other";
+        }
+    }
+
+    juce::var dawHostInfo() const
+    {
+        auto* o = new juce::DynamicObject();
+        const juce::String name (juce::PluginHostType().getHostDescription());
+        o->setProperty ("name", name.isEmpty() ? juce::String ("Unknown") : name);
+        o->setProperty ("format", pluginFormat());
+        if (const auto rate = hostSampleRate.load(); rate > 0.0) o->setProperty ("sampleRate", rate);
+        if (const auto block = hostBlockSize.load(); block > 0) o->setProperty ("blockSize", block);
+        o->setProperty ("editorOpen", getActiveEditor() != nullptr);
+        return juce::var (o);
+    }
+
+    juce::var dawParameterEntry (const ce::PanelParameter& desc) const
+    {
+        auto* o = new juce::DynamicObject();
+        auto* parameter = apvts.getParameter (desc.id);
+        o->setProperty ("id", desc.id);
+        o->setProperty ("name", parameter != nullptr ? parameter->getName (1024) : desc.label);
+        o->setProperty ("path", desc.path);
+        o->setProperty ("control", controlNameOf (desc.path));
+        o->setProperty ("min", desc.min);
+        o->setProperty ("max", desc.max);
+        o->setProperty ("default", desc.defaultValue);
+        o->setProperty ("unit", desc.unit);
+        o->setProperty ("kind", desc.valueKind);
+        if (desc.valueKind == "choice")
+        {
+            juce::Array<juce::var> choices;
+            for (const auto& c : desc.choiceLabels) choices.add (c);
+            o->setProperty ("choices", choices);
+        }
+        if (desc.group.isNotEmpty()) o->setProperty ("group", desc.group);
+        // The value as get() gives it, in the control's own terms; the parameter's when no script
+        // model is built in.
+       #if CEDITOR_SCRIPTING
+        if (const auto value = scriptValues.getValue (desc.path); ! value.isVoid()) o->setProperty ("value", value);
+        else
+       #endif
+        if (auto* raw = apvts.getRawParameterValue (desc.id)) o->setProperty ("value", raw->load());
+        return juce::var (o);
+    }
+
+    juce::var dawSpareEntry (int slot) const
+    {
+        auto* o = new juce::DynamicObject();
+        auto* spare = spareParameter (slot);
+        o->setProperty ("id", "spare" + juce::String (slot));
+        o->setProperty ("name", spare != nullptr ? spare->getName (1024) : "Spare " + juce::String (slot));
+        o->setProperty ("slot", slot);
+        const auto it = spareAssignments.find (slot);
+        const auto raw = spare != nullptr ? spare->position() : 0.0f;
+        if (it == spareAssignments.end())
+        {
+            o->setProperty ("min", 0.0); o->setProperty ("max", 1.0); o->setProperty ("default", 0.0);
+            o->setProperty ("unit", ""); o->setProperty ("kind", "float"); o->setProperty ("value", raw);
+            return juce::var (o);
+        }
+        const auto& d = it->second.display;
+        o->setProperty ("path", it->second.path);
+        o->setProperty ("control", controlNameOf (it->second.path));
+        o->setProperty ("min", d.min); o->setProperty ("max", d.max); o->setProperty ("default", d.min);
+        o->setProperty ("unit", d.unit);
+        o->setProperty ("kind", d.choices.isEmpty() ? "float" : "choice");
+        if (! d.choices.isEmpty())
+        {
+            juce::Array<juce::var> choices;
+            for (const auto& c : d.choices) choices.add (c);
+            o->setProperty ("choices", choices);
+        }
+        o->setProperty ("value", ce::SpareParameter::controlValueAt (d, raw));
+        return juce::var (o);
+    }
+
+    juce::var dawParameterList() const
+    {
+        juce::Array<juce::var> list;
+        for (const auto& desc : panelParams) list.add (dawParameterEntry (desc));
+        for (int slot = 1; slot <= spareCount; ++slot) list.add (dawSpareEntry (slot));
+        return list;
+    }
+
+    juce::var dawProgramInfo() const
+    {
+        const auto* program = ce::programForIndex (programBank, currentProgram);
+        if (program == nullptr) return {};
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("index", currentProgram);
+        o->setProperty ("number", currentProgram + 1);
+        o->setProperty ("name", program->name);
+        o->setProperty ("count", programBank.size());
+        return juce::var (o);
+    }
+
+    juce::var dawProgramList() const
+    {
+        juce::Array<juce::var> list;
+        for (int i = 0; i < programBank.size(); ++i)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("index", i);
+            o->setProperty ("number", i + 1);
+            o->setProperty ("name", programBank.programs.getReference (i).name);
+            list.add (juce::var (o));
+        }
+        return list;
+    }
+
+    /** Everything the window's ce.daw reads, in one push (PlayerHost::pushDawInfo). */
+    juce::var dawInfoForPage() const
+    {
+        auto* o = new juce::DynamicObject();
+        o->setProperty ("host", dawHostInfo());
+        o->setProperty ("parameters", dawParameterList());
+        o->setProperty ("program", dawProgramInfo());
+        o->setProperty ("programs", dawProgramList());
+        o->setProperty ("spares", spareCount);
+        return juce::var (o);
+    }
+
+    void dawInfoChanged()
+    {
+        if (onDawInfoChanged != nullptr) onDawInfoChanged();
+    }
+
+    bool dawBeginGesture (const juce::String& path, bool page)
+    {
+        const auto* desc = descForPath (path);
+        if (desc == nullptr) return false;
+        auto* parameter = apvts.getParameter (desc->id);
+        if (parameter == nullptr || scriptGestures.count (desc->id) > 0 || pageScriptGestures.count (desc->id) > 0)
+            return false;
+        (page ? pageScriptGestures : scriptGestures).insert (desc->id);
+        // A hand already holding it holds the DAW's gesture: the script's joins it rather than
+        // beginning a second one inside it.
+        if (uiGestures.count (desc->id) == 0) parameter->beginChangeGesture();
+        return true;
+    }
+
+    bool dawEndGesture (const juce::String& path, bool page)
+    {
+        const auto* desc = descForPath (path);
+        if (desc == nullptr) return false;
+        if ((page ? pageScriptGestures : scriptGestures).erase (desc->id) == 0) return false;
+        if (uiGestures.count (desc->id) == 0)
+            if (auto* parameter = apvts.getParameter (desc->id))
+                parameter->endChangeGesture();
+        return true;
+    }
+
+    /** Every gesture a script left open is closed: its scripts are going, or its window is. */
+    void endScriptGestures (bool page, const juce::String& why)
+    {
+        auto& open = page ? pageScriptGestures : scriptGestures;
+        for (const auto& id : std::vector<juce::String> (open.begin(), open.end()))
+        {
+            open.erase (id);
+            if (uiGestures.count (id) == 0)
+                if (auto* parameter = apvts.getParameter (id))
+                    parameter->endChangeGesture();
+            scriptLogLine ("[ce.daw] the gesture on \"" + id + "\" was still open when " + why + ", so it was ended.");
+        }
+    }
+
+    bool dawRename (const juce::String& path, const juce::String& name)
+    {
+        const auto* desc = descForPath (path);
+        if (desc == nullptr) return false;
+        if (! ce::renameParameter (apvts.getParameter (desc->id), name)) return false;
+        if (name.isEmpty()) dawNames.erase (desc->id); else dawNames[desc->id] = name;
+        saveDawState();
+        updateHostDisplay (ChangeDetails().withParameterInfoChanged (true));
+        dawInfoChanged();
+        return true;
+    }
+
+    /** How the control at `path` is shown on a spare: the exported parameter's range and texts
+        when it is one, else its own range. False for a control with nothing to show. */
+    bool spareDisplayFor (const juce::String& path, ce::SpareDisplay& d) const
+    {
+        d = {};
+        if (const auto* desc = descForPath (path))
+        {
+            d.assigned = true; d.min = desc->min; d.max = desc->max; d.unit = desc->unit;
+            if (desc->valueKind == "choice") d.choices = desc->choiceLabels;
+            return true;
+        }
+       #if CEDITOR_SCRIPTING
+        const auto control = scriptValues.controlByName (controlNameOf (path));
+        double lo = 0.0, hi = 0.0;
+        if (! control.isObject() || ! ceditor::PanelValueModel::rangeOf (control, lo, hi)) return false;
+        d.assigned = true; d.min = (float) lo; d.max = (float) hi;
+        const auto behavior = ceditor::PanelValueModel::readChildValue (control, "Behavior");
+        const auto unit = behavior.getProperty ("unit", juce::var());
+        if (unit.isString()) d.unit = unit.toString();
+        return true;
+       #else
+        return false;
+       #endif
+    }
+
+    /** Put `path` on spare `slot` (empty empties it). `display` is the window's reading of the
+        control when the window asked; the window-shut engines leave it void and it is worked out
+        here. */
+    bool dawAssign (int slot, const juce::String& pathIn, const juce::String& name, const juce::var& display)
+    {
+        auto* spare = spareParameter (slot);
+        if (spare == nullptr) return false;
+        if (pathIn.isEmpty())
+        {
+            spareAssignments.erase (slot);
+            spare->setDisplay ({});
+            spare->setNameOverride ({});
+        }
+        else
+        {
+            const auto path = controlPath (pathIn);
+            ce::SpareDisplay d;
+            if (auto* given = display.getDynamicObject())
+            {
+                d.assigned = true;
+                d.min = (float) (double) given->getProperty ("min");
+                d.max = (float) (double) given->getProperty ("max");
+                d.unit = given->getProperty ("unit").toString();
+                if (auto* choices = given->getProperty ("choices").getArray())
+                    for (const auto& c : *choices) d.choices.add (c.toString());
+                if (d.max <= d.min) return false;
+            }
+            else if (! spareDisplayFor (path, d)) return false;
+            // A control is on one slot at a time: assigning it again moves it.
+            for (auto it = spareAssignments.begin(); it != spareAssignments.end();)
+            {
+                if (it->first != slot && it->second.path == path)
+                {
+                    if (auto* other = spareParameter (it->first)) { other->setDisplay ({}); other->setNameOverride ({}); }
+                    it = spareAssignments.erase (it);
+                }
+                else ++it;
+            }
+            spareAssignments[slot] = { path, name, d };
+            spare->setDisplay (d);
+            spare->setNameOverride (name.isNotEmpty() ? name : controlNameOf (path));
+            followSpare (path);
+        }
+        saveDawState();
+        updateHostDisplay (ChangeDetails().withParameterInfoChanged (true));
+        dawInfoChanged();
+        return true;
+    }
+
+    /** The control on a spare moved, not by the spare: the spare follows, so the DAW shows it. */
+    void followSpare (const juce::String& pathIn)
+    {
+       #if CEDITOR_SCRIPTING
+        const auto path = controlPath (pathIn);
+        for (const auto& [slot, a] : spareAssignments)
+        {
+            if (a.path != path) continue;
+            auto* spare = spareParameter (slot);
+            if (spare == nullptr || a.display.max <= a.display.min) continue;
+            const auto value = scriptValues.getValue (path);
+            if (value.isVoid()) continue;
+            const auto at = juce::jlimit (0.0f, 1.0f, ((float) (double) value - a.display.min) / (a.display.max - a.display.min));
+            if (std::abs (spare->position() - at) < 1.0e-6f) continue;
+            spare->setValueNotifyingHost (at);
+            ownValue[spare->paramID] = spare->position();
+            lastSpareValue[slot] = spare->position();
+        }
+       #else
+        juce::ignoreUnused (pathIn);
+       #endif
+    }
+
+    bool dawMarkChanged()
+    {
+        updateHostDisplay (ChangeDetails().withNonParameterStateChanged (true));
+       #if CEDITOR_SCRIPTING
+        scriptStateDirty.store (true);   // onDawSaveState on the next tick, ready when the DAW asks
+       #endif
+        return true;
+    }
+
+    /** One ce.daw question or change, from a window-shut script ("daw" device query) or from the
+        window's (`page`). */
+    juce::var dawQuery (const juce::var& q, bool page)
+    {
+        const auto op = q.getProperty ("op", "").toString();
+        const auto path = q.getProperty ("path", "").toString();
+        if (op == "host") return dawHostInfo();
+        if (op == "parameters") return dawParameterList();
+        if (op == "program") return dawProgramInfo();
+        if (op == "programs") return dawProgramList();
+        if (op == "beginGesture") return dawBeginGesture (path, page);
+        if (op == "endGesture") return dawEndGesture (path, page);
+        if (op == "rename") return dawRename (path, q.getProperty ("name", "").toString());
+        if (op == "assign")
+            return dawAssign ((int) q.getProperty ("slot", 0), path, q.getProperty ("name", "").toString(),
+                              q.getProperty ("display", juce::var()));
+        if (op == "markChanged") return dawMarkChanged();
+        return {};
+    }
+
+    /** The names and assignments as a save writes them. Rebuilt on the message thread after each
+        change; getStateInformation, on any thread, takes the text. */
+    void saveDawState()
+    {
+        auto* names = new juce::DynamicObject();
+        for (const auto& [id, name] : dawNames) names->setProperty (id, name);
+        juce::Array<juce::var> spares;
+        for (const auto& [slot, a] : spareAssignments)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("slot", slot);
+            o->setProperty ("path", a.path);
+            if (a.name.isNotEmpty()) o->setProperty ("name", a.name);
+            o->setProperty ("min", a.display.min);
+            o->setProperty ("max", a.display.max);
+            if (a.display.unit.isNotEmpty()) o->setProperty ("unit", a.display.unit);
+            if (! a.display.choices.isEmpty())
+            {
+                juce::Array<juce::var> choices;
+                for (const auto& c : a.display.choices) choices.add (c);
+                o->setProperty ("choices", choices);
+            }
+            spares.add (juce::var (o));
+        }
+        juce::String json;
+        if (! dawNames.empty() || ! spares.isEmpty())
+        {
+            auto* state = new juce::DynamicObject();
+            state->setProperty ("names", juce::var (names));
+            state->setProperty ("spares", spares);
+            json = juce::JSON::toString (juce::var (state), true);
+        }
+        else delete names;
+        const juce::SpinLock::ScopedLockType lock (dawStateLock);
+        dawStateJson = json;
+    }
+
+    /** A project's names and assignments, on the message thread, before any of its automation is
+        read: the timer applies them first on the tick after the load. */
+    void servicePendingDawState()
+    {
+        if (! dawStateRestorePending.exchange (false)) return;
+        juce::String json;
+        {
+            const juce::SpinLock::ScopedLockType lock (dawStateLock);
+            json = pendingDawStateJson;
+        }
+        for (const auto& [id, name] : dawNames) ce::renameParameter (apvts.getParameter (id), {});
+        dawNames.clear();
+        for (const auto& [slot, a] : spareAssignments)
+            if (auto* spare = spareParameter (slot)) { spare->setDisplay ({}); spare->setNameOverride ({}); }
+        spareAssignments.clear();
+        const auto state = juce::JSON::parse (json);
+        if (auto* names = state.getProperty ("names", juce::var()).getDynamicObject())
+            for (const auto& entry : names->getProperties())
+                if (ce::renameParameter (apvts.getParameter (entry.name.toString()), entry.value.toString()))
+                    dawNames[entry.name.toString()] = entry.value.toString();
+        if (auto* spares = state.getProperty ("spares", juce::var()).getArray())
+            for (const auto& s : *spares)
+            {
+                // Not dawAssign's followSpare: the spare's value is the project's, restored with it.
+                const auto slot = (int) s.getProperty ("slot", 0);
+                auto* spare = spareParameter (slot);
+                if (spare == nullptr) continue;
+                ce::SpareDisplay d;
+                d.assigned = true;
+                d.min = (float) (double) s.getProperty ("min", 0.0);
+                d.max = (float) (double) s.getProperty ("max", 1.0);
+                d.unit = s.getProperty ("unit", "").toString();
+                if (auto* choices = s.getProperty ("choices", juce::var()).getArray())
+                    for (const auto& c : *choices) d.choices.add (c.toString());
+                if (d.max <= d.min) continue;
+                const auto name = s.getProperty ("name", "").toString();
+                const auto path = s.getProperty ("path", "").toString();
+                spareAssignments[slot] = { path, name, d };
+                spare->setDisplay (d);
+                spare->setNameOverride (name.isNotEmpty() ? name : controlNameOf (path));
+                lastSpareValue[slot] = spare->position();
+            }
+        saveDawState();
+        updateHostDisplay (ChangeDetails().withParameterInfoChanged (true));
+        dawInfoChanged();
+    }
+
+   #if CEDITOR_SCRIPTING
+    /** The value events for a control a change reached, as the window raises them, with origin()
+        saying who made it; and automationIn when it was the DAW. */
+    void dispatchValueEvents (const juce::String& path, const juce::var& value, const juce::String& origin,
+                              const juce::String& parameterId)
+    {
+        if (scriptRuntime == nullptr) return;
+        if (origin != "osc") oscFollowBinding (path, value);   // a tablet following the control sees it move
+        OriginScope scope (scriptOrigin, origin);
+        const auto control = controlNameOf (path);
+        scriptRuntime->dispatchEvent ("onValueChange", control, value);
+        auto* changed = new juce::DynamicObject();
+        changed->setProperty ("target", control);
+        changed->setProperty ("value", value);
+        scriptRuntime->dispatchEvent ("onControlChanged", "", juce::var (changed));
+        scriptRuntime->dispatchEvent ("onValueChanged", control, value);
+        if (origin != "host") return;
+        auto* move = new juce::DynamicObject();
+        move->setProperty ("control", control);
+        move->setProperty ("path", path);
+        move->setProperty ("value", value);
+        move->setProperty ("id", parameterId);
+        scriptRuntime->dispatchEvent ("onAutomationIn", "", juce::var (move));
+    }
+
+    /** The DAW moved a spare: its control moves, and the control's own parameter with it. */
+    void spareMovedByHost (int slot, float at, const juce::String& origin)
+    {
+        const auto it = spareAssignments.find (slot);
+        if (it == spareAssignments.end()) return;
+        const auto& a = it->second;
+        const auto value = ce::SpareParameter::controlValueAt (a.display, at);
+        scriptValues.setValue (a.path, value);
+        const auto bound = scriptBoundParamByPath.find (a.path);
+        if (bound != scriptBoundParamByPath.end())
+            if (auto* parameter = apvts.getParameter (bound->second))
+            {
+                parameter->setValueNotifyingHost (parameter->convertTo0to1 (value));
+                if (auto* raw = apvts.getRawParameterValue (bound->second))
+                {
+                    ownValue[bound->second] = raw->load();
+                    lastScriptValue[bound->second] = raw->load();
+                }
+            }
+        dispatchValueEvents (a.path, value, origin, "spare" + juce::String (slot));
+    }
+
+    // --- OSC learn with the window shut (docs/design/ce-osc-module.md, "Panel side") ---------------
+    //
+    // The same as the panel view does with the window open (panelRuntime.js, oscBindingsHeard): a
+    // control with an oscControl binding takes the value of a message to its address, and sends its
+    // value back when anything else moves it. Read once from the panel; the port is the instance's own,
+    // kept with the project, so two instances in one project do not take turns on one port.
+    struct OscBinding
+    {
+        juce::String name, path, address, sendTo;
+        int valueIndex = 1;
+        double min = 0.0, max = 1.0;
+        bool sendBack = true;
+    };
+    std::vector<OscBinding> oscBindings;
+    std::map<juce::String, juce::var> oscLastSender;   // control name -> { host, port }
+    int oscPanelPort = 8000;
+    bool oscPanelNetwork = false;
+
+    void readOscBindings()
+    {
+        oscBindings.clear();
+        const auto settings = scriptValues.panel().getProperty ("osc", juce::var());
+        const auto port = (int) settings.getProperty ("port", 8000);
+        oscPanelPort = port >= 1024 && port <= 65535 ? port : 8000;
+        oscPanelNetwork = (bool) settings.getProperty ("network", false);
+        scriptValues.eachControl ([this] (const juce::var& control)
+        {
+            const auto bindings = ceditor::PanelValueModel::readChildValue (control, "DeviceBindings");
+            if (! (bool) bindings.getProperty ("enabled", true)) return;
+            const auto core = ceditor::PanelValueModel::readChildValue (control, "Core");
+            auto name = core.getProperty ("name", juce::var()).toString();
+            if (name.isEmpty()) name = core.getProperty ("id", "").toString();
+            if (auto* list = bindings.getProperty ("bindings", juce::var()).getArray())
+                for (const auto& b : *list)
+                {
+                    const auto address = b.getProperty ("address", "").toString();
+                    if (b.getProperty ("kind", "").toString() != "oscControl" || ! address.startsWithChar ('/')) continue;
+                    OscBinding o;
+                    o.name = name;
+                    o.path = name + ".value";
+                    o.address = address;
+                    o.sendTo = b.getProperty ("sendTo", "").toString().trim();
+                    o.valueIndex = juce::jmax (1, (int) b.getProperty ("valueIndex", 1));
+                    o.min = (double) b.getProperty ("min", 0.0);
+                    o.max = (double) b.getProperty ("max", 1.0);
+                    o.sendBack = (bool) b.getProperty ("sendBack", true);
+                    oscBindings.push_back (o);
+                }
+        });
+    }
+    std::atomic<int> oscPortInUse { 0 };      // what a save writes: this instance's port
+    std::atomic<int> oscPortRestored { 0 };   // what a load read, until the timer listens on it
+
+    /** Open the panel's port for its bindings, and name its targets. `wanted` 0: the panel's port. */
+    void listenForOscBindings (int wanted = 0)
+    {
+        if (oscBindings.empty()) return;
+        auto* q = new juce::DynamicObject();
+        q->setProperty ("op", "listen");
+        q->setProperty ("port", wanted > 0 ? wanted : oscPanelPort);
+        q->setProperty ("network", oscPanelNetwork);
+        q->setProperty ("nextFree", true);
+        q->setProperty ("panel", oscPanelKey());
+        const auto answer = deviceService.oscCommand (juce::var (q));
+        if ((bool) answer.getProperty ("ok", false) && answer.hasProperty ("port"))
+            oscPortInUse.store ((int) answer.getProperty ("port", 0));
+        else if (answer.getProperty ("why", "").toString().isNotEmpty())
+            scriptLogLine ("[osc] the panel's OSC bindings are not listening: " + answer.getProperty ("why", "").toString());
+        const auto targets = scriptValues.panel().getProperty ("osc", juce::var()).getProperty ("targets", "").toString();
+        for (const auto& line : juce::StringArray::fromLines (targets))
+        {
+            const auto name = line.upToFirstOccurrenceOf ("=", false, false).trim();
+            const auto where = line.fromFirstOccurrenceOf ("=", false, false).trim();
+            const auto colon = where.lastIndexOfChar (':');
+            if (name.isEmpty() || colon <= 0) continue;
+            auto* t = new juce::DynamicObject();
+            t->setProperty ("op", "target");
+            t->setProperty ("name", name);
+            t->setProperty ("host", where.substring (0, colon));
+            t->setProperty ("port", where.substring (colon + 1).getIntValue());
+            t->setProperty ("panel", oscPanelKey());
+            deviceService.oscCommand (juce::var (t));
+        }
+    }
+
+    /** A message for the bindings, with the window shut: each control whose address matches takes the
+        value, as a hand's move would reach the DAW and the synth, with origin() giving "osc". */
+    void oscBindingHeard (const juce::var& message)
+    {
+        const auto address = message.getProperty ("address", "").toString();
+        const auto* args = message.getProperty ("args", juce::var()).getArray();
+        if (args == nullptr) return;
+        for (const auto& b : oscBindings)
+        {
+            if (! ceditor::osc::addressMatches (b.address, address)) continue;
+            if (b.valueIndex - 1 >= args->size()) continue;
+            const auto& v = args->getReference (b.valueIndex - 1);
+            double x = 0.0;
+            if (v.isBool()) x = (bool) v ? 1.0 : 0.0;
+            else if (v.isInt() || v.isInt64() || v.isDouble()) x = (double) v;
+            else continue;
+            const auto t = b.max == b.min ? 0.0 : juce::jlimit (0.0, 1.0, (x - b.min) / (b.max - b.min));
+            const auto control = scriptValues.controlByName (b.name);
+            double lo = 0.0, hi = 0.0;
+            if (! ceditor::PanelValueModel::rangeOf (control, lo, hi)) continue;
+            oscLastSender[b.name] = message.getProperty ("from", juce::var());
+            const auto value = lo + t * (hi - lo);
+            scriptValues.setValue (b.path, value);
+            if (const auto bound = scriptBoundParamByPath.find (b.path); bound != scriptBoundParamByPath.end())
+            {
+                setParamFromUi (bound->second, (float) value);   // the DAW records it; the next tick sends its MIDI
+                if (auto* raw = apvts.getRawParameterValue (bound->second)) lastScriptValue[bound->second] = raw->load();
+            }
+            followSpare (b.path);
+            dispatchValueEvents (b.path, juce::var (value), "osc", {});
+        }
+    }
+
+    /** A control with an OSC binding moved, not by OSC: its value goes back to the address. */
+    void oscFollowBinding (const juce::String& pathIn, const juce::var& valueIn)
+    {
+        if (oscBindings.empty() || ! (valueIn.isInt() || valueIn.isInt64() || valueIn.isDouble() || valueIn.isBool())) return;
+        const auto path = controlPath (pathIn);
+        for (const auto& b : oscBindings)
+        {
+            if (b.path != path || ! b.sendBack) continue;
+            double lo = 0.0, hi = 0.0;
+            if (! ceditor::PanelValueModel::rangeOf (scriptValues.controlByName (b.name), lo, hi)) continue;
+            const auto t = juce::jlimit (0.0, 1.0, ((double) valueIn - lo) / (hi - lo));
+            const juce::var to = b.sendTo.isNotEmpty() ? juce::var (b.sendTo) : oscLastSender[b.name];
+            if (to.isVoid()) continue;   // nobody has sent to it yet, and no target is named
+            auto* q = new juce::DynamicObject();
+            q->setProperty ("op", "send");
+            q->setProperty ("to", to);
+            q->setProperty ("address", b.address.removeCharacters ("*?[]{}"));
+            q->setProperty ("args", juce::Array<juce::var> { b.min + t * (b.max - b.min) });
+            q->setProperty ("types", "f");
+            q->setProperty ("panel", oscPanelKey());
+            deviceService.oscCommand (juce::var (q));
+        }
+    }
+   #endif
 
     ce::HostMidiInputQueue hostMidiInput;
     juce::MemoryBlock hostMidiMessage;
@@ -938,6 +1739,29 @@ private:
      * weaker and honest: it tells the synth which of its own patches to load, and what is in that
      * slot today is the synth's business.
      */
+    /** The DAW chose a program and its MIDI has gone: dawProgramIn, in whichever runtime runs. */
+    void dawProgramChosen()
+    {
+        const auto program = dawProgramInfo();
+        if (! program.isObject()) return;
+        auto* o = new juce::DynamicObject();
+        for (const auto* key : { "index", "number", "name" }) o->setProperty (key, program.getProperty (key, juce::var()));
+        const juce::var payload = juce::var (o);
+        dawInfoChanged();
+        if (getActiveEditor() != nullptr)
+        {
+            if (onDawProgramForPage != nullptr) onDawProgramForPage (payload);
+            return;
+        }
+       #if CEDITOR_SCRIPTING
+        if (scriptRuntime != nullptr)
+        {
+            OriginScope scope (scriptOrigin, "host");
+            scriptRuntime->dispatchEvent ("onDawProgramIn", "", payload);
+        }
+       #endif
+    }
+
     void serviceProgramChange()
     {
         if (! programChangePending.exchange (false)) return;
@@ -956,6 +1780,7 @@ private:
             sendRawMidiBytes ("program_" + juce::String (program->slot), bytes);
             scriptLogLine ("[program] sent captured patch \"" + program->name + "\" ("
                            + juce::String (bytes.size()) + " bytes)");
+            dawProgramChosen();
             return;
         }
 
@@ -978,6 +1803,7 @@ private:
             sendRawMidiBytes ("program_recall_" + juce::String (program->slot), message.bytes);
         scriptLogLine ("[program] recalled slot " + juce::String (program->slot) + " (\"" + program->name
                        + "\", " + juce::String (recall.transaction.messages.size()) + " message(s))");
+        dawProgramChosen();
     }
 
     void serviceRestorePush (bool windowOpen)
@@ -1373,8 +2199,10 @@ private:
      * THE ONE FUNNEL every raw MIDI send leaves through, script or not.
      *
      * Queues the bytes onto the plugin's MIDI OUTPUT BUS (drained in processBlock). The DAW routes
-     * that track to the synth's hardware port — the plugin never opens a port itself; that is the
-     * standalone's job, and a plugin opening hardware ports fights the host and is not portable.
+     * that track to the synth's hardware port; this funnel opens no port itself, since a plugin
+     * opening hardware ports fights the host and is not portable. (The plug-in does open other
+     * ports: a profile-bound send reaches a mapped MIDI output, audit finding C-27, and ce.osc
+     * opens a UDP port when a script or an OSC binding asks for one.)
      * `bytes` may be a multi-message stream (an NRPN is four CCs), so it is split into messages.
      *
      * IT LIVES HERE, NOT IN THE SCRIPTING BLOCK, and that is the whole point of this shape. It used
@@ -1505,6 +2333,7 @@ private:
 
         auto bytes = hexToByteVarArray (o->getProperty ("hex").toString());
         const juce::String messageType = o->getProperty ("messageType").toString();
+        OriginScope origin (scriptOrigin, "device");
 
         // interceptMidiIn runs BEFORE any of the three events below, so a filter that transposes or
         // remaps is seen by every handler rather than by whichever one happened to be dispatched
@@ -1526,14 +2355,24 @@ private:
         mo->setProperty ("bytes", juce::var (bytes));
         mo->setProperty ("status", status);
         mo->setProperty ("channel", status != 0 ? (status & 0x0F) : 0);
-        scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
 
-        if (messageType == "cc" && bytes.size() >= 3)
+        // Decoded once, here, as the panel view's midiInDecoder.js decodes it (MidiInDecoder.h):
+        // notes with their MPE ids, bends, pressure, programs, NRPNs, RPNs and transport.
+        auto role = o->getProperty ("deviceRole").toString();
+        if (role.isEmpty()) role = "mainSynth";
+        mo->setProperty ("from", role);
+        scriptRuntime->dispatchEvent ("onMidiIn", "", juce::var (mo));
+        std::vector<int> raw;
+        for (const auto& b : bytes) raw.push_back ((int) b);
+        const auto decoded = midiInDecoder.feed (role, raw, juce::Time::getMillisecondCounterHiRes());
+
+        if (messageType == "cc" && bytes.size() >= 3 && ! decoded.ccTaken)
         {
             auto* co = new juce::DynamicObject();
             co->setProperty ("channel", ((int) bytes.getReference (0)) & 0x0F);
             co->setProperty ("cc", (int) bytes.getReference (1));
             co->setProperty ("value", (int) bytes.getReference (2));
+            co->setProperty ("from", role);
             scriptRuntime->dispatchEvent ("onCcIn", "", juce::var (co));
         }
 
@@ -1572,28 +2411,26 @@ private:
             }
         }
 
-        // Notes. Classified from the STATUS BYTE rather than from messageType, so this and the
-        // WebView (panelRuntime noteEventFor) cannot decide differently — and because only the
-        // status byte settles the case below.
-        if (bytes.size() >= 3)
-        {
-            const int kind = status & 0xF0;
-            if (kind == 0x90 || kind == 0x80)
-            {
-                auto* no = new juce::DynamicObject();
-                // 1-16, matching sendNote, so onNoteIn -> sendNote echoes correctly.
-                no->setProperty ("channel", (status & 0x0F) + 1);
-                no->setProperty ("note", (int) bytes.getReference (1));
-                no->setProperty ("velocity", (int) bytes.getReference (2));
-                // A note-on with velocity 0 IS a note-off. Devices using running status send them
-                // constantly, and a panel that treated one as a note-on would hang a voice on every
-                // key release.
-                const bool off = (kind == 0x80) || ((int) bytes.getReference (2) == 0);
-                scriptRuntime->dispatchEvent (off ? "onNoteOffIn" : "onNoteIn", "", juce::var (no));
-            }
-        }
+        for (const auto& e : decoded.events) scriptRuntime->dispatchEvent (e.name, "", e.payload);
+        scheduleMidiInFlush();
     }
 
+    /** The thinned events whose time has come (a bend, pressure or expression that waited its 10 ms,
+        an NRPN's coarse half that waited 5 ms for its fine half), and the next wait. */
+    void flushMidiIn()
+    {
+        midiInFlushTimer.stopTimer();
+        if (scriptRuntime != nullptr && getActiveEditor() == nullptr)
+            for (const auto& e : midiInDecoder.flush (juce::Time::getMillisecondCounterHiRes()))
+                scriptRuntime->dispatchEvent (e.name, "", e.payload);
+        scheduleMidiInFlush();
+    }
+
+    void scheduleMidiInFlush()
+    {
+        if (const auto due = midiInDecoder.nextDue())
+            midiInFlushTimer.startTimer (juce::jmax (1, (int) std::ceil (*due - juce::Time::getMillisecondCounterHiRes())));
+    }
 
     void installScriptDeviceCallback()
     {
@@ -1620,6 +2457,24 @@ private:
                 const auto declared = scriptRuntime->matchDeviceDump (role, juce::var (bytes));
                 if (auto* d = declared.getDynamicObject())
                     dispatchDumpReceived (d->getProperty ("values"), d->getProperty ("kind").toString(), role);
+                return;
+            }
+
+            // ce.ci: a device's answers go to the prelude's waiters; who answered, left or turned a
+            // profile on or off is an event any script can handle.
+            if (name == "ciReply") { scriptRuntime->dispatchEvent ("__ciReply", "", payload); return; }
+            if (name == "ciDiscovered") { scriptRuntime->dispatchEvent ("onCiDiscovered", "", payload); return; }
+            if (name == "ciDeviceRemoved") { scriptRuntime->dispatchEvent ("onCiDeviceRemoved", "", payload); return; }
+            if (name == "ciProfileChanged") { scriptRuntime->dispatchEvent ("onCiProfileChanged", "", payload); return; }
+
+            // ce.osc: a message arrived. Each script's patterns hear it (__oscIn), then onOscIn, with
+            // origin() giving "osc".
+            if (name == "oscMessage")
+            {
+                oscBindingHeard (payload);   // OSC learn: the controls bound to its address move first
+                OriginScope origin (scriptOrigin, "osc");
+                scriptRuntime->dispatchEvent ("__oscIn", "", payload);
+                scriptRuntime->dispatchEvent ("onOscIn", "", payload);
                 return;
             }
 
@@ -1651,6 +2506,7 @@ private:
 
         // Inbound: set()s inside these handlers are silent by default.
         ceditor::scripting::InboundScope inbound (*scriptRuntime);
+        OriginScope origin (scriptOrigin, "device");
 
         // onDumpReceived({ values, kind, role }).
         auto* sp = new juce::DynamicObject();
@@ -1730,6 +2586,8 @@ private:
                             parameterValue = parameter->convertFrom0to1 (
                                 juce::jlimit (0.0f, 1.0f, parameterValue));
                     setParamFromUi (it->second, parameterValue);
+                    // Taken as seen: a script's set() is never raised back to it as the DAW's move.
+                    if (auto* raw = apvts.getRawParameterValue (it->second)) lastScriptValue[it->second] = raw->load();
                 }
             }
            #else
@@ -1743,6 +2601,13 @@ private:
                 scriptLogLine ("[script] set(\"" + path + "\"): nothing was written — that path does "
                                "not lead anywhere on this panel. A state patch key like "
                                "\"Background.Fill.colour\" is ONE map key rather than three path steps.");
+           #if CEDITOR_VALUE_LAYER
+            else
+            {
+                if (transmit) followSpare (path);   // a control on a spare parameter: the DAW sees it move
+                oscFollowBinding (path, scriptValues.getValue (controlPath (path)));   // and a tablet following it
+            }
+           #endif
         };
         // Only a control bound to a host parameter sends anything window-closed (setValue above), so
         // only a write to one spends the flood budget.
@@ -2264,6 +3129,88 @@ private:
                 return {};
             }
 
+            // ce.ci: one MIDI-CI command for the device layer's session (DeviceProfileService::ciCommand).
+            // Answers at once; what the device says comes later as the "__ciReply" event.
+            if (kind == "ci") return deviceService.ciCommand (payload);
+
+            // ce.osc: the panel's OSC transport, kept with the device layer (Osc/OscService.h). The
+            // user's yes for the network is kept per panel, so the panel is named here.
+            if (kind == "osc")
+            {
+                juce::var q = payload.isObject() ? payload : juce::var (new juce::DynamicObject());
+                if (auto* o = q.getDynamicObject()) o->setProperty ("panel", oscPanelKey());
+                return deviceService.oscCommand (q);
+            }
+
+           #if CEDITOR_VALUE_LAYER
+            // ce.daw: what the DAW is and sees, and the changes a script may make to it.
+            if (kind == "daw") return dawQuery (payload, false);
+           #endif
+            // origin(): who made the change the running handler is for; nothing outside one.
+            if (kind == "origin") return scriptOrigin.isEmpty() ? juce::var() : juce::var (scriptOrigin);
+
+            // ce.mpe.listen: how the input decoder reads MPE from a role ("" for every input); no
+            // opts stops reading it. Answered here, on the thread the decoder is fed on.
+            if (kind == "mpeListen")
+            {
+                auto* p = payload.getDynamicObject();
+                if (p == nullptr) return false;
+                midiInDecoder.listen (p->getProperty ("role").toString(), p->getProperty ("opts"));
+                return true;
+            }
+
+            // ce.patch: the profile's `patch` section, as the author wrote it (which dumps make a
+            // patch, how to store a slot). Void when the profile has none, and ce.patch works out the
+            // rest from the parameters.
+            if (kind == "patch")
+            {
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    return docObj->getProperty ("patch");
+                return {};
+            }
+
+            // ce.verify: the dumps as the profile wrote them, what asks for each, every parameter's
+            // encoding (how many payload bytes it reads) and the gap between messages, from which
+            // verifyCore.js works out which dump holds a parameter and how long a dump should be.
+            if (kind == "dumpLayout")
+            {
+                const auto doc = profileDocument();
+                auto* docObj = doc.getDynamicObject();
+                if (docObj == nullptr) return {};
+                auto* out = new juce::DynamicObject();
+                out->setProperty ("dumps", docObj->getProperty ("dumpDefinitions"));
+                out->setProperty ("requests", docObj->getProperty ("requests"));
+                auto* encodings = new juce::DynamicObject();
+                if (auto* arr = docObj->getProperty ("parameters").getArray())
+                    for (const auto& item : *arr)
+                        if (auto* o = item.getDynamicObject())
+                            if (const auto id = o->getProperty ("id").toString(); id.isNotEmpty() && o->hasProperty ("encoding"))
+                                encodings->setProperty (juce::Identifier (id), o->getProperty ("encoding"));
+                out->setProperty ("encodings", juce::var (encodings));
+                // The effective gap, as "timing" reads it: the profile's, with the mapping's on top.
+                juce::var gap;
+                if (auto* timing = docObj->getProperty ("timing").getDynamicObject())
+                    gap = timing->getProperty ("minDelayBetweenMessagesMs");
+                if (recordObj != nullptr)
+                    if (auto* overrides = recordObj->getProperty ("timingOverrides").getDynamicObject())
+                        if (overrides->hasProperty ("minDelayBetweenMessagesMs"))
+                            gap = overrides->getProperty ("minDelayBetweenMessagesMs");
+                out->setProperty ("gapMs", gap);
+                return juce::var (out);
+            }
+
+            // ce.patch: when a patch was kept. The engines have no clock of their own that is a date.
+            // UTC in the panel view's form (toISOString), so the two sort together as text.
+            if (kind == "now")
+            {
+                const auto local = juce::Time::getCurrentTime();
+                const juce::Time utc (local.toMilliseconds() - (juce::int64) local.getUTCOffsetSeconds() * 1000);
+                return juce::String::formatted ("%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", utc.getYear(), utc.getMonth() + 1,
+                                                utc.getDayOfMonth(), utc.getHours(), utc.getMinutes(), utc.getSeconds(),
+                                                utc.getMilliseconds());
+            }
+
             // The ids of what a profile can build or ask for.
             // The dumps the profile defines, by id: what requestDump, sendDump and buildDump take
             // (BridgeScriptHost::unknownDumpKind). Void, not empty, when there is no document to
@@ -2297,6 +3244,26 @@ private:
                                 const auto dump = response != nullptr ? response->getProperty ("dump").toString()
                                                                       : o->getProperty ("expectedDump").toString();
                                 return dump.isNotEmpty() ? juce::var (dump) : juce::var();
+                            }
+                return {};
+            }
+
+            // How long requestDump(kind, fn) waits by default: every try the profile allows
+            // (timeoutMs, sent 1 + retries times by the service), and never less than the 3000 ms it
+            // always waited. A fixed 3000 ms timed out an AN1x request whose own timeout is 4000 ms.
+            // The same sum as requestWaitMs in panelRuntime.js. Void for a kind that is no request.
+            if (kind == "answerWaitMs")
+            {
+                const auto wanted = p != nullptr ? p->getProperty ("request").toString() : juce::String();
+                const auto doc = profileDocument();
+                if (auto* docObj = doc.getDynamicObject())
+                    if (auto* arr = docObj->getProperty ("requests").getArray())
+                        for (const auto& item : *arr)
+                            if (auto* o = item.getDynamicObject(); o != nullptr && o->getProperty ("id").toString() == wanted)
+                            {
+                                const auto timeoutMs = o->hasProperty ("timeoutMs") ? juce::jmax (1, (int) o->getProperty ("timeoutMs")) : 2000;
+                                const auto retries = o->hasProperty ("retries") ? juce::jmax (0, (int) o->getProperty ("retries")) : 0;
+                                return juce::var (juce::jmax (3000, timeoutMs * (1 + retries) + 500));
                             }
                 return {};
             }
@@ -2446,6 +3413,9 @@ private:
                 scriptDumpParamPaths[desc.deviceParameterId] = desc.path;
         }
         installScriptDeviceCallback();   // receive window-closed device events (PlayerHost owns it open)
+        // OSC learn: a panel whose controls follow OSC addresses listens on its port from the start.
+        readOscBindings();
+        listenForOscBindings (oscPortRestored.exchange (0));
        #endif
 
         // Third-party modules FIRST — a module that is not installed cannot be enabled, and the
@@ -2494,8 +3464,32 @@ private:
     }
 
     ceditor::PanelValueModel scriptValues;
+    /** Which panel a yes for the network is for: its name, as the window names it too (a saved panel
+        keeps no id), so the window open and shut ask once between them. */
+    juce::String oscPanelKey() const
+    {
+        const auto& doc = scriptValues.panel();
+        const auto name = doc.getProperty ("name", juce::var()).toString();
+        return name.isNotEmpty() ? name : doc.getProperty ("id", "panel").toString();
+    }
+    // origin(): who made the change the handlers dispatched now are for. Set by OriginScope around
+    // each dispatch that has a "who": the DAW, the synth, a project being opened.
+    juce::String scriptOrigin;
+    struct OriginScope
+    {
+        OriginScope (juce::String& slotIn, const juce::String& now) : slot (slotIn), previous (slotIn) { slot = now; }
+        ~OriginScope() { slot = previous; }
+        juce::String& slot;
+        juce::String previous;
+    };
     std::unique_ptr<ceditor::scripting::BridgeScriptHost> scriptHost;
     std::unique_ptr<ceditor::scripting::ScriptRuntime> scriptRuntime;
+    // The MIDI a device sends, decoded once for the window-shut scripts (Scripting/MidiInDecoder.h),
+    // and the timer that lets a thinned bend or a lone NRPN coarse half go when its time comes.
+    ceditor::scripting::MidiInDecoder midiInDecoder;
+   #if CEDITOR_VALUE_LAYER
+    juce::TimedCallback midiInFlushTimer { [this] { flushMidiIn(); } };   // flushMidiIn is the value layer's
+   #endif
     // Declared after scriptRuntime so it is destroyed FIRST (stops its juce::Timer before the
     // runtime the fire callback references goes away).
     ceditor::scripting::TimerManager scriptTimers;
@@ -2517,6 +3511,10 @@ private:
     std::atomic<bool> scriptRuntimeReady { false };
     std::atomic<bool> scriptRestorePending { false };
     std::atomic<bool> scriptStateDirty { false };
+    // True while the window's page has handed over its scripts' state (applyDawStateFromPage): the
+    // page's scripts are the ones running, so theirs is what the project saves, and the window-shut
+    // engines' must not overwrite it. Message thread only.
+    bool pageOwnsScriptState = false;
    #endif
     // …and "local" scope: this machine only, and this instance only. It is not the panel's to carry
     // — a session handed to somebody else should carry the patch, not the sender's MIDI port choice
@@ -2615,6 +3613,42 @@ public:
         return juce::var (o);
     }
 
+    /** What the instance last saved for its scripts, for the page to start from when the window
+        opens (its onDawRestoreState runs with it). */
+    juce::var scriptDawStateForPage() const
+    {
+       #if CEDITOR_VALUE_LAYER
+        juce::String json;
+        {
+            const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+            json = cachedScriptStateJson;
+        }
+        const auto parsed = juce::JSON::parse (json);
+        return parsed.isObject() ? parsed : juce::var (new juce::DynamicObject());
+       #else
+        return juce::var (new juce::DynamicObject());
+       #endif
+    }
+
+    /** What the page's onDawSaveState handlers would save now, window open. It is what the project
+        saves until the window closes, when the window-shut engines are handed it to continue from. */
+    void applyDawStateFromPage (const juce::var& state)
+    {
+       #if CEDITOR_VALUE_LAYER
+        auto json = juce::JSON::toString (state.isObject() ? state : juce::var (new juce::DynamicObject()));
+        {
+            const juce::SpinLock::ScopedLockType lock (scriptStateLock);
+            cachedScriptStateJson = std::move (json);
+        }
+        pageOwnsScriptState = true;
+       #else
+        juce::ignoreUnused (state);
+       #endif
+    }
+
+    /** A project restored while the window is open: set by the editor, so the page hears it too. */
+    std::function<void (const juce::var& state)> onDawRestoreForPage;
+
     /** A write the page made, window open: { store, key, value } or { store, key, forget: true }. */
     void applyScriptSettingFromPage (const juce::var& change)
     {
@@ -2681,8 +3715,15 @@ public:
        #if CEDITOR_VALUE_LAYER
         // UI -> host parameter: the user moved a control, so record automation.
         host.onUiParamChange = [&p] (const juce::String& id, float value) { p.setParamFromUi (id, value); };
-        // UI is ready -> force a full re-push of current parameter values on the next tick.
-        host.onResyncRequest = [this] { lastPushed.clear(); };
+        host.onUiParamGesture = [&p] (const juce::String& id, bool begin) { if (begin) p.beginUiGesture (id); else p.endUiGesture (id); };
+        // UI is ready -> force a full re-push of current parameter values on the next tick, and of
+        // what ce.daw reads.
+        host.onResyncRequest = [this, &p] { lastPushed.clear(); host.pushDawInfo (p.dawInfoNow()); };
+        // ce.daw, window open: the page's scripts read the DAW from what is pushed, and what they
+        // change comes back here.
+        p.onDawInfoChanged = [this, &p] { host.pushDawInfo (p.dawInfoNow()); };
+        p.onDawProgramForPage = [this] (const juce::var& program) { host.pushDawProgram (program); };
+        host.onDawCommand = [&p] (const juce::var& command) { p.applyDawCommandFromPage (command); };
         // Total Recall S2: the processor decides WHEN to ask, the panel is WHERE the question goes.
         // Both directions are set here rather than in PlayerHost, because the processor is the only
         // thing that outlives the window and the answer has to be remembered by something that does.
@@ -2695,6 +3736,11 @@ public:
         // them, so one store serves the window open and closed.
         host.scriptStores = [&p] { return p.scriptStoresForPage(); };
         host.onScriptSetting = [&p] (const juce::var& change) { p.applyScriptSettingFromPage (change); };
+        // The DAW-state hooks, window open: the page starts from the instance's saved state, hands
+        // back what it would save, and hears a restore that arrives while it is open.
+        host.scriptDawState = [&p] { return p.scriptDawStateForPage(); };
+        host.onScriptDawState = [&p] (const juce::var& state) { p.applyDawStateFromPage (state); };
+        p.onDawRestoreForPage = [this] (const juce::var& state) { host.pushDawRestoreToPage (state); };
        #endif
         seenSessionRestore = p.sessionRestoreGeneration();
         // host parameter -> UI: poll the (atomic) parameter values and push changes to the panel so
@@ -2713,6 +3759,15 @@ public:
         // than a theoretical one. host.onRestoreAnswer needs no such care: it lives on `host`,
         // which is a member and dies here.
         processor.onRestorePrompt = nullptr;
+        processor.onDawInfoChanged = nullptr;      // the same lambda-captures-this hazard
+        processor.onDawProgramForPage = nullptr;
+        // A gesture a script in the window began and never ended must not hold the DAW's parameter.
+        processor.endPageScriptGestures();
+       #if CEDITOR_SCRIPTING
+        processor.onDawRestoreForPage = nullptr;   // the same lambda-captures-this hazard
+       #endif
+        // A press the closing window never finished must not hold a DAW parameter in touch mode.
+        processor.endAllUiGestures();
        #endif
     }
 
@@ -2733,19 +3788,23 @@ private:
             seenSessionRestore = generation;
             host.notifySessionRestored();
         }
-        for (const auto& desc : processor.parameterDescriptors())
+        // Each value that moved, saying whether it is the DAW's (ce.daw's automationIn, origin()) or
+        // one the panel set itself; the spare parameters too, which the page maps to their controls.
+        const auto push = [this] (const juce::String& id)
         {
-            if (auto* raw = processor.parameters().getRawParameterValue (desc.id))
+            if (auto* raw = processor.parameters().getRawParameterValue (id))
             {
                 const float value = raw->load();
-                auto it = lastPushed.find (desc.id);
+                auto it = lastPushed.find (id);
                 if (it == lastPushed.end() || it->second != value)
                 {
-                    lastPushed[desc.id] = value;
-                    host.pushParamToUi (desc.id, value);
+                    lastPushed[id] = value;
+                    host.pushParamToUi (id, value, ! processor.valueIsOwn (id, value));
                 }
             }
-        }
+        };
+        for (const auto& desc : processor.parameterDescriptors()) push (desc.id);
+        for (int slot = 1; slot <= processor.spareParameterCount(); ++slot) push ("spare" + juce::String (slot));
        #endif
     }
 

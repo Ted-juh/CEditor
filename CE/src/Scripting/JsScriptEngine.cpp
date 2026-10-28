@@ -50,7 +50,7 @@ var __ceCur = {
   __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
   __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
   __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
-  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [],
+  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [], __ciWaiters: {}, __oscListeners: [],
   __globals: {}
 };
 var __CE_OWN = Object.keys(__ceCur);
@@ -1238,6 +1238,3985 @@ function hslToHex(hue, sat, light) {
   return rgbToHex(Math.round(f(0) * 255), Math.round(f(8) * 255), Math.round(f(4) * 255));
 }
 
+// BEGIN GENERATED ce.format — tools/scripts/gen-format-prelude.mjs, from formatCore.js. Do not edit by hand.
+// @module ce.format
+// A rejected argument is an error, a value past the end of a table a warning, as in the panel view.
+function __fmtSay(level, text) { if (level === "warn") logWarn(text); else logError(text); }
+var __fmt = (function () {
+// ce.format — a value as the text a person reads, and typed text back as a value.
+//
+// Design record: docs/design/ce-format-module.md. Every function here is pure and sends nothing, and
+// each has a line-for-line twin in the Lua, JavaScript and Python preludes (LuaScriptEngine.cpp,
+// JsScriptEngine.cpp, PythonScriptEngine.cpp, `@module ce.format`). The point of the module is the
+// SAME TEXT in every language, so nothing here leans on the language's own number formatting:
+// rounding is half away from zero and written out digit by digit (fixedText), and the only
+// conversions used are ones every language does identically for whole numbers below 2^53.
+// test/formatParity.test.js runs one table of inputs and expected text through all four.
+//
+// `say(level, text)` is how a command reports a rejected argument ('error') or a value past the end
+// of a table ('warn'); the runtime binds it to its console.
+
+const FORMAT_PLACEHOLDER = '--';
+
+// The note lengths division() names, in the order it tries them (the panel's own vocabulary,
+// utils/transportLayout.js DIVISIONS; a tie goes to the earlier one).
+const FORMAT_DIVISIONS = [
+  ['1/1', 4], ['1/2', 2], ['1/4', 1], ['1/8', 0.5], ['1/16', 0.25], ['1/32', 0.125],
+  ['1/2D', 3], ['1/4D', 1.5], ['1/8D', 0.75], ['1/16D', 0.375],
+  ['1/2T', 4 / 3], ['1/4T', 2 / 3], ['1/8T', 1 / 3], ['1/16T', 1 / 6],
+];
+
+// fit()'s first step: the words a synth's display shortens, and how.
+const FORMAT_ABBREVIATIONS = [
+  ['Amount', 'Amt'], ['Attack', 'Atk'], ['Balance', 'Bal'], ['Bandwidth', 'BW'], ['Channel', 'Ch'],
+  ['Chorus', 'Chor'], ['Coarse', 'Crs'], ['Control', 'Ctrl'], ['Controller', 'Ctrl'], ['Decay', 'Dcy'],
+  ['Delay', 'Dly'], ['Depth', 'Dpth'], ['Destination', 'Dest'], ['Distortion', 'Dist'], ['Effect', 'FX'],
+  ['Effects', 'FX'], ['Envelope', 'Env'], ['Feedback', 'Fdbk'], ['Frequency', 'Freq'], ['Keyboard', 'Kbd'],
+  ['Length', 'Len'], ['Level', 'Lvl'], ['Master', 'Mstr'], ['Maximum', 'Max'], ['Minimum', 'Min'],
+  ['Modulation', 'Mod'], ['Number', 'Num'], ['Octave', 'Oct'], ['Oscillator', 'Osc'], ['Parameter', 'Param'],
+  ['Pattern', 'Pat'], ['Portamento', 'Porta'], ['Position', 'Pos'], ['Pressure', 'Press'], ['Program', 'Prog'],
+  ['Random', 'Rnd'], ['Release', 'Rel'], ['Resonance', 'Reso'], ['Reverb', 'Rvb'], ['Sample', 'Smp'],
+  ['Semitone', 'Semi'], ['Sequence', 'Seq'], ['Sequencer', 'Seq'], ['Source', 'Src'], ['Sustain', 'Sus'],
+  ['Transpose', 'Trans'], ['Tremolo', 'Trem'], ['Velocity', 'Vel'], ['Vibrato', 'Vib'], ['Volume', 'Vol'],
+  ['Waveform', 'Wave'], ['Width', 'Wdth'],
+];
+
+const SHARPS = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+const FLATS = ['C', 'Db', 'D', 'Eb', 'E', 'F', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+/* ---------------------------------------------------------------- the shared arithmetic */
+
+const NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+/** A number, or text that is one ("440"), else NaN. Never a boolean. */
+function toNumber(v) {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && NUMBER_TEXT.test(v.trim())) return Number(v.trim());
+  return NaN;
+}
+
+function opt(opts, key) {
+  return opts && typeof opts === 'object' ? opts[key] : undefined;
+}
+
+function optNumber(opts, key, fallback) {
+  const v = toNumber(opt(opts, key));
+  return Number.isFinite(v) ? v : fallback;
+}
+
+function clampInt(v, lo, hi) {
+  const r = Math.floor(v + 0.5);
+  return r < lo ? lo : r > hi ? hi : r;
+}
+
+/** Half away from zero, to `d` decimals, written digit by digit. */
+function fixedText(x, d) {
+  const neg = x < 0;
+  const p = 10 ** d;
+  const r = Math.floor(Math.abs(x) * p + 0.5 + 1e-9);
+  let s = r.toFixed(0);
+  while (s.length < d + 1) s = '0' + s;
+  const body = d > 0 ? s.slice(0, s.length - d) + '.' + s.slice(s.length - d) : s;
+  return (neg && r !== 0 ? '-' : '') + body;
+}
+
+/** How many decimals `digits` significant digits of `a` (>= 0) need, 0 to 6. */
+function significantDecimals(a, digits) {
+  if (a === 0) return 0;
+  let e = Math.floor(Math.log10(a));
+  if (10 ** (e + 1) <= a) e += 1;
+  if (10 ** e > a) e -= 1;
+  const d = digits - 1 - e;
+  return d < 0 ? 0 : d > 6 ? 6 : d;
+}
+
+function stripZeros(s) {
+  if (s.indexOf('.') < 0) return s;
+  let t = s;
+  while (t.endsWith('0')) t = t.slice(0, -1);
+  if (t.endsWith('.')) t = t.slice(0, -1);
+  return t;
+}
+
+/** The number part of every command: `decimals` exactly, else `fallback` decimals, else significant digits. */
+function numberText(v, opts, fallback) {
+  const decimals = toNumber(opt(opts, 'decimals'));
+  let s;
+  if (Number.isFinite(decimals)) s = fixedText(v, clampInt(decimals, 0, 6));
+  else if (fallback !== undefined) s = fixedText(v, fallback);
+  else s = stripZeros(fixedText(v, significantDecimals(Math.abs(v), clampInt(optNumber(opts, 'digits', 3), 1, 6))));
+  if (s === '-0') s = '0';
+  if (opt(opts, 'sign') === 'always' && !s.startsWith('-') && /[1-9]/.test(s)) s = '+' + s;
+  return s;
+}
+
+function withUnit(text, unit, opts) {
+  const u = opt(opts, 'unit');
+  if (u === false) return text;
+  const name = typeof u === 'string' ? u : unit;
+  if (!name) return text;
+  const space = opt(opts, 'space') === false || (name === '%' && typeof u !== 'string') ? '' : ' ';
+  return text + space + name;
+}
+
+/** The rules every command ends with: the typographic minus when asked, and the width. */
+function finish(text, opts) {
+  let t = text;
+  if (opt(opts, 'unicode') === true && t.startsWith('-')) t = '\u2212' + t.slice(1);
+  const width = toNumber(opt(opts, 'width'));
+  if (Number.isFinite(width)) {
+    const w = clampInt(width, 0, 200);
+    while (t.length < w) t = ' ' + t;
+  }
+  return t;
+}
+
+function placeholder(opts) {
+  const p = opt(opts, 'placeholder');
+  return typeof p === 'string' ? p : FORMAT_PLACEHOLDER;
+}
+
+/* ------------------------------------------------------------------------------- units */
+
+function __formatNumber(v, opts, say) {
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  void say;
+  return finish(withUnit(numberText(n, opts), '', opts), opts);
+}
+
+function scaled(v, opts, say, verb, small, large, factor, what) {
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  if (n < 0) {
+    say('error', `ce.format.${verb}: ${what} below 0 is not one, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const scale = String(opt(opts, 'scale') ?? 'auto').toLowerCase();
+  const big = scale === large.toLowerCase() || (scale !== small.toLowerCase() && n >= factor);
+  return finish(withUnit(numberText(big ? n / factor : n, opts), big ? large : small, opts), opts);
+}
+
+function __formatHz(v, opts, say) {
+  return scaled(v, opts, say, 'hz', 'Hz', 'kHz', 1000, 'a frequency');
+}
+
+function __formatTime(ms, opts, say) {
+  return scaled(ms, opts, say, 'time', 'ms', 's', 1000, 'a duration');
+}
+
+function __formatDb(v, opts, say) {
+  void say;
+  let n = toNumber(v);
+  if (Number.isNaN(n)) return placeholder(opts);
+  if (opt(opts, 'fromGain') === true) {
+    n = n <= 0 ? -144 : 20 * Math.log10(n);
+    if (n < -144) n = -144;
+  }
+  const floor = optNumber(opts, 'floor', -144);
+  let text;
+  if (n <= floor) text = opt(opts, 'unicode') === true ? '-\u221e' : '-inf';
+  else if (n === Infinity) text = opt(opts, 'unicode') === true ? '\u221e' : 'inf';
+  else text = numberText(n, opts, 1);
+  return finish(withUnit(text, 'dB', opts), opts);
+}
+
+function __formatPercent(v, opts, say) {
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  const min = optNumber(opts, 'min', 0);
+  const max = optNumber(opts, 'max', 1);
+  if (max === min) {
+    say('error', `ce.format.percent: min and max are the same, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  return finish(withUnit(numberText(((n - min) / (max - min)) * 100, opts, 0), '%', opts), opts);
+}
+
+function __formatPan(v, opts, say) {
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  const custom = opt(opts, 'min') !== undefined || opt(opts, 'max') !== undefined;
+  const min = optNumber(opts, 'min', -1);
+  const max = optNumber(opts, 'max', 1);
+  if (max === min) {
+    say('error', `ce.format.pan: min and max are the same, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const center = optNumber(opts, 'center', (min + max) / 2);
+  const steps = optNumber(opts, 'steps', 50);
+  const amount = custom ? n - center : ((n - center) / ((max - min) / 2)) * steps;
+  const t = numberText(Math.abs(amount), { decimals: opt(opts, 'decimals') }, 0);
+  if (!/[1-9]/.test(t)) return finish('C', opts);
+  const left = amount < 0;
+  const style = String(opt(opts, 'style') ?? 'L50');
+  let text;
+  if (style === '50L') text = t + (left ? 'L' : 'R');
+  else if (style === '<50') text = (left ? '<' : '>') + t;
+  else if (style === '50>') text = t + (left ? '<' : '>');
+  else text = (left ? 'L' : 'R') + t;
+  return finish(text, opts);
+}
+
+function __formatRatio(v, opts, say) {
+  const n = toNumber(v);
+  if (Number.isNaN(n)) return placeholder(opts);
+  if (n <= 0) {
+    say('error', `ce.format.ratio: a ratio must be above 0, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const x = opt(opts, 'style') === 'x';
+  let text;
+  if (n === Infinity) text = opt(opts, 'unicode') === true ? '\u221e' : 'inf';
+  else text = numberText(n, opts, x ? 2 : undefined);
+  return finish(x ? 'x' + text : text + ':1', opts);
+}
+
+function pad2(n) {
+  const s = n.toFixed(0);
+  return s.length < 2 ? '0' + s : s;
+}
+
+function __formatClock(ms, opts, say) {
+  void say;
+  const n = toNumber(ms);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  const d = clampInt(optNumber(opts, 'decimals', 1), 0, 3);
+  const p = 10 ** d;
+  // Cut, not rounded: a clock shows the tenth that has passed, never one still to come.
+  const units = Math.floor((Math.abs(n) * p) / 1000 + 1e-9);
+  const secs = Math.floor(units / p);
+  const frac = units - secs * p;
+  const h = Math.floor(secs / 3600);
+  const m = Math.floor((secs % 3600) / 60);
+  const s = secs % 60;
+  let text = h > 0 || opt(opts, 'hours') === true
+    ? h.toFixed(0) + ':' + pad2(m) + ':' + pad2(s)
+    : m.toFixed(0) + ':' + pad2(s);
+  if (d > 0) {
+    let f = frac.toFixed(0);
+    while (f.length < d) f = '0' + f;
+    text += '.' + f;
+  }
+  return finish((n < 0 && units > 0 ? '-' : '') + text, opts);
+}
+
+/* ------------------------------------------------------------------------------- music */
+
+function __formatNote(n, opts, say) {
+  const v = toNumber(n);
+  if (!Number.isFinite(v)) return placeholder(opts);
+  const note = v < 0 ? -Math.floor(-v + 0.5) : Math.floor(v + 0.5);
+  if (note < 0 || note > 127) {
+    say('error', `ce.format.note: a MIDI note is 0 to 127, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const middleC = clampInt(optNumber(opts, 'middleC', 4), -2, 9);
+  let name = (opt(opts, 'flats') === true ? FLATS : SHARPS)[note % 12];
+  if (opt(opts, 'unicode') === true) name = name.slice(0, 1) + name.slice(1).replace('#', '\u266f').replace('b', '\u266d');
+  if (opt(opts, 'octave') === false) return finish(name, { width: opt(opts, 'width') });
+  const octave = Math.floor(note / 12) - 5 + middleC;
+  return finish(name + octave.toFixed(0), { width: opt(opts, 'width') });
+}
+
+function __formatDivision(beats, opts, say) {
+  const n = toNumber(beats);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  if (n <= 0) {
+    say('error', `ce.format.division: a length must be above 0 beats, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const tolerance = Math.min(0.5, Math.max(0, optNumber(opts, 'tolerance', 0.02)));
+  let best = null;
+  let bestError = Infinity;
+  for (const [name, b] of FORMAT_DIVISIONS) {
+    const error = Math.abs(n - b) / b;
+    if (error < bestError) { best = name; bestError = error; }
+  }
+  if (bestError <= tolerance + 1e-12) return finish(best, opts);
+  return finish(numberText(n, opts) + ' beats', opts);
+}
+
+/* --------------------------------------------------------------------- lookup tables */
+
+/** A list, or a table of `{ upTo, text }` ranges. `list` is a JS array here; the preludes take their
+    language's own list (a Lua table read from 1, a Python list). */
+function __formatTable(v, list, opts, say) {
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(opts);
+  if (!Array.isArray(list) || list.length === 0) {
+    say('error', `ce.format.table: the table must be a list of texts, or of { upTo, text } ranges, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const first = list[0];
+  if (first && typeof first === 'object' && first.upTo !== undefined) {
+    for (const entry of list) {
+      const upTo = toNumber(entry?.upTo);
+      if (Number.isFinite(upTo) && n <= upTo) return finish(asText(entry.text), opts);
+    }
+    say('warn', `ce.format.table: ${numberText(n, {})} is past the last range, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  const start = Math.floor(optNumber(opts, 'start', 0) + 0.5);
+  const index = (n < 0 ? -Math.floor(-n + 0.5) : Math.floor(n + 0.5)) - start;
+  if (index < 0 || index >= list.length) {
+    say('warn', `ce.format.table: ${numberText(n, {})} is past the end of the table, so "${placeholder(opts)}" is shown.`);
+    return placeholder(opts);
+  }
+  return finish(asText(list[index]), opts);
+}
+
+/* -------------------------------------------------------------- as the synth shows it */
+
+/** The options a command gets from a profile `display`, before the call's own (which win). */
+function describedOptions(d, kind, opts) {
+  const o = {};
+  const precision = toNumber(d.precision);
+  if (Number.isFinite(precision)) o.decimals = precision;
+  if (typeof d.unit === 'string' && d.unit !== '' && (kind === '' || kind === 'number')) o.unit = d.unit;
+  const middleC = toNumber(d.middleC);
+  if (Number.isFinite(middleC)) o.middleC = middleC;
+  if (opts && typeof opts === 'object') {
+    for (const key of Object.keys(opts)) if (key !== 'role') o[key] = opts[key];
+  }
+  return o;
+}
+
+function withOptions(base, extra) {
+  const o = {};
+  for (const key of Object.keys(base)) o[key] = base[key];
+  for (const key of Object.keys(extra)) if (o[key] === undefined) o[key] = extra[key];
+  return o;
+}
+
+/**
+ * A parameter's value as the synth's display writes it, from the parameter as the device profile
+ * describes it (`ce.device.parameter(id)`): its choices, `display.table`, `display.min`/`max` over
+ * `range`, `display.format`, `display.unit`, `display.precision`, and `display.middleC`.
+ * ce.format.parameter is this after the lookup; the panel's readouts use it for a bound control.
+ */
+function __formatDescribed(desc, v, opts, say) {
+  const p = desc && typeof desc === 'object' ? desc : {};
+  const d = p.display && typeof p.display === 'object' ? p.display : {};
+  const kind = typeof d.format === 'string' ? d.format : '';
+  const o = describedOptions(d, kind, opts);
+
+  if (d.mode === 'text' || p.type === 'text') return finish(asText(v), o);
+
+  if (Array.isArray(p.choices)) {
+    const wanted = toNumber(v);
+    for (const c of p.choices) {
+      if (!c || typeof c !== 'object') continue;
+      const value = toNumber(c.value);
+      if ((Number.isFinite(wanted) && value === wanted) || (typeof v === 'string' && c.id === v)) {
+        return finish(asText(c.label !== undefined && c.label !== null ? c.label : c.id), o);
+      }
+    }
+  }
+
+  const n = toNumber(v);
+  if (!Number.isFinite(n)) return placeholder(o);
+  const range = p.range && typeof p.range === 'object' ? p.range : {};
+  const lo = toNumber(range.min);
+  const hi = toNumber(range.max);
+  const wireMin = Number.isFinite(lo) ? lo : 0;
+  const wireMax = Number.isFinite(hi) ? hi : 127;
+
+  // A list's first entry is for the lowest stored value, as a synth's manual lists them.
+  if (Array.isArray(d.table) && d.table.length > 0) return __formatTable(n, d.table, withOptions(o, { start: wireMin }), say);
+
+  const dmin = toNumber(d.min);
+  const dmax = toNumber(d.max);
+  const scaled = Number.isFinite(dmin) && Number.isFinite(dmax) && wireMax !== wireMin;
+  const shown = scaled ? dmin + ((n - wireMin) / (wireMax - wireMin)) * (dmax - dmin) : n;
+
+  if (kind === 'hz') return __formatHz(shown, o, say);
+  if (kind === 'time') return __formatTime(shown, o, say);
+  if (kind === 'db') return __formatDb(shown, o, say);
+  if (kind === 'ratio') return __formatRatio(shown, o, say);
+  if (kind === 'note') return __formatNote(shown, o, say);
+  if (kind === 'division') return __formatDivision(shown, o, say);
+  // How far along the stored range, so it needs no display range of its own.
+  if (kind === 'percent') return __formatPercent(n, withOptions(o, { min: wireMin, max: wireMax }), say);
+  if (kind === 'pan') {
+    const a = scaled ? dmin : wireMin;
+    const b = scaled ? dmax : wireMax;
+    const center = a < 0 && b > 0 ? 0 : Math.floor((a + b) / 2 + 0.5);
+    return __formatPan(shown, withOptions(o, { min: a, max: b, center }), say);
+  }
+  return __formatNumber(shown, o, say);
+}
+
+/** What a command shows for a value it cannot write: the call's `placeholder`, else "--". */
+function __formatPlaceholderFor(opts) {
+  return placeholder(opts);
+}
+
+/* ------------------------------------------------------------------- fitting a display */
+
+/** Text as given; a number written by numberText, never by the language (Lua writes 2 as "2.0"). */
+function asText(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? numberText(v, {}) : FORMAT_PLACEHOLDER;
+  if (typeof v === 'boolean') return v ? 'true' : 'false';
+  return v === undefined || v === null ? '' : String(v);
+}
+
+function abbreviationMap(extra) {
+  const map = new Map();
+  for (const [word, short] of FORMAT_ABBREVIATIONS) map.set(word.toLowerCase(), short);
+  if (extra && typeof extra === 'object') {
+    for (const key of Object.keys(extra)) map.set(key.toLowerCase(), String(extra[key]));
+  }
+  return map;
+}
+
+const VOWELS = 'aeiouAEIOU';
+
+function shorten(text, width, steps, extra) {
+  if (text.length <= width) return text;
+  let words = text.split(' ').filter((w) => w !== '');
+  const join = () => words.join(' ');
+  if (steps >= 1) {
+    const map = abbreviationMap(extra);
+    words = words.map((w) => (map.has(w.toLowerCase()) ? map.get(w.toLowerCase()) : w));
+    if (join().length <= width) return join();
+  }
+  if (steps >= 2) {
+    while (join().length > width) {
+      let pick = -1;
+      for (let i = 0; i < words.length; i++) {
+        const w = words[i];
+        let removable = false;
+        for (let k = 1; k < w.length; k++) if (VOWELS.includes(w[k])) removable = true;
+        if (removable && (pick < 0 || w.length > words[pick].length)) pick = i;
+      }
+      if (pick < 0) break;
+      const w = words[pick];
+      let k = w.length - 1;
+      while (k >= 1 && !VOWELS.includes(w[k])) k -= 1;
+      words[pick] = w.slice(0, k) + w.slice(k + 1);
+    }
+    if (join().length <= width) return join();
+  }
+  if (steps >= 3) {
+    while (join().length > width && words.length > 1) {
+      const last = words.pop();
+      words[words.length - 1] += last;
+    }
+    if (join().length <= width) return join();
+  }
+  return join().slice(0, width);
+}
+
+function padTo(text, width, align) {
+  let t = text;
+  if (align === 'right') { while (t.length < width) t = ' ' + t; return t; }
+  if (align === 'center') {
+    const before = Math.floor((width - t.length) / 2);
+    for (let i = 0; i < before; i++) t = ' ' + t;
+  }
+  while (t.length < width) t += ' ';
+  return t;
+}
+
+function __formatFit(text, width, opts, say) {
+  const w = toNumber(width);
+  if (!Number.isFinite(w) || w < 1) {
+    say('error', 'ce.format.fit: the width must be 1 character or more, so nothing is shown.');
+    return '';
+  }
+  const width0 = Math.floor(w);
+  const steps = clampInt(optNumber(opts, 'steps', 4), 1, 4);
+  const short = shorten(asText(text), width0, steps, opt(opts, 'abbreviations'));
+  if (opt(opts, 'pad') === false) return short;
+  return padTo(short, width0, String(opt(opts, 'align') ?? 'left'));
+}
+
+function __formatLine(left, right, width, opts, say) {
+  const w = toNumber(width);
+  if (!Number.isFinite(w) || w < 1) {
+    say('error', 'ce.format.line: the width must be 1 character or more, so nothing is shown.');
+    return '';
+  }
+  const width0 = Math.floor(w);
+  const gap = clampInt(optNumber(opts, 'gap', 1), 0, width0);
+  const r = asText(right);
+  // The value is never shortened: a wrong-looking value is worse than a short name. Too wide for the
+  // line, its end, where the unit is, stays.
+  if (r.length >= width0) return r.slice(r.length - width0);
+  const room = width0 - gap - r.length;
+  if (room <= 0) return padTo(r, width0, 'right');
+  let l = asText(left);
+  if (l.length > room) l = shorten(l, room, 4, opt(opts, 'abbreviations'));
+  let spaces = '';
+  while (l.length + spaces.length + r.length < width0) spaces += ' ';
+  return l + spaces + r;
+}
+
+/* ------------------------------------------------------------------- reading typed text */
+
+const NOTE_BASE = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+const PLAIN_NUMBER = /^[+-]?(\d+\.?\d*|\.\d+)$/;
+
+function readNumber(s) {
+  if (s === 'inf' || s === '+inf') return Infinity;
+  if (s === '-inf') return -Infinity;
+  return PLAIN_NUMBER.test(s) ? Number(s) : NaN;
+}
+
+const UNIT_SUFFIXES = [['khz', 'hz', 1000], ['hz', 'hz', 1], ['ms', 'time', 1], ['db', 'db', 1],
+  ['%', 'percent', 0.01], ['s', 'time', 1000], ['k', '', 1000]];
+
+function parseNote(s, opts) {
+  const letter = s.slice(0, 1);
+  if (!(letter in NOTE_BASE)) return NaN;
+  let rest = s.slice(1);
+  let pc = NOTE_BASE[letter];
+  if (rest.startsWith('#')) { pc += 1; rest = rest.slice(1); } else if (rest.startsWith('b') && rest.length > 1) { pc -= 1; rest = rest.slice(1); }
+  if (!/^-?\d+$/.test(rest)) return NaN;
+  const middleC = clampInt(optNumber(opts, 'middleC', 4), -2, 9);
+  const n = pc + (Number(rest) - middleC + 5) * 12;
+  return n >= 0 && n <= 127 ? n : NaN;
+}
+
+function parsePan(s, opts) {
+  if (s === 'c') return optNumber(opts, 'center', (optNumber(opts, 'min', -1) + optNumber(opts, 'max', 1)) / 2);
+  let side = '';
+  let digits = s;
+  const head = s.slice(0, 1);
+  const tail = s.slice(-1);
+  if (head === 'l' || head === '<') { side = 'l'; digits = s.slice(1); } else if (head === 'r' || head === '>') { side = 'r'; digits = s.slice(1); } else if (tail === 'l' || tail === '<') { side = 'l'; digits = s.slice(0, -1); } else if (tail === 'r' || tail === '>') { side = 'r'; digits = s.slice(0, -1); }
+  const amount = readNumber(digits);
+  if (!side || !Number.isFinite(amount)) return NaN;
+  const custom = opt(opts, 'min') !== undefined || opt(opts, 'max') !== undefined;
+  const min = optNumber(opts, 'min', -1);
+  const max = optNumber(opts, 'max', 1);
+  const center = optNumber(opts, 'center', (min + max) / 2);
+  const steps = optNumber(opts, 'steps', 50);
+  const signed = side === 'l' ? -amount : amount;
+  return custom ? center + signed : center + (signed / steps) * ((max - min) / 2);
+}
+
+function parseKind(s, kind, opts) {
+  if (kind === 'note') return parseNote(s, opts);
+  if (kind === 'division') {
+    for (const [name, b] of FORMAT_DIVISIONS) if (name.toLowerCase() === s) return b;
+    return NaN;
+  }
+  if (kind === 'pan') return parsePan(s, opts);
+  if (kind === 'ratio') {
+    if (s.endsWith(':1')) return readNumber(s.slice(0, -2));
+    if (s.startsWith('x')) return readNumber(s.slice(1));
+  }
+  return NaN;
+}
+
+/** The number typed, or undefined when there is none to read. */
+function __formatParse(text, opts) {
+  if (typeof text !== 'string' && typeof text !== 'number') return undefined;
+  let s = String(text).toLowerCase().replace(/\s+/g, '').replace(/\u2212/g, '-').replace(/\u266f/g, '#').replace(/\u266d/g, 'b').replace(/\u221e/g, 'inf');
+  if (s === '') return undefined;
+  const kind = String(opt(opts, 'kind') ?? 'auto');
+  let value = parseKind(s, kind, opts);
+  if (Number.isNaN(value)) {
+    let factor = 1;
+    let unitKind = '';
+    for (const [suffix, k, f] of UNIT_SUFFIXES) {
+      if (s.length > suffix.length && s.endsWith(suffix)) {
+        s = s.slice(0, s.length - suffix.length);
+        factor = f;
+        unitKind = k;
+        break;
+      }
+    }
+    if (unitKind && kind !== 'auto' && unitKind !== kind) return undefined;
+    value = readNumber(s);
+    if (Number.isNaN(value)) return undefined;
+    if (!unitKind && factor === 1 && kind === 'percent') factor = 0.01;
+    value *= factor;
+  }
+  const min = toNumber(opt(opts, 'min'));
+  const max = toNumber(opt(opts, 'max'));
+  if (Number.isFinite(min) && value < min) value = min;
+  if (Number.isFinite(max) && value > max) value = max;
+  return value;
+}
+return { formatNumber: __formatNumber, formatHz: __formatHz, formatTime: __formatTime, formatDb: __formatDb, formatPercent: __formatPercent, formatPan: __formatPan, formatRatio: __formatRatio, formatClock: __formatClock, formatNote: __formatNote, formatDivision: __formatDivision, formatTable: __formatTable, formatFit: __formatFit, formatLine: __formatLine, formatParse: __formatParse, formatDescribed: __formatDescribed, formatPlaceholderFor: __formatPlaceholderFor };
+})();
+function formatNumber(v, opts) { return __fmt.formatNumber(v, opts, __fmtSay); }
+function formatHz(v, opts) { return __fmt.formatHz(v, opts, __fmtSay); }
+function formatTime(ms, opts) { return __fmt.formatTime(ms, opts, __fmtSay); }
+function formatDb(v, opts) { return __fmt.formatDb(v, opts, __fmtSay); }
+function formatPercent(v, opts) { return __fmt.formatPercent(v, opts, __fmtSay); }
+function formatPan(v, opts) { return __fmt.formatPan(v, opts, __fmtSay); }
+function formatRatio(v, opts) { return __fmt.formatRatio(v, opts, __fmtSay); }
+function formatClock(ms, opts) { return __fmt.formatClock(ms, opts, __fmtSay); }
+function formatNote(n, opts) { return __fmt.formatNote(n, opts, __fmtSay); }
+function formatDivision(beats, opts) { return __fmt.formatDivision(beats, opts, __fmtSay); }
+function formatTable(v, table, opts) { return __fmt.formatTable(v, table, opts, __fmtSay); }
+function formatFit(text, width, opts) { return __fmt.formatFit(text, width, opts, __fmtSay); }
+function formatLine(left, right, width, opts) { return __fmt.formatLine(left, right, width, opts, __fmtSay); }
+function formatParse(text, opts) { return __fmt.formatParse(text, opts); }
+function formatParameter(id, v, opts) {
+  var role = opts && typeof opts === "object" ? opts.role : undefined;
+  var d = __deviceQuery("parameter", { role: (role === undefined || role === null || role === "") ? "mainSynth" : String(role), id: String(id) });
+  if (!d || typeof d !== "object") {
+    var shown = __fmt.formatPlaceholderFor(opts);
+    __fmtSay("error", "ce.format.parameter: the device profile has no parameter \"" + String(id) + "\", so \"" + shown + "\" is shown.");
+    return shown;
+  }
+  return __fmt.formatDescribed(d, v, opts, __fmtSay);
+}
+// END GENERATED ce.format
+
+// BEGIN GENERATED ce.patch — tools/scripts/gen-patch-prelude.mjs, from patchCore.js. Do not edit by hand.
+// @module ce.patch
+var __patchCore = (function () {
+  // ce.patch — a synth's sound as a value: the part that is the same in every runtime.
+  //
+  // Design record: docs/design/ce-patch-module.md. Everything here is pure: it takes the parameters
+  // the device profile describes (ce.device.parameters()) and patches, and gives patches, lists and
+  // plans. It reads and sends nothing; the runtimes do that around it (panelRuntime.js, and the
+  // `@module ce.patch` sections of the Lua, JavaScript and Python preludes). The JavaScript prelude
+  // runs this file itself (tools/scripts/gen-patch-prelude.mjs); the Lua and Python preludes are ports
+  // held to the same answers by test/patchParity.test.js.
+  //
+  // A patch is a table: { device, role, scope, name, values, missing, source }, `values` parameter id
+  // to value in the parameter's own units, a choice by its id, as ce.device.write() takes them.
+  //
+  // The rules for each kind of value are snapshotModel.js's (a choice is one end or the other, never
+  // between; a name has no midpoint), applied by profile parameter id. Numbers blend in a straight
+  // line between the two values: the descriptor a runtime has carries no curve, so "along the
+  // parameter's curve" waits for one.
+  //
+  // `say(level, text)` reports a refused call ('error') or a name the profile does not have ('warn').
+
+  const PATCH_LEAVE_OUT_GROUPS = ['system', 'global', 'utility', 'performance'];
+  const DEFAULT_SEED = 0x9E3779B9;
+  const NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+  /* -------------------------------------------------------------------------------- helpers */
+
+  function toNumber(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && NUMBER_TEXT.test(v.trim())) return Number(v.trim());
+    return NaN;
+  }
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  /** A list option: a list of texts, or one text. Anything else is none. */
+  function names(v) {
+    if (typeof v === 'string') return v === '' ? [] : [v];
+    if (!Array.isArray(v)) return [];
+    const out = [];
+    for (const x of v) if (typeof x === 'string' && x !== '') out.push(x);
+    return out;
+  }
+
+  function lower(s) {
+    return String(s ?? '').toLowerCase();
+  }
+
+  function contains(list, value) {
+    for (const x of list) if (x === value) return true;
+    return false;
+  }
+
+  function hasValue(values, id) {
+    return values !== null && typeof values === 'object' && Object.prototype.hasOwnProperty.call(values, id)
+      && values[id] !== undefined && values[id] !== null;
+  }
+
+  function copyValues(values) {
+    const out = {};
+    if (values && typeof values === 'object') {
+      for (const key of Object.keys(values)) if (values[key] !== undefined && values[key] !== null) out[key] = values[key];
+    }
+    return out;
+  }
+
+  /** Half away from zero, as every prelude rounds. */
+  function roundHalfAway(x) {
+    return x < 0 ? -Math.floor(-x + 0.5) : Math.floor(x + 0.5);
+  }
+
+  /* ----------------------------------------------------------------------- parameter kinds */
+
+  /** 'number', 'choice', 'text' or 'action', from the descriptor ce.device.parameters() gives. */
+  function __patchKind(desc) {
+    const type = String(desc?.type ?? '');
+    if (type === 'action' || type === 'momentary' || type === 'trigger') return 'action';
+    if (type === 'text') return 'text';
+    if (type === 'choice' || type === 'boolean' || type === 'enum' || type === 'bool') return 'choice';
+    if (Array.isArray(desc?.choices) && desc.choices.length > 0) return 'choice';
+    return 'number';
+  }
+
+  function writable(desc) {
+    const access = desc?.access;
+    if (typeof access === 'string') return lower(access).indexOf('write') >= 0;
+    if (access && typeof access === 'object' && access.canWrite === false) return false;
+    return true;
+  }
+
+  function isWhole(desc) {
+    const type = String(desc?.type ?? '');
+    return type !== 'float';
+  }
+
+  function rangeOf(desc) {
+    const range = desc?.range && typeof desc.range === 'object' ? desc.range : {};
+    const lo = toNumber(range.min);
+    const hi = toNumber(range.max);
+    const a = Number.isFinite(lo) ? lo : 0;
+    const b = Number.isFinite(hi) ? hi : 127;
+    return a <= b ? [a, b] : [b, a];
+  }
+
+  /** The values a choice takes, as patches hold them: its ids, or true/false for an on/off. */
+  function choicesOf(desc) {
+    const out = [];
+    if (Array.isArray(desc?.choices)) {
+      for (const c of desc.choices) {
+        if (c && typeof c === 'object') {
+          if (c.id !== undefined && c.id !== null) out.push(c.id);
+          else if (c.value !== undefined && c.value !== null) out.push(c.value);
+        } else if (c !== undefined && c !== null) {
+          out.push(c);
+        }
+      }
+    }
+    if (out.length === 0 && (String(desc?.type ?? '') === 'boolean' || String(desc?.type ?? '') === 'bool')) {
+      out.push(false);
+      out.push(true);
+    }
+    return out;
+  }
+
+  /** A number put back where the synth can take it: its step (a whole number unless float) and range. */
+  function settle(desc, v) {
+    let x = v;
+    if (isWhole(desc)) x = roundHalfAway(x);
+    const [lo, hi] = rangeOf(desc);
+    if (x < lo) x = lo;
+    if (x > hi) x = hi;
+    return x;
+  }
+
+  function sameValue(desc, a, b) {
+    const x = toNumber(a);
+    const y = toNumber(b);
+    if (typeof a !== 'boolean' && typeof b !== 'boolean' && Number.isFinite(x) && Number.isFinite(y)) {
+      // Two numbers closer than the parameter's step are the same value.
+      return Math.abs(x - y) < (isWhole(desc) ? 0.5 : 1e-9);
+    }
+    if (a === b) return true;
+    if (a === undefined || a === null || b === undefined || b === null) return false;
+    if (typeof a === 'boolean' || typeof b === 'boolean') return String(a) === String(b);
+    // Synths pad a name to its length, so "INIT  " and "INIT" are one name.
+    return String(a).replace(/\s+$/, '') === String(b).replace(/\s+$/, '');
+  }
+
+  /* -------------------------------------------------------------------------------- scopes */
+
+  function leftOutGroup(desc) {
+    return contains(PATCH_LEAVE_OUT_GROUPS, lower(desc?.group));
+  }
+
+  function matchesNameList(desc, list) {
+    const group = lower(desc?.group);
+    for (const name of list) {
+      if (name === desc?.id) return true;
+      if (group !== '' && lower(name) === group) return true;
+    }
+    return false;
+  }
+
+  /**
+   * The parameters a scope holds, in the profile's order. `defs` is the scopes a profile's `patch`
+   * section or define() describes, by id: { groups, only, except }. Without one, "voice" is every
+   * parameter but actions and the System, Global, Utility and Performance groups, and "system" those
+   * groups. Unknown scope: null.
+   */
+  function __patchScopeParams(params, scope, defs) {
+    const list = Array.isArray(params) ? params : [];
+    const id = String(scope ?? 'voice');
+    const def = defs && typeof defs === 'object' ? defs[id] : undefined;
+    const out = [];
+    if (def && typeof def === 'object') {
+      const groups = names(def.groups);
+      const only = names(def.only);
+      const except = names(def.except);
+      for (const desc of list) {
+        if (__patchKind(desc) === 'action') continue;
+        if ((groups.length > 0 || only.length > 0) && !matchesNameList(desc, groups) && !contains(only, desc?.id)) continue;
+        if (matchesNameList(desc, except)) continue;
+        out.push(desc);
+      }
+      return out;
+    }
+    if (id === 'voice') {
+      for (const desc of list) if (__patchKind(desc) !== 'action' && !leftOutGroup(desc)) out.push(desc);
+      return out;
+    }
+    if (id === 'system') {
+      for (const desc of list) if (__patchKind(desc) !== 'action' && leftOutGroup(desc)) out.push(desc);
+      return out;
+    }
+    return null;
+  }
+
+  /** The scope's one text parameter, which holds the patch name; none or several: ''. */
+  function __patchNameParameter(scoped) {
+    let found = '';
+    for (const desc of scoped) {
+      if (__patchKind(desc) !== 'text') continue;
+      if (found !== '') return '';
+      found = String(desc.id);
+    }
+    return found;
+  }
+
+  /* ------------------------------------------------------------------- choosing parameters */
+
+  function warnUnknown(scoped, list, what, verb, say, words) {
+    for (const name of list) {
+      if (words && contains(words, name)) continue;
+      let known = false;
+      for (const desc of scoped) {
+        if (desc?.id === name || (lower(desc?.group) !== '' && lower(desc?.group) === lower(name))) { known = true; break; }
+      }
+      if (!known) say('warn', `ce.patch.${verb}: the profile has no parameter or group "${name}" in this scope, in ${what}; the rest goes ahead.`);
+    }
+  }
+
+  /**
+   * The ids a command works on, in the profile's order, from the options every command shares; null
+   * when `groups` and `only` leave nothing (said). `forApply` keeps the patch name and the parameters
+   * the synth cannot be sent, which apply sends or lists as skipped rather than leaving out.
+   */
+  function __patchChoose(scoped, opts, say, verb, forApply) {
+    const groups = names(opt(opts, 'groups'));
+    const only = names(opt(opts, 'only'));
+    const except = names(opt(opts, 'except'));
+    const include = names(opt(opts, 'include'));
+    warnUnknown(scoped, groups, 'groups', verb, say, null);
+    warnUnknown(scoped, only, 'only', verb, say, null);
+    warnUnknown(scoped, except, 'except', verb, say, null);
+    warnUnknown(scoped, include, 'include', verb, say, ['name', 'readOnly', 'leaveOut']);
+    warnUnknown(scoped, names(opt(opts, 'lock')), 'lock', verb, say, null);
+    const chosen = [];
+    for (const desc of scoped) {
+      const included = matchesNameList(desc, include);
+      if (!forApply && !included) {
+        if (__patchKind(desc) === 'text' && !contains(include, 'name')) continue;
+        if (!writable(desc) && !contains(include, 'readOnly')) continue;
+      }
+      if ((groups.length > 0 || only.length > 0) && !matchesNameList(desc, groups) && !contains(only, desc?.id)) continue;
+      if (matchesNameList(desc, except)) continue;
+      chosen.push(String(desc.id));
+    }
+    if (chosen.length === 0 && (groups.length > 0 || only.length > 0)) {
+      say('error', `ce.patch.${verb}: groups and only leave no parameter chosen, so nothing was done.`);
+      return null;
+    }
+    return chosen;
+  }
+
+  function lockedIds(scoped, opts) {
+    const lock = names(opt(opts, 'lock'));
+    const out = [];
+    for (const desc of scoped) if (matchesNameList(desc, lock)) out.push(String(desc.id));
+    return out;
+  }
+
+  function byId(scoped) {
+    const map = {};
+    for (const desc of scoped) map[String(desc.id)] = desc;
+    return map;
+  }
+
+  /* --------------------------------------------------------------------------------- patches */
+
+  function isPatch(p) {
+    return p !== null && typeof p === 'object' && !Array.isArray(p) && p.values !== null && typeof p.values === 'object';
+  }
+
+  /** A patch of the same synth and scope as `base`, holding `values`. */
+  function __patchMake(base, values, scoped, source) {
+    const missing = [];
+    for (const desc of scoped) {
+      if (__patchKind(desc) !== 'action' && !hasValue(values, String(desc.id))) missing.push(String(desc.id));
+    }
+    const nameId = __patchNameParameter(scoped);
+    const patch = {
+      device: String(base?.device ?? ''),
+      role: String(base?.role ?? 'mainSynth'),
+      scope: String(base?.scope ?? 'voice'),
+      values,
+      missing,
+      source,
+    };
+    if (nameId !== '' && hasValue(values, nameId)) patch.name = String(values[nameId]);
+    else if (typeof base?.name === 'string') patch.name = base.name;
+    return patch;
+  }
+
+  function samePatches(a, b, verb, what, say) {
+    if (!isPatch(a) || !isPatch(b)) {
+      say('error', `ce.patch.${verb}: ${what} must be patches, as ce.patch.current() gives them, so nothing was done.`);
+      return false;
+    }
+    if (String(a.device ?? '') !== String(b.device ?? '') || String(a.scope ?? '') !== String(b.scope ?? '')) {
+      say('error', `ce.patch.${verb}: a patch of ${String(b.device ?? '')} (${String(b.scope ?? '')}) cannot be used with one of ${String(a.device ?? '')} (${String(a.scope ?? '')}), so nothing was done.`);
+      return false;
+    }
+    return true;
+  }
+
+  function clamp01(v) {
+    const n = toNumber(v);
+    if (!Number.isFinite(n)) return NaN;
+    return n < 0 ? 0 : n > 1 ? 1 : n;
+  }
+
+  /* ------------------------------------------------------------------------------ transforms */
+
+  /** ce.patch.morph: part of the way from `a` (t = 0) to `b` (t = 1). */
+  function __patchMorph(a, b, t, scoped, opts, say) {
+    if (!samePatches(a, b, 'morph', 'a and b', say)) return undefined;
+    const at = clamp01(t);
+    if (Number.isNaN(at)) {
+      say('error', 'ce.patch.morph: t must be a number from 0 to 1, so nothing was done.');
+      return undefined;
+    }
+    let switchAt = clamp01(opt(opts, 'switchAt'));
+    if (Number.isNaN(switchAt)) switchAt = 0.5;
+    const ids = __patchChoose(scoped, opts, say, 'morph', false);
+    if (ids === null) return undefined;
+    const locked = lockedIds(scoped, opts);
+    const descs = byId(scoped);
+    const out = copyValues(a.values);
+    for (const key of Object.keys(b.values)) if (!hasValue(out, key) && hasValue(b.values, key)) out[key] = b.values[key];
+    for (const id of ids) {
+      if (contains(locked, id) || !hasValue(a.values, id) || !hasValue(b.values, id)) continue;
+      const desc = descs[id];
+      const kind = __patchKind(desc);
+      if (kind === 'number') {
+        const x = toNumber(a.values[id]);
+        const y = toNumber(b.values[id]);
+        if (Number.isFinite(x) && Number.isFinite(y)) out[id] = settle(desc, x + (y - x) * at);
+      } else if (kind === 'choice') {
+        out[id] = at < switchAt ? a.values[id] : b.values[id];
+      }
+    }
+    return __patchMake(a, out, scoped, 'made');
+  }
+
+  /** ce.patch.blend: several patches, each counting as much as its weight. */
+  function __patchBlend(patches, weights, scoped, opts, say) {
+    if (!Array.isArray(patches) || patches.length < 2) {
+      say('error', 'ce.patch.blend: patches must be a list of two or more patches, so nothing was done.');
+      return undefined;
+    }
+    for (let i = 1; i < patches.length; i += 1) if (!samePatches(patches[0], patches[i], 'blend', 'patches', say)) return undefined;
+    const w = [];
+    let total = 0;
+    for (let i = 0; i < patches.length; i += 1) {
+      const n = Array.isArray(weights) ? toNumber(weights[i]) : NaN;
+      const v = Number.isFinite(n) && n > 0 ? n : 0;
+      w.push(v);
+      total += v;
+    }
+    if (!(total > 0)) {
+      say('error', 'ce.patch.blend: the weights add up to 0 or less, so nothing was done.');
+      return undefined;
+    }
+    const ids = __patchChoose(scoped, opts, say, 'blend', false);
+    if (ids === null) return undefined;
+    const locked = lockedIds(scoped, opts);
+    const descs = byId(scoped);
+    const out = copyValues(patches[0].values);
+    for (let i = 1; i < patches.length; i += 1) {
+      for (const key of Object.keys(patches[i].values)) if (!hasValue(out, key) && hasValue(patches[i].values, key)) out[key] = patches[i].values[key];
+    }
+    for (const id of ids) {
+      if (contains(locked, id)) continue;
+      const desc = descs[id];
+      const kind = __patchKind(desc);
+      if (kind === 'number') {
+        let sum = 0;
+        let weight = 0;
+        for (let i = 0; i < patches.length; i += 1) {
+          const x = toNumber(hasValue(patches[i].values, id) ? patches[i].values[id] : undefined);
+          if (!Number.isFinite(x) || w[i] <= 0) continue;
+          sum += x * w[i];
+          weight += w[i];
+        }
+        if (weight > 0) out[id] = settle(desc, sum / weight);
+      } else if (kind === 'choice') {
+        let best = -1;
+        for (let i = 0; i < patches.length; i += 1) {
+          if (!hasValue(patches[i].values, id) || w[i] <= 0) continue;
+          if (best < 0 || w[i] > w[best]) best = i;
+        }
+        if (best >= 0) out[id] = patches[best].values[id];
+      }
+    }
+    return __patchMake(patches[0], out, scoped, 'made');
+  }
+
+  /** A seeded xorshift32, as ce.math's: the same numbers in every language. Returns next() in [0, 1). */
+  function __patchRandomSource(seed) {
+    const n = toNumber(seed);
+    let x = Number.isFinite(n) ? (Math.floor(n) % 4294967296 + 4294967296) % 4294967296 : 0;
+    if (x === 0) x = DEFAULT_SEED;
+    return () => {
+      x = (x ^ ((x << 13) >>> 0)) >>> 0;
+      x = (x ^ (x >>> 17)) >>> 0;
+      x = (x ^ ((x << 5) >>> 0)) >>> 0;
+      return x / 4294967296;
+    };
+  }
+
+  function withinRange(desc, within) {
+    let [lo, hi] = rangeOf(desc);
+    const narrow = within && typeof within === 'object' ? within[String(desc.id)] : undefined;
+    if (Array.isArray(narrow) && narrow.length >= 2) {
+      const a = toNumber(narrow[0]);
+      const b = toNumber(narrow[1]);
+      if (Number.isFinite(a) && Number.isFinite(b)) {
+        const low = Math.max(lo, Math.min(a, b));
+        const high = Math.min(hi, Math.max(a, b));
+        if (low <= high) { lo = low; hi = high; }
+      }
+    }
+    return [lo, hi];
+  }
+
+  /** ce.patch.random: `from` with every chosen value drawn anew, within each parameter's range. */
+  function __patchRandom(from, scoped, opts, next, say) {
+    if (!isPatch(from)) {
+      say('error', 'ce.patch.random: from must be a patch, as ce.patch.current() gives them, so nothing was done.');
+      return undefined;
+    }
+    const ids = __patchChoose(scoped, opts, say, 'random', false);
+    if (ids === null) return undefined;
+    const locked = lockedIds(scoped, opts);
+    const descs = byId(scoped);
+    const within = opt(opts, 'within');
+    const out = copyValues(from.values);
+    for (const id of ids) {
+      if (contains(locked, id)) continue;
+      const desc = descs[id];
+      const kind = __patchKind(desc);
+      if (kind === 'number') {
+        const [lo, hi] = withinRange(desc, within);
+        const r = next();
+        out[id] = isWhole(desc) ? Math.min(Math.floor(hi), Math.ceil(lo) + Math.floor(r * (Math.floor(hi) - Math.ceil(lo) + 1))) : lo + r * (hi - lo);
+      } else if (kind === 'choice') {
+        const choices = choicesOf(desc);
+        const r = next();
+        if (choices.length > 0) out[id] = choices[Math.min(choices.length - 1, Math.floor(r * choices.length))];
+      }
+    }
+    return __patchMake(from, out, scoped, 'made');
+  }
+
+  /** ce.patch.mutate: every chosen value moved a little, at random. */
+  function __patchMutate(patch, amount, scoped, opts, next, say) {
+    if (!isPatch(patch)) {
+      say('error', 'ce.patch.mutate: patch must be a patch, as ce.patch.current() gives them, so nothing was done.');
+      return undefined;
+    }
+    const by = clamp01(amount);
+    if (Number.isNaN(by)) {
+      say('error', 'ce.patch.mutate: amount must be a number from 0 to 1, so nothing was done.');
+      return undefined;
+    }
+    const ids = __patchChoose(scoped, opts, say, 'mutate', false);
+    if (ids === null) return undefined;
+    const locked = lockedIds(scoped, opts);
+    const descs = byId(scoped);
+    const out = copyValues(patch.values);
+    for (const id of ids) {
+      if (contains(locked, id) || !hasValue(out, id)) continue;
+      const desc = descs[id];
+      const kind = __patchKind(desc);
+      if (kind === 'number') {
+        const x = toNumber(out[id]);
+        if (!Number.isFinite(x)) continue;
+        const [lo, hi] = rangeOf(desc);
+        // Two draws, so a small move is more likely than a large one.
+        const r1 = next();
+        const r2 = next();
+        out[id] = settle(desc, x + (r1 - r2) * by * (hi - lo));
+      } else if (kind === 'choice') {
+        const r1 = next();
+        const r2 = next();
+        if (r1 >= by) continue;
+        const others = [];
+        for (const c of choicesOf(desc)) if (!sameValue(desc, c, out[id])) others.push(c);
+        if (others.length > 0) out[id] = others[Math.min(others.length - 1, Math.floor(r2 * others.length))];
+      }
+    }
+    return __patchMake(patch, out, scoped, 'made');
+  }
+
+  /** ce.patch.merge: `base` with the chosen parameters taken from `other`. */
+  function __patchMerge(base, other, scoped, opts, say) {
+    if (!samePatches(base, other, 'merge', 'base and other', say)) return undefined;
+    if (names(opt(opts, 'groups')).length === 0 && names(opt(opts, 'only')).length === 0) {
+      say('error', 'ce.patch.merge: name the parameters to take, with groups or only; taking every value is other itself, so nothing was done.');
+      return undefined;
+    }
+    const ids = __patchChoose(scoped, opts, say, 'merge', false);
+    if (ids === null) return undefined;
+    const locked = lockedIds(scoped, opts);
+    const out = copyValues(base.values);
+    for (const id of ids) if (!contains(locked, id) && hasValue(other.values, id)) out[id] = other.values[id];
+    return __patchMake(base, out, scoped, 'made');
+  }
+
+  /* ------------------------------------------------------------------------------ comparing */
+
+  /** ce.patch.diff: { id, name, group, from, to } for each chosen parameter whose value differs. */
+  function __patchDiff(a, b, scoped, opts, say) {
+    if (!samePatches(a, b, 'diff', 'a and b', say)) return undefined;
+    const ids = __patchChoose(scoped, opts, say, 'diff', false);
+    if (ids === null) return undefined;
+    const descs = byId(scoped);
+    const out = [];
+    for (const id of ids) {
+      const inA = hasValue(a.values, id);
+      const inB = hasValue(b.values, id);
+      if (!inA && !inB) continue;
+      if (inA && inB && sameValue(descs[id], a.values[id], b.values[id])) continue;
+      const entry = { id, name: String(descs[id]?.name ?? id), group: String(descs[id]?.group ?? '') };
+      if (inA) entry.from = a.values[id];
+      if (inB) entry.to = b.values[id];
+      out.push(entry);
+    }
+    return out;
+  }
+
+  /** ce.patch.equal: no chosen parameter differs. */
+  function __patchEqual(a, b, scoped, opts, say) {
+    const d = __patchDiff(a, b, scoped, opts, say);
+    if (d === undefined) return undefined;
+    return d.length === 0;
+  }
+
+  /* -------------------------------------------------------------------------------- sending */
+
+  /**
+   * What apply sends: { send: [[id, value]], values, skipped: [{ id, why }] }. `values` is everything
+   * the panel takes (every chosen value the patch holds); `send` the ones to send, without those the
+   * synth already has when `changedOnly` is on (`known`: what the synth last had, by id).
+   */
+  function __patchApplyPlan(patch, known, scoped, opts, say) {
+    const ids = __patchChoose(scoped, opts, say, 'apply', true);
+    if (ids === null) return null;
+    const descs = byId(scoped);
+    const changedOnly = opt(opts, 'changedOnly') !== false;
+    const send = [];
+    const values = {};
+    const skipped = [];
+    for (const id of ids) {
+      if (!hasValue(patch.values, id)) continue;
+      const value = patch.values[id];
+      values[id] = value;
+      if (!writable(descs[id])) { skipped.push({ id, why: 'the synth cannot be sent it' }); continue; }
+      if (changedOnly && hasValue(known, id) && sameValue(descs[id], known[id], value)) continue;
+      send.push([id, value]);
+    }
+    // Sorted, so every language lists them in the same order (a Lua table has none of its own).
+    for (const key of Object.keys(patch.values).sort()) {
+      if (!Object.prototype.hasOwnProperty.call(descs, key)) skipped.push({ id: key, why: 'not a parameter of this scope' });
+    }
+    return { send, values, skipped };
+  }
+
+  /**
+   * apply(p, { live = true }): the ones that moved most first, at most `budget`; the rest wait for the
+   * next apply without `live`. Returns { now, later } as lists of [id, value].
+   */
+  function __patchLivePlan(send, known, scoped, budget) {
+    const descs = byId(scoped);
+    const moved = [];
+    for (let i = 0; i < send.length; i += 1) {
+      const [id, value] = send[i];
+      const [lo, hi] = rangeOf(descs[id]);
+      const x = toNumber(value);
+      const y = toNumber(hasValue(known, id) ? known[id] : undefined);
+      const delta = Number.isFinite(x) && Number.isFinite(y) ? Math.abs(x - y) / ((hi - lo) || 1) : 2;
+      moved.push([delta, i]);
+    }
+    // By how far it moved, then by the profile's order; the same in every language.
+    moved.sort((p, q) => (q[0] - p[0]) || (p[1] - q[1]));
+    const now = [];
+    const later = [];
+    for (let k = 0; k < moved.length; k += 1) (k < budget ? now : later).push(send[moved[k][1]]);
+    return { now, later };
+  }
+
+  /* ------------------------------------------------------------------------------ commands */
+
+  const SEND_MODES = ['auto', 'parameters', 'dump', 'none'];
+  const LIVE_BUDGET = 32;
+  const DEFINE_FIELDS = ['name', 'groups', 'only', 'except', 'dumps', 'read', 'transform'];
+  const STORE_PREFIX = 'ce.patch:';
+
+  function listOfScopes(section) {
+    const out = [];
+    const scopes = section && typeof section === 'object' ? section.scopes : undefined;
+    if (Array.isArray(scopes)) for (const s of scopes) if (s && typeof s === 'object' && typeof s.id === 'string' && s.id !== '') out.push(s);
+    return out;
+  }
+
+  /**
+   * The commands, over a runtime's host: `{ say(level, text), profile(role), parameters(role),
+   * read(id, role), write(id, value, role), fill(values), snapshot(), restore(values),
+   * requestDump(kind, fn, opts), sendDump(kind), setVariable(name, value, role), patchSection(role),
+   * random(), now(), store: { get(key), set(key, value), keys(), remove(key) } }`.
+   */
+  function __patchCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    const defined = {};     // role -> scope id -> spec, from define()
+    const waiting = {};     // role + scope -> [[id, value]] a live apply left for later
+
+    function context(role) {
+      const r = typeof role === 'string' && role !== '' ? role : 'mainSynth';
+      const profile = host.profile(r);
+      if (!profile || typeof profile !== 'object' || typeof profile.id !== 'string' || profile.id === '') {
+        return { role: r, device: 'panel', params: null, section: null };
+      }
+      const params = host.parameters(r);
+      const section = host.patchSection(r);
+      return { role: r, device: profile.id, params: Array.isArray(params) ? params : [], section: section && typeof section === 'object' ? section : null };
+    }
+
+    function scopeDefs(ctx) {
+      const defs = {};
+      for (const s of listOfScopes(ctx.section)) defs[s.id] = s;
+      const own = defined[ctx.role];
+      if (own) for (const id of Object.keys(own)) defs[id] = own[id];
+      return defs;
+    }
+
+    function panelDescriptors(values) {
+      const out = [];
+      // By name, so every language gives them in one order.
+      for (const name of Object.keys(values && typeof values === 'object' ? values : {}).sort()) {
+        const v = values[name];
+        const type = typeof v === 'number' ? 'float' : typeof v === 'boolean' ? 'boolean' : 'text';
+        out.push({ id: name, name, group: '', type });
+      }
+      return out;
+    }
+
+    function scoped(ctx, scope, verb) {
+      if (ctx.params === null) {
+        if (scope !== 'voice') {
+          say('error', `ce.patch.${verb}: a panel without a device profile has one scope, "voice", so nothing was done.`);
+          return null;
+        }
+        return panelDescriptors(host.snapshot());
+      }
+      const list = __patchScopeParams(ctx.params, scope, scopeDefs(ctx));
+      if (list === null) say('error', `ce.patch.${verb}: "${scope}" is not a scope of ${ctx.device}, so nothing was done. ce.patch.scopes() lists them.`);
+      return list;
+    }
+
+    function forPatch(patch, verb) {
+      if (!isPatch(patch)) {
+        say('error', `ce.patch.${verb}: that is not a patch, as ce.patch.current() gives them, so nothing was done.`);
+        return null;
+      }
+      const ctx = context(typeof patch.role === 'string' ? patch.role : 'mainSynth');
+      if (String(patch.device ?? '') !== ctx.device) {
+        say('error', `ce.patch.${verb}: the patch is one of ${String(patch.device ?? '')}, and this panel's synth is ${ctx.device}, so nothing was done.`);
+        return null;
+      }
+      const list = scoped(ctx, String(patch.scope ?? 'voice'), verb);
+      return list === null ? null : { ctx, list };
+    }
+
+    function scopeOf(scope, opts) {
+      if (typeof scope === 'string' && scope !== '') return scope;
+      const fromOpts = opt(opts, 'scope');
+      return typeof fromOpts === 'string' && fromOpts !== '' ? fromOpts : 'voice';
+    }
+
+    function current(scope, opts) {
+      const ctx = context(opt(opts, 'role'));
+      const id = scopeOf(scope, opts);
+      const list = scoped(ctx, id, 'current');
+      if (list === null) return undefined;
+      // The choosing options narrow what is captured; without them, the whole scope.
+      const narrowed = names(opt(opts, 'groups')).length > 0 || names(opt(opts, 'only')).length > 0 || names(opt(opts, 'except')).length > 0;
+      const ids = narrowed ? __patchChoose(list, opts, say, 'current', true) : null;
+      if (narrowed && ids === null) return undefined;
+      let values;
+      if (ctx.params === null) {
+        values = copyValues(host.snapshot());
+        if (ids !== null) for (const key of Object.keys(values)) if (!contains(ids, key)) delete values[key];
+      } else {
+        values = {};
+        for (const desc of list) {
+          if (ids !== null && !contains(ids, String(desc.id))) continue;
+          const v = host.read(String(desc.id), ctx.role);
+          if (v !== undefined && v !== null) values[String(desc.id)] = v;
+        }
+      }
+      return __patchMake({ device: ctx.device, role: ctx.role, scope: id }, values, list, 'panel');
+    }
+
+    function seeded(opts, verb) {
+      const seed = opt(opts, 'seed');
+      if (seed !== undefined && seed !== null) {
+        if (!Number.isFinite(toNumber(seed))) {
+          say('error', `ce.patch.${verb}: seed must be a number, so nothing was done.`);
+          return null;
+        }
+        return __patchRandomSource(seed);
+      }
+      return __patchRandomSource(Math.floor(host.random() * 4294967296));
+    }
+
+    function knownValues(ctx, list) {
+      const known = {};
+      if (ctx.params === null) return known;
+      for (const desc of list) {
+        const v = host.read(String(desc.id), ctx.role);
+        if (v !== undefined && v !== null) known[String(desc.id)] = v;
+      }
+      return known;
+    }
+
+    function scopeDumps(ctx, scope) {
+      const def = scopeDefs(ctx)[scope];
+      return def ? names(def.dumps) : [];
+    }
+
+    function apply(patch, opts) {
+      const at = forPatch(patch, 'apply');
+      if (at === null) return { ok: false, via: 'none', applied: 0, sent: 0, skipped: [] };
+      const { ctx, list } = at;
+      const scope = String(patch.scope ?? 'voice');
+      let send = opt(opts, 'send');
+      if (send === undefined || send === null) send = 'auto';
+      if (!contains(SEND_MODES, send)) {
+        say('error', `ce.patch.apply: send "${String(send)}" is not one of "auto", "parameters", "dump" or "none", so nothing was done.`);
+        return { ok: false, via: 'none', applied: 0, sent: 0, skipped: [] };
+      }
+      const known = knownValues(ctx, list);
+      const plan = __patchApplyPlan(patch, known, list, opts, say);
+      if (plan === null) return { ok: false, via: 'none', applied: 0, sent: 0, skipped: [] };
+      const applied = Object.keys(plan.values).length;
+      if (ctx.params === null) {
+        // No profile: the controls take the values, and send them as their own bindings say.
+        host.restore(plan.values);
+        return { ok: true, via: 'none', applied, sent: 0, skipped: plan.skipped };
+      }
+      const dumps = scopeDumps(ctx, scope);
+      const deliver = ctx.section && typeof ctx.section.deliver === 'string' ? ctx.section.deliver : '';
+      let via = send;
+      if (send === 'auto') via = deliver === 'dump' && dumps.length > 0 ? 'dump' : 'parameters';
+      if (via === 'dump' && dumps.length === 0) {
+        say('error', `ce.patch.apply: ${ctx.device} has no dumps for the "${scope}" scope, so it cannot take a patch as a dump, and nothing was done.`);
+        return { ok: false, via: 'none', applied: 0, sent: 0, skipped: [] };
+      }
+      host.fill(plan.values);
+      if (via === 'none') return { ok: true, via, applied, sent: 0, skipped: plan.skipped };
+      if (via === 'dump') {
+        for (const kind of dumps) host.sendDump(kind);
+        return { ok: true, via, applied, sent: dumps.length, skipped: plan.skipped };
+      }
+      const key = `${ctx.role}\u0000${scope}`;
+      let toSend = plan.send;
+      if (opt(opts, 'live') === true) {
+        const split = __patchLivePlan(plan.send, known, list, LIVE_BUDGET);
+        toSend = split.now;
+        waiting[key] = split.later;
+      } else {
+        // What a live apply left: sent now, unless this patch sets it again.
+        const later = waiting[key] ?? [];
+        delete waiting[key];
+        const planned = {};
+        for (const [id] of toSend) planned[id] = true;
+        for (const entry of later) if (!planned[entry[0]]) toSend = toSend.concat([entry]);
+      }
+      let sent = 0;
+      const skipped = plan.skipped.slice();
+      for (const [id, value] of toSend) {
+        if (host.write(id, value, ctx.role) === true) sent += 1;
+        else skipped.push({ id, why: 'not sent' });
+      }
+      return { ok: true, via, applied, sent, skipped };
+    }
+
+    function read(scope, fn, opts) {
+      const ctx = context(opt(opts, 'role'));
+      const id = typeof scope === 'string' && scope !== '' ? scope : 'voice';
+      if (typeof fn !== 'function') {
+        say('error', 'ce.patch.read: fn must be a function to call with the patch, so nothing was asked.');
+        return false;
+      }
+      if (scoped(ctx, id, 'read') === null) return false;
+      const dumps = ctx.params === null ? [] : scopeDumps(ctx, id);
+      if (dumps.length === 0) {
+        say('error', `ce.patch.read: the "${id}" scope has no dumps to ask the synth for, so it cannot be read. ce.patch.define() can name them.`);
+        return false;
+      }
+      let ok = true;
+      const timeout = toNumber(opt(opts, 'timeout'));
+      const dumpOpts = Number.isFinite(timeout) && timeout > 0 ? { timeout } : undefined;
+      let at = 0;
+      const next = () => {
+        if (at >= dumps.length) {
+          const patch = current(id, { role: ctx.role });
+          const info = { ok, missing: patch ? patch.missing : [] };
+          fn(patch, info);
+          return;
+        }
+        const kind = dumps[at];
+        at += 1;
+        const asked = host.requestDump(kind, (values, answer) => {
+          if (!answer || answer.ok !== true) ok = false;
+          next();
+        }, dumpOpts);
+        if (asked === false) { ok = false; next(); }
+      };
+      next();
+      return true;
+    }
+
+    function scopes(role) {
+      const ctx = context(role);
+      if (ctx.params === null) {
+        return [{ id: 'voice', name: 'Voice', parameters: Object.keys(host.snapshot()).length, canRead: false, canSend: true, via: 'none' }];
+      }
+      const defs = scopeDefs(ctx);
+      // The profile's scopes in its order, then the script's by name, so every language lists them alike.
+      const ids = defs.voice ? [] : ['voice'];
+      for (const s of listOfScopes(ctx.section)) if (!contains(ids, s.id)) ids.push(s.id);
+      for (const id of Object.keys(defined[ctx.role] ?? {}).sort()) if (!contains(ids, id)) ids.push(id);
+      const deliver = ctx.section && typeof ctx.section.deliver === 'string' ? ctx.section.deliver : '';
+      const out = [];
+      for (const id of ids) {
+        const list = __patchScopeParams(ctx.params, id, defs);
+        if (list === null || (list.length === 0 && !defs[id])) continue;
+        const dumps = defs[id] ? names(defs[id].dumps) : [];
+        out.push({
+          id,
+          name: defs[id] && typeof defs[id].name === 'string' ? defs[id].name : id.slice(0, 1).toUpperCase() + id.slice(1),
+          parameters: list.length,
+          canRead: dumps.length > 0,
+          canSend: true,
+          via: deliver === 'dump' && dumps.length > 0 ? 'dump' : 'parameters',
+        });
+      }
+      if (!defs.system) {
+        const system = __patchScopeParams(ctx.params, 'system', defs);
+        if (system !== null && system.length > 0) out.push({ id: 'system', name: 'System', parameters: system.length, canRead: false, canSend: true, via: 'parameters' });
+      }
+      return out;
+    }
+
+    function define(scope, spec, role) {
+      if (typeof scope !== 'string' || scope === '') {
+        say('error', 'ce.patch.define: scope must be a name, such as "voice", so nothing was defined.');
+        return false;
+      }
+      if (!spec || typeof spec !== 'object' || Array.isArray(spec)) {
+        say('error', 'ce.patch.define: spec must be a table of groups, only, except and dumps, so nothing was defined.');
+        return false;
+      }
+      for (const key of Object.keys(spec).sort()) {
+        if (!contains(DEFINE_FIELDS, key)) {
+          say('error', `ce.patch.define: "${key}" is not one of the fields a scope takes (${DEFINE_FIELDS.join(', ')}), so nothing was defined.`);
+          return false;
+        }
+      }
+      for (const key of ['groups', 'only', 'except', 'dumps']) {
+        const v = spec[key];
+        if (v !== undefined && v !== null && typeof v !== 'string' && !Array.isArray(v)) {
+          say('error', `ce.patch.define: ${key} must be a list of names, so nothing was defined.`);
+          return false;
+        }
+      }
+      const r = typeof role === 'string' && role !== '' ? role : 'mainSynth';
+      const def = { id: scope };
+      for (const key of Object.keys(spec)) def[key] = spec[key];
+      if (!defined[r]) defined[r] = {};
+      defined[r][scope] = def;
+      return true;
+    }
+
+    function storeKey(device, name) {
+      return `${STORE_PREFIX}${device}:${lower(name)}`;
+    }
+
+    function save(name, patch, opts) {
+      if (typeof name !== 'string' || name.trim() === '' || name.length > 64) {
+        say('error', 'ce.patch.save: name must be text of 1 to 64 characters, so nothing was kept.');
+        return false;
+      }
+      if (!isPatch(patch)) {
+        say('error', 'ce.patch.save: that is not a patch, as ce.patch.current() gives them, so nothing was kept.');
+        return false;
+      }
+      const key = storeKey(String(patch.device ?? ''), name);
+      if (opt(opts, 'replace') === false && host.store.get(key) !== undefined && host.store.get(key) !== null) {
+        say('error', `ce.patch.save: a patch called "${name}" is already kept, and replace is off, so nothing was kept.`);
+        return false;
+      }
+      return host.store.set(key, {
+        name, device: String(patch.device ?? ''), role: String(patch.role ?? 'mainSynth'), scope: String(patch.scope ?? 'voice'),
+        savedAt: String(host.now() ?? ''), values: copyValues(patch.values),
+      }) !== false;
+    }
+
+    function load(name, opts) {
+      const ctx = context(opt(opts, 'role'));
+      const record = host.store.get(storeKey(ctx.device, String(name ?? '')));
+      if (!record || typeof record !== 'object') {
+        for (const key of host.store.keys().slice().sort()) {
+          if (key.indexOf(STORE_PREFIX) !== 0 || key.slice(key.lastIndexOf(':') + 1) !== lower(name)) continue;
+          const other = host.store.get(key);
+          if (other && typeof other === 'object') {
+            say('error', `ce.patch.load: "${String(name ?? '')}" was kept for ${String(other.device ?? '')}, and this panel's synth is ${ctx.device}, so there is no patch.`);
+            return undefined;
+          }
+        }
+        say('error', `ce.patch.load: no patch called "${String(name ?? '')}" is kept for ${ctx.device}, so there is no patch.`);
+        return undefined;
+      }
+      const scope = typeof record.scope === 'string' ? record.scope : 'voice';
+      const list = scoped(ctx, scope, 'load') ?? [];
+      const patch = __patchMake({ device: ctx.device, role: ctx.role, scope, name: record.name }, copyValues(record.values), list, 'library');
+      patch.name = String(record.name ?? name);
+      return patch;
+    }
+
+    function listKept(opts) {
+      const ctx = context(opt(opts, 'role'));
+      const scope = opt(opts, 'scope');
+      const prefix = `${STORE_PREFIX}${ctx.device}:`;
+      const out = [];
+      for (const key of host.store.keys()) {
+        if (key.indexOf(prefix) !== 0) continue;
+        const record = host.store.get(key);
+        if (!record || typeof record !== 'object') continue;
+        if (typeof scope === 'string' && scope !== '' && record.scope !== scope) continue;
+        out.push({ name: String(record.name ?? ''), scope: String(record.scope ?? 'voice'), savedAt: String(record.savedAt ?? '') });
+      }
+      // Newest first; the same time (or none) by name, so every language lists them alike.
+      out.sort((a, b) => (a.savedAt < b.savedAt ? 1 : a.savedAt > b.savedAt ? -1 : a.name < b.name ? -1 : a.name > b.name ? 1 : 0));
+      return out;
+    }
+
+    function forget(name, opts) {
+      const ctx = context(opt(opts, 'role'));
+      const key = storeKey(ctx.device, String(name ?? ''));
+      const record = host.store.get(key);
+      if (record === undefined || record === null) return false;
+      host.store.remove(key);
+      return true;
+    }
+
+    function write(patch, slot, opts) {
+      const at = forPatch(patch, 'write');
+      if (at === null) return { ok: false, slot, error: 'not a patch of this synth' };
+      const how = at.ctx.section && typeof at.ctx.section.write === 'object' ? at.ctx.section.write : null;
+      const n = toNumber(slot);
+      if (!Number.isFinite(n) || n < 0 || Math.floor(n) !== n) {
+        say('error', 'ce.patch.write: slot must be a whole number from 0, so nothing was stored.');
+        return { ok: false, slot, error: 'not a slot' };
+      }
+      if (!how || how.via !== 'dump' || typeof how.dump !== 'string' || how.dump === '') {
+        const why = how && how.via === 'command'
+          ? 'its profile stores a slot with a write command, which ce.patch cannot send yet'
+          : 'its profile does not say how to store a slot (patch.write)';
+        say('error', `ce.patch.write: ${at.ctx.device} cannot be written to: ${why}, so nothing was stored.`);
+        return { ok: false, slot: n, error: why };
+      }
+      host.setVariable('slot', n, at.ctx.role);
+      host.fill(copyValues(patch.values));
+      host.sendDump(how.dump);
+      return { ok: true, slot: n };
+    }
+
+    return {
+      current,
+      read,
+      load,
+      morph: (a, b, t, opts) => { const at = forPatch(a, 'morph'); return at === null ? undefined : __patchMorph(a, b, t, at.list, opts, say); },
+      blend: (patches, weights, opts) => {
+        const first = Array.isArray(patches) ? patches[0] : undefined;
+        const at = forPatch(first, 'blend');
+        return at === null ? undefined : __patchBlend(patches, weights, at.list, opts, say);
+      },
+      random: (opts) => {
+        const from = opt(opts, 'from');
+        const base = from === undefined || from === null ? current(opt(opts, 'scope'), { role: opt(opts, 'role') }) : from;
+        if (base === undefined) return undefined;
+        const at = forPatch(base, 'random');
+        if (at === null) return undefined;
+        if (at.ctx.params === null) {
+          say('error', 'ce.patch.random: a panel without a device profile does not say each control\'s range, so nothing was drawn.');
+          return undefined;
+        }
+        const next = seeded(opts, 'random');
+        return next === null ? undefined : __patchRandom(base, at.list, opts, next, say);
+      },
+      mutate: (patch, amount, opts) => {
+        const at = forPatch(patch, 'mutate');
+        if (at === null) return undefined;
+        if (at.ctx.params === null) {
+          say('error', 'ce.patch.mutate: a panel without a device profile does not say each control\'s range, so nothing was changed.');
+          return undefined;
+        }
+        const next = seeded(opts, 'mutate');
+        return next === null ? undefined : __patchMutate(patch, amount, at.list, opts, next, say);
+      },
+      merge: (base, other, opts) => { const at = forPatch(base, 'merge'); return at === null ? undefined : __patchMerge(base, other, at.list, opts, say); },
+      diff: (a, b, opts) => { const at = forPatch(a, 'diff'); return at === null ? undefined : __patchDiff(a, b, at.list, opts, say); },
+      equal: (a, b, opts) => { const at = forPatch(a, 'equal'); return at === null ? undefined : __patchEqual(a, b, at.list, opts, say); },
+      apply,
+      save,
+      list: listKept,
+      forget,
+      write,
+      scopes,
+      define,
+    };
+  }
+return { patchCommands: __patchCommands };
+})();
+var __patch = __patchCore.patchCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  profile: function (role) { return __deviceQuery("profile", { role: role }); },
+  parameters: function (role) { return __deviceQuery("parameters", { role: role }) || []; },
+  read: function (id, role) { return __deviceQuery("read", { role: role, id: String(id) }); },
+  write: function (id, value, role) { return deviceWrite(id, value, role) === true; },
+  fill: function (values) { return applyDump(values); },
+  snapshot: function () { return panelSnapshot() || {}; },
+  restore: function (values) { return panelRestore(values); },
+  requestDump: function (kind, fn, opts) { return requestDump(kind, fn, opts); },
+  sendDump: function (kind) { return sendDump(kind); },
+  setVariable: function (name, value, role) { return deviceSetVariable(name, value, role); },
+  patchSection: function (role) { return __deviceQuery("patch", { role: role }); },
+  random: function () { return random(); },
+  now: function () { var t = __deviceQuery("now", null); return typeof t === "string" ? t : ""; },
+  store: {
+    get: function (key) { return loadSetting(key); },
+    set: function (key, value) { return saveSetting(key, value); },
+    keys: function () { return listSettings() || []; },
+    remove: function (key) { return forgetSetting(key); }
+  }
+});
+function patchCurrent(scope, opts) { return __patch.current(scope, opts); }
+function patchRead(scope, fn, opts) { return __patch.read(scope, fn, opts); }
+function patchLoad(name, opts) { return __patch.load(name, opts); }
+function patchMorph(a, b, t, opts) { return __patch.morph(a, b, t, opts); }
+function patchBlend(patches, weights, opts) { return __patch.blend(patches, weights, opts); }
+function patchRandom(opts) { return __patch.random(opts); }
+function patchMutate(patch, amount, opts) { return __patch.mutate(patch, amount, opts); }
+function patchMerge(base, other, opts) { return __patch.merge(base, other, opts); }
+function patchDiff(a, b, opts) { return __patch.diff(a, b, opts); }
+function patchEqual(a, b, opts) { return __patch.equal(a, b, opts); }
+function patchApply(patch, opts) { return __patch.apply(patch, opts); }
+function patchSave(name, patch, opts) { return __patch.save(name, patch, opts); }
+function patchList(opts) { return __patch.list(opts); }
+function patchForget(name, opts) { return __patch.forget(name, opts); }
+function patchWrite(patch, slot, opts) { return __patch.write(patch, slot, opts); }
+function patchScopes(role) { return __patch.scopes(role); }
+function patchDefine(scope, spec, role) { return __patch.define(scope, spec, role); }
+// END GENERATED ce.patch
+
+// BEGIN GENERATED ce.verify — tools/scripts/gen-verify-prelude.mjs, from verifyCore.js. Do not edit by hand.
+// @module ce.verify
+var __verifyCore = (function () {
+  // ce.verify — asking the synth whether it holds what was sent: the part that is the same in every
+  // runtime.
+  //
+  // Design record: docs/design/ce-verify-module.md. The runtimes give this file a host (panelRuntime.js,
+  // and the `@module ce.verify` sections of the Lua, JavaScript and Python preludes); everything that
+  // decides something is here: which dumps hold which parameters, when two values are the same, the
+  // report, the one line a report becomes. The JavaScript prelude runs this file itself
+  // (tools/scripts/gen-verify-prelude.mjs); the Lua and Python preludes are ports held to the same
+  // answers by test/verifyParity.test.js.
+  //
+  // The host: `{ say(level, text), parameters(role), layout(role), read(id, role),
+  // write(id, value, role), sendDump(kind), patchSection(role), connected(role),
+  // requestDump(kind, fn), after(ms, fn), clock(), emit(report), jobs }`, `jobs` optional.
+  // `layout(role)` gives the profile's `{ dumps, requests, encodings, gapMs }`: its dumpDefinitions
+  // and requests as written, each parameter's encoding by id, and the profile's gap between messages.
+  //
+  // The read-back is always a dump the synth sent after the check asked for it: requestDump fills the
+  // panel from it, so what the panel held is read BEFORE each request, never after.
+
+  const VERIFY_WHY = ['notInDump', 'noRequest', 'noReply', 'badChecksum', 'notWritable', 'moved', 'cancelled'];
+  const WHY_WORDS = {
+    notInDump: 'not in a dump', noRequest: 'no request', noReply: 'no reply', badChecksum: 'bad checksum',
+    notWritable: 'not writable', moved: 'moved', cancelled: 'cancelled',
+  };
+  // The reasons a check could have avoided: a report with one of these is not ok.
+  const AVOIDABLE = ['noReply', 'badChecksum', 'moved', 'cancelled'];
+  const MAIN_ROLE = 'mainSynth';
+  const TEXT_SAMPLE = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ012345';
+  const NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+  /* -------------------------------------------------------------------------------- helpers */
+
+  function toNumber(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && NUMBER_TEXT.test(v.trim())) return Number(v.trim());
+    return NaN;
+  }
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  function lower(s) {
+    return String(s ?? '').toLowerCase();
+  }
+
+  function contains(list, value) {
+    for (const x of list) if (x === value) return true;
+    return false;
+  }
+
+  function listOf(v) {
+    return Array.isArray(v) ? v : [];
+  }
+
+  function textList(v) {
+    if (typeof v === 'string') return v === '' ? [] : [v];
+    const out = [];
+    for (const x of listOf(v)) if (typeof x === 'string' && x !== '') out.push(x);
+    return out;
+  }
+
+  function roleOf(v) {
+    return typeof v === 'string' && v !== '' ? v : MAIN_ROLE;
+  }
+
+  function roundHalfAway(x) {
+    return x < 0 ? -Math.floor(-x + 0.5) : Math.floor(x + 0.5);
+  }
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  /* ----------------------------------------------------------------------- parameter kinds */
+
+  /** 'number', 'choice', 'text' or 'action', as ce.patch reads a descriptor. */
+  function kindOf(desc) {
+    const type = String(desc?.type ?? '');
+    if (type === 'action' || type === 'momentary' || type === 'trigger') return 'action';
+    if (type === 'text') return 'text';
+    if (type === 'choice' || type === 'boolean' || type === 'enum' || type === 'bool') return 'choice';
+    if (Array.isArray(desc?.choices) && desc.choices.length > 0) return 'choice';
+    return 'number';
+  }
+
+  function writable(desc) {
+    const access = desc?.access;
+    if (typeof access === 'string') return lower(access).indexOf('write') >= 0;
+    if (access && typeof access === 'object' && access.canWrite === false) return false;
+    return true;
+  }
+
+  function isWhole(desc) {
+    return String(desc?.type ?? '') !== 'float';
+  }
+
+  function rangeOf(desc) {
+    const range = desc?.range && typeof desc.range === 'object' ? desc.range : {};
+    const lo = toNumber(range.min);
+    const hi = toNumber(range.max);
+    const a = Number.isFinite(lo) ? lo : 0;
+    const b = Number.isFinite(hi) ? hi : 127;
+    return a <= b ? [a, b] : [b, a];
+  }
+
+  function choicesOf(desc) {
+    const out = [];
+    for (const c of listOf(desc?.choices)) {
+      if (c && typeof c === 'object') {
+        if (present(c.id)) out.push(c.id);
+        else if (present(c.value)) out.push(c.value);
+      } else if (present(c)) {
+        out.push(c);
+      }
+    }
+    if (out.length === 0 && (String(desc?.type ?? '') === 'boolean' || String(desc?.type ?? '') === 'bool')) {
+      out.push(false);
+      out.push(true);
+    }
+    return out;
+  }
+
+  /** The finest step a float can carry on the wire: 14 bits across its range. */
+  function floatStep(desc) {
+    const [lo, hi] = rangeOf(desc);
+    return (hi - lo) / 16383;
+  }
+
+  /**
+   * When two values are the same, in the parameter's own units: numbers after rounding to what the
+   * wire carries (a whole number, or a float's finest 14-bit step), text without trailing spaces and
+   * padding, a choice by its id, an on/off by its state.
+   */
+  function __verifySame(desc, a, b) {
+    if (!present(a) || !present(b)) return false;
+    if (typeof a === 'boolean' || typeof b === 'boolean') {
+      const x = typeof a === 'boolean' ? a : toNumber(a) !== 0;
+      const y = typeof b === 'boolean' ? b : toNumber(b) !== 0;
+      return x === y;
+    }
+    const x = toNumber(a);
+    const y = toNumber(b);
+    if (typeof a === 'number' && typeof b === 'number' && Number.isFinite(x) && Number.isFinite(y)) {
+      if (isWhole(desc)) return roundHalfAway(x) === roundHalfAway(y);
+      return Math.abs(x - y) <= floatStep(desc) / 2 + 1e-9;
+    }
+    return String(a).replace(/[\s\u0000]+$/, '') === String(b).replace(/[\s\u0000]+$/, '');
+  }
+
+  /** For a choice: the value the synth gave when the profile does not name it, else nothing. */
+  function rawOf(desc, got) {
+    if (kindOf(desc) !== 'choice' || !present(got) || typeof got === 'boolean') return null;
+    const choices = choicesOf(desc);
+    if (choices.length === 0) return null;
+    for (const c of choices) if (c === got) return null;
+    return got;
+  }
+
+  /* ------------------------------------------------------------------------------- layout */
+
+  /** How many bytes a mapped value takes in the payload, from its encoding. */
+  function __verifyByteWidth(encoding) {
+    const e = encoding && typeof encoding === 'object' ? encoding : {};
+    const type = String(e.type ?? 'u7');
+    const length = toNumber(e.length);
+    const nibbles = toNumber(e.nibbles);
+    if (type === 'text-ascii' || type === 'ascii' || type === 'fixed-ascii') return Number.isFinite(length) && length > 0 ? length : 1;
+    if (type === 'text-nibbled-ascii' || type === 'nibbled-ascii' || type === 'packed-nibbled-ascii') {
+      if (Number.isFinite(nibbles) && nibbles > 0) return nibbles;
+      return Number.isFinite(length) && length > 0 ? length * 2 : 2;
+    }
+    if (type === 'u14' || type === 'u14-msb-lsb' || type === 'u14-lsb-msb') return 2;
+    if (type === 'nibbled') return Number.isFinite(nibbles) && nibbles > 0 ? nibbles : 2;
+    return 1;
+  }
+
+  function intOr(v, fallback) {
+    const n = toNumber(v);
+    return Number.isFinite(n) ? Math.floor(n) : fallback;
+  }
+
+  /**
+   * The profile's dumps, as a check reads them: `{ id, name, request, timeoutMs, retries,
+   * expectedBytes, layoutBytes, payloadSize, mappings: [{ parameter, offset, size }] }`, in the
+   * profile's order. `request` is the request whose answer is the dump, or ''.
+   */
+  function __verifyDumps(layout) {
+    const requests = listOf(layout?.requests);
+    const encodings = layout?.encodings && typeof layout.encodings === 'object' ? layout.encodings : {};
+    const out = [];
+    for (const d of listOf(layout?.dumps)) {
+      if (!d || typeof d !== 'object' || typeof d.id !== 'string' || d.id === '') continue;
+      let request = '';
+      let timeoutMs = 2000;
+      let retries = 0;
+      for (const r of requests) {
+        if (!r || typeof r !== 'object') continue;
+        const answer = r.response && typeof r.response === 'object' && typeof r.response.dump === 'string' ? r.response.dump
+          : (typeof r.expectedDump === 'string' ? r.expectedDump : '');
+        if (answer === d.id && typeof r.id === 'string' && r.id !== '') {
+          request = r.id;
+          timeoutMs = intOr(r.timeoutMs, 2000);
+          retries = intOr(r.retries, 0);
+          break;
+        }
+      }
+      const matcher = d.matcher && typeof d.matcher === 'object' ? d.matcher : {};
+      const prefix = listOf(matcher.prefix).length;
+      const suffix = listOf(matcher.suffix).length;
+      const payload = d.payload && typeof d.payload === 'object' ? d.payload : {};
+      const payloadOffset = intOr(payload.offset, prefix);
+      const payloadSize = intOr(payload.size, 0);
+      const pack = payload.pack && typeof payload.pack === 'object' ? payload.pack : null;
+      let wire = payloadSize;
+      if (pack && pack.type === 'packed8to7' && payloadSize > 0) {
+        const group = Math.max(1, intOr(pack.groupSize, 7));
+        wire = payloadSize + Math.floor((payloadSize + group - 1) / group);
+      }
+      let end = payloadOffset + wire;
+      const checksum = d.checksum && typeof d.checksum === 'object' ? d.checksum : null;
+      if (checksum && Number.isFinite(toNumber(checksum.byteOffset))) {
+        end = Math.max(end, intOr(checksum.byteOffset, 0) + Math.max(1, intOr(checksum.byteCount, 1)));
+      }
+      const completion = d.completion && typeof d.completion === 'object' ? d.completion : {};
+      const expected = toNumber(completion.expectedBytes);
+      const mappings = [];
+      for (const m of listOf(d.mappings)) {
+        if (!m || typeof m !== 'object' || typeof m.parameter !== 'string') continue;
+        const codec = m.codec && typeof m.codec === 'object' ? m.codec : encodings[m.parameter];
+        mappings.push({ parameter: m.parameter, offset: intOr(m.offset, 0), size: __verifyByteWidth(codec) });
+      }
+      out.push({
+        id: d.id,
+        name: typeof d.name === 'string' && d.name !== '' ? d.name : d.id,
+        request,
+        timeoutMs,
+        retries,
+        expectedBytes: Number.isFinite(expected) ? Math.floor(expected) : null,
+        layoutBytes: end + suffix,
+        payloadSize,
+        mappings,
+      });
+    }
+    return out;
+  }
+
+  /** The payload byte ranges no parameter reads, as `{ from, to }`, both ends counted. */
+  function __verifyUnread(dump) {
+    const read = [];
+    for (let i = 0; i < dump.payloadSize; i += 1) read.push(false);
+    for (const m of dump.mappings) {
+      for (let i = m.offset; i < m.offset + m.size; i += 1) if (i >= 0 && i < dump.payloadSize) read[i] = true;
+    }
+    const out = [];
+    let from = -1;
+    for (let i = 0; i < dump.payloadSize; i += 1) {
+      if (!read[i] && from < 0) from = i;
+      if (read[i] && from >= 0) {
+        out.push({ from, to: i - 1 });
+        from = -1;
+      }
+    }
+    if (from >= 0) out.push({ from, to: dump.payloadSize - 1 });
+    return out;
+  }
+
+  /** Parameter id -> the first dump that holds it. */
+  function dumpIndex(dumps) {
+    const index = {};
+    for (const d of dumps) {
+      for (const m of d.mappings) if (!present(index[m.parameter])) index[m.parameter] = d;
+    }
+    return index;
+  }
+
+  /* ------------------------------------------------------------------------- choosing */
+
+  /**
+   * The parameters a check is asked about, in the profile's order: `ids`, or a `group`, or every
+   * parameter but the actions. An id the profile does not have is left out, with a warning.
+   */
+  function __verifyChoose(params, opts, say, verb) {
+    const ids = textList(opt(opts, 'ids'));
+    const group = opt(opts, 'group');
+    const out = [];
+    if (ids.length > 0) {
+      const known = {};
+      for (const desc of params) known[String(desc.id)] = true;
+      for (const id of ids) {
+        if (!known[id]) say('warn', `ce.verify.${verb}: "${id}" is not a parameter of the synth, so it was left out.`);
+      }
+      for (const desc of params) if (contains(ids, String(desc.id))) out.push(desc);
+      return out;
+    }
+    if (typeof group === 'string' && group !== '') {
+      for (const desc of params) if (lower(desc.group) === lower(group)) out.push(desc);
+      if (out.length === 0) say('warn', `ce.verify.${verb}: the synth has no parameters in the group "${group}".`);
+      return out;
+    }
+    for (const desc of params) if (kindOf(desc) !== 'action') out.push(desc);
+    return out;
+  }
+
+  /** coverage(): which of `list` a check can read back, and why not the rest. */
+  function __verifyCoverage(list, dumps, role) {
+    const index = dumpIndex(dumps);
+    const unchecked = [];
+    const used = [];
+    let checkable = 0;
+    for (const desc of list) {
+      const id = String(desc.id);
+      const d = index[id];
+      if (!d) unchecked.push({ id, name: String(desc.name ?? id), why: 'notInDump' });
+      else if (d.request === '') unchecked.push({ id, name: String(desc.name ?? id), why: 'noRequest' });
+      else checkable += 1;
+      if (d && !contains(used, d)) used.push(d);
+    }
+    const out = [];
+    for (const d of dumps) {
+      if (!contains(used, d)) continue;
+      out.push({ kind: d.id, expectedBytes: d.expectedBytes, layoutBytes: d.layoutBytes, unread: __verifyUnread(d) });
+    }
+    return { role, total: list.length, checkable, unchecked, dumps: out };
+  }
+
+  /* ------------------------------------------------------------------------------- reports */
+
+  function __verifyIsReport(r) {
+    return r !== null && typeof r === 'object' && !Array.isArray(r) && typeof r.kind === 'string'
+      && Array.isArray(r.matched) && Array.isArray(r.differed) && Array.isArray(r.unchecked);
+  }
+
+  function shortWhy(report) {
+    for (const d of listOf(report.dumps)) {
+      if (d && d.status !== 'ok') return `${WHY_WORDS[d.status] ?? String(d.status)}: ${String(d.kind)}`;
+    }
+    // The reason a check could have avoided first, as it is the one worth acting on; then the
+    // commonest, the first of equals.
+    const counts = {};
+    let best = '';
+    let avoidable = '';
+    for (const u of report.unchecked) {
+      const why = String(u?.why ?? '');
+      counts[why] = (counts[why] ?? 0) + 1;
+      if (best === '' || counts[why] > counts[best]) best = why;
+      if (contains(AVOIDABLE, why) && (avoidable === '' || counts[why] > counts[avoidable])) avoidable = why;
+    }
+    if (avoidable !== '') best = avoidable;
+    return best === '' ? '' : (WHY_WORDS[best] ?? best);
+  }
+
+  /**
+   * A report as one line: "1180 of 1222 match, 3 differ, 39 unchecked (no reply: tone3)". With a
+   * width, the reason in brackets goes first, then the words are shortened, then the line is cut.
+   */
+  function __verifySummary(report, opts) {
+    const total = Number.isFinite(toNumber(report.total)) ? toNumber(report.total) : report.matched.length + report.differed.length + report.unchecked.length;
+    const lead = report.cancelled === true ? 'cancelled: ' : '';
+    const why = shortWhy(report);
+    const base = `${lead}${report.matched.length} of ${total} match, ${report.differed.length} differ, ${report.unchecked.length} unchecked`;
+    const full = why === '' ? base : `${base} (${why})`;
+    const width = toNumber(opt(opts, 'width'));
+    if (!Number.isFinite(width) || width <= 0) return full;
+    const w = Math.floor(width);
+    if (full.length <= w) return full;
+    if (base.length <= w) return base;
+    const short = `${report.cancelled === true ? 'cancel ' : ''}${report.matched.length}/${total} ok ${report.differed.length} diff ${report.unchecked.length} unchk`;
+    return short.length <= w ? short : short.slice(0, w);
+  }
+
+  /* ------------------------------------------------------------------------------ commands */
+
+  function __verifyCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    // role -> the job running on it. A host may hand in a table every script shares, so a script's
+    // Stop button can cancel what another script's Check button started.
+    const running = host.jobs && typeof host.jobs === 'object' ? host.jobs : {};
+
+    function finish(job) {
+      if (job.finished) return;
+      job.finished = true;
+      if (running[job.role] === job) delete running[job.role];
+      const r = job.report;
+      let ok = r.differed.length === 0 && r.cancelled !== true;
+      for (const u of r.unchecked) if (contains(AVOIDABLE, u.why)) ok = false;
+      for (const d of r.dumps) if (d.status !== 'ok') ok = false;
+      r.ok = ok;
+      r.ms = Math.max(0, Math.floor(host.clock() - job.start));
+      try {
+        job.fn(r);
+      } catch (e) {
+        say('error', `ce.verify.${r.kind}: the function given to it failed: ${String(e && e.message ? e.message : e)}`);
+      }
+      host.emit(r);
+    }
+
+    function newJob(kind, role, fn, total, steps) {
+      const job = {
+        kind, role, fn, steps, at: 0, finished: false, cancelled: false, step: null, start: host.clock(),
+        report: { kind, role, ok: false, total, matched: [], differed: [], unchecked: [], dumps: [], probes: [], ms: 0, cancelled: false },
+        onCancel: null,
+      };
+      running[role] = job;
+      return job;
+    }
+
+    /** A check that talks to the synth may start: a function to call, the main synth, connected, idle. */
+    function mayStart(verb, role, fn) {
+      if (typeof fn !== 'function') {
+        say('error', `ce.verify.${verb}: fn must be a function to call with the report, so nothing was checked.`);
+        return false;
+      }
+      if (role !== MAIN_ROLE) {
+        say('error', `ce.verify.${verb}: only the main synth can be asked for a dump, and "${role}" is not it, so nothing was checked.`);
+        return false;
+      }
+      if (running[role]) return false;
+      return host.connected(role) === true;
+    }
+
+    /**
+     * Ask for one dump and call `done(values)` with what came back, or `done(null)` when nothing did.
+     * Only the first answer counts: a refused request still times out later, and a cancelled check
+     * hears nothing more.
+     */
+    function ask(job, dump, done) {
+      const step = { settled: false };
+      job.step = step;
+      const answer = (values, info) => {
+        if (step.settled || job.finished) return;
+        step.settled = true;
+        job.step = null;
+        const ok = info && info.ok === true && values && typeof values === 'object';
+        done(ok ? values : null);
+      };
+      const asked = host.requestDump(dump.request, answer);
+      if (asked === false) answer(null, { ok: false });
+    }
+
+    function later(job, ms, fn) {
+      host.after(Math.max(1, Math.floor(ms)), () => {
+        if (!job.finished) fn();
+      });
+    }
+
+    function descriptors(role) {
+      const params = host.parameters(role);
+      return Array.isArray(params) ? params : [];
+    }
+
+    function context(role) {
+      const params = descriptors(role);
+      const layout = host.layout(role);
+      const dumps = __verifyDumps(layout);
+      const gap = toNumber(layout?.gapMs);
+      return { role, params, dumps, index: dumpIndex(dumps), gapMs: Number.isFinite(gap) && gap > 0 ? gap : 0, encodings: layout?.encodings ?? {} };
+    }
+
+    function nameOf(desc) {
+      return String(desc.name ?? desc.id);
+    }
+
+    function leave(job, desc, why) {
+      job.report.unchecked.push({ id: String(desc.id), name: nameOf(desc), why });
+    }
+
+    function judge(job, desc, expected, got) {
+      if (__verifySame(desc, expected, got)) {
+        job.report.matched.push(String(desc.id));
+      } else {
+        job.report.differed.push({ id: String(desc.id), name: nameOf(desc), expected: present(expected) ? expected : null, got: present(got) ? got : null, raw: rawOf(desc, got) });
+      }
+    }
+
+    /**
+     * Plan a compare: the parameters by the dump that holds them, in the profile's order, and those
+     * no dump can bring back left unchecked with the reason.
+     */
+    function plan(job, ctx, list) {
+      const steps = [];
+      for (const d of ctx.dumps) {
+        if (d.request === '') continue;
+        const held = [];
+        for (const desc of list) if (ctx.index[String(desc.id)] === d) held.push(desc);
+        if (held.length > 0) steps.push({ dump: d, params: held });
+      }
+      for (const desc of list) {
+        const d = ctx.index[String(desc.id)];
+        if (!d) leave(job, desc, 'notInDump');
+        else if (d.request === '') leave(job, desc, 'noRequest');
+      }
+      return steps;
+    }
+
+    /** Ask for each step's dump in turn and compare what came back with what the panel held. */
+    function compareSteps(job, ctx, steps, before) {
+      job.steps = steps;
+      job.at = 0;
+      job.onCancel = () => {
+        for (let i = job.at; i < steps.length; i += 1) for (const desc of steps[i].params) leave(job, desc, 'cancelled');
+      };
+      const next = () => {
+        if (job.at >= steps.length) { finish(job); return; }
+        const step = steps[job.at];
+        const expected = {};
+        for (const desc of step.params) expected[String(desc.id)] = host.read(String(desc.id), ctx.role);
+        ask(job, step.dump, (values) => {
+          job.at += 1;
+          job.report.dumps.push({ kind: step.dump.id, status: values ? 'ok' : 'noReply', expectedBytes: step.dump.expectedBytes });
+          for (const desc of step.params) {
+            const id = String(desc.id);
+            if (!values) leave(job, desc, 'noReply');
+            else if (!__verifySame(desc, before[id], expected[id]) && (present(before[id]) || present(expected[id]))) leave(job, desc, 'moved');
+            else if (!present(values[id])) leave(job, desc, 'noReply');
+            else judge(job, desc, expected[id], values[id]);
+          }
+          if (job.at >= steps.length) finish(job);
+          else later(job, ctx.gapMs, next);
+        });
+      };
+      next();
+    }
+
+    function snapshot(ctx, list) {
+      const out = {};
+      for (const desc of list) out[String(desc.id)] = host.read(String(desc.id), ctx.role);
+      return out;
+    }
+
+    function splitArgs(a, b) {
+      return typeof a === 'function' ? { opts: undefined, fn: a } : { opts: a, fn: b };
+    }
+
+    function coverage(opts) {
+      const ctx = context(roleOf(opt(opts, 'role')));
+      return __verifyCoverage(__verifyChoose(ctx.params, opts, say, 'coverage'), ctx.dumps, ctx.role);
+    }
+
+    function check(a, b) {
+      const { opts, fn } = splitArgs(a, b);
+      const role = roleOf(opt(opts, 'role'));
+      if (!mayStart('check', role, fn)) return false;
+      const ctx = context(role);
+      const list = __verifyChoose(ctx.params, opts, say, 'check');
+      const job = newJob('check', role, fn, list.length, []);
+      compareSteps(job, ctx, plan(job, ctx, list), snapshot(ctx, list));
+      return true;
+    }
+
+    function dump(kind, a, b) {
+      const { opts, fn } = splitArgs(a, b);
+      const role = roleOf(opt(opts, 'role'));
+      if (typeof kind !== 'string' || kind === '') {
+        say('error', 'ce.verify.dump: kind must be the id of a dump in the profile, so nothing was checked.');
+        return false;
+      }
+      if (!mayStart('dump', role, fn)) return false;
+      const ctx = context(role);
+      let d = null;
+      for (const x of ctx.dumps) if (x.id === kind || (x.request !== '' && x.request === kind)) { d = x; break; }
+      if (d === null || d.request === '') {
+        say('error', `ce.verify.dump: the profile has ${d === null ? 'no dump' : 'no request for the dump'} "${kind}", so nothing was checked.`);
+        return false;
+      }
+      const timesGiven = toNumber(opt(opts, 'times'));
+      const times = Number.isFinite(timesGiven) ? Math.min(10, Math.max(2, Math.floor(timesGiven))) : 2;
+      const gapGiven = toNumber(opt(opts, 'gapMs'));
+      const gapMs = Number.isFinite(gapGiven) && gapGiven >= 0 ? gapGiven : 500;
+      const list = [];
+      for (const desc of ctx.params) if (ctx.index[String(desc.id)] === d) list.push(desc);
+      const job = newJob('dump', role, fn, list.length, []);
+      const replies = [];
+      let asked = 0;
+      job.onCancel = () => {
+        for (const desc of list) leave(job, desc, 'cancelled');
+      };
+      const end = () => {
+        if (replies.length < times) {
+          for (const desc of list) leave(job, desc, 'noReply');
+        } else {
+          const first = replies[0];
+          const last = replies[replies.length - 1];
+          for (const desc of list) {
+            const id = String(desc.id);
+            if (!present(first[id]) || !present(last[id])) leave(job, desc, 'noReply');
+            else judge(job, desc, first[id], last[id]);
+          }
+        }
+        finish(job);
+      };
+      const next = () => {
+        asked += 1;
+        ask(job, d, (values) => {
+          job.report.dumps.push({ kind: d.id, status: values ? 'ok' : 'noReply', expectedBytes: d.expectedBytes });
+          job.at = asked;
+          if (!values) { end(); return; }
+          replies.push(values);
+          if (asked >= times) end();
+          else later(job, gapMs, next);
+        });
+      };
+      job.steps = [];
+      for (let i = 0; i < times; i += 1) job.steps.push(d);
+      next();
+      return true;
+    }
+
+    function findParam(ctx, id, verb) {
+      for (const desc of ctx.params) if (String(desc.id) === id) return desc;
+      say('error', `ce.verify.${verb}: "${String(id)}" is not a parameter of the synth, so nothing was checked.`);
+      return null;
+    }
+
+    function settleOf(opts) {
+      const given = toNumber(opt(opts, 'settleMs'));
+      return Number.isFinite(given) && given >= 0 ? given : 100;
+    }
+
+    /**
+     * Write `value`, wait, ask for the dump that holds it, and call `done(got, why)`: what came back,
+     * or nothing and the reason it was not read.
+     */
+    function writeAndRead(job, ctx, desc, value, settleMs, done) {
+      const id = String(desc.id);
+      const d = ctx.index[id];
+      host.write(id, value, ctx.role);
+      if (!d) { done(null, 'notInDump'); return; }
+      if (d.request === '') { done(null, 'noRequest'); return; }
+      later(job, settleMs, () => {
+        const now = host.read(id, ctx.role);
+        if (present(now) && !__verifySame(desc, now, value)) { done(null, 'moved'); return; }
+        ask(job, d, (values) => {
+          job.report.dumps.push({ kind: d.id, status: values ? 'ok' : 'noReply', expectedBytes: d.expectedBytes });
+          if (!values || !present(values[id])) done(null, 'noReply');
+          else done(values[id], '');
+        });
+      });
+    }
+
+    function write(id, value, a, b) {
+      const { opts, fn } = splitArgs(a, b);
+      const role = roleOf(opt(opts, 'role'));
+      if (!mayStart('write', role, fn)) return false;
+      const ctx = context(role);
+      const desc = findParam(ctx, String(id ?? ''), 'write');
+      if (desc === null) return false;
+      if (!present(value)) {
+        say('error', 'ce.verify.write: value must be given, so nothing was checked.');
+        return false;
+      }
+      const job = newJob('write', role, fn, 1, [ctx.index[String(desc.id)]]);
+      job.onCancel = () => leave(job, desc, 'cancelled');
+      if (!writable(desc)) {
+        leave(job, desc, 'notWritable');
+        finish(job);
+        return true;
+      }
+      writeAndRead(job, ctx, desc, value, settleOf(opts), (got, why) => {
+        job.at = 1;
+        if (why !== '') leave(job, desc, why);
+        else judge(job, desc, value, got);
+        finish(job);
+      });
+      return true;
+    }
+
+    /** The values a probe tries when it is given none. */
+    function probeValues(desc, ctx) {
+      const kind = kindOf(desc);
+      const out = [];
+      const add = (v) => {
+        for (const x of out) if (x === v) return;
+        out.push(v);
+      };
+      if (kind === 'choice') {
+        const choices = choicesOf(desc);
+        if (choices.length <= 16) for (const c of choices) add(c);
+        else {
+          add(choices[0]);
+          add(choices[Math.floor(choices.length / 2)]);
+          add(choices[choices.length - 1]);
+        }
+        return out;
+      }
+      if (kind === 'text') {
+        const enc = ctx.encodings && typeof ctx.encodings === 'object' ? ctx.encodings[String(desc.id)] : null;
+        const length = toNumber(enc && typeof enc === 'object' ? enc.length : undefined);
+        const n = Number.isFinite(length) && length > 0 ? Math.min(TEXT_SAMPLE.length, Math.floor(length)) : 8;
+        add(TEXT_SAMPLE.slice(0, n));
+        add('');
+        return out;
+      }
+      const [lo, hi] = rangeOf(desc);
+      const step = isWhole(desc) ? 1 : (hi - lo) / 100;
+      let mid = lo + (hi - lo) / 2;
+      if (isWhole(desc)) mid = roundHalfAway(mid);
+      for (const v of [lo, lo + step, mid, hi - step, hi]) if (v >= lo && v <= hi) add(v);
+      return out;
+    }
+
+    function probe(id, a, b) {
+      const { opts, fn } = splitArgs(a, b);
+      const role = roleOf(opt(opts, 'role'));
+      if (!mayStart('probe', role, fn)) return false;
+      const ctx = context(role);
+      const desc = findParam(ctx, String(id ?? ''), 'probe');
+      if (desc === null) return false;
+      const given = opt(opts, 'values');
+      if (present(given) && (!Array.isArray(given) || given.length === 0)) {
+        say('error', 'ce.verify.probe: values must be a list of values to try, so nothing was checked.');
+        return false;
+      }
+      const values = present(given) ? given.slice() : probeValues(desc, ctx);
+      const settleMs = settleOf(opts);
+      const pid = String(desc.id);
+      const old = host.read(pid, role);
+      const job = newJob('probe', role, fn, 1, values);
+      job.report.restored = false;
+      // Nothing is sent that cannot be read back: a probe that learns nothing should change nothing.
+      const held = ctx.index[pid];
+      const cannot = !writable(desc) ? 'notWritable' : (!held ? 'notInDump' : (held.request === '' ? 'noRequest' : ''));
+      if (cannot !== '') {
+        leave(job, desc, cannot);
+        finish(job);
+        return true;
+      }
+      let failed = false;
+      let why = '';
+      const restore = (then) => {
+        if (!present(old)) { then(); return; }
+        writeAndRead(job, ctx, desc, old, settleMs, (got, reason) => {
+          job.report.restored = reason === '' && __verifySame(desc, old, got);
+          then();
+        });
+      };
+      job.onCancel = () => {
+        // Put back without waiting: the report goes out now, and the old value follows it.
+        if (present(old)) host.write(pid, old, role);
+        if (job.report.matched.length === 0 && job.report.differed.length === 0) leave(job, desc, 'cancelled');
+      };
+      const end = () => {
+        if (why !== '') leave(job, desc, why);
+        else if (!failed) job.report.matched.push(pid);
+        restore(() => finish(job));
+      };
+      const next = () => {
+        if (job.at >= values.length) { end(); return; }
+        const value = values[job.at];
+        writeAndRead(job, ctx, desc, value, settleMs, (got, reason) => {
+          job.at += 1;
+          if (reason !== '') { why = reason; end(); return; }
+          const same = __verifySame(desc, value, got);
+          job.report.probes.push({ id: pid, value, got, same });
+          if (!same) {
+            failed = true;
+            job.report.differed.push({ id: pid, name: nameOf(desc), expected: value, got, raw: rawOf(desc, got) });
+          }
+          next();
+        });
+      };
+      next();
+      return true;
+    }
+
+    function patch(a, b) {
+      const { opts, fn } = splitArgs(a, b);
+      const role = roleOf(opt(opts, 'role'));
+      const via = opt(opts, 'via');
+      if (present(via) && via !== 'dump' && via !== 'parameters') {
+        say('error', `ce.verify.patch: via "${String(via)}" is not "dump" or "parameters", so nothing was checked.`);
+        return false;
+      }
+      if (!mayStart('patch', role, fn)) return false;
+      const ctx = context(role);
+      const list = __verifyChoose(ctx.params, opts, say, 'patch');
+      const job = newJob('patch', role, fn, list.length, []);
+      const chosen = [];
+      for (const desc of list) {
+        if (writable(desc)) chosen.push(desc);
+        else leave(job, desc, 'notWritable');
+      }
+      const before = snapshot(ctx, chosen);
+      const steps = plan(job, ctx, chosen);
+      if (opt(opts, 'send') !== false) {
+        const section = host.patchSection(role);
+        const deliver = section && typeof section === 'object' && typeof section.deliver === 'string' ? section.deliver : '';
+        const how = present(via) ? via : (deliver === 'dump' ? 'dump' : 'parameters');
+        if (how === 'dump') {
+          for (const step of steps) host.sendDump(step.dump.id);
+        } else {
+          for (const desc of chosen) {
+            const v = before[String(desc.id)];
+            if (present(v)) host.write(String(desc.id), v, role);
+          }
+        }
+      }
+      if (steps.length === 0) {
+        finish(job);
+        return true;
+      }
+      later(job, settleOf(opts), () => compareSteps(job, ctx, steps, before));
+      return true;
+    }
+
+    function summary(report, opts) {
+      if (!__verifyIsReport(report)) {
+        say('error', 'ce.verify.summary: that is not a report, as a check gives them, so there is nothing to say.');
+        return undefined;
+      }
+      return __verifySummary(report, opts);
+    }
+
+    function runningNow(role) {
+      const job = running[roleOf(role)];
+      if (!job) return null;
+      return { kind: job.kind, role: job.role, done: job.at, total: job.steps.length, ms: Math.max(0, Math.floor(host.clock() - job.start)) };
+    }
+
+    function cancel(role) {
+      const job = running[roleOf(role)];
+      if (!job) return false;
+      job.cancelled = true;
+      job.report.cancelled = true;
+      if (job.step) job.step.settled = true;
+      if (job.onCancel) job.onCancel();
+      finish(job);
+      return true;
+    }
+
+    return { coverage, check, dump, write, probe, patch, summary, running: runningNow, cancel };
+  }
+return { verifyCommands: __verifyCommands };
+})();
+var __verify = __verifyCore.verifyCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  parameters: function (role) { return __deviceQuery("parameters", { role: role }) || []; },
+  layout: function (role) { return __deviceQuery("dumpLayout", { role: role }); },
+  read: function (id, role) { return __deviceQuery("read", { role: role, id: String(id) }); },
+  write: function (id, value, role) { return deviceWrite(id, value, role) === true; },
+  sendDump: function (kind) { return sendDump(kind); },
+  patchSection: function (role) { return __deviceQuery("patch", { role: role }); },
+  connected: function (role) { return deviceConnected(role) === true; },
+  requestDump: function (kind, fn) { return requestDump(kind, fn); },
+  after: function (ms, fn) { return after(ms, fn); },
+  clock: function () { return nowMs(); },
+  emit: function (report) { emit("onVerifyDone", report); }
+});
+function verifyCoverage(opts) { return __verify.coverage(opts); }
+function verifyCheck(opts, fn) { return __verify.check(opts, fn); }
+function verifyDump(kind, opts, fn) { return __verify.dump(kind, opts, fn); }
+function verifyWrite(id, value, opts, fn) { return __verify.write(id, value, opts, fn); }
+function verifyProbe(id, opts, fn) { return __verify.probe(id, opts, fn); }
+function verifyPatch(opts, fn) { return __verify.patch(opts, fn); }
+function verifySummary(report, opts) { return __verify.summary(report, opts); }
+function verifyRunning(role) { return __verify.running(role); }
+function verifyCancel(role) { return __verify.cancel(role); }
+// END GENERATED ce.verify
+
+// BEGIN GENERATED ce.file — tools/scripts/gen-file-prelude.mjs, from fileCore.js. Do not edit by hand.
+// @module ce.file
+var __fileCore = (function () {
+  // ce.file — the part that is the same in every runtime: taking .syx and .mid files apart and putting
+  // them together. These work on bytes the script already holds, so they run everywhere, window shut
+  // too; the dialogs that bring a file's bytes in are the panel view's (panelRuntime.js).
+  //
+  // Design record: docs/design/ce-file-module.md. The JavaScript prelude runs this file itself
+  // (tools/scripts/gen-file-prelude.mjs); the Lua and Python preludes are ports held to the same
+  // answers by test/fileParity.test.js.
+  //
+  // `say(level, text)` reports a refused call ('error') or something left out ('warn').
+
+  const HEX_TEXT = /^([0-9a-fA-F]{2})*$/;
+  const DEFAULT_TICKS = 480;
+
+  /* -------------------------------------------------------------------------------- helpers */
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  function finite(v) {
+    return typeof v === 'number' && Number.isFinite(v);
+  }
+
+  function clampInt(v, lo, hi, fallback) {
+    if (!finite(v)) return fallback;
+    const x = Math.floor(v + 0.5);
+    return x < lo ? lo : (x > hi ? hi : x);
+  }
+
+  /** Bytes from a list of numbers 0 to 255, or hex text ("F0 41 10" or "F04110"). Else null. */
+  function __fileBytes(v) {
+    if (typeof v === 'string') {
+      const text = v.replace(/\s+/g, '').replace(/^0x/i, '');
+      if (!HEX_TEXT.test(text)) return null;
+      const out = [];
+      for (let i = 0; i < text.length; i += 2) out.push(parseInt(text.slice(i, i + 2), 16));
+      return out;
+    }
+    if (!Array.isArray(v)) return null;
+    const out = [];
+    for (const b of v) {
+      if (!finite(b) || b < 0 || b > 255 || Math.floor(b) !== b) return null;
+      out.push(b);
+    }
+    return out;
+  }
+
+  function startsWith(list, prefix) {
+    if (list.length < prefix.length) return false;
+    for (let i = 0; i < prefix.length; i += 1) if (list[i] !== prefix[i]) return false;
+    return true;
+  }
+
+  /* -------------------------------------------------------------------------------- SysEx */
+
+  /** The SysEx messages in a .syx file's bytes, each from F0 to F7, in order. */
+  function __fileSyxSplit(bytes, opts, say) {
+    const data = __fileBytes(bytes);
+    if (data === null) {
+      say('error', 'ce.file.syxSplit: bytes must be a list of numbers 0 to 255, or hex text, so nothing was split.');
+      return [];
+    }
+    let prefix = [];
+    const givenPrefix = opt(opts, 'prefix');
+    if (givenPrefix !== undefined && givenPrefix !== null) {
+      const p = __fileBytes(givenPrefix);
+      if (p === null) {
+        say('error', 'ce.file.syxSplit: prefix must be bytes, a list or hex text, so nothing was split.');
+        return [];
+      }
+      prefix = p;
+    }
+    const out = [];
+    let current = null;
+    let start = 0;
+    let stray = 0;
+    let firstStray = -1;
+    for (let i = 0; i < data.length; i += 1) {
+      const b = data[i];
+      if (b === 0xF0) {
+        if (current !== null) say('warn', `ce.file.syxSplit: the message at byte ${start} has no F7 before the next F0, so it was left out.`);
+        current = [b];
+        start = i;
+      } else if (current === null) {
+        stray += 1;
+        if (firstStray < 0) firstStray = i;
+      } else {
+        current.push(b);
+        if (b === 0xF7) {
+          if (startsWith(current, prefix)) out.push(current);
+          current = null;
+        }
+      }
+    }
+    if (current !== null) {
+      if (opt(opts, 'partial') === true) {
+        if (startsWith(current, prefix)) out.push(current);
+      } else {
+        say('warn', `ce.file.syxSplit: the last message, from byte ${start}, has no F7, so it was left out.`);
+      }
+    }
+    if (stray > 0) say('warn', `ce.file.syxSplit: ${stray} ${stray === 1 ? 'byte' : 'bytes'} outside any message ${stray === 1 ? 'was' : 'were'} left out, the first at byte ${firstStray}.`);
+    return out;
+  }
+
+  /** Messages as one .syx file's bytes, in the order given. */
+  function __fileSyxJoin(messages, say) {
+    if (!Array.isArray(messages)) {
+      say('error', 'ce.file.syxJoin: messages must be a list of messages, so nothing was joined.');
+      return undefined;
+    }
+    const out = [];
+    for (let i = 0; i < messages.length; i += 1) {
+      const m = __fileBytes(messages[i]);
+      if (m === null || m.length < 2 || m[0] !== 0xF0 || m[m.length - 1] !== 0xF7) {
+        say('error', `ce.file.syxJoin: message ${i + 1} does not start with F0 and end with F7, so nothing was joined.`);
+        return undefined;
+      }
+      for (const b of m) out.push(b);
+    }
+    return out;
+  }
+
+  /* ------------------------------------------------------------------------------ MIDI files */
+
+  function u16(d, at) { return d[at] * 256 + d[at + 1]; }
+  function u32(d, at) { return ((d[at] * 256 + d[at + 1]) * 256 + d[at + 2]) * 256 + d[at + 3]; }
+  function latin1(d, from, to) {
+    let s = '';
+    for (let i = from; i < to; i += 1) s += String.fromCharCode(d[i]);
+    return s;
+  }
+
+  /** Text from bytes: UTF-8 when they are, else one character per byte (Latin-1), as old files are. */
+  function textOf(d, from, to) {
+    let s = '';
+    let i = from;
+    while (i < to) {
+      const b = d[i];
+      let n = 0;
+      let cp = 0;
+      if (b < 0x80) { s += String.fromCharCode(b); i += 1; continue; }
+      if (b >= 0xC2 && b <= 0xDF) { n = 1; cp = b & 0x1F; }
+      else if (b >= 0xE0 && b <= 0xEF) { n = 2; cp = b & 0x0F; }
+      else if (b >= 0xF0 && b <= 0xF4) { n = 3; cp = b & 0x07; }
+      else return latin1(d, from, to);
+      for (let k = 1; k <= n; k += 1) {
+        const c = d[i + k];
+        if (c === undefined || i + k >= to || (c & 0xC0) !== 0x80) return latin1(d, from, to);
+        cp = cp * 64 + (c & 0x3F);
+      }
+      if ((n === 2 && cp < 0x800) || (n === 3 && (cp < 0x10000 || cp > 0x10FFFF)) || (cp >= 0xD800 && cp <= 0xDFFF)) return latin1(d, from, to);
+      s += String.fromCodePoint(cp);
+      i += n + 1;
+    }
+    return s;
+  }
+
+  /** Text as UTF-8 bytes. */
+  function utf8(text) {
+    const out = [];
+    for (const ch of text) {
+      const cp = ch.codePointAt(0);
+      if (cp < 0x80) out.push(cp);
+      else if (cp < 0x800) out.push(0xC0 | (cp >> 6), 0x80 | (cp & 0x3F));
+      else if (cp < 0x10000) out.push(0xE0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+      else out.push(0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F));
+    }
+    return out;
+  }
+
+  /** Read a variable-length number at `at`: [value, next]. */
+  function varLen(d, at, end) {
+    let value = 0;
+    let i = at;
+    for (let n = 0; n < 4; n += 1) {
+      if (i >= end) return null;
+      const b = d[i];
+      i += 1;
+      value = value * 128 + (b & 0x7F);
+      if ((b & 0x80) === 0) return [value, i];
+    }
+    return null;
+  }
+
+  function midiRefuse(say, why) {
+    say('error', `ce.file.midiRead: ${why}, so nothing was read.`);
+    return undefined;
+  }
+
+  /** One track chunk's notes and events. */
+  function readTrack(d, from, to, tpb, index, song, say) {
+    const track = { name: '', notes: [], events: [] };
+    const open = {};      // channel:note -> notes still sounding, oldest first
+    let at = from;
+    let tick = 0;
+    let status = 0;
+    let endTick = 0;
+    while (at < to) {
+      const delta = varLen(d, at, to);
+      if (delta === null) return null;
+      tick += delta[0];
+      at = delta[1];
+      if (at >= to) return null;
+      let b = d[at];
+      if (b === 0xFF) {
+        if (at + 1 >= to) return null;
+        const type = d[at + 1];
+        const len = varLen(d, at + 2, to);
+        if (len === null || len[1] + len[0] > to) return null;
+        const body = len[1];
+        const bodyEnd = body + len[0];
+        if (type === 0x03 && track.name === '') track.name = textOf(d, body, bodyEnd);
+        else if (type === 0x51 && len[0] === 3) {
+          const micro = (d[body] * 256 + d[body + 1]) * 256 + d[body + 2];
+          if (micro > 0) song.tempos.push({ beat: tick / tpb, bpm: 60000000 / micro });
+        } else if (type === 0x58 && len[0] >= 2 && song.timeSignature === null) {
+          song.timeSignature = [d[body], Math.pow(2, d[body + 1])];
+        } else if (type === 0x2F) {
+          endTick = tick;
+          at = bodyEnd;
+          break;
+        }
+        at = bodyEnd;
+        endTick = tick;
+        continue;
+      }
+      if (b === 0xF0 || b === 0xF7) {
+        const len = varLen(d, at + 1, to);
+        if (len === null || len[1] + len[0] > to) return null;
+        const bytes = b === 0xF0 ? [0xF0] : [];
+        for (let i = len[1]; i < len[1] + len[0]; i += 1) bytes.push(d[i]);
+        track.events.push({ beat: tick / tpb, bytes });
+        at = len[1] + len[0];
+        endTick = tick;
+        continue;
+      }
+      if (b < 0x80) {
+        if (status === 0) return null;
+        b = status;          // running status: the data byte is read again below
+      } else {
+        status = b;
+        at += 1;
+      }
+      const kind = b & 0xF0;
+      const size = kind === 0xC0 || kind === 0xD0 ? 1 : 2;
+      if (at + size > to) return null;
+      const x = d[at];
+      const y = size === 2 ? d[at + 1] : 0;
+      at += size;
+      endTick = tick;
+      const channel = (b & 0x0F) + 1;
+      if (kind === 0x90 && y > 0) {
+        const note = { beat: tick / tpb, note: x, velocity: y, length: 0, channel };
+        track.notes.push(note);
+        const key = `${channel}:${x}`;
+        if (!open[key]) open[key] = [];
+        open[key].push({ note, tick });
+      } else if (kind === 0x80 || kind === 0x90) {
+        const key = `${channel}:${x}`;
+        const waiting = open[key];
+        if (waiting && waiting.length > 0) {
+          const first = waiting.shift();
+          first.note.length = (tick - first.tick) / tpb;
+        }
+      } else {
+        track.events.push({ beat: tick / tpb, bytes: size === 2 ? [b, x, y] : [b, x] });
+      }
+    }
+    for (const key of Object.keys(open).sort()) {
+      for (const w of open[key]) {
+        w.note.length = (endTick - w.tick) / tpb;
+        say('warn', `ce.file.midiRead: note ${w.note.note} on channel ${w.note.channel} at beat ${w.note.beat} in track ${index} never ends, so it lasts to the end of its track.`);
+      }
+    }
+    return track;
+  }
+
+  /** A Standard MIDI File, types 0 and 1, as a song: tracks of notes and events, times in beats. */
+  function __fileMidiRead(bytes, opts, say) {
+    const d = __fileBytes(bytes);
+    if (d === null) return midiRefuse(say, 'bytes must be a list of numbers 0 to 255, or hex text');
+    if (d.length < 14 || latin1(d, 0, 4) !== 'MThd') return midiRefuse(say, 'that is not a MIDI file (it does not start with "MThd")');
+    const headerLen = u32(d, 4);
+    const format = u16(d, 8);
+    const count = u16(d, 10);
+    const division = u16(d, 12);
+    if (format === 2) return midiRefuse(say, 'it is a type 2 file (separate songs in one file), which is not read');
+    if (format > 2) return midiRefuse(say, `it says it is a type ${format} file, which does not exist`);
+    if (division >= 0x8000) return midiRefuse(say, 'its times are in SMPTE frames, not beats');
+    if (division === 0) return midiRefuse(say, 'it gives 0 ticks per beat');
+    const only = opt(opts, 'track');
+    if (only !== undefined && only !== null && (!finite(only) || Math.floor(only) !== only || only < 1 || only > count)) {
+      return midiRefuse(say, `track ${String(only)} is not a track of the file, which has ${count}`);
+    }
+    const song = { ticksPerBeat: division, tempo: 120, tempos: [], timeSignature: null, tracks: [] };
+    let at = 8 + headerLen;
+    let index = 0;
+    while (at + 8 <= d.length && index < count) {
+      const id = latin1(d, at, at + 4);
+      const len = u32(d, at + 4);
+      const from = at + 8;
+      const to = Math.min(d.length, from + len);
+      at = from + len;
+      if (id !== 'MTrk') continue;
+      index += 1;
+      const track = readTrack(d, from, to, division, index, song, say);
+      if (track === null) return midiRefuse(say, `track ${index} is cut short or damaged`);
+      if (only === undefined || only === null || only === index) song.tracks.push(track);
+    }
+    song.tempos.sort((a, b) => a.beat - b.beat);
+    if (song.tempos.length > 0 && song.tempos[0].beat === 0) song.tempo = song.tempos[0].bpm;
+    if (song.timeSignature === null) song.timeSignature = [4, 4];
+    return song;
+  }
+
+  function pushVarLen(out, value) {
+    let v = Math.max(0, Math.floor(value));
+    const groups = [v & 0x7F];
+    v = Math.floor(v / 128);
+    while (v > 0) {
+      groups.push((v & 0x7F) | 0x80);
+      v = Math.floor(v / 128);
+    }
+    for (let i = groups.length - 1; i >= 0; i -= 1) out.push(groups[i]);
+  }
+
+  function pushU32(out, v) {
+    out.push(Math.floor(v / 16777216) % 256, Math.floor(v / 65536) % 256, Math.floor(v / 256) % 256, v % 256);
+  }
+
+  function noteFrom(n, channel, index, say) {
+    if (!n || typeof n !== 'object' || !finite(n.beat) || n.beat < 0 || !finite(n.note)) {
+      say('error', `ce.file.midiWrite: note ${index} needs a beat of 0 or more and a note number, so nothing was written.`);
+      return null;
+    }
+    return {
+      beat: n.beat,
+      note: clampInt(n.note, 0, 127, 60),
+      velocity: clampInt(n.velocity, 1, 127, 100),
+      length: finite(n.length) && n.length > 0 ? n.length : 0.25,
+      channel: clampInt(n.channel, 1, 16, channel),
+    };
+  }
+
+  /** The song a midiWrite argument stands for: a song, a list of notes, or a Phrase Recorder's section. */
+  function songFrom(song, opts, clock, say) {
+    const channel = clampInt(opt(opts, 'channel'), 1, 16, 1);
+    if (Array.isArray(song)) {
+      const notes = [];
+      for (let i = 0; i < song.length; i += 1) {
+        const n = noteFrom(song[i], channel, i + 1, say);
+        if (n === null) return null;
+        notes.push(n);
+      }
+      return { ticksPerBeat: DEFAULT_TICKS, tempo: null, tempos: [], timeSignature: null, tracks: [{ name: '', notes, events: [] }] };
+    }
+    if (song && typeof song === 'object' && Array.isArray(song.tracks)) {
+      const tracks = [];
+      for (const t of song.tracks) {
+        const notes = [];
+        const list = t && typeof t === 'object' && Array.isArray(t.notes) ? t.notes : [];
+        for (let i = 0; i < list.length; i += 1) {
+          const n = noteFrom(list[i], channel, i + 1, say);
+          if (n === null) return null;
+          notes.push(n);
+        }
+        const events = [];
+        for (const e of t && typeof t === 'object' && Array.isArray(t.events) ? t.events : []) {
+          const bytes = e && typeof e === 'object' ? __fileBytes(e.bytes) : null;
+          if (bytes === null || bytes.length === 0 || !finite(e.beat) || e.beat < 0) {
+            say('error', 'ce.file.midiWrite: an event needs a beat of 0 or more and its bytes, so nothing was written.');
+            return null;
+          }
+          events.push({ beat: e.beat, bytes });
+        }
+        tracks.push({ name: t && typeof t.name === 'string' ? t.name : '', notes, events });
+      }
+      const tpb = clampInt(song.ticksPerBeat, 1, 32767, DEFAULT_TICKS);
+      const sig = Array.isArray(song.timeSignature) && song.timeSignature.length >= 2 ? song.timeSignature : null;
+      return { ticksPerBeat: tpb, tempo: finite(song.tempo) && song.tempo > 0 ? song.tempo : null, tempos: Array.isArray(song.tempos) ? song.tempos : [], timeSignature: sig, tracks };
+    }
+    if (song && typeof song === 'object' && song.take && typeof song.take === 'object' && Array.isArray(song.take.events)) {
+      // A take is stored as places in the recorder's loop: t and dur are parts of the loop.
+      const perBar = clampInt(clock.beatsPerBar, 1, 32, 4);
+      const loop = clampInt(song.bars, 1, 16, 2) * perBar;
+      const notes = [];
+      const own = clampInt(song.channel, 1, 16, channel);
+      for (const e of song.take.events) {
+        if (!e || typeof e !== 'object' || !finite(e.t) || !finite(e.note)) continue;
+        notes.push({
+          beat: e.t * loop,
+          note: clampInt(e.note, 0, 127, 60),
+          velocity: clampInt(e.velocity, 1, 127, 100),
+          length: (finite(e.dur) && e.dur > 0 ? e.dur : 0.1) * loop,
+          channel: own,
+        });
+      }
+      return { ticksPerBeat: DEFAULT_TICKS, tempo: null, tempos: [], timeSignature: [perBar, 4], tracks: [{ name: '', notes, events: [] }] };
+    }
+    say('error', 'ce.file.midiWrite: song must be a song as midiRead gives it, a list of notes, or a Phrase Recorder\'s section, so nothing was written.');
+    return null;
+  }
+
+  /** The bytes of one track chunk. */
+  function trackChunk(track, tpb, metas) {
+    const items = [];    // { tick, order, seq, bytes }
+    let seq = 0;
+    const add = (tick, order, bytes) => {
+      items.push({ tick: Math.max(0, Math.floor(tick + 0.5)), order, seq, bytes });
+      seq += 1;
+    };
+    for (const m of metas) add(m.tick, 0, m.bytes);
+    if (track.name !== '') {
+      const text = utf8(track.name);
+      const name = [0xFF, 0x03];
+      pushVarLen(name, text.length);
+      for (const b of text) name.push(b);
+      add(0, 0, name);
+    }
+    for (const e of track.events) {
+      let bytes;
+      if (e.bytes[0] === 0xF0) {
+        bytes = [0xF0];
+        pushVarLen(bytes, e.bytes.length - 1);
+        for (let i = 1; i < e.bytes.length; i += 1) bytes.push(e.bytes[i]);
+      } else {
+        bytes = e.bytes.slice();
+      }
+      add(e.beat * tpb, 2, bytes);
+    }
+    for (const n of track.notes) {
+      const on = n.beat * tpb;
+      add(on, 3, [0x90 + n.channel - 1, n.note, n.velocity]);
+      add((n.beat + n.length) * tpb, 1, [0x80 + n.channel - 1, n.note, 0]);
+    }
+    // Note-offs before anything else at the same tick, so a note played again at once is not cut.
+    items.sort((a, b) => a.tick - b.tick || a.order - b.order || a.seq - b.seq);
+    const body = [];
+    let last = 0;
+    for (const item of items) {
+      pushVarLen(body, item.tick - last);
+      last = item.tick;
+      for (const b of item.bytes) body.push(b);
+    }
+    body.push(0x00, 0xFF, 0x2F, 0x00);
+    const out = [0x4D, 0x54, 0x72, 0x6B];
+    pushU32(out, body.length);
+    for (const b of body) out.push(b);
+    return out;
+  }
+
+  function tempoMeta(tick, bpm) {
+    const micro = Math.max(1, Math.min(16777215, Math.floor(60000000 / bpm + 0.5)));
+    return { tick, bytes: [0xFF, 0x51, 0x03, Math.floor(micro / 65536) % 256, Math.floor(micro / 256) % 256, micro % 256] };
+  }
+
+  /**
+   * A MIDI file's bytes. `clock` is the runtime's transport: `{ tempo, beatsPerBar }`, `tempo` null
+   * when nothing reports one.
+   */
+  function __fileMidiWrite(song, opts, clock, say) {
+    const s = songFrom(song, opts, clock || {}, say);
+    if (s === null) return undefined;
+    const given = opt(opts, 'tempo');
+    let bpm = 120;
+    if (finite(given) && given > 0) bpm = given;
+    else if (s.tempo !== null) bpm = s.tempo;
+    else if (clock && finite(clock.tempo) && clock.tempo > 0) bpm = clock.tempo;
+    const name = opt(opts, 'name');
+    if (typeof name === 'string' && name !== '') s.tracks[0].name = name;
+    const tpb = s.ticksPerBeat;
+    const sig = s.timeSignature ?? [clampInt(clock?.beatsPerBar, 1, 32, 4), 4];
+    let denomPower = 0;
+    let denom = clampInt(sig[1], 1, 64, 4);
+    while (denom > 1) { denom = Math.floor(denom / 2); denomPower += 1; }
+    const metas = [tempoMeta(0, bpm), { tick: 0, bytes: [0xFF, 0x58, 0x04, clampInt(sig[0], 1, 32, 4), denomPower, 24, 8] }];
+    for (const t of s.tempos) {
+      if (t && typeof t === 'object' && finite(t.beat) && t.beat > 0 && finite(t.bpm) && t.bpm > 0) metas.push(tempoMeta(t.beat * tpb, t.bpm));
+    }
+    const out = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, s.tracks.length > 1 ? 1 : 0];
+    out.push(Math.floor(s.tracks.length / 256) % 256, s.tracks.length % 256, Math.floor(tpb / 256) % 256, tpb % 256);
+    s.tracks.forEach((track, i) => {
+      for (const b of trackChunk(track, tpb, i === 0 ? metas : [])) out.push(b);
+    });
+    return out;
+  }
+
+  /** The four commands, over a runtime's `say` and its transport. */
+  function __fileCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    return {
+      syxSplit: (bytes, opts) => __fileSyxSplit(bytes, opts, say),
+      syxJoin: (messages) => __fileSyxJoin(messages, say),
+      midiRead: (bytes, opts) => __fileMidiRead(bytes, opts, say),
+      midiWrite: (song, opts) => __fileMidiWrite(song, opts, host.clock(), say),
+    };
+  }
+return { fileCommands: __fileCommands };
+})();
+var __file = __fileCore.fileCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  clock: function () { var t = transportInfo(); return { tempo: tempo(), beatsPerBar: t && t.beatsPerBar ? t.beatsPerBar : 4 }; }
+});
+function fileSyxSplit(bytes, opts) { return __file.syxSplit(bytes, opts); }
+function fileSyxJoin(messages) { return __file.syxJoin(messages); }
+function fileMidiRead(bytes, opts) { return __file.midiRead(bytes, opts); }
+function fileMidiWrite(song, opts) { return __file.midiWrite(song, opts); }
+// END GENERATED ce.file
+
+// BEGIN GENERATED ce.ci — tools/scripts/gen-ci-prelude.mjs, from ciCore.js. Do not edit by hand.
+// @module ce.ci
+var __ciCore = (function () {
+  // ce.ci — MIDI-CI for scripts: the part that is the same in every runtime. The session that talks to
+  // the device lives once, in the device layer in C++ (DeviceProfileService::ciCommand, MidiCiSession);
+  // this file checks a script's call, sends it on, and hands the device's answers to the function the
+  // script gave. The JavaScript prelude runs this file itself (tools/scripts/gen-ci-prelude.mjs); the
+  // Lua and Python preludes are ports held to the same answers by test/ciParity.test.js.
+  //
+  // Design record: docs/design/ce-ci-module.md.
+  //
+  // The host: `{ say(level, text), ask(fields) -> { ok, token } or { ok: false, error },
+  // query(fields) -> answer, waiters() -> table, call(fn, value) }`. `ask` starts a command whose
+  // answers come later, `query` one that answers at once; `waiters` is the running script's own table
+  // of token -> { fn }, so an answer reaches the script that asked; `receive` is called with each
+  // "ciReply" { token, final, result }.
+
+  const NUMBER_TEXT = /^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/;
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  function toNumber(v) {
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string' && NUMBER_TEXT.test(v.trim())) return Number(v.trim());
+    return NaN;
+  }
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  /** The options a command passes on to the device layer, as numbers and text it can read. */
+  function passOn(opts, keys) {
+    const out = {};
+    for (const key of keys) {
+      const v = opt(opts, key);
+      if (present(v)) out[key] = v;
+    }
+    return out;
+  }
+
+  function __ciCommands(host) {
+    const say = (level, text) => host.say(level, text);
+
+    function muidOf(verb, muid) {
+      const n = toNumber(muid);
+      if (Number.isFinite(n) && n >= 0 && Math.floor(n) === n) return n;
+      say('error', `ce.ci.${verb}: muid must be a device's number, as discover or devices give it, so nothing was sent.`);
+      return null;
+    }
+
+    function needFn(verb, fn) {
+      if (typeof fn === 'function') return true;
+      say('error', `ce.ci.${verb}: fn must be a function to call with the answer, so nothing was sent.`);
+      return false;
+    }
+
+    function needResource(verb, resource) {
+      if (typeof resource === 'string' && resource !== '') return true;
+      say('error', `ce.ci.${verb}: resource must be a resource's name, such as "ProgramList", so nothing was sent.`);
+      return false;
+    }
+
+    /** Start a command; its answers go to fn. The token, or false (said) when it was not sent. */
+    function start(verb, fields, fn) {
+      const answer = host.ask(fields);
+      if (!answer || answer.ok !== true || !present(answer.token)) {
+        const why = answer && typeof answer.error === 'string' && answer.error !== '' ? answer.error : 'MIDI-CI is not available here';
+        say('error', `ce.ci.${verb}: ${why}, so nothing was sent.`);
+        return false;
+      }
+      host.waiters()[String(answer.token)] = { fn };
+      return answer.token;
+    }
+
+    function discover(a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      if (!needFn('discover', fn)) return false;
+      const role = opt(opts, 'role');
+      const fields = { op: 'discover', role: typeof role === 'string' && role !== '' ? role : 'mainSynth' };
+      const timeout = toNumber(opt(opts, 'timeoutMs'));
+      if (Number.isFinite(timeout) && timeout > 0) fields.timeoutMs = timeout;
+      return start('discover', fields, fn) !== false;
+    }
+
+    function devices(role) {
+      const fields = { op: 'devices' };
+      if (typeof role === 'string' && role !== '') fields.role = role;
+      const list = host.query(fields);
+      return Array.isArray(list) ? list : [];
+    }
+
+    function get(muid, resource, a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      const m = muidOf('get', muid);
+      if (m === null || !needResource('get', resource) || !needFn('get', fn)) return false;
+      return start('get', { op: 'get', muid: m, resource, opts: passOn(opts, ['resId', 'offset', 'limit', 'timeoutMs']) }, fn) !== false;
+    }
+
+    function set(muid, resource, body, a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      const m = muidOf('set', muid);
+      if (m === null || !needResource('set', resource) || !needFn('set', fn)) return false;
+      if (!present(body)) {
+        say('error', 'ce.ci.set: body must be given: a table, text or bytes, so nothing was sent.');
+        return false;
+      }
+      return start('set', { op: 'set', muid: m, resource, body, opts: passOn(opts, ['resId', 'partial', 'mediaType', 'timeoutMs']) }, fn) !== false;
+    }
+
+    function subscribe(muid, resource, a, b) {
+      const opts = typeof a === 'function' ? undefined : a;
+      const fn = typeof a === 'function' ? a : b;
+      const m = muidOf('subscribe', muid);
+      if (m === null || !needResource('subscribe', resource) || !needFn('subscribe', fn)) return undefined;
+      const token = start('subscribe', { op: 'subscribe', muid: m, resource, opts: passOn(opts, ['resId']) }, fn);
+      return token === false ? undefined : token;
+    }
+
+    function unsubscribe(id) {
+      if (!present(id)) return false;
+      delete host.waiters()[String(id)];
+      return host.query({ op: 'unsubscribe', id: String(id) }) === true;
+    }
+
+    function profiles(muid, fn) {
+      const m = muidOf('profiles', muid);
+      if (m === null) return [];
+      const list = host.query({ op: 'profiles', muid: m });
+      if (present(fn)) {
+        if (needFn('profiles', fn)) start('profiles', { op: 'profiles', muid: m, ask: true }, fn);
+      }
+      return Array.isArray(list) ? list : [];
+    }
+
+    function setProfile(muid, id, on, opts) {
+      const m = muidOf('setProfile', muid);
+      if (m === null) return false;
+      if (typeof id !== 'string' || id === '') {
+        say('error', 'ce.ci.setProfile: id must be a profile, as profiles gives it ("7E 21 09 01 00"), so nothing was sent.');
+        return false;
+      }
+      if (typeof on !== 'boolean') {
+        say('error', 'ce.ci.setProfile: on must be true or false, so nothing was sent.');
+        return false;
+      }
+      let channel = 0;
+      const given = opt(opts, 'channel');
+      if (present(given)) {
+        const c = toNumber(given);
+        if (!Number.isFinite(c) || Math.floor(c) !== c || c < 1 || c > 16) {
+          say('error', 'ce.ci.setProfile: channel must be 1 to 16, so nothing was sent.');
+          return false;
+        }
+        channel = c;
+      }
+      const answer = host.query({ op: 'setProfile', muid: m, id, on, channel });
+      if (answer === true) return true;
+      const why = answer && typeof answer.error === 'string' && answer.error !== '' ? answer.error : 'MIDI-CI is not available here';
+      say('error', `ce.ci.setProfile: ${why}, so nothing was sent.`);
+      return false;
+    }
+
+    /** A device's answer: to the function that asked, once, or until a subscription ends. */
+    function receive(reply) {
+      if (!reply || typeof reply !== 'object' || !present(reply.token)) return;
+      const waiters = host.waiters();
+      const key = String(reply.token);
+      const w = waiters[key];
+      if (!w) return;
+      if (reply.final === true) delete waiters[key];
+      host.call(w.fn, reply.result);
+    }
+
+    return { discover, devices, get, set, subscribe, unsubscribe, profiles, setProfile, receive };
+  }
+return { ciCommands: __ciCommands };
+})();
+var __ci = __ciCore.ciCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  ask: function (fields) { return __deviceQuery("ci", fields); },
+  query: function (fields) { return __deviceQuery("ci", fields); },
+  waiters: function () { return __ciWaiters; },
+  call: function (fn, value) { try { fn(value); } catch (e) { logError("ce.ci: the function given to it failed: " + e); } }
+});
+on("*", "__ciReply", function (reply) { __ci.receive(reply); });
+function ciDiscover(opts, fn) { return __ci.discover(opts, fn); }
+function ciDevices(role) { return __ci.devices(role); }
+function ciGet(muid, resource, opts, fn) { return __ci.get(muid, resource, opts, fn); }
+function ciSet(muid, resource, body, opts, fn) { return __ci.set(muid, resource, body, opts, fn); }
+function ciSubscribe(muid, resource, opts, fn) { return __ci.subscribe(muid, resource, opts, fn); }
+function ciUnsubscribe(id) { return __ci.unsubscribe(id); }
+function ciProfiles(muid, fn) { return __ci.profiles(muid, fn); }
+function ciSetProfile(muid, id, on, opts) { return __ci.setProfile(muid, id, on, opts); }
+// END GENERATED ce.ci
+
+// BEGIN GENERATED ce.mpe — tools/scripts/gen-mpe-prelude.mjs, from mpeCore.js. Do not edit by hand.
+// @module ce.mpe
+var __mpeCore = (function () {
+  // ce.mpe — playing MPE, the part that is the same in every runtime (docs/design/midi-input-and-mpe.md).
+  // A script plays notes by id; this picks each note's member channel, sends its expression on that
+  // channel alone, and frees the channel when the note ends. Reading MPE back in is the input decoder's
+  // (midiInDecoder.js, MidiInDecoder.h); listen() only tells it how. The JavaScript prelude runs this
+  // file itself (tools/scripts/gen-mpe-prelude.mjs); the Lua and Python preludes are ports held to the
+  // same answers by test/mpeParity.test.js.
+  //
+  // The host: `{ say(level, text), send(bytes, role), note(v) -> 0..127 or undefined, listen(role, opts) }`.
+
+  const ZONES = ['lower', 'upper'];
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' ? opts[key] : undefined;
+  }
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  function finite(v) {
+    return typeof v === 'number' && Number.isFinite(v);
+  }
+
+  /** x held to lo..hi (not ce.math.clamp, which this module does not require). */
+  function held(x, lo, hi) {
+    return x < lo ? lo : (x > hi ? hi : x);
+  }
+
+  function roundHalfAway(x) {
+    return x < 0 ? -Math.floor(-x + 0.5) : Math.floor(x + 0.5);
+  }
+
+  function __mpeCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    let zone = null;            // { upper, members, bendRange, managerBendRange, role }
+    let sounding = [];          // { id, note, channel, velocity, bend, pressure, timbre }, oldest first
+    let released = {};          // channel -> when it was last freed (a count), for the longest-free rule
+    let releases = 0;
+    let nextId = 1;
+    let warnedFull = false;
+
+    function members() {
+      const out = [];
+      for (let i = 0; i < zone.members; i += 1) out.push(zone.upper ? 15 - i : 2 + i);
+      return out;
+    }
+
+    function send(bytes) {
+      host.send(bytes, zone.role);
+    }
+
+    function rpn(channel, msb, lsb, value) {
+      const status = 0xB0 + channel - 1;
+      send([status, 101, msb]);
+      send([status, 100, lsb]);
+      send([status, 6, value]);
+      send([status, 38, 0]);
+      send([status, 101, 127]);
+      send([status, 100, 127]);
+    }
+
+    function bendBytes(channel, semitones) {
+      const v = held(roundHalfAway(8192 + (semitones / zone.bendRange) * 8192), 0, 16383);
+      return [0xE0 + channel - 1, v % 128, Math.floor(v / 128)];
+    }
+
+    function amount7(x) {
+      return held(roundHalfAway(held(x, 0, 1) * 127), 0, 127);
+    }
+
+    function release(n, velocity) {
+      send([0x80 + n.channel - 1, n.note, velocity]);
+      sounding = sounding.filter((x) => x !== n);
+      releases += 1;
+      released[n.channel] = releases;
+    }
+
+    function allOff() {
+      if (zone === null) return 0;
+      const count = sounding.length;
+      for (const n of sounding.slice()) release(n, 64);
+      for (const channel of members()) send([0xE0 + channel - 1, 0, 64]);
+      return count;
+    }
+
+    function semitones(verb, value, name) {
+      if (!finite(value)) {
+        say('error', `ce.mpe.${verb}: ${name} must be a number of semitones, so nothing was done.`);
+        return null;
+      }
+      return value;
+    }
+
+    function setZone(opts) {
+      const which = present(opt(opts, 'zone')) ? opt(opts, 'zone') : 'lower';
+      if (!ZONES.includes(which)) {
+        say('error', `ce.mpe.zone: zone must be "lower" or "upper", so nothing was done.`);
+        return false;
+      }
+      const count = present(opt(opts, 'members')) ? opt(opts, 'members') : 15;
+      if (!finite(count) || Math.floor(count) !== count || count < 1 || count > 15) {
+        say('error', 'ce.mpe.zone: members must be a whole number from 1 to 15, so nothing was done.');
+        return false;
+      }
+      const bendRange = present(opt(opts, 'bendRange')) ? semitones('zone', opt(opts, 'bendRange'), 'bendRange') : 48;
+      if (bendRange === null) return false;
+      const managerBendRange = present(opt(opts, 'managerBendRange')) ? semitones('zone', opt(opts, 'managerBendRange'), 'managerBendRange') : 2;
+      if (managerBendRange === null) return false;
+      if (bendRange <= 0 || bendRange > 96 || managerBendRange <= 0 || managerBendRange > 96) {
+        say('error', 'ce.mpe.zone: a bend range must be above 0 and at most 96 semitones, so nothing was done.');
+        return false;
+      }
+      const role = opt(opts, 'role');
+      allOff();
+      zone = {
+        upper: which === 'upper', members: count, bendRange, managerBendRange,
+        role: typeof role === 'string' && role !== '' ? role : 'mainSynth',
+      };
+      sounding = [];
+      released = {};
+      if (opt(opts, 'send') !== false) {
+        const manager = zone.upper ? 16 : 1;
+        rpn(manager, 0, 6, count);
+        rpn(manager, 0, 0, roundHalfAway(managerBendRange));
+        for (const channel of members()) rpn(channel, 0, 0, roundHalfAway(bendRange));
+      }
+      return true;
+    }
+
+    function startValues(verb, values) {
+      const out = { bend: 0, pressure: 0, timbre: 0.5 };
+      if (!present(values)) return out;
+      if (typeof values !== 'object') {
+        say('error', `ce.mpe.${verb}: values must be a table of bend, pressure and timbre, so nothing was sent.`);
+        return null;
+      }
+      for (const key of ['bend', 'pressure', 'timbre']) {
+        const v = values[key];
+        if (!present(v)) continue;
+        if (!finite(v)) {
+          say('error', `ce.mpe.${verb}: ${key} must be a number, so nothing was sent.`);
+          return null;
+        }
+        out[key] = v;
+      }
+      return out;
+    }
+
+    function noteOn(note, velocity, opts) {
+      const n = host.note(note);
+      if (!present(n)) {
+        say('error', 'ce.mpe.noteOn: note must be 0 to 127 or a name such as "C4", so nothing was sent.');
+        return undefined;
+      }
+      if (!finite(velocity) || Math.floor(velocity) !== velocity || velocity < 1 || velocity > 127) {
+        say('error', 'ce.mpe.noteOn: velocity must be a whole number from 1 to 127, so nothing was sent.');
+        return undefined;
+      }
+      const start = startValues('noteOn', opts);
+      if (start === null) return undefined;
+      if (zone === null) setZone({});
+      const busy = {};
+      for (const x of sounding) busy[x.channel] = true;
+      let channel = 0;
+      let best = Infinity;
+      for (const c of members()) {
+        if (busy[c]) continue;
+        const when = released[c] ?? 0;
+        if (when < best) { best = when; channel = c; }
+      }
+      if (channel === 0) {
+        const oldest = sounding[0];
+        if (!warnedFull) {
+          warnedFull = true;
+          say('warn', 'ce.mpe.noteOn: every member channel is busy, so the oldest note was ended. More members, or fewer notes at once, avoid it.');
+        }
+        channel = oldest.channel;
+        release(oldest, 64);
+      }
+      const bend = held(start.bend, -zone.bendRange, zone.bendRange);
+      // As MPE asks: the note's bend and timbre first, so it never starts at the last note's.
+      send(bendBytes(channel, bend));
+      send([0xB0 + channel - 1, 74, amount7(start.timbre)]);
+      send([0xD0 + channel - 1, amount7(start.pressure)]);
+      send([0x90 + channel - 1, n, velocity]);
+      const id = nextId;
+      nextId += 1;
+      sounding.push({ id, note: n, channel, velocity, bend, pressure: held(start.pressure, 0, 1), timbre: held(start.timbre, 0, 1) });
+      return id;
+    }
+
+    function find(id) {
+      for (const n of sounding) if (n.id === id) return n;
+      return null;
+    }
+
+    function express(id, values) {
+      const n = find(id);
+      if (n === null) return false;
+      if (!values || typeof values !== 'object') {
+        say('error', 'ce.mpe.express: values must be a table of bend, pressure and timbre, so nothing was sent.');
+        return false;
+      }
+      const v = startValues('express', values);
+      if (v === null) return false;
+      if (present(values.bend)) {
+        n.bend = held(values.bend, -zone.bendRange, zone.bendRange);
+        send(bendBytes(n.channel, n.bend));
+      }
+      if (present(values.pressure)) {
+        n.pressure = held(values.pressure, 0, 1);
+        send([0xD0 + n.channel - 1, amount7(n.pressure)]);
+      }
+      if (present(values.timbre)) {
+        n.timbre = held(values.timbre, 0, 1);
+        send([0xB0 + n.channel - 1, 74, amount7(n.timbre)]);
+      }
+      return true;
+    }
+
+    function noteOff(id, velocity) {
+      const n = find(id);
+      if (n === null) return false;
+      let v = 64;
+      if (present(velocity)) {
+        if (!finite(velocity) || Math.floor(velocity) !== velocity || velocity < 0 || velocity > 127) {
+          say('error', 'ce.mpe.noteOff: velocity must be a whole number from 0 to 127, so the note was ended at 64.');
+        } else {
+          v = velocity;
+        }
+      }
+      release(n, v);
+      return true;
+    }
+
+    function notes() {
+      return sounding.map((n) => ({ id: n.id, note: n.note, channel: n.channel, velocity: n.velocity, bend: n.bend, pressure: n.pressure, timbre: n.timbre }));
+    }
+
+    function listen(opts) {
+      const from = opt(opts, 'from');
+      const role = typeof from === 'string' ? from : '';
+      if (opt(opts, 'off') === true) {
+        host.listen(role, null);
+        return true;
+      }
+      const which = present(opt(opts, 'zone')) ? opt(opts, 'zone') : 'lower';
+      if (!ZONES.includes(which)) {
+        say('error', 'ce.mpe.listen: zone must be "lower" or "upper", so nothing was done.');
+        return false;
+      }
+      const count = present(opt(opts, 'members')) ? opt(opts, 'members') : 15;
+      if (!finite(count) || Math.floor(count) !== count || count < 1 || count > 15) {
+        say('error', 'ce.mpe.listen: members must be a whole number from 1 to 15, so nothing was done.');
+        return false;
+      }
+      const bendRange = present(opt(opts, 'bendRange')) ? semitones('listen', opt(opts, 'bendRange'), 'bendRange') : 48;
+      if (bendRange === null) return false;
+      if (bendRange <= 0 || bendRange > 96) {
+        say('error', 'ce.mpe.listen: bendRange must be above 0 and at most 96 semitones, so nothing was done.');
+        return false;
+      }
+      host.listen(role, { zone: which, members: count, bendRange });
+      return true;
+    }
+
+    return { zone: setZone, noteOn, express, noteOff, allOff, notes, listen };
+  }
+return { mpeCommands: __mpeCommands };
+})();
+var __mpe = __mpeCore.mpeCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  send: function (bytes, role) {
+    if (role && role !== "mainSynth") routeMidi(role, function () { sendMidi(bytes); });
+    else sendMidi(bytes);
+  },
+  note: function (v) { return __note(v); },
+  listen: function (role, opts) { __deviceQuery("mpeListen", { role: role, opts: opts }); }
+});
+function mpeZone(opts) { return __mpe.zone(opts); }
+function mpeNoteOn(note, velocity, opts) { return __mpe.noteOn(note, velocity, opts); }
+function mpeExpress(id, values) { return __mpe.express(id, values); }
+function mpeNoteOff(id, velocity) { return __mpe.noteOff(id, velocity); }
+function mpeAllOff() { return __mpe.allOff(); }
+function mpeNotes() { return __mpe.notes(); }
+function mpeListen(opts) { return __mpe.listen(opts); }
+// END GENERATED ce.mpe
+
+// BEGIN GENERATED ce.daw — tools/scripts/gen-daw-prelude.mjs, from dawCore.js. Do not edit by hand.
+// @module ce.daw
+var __dawCore = (function () {
+  // ce.daw — the exported plug-in and its DAW: the part that is the same in every runtime. What the DAW
+  // is, its parameters and programs, and the changes a script may make to what it sees, all live in the
+  // plug-in (PluginProcessor.h); this file checks a script's call, asks the host, and hands back the
+  // answer in one shape. In the editor there is no DAW, and the host says so. The JavaScript prelude runs
+  // this file itself (tools/scripts/gen-daw-prelude.mjs); the Lua and Python preludes are ports held to
+  // the same answers by test/dawParity.test.js.
+  //
+  // Design record: docs/design/ce-daw-module.md.
+  //
+  // The host: `{ say(level, text), query(op, fields) -> answer }`. The ops are host, parameters,
+  // program, programs, beginGesture, endGesture, rename, assign and markChanged; an op the host cannot
+  // answer gives nothing.
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  function isTable(v) {
+    return v !== null && typeof v === 'object';
+  }
+
+  function __dawCommands(host) {
+    const say = (level, text) => host.say(level, text);
+
+    function needPath(verb, path, what) {
+      if (typeof path === 'string' && path !== '') return true;
+      say('error', `ce.daw.${verb}: path must be a control's path, such as "Cutoff.value", so ${what}.`);
+      return false;
+    }
+
+    function list(op) {
+      const answer = host.query(op, {});
+      return Array.isArray(answer) ? answer : [];
+    }
+
+    function table(op) {
+      const answer = host.query(op, {});
+      return isTable(answer) && !Array.isArray(answer) ? answer : undefined;
+    }
+
+    function hostInfo() { return table('host'); }
+
+    function parameters() { return list('parameters'); }
+
+    function parameter(path) {
+      if (!needPath('parameter', path, 'there is nothing to give')) return undefined;
+      for (const p of parameters()) if (isTable(p) && p.path === path) return p;
+      return undefined;
+    }
+
+    function program() { return table('program'); }
+
+    function programs() { return list('programs'); }
+
+    function gesture(verb, path) {
+      if (!needPath(verb, path, 'nothing was done')) return false;
+      return host.query(verb, { path }) === true;
+    }
+
+    function rename(path, name) {
+      if (!needPath('rename', path, 'nothing was renamed')) return false;
+      if (present(name) && typeof name !== 'string') {
+        say('error', 'ce.daw.rename: name must be text, or nothing for the name it was exported with, so nothing was renamed.');
+        return false;
+      }
+      return host.query('rename', { path, name: present(name) ? name : '' }) === true;
+    }
+
+    function assign(slot, path, opts) {
+      if (typeof slot !== 'number' || !Number.isFinite(slot) || Math.floor(slot) !== slot || slot < 1) {
+        say('error', 'ce.daw.assign: slot must be a whole number from 1, so nothing was assigned.');
+        return false;
+      }
+      if (present(path) && (typeof path !== 'string' || path === '')) {
+        say('error', 'ce.daw.assign: path must be a control\'s path, such as "Cutoff.value", or nothing to empty the slot, so nothing was assigned.');
+        return false;
+      }
+      const name = isTable(opts) ? opts.name : undefined;
+      if (present(name) && typeof name !== 'string') {
+        say('error', 'ce.daw.assign: name must be text, so nothing was assigned.');
+        return false;
+      }
+      return host.query('assign', { slot, path: present(path) ? path : '', name: present(name) ? name : '' }) === true;
+    }
+
+    function markChanged() { return host.query('markChanged', {}) === true; }
+
+    return {
+      host: hostInfo, parameters, parameter, program, programs,
+      beginGesture: (path) => gesture('beginGesture', path),
+      endGesture: (path) => gesture('endGesture', path),
+      rename, assign, markChanged,
+    };
+  }
+return { dawCommands: __dawCommands };
+})();
+var __daw = __dawCore.dawCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  query: function (op, fields) { var q = {}; for (var k in fields) q[k] = fields[k]; q.op = op; return __deviceQuery("daw", q); }
+});
+function dawHost() { return __daw.host(); }
+function dawParameters() { return __daw.parameters(); }
+function dawParameter(path) { return __daw.parameter(path); }
+function dawProgram() { return __daw.program(); }
+function dawPrograms() { return __daw.programs(); }
+function dawBeginGesture(path) { return __daw.beginGesture(path); }
+function dawEndGesture(path) { return __daw.endGesture(path); }
+function dawRename(path, name) { return __daw.rename(path, name); }
+function dawAssign(slot, path, opts) { return __daw.assign(slot, path, opts); }
+function dawMarkChanged() { return __daw.markChanged(); }
+// END GENERATED ce.daw
+
+// BEGIN GENERATED ce.osc — tools/scripts/gen-osc-prelude.mjs, from oscCore.js. Do not edit by hand.
+// @module ce.osc
+var __oscCore = (function () {
+  // ce.osc — Open Sound Control for scripts: the part that is the same in every runtime. The port, the
+  // reading and writing of OSC and the user's yes for the network live once, in C++ (Osc/OscService);
+  // this file checks a script's call, works out the types of what it sends, and hands each message
+  // that arrives to the functions whose pattern matches its address. The JavaScript prelude runs this
+  // file itself (tools/scripts/gen-osc-prelude.mjs); the Lua and Python preludes are ports held to the
+  // same answers by test/oscParity.test.js.
+  //
+  // Design record: docs/design/ce-osc-module.md.
+  //
+  // The host: `{ say(level, text), query(op, fields) -> answer, listeners() -> list, call(fn, value) }`.
+  // `query` asks the transport (listen, stop, status, target, send, bundle); its answer is
+  // { ok, error?, why?, ... }. `listeners` is the running script's own list of { id, pattern, fn }, so a
+  // script's patterns go when it reloads.
+
+  const PORT_MIN = 1024;
+  const PORT_MAX = 65535;
+  const TAGS = 'ihfdsSTFNIbrmtc';
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' && !Array.isArray(opts) ? opts[key] : undefined;
+  }
+
+  function whole(v) {
+    return typeof v === 'number' && Number.isFinite(v) && Math.floor(v) === v;
+  }
+
+  function isBytes(v, count) {
+    if (!Array.isArray(v) || (count >= 0 && v.length !== count)) return false;
+    for (const b of v) if (!whole(b) || b < 0 || b > 255) return false;
+    return true;
+  }
+
+  /** Whether `tag` can carry `v` (OscCodec.h's fits, in the same words). */
+  function fits(tag, v) {
+    const number = typeof v === 'number' && Number.isFinite(v);
+    if (tag === 'i') return whole(v) && v >= -2147483648 && v <= 2147483647;
+    if (tag === 'h') return whole(v);
+    if (tag === 'f' || tag === 'd' || tag === 't') return number;
+    if (tag === 's' || tag === 'S') return typeof v === 'string';
+    if (tag === 'c') return typeof v === 'string' && v !== '';
+    if (tag === 'b') return isBytes(v, -1);
+    if (tag === 'm') return isBytes(v, 4);
+    if (tag === 'r') return typeof v === 'string' && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
+    return TAGS.includes(tag) && tag !== '';
+  }
+
+  const WHAT = {
+    i: 'a whole number', h: 'a whole number', f: 'a number', d: 'a number', t: 'a number', s: 'text', S: 'text',
+    c: 'one character of text', b: 'a list of bytes', m: 'a list of four bytes', r: 'a colour such as "#FF8000"',
+  };
+
+  /** One part of an address against one part of a pattern: * ? [a-z] [!a] {one,two}. */
+  function partMatches(p, pi, s, si) {
+    while (pi < p.length) {
+      const c = p[pi];
+      if (c === '*') {
+        for (let k = s.length; k >= si; k -= 1) if (partMatches(p, pi + 1, s, k)) return true;
+        return false;
+      }
+      if (c === '?') {
+        if (si >= s.length) return false;
+        pi += 1; si += 1;
+        continue;
+      }
+      if (c === '[') {
+        const close = p.indexOf(']', pi + 1);
+        if (close < 0 || si >= s.length) return false;
+        let set = p.slice(pi + 1, close);
+        const negate = set.startsWith('!');
+        if (negate) set = set.slice(1);
+        let found = false;
+        for (let k = 0; k < set.length; k += 1) {
+          if (k + 2 < set.length && set[k + 1] === '-') {
+            if (s[si] >= set[k] && s[si] <= set[k + 2]) found = true;
+            k += 2;
+          } else if (s[si] === set[k]) found = true;
+        }
+        if (found === negate) return false;
+        pi = close + 1; si += 1;
+        continue;
+      }
+      if (c === '{') {
+        const close = p.indexOf('}', pi + 1);
+        if (close < 0) return false;
+        for (const alt of p.slice(pi + 1, close).split(',')) {
+          if (s.startsWith(alt, si) && partMatches(p, close + 1, s, si + alt.length)) return true;
+        }
+        return false;
+      }
+      if (si >= s.length || s[si] !== c) return false;
+      pi += 1; si += 1;
+    }
+    return si === s.length;
+  }
+
+  /** Whether an OSC address matches a pattern, part by part between the slashes. */
+  function __oscMatches(pattern, address) {
+    if (typeof pattern !== 'string' || typeof address !== 'string') return false;
+    const p = pattern.split('/');
+    const a = address.split('/');
+    if (p.length !== a.length) return false;
+    for (let i = 0; i < p.length; i += 1) if (!partMatches(p[i], 0, a[i], 0)) return false;
+    return true;
+  }
+
+  function __oscCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    let nextId = 1;
+
+    /** The transport's answer: true, or false having said why. */
+    function answered(verb, answer, what) {
+      if (answer === true || (answer && typeof answer === 'object' && answer.ok === true)) return true;
+      const why = answer && typeof answer.why === 'string' && answer.why !== '' ? answer.why : 'OSC is not available here';
+      say('error', `ce.osc.${verb}: ${why}, so ${what}.`);
+      return false;
+    }
+
+    /** `to` as the transport takes it: a target's name or "host:port", or { host, port }. */
+    function destination(verb, to) {
+      if (typeof to === 'string' && to.trim() !== '') return to.trim();
+      if (to && typeof to === 'object' && !Array.isArray(to) && typeof to.host === 'string' && whole(to.port)) {
+        return { host: to.host, port: to.port };
+      }
+      say('error', `ce.osc.${verb}: to must be a target's name, "host:port", or a message's from, so nothing was sent.`);
+      return null;
+    }
+
+    /** A message's values and their types, worked out and checked; null having said why. */
+    function message(verb, address, args, types, which) {
+      const where = which ? `message ${which}: ` : '';
+      if (typeof address !== 'string' || !address.startsWith('/')) {
+        say('error', `ce.osc.${verb}: ${where}address must be text starting with /, such as "/fader/1", so nothing was sent.`);
+        return null;
+      }
+      const values = !present(args) ? [] : (Array.isArray(args) ? args : [args]);
+      let tags = '';
+      if (present(types)) {
+        if (typeof types !== 'string' || types.length !== values.length || [...types].some((t) => !TAGS.includes(t))) {
+          say('error', `ce.osc.${verb}: ${where}types must be text with one OSC type for each value, such as "if", so nothing was sent.`);
+          return null;
+        }
+        tags = types;
+      } else {
+        for (let i = 0; i < values.length; i += 1) {
+          const v = values[i];
+          if (typeof v === 'number') tags += 'f';
+          else if (typeof v === 'string') tags += 's';
+          else if (typeof v === 'boolean') tags += v ? 'T' : 'F';
+          else if (v === null || v === undefined) tags += 'N';
+          else if (isBytes(v, -1)) tags += 'b';
+          else {
+            say('error', `ce.osc.${verb}: ${where}value ${i + 1} is not a number, text, true or false, or a list of bytes, so nothing was sent.`);
+            return null;
+          }
+        }
+      }
+      for (let i = 0; i < values.length; i += 1) {
+        if (!fits(tags[i], values[i])) {
+          say('error', `ce.osc.${verb}: ${where}value ${i + 1} is not ${WHAT[tags[i]] ?? 'what its type needs'}, as type "${tags[i]}" needs, so nothing was sent.`);
+          return null;
+        }
+      }
+      return { address, args: values.map((v) => (v === undefined ? null : v)), types: tags };
+    }
+
+    function listen(opts) {
+      const port = present(opt(opts, 'port')) ? opt(opts, 'port') : 8000;
+      if (!whole(port) || port < PORT_MIN || port > PORT_MAX) {
+        say('error', `ce.osc.listen: port must be a whole number from ${PORT_MIN} to ${PORT_MAX}, so it is not listening.`);
+        return false;
+      }
+      const network = opt(opts, 'network') === true;
+      const nextFree = opt(opts, 'nextFree') === true;
+      return answered('listen', host.query('listen', { port, network, nextFree }), 'it is not listening');
+    }
+
+    function stop() {
+      return host.query('stop', {}) === true;
+    }
+
+    function on(pattern, fn) {
+      if (typeof pattern !== 'string' || !pattern.startsWith('/')) {
+        say('error', 'ce.osc.on: pattern must be an address starting with /, such as "/fader/*", so nothing will run.');
+        return undefined;
+      }
+      if (typeof fn !== 'function') {
+        say('error', 'ce.osc.on: fn must be a function to call with each message, so nothing will run.');
+        return undefined;
+      }
+      const id = nextId;
+      nextId += 1;
+      host.listeners().push({ id, pattern, fn });
+      return id;
+    }
+
+    function off(id) {
+      const list = host.listeners();
+      for (let i = 0; i < list.length; i += 1) {
+        if (list[i].id === id) { list.splice(i, 1); return true; }
+      }
+      return false;
+    }
+
+    function target(name, address) {
+      if (typeof name !== 'string' || name === '') {
+        say('error', 'ce.osc.target: name must be text, such as "tablet", so nothing was set.');
+        return false;
+      }
+      if (!present(address)) return answered('target', host.query('target', { name, host: '', port: 0 }), 'nothing was set');
+      let where = null;
+      if (typeof address === 'string') {
+        const at = address.lastIndexOf(':');
+        const port = Number(address.slice(at + 1));
+        if (at > 0 && whole(port) && port >= 1 && port <= PORT_MAX) where = { host: address.slice(0, at).trim(), port };
+      } else if (address && typeof address === 'object' && typeof address.host === 'string' && whole(address.port)
+        && address.port >= 1 && address.port <= PORT_MAX) {
+        where = { host: address.host, port: address.port };
+      }
+      if (!where || where.host === '') {
+        say('error', 'ce.osc.target: address must be "host:port", { host, port } or a message\'s from, so nothing was set.');
+        return false;
+      }
+      return answered('target', host.query('target', { name, host: where.host, port: where.port }), 'nothing was set');
+    }
+
+    function send(to, address, args, types) {
+      const where = destination('send', to);
+      if (where === null) return false;
+      const m = message('send', address, args, types, 0);
+      if (m === null) return false;
+      return answered('send', host.query('send', { to: where, address: m.address, args: m.args, types: m.types }), 'nothing was sent');
+    }
+
+    function bundle(to, messages, opts) {
+      const where = destination('bundle', to);
+      if (where === null) return false;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        say('error', 'ce.osc.bundle: messages must be a list of { address, args, types }, so nothing was sent.');
+        return false;
+      }
+      const out = [];
+      for (let i = 0; i < messages.length; i += 1) {
+        const x = messages[i];
+        const m = message('bundle', x && typeof x === 'object' ? x.address : undefined, x?.args, x?.types, i + 1);
+        if (m === null) return false;
+        out.push(m);
+      }
+      const time = opt(opts, 'time');
+      if (present(time) && !(typeof time === 'number' && Number.isFinite(time) && time >= 0)) {
+        say('error', 'ce.osc.bundle: time must be a number of seconds, so nothing was sent.');
+        return false;
+      }
+      return answered('bundle', host.query('bundle', { to: where, messages: out, time: present(time) ? time : 0 }), 'nothing was sent');
+    }
+
+    function status() {
+      const s = host.query('status', {});
+      return s && typeof s === 'object' && !Array.isArray(s) ? s : { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+    }
+
+    /** A message arrived: each of this script's functions whose pattern matches it runs, in order. */
+    function receive(msg) {
+      if (!msg || typeof msg !== 'object' || typeof msg.address !== 'string') return;
+      for (const l of host.listeners().slice()) {
+        if (__oscMatches(l.pattern, msg.address)) host.call(l.fn, msg);
+      }
+    }
+
+    return { listen, stop, on, off, target, send, bundle, status, receive };
+  }
+return { oscCommands: __oscCommands, oscMatches: __oscMatches };
+})();
+var __osc = __oscCore.oscCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  query: function (op, fields) { var q = {}; for (var k in fields) q[k] = fields[k]; q.op = op; return __deviceQuery("osc", q); },
+  listeners: function () { return __oscListeners; },
+  call: function (fn, value) { try { fn(value); } catch (e) { logError("ce.osc: the function given to on failed: " + e); } }
+});
+on("*", "__oscIn", function (msg) { __osc.receive(msg); });
+function oscListen(opts) { return __osc.listen(opts); }
+function oscStop() { return __osc.stop(); }
+function oscOn(pattern, fn) { return __osc.on(pattern, fn); }
+function oscOff(id) { return __osc.off(id); }
+function oscTarget(name, address) { return __osc.target(name, address); }
+function oscSend(to, address, args, types) { return __osc.send(to, address, args, types); }
+function oscBundle(to, messages, opts) { return __osc.bundle(to, messages, opts); }
+function oscStatus() { return __osc.status(); }
+// END GENERATED ce.osc
+
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function __m12(n) { return ((Math.floor(n) % 12) + 12) % 12; }
@@ -2309,6 +6288,13 @@ var __WEBVIEW_ONLY = [
 // @module ce.image
   "imageAssets","imageAsset","imageSet","imageClear","imageRead","imageIcon","imageEmbed",
   "imageLoad",
+// @module ce.ci
+  "ciDraftProfile",
+// @module ce.file
+  "fileOpen","fileSave","fileRead","fileWrite","fileFolder","fileList","fileSaveIn",
+// @module ce.keys
+  "keysShortcut","keysRemove","keysList","keysIsDown","keysHeld","keysPiano","keysPianoInfo",
+  "keysFocus","keysFocused",
 // @module ce.text
   "textFonts","textFont","textStyle","textAxis","textRead","textMeasure","textFit",
 // @module ce.components.split
@@ -2484,6 +6470,9 @@ __global.uiDialog = function (opts, onChoice) {
 // sibling engine, and the flat names have to be the same in every language.
 function logWarn(message, value) { return __api.logAt("warn", String(message), value); }
 function logError(message, value) { return __api.logAt("error", String(message), value); }
+// origin(): who made the change the running handler is for ("user", "script", "host", "device",
+// "load"); nothing outside a handler. The plug-in knows, and answers the "origin" device query.
+function origin() { var o = __deviceQuery("origin", {}); return (o === null || o === undefined) ? undefined : o; }
 
 // @module ce.midi
 function sendMidi(bytes) { return __api.sendMidi(bytes); }
@@ -3368,7 +7357,9 @@ function __resolveDumps(kind, role, values, err) {
 function requestDump(kind, fn, opts) {
   kind = String(kind === undefined || kind === null ? "" : kind);
   if (typeof fn === "function") {
-    var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout) : 3000;
+    // Left out, the wait the profile's request deserves: its timeout for every try it allows.
+    var ms = opts && Number(opts.timeout) > 0 ? Number(opts.timeout)
+      : (Number(__deviceQuery("answerWaitMs", { role: "mainSynth", request: kind })) || 3000);
     // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     // so that is what the callback waits for; waiting for the request's own id, it heard only the
     // timeout.
@@ -3647,6 +7638,43 @@ var __CE_OPTIONS = {
   "animateTo": { path: "ce.anim.to", at: 2, refusal: "false", names: ["duration", "beats", "sync", "curve", "damping", "frequency", "from", "delay", "stagger", "repeat", "pingpong", "done"] },
   "animateSpring": { path: "ce.anim.spring", at: 2, refusal: "false", names: ["duration", "damping", "frequency", "from", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
   "animateEnvelope": { path: "ce.anim.envelope", at: 2, refusal: "false", names: ["from", "to", "duration", "beats", "sync", "delay", "stagger", "repeat", "pingpong", "done"] },
+  "patchCurrent": { path: "ce.patch.current", at: 1, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role", "scope"] },
+  "patchRead": { path: "ce.patch.read", at: 2, refusal: "false", names: ["timeout", "role"] },
+  "patchLoad": { path: "ce.patch.load", at: 1, refusal: "nothing", names: ["role"] },
+  "patchMorph": { path: "ce.patch.morph", at: 3, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role", "switchAt"] },
+  "patchBlend": { path: "ce.patch.blend", at: 2, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role"] },
+  "patchRandom": { path: "ce.patch.random", at: 0, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role", "scope", "seed", "from", "within"] },
+  "patchMutate": { path: "ce.patch.mutate", at: 2, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role", "seed"] },
+  "patchMerge": { path: "ce.patch.merge", at: 2, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role"] },
+  "patchDiff": { path: "ce.patch.diff", at: 2, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role"] },
+  "patchEqual": { path: "ce.patch.equal", at: 2, refusal: "nothing", names: ["groups", "only", "except", "lock", "include", "role"] },
+  "patchApply": { path: "ce.patch.apply", at: 1, refusal: "result", names: ["groups", "only", "except", "lock", "include", "role", "send", "changedOnly", "live"] },
+  "patchSave": { path: "ce.patch.save", at: 2, refusal: "false", names: ["replace"] },
+  "patchList": { path: "ce.patch.list", at: 0, refusal: "empty list", names: ["role", "scope"] },
+  "patchForget": { path: "ce.patch.forget", at: 1, refusal: "false", names: ["role"] },
+  "patchWrite": { path: "ce.patch.write", at: 2, refusal: "result", names: ["role"] },
+  "ciDiscover": { path: "ce.ci.discover", at: 0, refusal: "false", names: ["role", "timeoutMs"] },
+  "ciGet": { path: "ce.ci.get", at: 2, refusal: "false", names: ["resId", "timeoutMs", "offset", "limit"] },
+  "ciSet": { path: "ce.ci.set", at: 3, refusal: "false", names: ["resId", "timeoutMs", "partial", "mediaType"] },
+  "ciSubscribe": { path: "ce.ci.subscribe", at: 2, refusal: "nothing", names: ["resId"] },
+  "ciSetProfile": { path: "ce.ci.setProfile", at: 3, refusal: "false", names: ["channel"] },
+  "oscListen": { path: "ce.osc.listen", at: 0, refusal: "false", names: ["port", "network", "nextFree"] },
+  "oscBundle": { path: "ce.osc.bundle", at: 2, refusal: "false", names: ["time"] },
+  "dawAssign": { path: "ce.daw.assign", at: 2, refusal: "false", names: ["name"] },
+  "mpeZone": { path: "ce.mpe.zone", at: 0, refusal: "false", names: ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
+  "mpeNoteOn": { path: "ce.mpe.noteOn", at: 2, refusal: "nothing", names: ["bend", "pressure", "timbre"] },
+  "mpeExpress": { path: "ce.mpe.express", at: 1, refusal: "false", names: ["bend", "pressure", "timbre"] },
+  "mpeListen": { path: "ce.mpe.listen", at: 0, refusal: "false", names: ["from", "zone", "members", "bendRange", "off"] },
+  "fileSyxSplit": { path: "ce.file.syxSplit", at: 1, refusal: "empty list", names: ["partial", "prefix"] },
+  "fileMidiRead": { path: "ce.file.midiRead", at: 1, refusal: "nothing", names: ["track"] },
+  "fileMidiWrite": { path: "ce.file.midiWrite", at: 1, refusal: "nothing", names: ["tempo", "name", "channel"] },
+  "verifyCoverage": { path: "ce.verify.coverage", at: 0, refusal: "nothing", names: ["role", "ids", "group"] },
+  "verifyCheck": { path: "ce.verify.check", at: 0, refusal: "false", names: ["role", "ids", "group"] },
+  "verifyDump": { path: "ce.verify.dump", at: 1, refusal: "false", names: ["role", "times", "gapMs"] },
+  "verifyWrite": { path: "ce.verify.write", at: 2, refusal: "false", names: ["role", "settleMs"] },
+  "verifyProbe": { path: "ce.verify.probe", at: 1, refusal: "false", names: ["role", "settleMs", "values"] },
+  "verifyPatch": { path: "ce.verify.patch", at: 0, refusal: "false", names: ["role", "ids", "group", "settleMs", "via", "send"] },
+  "verifySummary": { path: "ce.verify.summary", at: 1, refusal: "nothing", names: ["width"] },
   "syncTimer": { path: "ce.time.syncTimer", at: 2, refusal: "nothing", names: ["follow"] },
   "deviceParameters": { path: "ce.device.parameters", at: 0, refusal: "empty list", names: ["role", "query", "group", "type", "access", "limit"] },
   "deviceDefineParameter": { path: "ce.device.defineParameter", at: 1, refusal: "false", names: ["name", "group", "type", "min", "max", "access", "choices", "trueValue", "falseValue", "cc", "nrpn", "sysex", "channel", "encoding", "nibbles", "checksum", "variables", "length", "pad"], nested: { "nrpn": { names: ["msb", "lsb"] } } },
@@ -3655,6 +7683,21 @@ var __CE_OPTIONS = {
   "checksum": { path: "ce.midi.checksum", at: 2, refusal: "nothing", names: ["offset"] },
   "panic": { path: "ce.midi.panic", at: 0, refusal: "nothing", names: ["channel", "resetControllers"] },
   "encodeJson": { path: "ce.storage.encode", at: 1, refusal: "nothing", names: ["indent"] },
+  "formatNumber": { path: "ce.format.number", at: 1, refusal: "nothing", names: ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode"] },
+  "formatHz": { path: "ce.format.hz", at: 1, refusal: "nothing", names: ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale"] },
+  "formatTime": { path: "ce.format.time", at: 1, refusal: "nothing", names: ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "scale"] },
+  "formatDb": { path: "ce.format.db", at: 1, refusal: "nothing", names: ["decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "fromGain", "floor"] },
+  "formatPercent": { path: "ce.format.percent", at: 1, refusal: "nothing", names: ["decimals", "sign", "unit", "space", "width", "placeholder", "unicode", "min", "max"] },
+  "formatPan": { path: "ce.format.pan", at: 1, refusal: "nothing", names: ["decimals", "width", "placeholder", "min", "max", "center", "steps", "style"] },
+  "formatRatio": { path: "ce.format.ratio", at: 1, refusal: "nothing", names: ["decimals", "digits", "width", "placeholder", "unicode", "style"] },
+  "formatClock": { path: "ce.format.clock", at: 1, refusal: "nothing", names: ["width", "placeholder", "unicode", "decimals", "hours"] },
+  "formatNote": { path: "ce.format.note", at: 1, refusal: "nothing", names: ["width", "placeholder", "unicode", "middleC", "flats", "octave"] },
+  "formatDivision": { path: "ce.format.division", at: 1, refusal: "nothing", names: ["decimals", "digits", "width", "placeholder", "tolerance"] },
+  "formatParameter": { path: "ce.format.parameter", at: 2, refusal: "nothing", names: ["decimals", "digits", "sign", "unit", "space", "width", "placeholder", "unicode", "role"] },
+  "formatTable": { path: "ce.format.table", at: 2, refusal: "nothing", names: ["width", "placeholder", "start"] },
+  "formatFit": { path: "ce.format.fit", at: 2, refusal: "nothing", names: ["abbreviations", "align", "pad", "steps"] },
+  "formatLine": { path: "ce.format.line", at: 3, refusal: "nothing", names: ["abbreviations", "gap"] },
+  "formatParse": { path: "ce.format.parse", at: 1, refusal: "nothing", names: ["kind", "min", "max", "center", "steps", "middleC"] },
   "bytesRead": { path: "ce.midi.read", at: 3, refusal: "nothing", names: ["bits", "order"] },
   "bytesWrite": { path: "ce.midi.write", at: 4, refusal: "nothing", names: ["bits", "order"] },
 };
@@ -3720,10 +7763,11 @@ function __ce_refused(refusal, lines) {
 // on top. ce.core is global: its members are never namespaced, so they appear here only for
 // discoverability (ce.core.set is the same function as set).
 var __CE_MODULES = {
-  "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
+  "ce.core": { "action": "defineAction", "compute": "compute", "emit": "emit", "error": "logError", "get": "get", "intercept": "intercept", "log": "log", "noTransmit": "noTransmit", "off": "off", "on": "on", "origin": "origin", "run": "run", "set": "set", "transmit": "transmit", "warn": "logWarn", "watch": "watch" },
   "ce.midi": { "checksum": "checksum", "denibblize": "denibblize", "feed": "feedMidi", "find": "bytesFind", "from14bit": "from14bit", "from7bit": "from7bit", "fromAscii": "fromAscii", "fromBase64": "bytesFromBase64", "fromHex": "bytesFromHex", "fromNibbles": "fromNibbles", "fromOffset": "fromOffset", "fromSigned": "fromSigned", "getBits": "getBits", "interceptIn": "interceptMidiIn", "interceptOut": "interceptMidiOut", "nibblize": "nibblize", "panic": "panic", "put": "bytesPut", "read": "bytesRead", "route": "routeMidi", "sendAftertouch": "sendAftertouch", "sendCC": "sendCC", "sendClock": "sendClock", "sendMidi": "sendMidi", "sendNRPN": "sendNRPN", "sendNote": "sendNote", "sendNoteOff": "sendNoteOff", "sendPitchBend": "sendPitchBend", "sendProgramChange": "sendProgramChange", "sendRPN": "sendRPN", "sendSongPosition": "sendSongPosition", "sendSysex": "sendSysex", "sendTransport": "sendTransport", "setBits": "setBits", "slice": "bytesSlice", "to14bit": "to14bit", "to7bit": "to7bit", "toAscii": "toAscii", "toBase64": "bytesToBase64", "toHex": "bytesToHex", "toNibbles": "toNibbles", "toOffset": "toOffset", "toSigned": "toSigned", "write": "bytesWrite" },
   "ce.device": { "applyDump": "applyDump", "bind": "deviceBind", "buildDump": "buildDump", "connected": "deviceConnected", "coverage": "deviceCoverage", "defineDump": "deviceDefineDump", "defineParameter": "deviceDefineParameter", "parameter": "deviceParameter", "parameters": "deviceParameters", "ports": "devicePorts", "preset": "preset", "profile": "deviceProfile", "read": "deviceRead", "recallPreset": "recallPreset", "recipes": "deviceRecipes", "requestDump": "requestDump", "requests": "deviceRequests", "sendDump": "sendDump", "setTiming": "deviceSetTiming", "setVariable": "deviceSetVariable", "timing": "deviceTiming", "unbind": "deviceUnbind", "variables": "deviceVariables", "write": "deviceWrite" },
   "ce.math": { "almost": "almost", "alpha": "colourAlpha", "angle": "angleOf", "approach": "approach", "bipolar": "bipolar", "blend": "blend", "blendBy": "blendBy", "chance": "randomBool", "choice": "randomChoice", "clamp": "clamp", "crossfade": "crossfade", "curve": "curve", "darken": "darken", "dbPosition": "dbPosition", "dbToGain": "dbToGain", "deadzone": "deadzone", "degrees": "toDegrees", "denorm": "denorm", "distance": "distance", "euclid": "euclid", "fold": "fold", "fromARGB": "colourFromArgb", "fromHsl": "hslToHex", "fromRGBA": "colourFromRgba", "gainToDb": "gainToDb", "gaussian": "randomGaussian", "hex": "rgbToHex", "hsl": "hexToHsl", "hysteresis": "hysteresis", "index": "indexOfRange", "lerp": "lerp", "lighten": "lighten", "map": "mapCurve", "max": "maxOf", "mean": "meanOf", "median": "median", "min": "minOf", "mix": "mixColour", "norm": "norm", "polar": "polar", "quantize": "quantizeTo", "radians": "toRadians", "random": "random", "randomFloat": "randomFloat", "rgb": "hexToRgb", "round": "round", "roundTo": "roundTo", "scale": "scale", "seed": "randomSeed", "shape": "shapeCurve", "shuffle": "shuffle", "smooth": "smooth", "snap": "snap", "stream": "randomStream", "sum": "sumOf", "ticks": "tickStops", "unipolar": "unipolar", "unshape": "unshape", "walk": "randomWalk", "weights": "weightsFor", "wrap": "wrap" },
+  "ce.format": { "clock": "formatClock", "db": "formatDb", "division": "formatDivision", "fit": "formatFit", "hz": "formatHz", "line": "formatLine", "note": "formatNote", "number": "formatNumber", "pan": "formatPan", "parameter": "formatParameter", "parse": "formatParse", "percent": "formatPercent", "ratio": "formatRatio", "table": "formatTable", "time": "formatTime" },
   "ce.music": { "arp": "arpOrder", "chord": "chordNotes", "degree": "scaleDegree", "degreeChord": "degreeChord", "inScale": "inScale", "lead": "voiceLead", "name": "noteName", "number": "noteNumber", "octaves": "expandOctaves", "quality": "chordQuality", "quantize": "quantizeNote", "scale": "scaleNotes", "spelling": "noteSpelling" },
   "ce.time": { "after": "after", "afterBeats": "afterBeats", "beatsToMs": "beatsToMs", "clockTempo": "clockTempo", "cycle": "cycleAt", "division": "beatsPerDivision", "divisions": "divisionNames", "looped": "loopedBeats", "msToBeats": "msToBeats", "now": "nowMs", "playing": "isPlaying", "position": "barBeatAt", "startTimer": "startTimer", "step": "stepAt", "steps": "stepsBetween", "stopTimer": "stopTimer", "swing": "swingOffset", "syncTimer": "syncTimer", "tap": "tapTempo", "tempo": "tempo", "timers": "runningTimers", "transport": "transportInfo" },
   "ce.anim": { "envelope": "animateEnvelope", "finish": "animateFinish", "list": "animateList", "pause": "animatePause", "play": "animatePlay", "resume": "animateResume", "reverse": "animateReverse", "running": "animateRunning", "spring": "animateSpring", "stop": "animateStop", "to": "animateTo", "value": "animateValue" },
@@ -3732,6 +7776,14 @@ var __CE_MODULES = {
   "ce.panel": { "align": "panelAlign", "batch": "panelBatch", "circle": "panelCircle", "clone": "panelClone", "create": "panelCreate", "define": "panelDefine", "destroy": "panelDestroy", "distribute": "panelDistribute", "each": "panelEach", "entries": "panelEntries", "entry": "panelEntry", "find": "panelFind", "flip": "panelFlip", "grid": "panelGrid", "info": "panelInfo", "keep": "panelKeep", "match": "panelMatch", "order": "panelOrder", "parent": "panelParent", "patch": "panelPatch", "rect": "panelRect", "restore": "panelRestore", "snapshot": "panelSnapshot", "types": "panelTypes", "undefine": "panelUndefine" },
   "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
+  "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+  "ce.osc": { "bundle": "oscBundle", "listen": "oscListen", "off": "oscOff", "on": "oscOn", "send": "oscSend", "status": "oscStatus", "stop": "oscStop", "target": "oscTarget" },
+  "ce.daw": { "assign": "dawAssign", "beginGesture": "dawBeginGesture", "endGesture": "dawEndGesture", "host": "dawHost", "markChanged": "dawMarkChanged", "parameter": "dawParameter", "parameters": "dawParameters", "program": "dawProgram", "programs": "dawPrograms", "rename": "dawRename" },
+  "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
+  "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
+  "ce.file": { "folder": "fileFolder", "list": "fileList", "midiRead": "fileMidiRead", "midiWrite": "fileMidiWrite", "open": "fileOpen", "read": "fileRead", "save": "fileSave", "saveIn": "fileSaveIn", "syxJoin": "fileSyxJoin", "syxSplit": "fileSyxSplit", "write": "fileWrite" },
+  "ce.verify": { "cancel": "verifyCancel", "check": "verifyCheck", "coverage": "verifyCoverage", "dump": "verifyDump", "patch": "verifyPatch", "probe": "verifyProbe", "running": "verifyRunning", "summary": "verifySummary", "write": "verifyWrite" },
+  "ce.keys": { "focus": "keysFocus", "focused": "keysFocused", "held": "keysHeld", "isDown": "keysIsDown", "list": "keysList", "piano": "keysPiano", "pianoInfo": "keysPianoInfo", "remove": "keysRemove", "shortcut": "keysShortcut" },
   "ce.text": { "axis": "textAxis", "fit": "textFit", "font": "textFont", "fonts": "textFonts", "measure": "textMeasure", "read": "textRead", "style": "textStyle" },
   "ce.components.split": { "channel": "splitChannel", "mute": "splitMute", "point": "splitPoint", "preset": "splitPreset", "read": "splitRead", "transpose": "splitTranspose" },
   "ce.components.phrase": { "cell": "phraseCell", "clear": "phraseClear", "direction": "phraseDirection", "key": "phraseKey", "read": "phraseRead", "run": "phraseRun", "scale": "phraseScale", "seed": "phraseSeed", "transpose": "phraseTranspose" },
@@ -3762,8 +7814,8 @@ var __CE_MODULES = {
   "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "layout": "lcdLayout", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix", "zoneAt": "lcdZoneAt", "zoneKind": "lcdZoneKind", "zoneLabel": "lcdZoneLabel", "zoneShow": "lcdZoneShow", "zoneSource": "lcdZoneSource", "zoneText": "lcdZoneText" },
   "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "kind": "pixelKind", "label": "pixelLabel", "layout": "pixelLayout", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "source": "pixelSource", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.osc","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.osc","version":"1.0","runtime":"any"},{"id":"ce.daw","version":"1.0","runtime":"any"},{"id":"ce.mpe","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

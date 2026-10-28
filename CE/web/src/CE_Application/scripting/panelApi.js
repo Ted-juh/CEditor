@@ -276,6 +276,38 @@ function optionFields(entries) {
 
 /** The option fields more than one member declares, defined once. */
 const SHARED_OPTION_FIELDS = {
+  /* --- ce.patch: choosing parameters, the options every patch command shares - */
+  patchGroups: { name: 'groups', type: 'list of text', default: 'every group', sample: '{"Filter", "Amp Env"}', summary: 'Only parameters in these groups, as the profile names them, in any case.' },
+  patchOnly: { name: 'only', type: 'list of text', default: 'every parameter', sample: '{"cutoff"}', summary: 'Only these parameters, by id. With groups: those in either.' },
+  patchExcept: { name: 'except', type: 'list of text', default: 'none', summary: 'Never these parameters, by id or group name. Wins over groups and only.' },
+  patchLock: { name: 'lock', type: 'list of text', default: 'none', summary: 'These keep their value from the first patch, by id or group name. Unlike except, they stay in the result.' },
+  patchInclude: { name: 'include', type: 'list of text', default: 'none', summary: 'Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups.' },
+  patchRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device, by its role as the panel names it.' },
+  patchScope: { name: 'scope', type: 'text', default: '"voice"', summary: 'The part of the synth, when the command takes no patch to read it from.' },
+  patchSeed: { name: 'seed', type: 'number', default: 'the script\'s random stream', summary: 'Where the random numbers start: the same seed gives the same patch, in every language.' },
+
+  /* --- ce.ci: the options its commands share -------------------------------- */
+  ciRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device whose MIDI ports to ask on.' },
+  ciResId: { name: 'resId', type: 'text', default: 'none', summary: 'For a resource that holds several items: which one, such as one program.' },
+  ciTimeout: { name: 'timeoutMs', type: 'number', default: '3000', unit: 'milliseconds', summary: 'How long to wait for the device\'s answer.' },
+
+  /* --- ce.verify: the options its checks share ----------------------------- */
+  verifyRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device. Every check but coverage asks the main synth only.' },
+  verifyIds: { name: 'ids', type: 'list of text', default: 'every parameter', sample: '{"cutoff", "resonance"}', summary: 'Only these parameters, by id.' },
+  verifyGroup: { name: 'group', type: 'text', default: 'every group', summary: 'Only the parameters of this group, as the profile names it, in any case.' },
+  verifySettle: { name: 'settleMs', type: 'number', default: '100', unit: 'milliseconds', summary: 'The wait between sending and asking the synth for the value back.' },
+
+  /* --- ce.format: the options every formatting command shares ------------- */
+  formatDecimals: { name: 'decimals', type: 'number', default: 'as the command decides', summary: 'Exactly this many decimal places, 0 to 6.' },
+  formatDigits: { name: 'digits', type: 'number', default: '3', summary: 'Significant digits, 1 to 6, when `decimals` is left out.' },
+  formatSign: { name: 'sign', type: 'text', default: '"auto"', values: ['auto', 'always'], summary: '"always" writes a plus too, as in "+12".' },
+  formatUnit: { name: 'unit', type: 'true or false, or text', default: 'true', summary: 'Off for no unit, or text for a unit of its own, such as "st".' },
+  formatSpace: { name: 'space', type: 'true or false', default: 'true', summary: 'The space between the number and its unit. None before % either way.' },
+  formatWidth: { name: 'width', type: 'number', summary: 'Pad to this many characters, the text on the right. Longer text is not cut (that is ce.format.fit).' },
+  formatPlaceholder: { name: 'placeholder', type: 'text', default: '"--"', summary: 'The text for a missing value.' },
+  formatUnicode: { name: 'unicode', type: 'true or false', default: 'false', summary: 'The typographic characters (−, ∞, ♯, ♭), for a label in a normal font. LCD fonts have none of them.' },
+  formatAbbreviations: { name: 'abbreviations', type: 'table', summary: 'More words to shorten, or the built-in ones changed: { Cutoff = "Cut" }.' },
+
   /* --- persistence ------------------------------------------------------- */
   scope: {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
@@ -556,13 +588,16 @@ export const LIFECYCLE_HOOKS = [
   // ScriptRuntime::onDawSaveState merges the returned keys into the shared store.
   //
   // Player-only. The editor has no DAW to save a project, so these never fire in preview — test
-  // them in the exported plugin.
+  // them in the exported plugin. With the plug-in's window open the page's scripts run them
+  // (panelRuntime.js, setDawStateSink), and the state passes between page and window-shut engines
+  // as the window opens and closes (PluginProcessor.h, applyDawStateFromPage).
   {
     id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawSaveState(store) -> object',
-    summary: 'Runs when the DAW saves the project: return what to keep.',
+    summary: 'Runs so the DAW can save your values with the project: return what to keep.',
     notes: [
       'Return a table holding what you want saved.',
+      'Runs shortly after your scripts have run, whether the plug-in\'s window is open or shut.',
       '`store` shows what other scripts saved so far; it is to read only, and changing it saves nothing.',
       'In an exported plug-in only.',
     ],
@@ -575,9 +610,10 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawRestoreState(store)',
-    summary: 'Runs when the DAW opens the project again: read your values back.',
+    summary: 'Runs when the DAW opens the project again, and when the plug-in\'s window opens or closes: read your values back.',
     notes: [
       '`store` holds what your `onDawSaveState` returned, with every other script\'s.',
+      'The window opening or closing runs it so that the scripts that run next carry on from the same values.',
       'In an exported plug-in only.',
     ],
     params: [{ name: 'store', type: 'object' }],
@@ -612,6 +648,11 @@ export const CONTROL_EVENTS = [
 export const PANEL_EVENTS = [
   { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'A control on the panel changed. `info.target` is its name and `info.value` its new value: one handler for many controls.' },
   { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.' },
+  // ce.keys. Panel view only: with the window shut there is no keyboard.
+  { id: 'keyDown', fn: 'onKeyDown', payload: 'key', runtime: RUNTIME_WEBVIEW,
+    summary: 'A key went down that nothing else on the panel kept: not while typing, and not the panic key, a shortcut, a piano key or a key the focused control used. `key.key` is its name as printed ("R", "7", "Space", "Up", "F2"), `key.code` its place, the same on every layout ("KeyR"), `key.ctrl`, `key.shift`, `key.alt` and `key.meta` the modifiers, `key.repeat` true while the system repeats a held key, and `key.control` the control that has the keyboard. Return true to keep the key: it then goes no further, not to the DAW and not to the editor.' },
+  { id: 'keyUp', fn: 'onKeyUp', payload: 'key', runtime: RUNTIME_WEBVIEW,
+    summary: 'A key whose keyDown was raised went up, with the same fields except `repeat`. Also raised for every such key when the panel loses the keyboard while it is held. Its return value is not used.' },
 ];
 
 // Musical time. Raised by whichever runtime is following the clock — the editor's master clock, or
@@ -633,18 +674,51 @@ export const DEVICE_EVENTS = [
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
+  // ce.osc: every OSC message that arrives, whether or not a pattern matched it.
+  { id: 'oscIn', fn: 'onOscIn', payload: 'message', decoded: false,
+    summary: 'An OSC message arrived on the port ce.osc.listen() opened. `message.address` is where it was sent, `message.args` its values, `message.types` their OSC types, `message.from` who sent it ({ host, port }), and `message.time` a bundle\'s time. origin() gives "osc".' },
+  // ce.daw: the DAW moved a parameter, or chose a program (docs/design/ce-daw-module.md). Raised by an
+  // exported plug-in, with its window open or shut; never in the editor, which has no DAW.
+  { id: 'automationIn', fn: 'onAutomationIn', payload: 'move', decoded: false,
+    summary: 'The DAW moved a parameter. `move.control` is the control\'s name, `move.path` its path, `move.value` the new value in the control\'s own range and `move.id` the DAW parameter\'s id. The control\'s own value events fire too, with origin() giving "host". Never for a change a script or a hand made.' },
+  { id: 'dawProgramIn', fn: 'onDawProgramIn', payload: 'program', decoded: false,
+    summary: 'The DAW chose a program from the plug-in\'s bank, and the plug-in has sent it to the synth. `program.index` counts from 0, `program.number` from 1, and `program.name` is its name.' },
+  // ce.ci: a MIDI-CI device answered, left, or had a profile turned on or off (docs/design/ce-ci-module.md).
+  { id: 'ciDiscovered', fn: 'onCiDiscovered', payload: 'device', decoded: true, summary: 'A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them.' },
+  { id: 'ciDeviceRemoved', fn: 'onCiDeviceRemoved', payload: 'device', decoded: true, summary: 'A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel\'s device it was found on. Its subscriptions have ended.' },
+  { id: 'ciProfileChanged', fn: 'onCiProfileChanged', payload: 'profile', decoded: true, summary: 'A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state.' },
+  // ce.verify: raised after a check's own function has run, so one script can show what any script checked.
+  { id: 'verifyDone', fn: 'onVerifyDone', payload: 'report', decoded: true, summary: 'A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too.' },
   { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe it; `preset.source` is "device" when the synth sent a Program Change, "panel" when the panel called recallPreset.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16.' },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0. `midi.from` is the device it came from.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16. `cc.from` is the device it came from.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
   // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
   { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
-    summary: 'A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn.' },
+    summary: 'A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn. `note.from` is the device it came from, and `note.id` the note\'s id while ce.mpe.listen() reads that device.' },
   { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
-    summary: 'A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0.' },
+    summary: 'A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0. `note.from` and `note.id` are as onNoteIn gives them.' },
+  // The rest of a device's MIDI, decoded once before any script (midiInDecoder.js, MidiInDecoder.h).
+  // Bends, pressure and expression are thinned to one every 10 ms per channel, never reordered.
+  { id: 'bendIn', fn: 'onBendIn', payload: 'bend', decoded: false,
+    summary: 'A pitch bend arrived. `bend.value` is -8192 to 8191, 0 in the middle; `bend.amount` the same from -1 to 1; `bend.raw` 0 to 16383, as the two bytes carry it. `bend.channel` is 1 to 16 and `bend.from` the device. Raised at most once every 10 ms per channel, with the latest value.' },
+  { id: 'pressureIn', fn: 'onPressureIn', payload: 'pressure', decoded: false,
+    summary: 'Channel pressure arrived. `pressure.value` is 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per channel.' },
+  { id: 'polyPressureIn', fn: 'onPolyPressureIn', payload: 'pressure', decoded: false,
+    summary: 'Pressure on one note arrived. `pressure.note` is the note, `pressure.value` 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per note.' },
+  { id: 'programIn', fn: 'onProgramIn', payload: 'program', decoded: false,
+    summary: 'A program change arrived. `program.program` is 0 to 127, as the message carries it, and `program.number` 1 to 128, as most synths show it. `program.bankMsb` and `program.bankLsb` are the bank select that came just before it on this channel, when one did. `program.channel` is 1 to 16 and `program.from` the device.' },
+  { id: 'nrpnIn', fn: 'onNrpnIn', payload: 'nrpn', decoded: false,
+    summary: 'An NRPN arrived, put together from its controllers (99, 98, then 6 and 38). `nrpn.msb` and `nrpn.lsb` are the parameter number\'s halves, as sendNRPN takes them, and `nrpn.parameter` the two as one number. `nrpn.value` is 0 to 16383 when the fine half came (`nrpn.fine` true), else 0 to 127. For an increment or decrement, `nrpn.step` is 1 or -1 instead. The controllers still raise ccIn too.' },
+  { id: 'rpnIn', fn: 'onRpnIn', payload: 'rpn', decoded: false,
+    summary: 'An RPN arrived, put together from controllers 101 and 100, then 6 and 38. The fields are those of nrpnIn, and `rpn.name` is "bendRange", "fineTuning", "coarseTuning" or "mpeConfiguration" for the numbers that have one.' },
+  { id: 'transportIn', fn: 'onTransportIn', payload: 'transport', decoded: false,
+    summary: 'A device sent start, stop, continue or a song position. `transport.action` is "start", "stop", "continue" or "position"; for "position", `transport.beat` is where it points, in beats from the start. `transport.from` is the device. Clock ticks are not raised one by one.' },
+  { id: 'expressionIn', fn: 'onExpressionIn', payload: 'expression', decoded: false,
+    summary: 'A note read with ce.mpe.listen() moved. `expression.id` is the note\'s id, as noteIn gave it, `expression.note` the note and `expression.channel` its member channel. `expression.bend` is in semitones, `expression.pressure` and `expression.timbre` 0 to 1, and `expression.changed` says which moved: "bend", "pressure" or "timbre". Raised at most once every 10 ms per note.' },
   { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'A SysEx message arrived. `bytes` holds it as a list of numbers.' },
   { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A synth was connected and is ready. `device.role` names it and `device.profileId` its profile.' },
   { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A synth is no longer connected and ready. `device.role` names it, and `device.message` may say why.' },
@@ -996,9 +1070,9 @@ export const COMMANDS = [
     ],
     params: [
       { name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, such as "system", or one declared with `deviceDefineDump()`; or a request\'s own id, such as "requestSystem".\nAny other: rejected with a console error.' },
-      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(values, info) when the reply arrives, or when it does not.\n`info.ok` false: nothing arrived within `opts.timeout`.\nA request answered by several dumps at once: none is waited for; name the dump wanted.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(values, info) when the reply arrives, or when it does not.\n`info.ok` false: nothing arrived in time; see `opts.timeout`.\nA request answered by several dumps at once: none is waited for; name the dump wanted.' },
       { name: 'opts', type: 'object', required: false, summary: 'The option below.', fields: optionFields([
-        { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
+        { name: 'timeout', type: 'number', default: 'the request\'s own timeout for every try, at least 3000', unit: 'milliseconds',
           summary: 'How long to wait for the reply before giving up and calling `fn` with '
             + 'info.ok = false.' },
       ]) },
@@ -2468,6 +2542,1190 @@ export const COMMANDS = [
     ],
     scopes: 'any',
   },
+  // patch
+  // A synth's sound as a value (docs/design/ce-patch-module.md). Everything that is the same in
+  // every runtime is patchCore.js; the runtimes read and send around it.
+  {
+    id: 'patchCurrent', category: 'Patches', signature: 'patchCurrent([scope [, opts]]) -> patch', refusal: 'nothing',
+    summary: 'Capture the patch as the panel knows it now: the values the synth last reported, or the controls hold.',
+    example: '`local before = ce.patch.current()` keeps the voice as it is now.',
+    notes: [
+      'A patch is a table: { device, role, scope, name, values, missing, source }. `values` is parameter id to value, in the parameter\'s own units; a choice is its id, such as "saw".',
+      'Asks the synth nothing. A parameter the synth never reported is listed in `missing`.',
+      'A panel without a device profile still works: `values` is then keyed by control name.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: false, summary: 'The part of the synth: "voice" when left out, or a scope ce.patch.scopes() lists.\nNot one: no result, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchScope']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchRead', category: 'Patches', signature: 'patchRead(scope, fn [, opts]) -> boolean', refusal: 'false',
+    summary: 'Ask the synth for a patch, and get it when the reply arrives: fn(patch, info).',
+    example: '`ce.patch.read("voice", function(p, info) if info.ok then state.original = p end end)` asks the synth for the voice it is playing.',
+    notes: [
+      'Asks for the scope\'s dumps, one after another, with ce.device.requestDump(); the panel\'s controls are filled from each reply, as a dump always fills them.',
+      '`info.ok` is false when a reply did not arrive in time; the patch is then what the panel knows. `info.missing` lists the ids no reply held.',
+      'A scope with no dumps to ask for (the profile\'s patch section, or define(), names them): false, with a console error.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: true, summary: 'The part of the synth.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(patch, info) when the reply arrives, or when it does not.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'timeout', type: 'number', unit: 'milliseconds', default: 'as long as the profile asks', summary: 'How long to wait for each dump.' },
+        'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchLoad', category: 'Patches', signature: 'patchLoad(name [, opts]) -> patch', refusal: 'nothing',
+    summary: 'Get a patch kept with ce.patch.save(), by its name.',
+    example: '`ce.patch.apply(ce.patch.load("Warm pad"))` plays the patch kept as "Warm pad".',
+    notes: [
+      'Loading sends nothing: pass the result to apply() to hear it.',
+      'No patch by that name, or one kept for another synth: no result, with a console error naming it.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'The name it was kept under, in any case.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMorph', category: 'Patches', signature: 'patchMorph(a, b, t [, opts]) -> patch', refusal: 'nothing',
+    summary: 'A patch part of the way from one patch to another.',
+    example: '`ce.patch.morph(warm, bright, 0.25)` gives a patch a quarter of the way from warm to bright.',
+    notes: [
+      'A number moves in a straight line from a to b, then is rounded to its step and held inside its range. A choice or an on/off is a\'s below `switchAt` and b\'s from it. The patch name stays a\'s.',
+      'A parameter only one of the two patches holds keeps that patch\'s value.',
+      'To morph from a knob, call it in the knob\'s onValueChange and pass the result to apply(p, { live = true }).',
+      'b of another synth or scope: no result, with a console error.',
+    ],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The patch at 0.' },
+      { name: 'b', type: 'table', required: true, summary: 'The patch at 1.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 to 1 (a to b).\nOutside the range: held at 0 or 1.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole',
+        { name: 'switchAt', type: 'number', default: '0.5', summary: 'Where a choice or an on/off changes from a\'s value to b\'s, 0 to 1.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchBlend', category: 'Patches', signature: 'patchBlend(patches, weights [, opts]) -> patch', refusal: 'nothing',
+    summary: 'One patch made of several, each counting as much as its weight.',
+    example: '`ce.patch.blend({ a, b, c }, { 0.5, 0.3, 0.2 })` leans mostly towards a.',
+    notes: [
+      'The weights need not add up to 1; a patch without a weight counts 0. Adding up to 0 or less: no result, with a console error.',
+      'A choice or an on/off takes the value of the patch with the largest weight.',
+      'The weights from ce.math.weightsFor() go straight in, for a morph pad.',
+    ],
+    params: [
+      { name: 'patches', type: 'list', required: true, summary: 'Two or more patches of the same synth and scope.' },
+      { name: 'weights', type: 'list of numbers', required: true, summary: 'How much each counts.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchRandom', category: 'Patches', signature: 'patchRandom([opts]) -> patch', refusal: 'nothing',
+    summary: 'A new patch with random values, within each parameter\'s range.',
+    example: '`ce.patch.random({ groups = {"Filter"}, seed = 7 })` gives the current patch with a new filter section.',
+    notes: [
+      'What is not chosen keeps its value from `from`. The patch name never changes.',
+      'The same `seed` gives the same patch, in every language.',
+      'A panel without a device profile does not say each control\'s range: no result, with a console error.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchScope', 'patchSeed',
+        { name: 'from', type: 'table', default: 'ce.patch.current()', summary: 'The patch whose unchosen values are kept.' },
+        { name: 'within', type: 'table', default: 'each parameter\'s whole range', sample: '{ cutoff = { 40, 100 } }', summary: 'Narrower ranges by id; outside the parameter\'s range they are held inside it.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMutate', category: 'Patches', signature: 'patchMutate(patch, amount [, opts]) -> patch', refusal: 'nothing',
+    summary: 'A variation of a patch: every chosen value moved a little, at random.',
+    example: '`ce.patch.mutate(p, 0.1)` moves each number by up to a tenth of its range.',
+    notes: [
+      'Numbers move by up to `amount` of their range, more often a little than a lot.',
+      'A choice or an on/off changes with a chance of `amount`, to another of its values. Text never changes.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch to vary.' },
+      { name: 'amount', type: 'number', required: true, summary: 'Range: 0 to 1 (no change to any value).\nOutside the range: held at 0 or 1.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchSeed']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMerge', category: 'Patches', signature: 'patchMerge(base, other, opts) -> patch', refusal: 'nothing',
+    summary: 'A patch with the chosen parameters taken from another patch.',
+    example: '`ce.patch.merge(mine, theirs, { groups = {"Filter"} })` keeps mine with the filter from theirs.',
+    notes: ['One of `groups` or `only` is needed: taking every value is `other` itself. Neither: no result, with a console error.'],
+    params: [
+      { name: 'base', type: 'table', required: true, summary: 'The patch that gives everything not chosen.' },
+      { name: 'other', type: 'table', required: true, summary: 'The patch that gives the chosen parameters.' },
+      { name: 'opts', type: 'object', required: true, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchDiff', category: 'Patches', signature: 'patchDiff(a, b [, opts]) -> list', refusal: 'nothing',
+    summary: 'List the parameters whose values differ between two patches: { id, name, group, from, to }.',
+    example: '`ce.patch.diff(saved, ce.patch.current())` lists what has changed since the patch was saved.',
+    notes: [
+      'In the profile\'s parameter order; the same patches give an empty list.',
+      'A parameter only one patch holds is listed, with no value on the other side.',
+      'Two numbers closer than the parameter\'s step count as the same, and so do two names that differ only in trailing spaces.',
+    ],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The first patch.' },
+      { name: 'b', type: 'table', required: true, summary: 'The second patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchEqual', category: 'Patches', signature: 'patchEqual(a, b [, opts]) -> boolean', refusal: 'nothing',
+    summary: 'Tell whether two patches hold the same values.',
+    example: '`if not ce.patch.equal(state.saved, ce.patch.current()) then ... end` runs when the patch has been changed.',
+    notes: ['The same as an empty ce.patch.diff(a, b, opts).'],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The first patch.' },
+      { name: 'b', type: 'table', required: true, summary: 'The second patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchApply', category: 'Patches', signature: 'patchApply(patch [, opts]) -> table', refusal: 'result',
+    summary: 'Put a patch on the panel and send it to the synth, the way this synth takes a patch.',
+    example: '`ce.patch.apply(p)` makes the panel and the synth play p.',
+    notes: [
+      'The panel\'s controls always take the values, whatever `send` says.',
+      'Returns { ok, via, applied, sent, skipped }: `via` is "parameters", "dump" or "none"; `skipped` lists { id, why }. Refused: ok false, with a console error.',
+      '"auto" sends the scope\'s dumps when the profile\'s patch section says `deliver = "dump"`, and one message per changed parameter otherwise.',
+      'A patch of another synth: refused, naming it.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch to apply.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole',
+        { name: 'send', type: 'text', default: '"auto"', values: ['auto', 'parameters', 'dump', 'none'], summary: 'How it goes to the synth: "none" sets the panel only.' },
+        { name: 'changedOnly', type: 'true or false', default: 'true', summary: 'Send only values that differ from what the synth last had.' },
+        { name: 'live', type: 'true or false', default: 'false', summary: 'For a value moving under a hand: the 32 parameters that moved most now, the rest with the next apply without live.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchSave', category: 'Patches', signature: 'patchSave(name, patch [, opts]) -> boolean', refusal: 'false',
+    summary: 'Keep a patch by name, for this synth.',
+    example: '`ce.patch.save("Warm pad", p)` keeps p as "Warm pad".',
+    notes: [
+      'Kept with the panel, as ce.storage.saveSetting() keeps a value: in the editor with the panel document, in an exported plug-in in the DAW project.',
+      'A name of 1 to 64 characters; anything else: false, with a console error.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'Up to 64 characters.' },
+      { name: 'patch', type: 'table', required: true, summary: 'The patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'replace', type: 'true or false', default: 'true', summary: 'Off: a name already in use is refused, with a console error.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchList', category: 'Patches', signature: 'patchList([opts]) -> list', refusal: 'empty list',
+    summary: 'List the patches kept for this synth: { name, scope, savedAt }, newest first.',
+    example: '`ce.patch.list()` gives every kept patch\'s name.',
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole',
+        { name: 'scope', type: 'text', default: 'every scope', summary: 'Only the patches of this scope.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchForget', category: 'Patches', signature: 'patchForget(name [, opts]) -> boolean', refusal: 'false',
+    summary: 'Remove a kept patch.',
+    example: '`ce.patch.forget("Warm pad")` removes it.',
+    notes: ['Returns true when one was removed; no patch by that name: false, without a word.'],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'Its name, in any case.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchWrite', category: 'Patches', signature: 'patchWrite(patch, slot [, opts]) -> table', refusal: 'result',
+    summary: 'Store a patch in the synth\'s own memory, in a writable slot.',
+    example: '`ce.patch.write(p, 130)` stores p in preset 130.',
+    notes: [
+      'Overwrites what the slot held. The synth does not ask, so ask first with ce.ui.choose().',
+      'How it is stored is the profile\'s patch section: `write = { via = "dump", dump = "..." }` sets the "slot" variable and sends that dump. A profile that does not say: refused, with a console error.',
+      'Returns { ok, slot, error }.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch.' },
+      { name: 'slot', type: 'number', required: true, summary: 'The preset number across all banks, counted from 0, as ce.device.recallPreset() takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchScopes', category: 'Patches', signature: 'patchScopes([role]) -> list', refusal: 'empty list',
+    summary: 'Describe the parts of the synth a patch can hold: { id, name, parameters, canRead, canSend, via }.',
+    example: '`ce.patch.scopes()` might give a voice and a system scope.',
+    notes: [
+      'Without a patch section in the profile: "voice" is every parameter but actions and the System, Global, Utility and Performance groups, and "system" those groups.',
+      'A panel without a device profile: one scope, "voice", holding the panel\'s controls.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  {
+    id: 'patchDefine', category: 'Patches', signature: 'patchDefine(scope, spec [, role]) -> boolean', refusal: 'false',
+    summary: 'Describe a scope from the script, for a synth whose profile has no patch section, or to change one.',
+    example: '`ce.patch.define("voice", { groups = {"Osc", "Filter", "Amp"}, dumps = {"voice"} })` makes the voice those three groups, read and sent as the voice dump.',
+    notes: [
+      'spec takes the fields the profile\'s patch section takes for one scope: name, groups, only, except, dumps, read, transform. Anything else: false, with a console error.',
+      'Lasts while the panel is open; call it in onPanelLoad.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: true, summary: 'The scope\'s id. An existing one is replaced for this panel.' },
+      { name: 'spec', type: 'table', required: true, summary: 'The scope: groups, only, except and dumps, as lists of names.' },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device.' },
+    ],
+    scopes: 'any',
+  },
+  // ci
+  // MIDI-CI for scripts (docs/design/ce-ci-module.md). The session lives once, in the device layer in
+  // C++ (DeviceProfileService::ciCommand); ciCore.js checks a call and hands back the answers, the same
+  // in every runtime. Not yet tried against a real MIDI-CI device: only against JUCE's own, in a loopback.
+  {
+    id: 'ciDiscover', category: 'MIDI-CI', signature: 'ciDiscover([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Ask which MIDI-CI devices are there, and get the ones that answer.',
+    example: '`ce.ci.discover(function(found) log(#found .. " MIDI-CI devices") end)`.',
+    notes: [
+      'fn is called once, when the time is up, with a list of devices; none: an empty list. A synth that does not speak MIDI-CI says nothing, so an empty list is the usual answer.',
+      'A device is { muid, role, manufacturer, family, model, version, names, propertyExchange, profiles, matchesProfile }: `muid` its MIDI-CI number for this session; the codes as hex text, as device profiles write them ("41", "01 00"); `names` the words from its DeviceInfo; `matchesProfile` true when it is the synth the role\'s device profile describes.',
+      'A muid changes each time the device is switched on: to find a device again, keep its manufacturer, family and model.',
+      'Each device is also raised as ciDiscovered as soon as it answers. Returns true when asked; false when the role has no MIDI output.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciRole',
+        { name: 'timeoutMs', type: 'number', default: '3000', unit: 'milliseconds', summary: 'How long to listen for answers.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the list of devices.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciDevices', category: 'MIDI-CI', signature: 'ciDevices([role]) -> list', refusal: 'empty list',
+    summary: 'The MIDI-CI devices found so far, without asking again.',
+    example: '`#ce.ci.devices() > 0` is true once a MIDI-CI device has answered.',
+    notes: ['A device stays in the list until it says it is leaving or its ports close.'],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'Only the devices on this role\'s ports. Left out: all.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'ciGet', category: 'MIDI-CI', signature: 'ciGet(muid, resource [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Read a resource from a device: its DeviceInfo, a controller or program list, or one of its own.',
+    example: '`ce.ci.get(state.synth, "ResourceList", fn)` gives the list of resources the device has.',
+    notes: [
+      'fn is called with { ok, status, message, body, mediaType }: `status` is the device\'s own (200 is fine, 404 a resource it does not have); `body` is a table for JSON, text for text, and bytes otherwise. No answer in time: ok false, status 0, "no reply in time".',
+      'ResourceList first: it says which resources exist, and whether each can be set or followed.',
+      'Returns true when sent; false, with a console error, for a device without property exchange or one nobody found.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device, from discover or devices.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name, as the device names it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId', 'ciTimeout',
+        { name: 'offset', type: 'number', default: '0', summary: 'For a long list the device gives in pages: where to start.' },
+        { name: 'limit', type: 'number', default: 'the whole list', summary: 'For a long list: how many to give.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the result.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSet', category: 'MIDI-CI', signature: 'ciSet(muid, resource, body [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Change a resource on a device.',
+    example: '`ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, fn)` renames the patch on a device that has that resource.',
+    notes: [
+      'A table is sent as JSON, text as text. To send bytes, give `mediaType`, such as "application/octet-stream".',
+      'fn is called with { ok, status, message }: 405 is a resource the device will not change.',
+      'Changes the device, as sendSysex can.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name.' },
+      { name: 'body', type: 'value', required: true, summary: 'What to set it to.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId', 'ciTimeout',
+        { name: 'partial', type: 'true or false', default: 'false', summary: 'Send only the fields that change, for a device that allows it.' },
+        { name: 'mediaType', type: 'text', default: 'as body says', summary: 'What body is, such as "text/plain"; needed for bytes.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the result.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSubscribe', category: 'MIDI-CI', signature: 'ciSubscribe(muid, resource [, opts], fn) -> id', refusal: 'nothing',
+    summary: 'Be told when a resource changes on the device.',
+    example: '`ce.ci.subscribe(state.synth, "ProgramList", fn)` calls fn when the user renames or stores a program on the synth.',
+    notes: [
+      'fn is called with { command, body } for each change: "full" (the whole resource), "partial" (only what changed) or "notify" (it changed: get it again); and once with "end" when the device, the panel or ce.ci.unsubscribe() ends it, or the device is gone. A device that refuses: "end" with ok false.',
+      'Returns an id for ce.ci.unsubscribe(); a device without property exchange: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with each update.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciUnsubscribe', category: 'MIDI-CI', signature: 'ciUnsubscribe(id) -> boolean', refusal: 'false',
+    summary: 'Stop following a resource; the device is told.',
+    example: '`ce.ci.unsubscribe(state.programs)` in onPanelClose.',
+    notes: ['Returns true when there was one.'],
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id ce.ci.subscribe() gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'ciProfiles', category: 'MIDI-CI', signature: 'ciProfiles(muid [, fn]) -> list', refusal: 'empty list',
+    summary: 'A device\'s MIDI-CI profiles, and which are on.',
+    example: '`ce.ci.profiles(state.synth)` gives what the last inquiry found.',
+    notes: [
+      'Each is { id, address, enabled }: `id` the profile\'s five bytes as hex text ("7E 21 09 01 00"), `address` "device" or a channel, 1 to 16.',
+      'Without fn: the list as last heard, at once. With fn: the device is asked again, and fn is called with the fresh list.',
+      'A MIDI-CI profile is an agreed way for a device to behave, such as a drawbar organ. It is not one of CEditor\'s device profiles.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called with the fresh list.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSetProfile', category: 'MIDI-CI', signature: 'ciSetProfile(muid, id, on [, opts]) -> boolean', refusal: 'false',
+    summary: 'Turn a MIDI-CI profile on or off.',
+    example: '`ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)`.',
+    notes: ['The device answers with its new state, raised as ciProfileChanged. A device that refuses raises nothing, and profiles keeps the old state.'],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'id', type: 'text', required: true, summary: 'The profile, as profiles gives it.' },
+      { name: 'on', type: 'boolean', required: true, summary: 'On or off.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'channel', type: 'number', default: 'the whole device', summary: 'One channel, 1 to 16, for a profile turned on per channel.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciDraftProfile', category: 'MIDI-CI', signature: 'ciDraftProfile(muid, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Make a draft device profile from what a device reports.',
+    example: '`ce.ci.draftProfile(state.synth, function(draft) log(draft.summary.parameters .. " parameters") end)`.',
+    notes: [
+      'Asks for DeviceInfo, AllCtrlList, ChCtrlList and ProgramList, then builds the draft as the Discovery screen does, marked as partial.',
+      'fn is called with { profile, summary }: `profile` a table ready to save as JSON with ce.file.save(); `summary` counts what it holds, and `missing` lists what the device did not say.',
+      'A starting point, not a finished profile: MIDI-CI says which controllers a device has, not its SysEx dumps.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the draft.' },
+    ],
+    scopes: 'any',
+  },
+  // osc
+  // Open Sound Control (docs/design/ce-osc-module.md). The port, OSC's reading and writing and the
+  // user's yes for the network live once, in C++ (Osc/OscService.h); oscCore.js checks a call and runs
+  // each pattern's function, the same in every runtime.
+  {
+    id: 'oscListen', category: 'OSC', signature: 'oscListen([opts]) -> boolean', refusal: 'false',
+    summary: 'Start receiving OSC on a port.',
+    example: '`ce.osc.listen({ port = 8000, network = true })` receives from a tablet on the same network, after the user says yes.',
+    notes: [
+      'This computer only, unless `network` is on; then the user is asked the first time, and listening starts when they say yes. The answer is kept on this computer for the panel, never in the panel file.',
+      'The port in use is in status().port: show it where the user types it into the tablet. Calling it again moves to the new port.',
+      'Returns true when listening, or waiting for the user. In an exported plug-in with its window shut, false when the port is in use or the user said no; in the panel view that comes a moment later, as a console line and status().error.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'port', type: 'number', default: '8000', summary: 'The port, 1024 to 65535.' },
+        { name: 'network', type: 'boolean', default: 'false', summary: 'Receive from other computers too, after the user says yes.' },
+        { name: 'nextFree', type: 'boolean', default: 'false', summary: 'Take the next free port when this one is in use, as a second copy of the panel must.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscStop', category: 'OSC', signature: 'oscStop() -> boolean', refusal: 'false',
+    summary: 'Stop receiving OSC, and close the port.',
+    example: '`ce.osc.stop()` from an "OSC off" switch.',
+    notes: ['Closed by itself when the panel closes. Returns true when a port was open.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'oscOn', category: 'OSC', signature: 'oscOn(pattern, fn) -> number', refusal: 'nothing',
+    summary: 'Run a function for every OSC message to an address; wildcards allowed.',
+    example: '`ce.osc.on("/fader/*", fn)` runs `fn` for `/fader/1`, `/fader/2` and so on.',
+    notes: [
+      'OSC\'s wildcards, inside one part of the address: `*` any text, `?` one character, `[1-4]` one of a range, `[!0]` anything but, `{cutoff,reso}` one of a list.',
+      'fn is called with the message: { address, args, types, from, time }. `args` are its values; `types` the OSC type of each, such as "if"; `from` { host, port }, which ce.osc.send() takes to answer; `time` a bundle\'s time.',
+      'Several patterns can match one message; each function runs, in the order they were made. A script\'s patterns go when it reloads.',
+      'Returns an id for ce.osc.off().',
+    ],
+    params: [
+      { name: 'pattern', type: 'string', required: true, summary: 'An address, starting with /.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with each message.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscOff', category: 'OSC', signature: 'oscOff(id) -> boolean', refusal: 'false',
+    summary: 'Remove a pattern ce.osc.on() made.',
+    example: '`ce.osc.off(state.faders)`.',
+    notes: ['Returns true when there was one.'],
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id ce.osc.on() gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'oscTarget', category: 'OSC', signature: 'oscTarget(name [, address]) -> boolean', refusal: 'false',
+    summary: 'Give a destination a name, so ce.osc.send() can use it.',
+    example: '`ce.osc.target("tablet", "192.168.1.20:9000")`.',
+    notes: [
+      'Another computer asks the user once, as listening on the network does; this computer ("127.0.0.1" or "localhost") does not.',
+      'Names belong to the panel and are shared by its scripts, until the panel closes.',
+      'Returns true when set, or waiting for the user\'s answer.',
+    ],
+    params: [
+      { name: 'name', type: 'string', required: true, summary: 'The name scripts will use.' },
+      { name: 'address', type: 'value', required: false, default: 'forget the name', summary: '"host:port", { host, port }, or a message\'s from.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscSend', category: 'OSC', signature: 'oscSend(to, address [, args] [, types]) -> boolean', refusal: 'false',
+    summary: 'Send one OSC message.',
+    example: '`ce.osc.send("tablet", "/label/1", "Cutoff")` sets a label in TouchOSC.',
+    notes: [
+      'Every number goes as `f`, the type most receivers expect; text as `s`, true and false as `T` and `F`, nothing as `N`, a list of bytes as `b`. A whole number needs `types` "i", because some languages cannot tell 1 from 1.0.',
+      '`types` gives one OSC type for each value instead: i h f d s S T F N I b r m t c.',
+      'Sending never waits; messages go out in the order sent. A destination on another computer asks the user first, and the message waits for the answer.',
+      'Returns true when sent; false for an address without a leading /, types that do not fit the values, or a destination the user refused.',
+    ],
+    params: [
+      { name: 'to', type: 'value', required: true, summary: 'A name from ce.osc.target(), "host:port", or a message\'s from.' },
+      { name: 'address', type: 'string', required: true, summary: 'Where to send it, starting with /.' },
+      { name: 'args', type: 'value', required: false, default: 'no values', summary: 'One value, or a list of them.' },
+      { name: 'types', type: 'string', required: false, default: 'worked out from the values', summary: 'The OSC types, one per value, such as "if".' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscBundle', category: 'OSC', signature: 'oscBundle(to, messages [, opts]) -> boolean', refusal: 'false',
+    summary: 'Send several OSC messages as one packet, so they arrive together.',
+    example: '`ce.osc.bundle("tablet", { { address = "/fader/1", args = { 0.5 } }, { address = "/label/1", args = { "64" } } })`.',
+    notes: [
+      'For a tablet showing many values: one bundle for a page of faders is one packet, not twenty. A bundle larger than 64 KB is refused; split it.',
+      'Returns true when sent.',
+    ],
+    params: [
+      { name: 'to', type: 'value', required: true, summary: 'As ce.osc.send() takes it.' },
+      { name: 'messages', type: 'list', required: true, summary: 'A list of { address, args, types }.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'time', type: 'number', default: 'at once', unit: 'seconds since 1900', summary: 'When the receiver should act on it, for a receiver that schedules bundles.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscStatus', category: 'OSC', signature: 'oscStatus() -> table', refusal: 'nothing',
+    summary: 'What OSC is doing: listening or not, on which port, what was received, sent and dropped.',
+    example: '`ce.osc.status().port` is the port to type into the tablet.',
+    notes: [
+      'Returns { listening, waiting, port, network, received, sent, dropped, error }: `waiting` while the user has not answered; the counts since the panel opened; `error` the last reason something was refused: "portInUse", "refusedByUser", "badPort", "badAddress", "badMessage", "tooLarge" or "badPacket".',
+      'In the panel view it answers from what the transport last said, a moment behind.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  // daw
+  // The exported plug-in and its DAW (docs/design/ce-daw-module.md). dawCore.js checks a call and asks
+  // the plug-in, the same in every runtime; in the editor there is no DAW.
+  {
+    id: 'dawHost', category: 'DAW', signature: 'dawHost() -> table', refusal: 'nothing',
+    summary: 'What the exported plug-in is running in: the DAW\'s name, the plug-in format, the sample rate and block size, and whether its window is open.',
+    example: '`ce.daw.host().name` is "Bitwig Studio" in Bitwig.',
+    notes: [
+      'Returns { name, format, sampleRate, blockSize, editorOpen }. `name` is the DAW as JUCE knows it, else "Unknown"; `format` is "vst3", "clap", "lv2", "au" or "standalone".',
+      '`sampleRate` and `blockSize` are nothing until the DAW has started the plug-in. Tempo, position and play state are in ce.time.',
+      'In the editor: nothing.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawParameters', category: 'DAW', signature: 'dawParameters() -> list', refusal: 'empty list',
+    summary: 'The plug-in\'s DAW parameters, in the order the DAW lists them.',
+    example: '`#ce.daw.parameters()` is how many the DAW can automate.',
+    notes: [
+      'Each is { id, name, path, control, min, max, default, unit, kind, choices, group, value }: `kind` is "float", "choice" or "bool"; `choices` the texts of a list; `group` the folder the DAW shows it in; `name` the name the DAW shows now; `value` as get() gives it.',
+      'The spare parameters are at the end, with `path` nothing while empty.',
+      'In the editor: the list the next export would bake.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawParameter', category: 'DAW', signature: 'dawParameter(path) -> table', refusal: 'nothing',
+    summary: 'One DAW parameter, by its control\'s path.',
+    example: '`ce.daw.parameter("Cutoff.value").name` is the name the DAW shows for the cutoff knob.',
+    notes: ['Returns one entry as ce.daw.parameters() gives it; a control that is not a DAW parameter: nothing.'],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path, as set takes it.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawProgram', category: 'DAW', signature: 'dawProgram() -> table', refusal: 'nothing',
+    summary: 'The program the DAW has chosen from the plug-in\'s bank.',
+    example: '`ce.daw.program().name` is what the DAW\'s program menu shows.',
+    notes: [
+      'Returns { index, number, name, count }: `index` from 0, `number` from 1, `count` the size of the bank.',
+      'The bank is the one baked at export from the device profile\'s presets. A panel without one, and the editor: nothing.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawPrograms', category: 'DAW', signature: 'dawPrograms() -> list', refusal: 'empty list',
+    summary: 'The whole bank the DAW chooses from.',
+    example: '`ce.daw.programs()[1].name` is the first program\'s name.',
+    notes: ['Returns a list of { index, number, name }; no bank: an empty list.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawBeginGesture', category: 'DAW', signature: 'dawBeginGesture(path) -> boolean', refusal: 'false',
+    summary: 'Start one DAW gesture on a parameter: every set on it until endGesture is one move to the DAW.',
+    example: '`ce.daw.beginGesture("Cutoff.value")` before a sweep the script plays.',
+    notes: [
+      'Without it, each set is a gesture of its own, and a DAW writing automation in touch or latch mode lets go of the parameter after every value.',
+      'Only for changes the script makes over time: a morph, a sweep. A drag by a hand is one gesture already.',
+      'A gesture left open is ended, with a console line, when the window or the plug-in closes.',
+      'Returns true when started; false when one is already open on it, or the path is not a DAW parameter, and in the editor.',
+    ],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawEndGesture', category: 'DAW', signature: 'dawEndGesture(path) -> boolean', refusal: 'false',
+    summary: 'End the gesture ce.daw.beginGesture() started.',
+    example: '`ce.daw.endGesture("Cutoff.value")` when the sweep is done.',
+    notes: ['Returns true when a gesture was open.'],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawRename', category: 'DAW', signature: 'dawRename(path [, name]) -> boolean', refusal: 'false',
+    summary: 'Give a parameter a new name in the DAW.',
+    example: '`ce.daw.rename("Osc2Param.value", "Sync amount")` when the oscillator\'s mode changes what its knob does.',
+    notes: [
+      'The parameter\'s id and place stay the same, so automation already written stays on it. The name is saved with the project.',
+      'Not every DAW shows a new name at once; some only after the project is opened again, and LV2 has no way to say it.',
+      'Returns true when the name was changed; in the editor, false.',
+    ],
+    params: [
+      { name: 'path', type: 'string', required: true, summary: 'The control\'s path.' },
+      { name: 'name', type: 'string', required: false, default: 'the name it was exported with', summary: 'The new name.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'dawAssign', category: 'DAW', signature: 'dawAssign(slot [, path] [, opts]) -> boolean', refusal: 'false',
+    summary: 'Put a control on one of the panel\'s spare parameters, so the DAW can automate it.',
+    example: '`ce.daw.assign(1, "LfoRate.value")` puts the LFO rate on spare parameter 1.',
+    notes: [
+      'The author reserves spare parameters in the panel\'s export settings; the script decides what is on them.',
+      'The spare shows the control\'s range and text: "440 Hz", not "0.53". Moving one moves the other, both ways.',
+      'A control is on one slot at a time: assigning it again moves it. The assignment is saved with the project and comes back before its automation plays.',
+      'Returns true when assigned; false for a slot the panel does not have, a control with no range, and in the editor.',
+    ],
+    params: [
+      { name: 'slot', type: 'number', required: true, summary: '1 to the number of spare parameters the panel has.' },
+      { name: 'path', type: 'string', required: false, default: 'empty the slot', summary: 'The control\'s path.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'name', type: 'string', default: 'the control\'s name', summary: 'The name the DAW shows for the slot.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'dawMarkChanged', category: 'DAW', signature: 'dawMarkChanged() -> boolean', refusal: 'false',
+    summary: 'Tell the DAW the project has unsaved changes.',
+    example: '`ce.daw.markChanged()` after a script changed something only onDawSaveState saves.',
+    notes: [
+      'Without it a DAW may close the project without asking, and lose what only the script holds. A change to a DAW parameter needs no call.',
+      'Also runs onDawSaveState on the next tick, so the state is ready when the DAW asks.',
+      'Returns true when the DAW was told; in the editor, false.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  // mpe
+  // MPE out (docs/design/midi-input-and-mpe.md): mpeCore.js picks each note's member channel and sends
+  // its expression there, the same in every runtime. One zone per panel; Python's is per script.
+  {
+    id: 'mpeZone', category: 'MPE', signature: 'mpeZone([opts]) -> boolean', refusal: 'false',
+    summary: 'Set up the MPE zone the panel plays into, and tell the synth.',
+    example: '`ce.mpe.zone({ members = 7 })` plays into a lower zone of seven channels, 2 to 8.',
+    notes: [
+      'MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself. A zone is one manager channel and the member channels its notes use: the lower zone has channel 1 as manager and members from 2 upwards; the upper zone has 16 and members from 15 down.',
+      'With `send` on, the synth gets the MPE Configuration Message (RPN 6) on the manager channel and the bend range (RPN 0) on every channel of the zone, so both ends agree.',
+      'Changing the zone ends every sounding note first. Returns true when the zone is set.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'zone', type: 'string', default: '"lower"', summary: '"lower" (manager channel 1) or "upper" (manager channel 16).' },
+        { name: 'members', type: 'number', default: '15', summary: 'How many member channels, 1 to 15, and so how many notes can sound at once.' },
+        { name: 'bendRange', type: 'number', default: '48', unit: 'semitones', summary: 'How far a full bend goes on a member channel. MPE\'s own default.' },
+        { name: 'managerBendRange', type: 'number', default: '2', unit: 'semitones', summary: 'The same, for the manager channel.' },
+        { name: 'send', type: 'boolean', default: 'true', summary: 'Send the setup to the synth. Off for a synth set up by hand.' },
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device to play.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNoteOn', category: 'MPE', signature: 'mpeNoteOn(note, velocity [, opts]) -> number', refusal: 'nothing',
+    summary: 'Play a note on a member channel of its own, and get its id.',
+    example: '`local id = ce.mpe.noteOn("C4", 100)` plays middle C and keeps its id.',
+    notes: [
+      'The channel is the free member channel released longest ago, so a release tail on the synth is not cut off. Every channel busy: the oldest note is ended first, with a console line the first time.',
+      'The starting bend, timbre and pressure are sent before the note, as MPE asks, so a note never starts at the last note\'s bend.',
+      'Before ce.mpe.zone(): a lower zone of 15 is set up first, and sent.',
+      'Returns the note\'s id, a number.',
+    ],
+    params: [
+      { name: 'note', type: 'number or text', required: true, summary: 'The note, 0 to 127, or a name such as "C4".' },
+      { name: 'velocity', type: 'number', required: true, summary: '1 to 127.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'bend', type: 'number', default: '0', unit: 'semitones', summary: 'The bend the note starts with, held to the zone\'s bend range.' },
+        { name: 'pressure', type: 'number', default: '0', summary: 'The pressure it starts with, 0 to 1.' },
+        { name: 'timbre', type: 'number', default: '0.5', summary: 'The timbre it starts with, 0 to 1 (controller 74).' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeExpress', category: 'MPE', signature: 'mpeExpress(id, values) -> boolean', refusal: 'false',
+    summary: 'Change one sounding note\'s bend, pressure or timbre.',
+    example: '`ce.mpe.express(id, { bend = 0.5, pressure = 0.8 })` bends the note up a quarter tone and presses it.',
+    notes: [
+      'What is left out is not sent.',
+      'A note that has ended: false, and nothing sent, so a late gesture does not land on the next note to use that channel. Returns true when sent.',
+    ],
+    params: [
+      { name: 'id', type: 'number', required: true, summary: 'A note\'s id, from ce.mpe.noteOn().' },
+      { name: 'values', type: 'object', required: true, fields: optionFields([
+        { name: 'bend', type: 'number', default: 'not sent', unit: 'semitones', summary: 'The note\'s bend, held to the zone\'s bend range.' },
+        { name: 'pressure', type: 'number', default: 'not sent', summary: 'Its pressure, 0 to 1.' },
+        { name: 'timbre', type: 'number', default: 'not sent', summary: 'Its timbre, 0 to 1 (controller 74).' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNoteOff', category: 'MPE', signature: 'mpeNoteOff(id [, velocity]) -> boolean', refusal: 'false',
+    summary: 'End a note played with ce.mpe.noteOn().',
+    example: '`ce.mpe.noteOff(id)` releases the note.',
+    notes: ['Returns true when the note was sounding; false when it had already ended.'],
+    params: [
+      { name: 'id', type: 'number', required: true, summary: 'The note\'s id.' },
+      { name: 'velocity', type: 'number', required: false, default: '64', summary: 'The release velocity, 0 to 127.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeAllOff', category: 'MPE', signature: 'mpeAllOff() -> number', refusal: 'zero',
+    summary: 'End every note the panel plays through MPE, and set each member channel\'s bend back to the middle.',
+    example: '`ce.mpe.allOff()` in onPanelClose leaves the synth silent.',
+    notes: [
+      'Returns how many notes were ended.',
+      'ce.midi.panic() silences these too, as it does every note; call this as well, so ce.mpe.notes() is empty again.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNotes', category: 'MPE', signature: 'mpeNotes() -> list', refusal: 'empty list',
+    summary: 'The notes sounding now through ce.mpe.',
+    example: '`#ce.mpe.notes()` is how many are held.',
+    notes: ['Each is { id, note, channel, velocity, bend, pressure, timbre }, oldest first; none: an empty list.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeListen', category: 'MPE', signature: 'mpeListen([opts]) -> boolean', refusal: 'false',
+    summary: 'Read MPE from a device: give each note an id, and raise expressionIn as it moves.',
+    example: '`ce.mpe.listen({ from = "controller" })` reads MPE from the device the panel calls "controller".',
+    notes: [
+      'An MPE controller sends each note on its own channel, with its bend, pressure and timbre on that channel. This turns them back into notes.',
+      'While listening, noteIn and noteOffIn from that device carry `note.id`, the same id expressionIn gives, and bendIn, pressureIn and controller 74 on its member channels are raised as expressionIn instead.',
+      'The zone comes from the MPE Configuration Message the device sends, when it sends one; else from `zone` and `members` here.',
+      'Returns true when listening. `listen({ off = true })` stops.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'from', type: 'string', kind: 'deviceRole', default: 'every input', summary: 'The device to read, by its role.' },
+        { name: 'zone', type: 'string', default: '"lower"', summary: '"lower" or "upper", until the device says which.' },
+        { name: 'members', type: 'number', default: '15', summary: 'How many member channels, 1 to 15, until the device says.' },
+        { name: 'bendRange', type: 'number', default: '48', unit: 'semitones', summary: 'For turning a member channel\'s bend into semitones.' },
+        { name: 'off', type: 'boolean', default: 'false', summary: 'True stops reading the device.' }]) },
+    ],
+    scopes: 'any',
+  },
+  // file
+  // Librarian files through the person's own dialogs (docs/design/ce-file-module.md). A script never
+  // names a path: every file comes from a dialog the person answered. The dialogs are the panel
+  // view's (scriptFileHost.js, over CE/src/ScriptFiles.h); the four that take files apart work on
+  // bytes and run everywhere (fileCore.js).
+  {
+    id: 'fileOpen', category: 'Files', signature: 'fileOpen(opts, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person for a file, and get its contents.',
+    example: '`ce.file.open({ types = {"syx"} }, function(file, data) … end)` asks for a .syx file and gives its bytes.',
+    notes: [
+      'fn is called as fn(file, data) once the person has chosen, or fn(nil) when they cancel. `data` is bytes for syx and mid, text for txt and csv, and a value for json.',
+      '`file` is a table to keep and pass back: { id, name, type, size, canWrite, isFolder }. It holds no folder: the script never sees where the file is.',
+      'A json file that is not valid JSON: fn(file, nil), with a console error naming the line where it goes wrong.',
+      'Returns true when the dialog opened. Another ce.file dialog already open: the console says so. With the plug-in\'s window shut there is nobody to answer, so nothing is done.',
+      'Files of up to 8 MB.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        { name: 'types', type: 'list of text', default: 'none, needed', sample: '{"syx"}', summary: 'The types the dialog accepts, from syx, mid, json, txt and csv.' },
+        { name: 'title', type: 'text', default: '"Open"', summary: 'The dialog\'s title: say what the file is for, such as "Import a bank".' },
+        { name: 'multiple', type: 'true or false', default: 'false', summary: 'Let the person pick several files: fn is then called once for each.' },
+        { name: 'writable', type: 'true or false', default: 'false', summary: 'Let ce.file.write() write this file again later, as a librarian keeps a bank file open.' },
+        { name: 'read', type: 'true or false', default: 'true', summary: 'Off: give the file value only, and read it later with ce.file.read().' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(file, data), or fn(nil) when the person cancels.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSave', category: 'Files', signature: 'fileSave(name, data [, opts [, fn]]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person where to save, then write the file there.',
+    example: '`ce.file.save("Bank A.syx", bytes)` offers to save the bytes as "Bank A.syx".',
+    notes: [
+      'The extension of `name` sets the type: .syx, .mid, .json, .txt or .csv. Anything else: false, with a console error.',
+      '`data` is bytes for syx and mid, text for txt and csv, and any value for json. The wrong kind for the type: false, with a console error, and nothing written.',
+      'fn is called as fn(file) when it is written, or fn(nil, why) when the person cancels or the write fails. The file value has `canWrite` on, so ce.file.write() can save to it again without asking.',
+      'The dialog asks before writing over a file that is there. The person can change the name; the file keeps the type asked for.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'The name the dialog suggests, with its extension.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'title', type: 'text', default: '"Save"', summary: 'The dialog\'s title.' },
+        { name: 'indent', type: 'number', default: 'none', summary: 'For json: spaces to indent each level, so a person can read the file.' }]) },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(file), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileRead', category: 'Files', signature: 'fileRead(file, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Read a chosen file again, as it is now.',
+    example: '`ce.file.read(state.bank, function(data) … end)` reads the bank file the person opened earlier.',
+    notes: [
+      'fn is called as fn(data), the contents as open gives them, or fn(nil, why) when the file has gone or cannot be read.',
+      'Not a file value from ce.file.open, save or list: false, with a console error.',
+    ],
+    params: [
+      { name: 'file', type: 'table', required: true, summary: 'A file value from open, save or list.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(data), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileWrite', category: 'Files', signature: 'fileWrite(file, data [, fn]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Write a chosen file again, without asking.',
+    example: '`ce.file.write(state.bank, ce.file.syxJoin(state.messages))` saves the edited bank back to its file.',
+    notes: [
+      'Only a file whose `canWrite` is on: one from save, saveIn, or open with `writable`. Anything else: false, with a console error saying the person must save to it first.',
+      'Written whole, through a temporary file, so a write cut short leaves the old file as it was.',
+      'fn is called as fn(true) when written, or fn(false, why) when not.',
+    ],
+    params: [
+      { name: 'file', type: 'table', required: true, summary: 'A file value whose canWrite is on.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write, as save takes it.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(true), or fn(false, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileFolder', category: 'Files', signature: 'fileFolder(opts, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person for a folder.',
+    example: '`ce.file.folder({ title = "Export the bank to", writable = true }, function(dir) … end)` asks where to put a bank\'s files.',
+    notes: [
+      'fn is called as fn(folder) once chosen, or fn(nil) when the person cancels.',
+      'Only this folder: not the folders inside it, and nothing above it.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        { name: 'title', type: 'text', default: '"Choose a folder"', summary: 'The dialog\'s title.' },
+        { name: 'writable', type: 'true or false', default: 'false', summary: 'Let ce.file.saveIn() write into it.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(folder), or fn(nil).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileList', category: 'Files', signature: 'fileList(folder [, opts]) -> list', refusal: 'empty list', runtime: RUNTIME_WEBVIEW,
+    summary: 'The files in a chosen folder, sorted as a person sorts them ("2" before "10").',
+    example: '`ce.file.list(dir, { types = {"syx"} })` gives every .syx file in it.',
+    notes: [
+      'Each is a file value, for ce.file.read(). They can be written only when the folder was chosen writable.',
+      'The files there when the folder was chosen, as saveIn last left them, or when list was last called: a file another program adds shows the next time.',
+    ],
+    params: [
+      { name: 'folder', type: 'table', required: true, summary: 'A folder value from ce.file.folder().' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'types', type: 'list of text', default: 'every type on the list', summary: 'Only these types.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSaveIn', category: 'Files', signature: 'fileSaveIn(folder, name, data [, opts [, fn]]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Write one file into a chosen folder.',
+    example: '`ce.file.saveIn(dir, "001 Brass.syx", bytes)` writes one patch of a bank.',
+    notes: [
+      'Only a folder chosen `writable`. A name with a /, \\ or .. in it, or without a listed extension: false, with a console error.',
+      'A file of that name already there is not written over, and fn gets the reason, unless `replace` is on. The person agreed to a folder, not to losing what was in it.',
+      'fn is called as fn(file) when written, or fn(nil, why) when not.',
+    ],
+    params: [
+      { name: 'folder', type: 'table', required: true, summary: 'A folder value from ce.file.folder(), chosen writable.' },
+      { name: 'name', type: 'text', required: true, summary: 'The file\'s name, with its extension.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write, as save takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'replace', type: 'true or false', default: 'false', summary: 'Write over a file of that name.' },
+        { name: 'indent', type: 'number', default: 'none', summary: 'For json: spaces to indent each level.' }]) },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(file), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSyxSplit', category: 'Files', signature: 'fileSyxSplit(bytes [, opts]) -> list', refusal: 'empty list',
+    summary: 'The SysEx messages in a .syx file, one by one, each from F0 to F7.',
+    example: '`ce.file.syxSplit(bytes)` gives a list of messages.',
+    notes: [
+      'Bytes outside any message are left out, with a console warning saying how many and where. So is a message cut off by the next F0, or with no F7 at the end of the file, unless `partial` is on.',
+      'Works on bytes the script holds, so it runs everywhere, window shut too.',
+    ],
+    params: [
+      { name: 'bytes', type: 'array', required: true, kind: 'bytes', summary: 'The file\'s bytes, a list or hex text.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'partial', type: 'true or false', default: 'false', summary: 'Keep a last message with no F7, so a cut-off file can still be looked at.' },
+        { name: 'prefix', type: 'list', default: 'none', summary: 'Only messages that start with these bytes, such as {0xF0, 0x41} for Roland.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSyxJoin', category: 'Files', signature: 'fileSyxJoin(messages) -> list', refusal: 'nothing',
+    summary: 'Messages as one .syx file\'s bytes, in the order given, nothing added between.',
+    example: '`ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))` saves a bank.',
+    notes: ['A message that does not start with F0 and end with F7: nothing, with a console error naming which.'],
+    params: [{ name: 'messages', type: 'list', required: true, summary: 'Messages, each bytes or hex text.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'fileMidiRead', category: 'Files', signature: 'fileMidiRead(bytes [, opts]) -> table', refusal: 'nothing',
+    summary: 'A MIDI file as tracks of notes: { ticksPerBeat, tempo, tempos, timeSignature, tracks }.',
+    example: '`ce.file.midiRead(data).tracks[1].notes` gives the first track\'s notes.',
+    notes: [
+      'Each track is { name, notes, events }. A note is { beat, note, velocity, length, channel }: `beat` from 0, `length` in beats, `channel` from 1. `events` holds everything else as { beat, bytes }: controllers, program changes, bend, SysEx.',
+      '`tempo` is the tempo at the start, 120 when the file gives none; `tempos` lists every change as { beat, bpm }.',
+      'A note-on with velocity 0 ends the note. A note that never ends lasts to the end of its track, with a console warning naming it.',
+      'Types 0 and 1. A type 2 file, a file timed in SMPTE frames, or one cut short: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'bytes', type: 'array', required: true, kind: 'bytes', summary: 'The file\'s bytes.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'track', type: 'number', default: 'every track', summary: 'Read only this track, counted from 1.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileMidiWrite', category: 'Files', signature: 'fileMidiWrite(song [, opts]) -> list', refusal: 'nothing',
+    summary: 'A MIDI file\'s bytes from a song, a list of notes, or a Phrase Recorder\'s take.',
+    example: '`ce.file.midiWrite(ce.components.recorder.read("Recorder"))` gives the recorder\'s take as a MIDI file.',
+    notes: [
+      '`song` is a song as midiRead gives it, a list of notes { beat, note, velocity, length, channel } written as one track, or a Phrase Recorder\'s section, whose take is written over its bars at the transport\'s beats per bar.',
+      'One track is written as type 0, several as type 1, at 480 ticks per beat unless the song says otherwise.',
+      'Returns the bytes, for ce.file.save(). Anything else as `song`: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'song', type: 'table', required: true, summary: 'A song, a list of notes, or a recorder\'s section.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'tempo', type: 'number', default: 'the song\'s, else the transport\'s, else 120', summary: 'The tempo written at the start, in beats per minute.' },
+        { name: 'name', type: 'text', default: 'none', summary: 'The name written into the first track.' },
+        { name: 'channel', type: 'number', default: '1', summary: 'The channel, 1 to 16, for notes that carry none.' }]) },
+    ],
+    scopes: 'any',
+  },
+  // verify
+  // Asking the synth whether it holds what was sent (docs/design/ce-verify-module.md). The deciding is
+  // verifyCore.js, the same in every runtime; each check ends in one report, handed to its function
+  // and raised as onVerifyDone.
+  {
+    id: 'verifyCoverage', category: 'Verify', signature: 'verifyCoverage([opts]) -> table', refusal: 'nothing',
+    summary: 'Which parameters a check can read back from the synth, which it cannot and why, and whether each dump\'s length adds up. Sends nothing.',
+    example: '`ce.verify.coverage().checkable` is how many of the synth\'s parameters can be checked.',
+    notes: [
+      'Returns { role, total, checkable, unchecked, dumps }: `unchecked` lists { id, name, why }, `why` "notInDump" (no dump holds it) or "noRequest" (the profile cannot ask for that dump).',
+      '`dumps` lists { kind, expectedBytes, layoutBytes, unread } for every dump these parameters are in. `expectedBytes` is the length the profile gives, `layoutBytes` what its layout adds up to; when the two differ, the profile is wrong in one of them. `unread` lists the payload bytes no parameter reads, as { from, to }.',
+      'Reads only the profile, so it works without a synth connected.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyCheck', category: 'Verify', signature: 'verifyCheck([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Ask the synth for its values and compare them with what the panel shows. Writes nothing.',
+    example: '`ce.verify.check(function(report) log(ce.verify.summary(report)) end)` checks every parameter and logs one line.',
+    notes: [
+      'Asks only for the dumps that hold the parameters asked about, one after another, with the profile\'s gap between them. Each reply fills the panel, as a dump always does.',
+      'The report: { kind, role, ok, total, matched, differed, unchecked, dumps, probes, ms, cancelled }. `matched` lists ids; `differed` lists { id, name, expected, got, raw }, `expected` what the panel held and `got` what the synth sent, `raw` the number the synth sent for a choice the profile does not name; `unchecked` lists { id, name, why }; `dumps` lists { kind, status, expectedBytes }, `status` "ok" or "noReply".',
+      '`why` is "notInDump", "noRequest", "noReply" (asked, asked again, no answer in time), "moved" (the value changed while it was checked), "notWritable" or "cancelled".',
+      '`ok` is true when nothing differed and nothing was left unchecked by no reply, a move or a cancel.',
+      'Returns true when started; false while a check runs on that device, when the synth is not connected, or for any device but the main synth.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyDump', category: 'Verify', signature: 'verifyDump(kind [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Ask for the same dump several times and compare the first reply with the last. Writes nothing.',
+    example: '`ce.verify.dump("common", function(report) log(#report.differed) end)` logs how many values changed between two asks.',
+    notes: [
+      'A value that changes when nothing was sent is one the synth changes by itself, such as a counter or a clock. Every check that compares it will find it different.',
+      '`differed` holds the parameters that changed, `expected` the first reply\'s value and `got` the last.',
+      'A dump the profile has no request for: false, with a console error.',
+    ],
+    params: [
+      { name: 'kind', type: 'dumpKind', required: true, summary: 'The dump, by the id the profile gives it, or the id of its request.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole',
+        { name: 'times', type: 'number', default: '2', summary: 'How many times to ask, 2 to 10.' },
+        { name: 'gapMs', type: 'number', default: '500', unit: 'milliseconds', summary: 'The wait between the asks.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyWrite', category: 'Verify', signature: 'verifyWrite(id, value [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Send one value, ask the synth for it back, and compare.',
+    example: '`ce.verify.write("tone1.filter.cutoff", 64, fn)` sends 64 and reports whether the synth holds 64.',
+    notes: [
+      'Sent as ce.device.write() sends it, so the panel\'s control follows. ce.device.write() says the message left; this says whether it landed.',
+      'A parameter no dump holds is still sent, and is reported unchecked with the reason.',
+    ],
+    params: [
+      { name: 'id', type: 'text', required: true, summary: 'The parameter id, as the profile names it.' },
+      { name: 'value', type: 'number or text', required: true, summary: 'The value, in the parameter\'s own units, as ce.device.write() takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifySettle']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyProbe', category: 'Verify', signature: 'verifyProbe(id [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Try a parameter at several values, read each one back, then put the old value back.',
+    example: '`ce.verify.probe("tone1.lfo.rate", fn)` tries the lowest, middle and highest rate and the two next to each end.',
+    notes: [
+      'Left out, `values` is: for a number, the lowest, the one above it, the middle, the one below the highest, and the highest; for a choice, every choice up to 16, else the first, middle and last; for on/off, both; for text, a name of full length and an empty one.',
+      'The report\'s `probes` lists { id, value, got, same } for each value tried, and `differed` the values that did not land. `restored` is true when the old value was read back too.',
+      'The old value is sent back when the probe ends, fails or is cancelled. A parameter that cannot be read back is not sent at all.',
+    ],
+    params: [
+      { name: 'id', type: 'text', required: true, summary: 'The parameter id.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifySettle',
+        { name: 'values', type: 'list', default: 'as the notes say', summary: 'The values to try, in the parameter\'s own units.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyPatch', category: 'Verify', signature: 'verifyPatch([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Send the panel\'s whole sound, ask for every dump that holds it, and compare every value.',
+    example: '`ce.verify.patch(fn)` after building a sound in the panel, before saving it on the synth.',
+    notes: [
+      '`via` left out: whole dumps when the profile\'s patch section says `deliver = "dump"`, else one message per parameter.',
+      'Parameters the profile says cannot be written are reported unchecked as "notWritable".',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup', 'verifySettle',
+        { name: 'via', type: 'text', default: 'as the profile delivers a patch', values: ['dump', 'parameters'], summary: 'How the sound is sent: whole dumps, or one value at a time.' },
+        { name: 'send', type: 'true or false', default: 'true', summary: 'Off: compare without sending first, as check does.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifySummary', category: 'Verify', signature: 'verifySummary(report [, opts]) -> text', refusal: 'nothing',
+    summary: 'A report as one line of text.',
+    example: '`ce.verify.summary(report)` gives "1180 of 1222 match, 3 differ, 39 unchecked (no reply: tone3)".',
+    notes: [
+      'Counts, then in brackets the dump that did not answer, or the most common reason a parameter was left unchecked. A cancelled check says so first.',
+      'Not a report: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'report', type: 'table', required: true, summary: 'A report from any check.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'width', type: 'number', default: 'no limit', summary: 'The most characters to give, for an LCD line. Too long: the part in brackets goes first, then the words are shortened ("5/9 ok 1 diff 3 unchk"), then the line is cut.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyRunning', category: 'Verify', signature: 'verifyRunning([role]) -> table', refusal: 'nothing',
+    summary: 'The check running now on a device: { kind, role, done, total, ms }, or nothing.',
+    example: '`ce.verify.running()` while a patch check runs gives { kind = "patch", done = 3, total = 5, ms = 1840 }.',
+    notes: [
+      '`done` and `total` count dumps asked for (for a probe, values tried), so a script can show progress.',
+      'In Lua and JavaScript every script sees every check on the panel. In Python a script sees the checks it started.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyCancel', category: 'Verify', signature: 'verifyCancel([role]) -> boolean', refusal: 'false',
+    summary: 'Stop the check running on a device.',
+    example: '`ce.verify.cancel()` from a "Stop" button.',
+    notes: [
+      'The check\'s function is still called, with what was read so far and `cancelled` true; what was not read is unchecked as "cancelled". A probe sends the old value back first.',
+      'Returns true when a check was running.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  // keys
+  // The computer keyboard on a panel (docs/design/ce-keys-module.md). Panel view only: with the
+  // window shut there is no keyboard. Who gets a key, in order, is scriptKeys.js's header.
+  {
+    id: 'keysShortcut', category: 'Keyboard', signature: 'keysShortcut(keys, fn [, opts]) -> id', refusal: 'nothing',
+    summary: 'Run a function when a key, or a key with modifiers, is pressed anywhere on the panel.',
+    example: '`ce.keys.shortcut("Ctrl+G", randomizeVoice, { description = "Random voice" })` runs randomizeVoice on Ctrl+G.',
+    notes: [
+      'Refused, with a console line saying why: the editor\'s own keys, the keys DAWs and the system take (Ctrl+R, Ctrl+S and the like), the panic key, and a key another shortcut already has. Space is allowed, with a console line: in a DAW it then no longer starts the transport while the plug-in has the keyboard.',
+      'A shortcut without a modifier waits for a focused control that uses that key: with a knob focused, a shortcut on "Up" does not run, and the knob moves. With a modifier it always runs.',
+      'Shortcuts name the key printed on it: "Ctrl+G" is G wherever it sits on a German or French keyboard.',
+      'Nothing runs while the user is typing into a text box or editing an LCD.',
+      'Returns an id for `remove`; refused: nothing. A script\'s shortcuts are removed when it reloads.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'keys', type: 'text', required: true, summary: 'The key and its modifiers joined by +: "Ctrl+G", "Shift+Up", "F2", "Space". Modifiers are Ctrl, Shift, Alt and Meta (the Windows key, or Cmd on a Mac), in any order and any case.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the same fields keyDown gives.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'description', type: 'text', sample: '"Random voice"', summary: 'The words `list` shows for it.' },
+        { name: 'repeat', type: 'true or false', default: 'false', summary: 'On: run again while the key is held and the system repeats it.' },
+      ]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'keysRemove', category: 'Keyboard', signature: 'keysRemove(id) -> boolean',
+    summary: 'Take a shortcut away.',
+    example: '`ce.keys.remove(state.randomKey)` when the page that used it is hidden.',
+    notes: ['Returns true when there was one.'],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id `shortcut` gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysList', category: 'Keyboard', signature: 'keysList() -> list',
+    summary: 'Every key the panel uses, for a help page: a list of { id, keys, description }.',
+    example: '`#ce.keys.list()` is how many keys the panel uses.',
+    notes: [
+      'The panic key comes first (id "panic"), then the shortcuts in the order they were made.',
+      'The piano is one entry while it is on, keys "Piano".',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysIsDown', category: 'Keyboard', signature: 'keysIsDown(key) -> boolean',
+    summary: 'Whether a key is held now.',
+    example: '`ce.keys.isDown("Shift")` in onValueChange, to move a knob in fine steps while Shift is held.',
+    notes: [
+      'Counts keys the panel saw go down, except while typing. False after the panel loses the keyboard.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'key', type: 'text', required: true, summary: 'A name as keyDown gives it ("Shift", "R", "Up"), or a place as its `code` gives it ("KeyR").' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysHeld', category: 'Keyboard', signature: 'keysHeld() -> list',
+    summary: 'The keys held now, by name, in the order they went down.',
+    example: '`ce.keys.held()` while Ctrl and G are held gives { "Ctrl", "G" }.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysPiano', category: 'Keyboard', signature: 'keysPiano([opts]) -> boolean', refusal: 'false',
+    summary: 'Play notes from the letter keys of the computer keyboard.',
+    example: '`ce.keys.piano({ target = "Keys" })` plays through the Keyboard component named "Keys", which lights up as notes play.',
+    notes: [
+      'The layout is the one Ableton Live and Hostage use, by the keys\' place: the middle letter row plays the white keys from C (A, S, D, F, G, H, J, K, L, ;, \'), the row above it the black ones (W, E, T, Y, U, O, P). On a German or French keyboard the same places play the same notes.',
+      'A key held plays one note until it is let go; the system\'s key repeat is ignored. Keys pressed with Ctrl, Alt or Meta are left for shortcuts.',
+      'With a `target`, the notes go through that Keyboard component: its channel, velocity, transpose, octave and scale lock apply, its keys show what is held, and it raises hit and release as for the mouse. Without one, the options below apply and the notes go to the device as sendNote sends them.',
+      'Every note is let go when the panel loses the keyboard, when the piano is turned off, and on the panic key.',
+      'Returns true when on; false when off, or when the panel has nothing to play to.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'on', type: 'true or false', default: 'true', summary: 'Off stops the piano and lets every note go.' },
+        { name: 'target', type: 'text', kind: 'control', sample: '"Keys"', summary: 'A Keyboard component to play through.' },
+        { name: 'octave', type: 'number', default: '4', summary: 'The octave the A key starts: 4 makes it C4, note 60.' },
+        { name: 'velocity', type: 'number', default: '100', summary: 'How hard every note is played, 1 to 127.' },
+        { name: 'channel', type: 'number', default: '1', summary: 'The MIDI channel, 1 to 16, without a `target`.' },
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device, without a `target`.' },
+        { name: 'octaveKeys', type: 'true or false', default: 'true', summary: 'Z and X move the octave down and up.' },
+        { name: 'velocityKeys', type: 'true or false', default: 'true', summary: 'C and V lower and raise the velocity by 20.' },
+      ]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'keysPianoInfo', category: 'Keyboard', signature: 'keysPianoInfo() -> table',
+    summary: 'What the piano is doing: { on, octave, velocity, channel, target, notes }.',
+    example: '`ce.keys.pianoInfo().octave` is the octave Z and X have moved it to.',
+    notes: [
+      '`notes` is a list of { note, key } for the notes held now.',
+      'To react to each note as it is played, give the piano a `target` and listen to that component\'s hit and release.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysFocus', category: 'Keyboard', signature: 'keysFocus([control]) -> boolean',
+    summary: 'Give a control the keyboard, so the arrows and digits move it.',
+    example: '`ce.keys.focus("Cutoff")` after a shortcut that jumps to the filter.',
+    notes: [
+      'The control shows its focus ring, as after Tab.',
+      'Left out: no control has the keyboard, and keys go to shortcuts and keyDown.',
+      'Refused (false) for a control with "Focusable" off or its keys turned off, a hidden control, and outside the preview.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'control', type: 'string', required: false, kind: 'control', summary: 'The control\'s name.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysFocused', category: 'Keyboard', signature: 'keysFocused() -> text',
+    summary: 'The control that has the keyboard, or nothing.',
+    example: '`ce.keys.focused() == "Cutoff"` while the cutoff knob takes the arrows.',
+    notes: ['The same name as keyDown\'s `control`.'],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
   {
     id: 'drawText', category: 'Drawing', signature: 'drawText(x, y, text [, opts])',
     refusal: 'false',
@@ -3290,8 +4548,11 @@ export const COMMANDS = [
           + '"Filter" and so on.' },
       { name: 'type', type: 'text', sample: '"number"',
         summary: 'Keep only one kind of parameter, such as "number" or "choice".' },
-      { name: 'access', type: 'text', sample: '"readwrite"',
-        summary: 'Keep only parameters you can read, write, or both.' },
+      { name: 'access', type: 'text', sample: '"writable"',
+        summary: 'Keep only some parameters by what can be done with them: "writable", the ones the '
+          + 'panel can send to the synth; "readonly", the ones the synth only reports; '
+          + '"realtimeWarning", the ones not safe to move while notes are playing.\nAny other '
+          + 'value: not filtered, with a console error.' },
       { name: 'limit', type: 'number', default: 'no limit', sample: '50',
         summary: 'Return at most this many. Useful on a synth with hundreds.' },
     ]) }],
@@ -4186,7 +5447,22 @@ export const COMMANDS = [
     ],
     scopes: 'any',
     snippet: { lua: 'ce.core.error("${1:message}")$0', javascript: 'ce.core.error("${1:message}")$0' },
+  },  // Who made a change (docs/design/ce-daw-module.md). A command and not a field, because
+  // onValueChange(value) is given a plain number, and a second argument would break the typed
+  // languages' handlers.
+  {
+    id: 'origin', category: 'Events', signature: 'origin() -> text', refusal: 'nothing',
+    summary: 'Who made the change the running handler is for: "user", "script", "host", "device", "osc" or "load".',
+    example: 'In `onValueChanged`, `origin() == "host"` means the DAW\'s automation moved the knob.',
+    notes: [
+      '"user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "osc": an OSC message. "load": the panel, a preset or the project being opened.',
+      'Outside a handler, and for an event no change caused (a timer, a key): nothing.',
+      'With the plug-in\'s window shut, a change a hand made while it was open is not raised again; and a script\'s set() raises no value events there, as inside a handler with the window open.',
+    ],
+    params: [],
+    scopes: 'any',
   },
+
 ];
 
 /* --------------------------------------------------------- panel-component verbs */
@@ -5143,6 +6419,259 @@ export const HELPERS = [
       { name: 'fn', type: 'function', required: true, summary: 'The code to run. The script\'s own sequence returns when it ends, even if it ends in an error.' },
     ],
   },
+  // --- ce.format: a value as text, and text back (docs/design/ce-format-module.md) ---
+  // Pure, and the same text in every language: formatCore.js here, and a line-for-line twin in each
+  // prelude, held together by test/formatParity.test.js. Options are checked as everywhere else: a
+  // key a command does not take refuses the call (the design said "ignored"; the contract's rule won).
+  {
+    id: 'formatNumber', category: 'Formatting', signature: 'formatNumber(v [, opts])', refusal: 'nothing',
+    summary: 'A number as text, with as many decimals as it needs.',
+    example: '`ce.format.number(12, { sign = "always" })` gives "+12".',
+    notes: [
+      'A whole number has no decimals unless `decimals` asks for them: 3 gives "3", and with `decimals = 1`, "3.0".',
+      'Otherwise three significant digits, trailing zeros dropped: 2.50 gives "2.5", 0.123456 gives "0.123".',
+      'Rounding is half away from zero and the point is always a point, in every language and on every computer.',
+      'No value (nothing, or text that is not a number) gives the placeholder, "--", never "0".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The number. Text that is a number, such as "440", is read as one.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode']) },
+    ],
+  },
+  {
+    id: 'formatHz', category: 'Formatting', signature: 'formatHz(v [, opts])', refusal: 'nothing',
+    summary: 'A frequency, in Hz or kHz, whichever reads shorter.',
+    example: '`ce.format.hz(1250)` gives "1.25 kHz".',
+    notes: [
+      'kHz from 1000 Hz up: 999 gives "999 Hz", 1000 gives "1 kHz". Below 1 Hz, as an LFO rate can be: 0.25 gives "0.25 Hz".',
+      '`space = false` packs it for a narrow display: "12.3kHz".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, unit: 'hertz', summary: 'The frequency.\nBelow 0: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'scale', type: 'text', default: '"auto"', values: ['auto', 'Hz', 'kHz'],
+          summary: '"Hz" or "kHz" keeps one, so a column of values lines up.' }]) },
+    ],
+  },
+  {
+    id: 'formatTime', category: 'Formatting', signature: 'formatTime(ms [, opts])', refusal: 'nothing',
+    summary: 'A duration, in ms or s, whichever reads shorter.',
+    example: '`ce.format.time(1200)` gives "1.2 s".',
+    notes: [
+      'Seconds from 1000 ms up; below 1 ms, 0.5 gives "0.5 ms".',
+      'For a length in beats, use `ce.format.division`; for minutes, `ce.format.clock`.',
+    ],
+    params: [
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'The duration.\nBelow 0: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'scale', type: 'text', default: '"auto"', values: ['auto', 'ms', 's'],
+          summary: '"ms" or "s" keeps one, so a column of values lines up.' }]) },
+    ],
+  },
+  {
+    id: 'formatDb', category: 'Formatting', signature: 'formatDb(v [, opts])', refusal: 'nothing',
+    summary: 'A level in decibels, with one decimal.',
+    example: '`ce.format.db(-6)` gives "-6.0 dB".',
+    notes: [
+      'One decimal by default, because a readout jumping between "-6 dB" and "-5.9 dB" reads as a fault.',
+      'At or below `floor` it is written "-inf dB": silence, as `ce.math.gainToDb` gives it, is -144 dB.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, unit: 'dB', summary: 'The level, or a gain (1 = 0 dB) with `fromGain`.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'fromGain', type: 'true or false', default: 'false', summary: '`v` is a gain, converted as `ce.math.gainToDb` does.' },
+        { name: 'floor', type: 'number', default: '-144', unit: 'dB', summary: 'At or below this: "-inf dB". A mixer fader often wants -80.' }]) },
+    ],
+  },
+  {
+    id: 'formatPercent', category: 'Formatting', signature: 'formatPercent(v [, opts])', refusal: 'nothing',
+    summary: 'A share, as a percentage.',
+    example: '`ce.format.percent(0.5)` gives "50%".',
+    notes: [
+      'Whole percentages unless `decimals` asks for more; no space before %.',
+      'Outside the range it is written as it is, "120%": hold it with `ce.math.clamp` first.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The share, 0 to 1 unless `min` and `max` say otherwise.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'min', type: 'number', default: '0', summary: 'The value that is 0%.' },
+        { name: 'max', type: 'number', default: '1', summary: 'The value that is 100%. `max = 127` reads a knob\'s raw value.\nThe same as min: the placeholder, with a console error.' }]) },
+    ],
+  },
+  {
+    id: 'formatPan', category: 'Formatting', signature: 'formatPan(v [, opts])', refusal: 'nothing',
+    summary: 'A position from left to right, as a synth\'s display writes it.',
+    example: '`ce.format.pan(-0.5)` gives "L25"; `ce.format.pan(0)` gives "C".',
+    notes: [
+      'With the default range, -1 to 1, the far left and far right read `steps`: -1 gives "L50", 1 gives "R50".',
+      'With a range of your own, the number is the distance from the centre as it is, which is what synths show: with `{ min = 0, max = 127, center = 64 }`, 0 reads "L64" and 127 "R63".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The position.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatWidth', 'formatPlaceholder',
+        { name: 'min', type: 'number', default: '-1', summary: 'The far left.' },
+        { name: 'max', type: 'number', default: '1', summary: 'The far right.' },
+        { name: 'center', type: 'number', default: 'halfway', summary: 'The value that reads "C".' },
+        { name: 'steps', type: 'number', default: '50', summary: 'What the far left and far right read, for the default range.' },
+        { name: 'style', type: 'text', default: '"L50"', values: ['L50', '50L', '<50', '50>'],
+          summary: '"L50" or "50L"; "<50" (">50" on the right) or "50>" ("50<" on the left) for a display with no letters to spare.' }]) },
+    ],
+  },
+  {
+    id: 'formatRatio', category: 'Formatting', signature: 'formatRatio(v [, opts])', refusal: 'nothing',
+    summary: 'A ratio, as a compressor or a frequency-modulation operator shows it.',
+    example: '`ce.format.ratio(4)` gives "4:1"; with `style = "x"`, 2 gives "x2.00".',
+    notes: ['A ratio of infinity, as a limiter has, is written "inf:1".'],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The ratio.\n0 or below: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatWidth',
+        'formatPlaceholder', 'formatUnicode',
+        { name: 'style', type: 'text', default: '":"', values: [':', 'x'], summary: '":" for "4:1"; "x" for "x2.00", as an FM ratio reads, two decimals.' }]) },
+    ],
+  },
+  {
+    id: 'formatClock', category: 'Formatting', signature: 'formatClock(ms [, opts])', refusal: 'nothing',
+    summary: 'A time as a clock shows it: minutes, seconds and tenths.',
+    example: '`ce.format.clock(83450)` gives "1:23.4".',
+    notes: [
+      'Hours appear from 60 minutes on: "1:02:03.4".',
+      'Cut, not rounded: a clock shows the tenth that has passed, never one still to come.',
+      'For a song position in bars and beats, use `ce.time.position`.',
+    ],
+    params: [
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'The time.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'decimals', type: 'number', default: '1', summary: 'Decimals of the seconds, 0 to 3.' },
+        { name: 'hours', type: 'true or false', default: 'false', summary: 'Always show hours.' }]) },
+    ],
+  },
+  {
+    id: 'formatNote', category: 'Formatting', signature: 'formatNote(n [, opts])', refusal: 'nothing',
+    summary: 'A MIDI note number as a note name, in the octave numbering the synth uses.',
+    example: '`ce.format.note(60, { middleC = 3 })` gives "C3", as a Yamaha\'s display reads middle C.',
+    notes: [
+      'Makers disagree on middle C: Roland and most software say C4, Yamaha says C3, some old gear C5. Get it wrong and every note on the display is an octave off.',
+      'The same names as `ce.music.name`, which stays for music; this one is for display.',
+    ],
+    params: [
+      { name: 'n', type: 'number', required: true, summary: 'The MIDI note, 0 to 127. A fraction is rounded.\nOutside the range: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'middleC', type: 'number', default: '4', summary: 'The octave number note 60 is written with: 3, 4 or 5.' },
+        { name: 'flats', type: 'true or false', default: 'false', summary: '"Db4" rather than "C#4".' },
+        { name: 'octave', type: 'true or false', default: 'true', summary: 'Off: the letter alone, "C#", for a key or a chord root.' }]) },
+    ],
+  },
+  {
+    id: 'formatDivision', category: 'Formatting', signature: 'formatDivision(beats [, opts])', refusal: 'nothing',
+    summary: 'The note length nearest to a number of beats, by the names the sequencer components use.',
+    example: '`ce.format.division(0.25)` gives "1/16"; `ce.format.division(1/3)` gives "1/8T".',
+    notes: [
+      'The names of `ce.time.divisions()`: "1/1" to "1/32", with "D" for dotted and "T" for triplet.',
+      'A length near no division gives the beats as a number, "0.3 beats", rather than the wrong name.',
+    ],
+    params: [
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'The length; a quarter note is 1.\n0 or below: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatWidth', 'formatPlaceholder',
+        { name: 'tolerance', type: 'number', default: '0.02', summary: 'How far from a division, as a part of it, still counts as that division. 0 to 0.5.' }]) },
+    ],
+  },
+  {
+    id: 'formatParameter', category: 'Formatting', signature: 'formatParameter(id, v [, opts])', refusal: 'nothing',
+    summary: 'A synth parameter\'s value, written the way the synth\'s own display writes it, from the device profile.',
+    example: '`ce.format.parameter("octaveShift", 61)` gives "-3" on a GAIA, where the value is stored 61 to 67 and the panel reads -3 to +3.',
+    notes: [
+      'What it reads from the profile, in order: a choice\'s label; `display.table`, its first entry for the lowest stored value; `display.min` and `display.max` to scale the stored range to the shown one; `display.format` to pick the command (`hz`, `time`, `db`, `percent`, `pan`, `ratio`, `note`, `division`); `display.unit`; `display.precision`; and `display.middleC`, from the parameter or the profile.',
+      'A parameter the profile says nothing more about is written as its number, which is what the panel shows today.',
+      'A `percent` is how far along the stored range the value is; a `pan` is the distance from the middle of the shown range, or from 0 when the range runs through 0.',
+      'What the call passes wins over what the profile says: `decimals = 0` writes a parameter whose profile gives one decimal without it.',
+      'The one command most panels need: `ce.components.lcd.text("Display", 1, ce.format.parameter(id, value))` shows any parameter as the synth does, once its profile says how.',
+    ],
+    requiresDeviceHost: true,
+    params: [
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter', summary: 'The parameter, by its id in the device profile.\nNot one of its parameters: the placeholder, with a console error.' },
+      { name: 'v', type: 'number or text', required: true, summary: 'The value as the synth stores it, as `ce.device.read()` gives it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
+          summary: 'Which device\'s profile to read, when the panel names more than one.' }]) },
+    ],
+  },
+  {
+    id: 'formatTable', category: 'Formatting', signature: 'formatTable(v, table [, opts])', refusal: 'nothing',
+    summary: 'Text from a lookup table, for a value whose display follows no formula.',
+    example: '`ce.format.table(2, {"Off", "I", "II", "I+II"})` gives "II".',
+    notes: [
+      'The first entry is for value 0 in every language, Lua included, because synths count from 0; `start = 1` changes that.',
+      'A list of ranges, `{ upTo, text }`, is read in order: the first whose upTo the value does not pass.',
+      'Past the end of the table: the placeholder, with a console warning.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The value.' },
+      { name: 'table', type: 'list', required: true, summary: 'A list of texts, or a list of { upTo, text } ranges.\nNeither, or empty: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder',
+        { name: 'start', type: 'number', default: '0', summary: 'The value the first entry of a list is for.' }]) },
+    ],
+  },
+  {
+    id: 'formatFit', category: 'Formatting', signature: 'formatFit(text, width [, opts])', refusal: 'nothing',
+    summary: 'Text made exactly `width` characters long: shortened the way a synth\'s display shortens it, then padded.',
+    example: '`ce.format.fit("Filter Envelope", 10)` gives "Filter Env".',
+    notes: [
+      'It shortens one step at a time until the text fits: (1) the abbreviation list, Envelope to Env, Resonance to Reso and about 50 more; (2) vowels from the ends of the longest words, never a first letter, Filter to Fltr; (3) the spaces between words, from the right; (4) the end, cut.',
+      'Characters are counted, which is right for an LCD and any monospaced font; for a proportional font, measure with `ce.text.measure`.',
+    ],
+    params: [
+      { name: 'text', type: 'text', required: true, summary: 'The text. A number is written as text first.' },
+      { name: 'width', type: 'number', required: true, summary: 'The characters, from 1.\nBelow 1: nothing, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatAbbreviations',
+        { name: 'align', type: 'text', default: '"left"', values: ['left', 'right', 'center'], summary: 'Where the padding goes.' },
+        { name: 'pad', type: 'true or false', default: 'true', summary: 'Off: shortened but not padded.' },
+        { name: 'steps', type: 'number', default: '4', summary: 'The last shortening step allowed, 1 to 4: 1 for abbreviations only, so a name is never mangled.' }]) },
+    ],
+  },
+  {
+    id: 'formatLine', category: 'Formatting', signature: 'formatLine(left, right, width [, opts])', refusal: 'nothing',
+    summary: 'One display line: a label on the left and a value on the right, with spaces between.',
+    example: '`ce.format.line("Cutoff", "12.3k", 16)` gives "Cutoff     12.3k".',
+    notes: [
+      'When the two do not fit, the label is shortened, as `ce.format.fit` does, never the value: a wrong-looking value is worse than a short name.',
+      'A value wider than the line is cut from the left, so its end, where the unit is, stays.',
+    ],
+    params: [
+      { name: 'left', type: 'text', required: true, summary: 'The label.' },
+      { name: 'right', type: 'text', required: true, summary: 'The value, usually from another ce.format command.' },
+      { name: 'width', type: 'number', required: true, summary: 'The line\'s width in characters.\nBelow 1: nothing, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatAbbreviations',
+        { name: 'gap', type: 'number', default: '1', summary: 'The fewest spaces between the two.' }]) },
+    ],
+  },
+  {
+    id: 'formatParse', category: 'Formatting', signature: 'formatParse(text [, opts]) -> number', refusal: 'nothing',
+    summary: 'A number from text a person typed, in the forms the other ce.format commands write.',
+    example: '`ce.format.parse("1.2k")` gives 1200; `ce.format.parse("C4", { kind = "note" })` gives 60.',
+    notes: [
+      'Without a kind it reads a number, with k for thousands, and Hz, kHz, ms, s, dB and % as units, each turned into the unit its command takes: "1.2 s" gives 1200 (ms), "50%" gives 0.5.',
+      'With a kind it also reads that kind\'s forms: a note name, a division ("1/8T"), a pan ("L25"), a ratio ("4:1"); and a bare number is taken in that kind\'s unit, so "5" is 5 ms as a time.',
+      'Spaces and case do not matter. Nothing it can read: no result, and no console line, because a person typing is not a script\'s mistake.',
+    ],
+    params: [
+      { name: 'text', type: 'text', required: true, summary: 'What was typed.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'kind', type: 'text', default: '"auto"', values: ['auto', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division'],
+          summary: 'What the value is. A unit that belongs to another kind gives no result.' },
+        { name: 'min', type: 'number', summary: 'The result is held at or above this; for a pan, the far left.' },
+        { name: 'max', type: 'number', summary: 'The result is held at or below this; for a pan, the far right.' },
+        { name: 'center', type: 'number', summary: 'For a pan: the value that reads "C".' },
+        { name: 'steps', type: 'number', default: '50', summary: 'For a pan, as `ce.format.pan` takes it.' },
+        { name: 'middleC', type: 'number', default: '4', summary: 'For a note, as `ce.format.note` takes it.' }]) },
+    ],
+  },
+
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -5644,14 +7173,14 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, the connected device, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, the DAW an exported plug-in runs in, and OSC.',
+    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time', 'ce.daw', 'ce.osc'] },
   { id: 'numbers', label: 'Working out values',
-    blurb: 'Value and range arithmetic, and moving a value over time.',
-    modules: ['ce.math', 'ce.anim'] },
+    blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
+    modules: ['ce.math', 'ce.format', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Creating and arranging controls, and saving things that outlive the session.',
-    modules: ['ce.panel', 'ce.storage'] },
+    blurb: 'Creating and arranging controls, the computer keyboard, saving things that outlive the session, and files.',
+    modules: ['ce.panel', 'ce.keys', 'ce.storage', 'ce.file'] },
   { id: 'appearance', label: 'How it looks',
     blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
@@ -5709,6 +7238,8 @@ export const MODULES = [
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'Work with numbers: ranges, curves, snapping, decibels, colours and random numbers.' },
+  { id: 'ce.format', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Show a value as the text a person reads, such as Hz, dB, a note name or a clock time, and read typed text back as a value.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
     summary: 'Work with notes and keys: note names, scales, chords, snapping to a key, chord names, voice leading and arpeggio orders.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
@@ -5736,6 +7267,30 @@ export const MODULES = [
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Put pictures on controls, from files or the icon library, and keep them in the panel for an export. Panel view only.' },
+  // requires the four whose commands it reads and sends through, so they are there whenever it is.
+  { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
+    summary: 'Work with a synth\'s whole sound: capture, morph, randomize, merge, compare, send and keep patches.' },
+  // requires ce.core only: the transport is the device layer's, and messages arrive as events.
+  { id: 'ce.osc', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Send and receive Open Sound Control messages, using the network only after the user says yes.' },
+  // requires ce.core only: it asks the plug-in, and names controls as set does.
+  { id: 'ce.daw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Work with the DAW an exported plug-in runs in: its parameters, programs, gestures, names and spare parameters.' },
+  // requires ce.midi, whose sends MPE goes out through and whose note names it reads.
+  { id: 'ce.mpe', version: '1.0', requires: ['ce.core', 'ce.midi'], runtime: RUNTIME_ANY,
+    summary: 'Play and read MPE, where each note has a channel of its own and can bend, swell and change tone by itself.' },
+  // requires ce.device, whose role ports MIDI-CI goes out and comes back on.
+  { id: 'ce.ci', version: '1.0', requires: ['ce.core', 'ce.device'], runtime: RUNTIME_ANY,
+    summary: 'Ask a MIDI-CI device who it is, read and change its properties, and turn its profiles on and off. Not yet tried against a real MIDI-CI device.' },
+  // requires ce.time, whose tempo and beats per bar midiWrite uses when a song gives neither. The
+  // dialogs are the panel view's; the byte commands run everywhere.
+  { id: 'ce.file', version: '1.0', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Open, save and take apart librarian files, such as .syx and MIDI files, through the person\'s own file dialogs.' },
+  // requires ce.device, whose dumps it asks for, and ce.time, whose after() spaces the asks.
+  { id: 'ce.verify', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Ask the synth whether it holds what was sent, and report what matched, what differed and what could not be checked.' },
+  { id: 'ce.keys', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Use the computer keyboard: shortcuts, the keys held and a piano on the letter keys. Panel view only.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
     summary: 'Set a control\'s typography, list the fonts there are, and measure text to fit its box. Panel view only.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
@@ -5810,7 +7365,8 @@ const MODULE_MEMBERS = {
   'ce.core': { set: 'set', get: 'get', log: 'log', warn: 'logWarn', error: 'logError',
                on: 'on', off: 'off', emit: 'emit', run: 'run',
                noTransmit: 'noTransmit', transmit: 'transmit',
-               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction' },
+               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction',
+               origin: 'origin' },
   'ce.midi': [
     'sendCC', 'sendNRPN', 'sendRPN', 'sendSysex', 'checksum', 'panic', 'sendSongPosition',
     'sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange', 'sendPitchBend',
@@ -5883,6 +7439,13 @@ const MODULE_MEMBERS = {
                // a panel author would give their own helper, so a qualifier would only be noise.
                smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape',
                euclid: 'euclid' },
+  // Every namespaced name is a bare word (`number`, `time`, `table`, `line`, `fit`, `parse`), so
+  // every flat alias keeps the format prefix.
+  'ce.format': {
+    number: 'formatNumber', hz: 'formatHz', time: 'formatTime', db: 'formatDb', percent: 'formatPercent',
+    pan: 'formatPan', ratio: 'formatRatio', clock: 'formatClock', note: 'formatNote', division: 'formatDivision',
+    parameter: 'formatParameter', table: 'formatTable', fit: 'formatFit', line: 'formatLine', parse: 'formatParse',
+  },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote',
                 spelling: 'noteSpelling', inScale: 'inScale', degree: 'scaleDegree',
@@ -5921,6 +7484,41 @@ const MODULE_MEMBERS = {
   // §1 once more, and this module is the clearest case of it: every namespaced spelling here is a
   // bare English word, so every flat alias keeps the text prefix. `read`, `style`, `fit` and
   // `measure` as globals would be four collisions waiting to happen.
+  'ce.patch': {
+    current: 'patchCurrent', read: 'patchRead', load: 'patchLoad', morph: 'patchMorph', blend: 'patchBlend',
+    random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
+    apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
+    scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.osc': {
+    listen: 'oscListen', stop: 'oscStop', on: 'oscOn', off: 'oscOff', target: 'oscTarget', send: 'oscSend',
+    bundle: 'oscBundle', status: 'oscStatus',
+  },
+  'ce.daw': {
+    host: 'dawHost', parameters: 'dawParameters', parameter: 'dawParameter', program: 'dawProgram',
+    programs: 'dawPrograms', beginGesture: 'dawBeginGesture', endGesture: 'dawEndGesture', rename: 'dawRename',
+    assign: 'dawAssign', markChanged: 'dawMarkChanged',
+  },
+  'ce.mpe': {
+    zone: 'mpeZone', noteOn: 'mpeNoteOn', express: 'mpeExpress', noteOff: 'mpeNoteOff',
+    allOff: 'mpeAllOff', notes: 'mpeNotes', listen: 'mpeListen',
+  },
+  'ce.ci': {
+    discover: 'ciDiscover', devices: 'ciDevices', get: 'ciGet', set: 'ciSet', subscribe: 'ciSubscribe',
+    unsubscribe: 'ciUnsubscribe', profiles: 'ciProfiles', setProfile: 'ciSetProfile', draftProfile: 'ciDraftProfile',
+  },
+  'ce.file': {
+    open: 'fileOpen', save: 'fileSave', read: 'fileRead', write: 'fileWrite', folder: 'fileFolder', list: 'fileList',
+    saveIn: 'fileSaveIn', syxSplit: 'fileSyxSplit', syxJoin: 'fileSyxJoin', midiRead: 'fileMidiRead', midiWrite: 'fileMidiWrite',
+  },
+  'ce.verify': {
+    coverage: 'verifyCoverage', check: 'verifyCheck', dump: 'verifyDump', write: 'verifyWrite', probe: 'verifyProbe',
+    patch: 'verifyPatch', summary: 'verifySummary', running: 'verifyRunning', cancel: 'verifyCancel',
+  },
+  'ce.keys': {
+    shortcut: 'keysShortcut', remove: 'keysRemove', list: 'keysList', isDown: 'keysIsDown', held: 'keysHeld',
+    piano: 'keysPiano', pianoInfo: 'keysPianoInfo', focus: 'keysFocus', focused: 'keysFocused',
+  },
   'ce.text': {
     fonts: 'textFonts', font: 'textFont', style: 'textStyle', axis: 'textAxis',
     read: 'textRead', measure: 'textMeasure', fit: 'textFit',
@@ -6184,10 +7782,13 @@ export function resolveModules(declared) {
 // What a reference to a member looks like in the languages a panel can be written in. Both
 // spellings count: the flat alias (`sendCC(`) and the namespaced path (`ce.midi.sendCC`).
 // Value members have no call parens, so they are matched as bare words.
-function memberReferenceRe(memberId, shortName) {
+function memberReferenceRe(memberId, shortName, isModuleName = false) {
   const flat = escapeForRe(memberId);
   const short = escapeForRe(shortName);
-  return new RegExp(`\\b${flat}\\b|\\.\\s*${short}\\b`);
+  // A member whose short name is also a module's (ce.format.time beside ce.time) would otherwise be
+  // found in every script that reaches for that module, so `ce.time` itself does not count for it.
+  const before = isModuleName ? '(?<!\\bce\\s*)' : '';
+  return new RegExp(`\\b${flat}\\b|${before}\\.\\s*${short}\\b`);
 }
 
 function escapeForRe(s) {
@@ -6215,7 +7816,10 @@ function scanMatchers() {
   const known = allModules();
   const members = Object.entries(memberModule())
     .filter(([, at]) => !moduleById(at.module)?.global)
-    .map(([id, at]) => ({ module: at.module, re: memberReferenceRe(id, at.name) }));
+    .map(([id, at]) => ({
+      module: at.module,
+      re: memberReferenceRe(id, at.name, known.some((m) => m.id === `ce.${at.name}`)),
+    }));
   const paths = known.filter((module) => !module.global)
     .map((module) => ({ module: module.id, re: new RegExp(`\\b${escapeForRe(module.id)}\\b`) }));
   return moduleScanMatchers = { known, members, paths };

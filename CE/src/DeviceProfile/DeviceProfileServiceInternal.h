@@ -69,8 +69,13 @@ inline bool descriptorMatches (const juce::DynamicObject& descriptor,
 {
     auto descriptorGroup = objectString (&descriptor, "group");
     auto descriptorType = objectString (&descriptor, "type");
-    auto* accessObject = descriptor.getProperty ("access").getDynamicObject();
-    auto canWrite = accessObject == nullptr || ! accessObject->hasProperty ("canWrite") || static_cast<bool> (accessObject->getProperty ("canWrite"));
+    const auto accessValue = descriptor.getProperty ("access");
+    auto* accessObject = accessValue.getDynamicObject();
+    // A script-declared parameter gives its access as text ("read", "readWrite"); the panel view
+    // reads it the same way (accessMatches in panelRuntime.js).
+    auto canWrite = accessValue.isString()
+        ? accessValue.toString().containsIgnoreCase ("write")
+        : accessObject == nullptr || ! accessObject->hasProperty ("canWrite") || static_cast<bool> (accessObject->getProperty ("canWrite"));
     auto realtimeSafe = accessObject == nullptr || ! accessObject->hasProperty ("realtimeSafe") || static_cast<bool> (accessObject->getProperty ("realtimeSafe"));
 
     if (group.isNotEmpty() && group != "all" && descriptorGroup != group)

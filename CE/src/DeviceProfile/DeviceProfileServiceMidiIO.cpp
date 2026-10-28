@@ -462,6 +462,7 @@ void DeviceProfileService::sendRawMidiToRole (const juce::String& deviceRole, co
     const auto destination = resolveDestination (deviceRole);
     if (destination.type != "hardwareOutput" || destination.id.isEmpty())
         return;
+    if (rawMidiTapForTesting) { rawMidiTapForTesting (deviceRole, message); return; }
 
     auto& output = midiOutputs[destination.id];
     if (output == nullptr)
@@ -518,7 +519,8 @@ void DeviceProfileService::timerCallback()
     // any of either or the file is still there, so the file goes when they do.
     publishPendingRequests();
 
-    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive
+    if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive && ciDiscoveries.empty()
+        && std::none_of (ciSessions.begin(), ciSessions.end(), [] (const auto& kv) { return kv.second->busy(); })
         && answeredReplies.empty() && publishedRequests.isEmpty())
         stopTimer();
 }

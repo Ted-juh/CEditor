@@ -17,6 +17,28 @@
 // and a fifteenth was spelled differently, and forty-seven panel verbs existed here and nowhere
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
+import {
+  formatNumber, formatHz, formatTime, formatDb, formatPercent, formatPan, formatRatio, formatClock,
+  formatNote, formatDivision, formatTable, formatFit, formatLine, formatParse, formatDescribed,
+  formatPlaceholderFor,
+} from './formatCore.js';
+import {
+  addShortcut as keysAddShortcut, removeShortcut as keysRemoveShortcut, listShortcuts as keysListShortcuts,
+  isDown as keysIsDownRead, heldKeys as keysHeldRead, setPiano as keysSetPiano, pianoInfo as keysPianoInfoRead,
+  focusControl as keysFocusControl, focusedControl as keysFocusedControl, resetKeys, setShortcutRunner,
+  setKeysPanelResolver,
+} from './scriptKeys.js';
+import { patchCommands } from './patchCore.js';
+import { verifyCommands } from './verifyCore.js';
+import { fileCommands } from './fileCore.js';
+import { createFileDialogs } from './scriptFileHost.js';
+import { createCiBridge } from './ciHost.js';
+import { createMidiInDecoder } from './midiInDecoder.js';
+import { mpeCommands } from './mpeCore.js';
+import { dawCommands } from './dawCore.js';
+import { oscCommands, oscMatches } from './oscCore.js';
+import { OSC_CONTROL_KIND, parseOscTargets } from '../utils/oscControlBindings.js';
+import { collectExportParameters } from '../utils/exportParameters.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -322,6 +344,7 @@ export function setRuntimeHost(h) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
     seedSessionSnapshot();
+    syncOscBindings();   // the player's panel: open its OSC port when it has OSC bindings
   }
 }
 
@@ -756,6 +779,13 @@ function scriptSet(path, value, form) {
 }
 
 function setValue(path, value, formOrOpts = '') {
+  // A write outside any handler (after(), a timer's own callback) raises the value events itself:
+  // origin() then says a script made it, unless whoever called this said otherwise first.
+  if (!dispatchingNow() && panelsOrigin == null) {
+    panelsOrigin = 'script';
+    // A write that changed nothing raises nothing, and must not lend its origin to a later one.
+    queueMicrotask(() => { panelsOrigin = null; });
+  }
   const form = typeof formOrOpts === 'string' ? formOrOpts : '';
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
   const notAForm = formRefusal(`set("${path}")`, 'nothing was set', form);
@@ -2047,6 +2077,11 @@ function unshapeImpl(y, curve, tension) {
   }
 }
 
+// ce.format's console: a rejected argument is an error, a value past the end of a table a warning.
+function formatSay(level, text) {
+  addScriptTrace(level === 'warn' ? 'warn' : 'error', '', text);
+}
+
 const helpers = {
   clamp: (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v),
   round: (v) => Math.round(v),
@@ -2147,6 +2182,33 @@ const helpers = {
     if (!Number.isFinite(g) || g <= 0) return MIN_DB;
     const db = 20 * Math.log10(g);
     return db < MIN_DB ? MIN_DB : db;
+  },
+  // @module ce.format
+  // Pure, and line for line the preludes' own (formatCore.js says why that matters here).
+  formatNumber: (v, opts) => formatNumber(v, opts, formatSay),
+  formatHz: (v, opts) => formatHz(v, opts, formatSay),
+  formatTime: (ms, opts) => formatTime(ms, opts, formatSay),
+  formatDb: (v, opts) => formatDb(v, opts, formatSay),
+  formatPercent: (v, opts) => formatPercent(v, opts, formatSay),
+  formatPan: (v, opts) => formatPan(v, opts, formatSay),
+  formatRatio: (v, opts) => formatRatio(v, opts, formatSay),
+  formatClock: (ms, opts) => formatClock(ms, opts, formatSay),
+  formatNote: (n, opts) => formatNote(n, opts, formatSay),
+  formatDivision: (beats, opts) => formatDivision(beats, opts, formatSay),
+  formatTable: (v, table, opts) => formatTable(v, table, opts, formatSay),
+  formatFit: (text, width, opts) => formatFit(text, width, opts, formatSay),
+  formatLine: (left, right, width, opts) => formatLine(left, right, width, opts, formatSay),
+  formatParse: (text, opts) => formatParse(text, opts),
+  // The one ce.format command that reads the device: the profile's description, then the pure part.
+  formatParameter: (id, v, opts) => {
+    const role = opts && typeof opts === 'object' && opts.role ? String(opts.role) : DEFAULT_ROLE;
+    const desc = deviceParameterRead(id, role);
+    if (!desc || typeof desc !== 'object') {
+      const shown = formatPlaceholderFor(opts);
+      formatSay('error', `ce.format.parameter: the device profile has no parameter "${String(id)}", so "${shown}" is shown.`);
+      return shown;
+    }
+    return formatDescribed(desc, v, opts, formatSay);
   },
   // @module ce.music
   // Two spellings, chosen by whether the second argument is there at all. Omitted, you get this
@@ -7998,6 +8060,8 @@ function stopAllTimers() {
     sendRawMidiForRole([0x80 | active.channel, active.note, 0], `noteoff_${active.note}`, active.role);
   }
   activeScriptNotes.clear();
+  // ce.mpe's notes likewise: ended, with each member channel's bend put back, before the panel goes.
+  if (mpeShared !== null) { mpeShared.allOff(); mpeShared = null; }
   afterCallbacks.clear();   // a one-shot outliving its panel would fire into nothing
   for (const handle of timers.values()) clearInterval(handle);
   timers.clear();
@@ -8426,6 +8490,25 @@ function deviceValueWrite(id, value, role) {
  * id overrides it — which is what lets a script correct one wrong parameter in an otherwise good
  * profile without having to redeclare the rest.
  */
+// The access filter, the same three words the exported plug-in's engines take
+// (descriptorMatches in DeviceProfileServiceInternal.h). This read used to match the text of
+// `access` as a substring — but a profile's access is an object, whose text is "[object Object]",
+// so any value at all filtered every profile parameter out, while the plug-in ignored the
+// "readwrite" the manual's example passed and returned them all.
+const ACCESS_FILTERS = new Set(['writable', 'readonly', 'realtimeWarning']);
+function accessMatches(access, filter) {
+  if (!ACCESS_FILTERS.has(filter)) return true;
+  // A profile gives { canWrite, realtimeSafe }; a declared parameter gives text such as "read" or
+  // "readWrite". Missing means writable and safe, as the engine reads it.
+  const canWrite = typeof access === 'string'
+    ? /write/i.test(access)
+    : access?.canWrite !== false;
+  const realtimeSafe = typeof access === 'string' ? true : access?.realtimeSafe !== false;
+  if (filter === 'writable') return canWrite;
+  if (filter === 'readonly') return !canWrite;
+  return !realtimeSafe;
+}
+
 function deviceParametersRead(opts = {}) {
   const role = opts.role || DEFAULT_ROLE;
   const declared = definedParameters(role);
@@ -8464,9 +8547,15 @@ function deviceParametersRead(opts = {}) {
   for (const p of [...fromProfile, ...declared]) byId.set(String(p?.id ?? ''), p);
 
   const wanted = (field, value) => !value || String(field ?? '').toLowerCase().includes(String(value).toLowerCase());
+  const access = String(opts.access ?? '');
+  if (access && !ACCESS_FILTERS.has(access)) {
+    addScriptTrace('error', '',
+      `deviceParameters(): access "${access}" is not one of "writable", "readonly" or "realtimeWarning"; `
+      + 'the list is not filtered by access.');
+  }
   let out = [...byId.values()].filter((p) => wanted(p?.group, opts.group)
     && wanted(p?.type, opts.type)
-    && wanted(p?.access, opts.access)
+    && accessMatches(p?.access, access)
     && (!opts.query
       || String(p?.id ?? '').toLowerCase().includes(String(opts.query).toLowerCase())
       || String(p?.name ?? '').toLowerCase().includes(String(opts.query).toLowerCase())));
@@ -8804,7 +8893,7 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   const role = DEFAULT_ROLE;
 
   if (typeof fn === 'function') {
-    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
+    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : requestWaitMs(role, key);
     // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     // so that is what the callback waits for, in every runtime; waiting for the request's own id,
     // it heard only the timeout.
@@ -8847,6 +8936,23 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   return false;
 }
 
+/**
+ * How long requestDump(kind, fn) waits when the script gives no timeout: the request's own timeoutMs
+ * for every try the profile allows (the service sends it 1 + retries times), and never less than the
+ * 3000 ms it always waited. A fixed 3000 ms reported an AN1x request, whose profile gives it 4000 ms,
+ * as unanswered while its reply was still on the way. The plug-in's "answerWaitMs" query is the
+ * same sum.
+ */
+function requestWaitMs(role, kind) {
+  const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
+  if (!request) return 3000;
+  const timeoutMs = Number(request.timeoutMs) > 0 ? Math.round(Number(request.timeoutMs)) : 2000;
+  const retries = Number(request.retries) > 0 ? Math.round(Number(request.retries)) : 0;
+  return Math.max(3000, timeoutMs * (1 + retries) + 500);
+}
+
+export function requestWaitMsForTesting(role, kind) { return requestWaitMs(role, kind); }
+
 /** The dump a request of the role's profile answers with, or null (the plug-in's "answers" query). */
 function requestAnswer(role, kind) {
   const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
@@ -8882,6 +8988,16 @@ export function clearDeviceRuntimeDefinitions() {
     waiter.done = true;
     if (waiter.timerId) stopTimer(waiter.timerId);
   }
+  // A check outliving its panel would never finish, and its device would stay busy.
+  for (const role of Object.keys(verifyJobs)) delete verifyJobs[role];
+  forgetChosenFiles();
+  ciBridge.reset();   // …and a device's answer to a panel that is gone reaches nobody
+  midiInDecode.reset();     // …and a bend half way through its thinning belongs to no panel
+  mpeShared = null;         // …and a new panel sets its own zone
+  dawPageGestures.clear();  // …and the plug-in ended the window's gestures with it
+  forgetOsc();              // …and its OSC port closes, and its targets are forgotten
+  controlOrigins.clear();
+  if (midiInTimer !== null) { clearTimeout(midiInTimer); midiInTimer = null; }
 }
 
 // @module ce.storage
@@ -9380,7 +9496,160 @@ export function optionCheckedMembersForTesting() {
 }
 
 // @module -
+/**
+ * ce.patch over the panel view: patchCore.js's commands, reading and sending through the same
+ * functions the ce.device, ce.panel, ce.math and ce.storage commands use, for this script.
+ */
+function patchHostFor(scriptId) {
+  return {
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    profile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
+    parameters: (role) => deviceParametersRead({ role: role || DEFAULT_ROLE }),
+    read: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    write: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    fill: (values) => midiApi.applyDump(values),
+    snapshot: () => panelSnapshotImpl(),
+    restore: (values) => panelRestoreImpl(values),
+    requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),
+    sendDump: (kind) => midiApi.sendDump(kind),
+    setVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
+    patchSection: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE, { own: true });
+      return source && typeof source.patch === 'object' ? source.patch : null;
+    },
+    random: () => randomImpl(scriptId),
+    now: () => new Date().toISOString(),
+    store: {
+      get: (key) => loadSetting(key, undefined, undefined, scriptId),
+      set: (key, value) => saveSetting(key, value, undefined, scriptId),
+      keys: () => listSettings(undefined, scriptId) ?? [],
+      remove: (key) => forgetSetting(key, undefined, scriptId),
+    },
+  };
+}
+
+/**
+ * ce.verify's host for one script (docs/design/ce-verify-module.md). The checks themselves are the
+ * panel's, in verifyJobs, so a script's Stop button can cancel what another script's Check button
+ * started; the report reaches every script as onVerifyDone.
+ */
+const verifyJobs = {};
+
+function verifyHostFor(scriptId) {
+  return {
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    parameters: (role) => deviceParametersRead({ role: role || DEFAULT_ROLE }),
+    layout: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE);
+      if (!source) return null;
+      const encodings = {};
+      for (const p of Array.isArray(source.parameters) ? source.parameters : []) {
+        if (p && typeof p.id === 'string' && p.encoding && typeof p.encoding === 'object') encodings[p.id] = p.encoding;
+      }
+      return {
+        dumps: Array.isArray(source.dumpDefinitions) ? source.dumpDefinitions : [],
+        requests: Array.isArray(source.requests) ? source.requests : [],
+        encodings,
+        gapMs: deviceTimingRead(role || DEFAULT_ROLE)?.minDelayBetweenMessagesMs,
+      };
+    },
+    read: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    write: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    sendDump: (kind) => midiApi.sendDump(kind),
+    patchSection: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE, { own: true });
+      return source && typeof source.patch === 'object' ? source.patch : null;
+    },
+    connected: (role) => deviceConnectedRead(role || DEFAULT_ROLE) === true,
+    requestDump: (kind, fn) => requestDumpImpl(kind, fn, undefined, scriptId),
+    after: (ms, fn) => afterFor(scriptId, ms, fn, 'ce.verify'),
+    clock: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+    emit: (report) => deliverEmit('onVerifyDone', null, report),
+    jobs: verifyJobs,
+  };
+}
+
+/**
+ * ce.file (docs/design/ce-file-module.md). The byte commands are fileCore.js, the same code the
+ * JavaScript prelude runs; the dialogs are scriptFileHost.js over the native side's "scriptFile"
+ * event (CE/src/ScriptFiles.h), one per script so its messages and functions are its own, with the
+ * folders' listings shared, as a folder one script chose is every script's to list.
+ */
+const fileDialogSet = new Set();
+const fileListings = new Map();
+let fileResultsHeard = false;
+
+function fileDialogsFor(scriptId) {
+  if (!fileResultsHeard && isJuceAvailable() && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    fileResultsHeard = true;
+    window.__JUCE__.backend.addEventListener('scriptFileResult', (result) => {
+      for (const dialogs of fileDialogSet) dialogs.receive(result);
+    });
+  }
+  const dialogs = createFileDialogs({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    send: (payload) => {
+      if (!isJuceAvailable()) return false;
+      window.__JUCE__.backend.emitEvent('scriptFile', payload);
+      return true;
+    },
+    call: (fn, ...args) => runScriptCallback(scriptId, 'ce.file', () => fn(...args)),
+    listings: fileListings,
+  });
+  fileDialogSet.add(dialogs);
+  return dialogs;
+}
+
+/**
+ * ce.ci (docs/design/ce-ci-module.md): one bridge to the device layer's MIDI-CI session for the panel,
+ * with what it has heard of devices and profiles; each script gets its own commands over it.
+ */
+const ciBridge = createCiBridge({
+  send: (name, payload) => {
+    if (!isJuceAvailable()) return false;
+    window.__JUCE__.backend.emitEvent(name, payload);
+    return true;
+  },
+  raise: (name, payload) => deliverEmit(name, null, payload),
+});
+let ciHeard = false;
+
+function ciFor(scriptId) {
+  if (!ciHeard && isJuceAvailable() && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    ciHeard = true;
+    for (const name of ['ciCommandAnswered', 'ciReply', 'ciDiscovered', 'ciDeviceRemoved', 'ciProfileChanged']) {
+      window.__JUCE__.backend.addEventListener(name, (payload) => ciBridge.heard(name, payload));
+    }
+  }
+  return ciBridge.forScript({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    call: (fn, value) => runScriptCallback(scriptId, 'ce.ci', () => fn(value)),
+  });
+}
+
+/** Tests stand in for the native side: what it sends back, as it would arrive. */
+export function ciHeardForTesting(name, payload) { ciBridge.heard(name, payload); }
+
+/** The panel closed: the files the person chose go with it, here and natively. */
+function forgetChosenFiles() {
+  if (fileDialogSet.size === 0 && fileListings.size === 0) return;
+  for (const dialogs of fileDialogSet) dialogs.forget();
+  fileDialogSet.clear();
+  fileListings.clear();
+}
+
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
+  const fileBytes = fileCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    clock: () => { const t = transportSnapshot(); return { tempo: t.bpm, beatsPerBar: t.beatsPerBar }; },
+  });
+  let fileDialogs = null;
+  const dialogs = () => (fileDialogs ??= fileDialogsFor(scriptId));
+  let ciCommandsOwn = null;
+  const ci = () => (ciCommandsOwn ??= ciFor(scriptId));
+  const patch = patchCommands(patchHostFor(scriptId));
+  const verify = verifyCommands(verifyHostFor(scriptId));
+  const daw = dawCommands(dawHostFor(scriptId));
   const self = {
     set: (p, v, form) => scriptSet(ownerName ? `${ownerName}.${p}` : p, v, form),
     get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form, true),
@@ -9699,6 +9968,106 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     textRead: (target, field) => textReadImpl(target, field),
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
+
+    // ce.keys (docs/design/ce-keys-module.md). The keyboard itself, and who gets each key, is
+    // scriptKeys.js's; the preview surface feeds it and plays the piano's notes.
+    keysShortcut: (keys, fn, opts) => keysAddShortcut(scriptId, keys, fn, opts, (level, text) => addScriptTrace(level, scriptId, text)),
+    keysRemove: (id) => keysRemoveShortcut(id),
+    keysList: () => keysListShortcuts(),
+    keysIsDown: (key) => keysIsDownRead(key),
+    keysHeld: () => keysHeldRead(),
+    keysPiano: (opts) => keysSetPiano(opts, (level, text) => addScriptTrace(level, scriptId, text)),
+    keysPianoInfo: () => keysPianoInfoRead(),
+    keysFocus: (control) => keysFocusControl(control),
+    keysFocused: () => keysFocusedControl(),
+
+    // ce.patch (docs/design/ce-patch-module.md): patchCore.js, the same code the JavaScript prelude runs.
+    patchCurrent: (scope, opts) => patch.current(scope, opts),
+    patchRead: (scope, fn, opts) => patch.read(scope, fn, opts),
+    patchLoad: (name, opts) => patch.load(name, opts),
+    patchMorph: (a, b, t, opts) => patch.morph(a, b, t, opts),
+    patchBlend: (patches, weights, opts) => patch.blend(patches, weights, opts),
+    patchRandom: (opts) => patch.random(opts),
+    patchMutate: (p, amount, opts) => patch.mutate(p, amount, opts),
+    patchMerge: (base, other, opts) => patch.merge(base, other, opts),
+    patchDiff: (a, b, opts) => patch.diff(a, b, opts),
+    patchEqual: (a, b, opts) => patch.equal(a, b, opts),
+    patchApply: (p, opts) => patch.apply(p, opts),
+    patchSave: (name, p, opts) => patch.save(name, p, opts),
+    patchList: (opts) => patch.list(opts),
+    patchForget: (name, opts) => patch.forget(name, opts),
+    patchWrite: (p, slot, opts) => patch.write(p, slot, opts),
+    patchScopes: (role) => patch.scopes(role),
+    patchDefine: (scope, spec, role) => patch.define(scope, spec, role),
+
+    // ce.verify (docs/design/ce-verify-module.md): verifyCore.js, the same code the JavaScript prelude runs.
+    verifyCoverage: (opts) => verify.coverage(opts),
+    verifyCheck: (opts, fn) => verify.check(opts, fn),
+    verifyDump: (kind, opts, fn) => verify.dump(kind, opts, fn),
+    verifyWrite: (id, value, opts, fn) => verify.write(id, value, opts, fn),
+    verifyProbe: (id, opts, fn) => verify.probe(id, opts, fn),
+    verifyPatch: (opts, fn) => verify.patch(opts, fn),
+    verifySummary: (report, opts) => verify.summary(report, opts),
+    verifyRunning: (role) => verify.running(role),
+    verifyCancel: (role) => verify.cancel(role),
+
+    // ce.file (docs/design/ce-file-module.md): the byte commands run everywhere, the dialogs here.
+    fileOpen: (opts, fn) => dialogs().open(opts, fn),
+    fileSave: (name, data, opts, fn) => dialogs().save(name, data, opts, fn),
+    fileRead: (file, fn) => dialogs().read(file, fn),
+    fileWrite: (file, data, fn) => dialogs().write(file, data, fn),
+    fileFolder: (opts, fn) => dialogs().folder(opts, fn),
+    fileList: (dir, opts) => dialogs().list(dir, opts),
+    fileSaveIn: (dir, name, data, opts, fn) => dialogs().saveIn(dir, name, data, opts, fn),
+    fileSyxSplit: (bytes, opts) => fileBytes.syxSplit(bytes, opts),
+    fileSyxJoin: (messages) => fileBytes.syxJoin(messages),
+    fileMidiRead: (bytes, opts) => fileBytes.midiRead(bytes, opts),
+    fileMidiWrite: (song, opts) => fileBytes.midiWrite(song, opts),
+
+    // ce.ci (docs/design/ce-ci-module.md): ciCore.js over the device layer's MIDI-CI session.
+    ciDiscover: (opts, fn) => ci().discover(opts, fn),
+    ciDevices: (role) => ci().devices(role),
+    ciGet: (muid, resource, opts, fn) => ci().get(muid, resource, opts, fn),
+    ciSet: (muid, resource, body, opts, fn) => ci().set(muid, resource, body, opts, fn),
+    ciSubscribe: (muid, resource, opts, fn) => ci().subscribe(muid, resource, opts, fn),
+    ciUnsubscribe: (id) => ci().unsubscribe(id),
+    ciProfiles: (muid, fn) => ci().profiles(muid, fn),
+    ciSetProfile: (muid, id, on, opts) => ci().setProfile(muid, id, on, opts),
+    ciDraftProfile: (muid, fn) => ci().draftProfile(muid, fn),
+
+    // origin() (docs/design/ce-daw-module.md): who made the change the running handler is for.
+    origin: () => currentOrigin ?? undefined,
+    // ce.daw: dawCore.js, answered from the plug-in's picture with the window open, and from the
+    // panel in the editor, which has no DAW.
+    dawHost: () => daw.host(),
+    dawParameters: () => daw.parameters(),
+    dawParameter: (path) => daw.parameter(path),
+    dawProgram: () => daw.program(),
+    dawPrograms: () => daw.programs(),
+    dawBeginGesture: (path) => daw.beginGesture(path),
+    dawEndGesture: (path) => daw.endGesture(path),
+    dawRename: (path, name) => daw.rename(path, name),
+    dawAssign: (slot, path, opts) => daw.assign(slot, path, opts),
+    dawMarkChanged: () => daw.markChanged(),
+
+    // ce.osc: oscCore.js over the device layer's OSC transport.
+    oscListen: (opts) => oscFor(scriptId).listen(opts),
+    oscStop: () => oscFor(scriptId).stop(),
+    oscOn: (pattern, fn) => oscFor(scriptId).on(pattern, fn),
+    oscOff: (id) => oscFor(scriptId).off(id),
+    oscTarget: (name, address) => oscFor(scriptId).target(name, address),
+    oscSend: (to, address, args, types) => oscFor(scriptId).send(to, address, args, types),
+    oscBundle: (to, messages, opts) => oscFor(scriptId).bundle(to, messages, opts),
+    oscStatus: () => oscFor(scriptId).status(),
+
+    // ce.mpe: mpeCore.js, one per panel; reading MPE back in is the input decoder's.
+    mpeZone: (opts) => mpeFor(scriptId).zone(opts),
+    mpeNoteOn: (note, velocity, opts) => mpeFor(scriptId).noteOn(note, velocity, opts),
+    mpeExpress: (id, values) => mpeFor(scriptId).express(id, values),
+    mpeNoteOff: (id, velocity) => mpeFor(scriptId).noteOff(id, velocity),
+    mpeAllOff: () => mpeFor(scriptId).allOff(),
+    mpeNotes: () => mpeFor(scriptId).notes(),
+    mpeListen: (opts) => mpeFor(scriptId).listen(opts),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
@@ -10792,6 +11161,7 @@ function resetScriptState() {
   }
   handlerCache.clear();
   listeners.length = 0;
+  oscInstances.clear();   // a script's OSC patterns go when it reloads
   watchers.length = 0;
   computeds.length = 0;
   filters.length = 0;
@@ -10801,6 +11171,7 @@ function resetScriptState() {
   clearMidiFilters();
   routedRole = null;
   stopAllTimers();
+  resetKeys();           // a script's shortcuts and piano go with it; the keys held stay the user's
   scriptState.clear();   // `state` lives exactly as long as the loaded script does
   resetRandomStreams();
 }
@@ -10820,13 +11191,16 @@ async function invokeHandler(script, hook = null, payload = undefined) {
     // Only the synchronous part belongs to this transaction. If the handler returns a promise,
     // publish before awaiting so UI state is not held hostage by network or timer work. Writes
     // after an await keep their existing immediate semantics unless the script explicitly batches.
-    const result = withDocumentWriteBatch(() =>
+    let result = withDocumentWriteBatch(() =>
       fn(payload !== undefined ? payload : samplePayload(fnName)));
-    if (result && typeof result.then === 'function') await result;
+    if (result && typeof result.then === 'function') result = await result;
     addScriptTrace('log', script.id, `ran ${fnName}() in "${script.name}"`);
+    // What it answered: keyDown keeps a key when a handler returns true.
+    return result;
   } catch (e) {
     reportScriptError(script.id, e);
   }
+  return undefined;
 }
 
 /**
@@ -11053,47 +11427,62 @@ function drainInteractionEvents() {
   const current = [];
   for (const entry of pending) {
     if (live.enabledGlobal && entry.panelId === panelId) current.push(entry);
-    else entry.resolve();
+    else entry.resolve(entry.answer ? false : undefined);
   }
   if (current.length) {
     dispatchEvents(current.map((entry) => entry.event)).then(
-      () => { for (const entry of current) entry.resolve(); },
+      (answers) => { current.forEach((entry, i) => entry.resolve(entry.answer ? answers?.[i] === true : undefined)); },
       (error) => { for (const entry of current) entry.reject(error); });
   }
 }
 
+/**
+ * Run each event's handlers. Answers, per event, whether any handler returned true (keyDown keeps
+ * its key that way; every other event ignores the answer).
+ */
 async function dispatchEvents(events, { inbound = false } = {}) {
-  if (!events.length) return;
-  if (!ensurePanelExecutionApproved()) { resetScriptState(); return; }
+  const answers = events.map(() => false);
+  if (!events.length) return answers;
+  if (!ensurePanelExecutionApproved()) { resetScriptState(); return answers; }
   const scripts = activeScripts();
   const epoch = executionEpoch;
+  const outerOrigin = currentOrigin;
   live.dispatching = true;
   if (inbound) origin.inboundDepth += 1;
   try {
     // Load everything first: a script that only registers on(…) listeners has no `event` of its
     // own, so it would never be loaded by the match loop below and its listeners would never fire.
     await primeHandlers();
-    for (const ev of events) {
-      if (epoch !== executionEpoch) return;
+    for (let i = 0; i < events.length; i += 1) {
+      const ev = events[i];
+      if (epoch !== executionEpoch) return answers;
+      // origin(): who made the change this event is for. Inbound events came from the device.
+      currentOrigin = ev.origin ?? (inbound ? 'device' : null);
+      if (ev.event === 'onValueChange' && currentOrigin !== 'host' && currentOrigin !== 'load') dawFollowSpare(ev.controlName, ev.payload);
+      if (ev.event === 'onValueChange' && currentOrigin !== 'osc') oscFollowBinding(ev.controlName, ev.payload);
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
       for (const s of matches) {
-        if (epoch !== executionEpoch) return;
-        await invokeHandler(s, s.event, ev.payload);
+        if (epoch !== executionEpoch) return answers;
+        if (await invokeHandler(s, s.event, ev.payload) === true) answers[i] = true;
       }
-      if (epoch !== executionEpoch) return;
+      if (epoch !== executionEpoch) return answers;
       // …then the explicit on(target, event, fn) listeners for the same event.
       for (const l of [...listeners]) {
         if (l.event !== ev.event || !listenerMatches(l, ev.controlName)) continue;
-        try { withDocumentWriteBatch(() => l.fn(ev.payload)); } catch (e) { reportScriptError(l.scriptId, e); }
+        try {
+          if (withDocumentWriteBatch(() => l.fn(ev.payload)) === true) answers[i] = true;
+        } catch (e) { reportScriptError(l.scriptId, e); }
       }
     }
   } finally {
+    currentOrigin = outerOrigin;
     if (inbound) origin.inboundDepth -= 1;
     if (epoch === executionEpoch) {
       snapshotValues();          // absorb panels writes our scripts just made
       live.dispatching = false;
+      scheduleDawStateSave();    // the processor saves what the scripts would now say
       // Changes that raised declared events skipped the reactive pass while this async
       // dispatch was busy. Settle their watchers before absorbing the session baseline.
       runReactive();
@@ -11114,6 +11503,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       }
     }
   }
+  return answers;
 }
 
 /* --- source 1: panels store (script-driven value changes) --- */
@@ -11150,6 +11540,12 @@ function onPanelsChanged() {
     }
   }
   live.last = next;
+  syncOscBindings();   // a binding or the panel's OSC settings may have changed
+  // Who made the change: a script's set() outside a handler, a spare parameter the DAW moved, or a
+  // hand in the editor's inspector.
+  const why = panelsOrigin ?? 'user';
+  panelsOrigin = null;
+  for (const e of events) e.origin = why;
   // Returned, as the session diff's is, so a test can wait for the handlers; the store subscriber
   // ignores it.
   const dispatched = events.length ? dispatchEvents(events) : null;
@@ -11273,7 +11669,14 @@ function onPreviewSessionsChanged(sessions) {
   const events = [];
   const next = new Map();
   let controlsById = null;
+  // Who moved each control: a hand, unless the plug-in said the DAW or a project did (noteHostValue)
+  // or a dump filled it (sessionsOrigin).
+  const spans = [];
+  const byDefault = sessionsOrigin ?? 'user';
+  sessionsOrigin = null;
   for (const [id, s] of Object.entries(sessions ?? {})) {
+    spans.push({ from: events.length, origin: controlOrigins.get(id) ?? byDefault });
+    controlOrigins.delete(id);
     const prev = live.sessionLast.get(id);
     controlsById ??= new Map(flatControls(livePanel()?.controls ?? []).map((c) => [c?._children?.Core?.id, c]));
     const cur = sessionEntry(s, prev, controlsById.get(id));
@@ -11394,6 +11797,10 @@ function onPreviewSessionsChanged(sessions) {
     }
   }
   live.sessionLast = next;
+  for (let k = 0; k < spans.length; k += 1) {
+    const to = k + 1 < spans.length ? spans[k + 1].from : events.length;
+    for (let i = spans[k].from; i < to; i += 1) events[i].origin = spans[k].origin;
+  }
   const dispatched = events.length ? dispatchEvents(events) : null;
   // The reactive rules settle AFTER the declared events, and run even when there were no
   // events at all: a nested field moving (a colour, a section property) produces no
@@ -11406,6 +11813,82 @@ function onPreviewSessionsChanged(sessions) {
 
 let previewStopWork = null;
 let previewStartWork = null;
+
+/* --- the DAW-state hooks, in the panel view (exported plug-in, window open) ---
+ *
+ * onDawSaveState and onDawRestoreState were raised only by the window-shut engines. With the
+ * plug-in's window open the scripts that run are these, so the state the DAW saved with the project
+ * was the window-shut engines', frozen at the moment the window opened, and a project restored with
+ * the window open never reached these scripts at all.
+ *
+ * Now, in the player (setDawStateSink installs the way out; the editor has none and raises neither):
+ *   - after anything a script does, the page's onDawSaveState handlers are run and their merged
+ *     answer handed to the processor, which saves it with the project while the window is open;
+ *   - the panel starts from the processor's state: onDawRestoreState runs after onPanelBuild, before
+ *     onPanelReady, with what the window-shut engines last saved (setDawRestoreForNextStart);
+ *   - a project restored while the window is open is raised here too (raiseDawRestoreState).
+ * When the window closes, the processor hands the page's last state to the window-shut engines.
+ * The contract is the C++ one (ScriptRuntime::onDawSaveState): a handler RETURNS its keys, which are
+ * merged into one store; `store` is for reading.
+ */
+let dawStateSink = null;
+let dawStateTimer = null;
+let dawRestoreForNextStart = null;
+
+export function setDawStateSink(fn) {
+  dawStateSink = typeof fn === 'function' ? fn : null;
+  if (!dawStateSink && dawStateTimer) { clearTimeout(dawStateTimer); dawStateTimer = null; }
+}
+
+export function setDawRestoreForNextStart(store) {
+  dawRestoreForNextStart = store && typeof store === 'object' && Object.keys(store).length ? store : null;
+}
+
+function hasDawSaveScripts() {
+  return activeScripts().some((s) => s.enabled !== false && s.event === 'onDawSaveState');
+}
+
+/** Every onDawSaveState handler's answer, merged into one store, as ScriptRuntime does it. */
+export async function collectDawSaveState() {
+  const store = {};
+  if (!ensurePanelExecutionApproved()) return store;
+  const epoch = executionEpoch;
+  for (const s of activeScripts()) {
+    if (s.enabled === false || s.event !== 'onDawSaveState') continue;
+    const handlers = await handlersFor(s);
+    if (epoch !== executionEpoch) return store;
+    const fn = handlers?.onDawSaveState;
+    if (typeof fn !== 'function') continue;
+    try {
+      // A copy: a handler that writes into `store` instead of returning would otherwise change what
+      // the next handler is given, and the C++ engines do not let it.
+      const answer = await fn(deepClone(store));
+      if (answer && typeof answer === 'object' && !Array.isArray(answer)) Object.assign(store, answer);
+    } catch (e) {
+      reportScriptError(s.id, e);
+    }
+  }
+  return store;
+}
+
+/** Hand the processor the page's state soon after scripts have run; coalesced, and only when a
+    script saves anything, so a panel without save handlers never claims the state. */
+function scheduleDawStateSave() {
+  if (!dawStateSink || dawStateTimer || !hasDawSaveScripts()) return;
+  dawStateTimer = setTimeout(async () => {
+    dawStateTimer = null;
+    const sink = dawStateSink;
+    if (!sink) return;
+    const store = await collectDawSaveState();
+    if (sink === dawStateSink) sink(store);
+  }, 150);
+}
+
+export function raiseDawRestoreState(store) {
+  if (!store || typeof store !== 'object') return Promise.resolve();
+  return dispatchEvents([{ event: 'onDawRestoreState', controlName: null, payload: store }]);
+}
+
 function onPreviewModeChanged(on) {
   if (on && !ensurePanelExecutionApproved()) {
     live.prevPreviewOn = false;
@@ -11422,9 +11905,13 @@ function onPreviewModeChanged(on) {
     // declares what it declares, rather than accumulating a second copy on every run.
     clearGeneratedControls();
     clearDeviceRuntimeDefinitions();
+    const restore = dawStateSink ? dawRestoreForNextStart : null;
+    dawRestoreForNextStart = null;
     previewStartWork = dispatchEvents([
       { event: 'onPanelLoad', controlName: null, payload: undefined },
       { event: 'onPanelBuild', controlName: null, payload: undefined },
+      // The plug-in's window opening: the scripts start from what was saved (see setDawStateSink).
+      ...(restore ? [{ event: 'onDawRestoreState', controlName: null, payload: restore }] : []),
       { event: 'onPanelReady', controlName: null, payload: { firstTime } },
     ]);
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {
@@ -11458,7 +11945,10 @@ function onPreviewModeChanged(on) {
 function onDumpParsed(payload) {
   const values = payload?.values ?? payload?.parsed?.values ?? null;
   const role = payload?.deviceRole ?? DEFAULT_ROLE;
-  if (values && typeof values === 'object') syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  if (values && typeof values === 'object') {
+    sessionsOrigin = 'device';
+    syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  }
 
   const events = [{ event: 'onDumpReceived', controlName: null,
     payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role } }];
@@ -11522,24 +12012,448 @@ function noteEventFor(bytes) {
   return { event: off ? 'onNoteOffIn' : 'onNoteIn', payload };
 }
 
+/**
+ * The MIDI a device sends, decoded once for every script (midiInDecoder.js; the plug-in's
+ * MidiInDecoder.h decodes it the same way with its window shut): notes with their MPE ids, bends,
+ * pressure, programs with their bank select, NRPNs and RPNs, transport. A thinned bend, or an NRPN's
+ * coarse half, waits for its time; the timer below lets it go.
+ */
+const midiInDecode = createMidiInDecoder();
+let midiInTimer = null;
+const midiInNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function scheduleMidiInFlush() {
+  if (midiInTimer !== null) return;
+  const due = midiInDecode.nextDue();
+  if (due === null) return;
+  midiInTimer = setTimeout(() => {
+    midiInTimer = null;
+    const events = midiInDecode.flush(midiInNow()).map((e) => ({ event: e.event, controlName: null, payload: e.payload }));
+    if (events.length && !live.dispatching && live.enabledGlobal) dispatchEvents(events, { inbound: true });
+    scheduleMidiInFlush();
+  }, Math.max(1, Math.ceil(due - midiInNow())));
+}
+
+/** ce.mpe.listen's reading of MPE, for the decoder. */
+export function midiInListen(role, opts) { midiInDecode.listen(role, opts); }
+
+// ce.mpe (docs/design/midi-input-and-mpe.md): one zone and one set of sounding notes for the panel,
+// as the JavaScript prelude has (it runs once per panel). What it says goes to the script that called.
+let mpeSayTo = '';
+let mpeShared = null;
+function mpeFor(scriptId) {
+  mpeSayTo = scriptId;
+  mpeShared ??= mpeCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', mpeSayTo, text),
+    send: (bytes, role) => sendRawMidiForRole(bytes, 'mpe', role || DEFAULT_ROLE),
+    note: midiNote,
+    listen: (role, opts) => midiInDecode.listen(role, opts),
+  });
+  return mpeShared;
+}
+
+
+/* ------------------------------------------------------------------------------- ce.osc */
+// docs/design/ce-osc-module.md. The port, the reading and writing of OSC and the user's yes live with
+// the device layer in C++ (Osc/OscService.h). The page sends each command over the bridge
+// ("oscCommand") and cannot wait for the answer while a script runs, so a command answers true when
+// sent, a refusal arrives a moment later as a console line, and status() answers from the last status
+// the transport gave. Each script's patterns are its own, and go when the scripts reload.
+
+const oscInstances = new Map();   // scriptId -> oscCommands
+const oscAsked = new Map();       // requestId -> { scriptId, op }
+let oscStatusSeen = { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+let oscRequests = 0;
+let oscBridgeListening = false;
+
+/** Which panel a yes for the network is for: its name, as the exported plug-in names it too (a saved
+    panel keeps no id), so the window open and shut ask once between them. */
+function oscPanelKey() {
+  const panel = livePanel();
+  return String(panel?.name || panel?.id || 'panel');
+}
+
+function ensureOscBridge() {
+  const backend = window.__JUCE__?.backend;
+  if (oscBridgeListening || typeof backend?.addEventListener !== 'function') return;
+  oscBridgeListening = true;
+  backend.addEventListener('oscCommandAnswered', (p) => oscHeard('oscCommandAnswered', p));
+  backend.addEventListener('oscMessage', (p) => oscHeard('oscMessage', p));
+}
+
+/** One command to the transport; false when there is no app or plug-in to send it to. */
+function oscSendCommand(fields, scriptId) {
+  if (!isJuceAvailable()) return false;
+  oscRequests += 1;
+  const requestId = `osc${oscRequests}`;
+  if (scriptId !== null) oscAsked.set(requestId, { scriptId, op: fields.op });
+  ensureOscBridge();
+  window.__JUCE__.backend.emitEvent('oscCommand', { ...fields, requestId, panel: oscPanelKey() });
+  return true;
+}
+
+/** What the transport sends back: an answer to a command, or a message that arrived. */
+function oscHeard(name, payload) {
+  if (name === 'oscCommandAnswered') {
+    const key = String(payload?.requestId ?? '');
+    const asked = oscAsked.get(key);
+    oscAsked.delete(key);
+    const answer = payload?.answer;
+    if (payload?.op === 'status') {
+      if (answer && typeof answer === 'object') oscStatusSeen = { ...answer };
+      return;
+    }
+    if (asked && answer && typeof answer === 'object' && answer.ok === false) {
+      addScriptTrace('error', asked.scriptId, `ce.osc.${asked.op}: ${answer.why || answer.error || 'it was refused'}.`);
+    }
+    oscSendCommand({ op: 'status' }, null);   // and the picture after it
+    return;
+  }
+  if (name !== 'oscMessage' || !payload || typeof payload.address !== 'string') return;
+  oscStatusSeen = { ...oscStatusSeen, received: (Number(oscStatusSeen.received) || 0) + 1 };
+  const outer = currentOrigin;
+  currentOrigin = 'osc';
+  try {
+    for (const o of oscInstances.values()) o.receive(payload);
+  } finally {
+    currentOrigin = outer;
+  }
+  oscBindingsHeard(payload);
+  dispatchEvents([{ event: 'onOscIn', controlName: null, payload, origin: 'osc' }]);
+}
+
+/** Tests stand in for the native side: what it sends back, as it would arrive. */
+export function oscHeardForTesting(name, payload) { oscHeard(name, payload); }
+
+function oscFor(scriptId) {
+  const known = oscInstances.get(scriptId);
+  if (known) return known;
+  const listenersOwn = [];
+  const o = oscCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    listeners: () => listenersOwn,
+    call: (fn, value) => runScriptCallback(scriptId, 'osc', () => fn(value)),
+    query(op, fields) {
+      if (op === 'status') {
+        oscSendCommand({ op: 'status' }, null);
+        return { ...oscStatusSeen };
+      }
+      if (!isJuceAvailable()) return { ok: false, why: 'OSC needs the app or the plug-in, which have a network port' };
+      oscSendCommand({ ...fields, op }, scriptId);
+      if (op === 'stop') {
+        const was = oscStatusSeen.listening === true || oscStatusSeen.waiting === true;
+        oscStatusSeen = { ...oscStatusSeen, listening: false, waiting: false };
+        return was;
+      }
+      return { ok: true };
+    },
+  });
+  oscInstances.set(scriptId, o);
+  return o;
+}
+
+/** The panel went: the transport stops listening and forgets its targets. */
+function forgetOsc() {
+  oscBindingsSignature = '';
+  oscLearnWaiter = null;
+  oscLastSender.clear();
+  oscInstances.clear();
+  oscAsked.clear();
+  if (oscStatusSeen.listening || oscStatusSeen.waiting || oscRequests > 0) oscSendCommand({ op: 'reset' }, null);
+  oscStatusSeen = { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+}
+
+
+/* ---------------------------------------------------------------------- OSC learn (no script) */
+// docs/design/ce-osc-module.md, "Panel side". A control with an oscControl binding follows an OSC
+// address and, unless told not to, sends its value back there when anything else moves it. The panel's
+// settings (panel.osc: port, network, targets) say where to listen and the names to send to. A
+// control moved by OSC is written as a script's set() is, with origin() giving "osc", so it reaches
+// the synth through its own binding and is never sent back to the address it came from.
+
+const oscLastSender = new Map();   // control name -> { host, port } the last message for it came from
+let oscBindingsSignature = '';
+let oscLearnWaiter = null;
+
+/** Every OSC binding on the panel, with the control it is on. */
+function oscBindingsOf(panel) {
+  const out = [];
+  for (const control of flatControls(panel?.controls ?? [])) {
+    const bindings = control?._children?.DeviceBindings;
+    if (!bindings || bindings.enabled === false || !Array.isArray(bindings.bindings)) continue;
+    for (const b of bindings.bindings) {
+      if (b?.kind !== OSC_CONTROL_KIND || typeof b.address !== 'string' || !b.address.startsWith('/')) continue;
+      out.push({ control, name: String(control._children.Core?.name ?? control._children.Core?.id), binding: b });
+    }
+  }
+  return out;
+}
+
+/** The panel's OSC settings, read as the editor writes them. */
+function panelOscSettings(panel) {
+  const osc = panel?.osc && typeof panel.osc === 'object' ? panel.osc : {};
+  const port = Number.isInteger(osc.port) && osc.port >= 1024 && osc.port <= 65535 ? osc.port : 8000;
+  return { port, network: osc.network === true, targets: parseOscTargets(osc.targets) };
+}
+
+/** Open the panel's port when it has OSC bindings (or a learn is waiting), and name its targets.
+    Sent again only when something it depends on changed. */
+function syncOscBindings() {
+  const panel = livePanel();
+  const settings = panelOscSettings(panel);
+  const wanted = oscBindingsOf(panel).length > 0 || oscLearnWaiter !== null;
+  const signature = wanted ? JSON.stringify(settings) : '';
+  if (signature === oscBindingsSignature) return;
+  oscBindingsSignature = signature;
+  if (!wanted) return;
+  oscSendCommand({ op: 'listen', port: settings.port, network: settings.network, nextFree: true }, null);
+  for (const t of settings.targets) oscSendCommand({ op: 'target', name: t.name, host: t.host, port: t.port }, null);
+}
+
+/** A message for the bindings: each control whose address matches takes the value. */
+function oscBindingsHeard(message) {
+  if (oscLearnWaiter) {
+    const waiter = oscLearnWaiter;
+    oscLearnWaiter = null;
+    try { waiter(message.address, message); } catch { /* the editor's, not a script's */ }
+  }
+  for (const { name, binding } of oscBindingsOf(livePanel())) {
+    if (!oscMatches(binding.address, message.address)) continue;
+    const at = Math.max(1, Math.floor(Number(binding.valueIndex) || 1)) - 1;
+    let v = message.args?.[at];
+    if (typeof v === 'boolean') v = v ? 1 : 0;
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const min = Number.isFinite(Number(binding.min)) ? Number(binding.min) : 0;
+    const max = Number.isFinite(Number(binding.max)) ? Number(binding.max) : 1;
+    const t = max === min ? 0 : Math.max(0, Math.min(1, (v - min) / (max - min)));
+    if (message.from) oscLastSender.set(name, message.from);
+    panelsOrigin = 'osc';
+    setValue(`${name}.value`, t, 'normalizedValue');
+    panelsOrigin = null;
+  }
+}
+
+/** A control with an OSC binding moved, not by OSC: its value goes back to the address. */
+function oscFollowBinding(controlName, value) {
+  if (controlName == null) return;
+  for (const { control, name, binding } of oscBindingsOf(livePanel())) {
+    if (name !== controlName || binding.sendBack === false) continue;
+    const range = rangeOf(control);
+    const v = Number(value);
+    if (!range || !Number.isFinite(v)) continue;
+    const t = Math.max(0, Math.min(1, (v - range.min) / (range.max - range.min)));
+    const min = Number.isFinite(Number(binding.min)) ? Number(binding.min) : 0;
+    const max = Number.isFinite(Number(binding.max)) ? Number(binding.max) : 1;
+    const to = typeof binding.sendTo === 'string' && binding.sendTo.trim() !== '' ? binding.sendTo.trim() : oscLastSender.get(name);
+    if (!to) continue;   // nobody has sent to it yet, and no target is named
+    oscSendCommand({ op: 'send', to, address: binding.address.replace(/[*?[\]{}]/g, ''), args: [min + t * (max - min)], types: 'f' }, null);
+  }
+}
+
+/** The editor's Learn: the next message's address goes to `fn`. Opens the panel's port for it. */
+export function oscLearnNext(fn) {
+  oscLearnWaiter = typeof fn === 'function' ? fn : null;
+  oscBindingsSignature = '';
+  syncOscBindings();
+  return oscLearnWaiter !== null && Boolean(isJuceAvailable());
+}
+
+/** Tests: what the runtime does when the panel loads or changes. */
+export function syncOscBindingsForTesting() { syncOscBindings(); }
+
+/* ------------------------------------------------------------------ ce.daw and origin() */
+// docs/design/ce-daw-module.md. With the plug-in's window open the page reads the DAW from what the
+// processor pushes (PlayerHost::pushDawInfo), since the bridge cannot answer while a script waits,
+// and sends what a script changes back (dawCommand). In the editor there is no DAW: the questions
+// that need one answer nothing, and parameters gives the list the next export would bake.
+
+let currentOrigin = null;          // what origin() answers inside a handler
+/** Whether handlers are running (setValue has a `live` of its own, so it asks here). */
+function dispatchingNow() { return live.dispatching; }
+let panelsOrigin = null;           // who made the next panel-document change, when not a hand
+let sessionsOrigin = null;         // who made the next preview change, when not a hand: a dump
+const controlOrigins = new Map();  // control id -> "host" | "load", from the plug-in's pushes
+let dawInfo = null;                // the plug-in's picture; null in the editor
+let dawCommandSink = null;         // sends a change to the plug-in
+let dawParamSink = null;           // sends a spare parameter's new position
+const dawPageGestures = new Set(); // paths a script in this window holds a gesture on
+
+/** The plug-in's picture of the DAW, as PlayerHost pushes it. null: the editor. */
+export function setDawInfo(info) {
+  dawInfo = info && typeof info === 'object' ? info : null;
+  if (!dawInfo) dawPageGestures.clear();
+}
+export function setDawCommandSink(fn) { dawCommandSink = typeof fn === 'function' ? fn : null; }
+export function setDawParamSink(fn) { dawParamSink = typeof fn === 'function' ? fn : null; }
+
+/** The plug-in pushed a value for this control: the DAW's move, or a project's ("load"). */
+export function noteHostValue(controlId, why) {
+  if (controlId != null && (why === 'host' || why === 'load')) controlOrigins.set(String(controlId), why);
+}
+
+function dawEntry(id) {
+  return (Array.isArray(dawInfo?.parameters) ? dawInfo.parameters : []).find((p) => p?.id === id) ?? null;
+}
+
+/** The DAW moved parameter `id`: automationIn, after the control's own value events. */
+export function raiseAutomationIn(id, value) {
+  const entry = dawEntry(String(id));
+  if (!entry?.path) return null;
+  const control = entry.control ?? String(entry.path).split('.')[0];
+  return dispatchEvents([{ event: 'onAutomationIn', controlName: null, origin: 'host',
+    payload: { control, path: entry.path, value, id: entry.id } }]);
+}
+
+/** The DAW chose a program, and the plug-in has sent it. */
+export function raiseDawProgramIn(program) {
+  if (!program || typeof program !== 'object') return null;
+  const payload = { index: program.index, number: program.number, name: program.name };
+  if (dawInfo) dawInfo = { ...dawInfo, program: { ...(dawInfo.program ?? {}), ...payload } };
+  return dispatchEvents([{ event: 'onDawProgramIn', controlName: null, origin: 'host', payload }]);
+}
+
+/** A spare parameter moved in the DAW (or arrived with a project): its control moves with it. */
+export function dawSpareMoved(slot, at, why = 'host') {
+  const entry = dawEntry(`spare${slot}`);
+  if (!entry?.path) return;
+  const min = Number(entry.min), max = Number(entry.max);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+  let value = min + Math.max(0, Math.min(1, Number(at) || 0)) * (max - min);
+  if (entry.kind === 'choice') value = Math.round(value);
+  panelsOrigin = why === 'load' ? 'load' : 'host';
+  setValue(entry.path, value);
+  panelsOrigin = null;
+  if (why !== 'load') raiseAutomationIn(entry.id, value);
+}
+
+/** A control on a spare moved, not by the spare: the spare follows, so the DAW sees it. */
+function dawFollowSpare(controlName, value) {
+  if (!dawInfo || !dawParamSink || controlName == null) return;
+  for (const entry of dawInfo.parameters ?? []) {
+    if (!entry?.path || !String(entry.id).startsWith('spare') || entry.control !== controlName) continue;
+    const min = Number(entry.min), max = Number(entry.max);
+    const v = Number(value);
+    if (!Number.isFinite(v) || !(max > min)) continue;
+    dawParamSink(entry.id, Math.max(0, Math.min(1, (v - min) / (max - min))));
+  }
+}
+
+/** The list the next export would bake, as ce.daw.parameters gives it in the editor. */
+function editorDawParameters() {
+  const panel = livePanel();
+  const list = collectExportParameters(panel).map((p) => {
+    const entry = {
+      id: p.id, name: p.label ?? p.id, path: p.path, control: p.controlName ?? String(p.path).split('.')[0],
+      min: p.min, max: p.max, default: p.defaultValue, unit: p.unit ?? '', kind: p.valueKind ?? 'float',
+      value: getValue(p.path),
+    };
+    if (entry.kind === 'choice' && Array.isArray(p.choiceLabels)) entry.choices = [...p.choiceLabels];
+    if (p.group) entry.group = p.group;
+    return entry;
+  });
+  const spares = Math.max(0, Math.min(32, Math.floor(Number(panel?.exportSettings?.spareDawParameters) || 0)));
+  for (let slot = 1; slot <= spares; slot += 1) {
+    list.push({ id: `spare${slot}`, name: `Spare ${slot}`, slot, min: 0, max: 1, default: 0, unit: '', kind: 'float', value: 0 });
+  }
+  return list;
+}
+
+/** What a control on a spare is shown as: its exported parameter's range, else its own. */
+function spareDisplayFor(path) {
+  const name = String(path).split('.')[0];
+  const exported = collectExportParameters(livePanel()).find((p) => p.path === path);
+  if (exported) {
+    const d = { min: exported.min, max: exported.max, unit: exported.unit ?? '' };
+    if (exported.valueKind === 'choice' && Array.isArray(exported.choiceLabels)) d.choices = [...exported.choiceLabels];
+    return d;
+  }
+  const control = findControlByName(name);
+  const range = control ? rangeOf(control) : null;
+  if (!range) return null;
+  const unit = control?._children?.Behavior?.unit;
+  return { min: range.min, max: range.max, unit: typeof unit === 'string' ? unit : '' };
+}
+
+function dawHostFor(scriptId) {
+  const say = (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text);
+  const send = (command) => { if (dawCommandSink) dawCommandSink(command); };
+  return {
+    say,
+    query(op, fields) {
+      if (!dawInfo) {
+        if (op === 'parameters') return editorDawParameters();
+        if (op === 'programs') return [];
+        if (op === 'host' || op === 'program') return undefined;
+        return false;
+      }
+      const params = Array.isArray(dawInfo.parameters) ? dawInfo.parameters : [];
+      const named = (path) => params.find((p) => p?.path === (String(path).includes('.') ? path : `${path}.value`)
+        && !String(p.id).startsWith('spare'));
+      if (op === 'host') return dawInfo.host ? { ...dawInfo.host, editorOpen: true } : undefined;
+      if (op === 'parameters') return params.map((p) => ({ ...p, ...(p.path ? { value: getValue(p.path) } : {}) }));
+      if (op === 'program') return dawInfo.program ?? undefined;
+      if (op === 'programs') return Array.isArray(dawInfo.programs) ? dawInfo.programs : [];
+      if (op === 'beginGesture' || op === 'endGesture') {
+        const p = named(fields.path);
+        if (!p) return false;
+        if (op === 'beginGesture' ? dawPageGestures.has(p.path) : !dawPageGestures.has(p.path)) return false;
+        if (op === 'beginGesture') dawPageGestures.add(p.path); else dawPageGestures.delete(p.path);
+        send({ op, path: p.path });
+        return true;
+      }
+      if (op === 'rename') {
+        const p = named(fields.path);
+        if (!p) return false;
+        send({ op, path: p.path, name: fields.name });
+        return true;
+      }
+      if (op === 'assign') {
+        const count = Math.floor(Number(dawInfo.spares) || 0);
+        if (fields.slot > count) return false;
+        if (fields.path === '') { send({ op, slot: fields.slot, path: '', name: '' }); return true; }
+        const path = String(fields.path).includes('.') ? fields.path : `${fields.path}.value`;
+        const display = spareDisplayFor(path);
+        if (!display) return false;
+        send({ op, slot: fields.slot, path, name: fields.name, display });
+        return true;
+      }
+      if (op === 'markChanged') {
+        send({ op });
+        scheduleDawStateSave();
+        return true;
+      }
+      return undefined;
+    },
+  };
+}
+
+/** Tests feed the decoder through the same door the bridge does, at a time they choose. */
+export function midiInputForTesting(payload) { onMidiInputMessage(payload); }
+export function midiInFlushForTesting(now) {
+  const events = midiInDecode.flush(now).map((e) => ({ event: e.event, controlName: null, payload: e.payload }));
+  if (events.length) dispatchEvents(events, { inbound: true });
+}
+
 function onMidiInputMessage(payload) {
   if (live.dispatching || !live.enabledGlobal) return;
   if (!payload) return;
   const bytes = hexToBytes(payload.hex);
   if (!bytes.length) return;
   const status = bytes[0] ?? 0;
+  const from = String(payload.deviceRole ?? '') || DEFAULT_ROLE;
   const events = [{
     event: 'onMidiIn',
     controlName: null,
-    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0 },
+    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0, from },
   }];
-  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3) {
+  const decoded = midiInDecode.feed(from, bytes, Number.isFinite(payload.atForTesting) ? payload.atForTesting : midiInNow());
+  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3 && !decoded.ccTaken) {
     events.push({ event: 'onCcIn', controlName: null,
-      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2] } });
+      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2], from } });
   }
-  const note = noteEventFor(bytes);
-  if (note) events.push({ event: note.event, controlName: null, payload: note.payload });
+  for (const e of decoded.events) events.push({ event: e.event, controlName: null, payload: e.payload });
   dispatchEvents(events, { inbound: true });
+  if (!Number.isFinite(payload.atForTesting)) scheduleMidiInFlush();
 
   // A Program Change is the instrument saying which preset it is on. Raised AFTER the events above
   // rather than folded into them, because onPresetChange carries the profile's reading of the slot
@@ -11762,5 +12676,38 @@ export function dispatchInteraction(controlId, eventName, payload) {
   }
   // The promise is returned rather than dropped. Callers in the UI ignore it — an interaction is
   // fire-and-forget — but returning it is what lets anything else wait for the handlers to finish.
-  return dispatchEvents([event]);
+  return dispatchEvents([event]).then(() => undefined);
+}
+
+/**
+ * ce.keys: raise keyDown or keyUp ('onKeyDown' / 'onKeyUp') for the panel's scripts. Resolves true
+ * when a handler returned true, which for keyDown keeps the key from the DAW and the editor.
+ */
+export function dispatchKeyEvent(eventName, payload) {
+  if (!live.enabledGlobal) return Promise.resolve(false);
+  const event = { event: eventName, controlName: null, payload };
+  if (live.dispatching) {
+    return new Promise((resolve, reject) => {
+      live.interactions.push({ event, panelId: String(livePanel()?.id ?? live.activePanelId), resolve, reject, answer: true });
+    });
+  }
+  return dispatchEvents([event]).then((answers) => answers[0] === true);
+}
+
+// A shortcut's function is a script's: run it as an on(…) listener is run, so its writes batch and a
+// failure is that script's error rather than the keyboard's.
+setShortcutRunner((shortcut, fields) => {
+  try { withDocumentWriteBatch(() => shortcut.fn(fields)); } catch (e) { reportScriptError(shortcut.scriptId, e); }
+});
+
+// The keyboard belongs to the surface showing the panel these scripts run on.
+setKeysPanelResolver(() => {
+  try { return String(livePanel()?.id ?? live.activePanelId ?? ''); } catch { return ''; }
+});
+
+/** Whether any loaded script hears `eventName` ('onKeyDown'): only then is a key held back for it. */
+export function scriptsHear(eventName) {
+  if (!live.enabledGlobal) return false;
+  return activeScripts().some((s) => s.enabled !== false && s.event === eventName)
+    || listeners.some((l) => l.event === eventName);
 }

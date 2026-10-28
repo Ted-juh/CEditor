@@ -324,6 +324,10 @@ public:
     /** Find a control's live var by friendly name (case-insensitive) or id — for event dispatch. */
     juce::var controlByName (const juce::String& name) const { return findControlByName (name); }
 
+    /** Every control in the document, containers included, in document order (forEachControl). */
+    template <typename Fn>
+    void eachControl (Fn&& fn) const { forEachControl (std::forward<Fn> (fn)); }
+
     // ---- path navigation (mirrors controlTreeUtils.js / panelRuntime.js) -------------------------
 
     // readChildValue: array index, then _children[part], then plain [part] — EXACT-case (the resolved

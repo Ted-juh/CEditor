@@ -808,11 +808,12 @@ function onPanelDestroy() {
 
 ### `onDawSaveState(store) -> object`
 
-Runs when the DAW saves the project: return what to keep.
+Runs so the DAW can save your values with the project: return what to keep.
 
 Good to know:
 
 - Return a table holding what you want saved.
+- Runs shortly after your scripts have run, whether the plug-in's window is open or shut.
 - `store` shows what other scripts saved so far; it is to read only, and changing it saves nothing.
 - In an exported plug-in only.
 
@@ -833,11 +834,12 @@ function onDawSaveState(store) {
 
 ### `onDawRestoreState(store)`
 
-Runs when the DAW opens the project again: read your values back.
+Runs when the DAW opens the project again, and when the plug-in's window opens or closes: read your values back.
 
 Good to know:
 
 - `store` holds what your `onDawSaveState` returned, with every other script's.
+- The window opening or closing runs it so that the scripts that run next carry on from the same values.
 - In an exported plug-in only.
 
 *Exported plugin only — never runs in the editor.*
@@ -886,6 +888,8 @@ Raised by the control the script belongs to.
 |---|---|
 | `onControlChanged(info)` | A control on the panel changed. `info.target` is its name and `info.value` its new value: one handler for many controls. |
 | `onTimer(info)` | A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`. |
+| `onKeyDown(key)` | A key went down that nothing else on the panel kept: not while typing, and not the panic key, a shortcut, a piano key or a key the focused control used. `key.key` is its name as printed ("R", "7", "Space", "Up", "F2"), `key.code` its place, the same on every layout ("KeyR"), `key.ctrl`, `key.shift`, `key.alt` and `key.meta` the modifiers, `key.repeat` true while the system repeats a held key, and `key.control` the control that has the keyboard. Return true to keep the key: it then goes no further, not to the DAW and not to the editor. |
+| `onKeyUp(key)` | A key whose keyDown was raised went up, with the same fields except `repeat`. Also raised for every such key when the panel loses the keyboard while it is held. Its return value is not used. |
 
 ### Time events
 
@@ -907,11 +911,26 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 |---|---|
 | `onParameterReceived(info)` | The synth sent a parameter's value, read through its profile. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
 | `onDumpReceived(dump)` | A dump from the synth arrived and was read; the controls bound to it are filled in already. `dump.values` holds each value by parameter id, `dump.kind` names the dump, such as "patch", and `dump.role` the synth it came from. |
+| `onOscIn(message)` | An OSC message arrived on the port ce.osc.listen() opened. `message.address` is where it was sent, `message.args` its values, `message.types` their OSC types, `message.from` who sent it ({ host, port }), and `message.time` a bundle's time. origin() gives "osc". |
+| `onAutomationIn(move)` | The DAW moved a parameter. `move.control` is the control's name, `move.path` its path, `move.value` the new value in the control's own range and `move.id` the DAW parameter's id. The control's own value events fire too, with origin() giving "host". Never for a change a script or a hand made. |
+| `onDawProgramIn(program)` | The DAW chose a program from the plug-in's bank, and the plug-in has sent it to the synth. `program.index` counts from 0, `program.number` from 1, and `program.name` is its name. |
+| `onCiDiscovered(device)` | A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them. |
+| `onCiDeviceRemoved(device)` | A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel's device it was found on. Its subscriptions have ended. |
+| `onCiProfileChanged(profile)` | A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state. |
+| `onVerifyDone(report)` | A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too. |
 | `onPresetChange(preset)` | The preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe it; `preset.source` is "device" when the synth sent a Program Change, "panel" when the panel called recallPreset. |
-| `onMidiIn(midi)` | A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
-| `onCcIn(cc)` | A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16. |
-| `onNoteIn(note)` | A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn. |
-| `onNoteOffIn(note)` | A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0. |
+| `onMidiIn(midi)` | A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0. `midi.from` is the device it came from. |
+| `onCcIn(cc)` | A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16. `cc.from` is the device it came from. |
+| `onNoteIn(note)` | A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn. `note.from` is the device it came from, and `note.id` the note's id while ce.mpe.listen() reads that device. |
+| `onNoteOffIn(note)` | A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0. `note.from` and `note.id` are as onNoteIn gives them. |
+| `onBendIn(bend)` | A pitch bend arrived. `bend.value` is -8192 to 8191, 0 in the middle; `bend.amount` the same from -1 to 1; `bend.raw` 0 to 16383, as the two bytes carry it. `bend.channel` is 1 to 16 and `bend.from` the device. Raised at most once every 10 ms per channel, with the latest value. |
+| `onPressureIn(pressure)` | Channel pressure arrived. `pressure.value` is 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per channel. |
+| `onPolyPressureIn(pressure)` | Pressure on one note arrived. `pressure.note` is the note, `pressure.value` 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per note. |
+| `onProgramIn(program)` | A program change arrived. `program.program` is 0 to 127, as the message carries it, and `program.number` 1 to 128, as most synths show it. `program.bankMsb` and `program.bankLsb` are the bank select that came just before it on this channel, when one did. `program.channel` is 1 to 16 and `program.from` the device. |
+| `onNrpnIn(nrpn)` | An NRPN arrived, put together from its controllers (99, 98, then 6 and 38). `nrpn.msb` and `nrpn.lsb` are the parameter number's halves, as sendNRPN takes them, and `nrpn.parameter` the two as one number. `nrpn.value` is 0 to 16383 when the fine half came (`nrpn.fine` true), else 0 to 127. For an increment or decrement, `nrpn.step` is 1 or -1 instead. The controllers still raise ccIn too. |
+| `onRpnIn(rpn)` | An RPN arrived, put together from controllers 101 and 100, then 6 and 38. The fields are those of nrpnIn, and `rpn.name` is "bendRange", "fineTuning", "coarseTuning" or "mpeConfiguration" for the numbers that have one. |
+| `onTransportIn(transport)` | A device sent start, stop, continue or a song position. `transport.action` is "start", "stop", "continue" or "position"; for "position", `transport.beat` is where it points, in beats from the start. `transport.from` is the device. Clock ticks are not raised one by one. |
+| `onExpressionIn(expression)` | A note read with ce.mpe.listen() moved. `expression.id` is the note's id, as noteIn gave it, `expression.note` the note and `expression.channel` its member channel. `expression.bend` is in semitones, `expression.pressure` and `expression.timbre` 0 to 1, and `expression.changed` says which moved: "bend", "pressure" or "timbre". Raised at most once every 10 ms per note. |
 | `onSysexIn(bytes)` | A SysEx message arrived. `bytes` holds it as a list of numbers. |
 | `onDeviceConnected(device)` | A synth was connected and is ready. `device.role` names it and `device.profileId` its profile. |
 | `onDeviceDisconnected(device)` | A synth is no longer connected and ready. `device.role` names it, and `device.message` may say why. |
@@ -1294,9 +1313,21 @@ Good to know:
 ce.core.error("message")
 ```
 
+#### `origin() -> text`
+
+Who made the change the running handler is for: "user", "script", "host", "device", "osc" or "load".
+
+Example: In `onValueChanged`, `origin() == "host"` means the DAW's automation moved the knob.
+
+Good to know:
+
+- "user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "osc": an OSC message. "load": the panel, a preset or the project being opened.
+- Outside a handler, and for an event no change caused (a timer, a key): nothing.
+- With the plug-in's window shut, a change a hand made while it was open is not raised again; and a script's set() raises no value events there, as inside a handler with the window open.
+
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, the connected device, music theory, and musical time.
+MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, the DAW an exported plug-in runs in, and OSC.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -1742,6 +1773,175 @@ ce.midi.panic()
 | `ce.midi.toBase64(bytes) -> string` | Write bytes as base64 text, to keep a dump in a setting or in state. Example: `bytesToBase64({240, 65, 16, 247})` gives "8EEQ9w==". `bytes` (bytes, required): The bytes, as a list. Base64 is about a third shorter than hex. It uses the standard alphabet, with = padding. Short name: `bytesToBase64`. |
 | `ce.midi.fromBase64(text) -> list` | Read base64 text back into a list of bytes. Example: `bytesFromBase64("8EEQ9w==")` gives {240, 65, 16, 247}. `text` (text, required): The base64 text. Spaces and line breaks are ignored; anything else that is not base64 is refused with a message. Short name: `bytesFromBase64`. |
 
+### ce.mpe: MPE
+
+MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself: pitch bend for pitch, channel pressure for pressure, controller 74 for timbre. A zone is one manager channel and the member channels its notes use.
+
+A script plays notes by id: `noteOn` picks a free member channel, sends the note's starting bend, timbre and pressure there, and gives back the id; `express` moves one note; `noteOff` ends it and frees its channel. `zone` sets the zone up and tells the synth; without it, the first note sets up a lower zone of 15.
+
+MPE coming in is the other half: `listen` reads an MPE controller's notes back, so `noteIn` carries each note's id and `expressionIn` says how it moves.
+
+```lua
+-- Lua: an MPE controller's notes, played on the synth through MPE
+function onPanelLoad()
+  state.out = {}
+  ce.mpe.listen({ from = "controller" })
+end
+
+function onNoteIn(note)
+  if note.from == "controller" then state.out[note.id] = ce.mpe.noteOn(note.note, note.velocity) end
+end
+
+function onExpressionIn(e)
+  local out = state.out[e.id]
+  if out then ce.mpe.express(out, { bend = e.bend, pressure = e.pressure, timbre = e.timbre }) end
+end
+
+function onNoteOffIn(note)
+  local out = state.out[note.id]
+  if out then ce.mpe.noteOff(out); state.out[note.id] = nil end
+end
+```
+
+#### `ce.mpe.zone([opts]) -> boolean`
+
+Set up the MPE zone the panel plays into, and tell the synth.
+
+Example: `ce.mpe.zone({ members = 7 })` plays into a lower zone of seven channels, 2 to 8.
+
+Good to know:
+
+- MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself. A zone is one manager channel and the member channels its notes use: the lower zone has channel 1 as manager and members from 2 upwards; the upper zone has 16 and members from 15 down.
+- With `send` on, the synth gets the MPE Configuration Message (RPN 6) on the manager channel and the bend range (RPN 0) on every channel of the zone, so both ends agree.
+- Changing the zone ends every sounding note first. Returns true when the zone is set.
+
+*Short name: `mpeZone`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `zone` | string | "lower" | "lower" (manager channel 1) or "upper" (manager channel 16). |
+| `members` | number | 15 | How many member channels, 1 to 15, and so how many notes can sound at once. |
+| `bendRange` | number (semitones) | 48 | How far a full bend goes on a member channel. MPE's own default. |
+| `managerBendRange` | number (semitones) | 2 | The same, for the manager channel. |
+| `send` | boolean | true | Send the setup to the synth. Off for a synth set up by hand. |
+| `role` | string | "mainSynth" | The device to play. |
+
+#### `ce.mpe.noteOn(note, velocity [, opts]) -> number`
+
+Play a note on a member channel of its own, and get its id.
+
+Example: `local id = ce.mpe.noteOn("C4", 100)` plays middle C and keeps its id.
+
+- `note` (number or text, required): The note, 0 to 127, or a name such as "C4".
+- `velocity` (number, required): 1 to 127.
+
+Good to know:
+
+- The channel is the free member channel released longest ago, so a release tail on the synth is not cut off. Every channel busy: the oldest note is ended first, with a console line the first time.
+- The starting bend, timbre and pressure are sent before the note, as MPE asks, so a note never starts at the last note's bend.
+- Before ce.mpe.zone(): a lower zone of 15 is set up first, and sent.
+- Returns the note's id, a number.
+
+*Short name: `mpeNoteOn`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `bend` | number (semitones) | 0 | The bend the note starts with, held to the zone's bend range. |
+| `pressure` | number | 0 | The pressure it starts with, 0 to 1. |
+| `timbre` | number | 0.5 | The timbre it starts with, 0 to 1 (controller 74). |
+
+#### `ce.mpe.express(id, values) -> boolean`
+
+Change one sounding note's bend, pressure or timbre.
+
+Example: `ce.mpe.express(id, { bend = 0.5, pressure = 0.8 })` bends the note up a quarter tone and presses it.
+
+- `id` (number, required): A note's id, from ce.mpe.noteOn().
+
+Good to know:
+
+- What is left out is not sent.
+- A note that has ended: false, and nothing sent, so a late gesture does not land on the next note to use that channel. Returns true when sent.
+
+*Short name: `mpeExpress`.*
+
+**`values`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `bend` | number (semitones) | not sent | The note's bend, held to the zone's bend range. |
+| `pressure` | number | not sent | Its pressure, 0 to 1. |
+| `timbre` | number | not sent | Its timbre, 0 to 1 (controller 74). |
+
+#### `ce.mpe.noteOff(id [, velocity]) -> boolean`
+
+End a note played with ce.mpe.noteOn().
+
+Example: `ce.mpe.noteOff(id)` releases the note.
+
+- `id` (number, required): The note's id.
+- `velocity` (number, optional): The release velocity, 0 to 127.
+
+Good to know:
+
+- Returns true when the note was sounding; false when it had already ended.
+
+*Short name: `mpeNoteOff`.*
+
+#### `ce.mpe.allOff() -> number`
+
+End every note the panel plays through MPE, and set each member channel's bend back to the middle.
+
+Example: `ce.mpe.allOff()` in onPanelClose leaves the synth silent.
+
+Good to know:
+
+- Returns how many notes were ended.
+- ce.midi.panic() silences these too, as it does every note; call this as well, so ce.mpe.notes() is empty again.
+
+*Short name: `mpeAllOff`.*
+
+#### `ce.mpe.notes() -> list`
+
+The notes sounding now through ce.mpe.
+
+Example: `#ce.mpe.notes()` is how many are held.
+
+Good to know:
+
+- Each is { id, note, channel, velocity, bend, pressure, timbre }, oldest first; none: an empty list.
+
+*Short name: `mpeNotes`.*
+
+#### `ce.mpe.listen([opts]) -> boolean`
+
+Read MPE from a device: give each note an id, and raise expressionIn as it moves.
+
+Example: `ce.mpe.listen({ from = "controller" })` reads MPE from the device the panel calls "controller".
+
+Good to know:
+
+- An MPE controller sends each note on its own channel, with its bend, pressure and timbre on that channel. This turns them back into notes.
+- While listening, noteIn and noteOffIn from that device carry `note.id`, the same id expressionIn gives, and bendIn, pressureIn and controller 74 on its member channels are raised as expressionIn instead.
+- The zone comes from the MPE Configuration Message the device sends, when it sends one; else from `zone` and `members` here.
+- Returns true when listening. `listen({ off = true })` stops.
+
+*Short name: `mpeListen`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `from` | string | every input | The device to read, by its role. |
+| `zone` | string | "lower" | "lower" or "upper", until the device says which. |
+| `members` | number | 15 | How many member channels, 1 to 15, until the device says. |
+| `bendRange` | number (semitones) | 48 | For turning a member channel's bend into semitones. |
+| `off` | boolean | false | True stops reading the device. |
+
 ### ce.device: your synth
 
 Working with the synth through its device profile — the description of the synth's parameters, messages and dumps that you build in the Device Profile Designer. With a profile you work in parameter names and real values, and the profile turns them into MIDI. These commands ask the synth for its settings, recall presets, read and change parameters by name, and describe a synth from a script when it has no profile. `role` picks which device to talk to when a panel uses more than one; it defaults to "mainSynth".
@@ -1753,7 +1953,7 @@ Ask the synth to send a dump: every setting of a patch in one message.
 Example: `requestDump("patch")` asks the synth for its patch dump.
 
 - `kind` (text, required): A dump the device profile defines, such as "system", or one declared with `deviceDefineDump()`; or a request's own id, such as "requestSystem".<br>Any other: rejected with a console error.
-- `fn` (function, optional): Called as fn(values, info) when the reply arrives, or when it does not.<br>`info.ok` false: nothing arrived within `opts.timeout`.<br>A request answered by several dumps at once: none is waited for; name the dump wanted.
+- `fn` (function, optional): Called as fn(values, info) when the reply arrives, or when it does not.<br>`info.ok` false: nothing arrived in time; see `opts.timeout`.<br>A request answered by several dumps at once: none is waited for; name the dump wanted.
 - `opts` (options, optional): The option below.
 
 Good to know:
@@ -1767,7 +1967,7 @@ Good to know:
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `timeout` | number (milliseconds) | 3000 | How long to wait for the reply before giving up and calling `fn` with info.ok = false. |
+| `timeout` | number (milliseconds) | the request's own timeout for every try, at least 3000 | How long to wait for the reply before giving up and calling `fn` with info.ok = false. |
 
 ```lua
 -- Lua
@@ -1939,7 +2139,7 @@ Good to know:
 | `query` | text | — | Keep only parameters whose name or id contains this. |
 | `group` | text | — | Keep only one group, the way the synth itself files them — "Oscillator", "Filter" and so on. |
 | `type` | text | — | Keep only one kind of parameter, such as "number" or "choice". |
-| `access` | text | — | Keep only parameters you can read, write, or both. |
+| `access` | text | — | Keep only some parameters by what can be done with them: "writable", the ones the panel can send to the synth; "readonly", the ones the synth only reports; "realtimeWarning", the ones not safe to move while notes are playing.<br>Any other value: not filtered, with a console error. |
 | `limit` | number | no limit | Return at most this many. Useful on a synth with hundreds. |
 
 ```lua
@@ -2413,6 +2613,859 @@ for _, id in ipairs(ce.device.requests()) do log(id) end
 // JavaScript
 for (const id of ce.device.requests()) log(id);
 ```
+
+### ce.ci: MIDI-CI
+
+MIDI-CI lets a script ask a device who it is, read and change its properties, follow them as they change, and turn its profiles on and off. Most synths do not speak MIDI-CI, and say nothing: an empty answer to `discover` is the usual one.
+
+A device is found by `discover`, and named by its `muid`, a number it keeps until it is switched off. `get`, `set` and `subscribe` work on its named resources (property exchange): `DeviceInfo`, `ResourceList`, controller and program lists, and resources of its own whose names start with `X-`. `profiles` and `setProfile` work on its MIDI-CI profiles, agreed ways for a device to behave, which are not CEditor's device profiles.
+
+Nothing waits: every command that talks to a device returns at once and calls its function when the answer comes, or when it does not, after a timeout. The talking is done once, in the device layer, so the editor, the player and an exported plug-in, window open or shut, see the same devices and answers. It goes out on the role's own MIDI ports. Not yet tried against a real MIDI-CI device.
+
+```lua
+-- Lua: find the synth, and show the first four of its program names
+function onPanelReady()
+  ce.ci.discover(function(found)
+    for _, d in ipairs(found) do
+      if d.matchesProfile then
+        ce.ci.get(d.muid, "ProgramList", function(result)
+          if not result.ok then return end
+          for row = 1, 4 do ce.components.lcd.text("Programs", row, result.body[row] and result.body[row].title or "") end
+        end)
+      end
+    end
+  end)
+end
+```
+
+#### `ce.ci.discover([opts,] fn) -> boolean`
+
+Ask which MIDI-CI devices are there, and get the ones that answer.
+
+Example: `ce.ci.discover(function(found) log(#found .. " MIDI-CI devices") end)`.
+
+- `fn` (function, required): Called with the list of devices.
+
+Good to know:
+
+- fn is called once, when the time is up, with a list of devices; none: an empty list. A synth that does not speak MIDI-CI says nothing, so an empty list is the usual answer.
+- A device is { muid, role, manufacturer, family, model, version, names, propertyExchange, profiles, matchesProfile }: `muid` its MIDI-CI number for this session; the codes as hex text, as device profiles write them ("41", "01 00"); `names` the words from its DeviceInfo; `matchesProfile` true when it is the synth the role's device profile describes.
+- A muid changes each time the device is switched on: to find a device again, keep its manufacturer, family and model.
+- Each device is also raised as ciDiscovered as soon as it answers. Returns true when asked; false when the role has no MIDI output.
+
+*Short name: `ciDiscover`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device whose MIDI ports to ask on. |
+| `timeoutMs` | number (milliseconds) | 3000 | How long to listen for answers. |
+
+#### `ce.ci.devices([role]) -> list`
+
+The MIDI-CI devices found so far, without asking again.
+
+Example: `#ce.ci.devices() > 0` is true once a MIDI-CI device has answered.
+
+- `role` (text, optional): Only the devices on this role's ports. Left out: all.
+
+Good to know:
+
+- A device stays in the list until it says it is leaving or its ports close.
+
+*Short name: `ciDevices`.*
+
+#### `ce.ci.get(muid, resource [, opts], fn) -> boolean`
+
+Read a resource from a device: its DeviceInfo, a controller or program list, or one of its own.
+
+Example: `ce.ci.get(state.synth, "ResourceList", fn)` gives the list of resources the device has.
+
+- `muid` (number, required): The device, from discover or devices.
+- `resource` (text, required): The resource's name, as the device names it.
+- `fn` (function, required): Called with the result.
+
+Good to know:
+
+- fn is called with { ok, status, message, body, mediaType }: `status` is the device's own (200 is fine, 404 a resource it does not have); `body` is a table for JSON, text for text, and bytes otherwise. No answer in time: ok false, status 0, "no reply in time".
+- ResourceList first: it says which resources exist, and whether each can be set or followed.
+- Returns true when sent; false, with a console error, for a device without property exchange or one nobody found.
+
+*Short name: `ciGet`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `resId` | text | none | For a resource that holds several items: which one, such as one program. |
+| `timeoutMs` | number (milliseconds) | 3000 | How long to wait for the device's answer. |
+| `offset` | number | 0 | For a long list the device gives in pages: where to start. |
+| `limit` | number | the whole list | For a long list: how many to give. |
+
+#### `ce.ci.set(muid, resource, body [, opts], fn) -> boolean`
+
+Change a resource on a device.
+
+Example: `ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, fn)` renames the patch on a device that has that resource.
+
+- `muid` (number, required): The device.
+- `resource` (text, required): The resource's name.
+- `body` (any value, required): What to set it to.
+- `fn` (function, required): Called with the result.
+
+Good to know:
+
+- A table is sent as JSON, text as text. To send bytes, give `mediaType`, such as "application/octet-stream".
+- fn is called with { ok, status, message }: 405 is a resource the device will not change.
+- Changes the device, as sendSysex can.
+
+*Short name: `ciSet`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `resId` | text | none | For a resource that holds several items: which one, such as one program. |
+| `timeoutMs` | number (milliseconds) | 3000 | How long to wait for the device's answer. |
+| `partial` | true or false | false | Send only the fields that change, for a device that allows it. |
+| `mediaType` | text | as body says | What body is, such as "text/plain"; needed for bytes. |
+
+#### `ce.ci.subscribe(muid, resource [, opts], fn) -> id`
+
+Be told when a resource changes on the device.
+
+Example: `ce.ci.subscribe(state.synth, "ProgramList", fn)` calls fn when the user renames or stores a program on the synth.
+
+- `muid` (number, required): The device.
+- `resource` (text, required): The resource's name.
+- `fn` (function, required): Called with each update.
+
+Good to know:
+
+- fn is called with { command, body } for each change: "full" (the whole resource), "partial" (only what changed) or "notify" (it changed: get it again); and once with "end" when the device, the panel or ce.ci.unsubscribe() ends it, or the device is gone. A device that refuses: "end" with ok false.
+- Returns an id for ce.ci.unsubscribe(); a device without property exchange: nothing, with a console error.
+
+*Short name: `ciSubscribe`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `resId` | text | none | For a resource that holds several items: which one, such as one program. |
+
+#### `ce.ci.unsubscribe(id) -> boolean`
+
+Stop following a resource; the device is told.
+
+Example: `ce.ci.unsubscribe(state.programs)` in onPanelClose.
+
+- `id` (number, required): The id ce.ci.subscribe() gave.
+
+Good to know:
+
+- Returns true when there was one.
+
+*Short name: `ciUnsubscribe`.*
+
+#### `ce.ci.profiles(muid [, fn]) -> list`
+
+A device's MIDI-CI profiles, and which are on.
+
+Example: `ce.ci.profiles(state.synth)` gives what the last inquiry found.
+
+- `muid` (number, required): The device.
+- `fn` (function, optional): Called with the fresh list.
+
+Good to know:
+
+- Each is { id, address, enabled }: `id` the profile's five bytes as hex text ("7E 21 09 01 00"), `address` "device" or a channel, 1 to 16.
+- Without fn: the list as last heard, at once. With fn: the device is asked again, and fn is called with the fresh list.
+- A MIDI-CI profile is an agreed way for a device to behave, such as a drawbar organ. It is not one of CEditor's device profiles.
+
+*Short name: `ciProfiles`.*
+
+#### `ce.ci.setProfile(muid, id, on [, opts]) -> boolean`
+
+Turn a MIDI-CI profile on or off.
+
+Example: `ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)`.
+
+- `muid` (number, required): The device.
+- `id` (text, required): The profile, as profiles gives it.
+- `on` (true or false, required): On or off.
+
+Good to know:
+
+- The device answers with its new state, raised as ciProfileChanged. A device that refuses raises nothing, and profiles keeps the old state.
+
+*Short name: `ciSetProfile`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `channel` | number | the whole device | One channel, 1 to 16, for a profile turned on per channel. |
+
+#### `ce.ci.draftProfile(muid, fn) -> boolean`
+
+Make a draft device profile from what a device reports.
+
+Example: `ce.ci.draftProfile(state.synth, function(draft) log(draft.summary.parameters .. " parameters") end)`.
+
+- `muid` (number, required): The device.
+- `fn` (function, required): Called with the draft.
+
+Good to know:
+
+- Asks for DeviceInfo, AllCtrlList, ChCtrlList and ProgramList, then builds the draft as the Discovery screen does, marked as partial.
+- fn is called with { profile, summary }: `profile` a table ready to save as JSON with ce.file.save(); `summary` counts what it holds, and `missing` lists what the device did not say.
+- A starting point, not a finished profile: MIDI-CI says which controllers a device has, not its SysEx dumps.
+
+*Short name: `ciDraftProfile` · Panel window only.*
+
+### ce.patch: the synth's sound as a value
+
+A synth's sound as one value you can hold, change, compare, send and keep. `current` captures it, `morph`, `blend`, `random`, `mutate` and `merge` make new ones without sending anything, `diff` and `equal` compare two, and `apply` puts one on the panel and sends it the way the synth takes a patch.
+
+A patch is a table: `device` (the device profile's id), `role`, `scope` (which part of the synth: "voice" unless the profile names others), `name`, `values` (parameter id to value, in the parameter's own units; a choice is its id), `missing` (ids nothing is known for) and `source`.
+
+Every command that works on parameters takes the same choosing options: `groups`, `only`, `except`, `lock` and `include`. The transforms leave the patch name and the parameters the synth cannot be sent alone unless `include` names them. A profile can describe its patches in a `patch` section: which scopes a patch can hold and the dumps that read and send each, how `apply` sends one (`deliver`), and how `write` stores a slot.
+
+```lua
+-- Lua: a knob morphs from the patch kept as A to the one kept as B
+function onValueChange(value)
+  ce.patch.apply(ce.patch.morph(ce.patch.load("A"), ce.patch.load("B"), value / 127), { live = true })
+end
+```
+
+#### `ce.patch.current([scope [, opts]]) -> patch`
+
+Capture the patch as the panel knows it now: the values the synth last reported, or the controls hold.
+
+Example: `local before = ce.patch.current()` keeps the voice as it is now.
+
+- `scope` (text, optional): The part of the synth: "voice" when left out, or a scope ce.patch.scopes() lists.<br>Not one: no result, with a console error.
+
+Good to know:
+
+- A patch is a table: { device, role, scope, name, values, missing, source }. `values` is parameter id to value, in the parameter's own units; a choice is its id, such as "saw".
+- Asks the synth nothing. A parameter the synth never reported is listed in `missing`.
+- A panel without a device profile still works: `values` is then keyed by control name.
+
+*Short name: `patchCurrent`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `scope` | text | "voice" | The part of the synth, when the command takes no patch to read it from. |
+
+#### `ce.patch.read(scope, fn [, opts]) -> boolean`
+
+Ask the synth for a patch, and get it when the reply arrives: fn(patch, info).
+
+Example: `ce.patch.read("voice", function(p, info) if info.ok then state.original = p end end)` asks the synth for the voice it is playing.
+
+- `scope` (text, required): The part of the synth.
+- `fn` (function, required): Called as fn(patch, info) when the reply arrives, or when it does not.
+
+Good to know:
+
+- Asks for the scope's dumps, one after another, with ce.device.requestDump(); the panel's controls are filled from each reply, as a dump always fills them.
+- `info.ok` is false when a reply did not arrive in time; the patch is then what the panel knows. `info.missing` lists the ids no reply held.
+- A scope with no dumps to ask for (the profile's patch section, or define(), names them): false, with a console error.
+
+*Short name: `patchRead`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `timeout` | number (milliseconds) | as long as the profile asks | How long to wait for each dump. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.load(name [, opts]) -> patch`
+
+Get a patch kept with ce.patch.save(), by its name.
+
+Example: `ce.patch.apply(ce.patch.load("Warm pad"))` plays the patch kept as "Warm pad".
+
+- `name` (text, required): The name it was kept under, in any case.
+
+Good to know:
+
+- Loading sends nothing: pass the result to apply() to hear it.
+- No patch by that name, or one kept for another synth: no result, with a console error naming it.
+
+*Short name: `patchLoad`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.morph(a, b, t [, opts]) -> patch`
+
+A patch part of the way from one patch to another.
+
+Example: `ce.patch.morph(warm, bright, 0.25)` gives a patch a quarter of the way from warm to bright.
+
+- `a` (table, required): The patch at 0.
+- `b` (table, required): The patch at 1.
+- `t` (number, required): Range: 0 to 1 (a to b).<br>Outside the range: held at 0 or 1.
+
+Good to know:
+
+- A number moves in a straight line from a to b, then is rounded to its step and held inside its range. A choice or an on/off is a's below `switchAt` and b's from it. The patch name stays a's.
+- A parameter only one of the two patches holds keeps that patch's value.
+- To morph from a knob, call it in the knob's onValueChange and pass the result to apply(p, { live = true }).
+- b of another synth or scope: no result, with a console error.
+
+*Short name: `patchMorph`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `switchAt` | number | 0.5 | Where a choice or an on/off changes from a's value to b's, 0 to 1. |
+
+#### `ce.patch.blend(patches, weights [, opts]) -> patch`
+
+One patch made of several, each counting as much as its weight.
+
+Example: `ce.patch.blend({ a, b, c }, { 0.5, 0.3, 0.2 })` leans mostly towards a.
+
+- `patches` (list, required): Two or more patches of the same synth and scope.
+- `weights` (list of numbers, required): How much each counts.
+
+Good to know:
+
+- The weights need not add up to 1; a patch without a weight counts 0. Adding up to 0 or less: no result, with a console error.
+- A choice or an on/off takes the value of the patch with the largest weight.
+- The weights from ce.math.weightsFor() go straight in, for a morph pad.
+
+*Short name: `patchBlend`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.random([opts]) -> patch`
+
+A new patch with random values, within each parameter's range.
+
+Example: `ce.patch.random({ groups = {"Filter"}, seed = 7 })` gives the current patch with a new filter section.
+
+Good to know:
+
+- What is not chosen keeps its value from `from`. The patch name never changes.
+- The same `seed` gives the same patch, in every language.
+- A panel without a device profile does not say each control's range: no result, with a console error.
+
+*Short name: `patchRandom`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `scope` | text | "voice" | The part of the synth, when the command takes no patch to read it from. |
+| `seed` | number | the script's random stream | Where the random numbers start: the same seed gives the same patch, in every language. |
+| `from` | table | ce.patch.current() | The patch whose unchosen values are kept. |
+| `within` | table | each parameter's whole range | Narrower ranges by id; outside the parameter's range they are held inside it. |
+
+#### `ce.patch.mutate(patch, amount [, opts]) -> patch`
+
+A variation of a patch: every chosen value moved a little, at random.
+
+Example: `ce.patch.mutate(p, 0.1)` moves each number by up to a tenth of its range.
+
+- `patch` (table, required): The patch to vary.
+- `amount` (number, required): Range: 0 to 1 (no change to any value).<br>Outside the range: held at 0 or 1.
+
+Good to know:
+
+- Numbers move by up to `amount` of their range, more often a little than a lot.
+- A choice or an on/off changes with a chance of `amount`, to another of its values. Text never changes.
+
+*Short name: `patchMutate`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `seed` | number | the script's random stream | Where the random numbers start: the same seed gives the same patch, in every language. |
+
+#### `ce.patch.merge(base, other, opts) -> patch`
+
+A patch with the chosen parameters taken from another patch.
+
+Example: `ce.patch.merge(mine, theirs, { groups = {"Filter"} })` keeps mine with the filter from theirs.
+
+- `base` (table, required): The patch that gives everything not chosen.
+- `other` (table, required): The patch that gives the chosen parameters.
+
+Good to know:
+
+- One of `groups` or `only` is needed: taking every value is `other` itself. Neither: no result, with a console error.
+
+*Short name: `patchMerge`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.diff(a, b [, opts]) -> list`
+
+List the parameters whose values differ between two patches: { id, name, group, from, to }.
+
+Example: `ce.patch.diff(saved, ce.patch.current())` lists what has changed since the patch was saved.
+
+- `a` (table, required): The first patch.
+- `b` (table, required): The second patch.
+
+Good to know:
+
+- In the profile's parameter order; the same patches give an empty list.
+- A parameter only one patch holds is listed, with no value on the other side.
+- Two numbers closer than the parameter's step count as the same, and so do two names that differ only in trailing spaces.
+
+*Short name: `patchDiff`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.equal(a, b [, opts]) -> boolean`
+
+Tell whether two patches hold the same values.
+
+Example: `if not ce.patch.equal(state.saved, ce.patch.current()) then ... end` runs when the patch has been changed.
+
+- `a` (table, required): The first patch.
+- `b` (table, required): The second patch.
+
+Good to know:
+
+- The same as an empty ce.patch.diff(a, b, opts).
+
+*Short name: `patchEqual`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.apply(patch [, opts]) -> table`
+
+Put a patch on the panel and send it to the synth, the way this synth takes a patch.
+
+Example: `ce.patch.apply(p)` makes the panel and the synth play p.
+
+- `patch` (table, required): The patch to apply.
+
+Good to know:
+
+- The panel's controls always take the values, whatever `send` says.
+- Returns { ok, via, applied, sent, skipped }: `via` is "parameters", "dump" or "none"; `skipped` lists { id, why }. Refused: ok false, with a console error.
+- "auto" sends the scope's dumps when the profile's patch section says `deliver = "dump"`, and one message per changed parameter otherwise.
+- A patch of another synth: refused, naming it.
+
+*Short name: `patchApply`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `groups` | list of text | every group | Only parameters in these groups, as the profile names them, in any case. |
+| `only` | list of text | every parameter | Only these parameters, by id. With groups: those in either. |
+| `except` | list of text | none | Never these parameters, by id or group name. Wins over groups and only. |
+| `lock` | list of text | none | These keep their value from the first patch, by id or group name. Unlike except, they stay in the result. |
+| `include` | list of text | none | Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups. |
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `send` | text | "auto" | How it goes to the synth: "none" sets the panel only.<br>One of "auto", "parameters", "dump" or "none". Case-insensitive. |
+| `changedOnly` | true or false | true | Send only values that differ from what the synth last had. |
+| `live` | true or false | false | For a value moving under a hand: the 32 parameters that moved most now, the rest with the next apply without live. |
+
+#### `ce.patch.save(name, patch [, opts]) -> boolean`
+
+Keep a patch by name, for this synth.
+
+Example: `ce.patch.save("Warm pad", p)` keeps p as "Warm pad".
+
+- `name` (text, required): Up to 64 characters.
+- `patch` (table, required): The patch.
+
+Good to know:
+
+- Kept with the panel, as ce.storage.saveSetting() keeps a value: in the editor with the panel document, in an exported plug-in in the DAW project.
+- A name of 1 to 64 characters; anything else: false, with a console error.
+
+*Short name: `patchSave`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `replace` | true or false | true | Off: a name already in use is refused, with a console error. |
+
+#### `ce.patch.list([opts]) -> list`
+
+List the patches kept for this synth: { name, scope, savedAt }, newest first.
+
+Example: `ce.patch.list()` gives every kept patch's name.
+
+*Short name: `patchList`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+| `scope` | text | every scope | Only the patches of this scope. |
+
+#### `ce.patch.forget(name [, opts]) -> boolean`
+
+Remove a kept patch.
+
+Example: `ce.patch.forget("Warm pad")` removes it.
+
+- `name` (text, required): Its name, in any case.
+
+Good to know:
+
+- Returns true when one was removed; no patch by that name: false, without a word.
+
+*Short name: `patchForget`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.write(patch, slot [, opts]) -> table`
+
+Store a patch in the synth's own memory, in a writable slot.
+
+Example: `ce.patch.write(p, 130)` stores p in preset 130.
+
+- `patch` (table, required): The patch.
+- `slot` (number, required): The preset number across all banks, counted from 0, as ce.device.recallPreset() takes it.
+
+Good to know:
+
+- Overwrites what the slot held. The synth does not ask, so ask first with ce.ui.choose().
+- How it is stored is the profile's patch section: `write = { via = "dump", dump = "..." }` sets the "slot" variable and sends that dump. A profile that does not say: refused, with a console error.
+- Returns { ok, slot, error }.
+
+*Short name: `patchWrite`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device, by its role as the panel names it. |
+
+#### `ce.patch.scopes([role]) -> list`
+
+Describe the parts of the synth a patch can hold: { id, name, parameters, canRead, canSend, via }.
+
+Example: `ce.patch.scopes()` might give a voice and a system scope.
+
+- `role` (text, optional): The device; left out: "mainSynth".
+
+Good to know:
+
+- Without a patch section in the profile: "voice" is every parameter but actions and the System, Global, Utility and Performance groups, and "system" those groups.
+- A panel without a device profile: one scope, "voice", holding the panel's controls.
+
+*Short name: `patchScopes`.*
+
+#### `ce.patch.define(scope, spec [, role]) -> boolean`
+
+Describe a scope from the script, for a synth whose profile has no patch section, or to change one.
+
+Example: `ce.patch.define("voice", { groups = {"Osc", "Filter", "Amp"}, dumps = {"voice"} })` makes the voice those three groups, read and sent as the voice dump.
+
+- `scope` (text, required): The scope's id. An existing one is replaced for this panel.
+- `spec` (table, required): The scope: groups, only, except and dumps, as lists of names.
+- `role` (text, optional): The device.
+
+Good to know:
+
+- spec takes the fields the profile's patch section takes for one scope: name, groups, only, except, dumps, read, transform. Anything else: false, with a console error.
+- Lasts while the panel is open; call it in onPanelLoad.
+
+*Short name: `patchDefine`.*
+
+### ce.verify: checking what the synth holds
+
+Asking the synth whether it holds what was sent. `coverage` says which parameters can be read back at all, and why not the rest, without sending anything. `check` compares the synth with the panel, `dump` asks for one dump twice to find values the synth changes by itself, and `write`, `probe` and `patch` send first and then read back: one value, one parameter at several values, or the whole sound.
+
+Every check returns at once and calls its function with a report when it is done; the same report is raised as onVerifyDone. A report names every parameter that matched, every one that differed, with both values, and every one that could not be checked, with the reason. The read-back is always a dump the synth sent after the check asked for it, never what the panel last sent.
+
+Only `write`, `probe` and `patch` change the synth, and `probe` puts the old value back. One check runs on a device at a time, and only the main synth can be asked.
+
+```lua
+-- Lua: a "Check" button that shows the result on an LCD
+function onClick()
+  ce.verify.check(function(report)
+    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width = 16 }))
+  end)
+end
+```
+
+#### `ce.verify.coverage([opts]) -> table`
+
+Which parameters a check can read back from the synth, which it cannot and why, and whether each dump's length adds up. Sends nothing.
+
+Example: `ce.verify.coverage().checkable` is how many of the synth's parameters can be checked.
+
+Good to know:
+
+- Returns { role, total, checkable, unchecked, dumps }: `unchecked` lists { id, name, why }, `why` "notInDump" (no dump holds it) or "noRequest" (the profile cannot ask for that dump).
+- `dumps` lists { kind, expectedBytes, layoutBytes, unread } for every dump these parameters are in. `expectedBytes` is the length the profile gives, `layoutBytes` what its layout adds up to; when the two differ, the profile is wrong in one of them. `unread` lists the payload bytes no parameter reads, as { from, to }.
+- Reads only the profile, so it works without a synth connected.
+
+*Short name: `verifyCoverage`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `ids` | list of text | every parameter | Only these parameters, by id. |
+| `group` | text | every group | Only the parameters of this group, as the profile names it, in any case. |
+
+#### `ce.verify.check([opts,] fn) -> boolean`
+
+Ask the synth for its values and compare them with what the panel shows. Writes nothing.
+
+Example: `ce.verify.check(function(report) log(ce.verify.summary(report)) end)` checks every parameter and logs one line.
+
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- Asks only for the dumps that hold the parameters asked about, one after another, with the profile's gap between them. Each reply fills the panel, as a dump always does.
+- The report: { kind, role, ok, total, matched, differed, unchecked, dumps, probes, ms, cancelled }. `matched` lists ids; `differed` lists { id, name, expected, got, raw }, `expected` what the panel held and `got` what the synth sent, `raw` the number the synth sent for a choice the profile does not name; `unchecked` lists { id, name, why }; `dumps` lists { kind, status, expectedBytes }, `status` "ok" or "noReply".
+- `why` is "notInDump", "noRequest", "noReply" (asked, asked again, no answer in time), "moved" (the value changed while it was checked), "notWritable" or "cancelled".
+- `ok` is true when nothing differed and nothing was left unchecked by no reply, a move or a cancel.
+- Returns true when started; false while a check runs on that device, when the synth is not connected, or for any device but the main synth.
+
+*Short name: `verifyCheck`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `ids` | list of text | every parameter | Only these parameters, by id. |
+| `group` | text | every group | Only the parameters of this group, as the profile names it, in any case. |
+
+#### `ce.verify.dump(kind [, opts], fn) -> boolean`
+
+Ask for the same dump several times and compare the first reply with the last. Writes nothing.
+
+Example: `ce.verify.dump("common", function(report) log(#report.differed) end)` logs how many values changed between two asks.
+
+- `kind` (text, required): The dump, by the id the profile gives it, or the id of its request.
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- A value that changes when nothing was sent is one the synth changes by itself, such as a counter or a clock. Every check that compares it will find it different.
+- `differed` holds the parameters that changed, `expected` the first reply's value and `got` the last.
+- A dump the profile has no request for: false, with a console error.
+
+*Short name: `verifyDump`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `times` | number | 2 | How many times to ask, 2 to 10. |
+| `gapMs` | number (milliseconds) | 500 | The wait between the asks. |
+
+#### `ce.verify.write(id, value [, opts], fn) -> boolean`
+
+Send one value, ask the synth for it back, and compare.
+
+Example: `ce.verify.write("tone1.filter.cutoff", 64, fn)` sends 64 and reports whether the synth holds 64.
+
+- `id` (text, required): The parameter id, as the profile names it.
+- `value` (number or text, required): The value, in the parameter's own units, as ce.device.write() takes it.
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- Sent as ce.device.write() sends it, so the panel's control follows. ce.device.write() says the message left; this says whether it landed.
+- A parameter no dump holds is still sent, and is reported unchecked with the reason.
+
+*Short name: `verifyWrite`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `settleMs` | number (milliseconds) | 100 | The wait between sending and asking the synth for the value back. |
+
+#### `ce.verify.probe(id [, opts], fn) -> boolean`
+
+Try a parameter at several values, read each one back, then put the old value back.
+
+Example: `ce.verify.probe("tone1.lfo.rate", fn)` tries the lowest, middle and highest rate and the two next to each end.
+
+- `id` (text, required): The parameter id.
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- Left out, `values` is: for a number, the lowest, the one above it, the middle, the one below the highest, and the highest; for a choice, every choice up to 16, else the first, middle and last; for on/off, both; for text, a name of full length and an empty one.
+- The report's `probes` lists { id, value, got, same } for each value tried, and `differed` the values that did not land. `restored` is true when the old value was read back too.
+- The old value is sent back when the probe ends, fails or is cancelled. A parameter that cannot be read back is not sent at all.
+
+*Short name: `verifyProbe`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `settleMs` | number (milliseconds) | 100 | The wait between sending and asking the synth for the value back. |
+| `values` | list | as the notes say | The values to try, in the parameter's own units. |
+
+#### `ce.verify.patch([opts,] fn) -> boolean`
+
+Send the panel's whole sound, ask for every dump that holds it, and compare every value.
+
+Example: `ce.verify.patch(fn)` after building a sound in the panel, before saving it on the synth.
+
+- `fn` (function, required): Called with the report.
+
+Good to know:
+
+- `via` left out: whole dumps when the profile's patch section says `deliver = "dump"`, else one message per parameter.
+- Parameters the profile says cannot be written are reported unchecked as "notWritable".
+
+*Short name: `verifyPatch`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `role` | string | "mainSynth" | The device. Every check but coverage asks the main synth only. |
+| `ids` | list of text | every parameter | Only these parameters, by id. |
+| `group` | text | every group | Only the parameters of this group, as the profile names it, in any case. |
+| `settleMs` | number (milliseconds) | 100 | The wait between sending and asking the synth for the value back. |
+| `via` | text | as the profile delivers a patch | How the sound is sent: whole dumps, or one value at a time.<br>One of "dump" or "parameters". Case-insensitive. |
+| `send` | true or false | true | Off: compare without sending first, as check does. |
+
+#### `ce.verify.summary(report [, opts]) -> text`
+
+A report as one line of text.
+
+Example: `ce.verify.summary(report)` gives "1180 of 1222 match, 3 differ, 39 unchecked (no reply: tone3)".
+
+- `report` (table, required): A report from any check.
+
+Good to know:
+
+- Counts, then in brackets the dump that did not answer, or the most common reason a parameter was left unchecked. A cancelled check says so first.
+- Not a report: nothing, with a console error.
+
+*Short name: `verifySummary`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `width` | number | no limit | The most characters to give, for an LCD line. Too long: the part in brackets goes first, then the words are shortened ("5/9 ok 1 diff 3 unchk"), then the line is cut. |
+
+#### `ce.verify.running([role]) -> table`
+
+The check running now on a device: { kind, role, done, total, ms }, or nothing.
+
+Example: `ce.verify.running()` while a patch check runs gives { kind = "patch", done = 3, total = 5, ms = 1840 }.
+
+- `role` (text, optional): The device; left out: "mainSynth".
+
+Good to know:
+
+- `done` and `total` count dumps asked for (for a probe, values tried), so a script can show progress.
+- In Lua and JavaScript every script sees every check on the panel. In Python a script sees the checks it started.
+
+*Short name: `verifyRunning`.*
+
+#### `ce.verify.cancel([role]) -> boolean`
+
+Stop the check running on a device.
+
+Example: `ce.verify.cancel()` from a "Stop" button.
+
+- `role` (text, optional): The device; left out: "mainSynth".
+
+Good to know:
+
+- The check's function is still called, with what was read so far and `cancelled` true; what was not read is unchecked as "cancelled". A probe sends the old value back first.
+- Returns true when a check was running.
+
+*Short name: `verifyCancel`.*
 
 ### ce.music: notes, scales and chords
 
@@ -2933,9 +3986,346 @@ Good to know:
 
 *Short name: `clockTempo`.*
 
+### ce.daw: The DAW
+
+For a panel exported as a plug-in: what the DAW is, its parameters and programs, and the changes a script may make to what the DAW sees. In the editor there is no DAW; the questions that need one answer nothing, and `parameters` gives the list the next export would bake, so a panel can be tested.
+
+A DAW keys automation by a parameter's id and its place in the list, so the list is fixed at export. A script can rename a parameter, and fill the spare parameters the author reserved in the export settings (`assign`); it cannot add or remove one. A parameter is named by its control's path, such as `"Cutoff.value"`, and its values are the control's own, as `set` and `get` give them.
+
+`origin()`, beside this module, says who made the change a handler is running for: a hand, a script, the DAW, the synth, or a project being opened. `automationIn` is raised when the DAW moved a parameter, and never for a change a script or a hand made.
+
+```lua
+-- Lua: a button starts a two-second sweep, written to the DAW as one move
+function onClick()
+  state.step = 0
+  ce.daw.beginGesture("Cutoff.value")
+  startTimer("sweep", 20)
+end
+
+function onTimer(info)
+  if info.id ~= "sweep" then return end
+  state.step = state.step + 1
+  set("Cutoff.value", state.step * 127 / 100)
+  if state.step == 100 then
+    ce.time.stopTimer("sweep")
+    ce.daw.endGesture("Cutoff.value")
+  end
+end
+```
+
+#### `ce.daw.host() -> table`
+
+What the exported plug-in is running in: the DAW's name, the plug-in format, the sample rate and block size, and whether its window is open.
+
+Example: `ce.daw.host().name` is "Bitwig Studio" in Bitwig.
+
+Good to know:
+
+- Returns { name, format, sampleRate, blockSize, editorOpen }. `name` is the DAW as JUCE knows it, else "Unknown"; `format` is "vst3", "clap", "lv2", "au" or "standalone".
+- `sampleRate` and `blockSize` are nothing until the DAW has started the plug-in. Tempo, position and play state are in ce.time.
+- In the editor: nothing.
+
+*Short name: `dawHost`.*
+
+#### `ce.daw.parameters() -> list`
+
+The plug-in's DAW parameters, in the order the DAW lists them.
+
+Example: `#ce.daw.parameters()` is how many the DAW can automate.
+
+Good to know:
+
+- Each is { id, name, path, control, min, max, default, unit, kind, choices, group, value }: `kind` is "float", "choice" or "bool"; `choices` the texts of a list; `group` the folder the DAW shows it in; `name` the name the DAW shows now; `value` as get() gives it.
+- The spare parameters are at the end, with `path` nothing while empty.
+- In the editor: the list the next export would bake.
+
+*Short name: `dawParameters`.*
+
+#### `ce.daw.parameter(path) -> table`
+
+One DAW parameter, by its control's path.
+
+Example: `ce.daw.parameter("Cutoff.value").name` is the name the DAW shows for the cutoff knob.
+
+- `path` (text, required): The control's path, as set takes it.
+
+Good to know:
+
+- Returns one entry as ce.daw.parameters() gives it; a control that is not a DAW parameter: nothing.
+
+*Short name: `dawParameter`.*
+
+#### `ce.daw.program() -> table`
+
+The program the DAW has chosen from the plug-in's bank.
+
+Example: `ce.daw.program().name` is what the DAW's program menu shows.
+
+Good to know:
+
+- Returns { index, number, name, count }: `index` from 0, `number` from 1, `count` the size of the bank.
+- The bank is the one baked at export from the device profile's presets. A panel without one, and the editor: nothing.
+
+*Short name: `dawProgram`.*
+
+#### `ce.daw.programs() -> list`
+
+The whole bank the DAW chooses from.
+
+Example: `ce.daw.programs()[1].name` is the first program's name.
+
+Good to know:
+
+- Returns a list of { index, number, name }; no bank: an empty list.
+
+*Short name: `dawPrograms`.*
+
+#### `ce.daw.beginGesture(path) -> boolean`
+
+Start one DAW gesture on a parameter: every set on it until endGesture is one move to the DAW.
+
+Example: `ce.daw.beginGesture("Cutoff.value")` before a sweep the script plays.
+
+- `path` (text, required): The control's path.
+
+Good to know:
+
+- Without it, each set is a gesture of its own, and a DAW writing automation in touch or latch mode lets go of the parameter after every value.
+- Only for changes the script makes over time: a morph, a sweep. A drag by a hand is one gesture already.
+- A gesture left open is ended, with a console line, when the window or the plug-in closes.
+- Returns true when started; false when one is already open on it, or the path is not a DAW parameter, and in the editor.
+
+*Short name: `dawBeginGesture`.*
+
+#### `ce.daw.endGesture(path) -> boolean`
+
+End the gesture ce.daw.beginGesture() started.
+
+Example: `ce.daw.endGesture("Cutoff.value")` when the sweep is done.
+
+- `path` (text, required): The control's path.
+
+Good to know:
+
+- Returns true when a gesture was open.
+
+*Short name: `dawEndGesture`.*
+
+#### `ce.daw.rename(path [, name]) -> boolean`
+
+Give a parameter a new name in the DAW.
+
+Example: `ce.daw.rename("Osc2Param.value", "Sync amount")` when the oscillator's mode changes what its knob does.
+
+- `path` (text, required): The control's path.
+- `name` (text, optional): The new name.
+
+Good to know:
+
+- The parameter's id and place stay the same, so automation already written stays on it. The name is saved with the project.
+- Not every DAW shows a new name at once; some only after the project is opened again, and LV2 has no way to say it.
+- Returns true when the name was changed; in the editor, false.
+
+*Short name: `dawRename`.*
+
+#### `ce.daw.assign(slot [, path] [, opts]) -> boolean`
+
+Put a control on one of the panel's spare parameters, so the DAW can automate it.
+
+Example: `ce.daw.assign(1, "LfoRate.value")` puts the LFO rate on spare parameter 1.
+
+- `slot` (number, required): 1 to the number of spare parameters the panel has.
+- `path` (text, optional): The control's path.
+
+Good to know:
+
+- The author reserves spare parameters in the panel's export settings; the script decides what is on them.
+- The spare shows the control's range and text: "440 Hz", not "0.53". Moving one moves the other, both ways.
+- A control is on one slot at a time: assigning it again moves it. The assignment is saved with the project and comes back before its automation plays.
+- Returns true when assigned; false for a slot the panel does not have, a control with no range, and in the editor.
+
+*Short name: `dawAssign`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `name` | string | the control's name | The name the DAW shows for the slot. |
+
+#### `ce.daw.markChanged() -> boolean`
+
+Tell the DAW the project has unsaved changes.
+
+Example: `ce.daw.markChanged()` after a script changed something only onDawSaveState saves.
+
+Good to know:
+
+- Without it a DAW may close the project without asking, and lose what only the script holds. A change to a DAW parameter needs no call.
+- Also runs onDawSaveState on the next tick, so the state is ready when the DAW asks.
+- Returns true when the DAW was told; in the editor, false.
+
+*Short name: `dawMarkChanged`.*
+
+### ce.osc: OSC
+
+Open Sound Control lets a panel talk to a tablet running TouchOSC or Lemur, to Max or Pure Data, to a DAW or a lighting desk. A message is an address, such as `/fader/1`, and its values.
+
+Nothing opens until asked: `listen` opens a port, on this computer only unless `network` is on, and the network is used only after the user says yes, once for the panel. `on` runs a function for the messages to an address, with OSC's wildcards; `oscIn` is raised for every one. `send` and `bundle` send, to a name `target` gave, to `"host:port"`, or back to a message's `from`. Every common OSC type is read and written, both ways; a number goes out as a decimal unless `types` says otherwise.
+
+A change a message makes is from `"osc"`, as `origin()` says, so a panel can send its values to the tablet without sending a tablet's own move back to it.
+
+```lua
+-- Lua: eight faders on a tablet move the eight sliders on the panel
+function onPanelReady()
+  ce.osc.listen({ port = 8000, network = true })
+  ce.osc.on("/fader/[1-8]", function(msg)
+    local n = tonumber(msg.address:match("(%d)$"))
+    set("Slider" .. n .. ".value", msg.args[1] * 127)
+  end)
+end
+```
+
+#### `ce.osc.listen([opts]) -> boolean`
+
+Start receiving OSC on a port.
+
+Example: `ce.osc.listen({ port = 8000, network = true })` receives from a tablet on the same network, after the user says yes.
+
+Good to know:
+
+- This computer only, unless `network` is on; then the user is asked the first time, and listening starts when they say yes. The answer is kept on this computer for the panel, never in the panel file.
+- The port in use is in status().port: show it where the user types it into the tablet. Calling it again moves to the new port.
+- Returns true when listening, or waiting for the user. In an exported plug-in with its window shut, false when the port is in use or the user said no; in the panel view that comes a moment later, as a console line and status().error.
+
+*Short name: `oscListen`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `port` | number | 8000 | The port, 1024 to 65535. |
+| `network` | boolean | false | Receive from other computers too, after the user says yes. |
+| `nextFree` | boolean | false | Take the next free port when this one is in use, as a second copy of the panel must. |
+
+#### `ce.osc.stop() -> boolean`
+
+Stop receiving OSC, and close the port.
+
+Example: `ce.osc.stop()` from an "OSC off" switch.
+
+Good to know:
+
+- Closed by itself when the panel closes. Returns true when a port was open.
+
+*Short name: `oscStop`.*
+
+#### `ce.osc.on(pattern, fn) -> number`
+
+Run a function for every OSC message to an address; wildcards allowed.
+
+Example: `ce.osc.on("/fader/*", fn)` runs `fn` for `/fader/1`, `/fader/2` and so on.
+
+- `pattern` (text, required): An address, starting with /.
+- `fn` (function, required): Called with each message.
+
+Good to know:
+
+- OSC's wildcards, inside one part of the address: `*` any text, `?` one character, `[1-4]` one of a range, `[!0]` anything but, `{cutoff,reso}` one of a list.
+- fn is called with the message: { address, args, types, from, time }. `args` are its values; `types` the OSC type of each, such as "if"; `from` { host, port }, which ce.osc.send() takes to answer; `time` a bundle's time.
+- Several patterns can match one message; each function runs, in the order they were made. A script's patterns go when it reloads.
+- Returns an id for ce.osc.off().
+
+*Short name: `oscOn`.*
+
+#### `ce.osc.off(id) -> boolean`
+
+Remove a pattern ce.osc.on() made.
+
+Example: `ce.osc.off(state.faders)`.
+
+- `id` (number, required): The id ce.osc.on() gave.
+
+Good to know:
+
+- Returns true when there was one.
+
+*Short name: `oscOff`.*
+
+#### `ce.osc.target(name [, address]) -> boolean`
+
+Give a destination a name, so ce.osc.send() can use it.
+
+Example: `ce.osc.target("tablet", "192.168.1.20:9000")`.
+
+- `name` (text, required): The name scripts will use.
+- `address` (any value, optional): "host:port", { host, port }, or a message's from.
+
+Good to know:
+
+- Another computer asks the user once, as listening on the network does; this computer ("127.0.0.1" or "localhost") does not.
+- Names belong to the panel and are shared by its scripts, until the panel closes.
+- Returns true when set, or waiting for the user's answer.
+
+*Short name: `oscTarget`.*
+
+#### `ce.osc.send(to, address [, args] [, types]) -> boolean`
+
+Send one OSC message.
+
+Example: `ce.osc.send("tablet", "/label/1", "Cutoff")` sets a label in TouchOSC.
+
+- `to` (any value, required): A name from ce.osc.target(), "host:port", or a message's from.
+- `address` (text, required): Where to send it, starting with /.
+- `args` (any value, optional): One value, or a list of them.
+- `types` (text, optional): The OSC types, one per value, such as "if".
+
+Good to know:
+
+- Every number goes as `f`, the type most receivers expect; text as `s`, true and false as `T` and `F`, nothing as `N`, a list of bytes as `b`. A whole number needs `types` "i", because some languages cannot tell 1 from 1.0.
+- `types` gives one OSC type for each value instead: i h f d s S T F N I b r m t c.
+- Sending never waits; messages go out in the order sent. A destination on another computer asks the user first, and the message waits for the answer.
+- Returns true when sent; false for an address without a leading /, types that do not fit the values, or a destination the user refused.
+
+*Short name: `oscSend`.*
+
+#### `ce.osc.bundle(to, messages [, opts]) -> boolean`
+
+Send several OSC messages as one packet, so they arrive together.
+
+Example: `ce.osc.bundle("tablet", { { address = "/fader/1", args = { 0.5 } }, { address = "/label/1", args = { "64" } } })`.
+
+- `to` (any value, required): As ce.osc.send() takes it.
+- `messages` (list, required): A list of { address, args, types }.
+
+Good to know:
+
+- For a tablet showing many values: one bundle for a page of faders is one packet, not twenty. A bundle larger than 64 KB is refused; split it.
+- Returns true when sent.
+
+*Short name: `oscBundle`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `time` | number (seconds since 1900) | at once | When the receiver should act on it, for a receiver that schedules bundles. |
+
+#### `ce.osc.status() -> table`
+
+What OSC is doing: listening or not, on which port, what was received, sent and dropped.
+
+Example: `ce.osc.status().port` is the port to type into the tablet.
+
+Good to know:
+
+- Returns { listening, waiting, port, network, received, sent, dropped, error }: `waiting` while the user has not answered; the counts since the panel opened; `error` the last reason something was refused: "portInUse", "refusedByUser", "badPort", "badAddress", "badMessage", "tooLarge" or "badPacket".
+- In the panel view it answers from what the transport last said, a moment behind.
+
+*Short name: `oscStatus`.*
+
 ## Commands: Working out values
 
-Value and range arithmetic, and moving a value over time.
+Value and range arithmetic, a value as text, and moving a value over time.
 
 ### ce.math: numbers, ranges and colours
 
@@ -3170,6 +4560,38 @@ Good to know:
 | `ce.math.random([lo, hi])` | Get a random number. Example: `random(1, 6)` gives a whole number from 1 to 6, as a die does. `lo` (number, optional): The lowest whole number it can return. Give lo and hi together; with only lo, or neither, it returns a fraction in the range 0 ↔ 1, never 1. `hi` (number, optional): The highest whole number it can return. It may be below lo. Only whole numbers inside the range: random(1.5, 3.5) gives 2 or 3. With none inside, such as random(1.2, 1.8): an error in the console and no result. Short name: `random`. |
 | `ce.math.seed(n)` | Set where this script's random numbers start, so the same seed gives the same sequence. `n` (number, required): The seed. 0 uses the default. Until you set one, every script starts from the same default, so its numbers repeat each time it loads. Every script and every named stream has its own sequence, so this never affects another script. Short name: `randomSeed`. |
 | `ce.math.stream(name, fn)` | Run a block of code with random numbers from a separate, named sequence. `name` (text, required): The sequence's name. Two scripts using the same name get separate sequences. `fn` (function, required): The code to run. The script's own sequence returns when it ends, even if it ends in an error. Use it so two parts of one script, such as a melody and a drum pattern, do not affect each other's random numbers or seeds. Short name: `randomStream`. |
+
+### ce.format: a value as text
+
+A value written as the text a person reads, and typed text read back as a value. Each command gives the same text in every language and on every computer: rounding is half away from zero, the decimal point is always a point, and a missing value is "--", never 0. The text is plain ASCII by default, because LCD fonts have no minus sign, infinity or sharp sign; `unicode = true` gives the typographic forms for a label in a normal font.
+
+Most commands take the same options: `decimals`, `digits` (significant digits, 3 by default), `sign` ("always" for a plus too), `unit` (false for none, or a unit of your own), `space`, `width`, `placeholder` and `unicode`. A command lists the ones it takes, and an option it does not take refuses the call with a console line naming it.
+
+```lua
+-- Lua: a 16-character LCD line, a label on the left and the value on the right
+ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))
+```
+
+
+#### Helper functions in ce.format
+
+| Function | What it does |
+|---|---|
+| `ce.format.number(v [, opts])` | A number as text, with as many decimals as it needs. Example: `ce.format.number(12, { sign = "always" })` gives "+12". `v` (number, required): The number. Text that is a number, such as "440", is read as one. A whole number has no decimals unless `decimals` asks for them: 3 gives "3", and with `decimals = 1`, "3.0". Otherwise three significant digits, trailing zeros dropped: 2.50 gives "2.5", 0.123456 gives "0.123". Rounding is half away from zero and the point is always a point, in every language and on every computer. No value (nothing, or text that is not a number) gives the placeholder, "--", never "0". Short name: `formatNumber`. |
+| `ce.format.hz(v [, opts])` | A frequency, in Hz or kHz, whichever reads shorter. Example: `ce.format.hz(1250)` gives "1.25 kHz". `v` (number, required): The frequency.<br>Below 0: the placeholder, with a console error. kHz from 1000 Hz up: 999 gives "999 Hz", 1000 gives "1 kHz". Below 1 Hz, as an LFO rate can be: 0.25 gives "0.25 Hz". `space = false` packs it for a narrow display: "12.3kHz". Short name: `formatHz`. |
+| `ce.format.time(ms [, opts])` | A duration, in ms or s, whichever reads shorter. Example: `ce.format.time(1200)` gives "1.2 s". `ms` (number, required): The duration.<br>Below 0: the placeholder, with a console error. Seconds from 1000 ms up; below 1 ms, 0.5 gives "0.5 ms". For a length in beats, use `ce.format.division`; for minutes, `ce.format.clock`. Short name: `formatTime`. |
+| `ce.format.db(v [, opts])` | A level in decibels, with one decimal. Example: `ce.format.db(-6)` gives "-6.0 dB". `v` (number, required): The level, or a gain (1 = 0 dB) with `fromGain`. One decimal by default, because a readout jumping between "-6 dB" and "-5.9 dB" reads as a fault. At or below `floor` it is written "-inf dB": silence, as `ce.math.gainToDb` gives it, is -144 dB. Short name: `formatDb`. |
+| `ce.format.percent(v [, opts])` | A share, as a percentage. Example: `ce.format.percent(0.5)` gives "50%". `v` (number, required): The share, 0 to 1 unless `min` and `max` say otherwise. Whole percentages unless `decimals` asks for more; no space before %. Outside the range it is written as it is, "120%": hold it with `ce.math.clamp` first. Short name: `formatPercent`. |
+| `ce.format.pan(v [, opts])` | A position from left to right, as a synth's display writes it. Example: `ce.format.pan(-0.5)` gives "L25"; `ce.format.pan(0)` gives "C". `v` (number, required): The position. With the default range, -1 to 1, the far left and far right read `steps`: -1 gives "L50", 1 gives "R50". With a range of your own, the number is the distance from the centre as it is, which is what synths show: with `{ min = 0, max = 127, center = 64 }`, 0 reads "L64" and 127 "R63". Short name: `formatPan`. |
+| `ce.format.ratio(v [, opts])` | A ratio, as a compressor or a frequency-modulation operator shows it. Example: `ce.format.ratio(4)` gives "4:1"; with `style = "x"`, 2 gives "x2.00". `v` (number, required): The ratio.<br>0 or below: the placeholder, with a console error. A ratio of infinity, as a limiter has, is written "inf:1". Short name: `formatRatio`. |
+| `ce.format.clock(ms [, opts])` | A time as a clock shows it: minutes, seconds and tenths. Example: `ce.format.clock(83450)` gives "1:23.4". `ms` (number, required): The time. Hours appear from 60 minutes on: "1:02:03.4". Cut, not rounded: a clock shows the tenth that has passed, never one still to come. For a song position in bars and beats, use `ce.time.position`. Short name: `formatClock`. |
+| `ce.format.note(n [, opts])` | A MIDI note number as a note name, in the octave numbering the synth uses. Example: `ce.format.note(60, { middleC = 3 })` gives "C3", as a Yamaha's display reads middle C. `n` (number, required): The MIDI note, 0 to 127. A fraction is rounded.<br>Outside the range: the placeholder, with a console error. Makers disagree on middle C: Roland and most software say C4, Yamaha says C3, some old gear C5. Get it wrong and every note on the display is an octave off. The same names as `ce.music.name`, which stays for music; this one is for display. Short name: `formatNote`. |
+| `ce.format.division(beats [, opts])` | The note length nearest to a number of beats, by the names the sequencer components use. Example: `ce.format.division(0.25)` gives "1/16"; `ce.format.division(1/3)` gives "1/8T". `beats` (number, required): The length; a quarter note is 1.<br>0 or below: the placeholder, with a console error. The names of `ce.time.divisions()`: "1/1" to "1/32", with "D" for dotted and "T" for triplet. A length near no division gives the beats as a number, "0.3 beats", rather than the wrong name. Short name: `formatDivision`. |
+| `ce.format.parameter(id, v [, opts])` | A synth parameter's value, written the way the synth's own display writes it, from the device profile. Example: `ce.format.parameter("octaveShift", 61)` gives "-3" on a GAIA, where the value is stored 61 to 67 and the panel reads -3 to +3. `id` (text, required): The parameter, by its id in the device profile.<br>Not one of its parameters: the placeholder, with a console error. `v` (number or text, required): The value as the synth stores it, as `ce.device.read()` gives it. What it reads from the profile, in order: a choice's label; `display.table`, its first entry for the lowest stored value; `display.min` and `display.max` to scale the stored range to the shown one; `display.format` to pick the command (`hz`, `time`, `db`, `percent`, `pan`, `ratio`, `note`, `division`); `display.unit`; `display.precision`; and `display.middleC`, from the parameter or the profile. A parameter the profile says nothing more about is written as its number, which is what the panel shows today. A `percent` is how far along the stored range the value is; a `pan` is the distance from the middle of the shown range, or from 0 when the range runs through 0. What the call passes wins over what the profile says: `decimals = 0` writes a parameter whose profile gives one decimal without it. The one command most panels need: `ce.components.lcd.text("Display", 1, ce.format.parameter(id, value))` shows any parameter as the synth does, once its profile says how. Short name: `formatParameter`. |
+| `ce.format.table(v, table [, opts])` | Text from a lookup table, for a value whose display follows no formula. Example: `ce.format.table(2, {"Off", "I", "II", "I+II"})` gives "II". `v` (number, required): The value. `table` (list, required): A list of texts, or a list of { upTo, text } ranges.<br>Neither, or empty: the placeholder, with a console error. The first entry is for value 0 in every language, Lua included, because synths count from 0; `start = 1` changes that. A list of ranges, `{ upTo, text }`, is read in order: the first whose upTo the value does not pass. Past the end of the table: the placeholder, with a console warning. Short name: `formatTable`. |
+| `ce.format.fit(text, width [, opts])` | Text made exactly `width` characters long: shortened the way a synth's display shortens it, then padded. Example: `ce.format.fit("Filter Envelope", 10)` gives "Filter Env". `text` (text, required): The text. A number is written as text first. `width` (number, required): The characters, from 1.<br>Below 1: nothing, with a console error. It shortens one step at a time until the text fits: (1) the abbreviation list, Envelope to Env, Resonance to Reso and about 50 more; (2) vowels from the ends of the longest words, never a first letter, Filter to Fltr; (3) the spaces between words, from the right; (4) the end, cut. Characters are counted, which is right for an LCD and any monospaced font; for a proportional font, measure with `ce.text.measure`. Short name: `formatFit`. |
+| `ce.format.line(left, right, width [, opts])` | One display line: a label on the left and a value on the right, with spaces between. Example: `ce.format.line("Cutoff", "12.3k", 16)` gives "Cutoff     12.3k". `left` (text, required): The label. `right` (text, required): The value, usually from another ce.format command. `width` (number, required): The line's width in characters.<br>Below 1: nothing, with a console error. When the two do not fit, the label is shortened, as `ce.format.fit` does, never the value: a wrong-looking value is worse than a short name. A value wider than the line is cut from the left, so its end, where the unit is, stays. Short name: `formatLine`. |
+| `ce.format.parse(text [, opts]) -> number` | A number from text a person typed, in the forms the other ce.format commands write. Example: `ce.format.parse("1.2k")` gives 1200; `ce.format.parse("C4", { kind = "note" })` gives 60. `text` (text, required): What was typed. Without a kind it reads a number, with k for thousands, and Hz, kHz, ms, s, dB and % as units, each turned into the unit its command takes: "1.2 s" gives 1200 (ms), "50%" gives 0.5. With a kind it also reads that kind's forms: a note name, a division ("1/8T"), a pan ("L25"), a ratio ("4:1"); and a bare number is taken in that kind's unit, so "5" is 5 ms as a time. Spaces and case do not matter. Nothing it can read: no result, and no console line, because a person typing is not a script's mistake. Short name: `formatParse`. |
 
 ### ce.anim: smooth movement
 
@@ -3458,7 +4880,7 @@ Good to know:
 
 ## Commands: The panel itself
 
-Creating and arranging controls, and saving things that outlive the session.
+Creating and arranging controls, the computer keyboard, saving things that outlive the session, and files.
 
 ### ce.panel: building and arranging the panel
 
@@ -4102,6 +5524,169 @@ ce.panel.restore(before)
 ce.panel.restore(before);
 ```
 
+### ce.keys: the computer keyboard
+
+The computer keyboard on a panel: shortcuts, the keys held, a piano played from the letter keys, and which control has the keyboard. In the panel view only, the editor's preview and an exported plug-in with its window open; with the window shut there is no keyboard.
+
+Who gets a key, in order; a kept key goes no further: (1) typing into a text box or an LCD keeps every key; (2) the panic key; (3) shortcuts, those with a modifier at once and those without after the focused control; (4) the piano, when it is on; (5) the focused control's own keys, the arrows on a knob and Space on a button; (6) keyDown, for any script that listens, which keeps the key by returning true; (7) whatever is around the panel, the DAW or the editor. When the panel loses the keyboard (the window loses focus or is hidden, or the panel closes) every held key gets its keyUp and every piano note its note-off.
+
+```lua
+-- Lua: Ctrl+G picks a random voice; a help LCD shows every key the panel uses
+function onPanelReady()
+  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })
+  for row, s in ipairs(ce.keys.list()) do
+    ce.components.lcd.text("Help", row, s.keys .. "  " .. (s.description or ""))
+  end
+end
+```
+
+Everything in this chapter needs the panel window. With the window closed these commands do nothing and write a note to the log.
+
+#### `ce.keys.shortcut(keys, fn [, opts]) -> id`
+
+Run a function when a key, or a key with modifiers, is pressed anywhere on the panel.
+
+Example: `ce.keys.shortcut("Ctrl+G", randomizeVoice, { description = "Random voice" })` runs randomizeVoice on Ctrl+G.
+
+- `keys` (text, required): The key and its modifiers joined by +: "Ctrl+G", "Shift+Up", "F2", "Space". Modifiers are Ctrl, Shift, Alt and Meta (the Windows key, or Cmd on a Mac), in any order and any case.
+- `fn` (function, required): Called with the same fields keyDown gives.
+
+Good to know:
+
+- Refused, with a console line saying why: the editor's own keys, the keys DAWs and the system take (Ctrl+R, Ctrl+S and the like), the panic key, and a key another shortcut already has. Space is allowed, with a console line: in a DAW it then no longer starts the transport while the plug-in has the keyboard.
+- A shortcut without a modifier waits for a focused control that uses that key: with a knob focused, a shortcut on "Up" does not run, and the knob moves. With a modifier it always runs.
+- Shortcuts name the key printed on it: "Ctrl+G" is G wherever it sits on a German or French keyboard.
+- Nothing runs while the user is typing into a text box or editing an LCD.
+- Returns an id for `remove`; refused: nothing. A script's shortcuts are removed when it reloads.
+
+*Short name: `keysShortcut`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `description` | text | — | The words `list` shows for it. |
+| `repeat` | true or false | false | On: run again while the key is held and the system repeats it. |
+
+#### `ce.keys.remove(id) -> boolean`
+
+Take a shortcut away.
+
+Example: `ce.keys.remove(state.randomKey)` when the page that used it is hidden.
+
+- `id` (number, required): The id `shortcut` gave.
+
+Good to know:
+
+- Returns true when there was one.
+
+*Short name: `keysRemove`.*
+
+#### `ce.keys.list() -> list`
+
+Every key the panel uses, for a help page: a list of { id, keys, description }.
+
+Example: `#ce.keys.list()` is how many keys the panel uses.
+
+Good to know:
+
+- The panic key comes first (id "panic"), then the shortcuts in the order they were made.
+- The piano is one entry while it is on, keys "Piano".
+
+*Short name: `keysList`.*
+
+#### `ce.keys.isDown(key) -> boolean`
+
+Whether a key is held now.
+
+Example: `ce.keys.isDown("Shift")` in onValueChange, to move a knob in fine steps while Shift is held.
+
+- `key` (text, required): A name as keyDown gives it ("Shift", "R", "Up"), or a place as its `code` gives it ("KeyR").
+
+Good to know:
+
+- Counts keys the panel saw go down, except while typing. False after the panel loses the keyboard.
+
+*Short name: `keysIsDown`.*
+
+#### `ce.keys.held() -> list`
+
+The keys held now, by name, in the order they went down.
+
+Example: `ce.keys.held()` while Ctrl and G are held gives { "Ctrl", "G" }.
+
+*Short name: `keysHeld`.*
+
+#### `ce.keys.piano([opts]) -> boolean`
+
+Play notes from the letter keys of the computer keyboard.
+
+Example: `ce.keys.piano({ target = "Keys" })` plays through the Keyboard component named "Keys", which lights up as notes play.
+
+Good to know:
+
+- The layout is the one Ableton Live and Hostage use, by the keys' place: the middle letter row plays the white keys from C (A, S, D, F, G, H, J, K, L, ;, '), the row above it the black ones (W, E, T, Y, U, O, P). On a German or French keyboard the same places play the same notes.
+- A key held plays one note until it is let go; the system's key repeat is ignored. Keys pressed with Ctrl, Alt or Meta are left for shortcuts.
+- With a `target`, the notes go through that Keyboard component: its channel, velocity, transpose, octave and scale lock apply, its keys show what is held, and it raises hit and release as for the mouse. Without one, the options below apply and the notes go to the device as sendNote sends them.
+- Every note is let go when the panel loses the keyboard, when the piano is turned off, and on the panic key.
+- Returns true when on; false when off, or when the panel has nothing to play to.
+
+*Short name: `keysPiano`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `on` | true or false | true | Off stops the piano and lets every note go. |
+| `target` | text | — | A Keyboard component to play through. |
+| `octave` | number | 4 | The octave the A key starts: 4 makes it C4, note 60. |
+| `velocity` | number | 100 | How hard every note is played, 1 to 127. |
+| `channel` | number | 1 | The MIDI channel, 1 to 16, without a `target`. |
+| `role` | string | "mainSynth" | The device, without a `target`. |
+| `octaveKeys` | true or false | true | Z and X move the octave down and up. |
+| `velocityKeys` | true or false | true | C and V lower and raise the velocity by 20. |
+
+#### `ce.keys.pianoInfo() -> table`
+
+What the piano is doing: { on, octave, velocity, channel, target, notes }.
+
+Example: `ce.keys.pianoInfo().octave` is the octave Z and X have moved it to.
+
+Good to know:
+
+- `notes` is a list of { note, key } for the notes held now.
+- To react to each note as it is played, give the piano a `target` and listen to that component's hit and release.
+
+*Short name: `keysPianoInfo`.*
+
+#### `ce.keys.focus([control]) -> boolean`
+
+Give a control the keyboard, so the arrows and digits move it.
+
+Example: `ce.keys.focus("Cutoff")` after a shortcut that jumps to the filter.
+
+- `control` (text, optional): The control's name.
+
+Good to know:
+
+- The control shows its focus ring, as after Tab.
+- Left out: no control has the keyboard, and keys go to shortcuts and keyDown.
+- Refused (false) for a control with "Focusable" off or its keys turned off, a hidden control, and outside the preview.
+
+*Short name: `keysFocus`.*
+
+#### `ce.keys.focused() -> text`
+
+The control that has the keyboard, or nothing.
+
+Example: `ce.keys.focused() == "Cutoff"` while the cutoff knob takes the arrows.
+
+Good to know:
+
+- The same name as keyDown's `control`.
+
+*Short name: `keysFocused`.*
+
 ### ce.storage: remembering things
 
 Three ways to keep values for later. `state` holds them between one run of a handler and the next. Settings outlive the session: they can be stored with the panel, kept private to one script, or kept on this computer only. The JSON helpers turn a value into text and back.
@@ -4367,6 +5952,262 @@ Good to know:
 - A JSON null is nothing: {"a":1,"b":null} gives a table with a only, and [1,null,2] a list of two.
 
 *Short name: `decodeJson`.*
+
+### ce.file: files, through the person's own dialogs
+
+Librarian files: `.syx` banks, `.mid` files, JSON and text. A script never names a path. Every file comes from a dialog the person answered: `open` or `save` for one file, `folder` for a folder. The script gets a file value back, a table holding the file's `name`, `type`, `size`, `canWrite` and `isFolder` but never its folder, and passes it to `read`, `write`, `list` and `saveIn`.
+
+The rules no option turns off: only the types syx, mid, json, txt and csv; writing only where the person saved, or opened a file or chose a folder `writable`; a folder and nothing above or inside it; up to 8 MB a file; and every file value gone when the panel closes.
+
+The dialogs need the panel window: in the editor, and in an exported plug-in while its window is open. `syxSplit`, `syxJoin`, `midiRead` and `midiWrite` work on bytes the script already holds, and run everywhere.
+
+```lua
+-- Lua: import a bank and send it to the synth, message by message
+ce.file.open({ types = {"syx"}, title = "Import a bank" }, function(file, bytes)
+  if not file then return end
+  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end
+end)
+```
+
+#### `ce.file.open(opts, fn) -> boolean`
+
+Ask the person for a file, and get its contents.
+
+Example: `ce.file.open({ types = {"syx"} }, function(file, data) … end)` asks for a .syx file and gives its bytes.
+
+- `fn` (function, required): Called as fn(file, data), or fn(nil) when the person cancels.
+
+Good to know:
+
+- fn is called as fn(file, data) once the person has chosen, or fn(nil) when they cancel. `data` is bytes for syx and mid, text for txt and csv, and a value for json.
+- `file` is a table to keep and pass back: { id, name, type, size, canWrite, isFolder }. It holds no folder: the script never sees where the file is.
+- A json file that is not valid JSON: fn(file, nil), with a console error naming the line where it goes wrong.
+- Returns true when the dialog opened. Another ce.file dialog already open: the console says so. With the plug-in's window shut there is nobody to answer, so nothing is done.
+- Files of up to 8 MB.
+
+*Short name: `fileOpen` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `types` | list of text | none, needed | The types the dialog accepts, from syx, mid, json, txt and csv. |
+| `title` | text | "Open" | The dialog's title: say what the file is for, such as "Import a bank". |
+| `multiple` | true or false | false | Let the person pick several files: fn is then called once for each. |
+| `writable` | true or false | false | Let ce.file.write() write this file again later, as a librarian keeps a bank file open. |
+| `read` | true or false | true | Off: give the file value only, and read it later with ce.file.read(). |
+
+#### `ce.file.save(name, data [, opts [, fn]]) -> boolean`
+
+Ask the person where to save, then write the file there.
+
+Example: `ce.file.save("Bank A.syx", bytes)` offers to save the bytes as "Bank A.syx".
+
+- `name` (text, required): The name the dialog suggests, with its extension.
+- `data` (any value, required): What to write.
+- `fn` (function, optional): Called as fn(file), or fn(nil, why).
+
+Good to know:
+
+- The extension of `name` sets the type: .syx, .mid, .json, .txt or .csv. Anything else: false, with a console error.
+- `data` is bytes for syx and mid, text for txt and csv, and any value for json. The wrong kind for the type: false, with a console error, and nothing written.
+- fn is called as fn(file) when it is written, or fn(nil, why) when the person cancels or the write fails. The file value has `canWrite` on, so ce.file.write() can save to it again without asking.
+- The dialog asks before writing over a file that is there. The person can change the name; the file keeps the type asked for.
+
+*Short name: `fileSave` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `title` | text | "Save" | The dialog's title. |
+| `indent` | number | none | For json: spaces to indent each level, so a person can read the file. |
+
+#### `ce.file.read(file, fn) -> boolean`
+
+Read a chosen file again, as it is now.
+
+Example: `ce.file.read(state.bank, function(data) … end)` reads the bank file the person opened earlier.
+
+- `file` (table, required): A file value from open, save or list.
+- `fn` (function, required): Called as fn(data), or fn(nil, why).
+
+Good to know:
+
+- fn is called as fn(data), the contents as open gives them, or fn(nil, why) when the file has gone or cannot be read.
+- Not a file value from ce.file.open, save or list: false, with a console error.
+
+*Short name: `fileRead` · Panel window only.*
+
+#### `ce.file.write(file, data [, fn]) -> boolean`
+
+Write a chosen file again, without asking.
+
+Example: `ce.file.write(state.bank, ce.file.syxJoin(state.messages))` saves the edited bank back to its file.
+
+- `file` (table, required): A file value whose canWrite is on.
+- `data` (any value, required): What to write, as save takes it.
+- `fn` (function, optional): Called as fn(true), or fn(false, why).
+
+Good to know:
+
+- Only a file whose `canWrite` is on: one from save, saveIn, or open with `writable`. Anything else: false, with a console error saying the person must save to it first.
+- Written whole, through a temporary file, so a write cut short leaves the old file as it was.
+- fn is called as fn(true) when written, or fn(false, why) when not.
+
+*Short name: `fileWrite` · Panel window only.*
+
+#### `ce.file.folder(opts, fn) -> boolean`
+
+Ask the person for a folder.
+
+Example: `ce.file.folder({ title = "Export the bank to", writable = true }, function(dir) … end)` asks where to put a bank's files.
+
+- `fn` (function, required): Called as fn(folder), or fn(nil).
+
+Good to know:
+
+- fn is called as fn(folder) once chosen, or fn(nil) when the person cancels.
+- Only this folder: not the folders inside it, and nothing above it.
+
+*Short name: `fileFolder` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `title` | text | "Choose a folder" | The dialog's title. |
+| `writable` | true or false | false | Let ce.file.saveIn() write into it. |
+
+#### `ce.file.list(folder [, opts]) -> list`
+
+The files in a chosen folder, sorted as a person sorts them ("2" before "10").
+
+Example: `ce.file.list(dir, { types = {"syx"} })` gives every .syx file in it.
+
+- `folder` (table, required): A folder value from ce.file.folder().
+
+Good to know:
+
+- Each is a file value, for ce.file.read(). They can be written only when the folder was chosen writable.
+- The files there when the folder was chosen, as saveIn last left them, or when list was last called: a file another program adds shows the next time.
+
+*Short name: `fileList` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `types` | list of text | every type on the list | Only these types. |
+
+#### `ce.file.saveIn(folder, name, data [, opts [, fn]]) -> boolean`
+
+Write one file into a chosen folder.
+
+Example: `ce.file.saveIn(dir, "001 Brass.syx", bytes)` writes one patch of a bank.
+
+- `folder` (table, required): A folder value from ce.file.folder(), chosen writable.
+- `name` (text, required): The file's name, with its extension.
+- `data` (any value, required): What to write, as save takes it.
+- `fn` (function, optional): Called as fn(file), or fn(nil, why).
+
+Good to know:
+
+- Only a folder chosen `writable`. A name with a /, \ or .. in it, or without a listed extension: false, with a console error.
+- A file of that name already there is not written over, and fn gets the reason, unless `replace` is on. The person agreed to a folder, not to losing what was in it.
+- fn is called as fn(file) when written, or fn(nil, why) when not.
+
+*Short name: `fileSaveIn` · Panel window only.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `replace` | true or false | false | Write over a file of that name. |
+| `indent` | number | none | For json: spaces to indent each level. |
+
+#### `ce.file.syxSplit(bytes [, opts]) -> list`
+
+The SysEx messages in a .syx file, one by one, each from F0 to F7.
+
+Example: `ce.file.syxSplit(bytes)` gives a list of messages.
+
+- `bytes` (bytes, required): The file's bytes, a list or hex text.
+
+Good to know:
+
+- Bytes outside any message are left out, with a console warning saying how many and where. So is a message cut off by the next F0, or with no F7 at the end of the file, unless `partial` is on.
+- Works on bytes the script holds, so it runs everywhere, window shut too.
+
+*Short name: `fileSyxSplit`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `partial` | true or false | false | Keep a last message with no F7, so a cut-off file can still be looked at. |
+| `prefix` | list | none | Only messages that start with these bytes, such as {0xF0, 0x41} for Roland. |
+
+#### `ce.file.syxJoin(messages) -> list`
+
+Messages as one .syx file's bytes, in the order given, nothing added between.
+
+Example: `ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))` saves a bank.
+
+- `messages` (list, required): Messages, each bytes or hex text.
+
+Good to know:
+
+- A message that does not start with F0 and end with F7: nothing, with a console error naming which.
+
+*Short name: `fileSyxJoin`.*
+
+#### `ce.file.midiRead(bytes [, opts]) -> table`
+
+A MIDI file as tracks of notes: { ticksPerBeat, tempo, tempos, timeSignature, tracks }.
+
+Example: `ce.file.midiRead(data).tracks[1].notes` gives the first track's notes.
+
+- `bytes` (bytes, required): The file's bytes.
+
+Good to know:
+
+- Each track is { name, notes, events }. A note is { beat, note, velocity, length, channel }: `beat` from 0, `length` in beats, `channel` from 1. `events` holds everything else as { beat, bytes }: controllers, program changes, bend, SysEx.
+- `tempo` is the tempo at the start, 120 when the file gives none; `tempos` lists every change as { beat, bpm }.
+- A note-on with velocity 0 ends the note. A note that never ends lasts to the end of its track, with a console warning naming it.
+- Types 0 and 1. A type 2 file, a file timed in SMPTE frames, or one cut short: nothing, with a console error.
+
+*Short name: `fileMidiRead`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `track` | number | every track | Read only this track, counted from 1. |
+
+#### `ce.file.midiWrite(song [, opts]) -> list`
+
+A MIDI file's bytes from a song, a list of notes, or a Phrase Recorder's take.
+
+Example: `ce.file.midiWrite(ce.components.recorder.read("Recorder"))` gives the recorder's take as a MIDI file.
+
+- `song` (table, required): A song, a list of notes, or a recorder's section.
+
+Good to know:
+
+- `song` is a song as midiRead gives it, a list of notes { beat, note, velocity, length, channel } written as one track, or a Phrase Recorder's section, whose take is written over its bars at the transport's beats per bar.
+- One track is written as type 0, several as type 1, at 480 ticks per beat unless the song says otherwise.
+- Returns the bytes, for ce.file.save(). Anything else as `song`: nothing, with a console error.
+
+*Short name: `fileMidiWrite`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `tempo` | number | the song's, else the transport's, else 120 | The tempo written at the start, in beats per minute. |
+| `name` | text | none | The name written into the first track. |
+| `channel` | number | 1 | The channel, 1 to 16, for notes that carry none. |
 
 ## Commands: How it looks
 

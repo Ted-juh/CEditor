@@ -2,6 +2,7 @@
 
 #include <juce_gui_extra/juce_gui_extra.h>
 #include "DeviceProfile/DeviceProfileService.h"
+#include "ScriptFileDialog.h"
 
 /**
  * Phase B4 — standalone player host.
@@ -30,9 +31,14 @@ public:
     // Called when the user moves a control in the panel (JS "paramChanged"): the plugin sets the
     // matching host parameter so the DAW records automation. Set by the plugin editor.
     std::function<void (const juce::String& parameterId, float value)> onUiParamChange;
+    // The page's press on a control began or ended (JS "paramGesture"): every value between is one
+    // DAW gesture, so a DAW writing in touch mode holds the parameter for the whole drag.
+    std::function<void (const juce::String& parameterId, bool begin)> onUiParamGesture;
 
     // Push a host-parameter value into the panel UI (automation playback -> on-screen control moves).
-    void pushParamToUi (const juce::String& parameterId, float value);
+    // `fromHost` is false for a value the panel itself set, which the page must not take for the
+    // DAW's (ce.daw's automationIn and origin()).
+    void pushParamToUi (const juce::String& parameterId, float value, bool fromHost = true);
 
     // Push the DAW playhead into the panel UI, for a Transport control set to "Host / DAW".
     // Fields the host did not report are omitted from the payload rather than sent as 0 --
@@ -80,6 +86,27 @@ public:
     std::function<juce::var()> scriptStores;
     std::function<void (const juce::var& change)> onScriptSetting;
 
+    // --- The DAW-state hooks, window open -----------------------------------------------------------
+    // What the instance last saved for its scripts (onDawSaveState's merged store), handed to the page
+    // with the panel so its scripts start from it; and what the page's scripts would save now
+    // (JS "scriptDawState"), handed back so the project saves the state of the scripts that run.
+    // Unset (the CEditor Player app), the page raises neither hook.
+    std::function<juce::var()> scriptDawState;
+    std::function<void (const juce::var& state)> onScriptDawState;
+    /** A project restored while the window is open: the page's onDawRestoreState hears it too. */
+    void pushDawRestoreToPage (const juce::var& state);
+
+    // --- ce.daw, window open -----------------------------------------------------------------------
+    // What the page's scripts read of the DAW (the host, the parameters with their names now, the
+    // bank and the program, the spare parameters' assignments), pushed whenever it changes; the
+    // page's ce.daw answers from it, as the bridge cannot answer while a script waits. What a page's
+    // script changes (JS "dawCommand": a gesture, a name, an assignment, markChanged) goes to the
+    // processor, which pushes the new picture back. Unset (the CEditor Player app), the page has no DAW.
+    std::function<void (const juce::var& command)> onDawCommand;
+    void pushDawInfo (const juce::var& info);
+    /** The DAW chose a program and the plug-in has sent it: the page raises dawProgramIn. */
+    void pushDawProgram (const juce::var& program);
+
     // --- Whether the webview came up ------------------------------------------------------------
     /** The name of the WebView2 profile folder this window's webview was given; empty when there
         is no webview (the runtime is missing). Off Windows the folder is made and goes unused. */
@@ -112,4 +139,8 @@ private:
     std::unique_ptr<juce::Label> statusLabel;
     juce::String webViewProfileName;
     bool hostWindowShown = true;   // the host's window shows ours (timerCallback, Windows only)
+    // ce.file while the window is open (ScriptFiles.h). Declared last, so it goes first: no dialog
+    // answers into a host that is half gone. The files chosen go with the window.
+    std::shared_ptr<std::unique_ptr<juce::FileChooser>> scriptFileChooser = std::make_shared<std::unique_ptr<juce::FileChooser>>();
+    ceditor::ScriptFiles scriptFiles { ceditor::scriptFileDialog (scriptFileChooser) };
 };
