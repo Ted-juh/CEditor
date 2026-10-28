@@ -5383,7 +5383,8 @@ def _mpe_send(data, role):
 
 def _mpe_note(v):
     n = None
-    if isinstance(v, str): n = noteNumber(v)
+    # Read quietly, as the senders read a name; ce.mpe says its own why.
+    if isinstance(v, str): n = __noteNumberOf(v)
     elif _mpe_finite(v): n = int(_mpe_math.floor(v + 0.5))
     return n if n is not None and 0 <= n <= 127 else None
 

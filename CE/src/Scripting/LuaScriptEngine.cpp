@@ -4539,14 +4539,9 @@ do
     send = function(bytes, role)
       if role ~= nil and role ~= "mainSynth" then routeMidi(role, function() sendMidi(bytes) end) else sendMidi(bytes) end
     end,
-    -- A note as sendNote reads it: a number, rounded, or a name such as "C4".
-    note = function(v)
-      local n = nil
-      if type(v) == "string" then n = noteNumber(v)
-      elseif finite(v) then n = math.floor(v + 0.5) end
-      if n ~= nil and n >= 0 and n <= 127 then return n end
-      return nil
-    end,
+    -- A note as sendNote reads it: a number, rounded, or a name such as "C4". Read quietly, by
+    -- __mpeNote below; ce.mpe says its own why.
+    note = function(v) return __mpeNote(v) end,
     listen = function(role, opts) __deviceQuery("mpeListen", { role = role, opts = opts }) end,
   })
 
@@ -6376,6 +6371,9 @@ local function __note(n)
   if v ~= nil and v >= 0 and v <= 127 then return v end
   return nil
 end
+-- ce.mpe reads its notes here, as the senders do and without a word of its own: its block comes
+-- before this one, and a local is not seen above its line, so it asks by this global at run time.
+function __mpeNote(n) return __note(n) end
 local function __badNote(verb, note)
   local range = "MIDI notes run from 0 to 127, which is C-1 to G9."
   local why
