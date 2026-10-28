@@ -7,6 +7,7 @@
 //
 // Run:  node browser-checks/runAll.mjs [name ...]   (names, without .mjs, run just those)
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -21,6 +22,24 @@ export const CHECKS = [
   'templateLabels', 'macroSetKnob', 'setSwatches', 'anatomyForms', 'panelFile', 'valuesSidebar',
   'valueCompletion',
 ];
+
+// The checks launch the browser CHROMIUM_PATH names, or else the one this repo's Linux containers
+// have, which a Windows machine does not: every check there failed at launch with "executable doesn't
+// exist at /opt/pw-browsers/...". CI's Windows job sets CHROMIUM_PATH to Chrome or Edge itself; on a
+// Windows machine with neither set, the same two are looked for here, in the same order, so that
+// `npm run test:browser` runs as it is.
+if (!process.env.CHROMIUM_PATH && process.platform === 'win32') {
+  const found = [
+    path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Google', 'Chrome', 'Application', 'chrome.exe'),
+    path.join(process.env['ProgramFiles(x86)'] ?? 'C:\\Program Files (x86)', 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+  ].find((candidate) => existsSync(candidate));
+  if (found) {
+    process.env.CHROMIUM_PATH = found;
+    console.log(`Browser: ${found} (set CHROMIUM_PATH to use another)`);
+  } else {
+    console.log('No Chrome or Edge found where they install; set CHROMIUM_PATH to a Chromium browser.');
+  }
+}
 
 // A check that hangs (a browser that never answers) fails rather than holding the run forever.
 const PER_CHECK_MS = 15 * 60 * 1000;
