@@ -1702,6 +1702,8 @@ private:
                                   const juce::String& form) { return scriptValues.colourWrites (call, path, value, form); };
         cb.isColourProperty = [this] (const juce::String& path) { return scriptValues.isColourProperty (path); };
         cb.namesMissingControl = [this] (const juce::String& path) { return scriptValues.namesMissingControl (path); };
+        cb.writeNeedsNumber = [this] (const juce::String& path, const juce::String& form)
+            { return scriptValues.writeNeedsNumber (path, form); };
         cb.setValue = [this] (const juce::String& path, const juce::var& value, bool transmit, const juce::String& form)
         {
            #if CEDITOR_VALUE_LAYER
@@ -1710,12 +1712,25 @@ private:
             const auto it = scriptBoundParamByPath.find (path);
             if (transmit && it != scriptBoundParamByPath.end())
             {
-                auto parameterValue = (float) value;
-                if (form == "normalizedValue")
-                    if (auto* parameter = apvts.getParameter (it->second))
-                        parameterValue = parameter->convertFrom0to1 (
-                            juce::jlimit (0.0f, 1.0f, parameterValue));
-                setParamFromUi (it->second, parameterValue);
+                // Read as the editor reads it (scriptParameterValue): a choice by its name, a switch by
+                // on or off, and text that is neither refused, where `(float) value` sent it as 0.
+                const ce::PanelParameter* desc = nullptr;
+                for (const auto& p : panelParams)
+                    if (p.id == it->second) { desc = &p; break; }
+                const auto read = ceditor::scripting::scriptParameterValue (
+                    desc != nullptr ? desc->valueKind : juce::String ("float"),
+                    desc != nullptr ? desc->choiceLabels : juce::StringArray(), value);
+                if (! read.ok)
+                    scriptLogLine ("[script] set(\"" + path + "\"): " + read.refused);
+                else
+                {
+                    auto parameterValue = read.value;
+                    if (form == "normalizedValue")
+                        if (auto* parameter = apvts.getParameter (it->second))
+                            parameterValue = parameter->convertFrom0to1 (
+                                juce::jlimit (0.0f, 1.0f, parameterValue));
+                    setParamFromUi (it->second, parameterValue);
+                }
             }
            #else
             juce::ignoreUnused (transmit);

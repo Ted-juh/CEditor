@@ -228,8 +228,10 @@ slashes; fixed separator handling. No generated C++ source changed.
 
 Run the new scenarios with `npm run test:component-behavior` from CE/web. Windows uses installed
 Edge; `CHROMIUM_PATH` can select an executable elsewhere. `CEDITOR_BEHAVIOR_OUT` selects the
-evidence directory; `CEDITOR_BEHAVIOR_CASE` filters by scenario-name substring. Keep source files
-stable while running: a Vite hot reload deliberately resets the application being measured.
+evidence directory; `CEDITOR_BEHAVIOR_CASE` filters by scenario-name substring, several separated
+by `|`, and fails when one matches none. Keep source files stable while running: a Vite hot reload
+deliberately resets the application being measured. Since 2026-10-26 CI runs every scenario, in a
+job of its own (`component-behavior` in `.github/workflows/ci.yml`).
 
 Still to execute: remaining component-specific properties, conditional settings, shared
 appearance combinations, routing and script consumers, custom package behavior (Claude), and
@@ -273,3 +275,30 @@ The previous 87 browser scenarios passed together with zero page errors. These t
 - Numpad readout/blank placeholder, Clear/Enter visibility, key spacing, pressed-key colour, label/action/readout/border colours and fresh reopen pass.
 
 All **93 root real-App scenarios pass together, with zero browser errors**. **4,822 Node tests pass, zero skips**. Claude's integrated clock suite has **76 verified, 1 unverified, 0 defects**; assertion totals are not unique-property counts. The latest production build passed before the B70–B73 changes and must be refreshed. Combined-panel and remaining property/native/hardware work is still open.
+
+### 2026-10-26: 95 scenarios pass together again
+
+Twenty-one had been failing, on `main` as on the branch that found them (#70, where a 95th case was
+added). Nineteen were the fixture, two the app:
+
+- **The fixture's panel is on plain Graphite.** Since 8 October a new panel starts on the designed
+  Graphite, whose forms draw a Meter, a Knob and a ProgressBar in place of the control's own
+  renderer (no `.meter-track`, `.slider-readout` or `svg.meter-arc` to measure) and whose Pixel
+  Display has square dots. `screenDock.mjs` met the same thing then and moved to plain Graphite;
+  these cases are of each control's own properties, so they do too. Nineteen pass with no other
+  change. What the designed sets do to these properties is not covered here.
+- **B74, route into a Meter.** A Meter's `onZone`, an Envelope's `onStage` and a Constellation's
+  `onRecall` were raised from the value sources, which run while the Preview is drawn
+  (`resolvedPreviewFor`). The dispatch writes the runtime's execution status, which Svelte refuses
+  inside a derivation (`state_unsafe_mutation`): a routed Meter crossing a band logged a page error,
+  and the handler never ran. They are raised once the drawing is done (`afterDraw`, in order); a
+  probe saw `onZone` with zone 3 from 1, then 1 from 3.
+- **B75, Number and Range Display keys.** A display's value field is `readonly` to the browser, which
+  stops typing and not the key handler: ArrowUp took a Number display from 40 to 41. The shared
+  `adjustRangeFromKey`, and the value fields' input and commit, refuse a display.
+- **The reload in `reopen()`** gets the first load's allowance rather than the 6 s default: one
+  whole run had a reload take longer, in a case that passes otherwise.
+
+`CEDITOR_BEHAVIOR_CASE` takes several names separated by `|`, and a name that matches no case
+fails. The whole file takes seventeen to eighteen minutes here (996 s and 1086 s), and CI runs it in
+a job of its own on every pull request, `component-behavior`, at the owner's word.

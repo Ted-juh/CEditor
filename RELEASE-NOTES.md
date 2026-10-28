@@ -144,7 +144,228 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - Every component verb has an example, a note saying what it returns, and a text for each
   parameter with its range and what is rejected, in the Insert picker, the hover card and the API
   explorer. The LCD Display's verbs say what each setting is: the scrolling speed in characters
-  per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show.
+  per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show,
+  that brightness 0 is the dimmest and still lit, that a control linked as the source sets the
+  brightness or the value whatever a script writes, and that a script's edit-field text is not held
+  to the characters and length that typing is.
+- `ce.components.lcd.cursorAt` keeps the cursor on the display: a column or row past the
+  display's own size is its last column or row, with a console warning the first time. It took
+  anything up to 256, and column 40 of a 16-column display put the cursor nowhere. A fraction is
+  rounded, so `read` gives back the cell the cursor is drawn on.
+- A verb that takes two numbers (`cursorAt`, `joystick.move`, `timbre.move`, `kinetic.launch`,
+  `kinetic.velocity`, `constellation.probe`) given one that is not a number is refused with a
+  console error and moves nothing. It moved the other one and dropped this one without a word.
+  Either number may still be left out to move only the other.
+- The LCD Display's inspector counts the cursor's row and column from 1, as scripts do. It counted
+  from 0, so its column 0 was a script's column 1.
+- `ce.components.lcd.blinkRate` takes 60 to 5000 ms, as the display and the inspector do: 50 to 59
+  are 60, with a console warning the first time. They were stored as given and drawn as 60. The
+  inspector's Blink Rate stops at 5000, as a script does.
+- A component verb that switches something on or off reads the text "false", "off" and "0", in
+  any case, as off, as it reads `false`, 0 and "". Any text but "" was on, so
+  `ce.components.lcd.blink("Screen", "false")` or `"OFF"` switched blinking on. This is every
+  on/off verb of every component, 134 of them, the Arpeggiator's `mute` among them.
+- A component verb that takes a word from a list reads it in any case: `ce.components.lcd.scroll
+  ("Screen", "LEFT")` is "left", and `read`, `size`, `fill`, `insert` and `remove` take a verb's
+  name in any case too. A word in another case was refused. Control names and a pixel display's
+  element names were matched in any case already.
+- Every word a script takes from a list the app defines is read in any case, and with spaces
+  around it, in the panel window and with it shut: blend modes, stroke caps and joins, image fits
+  and alignments, text styles, the arrangement words, easing curves, `ce.math`'s curve, shape and
+  crossfade names, note names (`"c4"`, `"eb4"`), byte order, a checksum's name, scale, chord, arp
+  pattern and voice-leading names, the storage scope, a message's kind, and `get`'s and `set`'s
+  value form. A capital letter was refused (`"Dorian"`, `"NormalizedValue"`, `"Multiply"`), drew or
+  played the default (`"COVER"`, `"EXP"`, `"DOWN"`), or, for `to7bit`'s `"MSB"`, reversed the bytes.
+  A name you or a script make up is matched as it was; a control's and an element's, in any case,
+  as they always were.
+- `ce.components.lcd.animPreset` and `ce.components.pixel.animPreset` take one of the six presets,
+  "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Any other word is refused with a
+  console error that lists them; it was stored, and the display drew no animation.
+- `ce.components.lcd.glyph` reads each row between "|" on its own, padding a short one with
+  unlit cells: `"#|#|#"` is a dot in each of three rows. The rows ran into each other, and it lit
+  three dots of the top row. A character that is not a cell (`"abc"`), more than eight rows or a
+  row longer than five is refused with a console error saying which; it was stored, and the slot
+  drew nothing or cut the glyph off.
+- `ce.components.lcd.text` called with the text left out, or nil, None or null, writes an error to
+  the console and changes nothing, as the other text verbs do. It blanked the line. `""` still
+  blanks it.
+- Every component parameter counted from 1 (a row, a slot, a pad, a step, a position for `read`,
+  `insert` or `remove`) says that a fraction is rounded, as it always was: row 1.5 is row 2.
+- An LCD Display's layouts have text of their own, shown wherever no zone paints, with `{value}`,
+  `{pct}` and `{bar}` filled in. `ce.components.lcd.text` writes it on the layout showing; on a
+  display with layouts it wrote lines that were never drawn. The inspector's Text rows edit the
+  layout being edited, "+ Enable" gives the first layout the lines so the screen does not go
+  blank, and every list of layouts shows each one's number beside its name ("1 · Home").
+- `ce.components.lcd.text`, `clear` and `read` take a position: a row, as before, or a table
+  naming the layout, the row and the column. `text("Screen", {row = 2, col = 15}, "X")` writes from
+  column 15 and keeps the rest of the row; `clear("Screen", {layout = 2, row = 4, col = {5, 10}})`
+  blanks columns 5 to 10 of row 4 of layout 2; `read("Screen", "text", {row = 1, col = 3})` gives
+  one character. A layout is its number or its name; a range is a list, `col = {5, 10}`. A part the
+  display does not have is refused with a console error that says why.
+- `ce.components.lcd.clear("Screen", 2)` blanks row 2. It blanked every row, the 2 dropped.
+- `ce.components.lcd.animSpeed` and `ce.components.pixel.animSpeed` take 0.1 to 5, as the inspector's
+  preset Speed does; past it, the nearest end with a console warning the first time. They took 0 to
+  16, and 0 played at normal speed.
+- The scripting manual describes every component command in full: what it does, an example, each
+  parameter and what comes back. It listed them by name only.
+- A knob or slider linked as a display's backlight source lights it from halfway along its range,
+  on the LCD and the Pixel Display. It lit it at 0.5 of the control's own number, so a knob from 0
+  to 127 switched it on at 1. A switch or a button works as before.
+- `ce.components.lcd.layout` and `ce.components.pixel.layout` show a layout by its number or its
+  name, as a soft key does, and `read(t, "layout")` gives the number of the one showing. Nothing is
+  written to the panel.
+- An LCD Display's zones have a name, in a new Name column of the zone table, and scripts reach
+  them by it: `zoneText`, `zoneLabel`, `zoneShow`, `zoneAt`, `zoneSource` and `zoneKind` on
+  `ce.components.lcd`, and `read(t, "zoneText")` and the like. A name reaches every zone carrying
+  it on every layout, in any case. `zoneAt("Screen", "Cutoff", {row = 2, col = {1, 8}})` moves a
+  zone; `zoneSource("Screen", "Cutoff", "Resonance")` links one to a control by its name.
+- A Pixel Display's element names that differ only in case are one name to `read`, as they always
+  were to the commands; `read(t, "text")` listed both spellings.
+- The Arpeggiator's "Random" pattern plays a note at random each step, and "As played" plays a
+  linked Chord Pad's or the MIDI input's notes in the order they were pressed. Both played low to
+  high, exactly as "Up". The playhead shows the note a random step played.
+- `ce.components.arp.rate` takes 0.1 to 40 steps a second, as the inspector does; past it, the
+  nearest end with a console warning the first time. It took 0.01 to 200, and played nothing slower
+  than 0.1 and skipped steps above about 60.
+- `ce.components.arp.octaves` takes 1 to 4, as the inspector does; 5 and 6 were stored and played
+  as 4.
+- `ce.components.arp.gate` takes 0.05 to 1, as the inspector does; 0 played a 10 ms blip.
+- `ce.components.arp.swing` takes 0 to 1, as the inspector does; a negative swing played straight.
+  `ce.components.arp.swingSource` sets whose swing a synced arp plays, the Transport's or its own,
+  as the inspector's "Swing from" does: on a synced arp `swing()` did nothing, and no script could
+  change that.
+- `ce.components.arp.phase` moves the arp to a point in its sequence: a running one at once, a
+  stopped one where it starts. `read(t, "phase")` gives where it is now. It wrote a number the
+  preview read only when it opened, so a running arp never moved and `read` gave the number back.
+- `read(t, "mute")` on the Arpeggiator gives the muted steps counted from 1, as `mute()` takes them,
+  and `read(t, "mute", 3)` whether step 3 is muted. It gave them counted from 0, and the list's
+  third entry.
+- The Arpeggiator's own chord: `degree` counts from 1, as `ce.music.degreeChord` does and as the
+  inspector now shows it, up to the scale's own length (5 on a pentatonic, where 6 and 7 played as
+  5); `key` takes a note's name, `key("Arp", "F#")`, and a number goes round the octave, 12 is C (it
+  was B). `followPanelKey(t, true)`, on every component that has it, takes the panel's key at once
+  as the inspector's toggle does; it waited for the panel's next key change.
+- A component's link that is refused (`ce.components.arp.link`, `meter.source`, `lcd.valueSource`
+  and the six others) says so in the console as every other command does:
+  `arp Arp: link("Knob") — refused, nothing changed. "Knob" is not a Chord Pad.`
+- The Arpeggiator's `euclidPulses` takes 0 to the rhythm's steps, as the inspector does; 20 on 8 steps
+  was stored and sounded every step. `euclidRotate` goes round the steps, -1 the last, as the
+  rhythm always did; it took -32 to 32 and stopped there.
+- `ce.components.pixel.show` with no third argument hides an element that stores no `visible`, as
+  it is drawn shown; the first call wrote the shown it already was and nothing hid. `read` answers
+  true for such an element's `show` and false for its `blink`, where it gave nil.
+- `ce.components.pixel.x`, `y`, `w` and `h` say in the console when a number past their range was
+  used as its nearest end, and why a call was refused (`"big" is not a number.`), as every other
+  number command does; both were silent.
+- `ce.components.pixel.kind` and `ce.components.pixel.source` set what an element is and which
+  control it shows, by the element's name, as `lcd.zoneKind` and `lcd.zoneSource` do for a zone:
+  `pixel.source("Screen", "Cutoff", "Resonance")`. Only the inspector could set either.
+- `ce.components.pixel.gamma` takes 0.2 to 4 and `transitionMs` 0 to 2000, as the inspector does:
+  a gamma of 0.1 was stored and drawn as 0.2, and a transition up to 5000 ms could be set that the
+  inspector could not show.
+- `ce.components.meter.labelPosition` sets where a Meter's caption sits, "above", "below" or
+  "none"; a caption is drawn only there, so `label()` on a new meter showed nothing.
+- `ce.components.chordpad.key` takes a note's name, `key("ChordPad", "Eb")`, and a number goes round
+  the octave, 14 is D, as the Arpeggiator's does; 12 and above were stored as 11, B.
+- `ce.components.noteribbon.key` reads the same way, and `bendRange` takes whole semitones, as the
+  strip plays it; a fraction was stored and played rounded.
+- `ce.components.drumpads.gate` takes 5 to 2000 ms, whole, as the pads play it and the inspector
+  offers it; 1 was played as 5 and 5000 as 2000. `rollDelay` and `flamMs` take whole milliseconds.
+- `ce.components.transport` takes the clock's own ranges: a tempo of 20 to 300, a swing of 0 to 1,
+  a loop from bar 1 to 999 and 0.25 to 64 bars long, a count-in of 0 to 8 bars. A script could set
+  400, a negative swing, 9999 bars and a 16-bar count-in, and the clock played 300, straight, 999,
+  64 and 8; `loopBars` took whole bars only, where the inspector takes quarters.
+- `ce.panel` says what it did not do. `create` and `find` read a type in any case ("knob"); a
+  container that is not there, or not a container, refuses `create` and `clone` (the control was
+  made at the top level with an error said); a place or size that is not a number is said, and the
+  control keeps its own; one name given to `align` and the others is a list of one (it was read
+  letter by letter); too few controls, a negative radius, an option that is not a number, and a
+  name or snapshot left out are each refused or said, where they did nothing without a word.
+- `ce.components.envelope.preset` gives the envelope the preset's shape, as the inspector's Preset
+  does; it wrote the name and left the shape. A point moved with `pointX`, and a Router curve point
+  with `curveX`, stays between its neighbours, the first at 0 and the last at 1, as a drag keeps
+  it; `loopStart` and `loopEnd` count from 1 to the points there are (0 was stored as -1).
+- `ce.components.turing.phase` moves a running Turing Machine, as the arp's does, and `read` gives
+  where it is; a change to its steps, by `step()` or the inspector, starts the running register from
+  them, where a register that had mutated went on without them. Its `length` starts at 2, as it plays.
+- A script that moves a source (`ce.components.macro.value`, `ribbon.value`, `crossfader.mix`,
+  `joystick.move`, `timbre.move`, `constellation.probe`, a Mod Matrix cell, an Envelope point) now
+  sends the new values to the parameters bound to it, as a drag does. It moved what was drawn and
+  sent nothing.
+- `ce.components.orbit.phase` and `ce.components.looper.phase` move a running Orbit or Looper, as the
+  arp's does, and `read` gives where it is. The Orbit's and the Looper's `bars`, and the
+  Constellation's, take quarters from 0.25, as they play; the Orbit's `nodeDepth` takes 0 to 1 and
+  the Constellation's `blend` 0.5 to 16, where values outside were taken and played as the nearest.
+- `ce.components.kinetic.launch` and `velocity` throw a running ball again, where it went on as it
+  was. Its `gravity` takes 0 to 4 and `bounce` 0 to 1, as the ball plays them: an upward pull played
+  as none, and a bounce above 1 as 1.
+- `ce.music.name` refuses what is not a number, and `ce.music.number` what is not a note name, each
+  with a console error, in the panel window and the plug-in alike. A name given to `name` stopped a
+  Lua or Python script with an error and gave "undefinedNaN" in JavaScript; `number` gave nothing
+  without a word.
+- `ce.components.constraint.member` keeps the Constraint's rule, as a drag does: the other members
+  move. It set the one member and left the others, so members that should add up to 1 did not.
+  `ce.components.timbre.power` takes 0.5 to 16, as the pad blends it.
+- `ce.components.recorder.store` refuses a slot past 8, where it answered true and stored nothing;
+  `quantize` reads a key by its name ("F#") and a scale in any case, and refuses a grid written as
+  text, where "1/16" was one division of the loop and a key's name was C; and its take commands say
+  why they did nothing when there is no take, or while it records.
+- `ce.image` and `ce.text` tell a name that is no control so, where they said it had no image
+  layer or no Text section; `ce.image.asset()`, `ce.text.font()` and `ce.image.load()` with nothing
+  to look up, and `ce.image.set` with neither a picture nor an option, say so; and
+  `ce.image.assets` and `ce.text.fonts` apply both of their filters together.
+- The Zone Splitter, Phrase Sequencer, Harmoniser and Setlist commands refuse a number that is not
+  one, and say what they take: a Zone Splitter transpose of "x" was -48 and a split point of "x" its
+  lowest note. A preset's notes are read as notes ("C2") and put lowest first. The Phrase and the
+  Harmoniser take a key by its name ("D"), and the Phrase's commands answer true when they work.
+- `ce.components.matrix.cell` takes 0 to 1 while the matrix is not bipolar, as a drag does; -0.5
+  was stored and sent.
+- `ce.ui` says what it did not do: a message, an id, a question or text to copy left out is refused
+  with a console error, and a kind or a duration that is not one is the default, said once.
+- `ce.midi`'s encoding helpers, `to7bit` to `fromSigned`, answer nothing and say why for a value
+  that does not fit, where they gave a wrong number without a word: `to14bit(20000)` gave msb 28 and
+  lsb 32, `nibblize({300})` split 300, `toSigned(-200, 8)` gave 56, `denibblize` took an odd count of
+  halves, and `to7bit` read any order but "msb" as "lsb". A number may be text that is one, and
+  `from7bit` reads hex text. `toAscii` refuses a character outside ASCII, and cuts text longer than
+  its length to it, saying so once.
+- `ce.music.degreeChord` says once when its step or size is not a number and the default was used,
+  in every language; `null` was step 0 in JavaScript and 1 in Lua. `ce.music.arp` with no pattern is
+  refused with an empty list, where it played "up" with a warning.
+- `ce.storage.saveSetting` refuses a name or a value left out, where it saved under "" or saved
+  nothing and answered true; `loadSetting` and `forget` refuse a name left out. `decodeJson` says when
+  text is not JSON (Python read NaN and Infinity, which no other language does), and `encodeJson`
+  says once when it cannot use an indent: one that is not a number, or is below 0, is one line, and
+  one above 10 is 10, in every language.
+- `set()` refuses a value left out, and a Knob's, a Slider's, a Number's or a Range's value, or a
+  `.normalizedValue`, that is not a number; text that is a number is read as one. A knob set to "x"
+  stored "x". A control bound to a device parameter is read by its binding, as before, which takes a
+  choice by its name. A colour property left out says so in a colour's words, as it did.
+- `on`, `watch`, `compute`, `intercept` and `defineAction` say so when the event, path or name, or
+  the function, is left out, where they set nothing up without a word; in Lua they stopped the
+  script. `on` with no target listens to every control in the plug-in's JavaScript too.
+- `ce.device.parameter` and `read` say when no id is given; `parameters` and `ports` refuse a value
+  that is not a table of options, where `ports("in")` listed every port; `ports` says once of a
+  direction that is not "in" or "out"; `setTiming` refuses a name the profile has no timing for,
+  where it stored one that nothing reads, and takes a name in any case; and in the plug-in a name left
+  out of `setTiming` or `setVariable` is refused, where "nil" was stored. `bind` to an id nothing
+  knows yet is a warning in the console, where it was a plain line.
+- A component command that refuses a colour says so as its other refusals do, the call as written:
+  `drumpads Kit: colour(3, "redd") — refused, nothing changed. In pad 3, "redd" is not a colour …`,
+  where it named the call as `set()` does. The Zone Splitter, Phrase Sequencer, Recorder, Harmoniser
+  and Setlist name a refused call as written too, `recorder Rec: store(9)`, where they printed their
+  own arguments as JSON (`store {"slot":9}`).
+- `ce.components.orbit.nodeOutput` sets what a satellite sends, its height, its place across, a sine
+  of its angle or its radius, and `nodeInvert` turns it upside down; only the inspector could.
+- In the plug-in, a control bound to a host parameter takes a choice by its name, in any case, and a
+  switch by "on" or "off", as the editor does; other text is refused in the console, where it was
+  sent as 0.
+- A script's `onZone` hears a Meter's reading cross from one colour band to the next when a route
+  or a linked control moves it. The event was raised while the Preview was drawing, where the panel
+  runtime may not write its state: the page logged an error and the handler was never called. The
+  Envelope's `onStage` and the Constellation's `onRecall` were raised the same way and are fixed
+  with it.
+- A Number or Range set to Display ignores the arrow, Home, End and Page keys in its value field, as
+  it already ignored typing. ArrowUp moved the number and sent it.
 
 ## What you get
 

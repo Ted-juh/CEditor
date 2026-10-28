@@ -148,6 +148,47 @@ local function __realNumber(v)
   if n == nil or n ~= n or n == math.huge or n == -math.huge then return nil end
   return n
 end
+-- @module ce.core
+-- on, watch, compute, intercept and defineAction are the host's bindings; each is wrapped here so an
+-- event, path or name left out, or a function that is not one, sets nothing up and says so, in the
+-- WebView runtime's words (hookRefusal), where the binding stopped the script with words of its own
+-- or set nothing up without a word. A target left out is "*", as the editor reads it, and a name
+-- that is a number is its text, as every other runtime takes it.
+local function __hookRefused(verb, what, name, fn)
+  local why = nil
+  if name == nil or (type(name) == "string" and not name:find("%S")) then
+    why = verb .. ": no " .. what .. " was given, so nothing was set up."
+  elseif type(fn) ~= "function" then
+    if fn == nil then why = verb .. ": no function was given, so nothing was set up."
+    else why = verb .. ": " .. __shownValue(fn) .. " is not a function, so nothing was set up." end
+  end
+  if why then logError(why) return true end
+  return false
+end
+do
+  local hostOn, hostWatch, hostCompute, hostIntercept, hostAction = on, watch, compute, intercept, defineAction
+  function on(target, event, fn)
+    if __hookRefused("ce.core.on", "event", event, fn) then return end
+    return hostOn(target == nil and "*" or tostring(target), tostring(event), fn)
+  end
+  function watch(path, fn)
+    if __hookRefused("ce.core.watch", "path", path, fn) then return end
+    return hostWatch(tostring(path), fn)
+  end
+  function compute(path, fn)
+    if __hookRefused("ce.core.compute", "path", path, fn) then return end
+    return hostCompute(tostring(path), fn)
+  end
+  function intercept(path, fn)
+    if __hookRefused("ce.core.intercept", "path", path, fn) then return end
+    return hostIntercept(tostring(path), fn)
+  end
+  function defineAction(name, fn)
+    if __hookRefused("ce.core.action", "name", name, fn) then return end
+    return hostAction(tostring(name), fn)
+  end
+end
+-- @module ce.math
 -- A number a ce.math command was given, or nil after an error in the console. Left out, it is the
 -- fallback when there is one. The WebView runtime's mathNumber, word for word.
 local function __mnum(verb, what, v, fallback)
@@ -183,13 +224,15 @@ function lerp(a, b, t)
 end
 function curve(v, shape)
   shape = shape or "linear"
-  if shape == "exp" then return v * v
-  elseif shape == "log" then return math.sqrt(math.max(0, v))
-  elseif shape == "s" then return v * v * (3 - 2 * v)
+  -- A name in any case, as every word from a list is read: "EXP" is "exp".
+  local name = tostring(shape):lower():match("^%s*(.-)%s*$")
+  if name == "exp" then return v * v
+  elseif name == "log" then return math.sqrt(math.max(0, v))
+  elseif name == "s" then return v * v * (3 - 2 * v)
   else
     -- A shape the list does not have used to return v in SILENCE, which reads as a curve that does
     -- nothing rather than as a name that was never applied.
-    if shape ~= "linear" and shape ~= "" then
+    if name ~= "linear" and name ~= "" then
       log("curve(v, \"" .. tostring(shape) .. "\"): unknown shape — using linear. The names are "
           .. "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     end
@@ -355,7 +398,7 @@ end
 -- that matters: a linear fade between two sounds dips in the middle, audibly.
 function crossfade(a, b, t, law)
   local x, from, to = norm(t, 0, 1), __num(a), __num(b)
-  law = tostring(law or "linear"):lower()
+  law = tostring(law or "linear"):lower():match("^%s*(.-)%s*$")
   if law == "equalpower" then
     local angle = x * math.pi / 2
     return from * math.cos(angle) + to * math.sin(angle)
@@ -497,7 +540,7 @@ function shapeCurve(v, curve, tension)
   local ten = __num(tension, 0)
   if ten == 0 then ten = 1.6 end
   local k = 1 + math.max(0, ten)
-  local name = tostring(curve)
+  local name = tostring(curve):lower():match("^%s*(.-)%s*$")   -- in any case: "SCurve" is "scurve"
   if name == "exp" then return t ^ k
   elseif name == "log" then return 1 - (1 - t) ^ k
   elseif name == "scurve" or name == "s" then return t * t * (3 - 2 * t)
@@ -632,7 +675,7 @@ function unshape(y, curve, tension)
   local ten = __num(tension, 0)
   if ten == 0 then ten = 1.6 end
   local k = 1 + math.max(0, ten)
-  local name = tostring(curve)
+  local name = tostring(curve):lower():match("^%s*(.-)%s*$")
   if name == "exp" then return v ^ (1 / k)
   elseif name == "log" then return 1 - (1 - v) ^ (1 / k)
   -- The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and would
@@ -1151,19 +1194,30 @@ local __FLAT_LETTER = { C = 11, D = 1, E = 3, F = 4, G = 6, A = 8, B = 10 }
 -- Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
 -- plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
 -- the same generated table the Chord Pad and Harmoniser print from — true "E♭4", false "C♯4".
+-- A number, or text that is one, rounded down; anything else is no answer, and says why. A name
+-- ("C4") went to math.floor and raised, where the editor gave nothing.
 function noteName(n, flats)
-  n = math.floor(n)
+  local v = __realNumber(n)
+  if v == nil then
+    if n == nil then logError('ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.')
+    else logError('ce.music.name: ' .. __shownValue(n) .. ' is not a note number, so there is no answer. A note is a MIDI number, such as 60.') end
+    return nil
+  end
+  n = math.floor(v)
   local tbl = NOTE_NAMES
   if flats ~= nil then if flats then tbl = __CE_NOTE_FLAT else tbl = __CE_NOTE_SHARP end end
   return tbl[__m12(n) + 1] .. tostring(math.floor(n / 12) - 1)
 end
 -- Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a real
 -- MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
-function noteNumber(name)
+local function __noteNumberOf(name)
   local s = string.gsub(tostring(name), "♯", "#")
   s = string.gsub(s, "♭", "b")
-  local letter, acc, oct = string.match(s, "^([A-G])([#b]?)(-?%d+)$")
+  -- In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
+  local letter, acc, oct = string.match(s:match("^%s*(.-)%s*$"), "^([A-Ga-g])([#bB]?)(-?%d+)$")
   if not letter then return nil end
+  letter = letter:upper()
+  if acc == "B" then acc = "b" end
   local pc = nil
   if acc == "b" then
     pc = __FLAT_LETTER[letter]
@@ -1174,6 +1228,17 @@ function noteNumber(name)
   local o = tonumber(oct) + 1
   if acc == "b" and letter == "C" then o = o - 1 end
   return o * 12 + pc
+end
+-- ce.music.number. The senders and the other helpers read a name with __noteNumberOf, above, and
+-- say their own why.
+function noteNumber(name)
+  local n = nil
+  if type(name) == "string" then n = __noteNumberOf(name) end
+  if n == nil then
+    if name == nil then logError('ce.music.number: no note name was given, so there is no answer.')
+    else logError('ce.music.number: ' .. __shownValue(name) .. ' is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
+  end
+  return n
 end
 
 -- BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
@@ -1312,13 +1377,22 @@ __CE_EASINGS["inOutBack"] = {0.68,-0.55,0.265,1.55}
 -- A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
 -- unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 local function __pitch(v)
-  if type(v) == "string" then return noteNumber(v) end
+  if type(v) == "string" then return __noteNumberOf(v) end
   if type(v) == "number" and v == v and v ~= math.huge and v ~= -math.huge then return math.floor(v) end
   return nil
 end
+-- A word from a list, in any case and with spaces around it, as the list spells it (the keys of
+-- `set`), or nil: "Dorian" is "dorian", "MAJ7" is "maj7", "AsPlayed" is "asPlayed".
+local function __word(set, name)
+  if type(name) ~= "string" then return nil end
+  local want = name:lower():match("^%s*(.-)%s*$")
+  for k, _ in pairs(set) do if type(k) == "string" and k:lower() == want then return k end end
+  return nil
+end
 local function __steps(tbl, name, fallback)
-  local s = tbl[name == nil and fallback or tostring(name)]
-  return s
+  if name == nil then return tbl[fallback] end
+  local key = __word(tbl, tostring(name))
+  return key and tbl[key] or nil
 end
 local function __pitchOf(verb, v)
   -- A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
@@ -1330,7 +1404,7 @@ local function __pitchOf(verb, v)
   if n == nil then
     if type(v) == "string" then
       logError(verb .. ': "' .. v .. '" is not a note name, so there is no answer. A name is '
-        .. 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+        .. 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
     else
       logError(verb .. ': ' .. __shownValue(v) .. ' is not a note, so there is no answer. A note is a MIDI '
         .. 'number or a name, such as 60 or "C4".')
@@ -1384,13 +1458,6 @@ end
 -- these answer questions about a note IN A KEY, which is what the Chord Pad, the Harmoniser and the
 -- Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 -- chord and the panel labelling the same chord have to agree or the panel contradicts itself.
--- A count argument that is not a finite number falls back to its default. Written out rather than
--- leaning on falsiness, because `0 or 3` is 3 in JavaScript and Python and 0 in Lua.
-local function __count(v, fallback)
-  local n = tonumber(v)
-  if n == nil or n ~= n or n == math.huge or n == -math.huge then return fallback end
-  return math.floor(n)
-end
 -- ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
 -- or text that is a number, and one that is neither refuses the call, saying where it is. They were
 -- read with tonumber, so a chord written by name was an empty one, without a word. nil for a list
@@ -1405,7 +1472,7 @@ local function __noteListItem(v)
     return nil
   end
   if type(v) ~= "string" then return nil end
-  local n = noteNumber(v)
+  local n = __noteNumberOf(v)
   if n ~= nil then return n end
   return __realNumber(v)
 end
@@ -1425,7 +1492,7 @@ local function __noteList(fn, name, list, mayBeAbsent)
     local n = __noteListItem(list[i])
     if n == nil then
       local where = __shownValue(list[i]) .. " at position " .. i .. " of " .. name
-      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
+      if type(list[i]) == "string" then return say(where .. " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".') end
       return say(where .. " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
     end
     out[#out + 1] = n
@@ -1445,10 +1512,20 @@ local function __musicSaid(text)
   __musicWarned[text] = true
   logWarn(text .. " This is said only the first time.")
 end
+-- degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+-- anything else the default, said once. The WebView runtime's musicStep, word for word. Written out
+-- rather than leaning on falsiness, because `0 or 3` is 3 in JavaScript and Python and 0 in Lua.
+local function __musicStep(what, v, fallback)
+  if v == nil then return fallback end
+  local n = __realNumber(v)
+  if n ~= nil then return math.floor(n) end
+  __musicSaid("ce.music.degreeChord: " .. what .. " is " .. __shownValue(v) .. ", which is not a number, so " .. fallback .. " was used.")
+  return fallback
+end
 local __VOICE_LEAD_MODES = { closest = true, smooth = true, off = true }
 local __ARP_ORDER_PATTERNS = { up = true, down = true, updown = true, downup = true, asPlayed = true, random = true, chord = true }
 function noteSpelling(root, scale)
-  local nm = (scale == nil) and "major" or tostring(scale)
+  local nm = (scale == nil) and "major" or (__word(__CE_SCALES, tostring(scale)) or tostring(scale))
   if __setOf("ce.music.spelling", "scale", scale) == nil then return nil end
   local pitch = __pitchOf("ce.music.spelling", root)
   if pitch == nil then return nil end
@@ -1527,13 +1604,13 @@ end
 -- The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 -- scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size)
-  local nm = (scale == nil) and "major" or tostring(scale)
+  local nm = (scale == nil) and "major" or (__word(__CE_SCALES, tostring(scale)) or tostring(scale))
   local s = __setOf("ce.music.degreeChord", "scale", scale)
   if s == nil or #s == 0 then return nil end
   if __pitchOf("ce.music.degreeChord", root) == nil then return nil end
   local n = #s
-  local d = __count(degree, 1) - 1
-  local sz = math.max(2, __count(size, 3))
+  local d = __musicStep("degree", degree, 1) - 1
+  local sz = math.max(2, __musicStep("size", size, 3))
   local offsets = {}
   for k = 0, sz - 1 do
     local idx = d + k * 2
@@ -1573,7 +1650,7 @@ function voiceLead(notes, previous, mode)
   local before = read and __noteList("voiceLead", "previous", previous, true)
   if read == nil or before == nil then return {} end
   local chord, prev = __sortedNotes(read), __sortedNotes(before)
-  local how = (mode == nil) and "closest" or tostring(mode)
+  local how = (mode == nil) and "closest" or (__word(__VOICE_LEAD_MODES, tostring(mode)) or tostring(mode))
   if not __VOICE_LEAD_MODES[how] then
     __musicSaid("ce.music.lead: " .. __shownValue(mode) .. ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
     how = "closest"
@@ -1642,10 +1719,10 @@ end
 function arpOrder(notes, pattern)
   local asc = __noteList("arpOrder", "notes", notes)
   if asc == nil then return {} end
-  local p = pattern ~= nil and tostring(pattern) or nil
+  local p = pattern ~= nil and (__word(__ARP_ORDER_PATTERNS, tostring(pattern)) or tostring(pattern)) or nil
   if p == nil then
-    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
-    p = "up"
+    logError('ce.music.arp: no pattern was given, so the answer is an empty list. One of: up, down, updown, downup, asPlayed, random, chord.')
+    return {}
   elseif not __ARP_ORDER_PATTERNS[p] then
     __musicSaid("ce.music.arp: " .. __shownValue(pattern) .. ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
     p = "up"
@@ -1670,31 +1747,6 @@ function arpOrder(notes, pattern)
   return out
 end
 -- @module ce.midi
-function to14bit(v) v = math.floor(v) return { msb = math.floor(v / 128) % 128, lsb = v % 128 } end
-function from14bit(msb, lsb) return msb * 128 + lsb end
-function to7bit(v, count, order)
-  count = count or 2; order = order or "msb"; v = math.floor(v)
-  local out = {}
-  for i = 1, count do out[i] = v % 128; v = math.floor(v / 128) end
-  if order == "msb" then local r = {} for i = count, 1, -1 do r[#r + 1] = out[i] end return r end
-  return out
-end
-function from7bit(bytes, order)
-  order = order or "msb"; local v = 0
-  if order == "msb" then for i = 1, #bytes do v = v * 128 + bytes[i] end
-  else for i = #bytes, 1, -1 do v = v * 128 + bytes[i] end end
-  return v
-end
-function toNibbles(b) b = math.floor(b) return { hi = math.floor(b / 16) % 16, lo = b % 16 } end
-function fromNibbles(hi, lo) return hi * 16 + lo end
-function nibblize(bytes) local o = {} for i = 1, #bytes do local n = toNibbles(bytes[i]) o[#o+1] = n.hi; o[#o+1] = n.lo end return o end
-function denibblize(bytes) local o = {} for i = 1, #bytes, 2 do o[#o+1] = fromNibbles(bytes[i], bytes[i+1] or 0) end return o end
-function toAscii(str, length) local o = {} for i = 1, #str do o[i] = string.byte(str, i) end if length then for i = #str + 1, length do o[i] = 32 end end return o end
-function fromAscii(bytes) local s = "" for i = 1, #bytes do s = s .. string.char(bytes[i]) end return s end
-function toOffset(v, center) return v + center end
-function fromOffset(b, center) return b - center end
-function toSigned(v, bits) local m = 2 ^ bits; if v < 0 then return v + m end return v end
-function fromSigned(b, bits) local m = 2 ^ bits; if b >= m / 2 then return b - m end return b end
 
 -- checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 -- plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
@@ -1797,7 +1849,7 @@ function checksum(kind, bytes, opts)
   local verb = "ce.midi.checksum"
   if bytes == nil then
     -- checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
-    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] ~= nil) then
+    if kind == nil or (type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind):match("^%s*(.-)%s*$")] ~= nil) then
       logError(verb .. ": no bytes given, so there is no checksum.")
       return nil
     end
@@ -1805,7 +1857,7 @@ function checksum(kind, bytes, opts)
   end
   bytes = __scriptBytes(verb, bytes, "there is no checksum")
   if bytes == nil then return nil end
-  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind)] or nil
+  local id = type(kind) == "string" and __CE_CKSUM_ALIAS[string.lower(kind):match("^%s*(.-)%s*$")] or nil
   if id == nil then
     -- The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
     local names = {}
@@ -1875,6 +1927,8 @@ local function __shape(verb, opts)
     if opts.bits ~= nil then bits = opts.bits end
     if opts.order ~= nil then order = opts.order end
   end
+  -- In any case, as every word from a list is read: "MSB" is "msb".
+  if type(order) == "string" then order = order:lower():match("^%s*(.-)%s*$") end
   if bits ~= 7 and bits ~= 8 then return __refuse(verb, "bits must be 7 or 8") end
   if order ~= "msb" and order ~= "lsb" then return __refuse(verb, 'order must be "msb" or "lsb"') end
   return { bits = math.floor(bits), order = order }
@@ -2063,6 +2117,196 @@ function bytesFromBase64(text)
   return out
 end
 
+-- The older encoding helpers, to7bit to fromSigned, held to the byte lists' rule: a value that does
+-- not fit, a number that is not one and a list that is not bytes answer nil and say why. The
+-- WebView runtime's "older encoding helpers", rule for rule and message for message. A value to
+-- split is rounded down first, as it always was; a part to join must be whole.
+local function __packNumber(verb, what, v)
+  local n = __realNumber(v)
+  if n ~= nil then return n end
+  if v == nil then return __refuse(verb, what .. " is a number, and none was given") end
+  return __refuse(verb, what .. " is a number, and " .. __shownValue(v) .. " is not")
+end
+local function __packRange(verb, what, n, bits, room, roundDown)
+  local m = n
+  if roundDown then m = math.floor(n) end
+  if m ~= math.floor(m) then return __refuse(verb, what .. " is " .. __shown(n) .. ", which is not a whole number") end
+  if m < 0 or m >= 2 ^ bits then return __refuse(verb, what .. " is " .. __shown(n) .. ", which does not fit in " .. room) end
+  return math.floor(m)
+end
+local function __packFit(verb, what, v, bits, room, roundDown)
+  local n = __packNumber(verb, what, v)
+  if n == nil then return nil end
+  return __packRange(verb, what, n, bits, room, roundDown)
+end
+local function __packSetting(verb, what, v, lo, hi, fallback)
+  if v == nil and fallback ~= nil then return fallback end
+  local n = __realNumber(v)
+  if n == nil or n ~= math.floor(n) or n < lo or n > hi then
+    return __refuse(verb, what .. " must be a whole number from " .. lo .. " to " .. hi)
+  end
+  return math.floor(n)
+end
+local function __packOrder(verb, order)
+  local o = order
+  if o == nil then o = "msb" elseif type(o) == "string" then o = o:lower():match("^%s*(.-)%s*$") end
+  if o == "msb" or o == "lsb" then return o end
+  return __refuse(verb, 'order must be "msb" or "lsb"')
+end
+local function __packList(verb, input, bits, why)
+  local list = __bytesIn(verb, input)
+  if list == nil then return nil end
+  for i = 1, #list do
+    if list[i] >= 2 ^ bits then return __refuse(verb, list[i] .. " at position " .. (i - 1) .. " " .. why) end
+  end
+  return list
+end
+function to14bit(v)
+  local n = __packFit("ce.midi.to14bit", "v", v, 14, "14 bits", true)
+  if n == nil then return nil end
+  return { msb = n // 128, lsb = n % 128 }
+end
+function from14bit(msb, lsb)
+  local verb = "ce.midi.from14bit"
+  local hi = __packFit(verb, "msb", msb, 7, "7 bits")
+  if hi == nil then return nil end
+  local lo = __packFit(verb, "lsb", lsb, 7, "7 bits")
+  if lo == nil then return nil end
+  return hi * 128 + lo
+end
+function to7bit(v, count, order)
+  local verb = "ce.midi.to7bit"
+  local n = __packNumber(verb, "v", v)
+  if n == nil then return nil end
+  local k = __packSetting(verb, "count", count, 1, 4, 2)
+  if k == nil then return nil end
+  local o = __packOrder(verb, order)
+  if o == nil then return nil end
+  local x = __packRange(verb, "v", n, 7 * k, __plural(k, "byte") .. " of 7 bits", true)
+  if x == nil then return nil end
+  local out = {}
+  for i = 1, k do out[i] = x % 128; x = x // 128 end
+  if o == "msb" then local r = {} for i = k, 1, -1 do r[#r + 1] = out[i] end return r end
+  return out
+end
+function from7bit(bytes, order)
+  local verb = "ce.midi.from7bit"
+  local list = __packList(verb, bytes, 7, "does not fit in 7 bits")
+  if list == nil then return nil end
+  if #list < 1 or #list > 4 then return __refuse(verb, "it joins 1 to 4 bytes, and " .. #list .. " were given") end
+  local o = __packOrder(verb, order)
+  if o == nil then return nil end
+  local v = 0
+  if o == "msb" then for i = 1, #list do v = v * 128 + list[i] end
+  else for i = #list, 1, -1 do v = v * 128 + list[i] end end
+  return v
+end
+function toNibbles(b)
+  local n = __packFit("ce.midi.toNibbles", "byte", b, 8, "8 bits", true)
+  if n == nil then return nil end
+  return { hi = n // 16, lo = n % 16 }
+end
+function fromNibbles(hi, lo)
+  local verb = "ce.midi.fromNibbles"
+  local h = __packFit(verb, "hi", hi, 4, "4 bits")
+  if h == nil then return nil end
+  local l = __packFit(verb, "lo", lo, 4, "4 bits")
+  if l == nil then return nil end
+  return h * 16 + l
+end
+function nibblize(bytes)
+  local list = __bytesIn("ce.midi.nibblize", bytes)
+  if list == nil then return nil end
+  local out = {}
+  for i = 1, #list do out[#out + 1] = list[i] // 16; out[#out + 1] = list[i] % 16 end
+  return out
+end
+function denibblize(bytes)
+  local verb = "ce.midi.denibblize"
+  local list = __packList(verb, bytes, 4, "does not fit in 4 bits")
+  if list == nil then return nil end
+  if #list % 2 == 1 then return __refuse(verb, "the halves come in pairs, and " .. #list .. " is an odd count") end
+  local out = {}
+  for i = 1, #list, 2 do out[#out + 1] = list[i] * 16 + list[i + 1] end
+  return out
+end
+-- Text longer than the length is cut to it, and a length that is not one is no length; each said once.
+local __packWarned = {}
+local function __packSaid(key, text)
+  if __packWarned[key] then return end
+  __packWarned[key] = true
+  logWarn(text .. " This is said only the first time.")
+end
+function toAscii(str, length)
+  local verb = "ce.midi.toAscii"
+  if type(str) ~= "string" then
+    if str == nil then return __refuse(verb, "str is text, and none was given") end
+    return __refuse(verb, "str is text, and " .. __shownValue(str) .. " is not")
+  end
+  local out = {}
+  for i = 1, #str do
+    local c = string.byte(str, i)
+    if c > 127 then return __refuse(verb, "the text has a character outside ASCII") end
+    out[i] = c
+  end
+  if length == nil then return out end
+  local n = __realNumber(length)
+  if n == nil or n ~= math.floor(n) or n < 1 then
+    __packSaid("toAscii length", verb .. ": length is " .. __shownValue(length)
+      .. ", which is not a whole number from 1, so the text was neither filled out nor cut.")
+    return out
+  end
+  n = math.floor(n)
+  if #out > n then
+    __packSaid("toAscii cut", verb .. ': "' .. str .. '" is longer than ' .. __plural(n, "character") .. ", so it was cut to " .. n .. ".")
+    for i = #out, n + 1, -1 do out[i] = nil end
+  end
+  for i = #out + 1, n do out[i] = 32 end
+  return out
+end
+function fromAscii(bytes)
+  local list = __packList("ce.midi.fromAscii", bytes, 7, "is not an ASCII character")
+  if list == nil then return nil end
+  local s = {}
+  for i = 1, #list do s[i] = string.char(list[i]) end
+  return table.concat(s)
+end
+local function __packOffset(verb, what, v, center, sign)
+  local n = __packNumber(verb, what, v)
+  if n == nil then return nil end
+  local c = __packNumber(verb, "center", center)
+  if c == nil then return nil end
+  return n + sign * c
+end
+function toOffset(v, center) return __packOffset("ce.midi.toOffset", "v", v, center, 1) end
+function fromOffset(b, center) return __packOffset("ce.midi.fromOffset", "b", b, center, -1) end
+function toSigned(v, bits)
+  local verb = "ce.midi.toSigned"
+  local n = __packNumber(verb, "v", v)
+  if n == nil then return nil end
+  local k = __packSetting(verb, "bits", bits, 1, 32)
+  if k == nil then return nil end
+  local m = math.floor(n)
+  local half = 1 << (k - 1)
+  if m < -half or m >= half then
+    return __refuse(verb, "v is " .. __shown(n) .. ", and in " .. __plural(k, "bit") .. " a signed number is from "
+      .. -half .. " to " .. (half - 1))
+  end
+  if m < 0 then return m + (1 << k) end
+  return m
+end
+function fromSigned(b, bits)
+  local verb = "ce.midi.fromSigned"
+  local n = __packNumber(verb, "b", b)
+  if n == nil then return nil end
+  local k = __packSetting(verb, "bits", bits, 1, 32)
+  if k == nil then return nil end
+  local m = __packRange(verb, "b", n, k, __plural(k, "bit"))
+  if m == nil then return nil end
+  if m >= (1 << (k - 1)) then return m - (1 << k) end
+  return m
+end
+
 -- The numbers a channel message carries, checked before anything is sent: the WebView runtime's
 -- MIDI_ARGS and midiArg, word for word. An address (channel, controller, program, bank, parameter
 -- number) outside its range is refused, since clamping it picks a different message; a value past
@@ -2173,10 +2417,10 @@ local WEBVIEW_ONLY = {
   "setlistRead",
 -- @module ce.components.arp
   "arpRun","arpPattern","arpRate","arpDivision","arpSync","arpOctaves","arpGate","arpSwing",
-  "arpLatch","arpKey","arpScale","arpFollowPanelKey","arpDegree","arpChordType","arpVelocity",
-  "arpChannel","arpEuclid","arpEuclidSteps","arpEuclidPulses","arpEuclidRotate","arpPhase",
-  "arpMute","arpInputChannel","arpBaseOctave","arpSource","arpLink","arpEditable","arpShowNotes",
-  "arpShowHeader","arpRead",
+  "arpSwingSource","arpLatch","arpKey","arpScale","arpFollowPanelKey","arpDegree","arpChordType",
+  "arpVelocity","arpChannel","arpEuclid","arpEuclidSteps","arpEuclidPulses","arpEuclidRotate",
+  "arpPhase","arpMute","arpInputChannel","arpBaseOctave","arpSource","arpLink","arpEditable",
+  "arpShowNotes","arpShowHeader","arpRead",
 -- @module ce.components.chordpad
   "chordPadMode","chordPadKey","chordPadScale","chordPadFollowPanelKey","chordPadChordType",
   "chordPadVoicing","chordPadInversion","chordPadOctave","chordPadVelocity","chordPadChannel",
@@ -2209,9 +2453,9 @@ local WEBVIEW_ONLY = {
   "looperShowDivisions","looperRead","looperSize","looperFill","looperInsert","looperRemove",
 -- @module ce.components.orbit
   "orbitRun","orbitRate","orbitBars","orbitSync","orbitPhase","orbitNode","orbitNodeRadius",
-  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth","orbitEditable","orbitShowTrails",
-  "orbitShowSpokes","orbitShowRings","orbitShowValues","orbitRead","orbitSize","orbitFill",
-  "orbitInsert","orbitRemove",
+  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth","orbitNodeOutput","orbitNodeInvert",
+  "orbitEditable","orbitShowTrails","orbitShowSpokes","orbitShowRings","orbitShowValues",
+  "orbitRead","orbitSize","orbitFill","orbitInsert","orbitRemove",
 -- @module ce.components.kinetic
   "kineticRun","kineticSync","kineticGravity","kineticBounce","kineticFriction","kineticKeepAlive",
   "kineticLaunch","kineticVelocity","kineticEditable","kineticShowTrail","kineticShowWalls",
@@ -2257,16 +2501,16 @@ local WEBVIEW_ONLY = {
   "crossfaderLabelA","crossfaderLabelB","crossfaderEditable","crossfaderShowLabels",
   "crossfaderShowGains","crossfaderRead",
 -- @module ce.components.joystick
-  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnAxes",
-  "joystickReturnTime","joystickReturnCurve","joystickCornerLabel","joystickEditable",
+  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnTime",
+  "joystickReturnCurve","joystickReturnAxes","joystickCornerLabel","joystickEditable",
   "joystickShowGrid","joystickShowCrosshair","joystickShowCorners","joystickShowTrail",
   "joystickRead","joystickSize","joystickFill",
 -- @module ce.components.meter
   "meterValue","meterScale","meterPeakHold","meterHoldMs","meterDecay","meterValueMin",
   "meterValueMax","meterDbFloor","meterDbCeil","meterOrientation","meterGradient","meterLabel",
-  "meterValuePrecision","meterValuePrefix","meterValueSuffix","meterZoneAt","meterSource",
-  "meterShowTicks","meterShowScaleLabels","meterShowValue","meterRead","meterSize","meterFill",
-  "meterInsert","meterRemove",
+  "meterLabelPosition","meterValuePrecision","meterValuePrefix","meterValueSuffix","meterZoneAt",
+  "meterSource","meterShowTicks","meterShowScaleLabels","meterShowValue","meterRead","meterSize",
+  "meterFill","meterInsert","meterRemove",
 -- @module ce.components.transport
   "transportBpm","transportSwing","transportSource","transportBeatsPerBar","transportBeatUnit",
   "transportLoop","transportLoopStart","transportLoopBars","transportCountIn","transportClockOut",
@@ -2281,13 +2525,14 @@ local WEBVIEW_ONLY = {
   "lcdAnimFps","lcdAnimLoop","lcdScrollMode","lcdScrollRepeat","lcdBlinkRate","lcdCursorBlink",
   "lcdValueMin","lcdValueMax","lcdValuePrecision","lcdValuePrefix","lcdValueSuffix",
   "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText",
+  "lcdZoneText","lcdZoneLabel","lcdZoneShow","lcdZoneAt","lcdZoneSource","lcdZoneKind","lcdLayout",
   "lcdShowGlass","lcdShowGhost","lcdShowScanlines","lcdShowGrid","lcdRead","lcdSize","lcdFill",
 -- @module ce.components.pixel
-  "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH",
-  "pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow",
-  "pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
+  "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH","pixelKind",
+  "pixelSource","pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma",
+  "pixelGlow","pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
   "pixelLayoutTransition","pixelTransitionMs","pixelBrightnessSource","pixelBacklightSource",
-  "pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
+  "pixelLayout","pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
 }
 -- @module -
 for _, name in ipairs(WEBVIEW_ONLY) do
@@ -2324,7 +2569,7 @@ end
 -- table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
 local function __note(n)
   local v = nil
-  if type(n) == "string" then v = noteNumber(n)
+  if type(n) == "string" then v = __noteNumberOf(n)
   elseif type(n) == "number" and n == n and n ~= math.huge and n ~= -math.huge then v = math.floor(n + 0.5) end
   if v ~= nil and v >= 0 and v <= 127 then return v end
   return nil
@@ -2335,8 +2580,8 @@ local function __badNote(verb, note)
   if note == nil then
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
   elseif type(note) == "string" then
-    if noteNumber(note) == nil then
-      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+    if __noteNumberOf(note) == nil then
+      why = '"' .. note .. '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         .. 'has one, then the octave: "C4", "Eb3", "F#-1".'
     else
       why = '"' .. note .. '" is outside the MIDI notes, so nothing was sent. ' .. range
@@ -2449,7 +2694,7 @@ function sendTransport(action)
   end
   local status = nil
   if type(action) == "string" then
-    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action)]
+    status = ({ start = 0xFA, ["continue"] = 0xFB, stop = 0xFC })[string.lower(action):match("^%s*(.-)%s*$")]
   end
   if status == nil then
     logError("sendTransport: " .. __shownValue(action) .. " is not a transport action, so nothing was sent. " .. actions)
@@ -3139,7 +3384,21 @@ function deviceProfile(role) return __deviceQuery("profile", { role = __role(rol
 -- read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
 -- query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
 -- profile and sends; it returns whether the message went out, not whether the synth accepted it.
-function deviceRead(id, role) return __deviceQuery("read", { role = __role(role), id = tostring(id) }) end
+-- An id left out, or blank, is refused, where it answered nothing without a word; parameters() and
+-- ports() take a table of options or nothing; ports() says once of a direction that is not one; and
+-- setTiming takes a timing the profile has, in any case, written in its spelling. The WebView
+-- runtime's words (deviceWords.js).
+local function __deviceIdMissing(id) return id == nil or (type(id) == "string" and not id:find("%S")) end
+local function __deviceNotOptions(verb, opts)
+  if opts == nil or type(opts) == "table" then return false end
+  logError("ce.device." .. verb .. ": " .. __shownValue(opts) .. " is not a table of options, so the answer is an empty list.")
+  return true
+end
+local __devicePortsWarned = {}
+function deviceRead(id, role)
+  if __deviceIdMissing(id) then logError("ce.device.read: no parameter id was given, so there is no answer.") return nil end
+  return __deviceQuery("read", { role = __role(role), id = tostring(id) })
+end
 function deviceWrite(id, value, role) return __deviceWrite(tostring(id), value, __role(role)) end
 function deviceConnected(role) return __deviceQuery("connected", { role = __role(role) }) == true end
 -- Preset recall, through the profile's own action. The slot is the device-global number the
@@ -3157,13 +3416,34 @@ end
 function deviceRecipes(role) return __deviceQuery("recipes", { role = __role(role) }) or {} end
 function deviceRequests(role) return __deviceQuery("requests", { role = __role(role) }) or {} end
 -- The two writes. They land on THIS PROJECT's override, never on the shared profile.
+-- A name left out reaches the host as "", which says a name is required; it was "nil", and stored.
 function deviceSetVariable(name, value, role)
-  return __deviceSet("variable", tostring(name), value, __role(role)) == true
+  return __deviceSet("variable", name == nil and "" or tostring(name), value, __role(role)) == true
 end
 function deviceSetTiming(name, ms, role)
-  return __deviceSet("timing", tostring(name), ms, __role(role)) == true
+  local r = __role(role)
+  local key = name == nil and "" or tostring(name):match("^%s*(.-)%s*$")
+  if key ~= "" then
+    local timing = __deviceQuery("timing", { role = r })
+    if type(timing) == "table" then
+      local names, known = {}, nil
+      for k in pairs(timing) do
+        names[#names + 1] = tostring(k)
+        if tostring(k):lower() == key:lower() then known = tostring(k) end
+      end
+      if known == nil then
+        table.sort(names)
+        logError("ce.device.setTiming: the profile for " .. r .. ' has no timing called "' .. key .. '", so nothing was changed. '
+          .. (#names > 0 and ("Its timings: " .. table.concat(names, ", ") .. ".") or "It has none."))
+        return false
+      end
+      key = known
+    end
+  end
+  return __deviceSet("timing", key, ms, r) == true
 end
 function deviceParameters(opts)
+  if __deviceNotOptions("parameters", opts) then return {} end
   opts = opts or {}
   local q = { role = __role(opts.role), query = opts.query, group = opts.group,
               type = opts.type, access = opts.access, limit = opts.limit }
@@ -3172,14 +3452,29 @@ function deviceParameters(opts)
   return r
 end
 function deviceParameter(id, role)
+  if __deviceIdMissing(id) then logError("ce.device.parameter: no parameter id was given, so there is no answer.") return nil end
   return __deviceQuery("parameter", { role = __role(role), id = tostring(id) })
 end
 -- ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
 -- configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
 -- device that showed up.
 function devicePorts(opts)
+  if __deviceNotOptions("ports", opts) then return {} end
   opts = opts or {}
-  local r = __deviceQuery("ports", { direction = opts.direction })
+  local q = {}
+  if opts.direction ~= nil then
+    local d = type(opts.direction) == "string" and opts.direction:lower():match("^%s*(.-)%s*$") or ""
+    if d == "in" or d == "input" or d == "out" or d == "output" then q.direction = d
+    else
+      local said = "ce.device.ports: direction is " .. __shownValue(opts.direction)
+        .. ', which is not "in" or "out", so every port was listed.'
+      if not __devicePortsWarned[said] then
+        __devicePortsWarned[said] = true
+        logWarn(said .. " This is said only the first time.")
+      end
+    end
+  end
+  local r = __deviceQuery("ports", q)
   if r == nil then return {} end
   return r
 end
@@ -3295,9 +3590,10 @@ function __storageScope(opts, verb)
     raw = opts.scope
   end
   if raw == nil or raw == "" then return "panel" end
-  local scope = tostring(raw)
+  -- In any case, as every word from a list is read: "Local" is "local".
+  local scope = tostring(raw):lower():match("^%s*(.-)%s*$")
   for _, known in ipairs(__CE_SCOPES) do if known == scope then return scope end end
-  logError(verb .. ': "' .. scope .. '" is not a scope, so nothing was done. One of: panel, script, local.')
+  logError(verb .. ': "' .. tostring(raw) .. '" is not a scope, so nothing was done. One of: panel, script, local.')
   return nil
 end
 
@@ -3323,23 +3619,45 @@ function __storageKeyFrom(scope, stored)
   return stored
 end
 
+-- A setting's name: text, or a number used as text. Left out, or anything else, is refused. The
+-- WebView runtime's storageName, word for word.
+local function __storageName(verb, key, outcome)
+  if type(key) == "string" then return key end
+  if type(key) == "number" and key == key and key ~= math.huge and key ~= -math.huge then return __shown(key) end
+  if key == nil then logError(verb .. ": no name was given, so " .. outcome .. ".")
+  else
+    logError(verb .. ": " .. __shownValue(key) .. " is not a name, so " .. outcome .. ". A name is text, or a number used as text.")
+  end
+  return nil
+end
+
 function saveSetting(key, value, opts)
-  local scope = __storageScope(opts, "ce.storage.saveSetting")
+  local verb = "ce.storage.saveSetting"
+  local name = __storageName(verb, key, "nothing was saved")
+  if name == nil then return false end
+  -- Nothing to save is no value, where it answered true and saved nothing: a table cannot hold nil.
+  if value == nil then
+    logError(verb .. ': no value was given for "' .. name .. '", so nothing was saved. ce.storage.forget() deletes a setting.')
+    return false
+  end
+  local scope = __storageScope(opts, verb)
   if scope == nil then return false end
   local store = __storageStore(scope)
   if __settingsAvailable(store) ~= true then
-    logError('saveSetting("' .. tostring(key) .. '"): the ' .. scope .. ' store is unavailable '
+    logError('saveSetting("' .. name .. '"): the ' .. scope .. ' store is unavailable '
              .. "here, so nothing was saved. ce.storage.info() says which stores are available.")
     return false
   end
-  __saveSetting(__storageKeyFor(scope, key), value, store)
+  __saveSetting(__storageKeyFor(scope, name), value, store)
   return true
 end
 
 function loadSetting(key, fallback, opts)
+  local name = __storageName("ce.storage.loadSetting", key, "the fallback was given back")
+  if name == nil then return fallback end
   local scope = __storageScope(opts, "ce.storage.loadSetting")
   if scope == nil then return fallback end
-  local v = __loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
+  local v = __loadSetting(__storageKeyFor(scope, name), __storageStore(scope))
   if v == nil then return fallback end
   return v
 end
@@ -3358,9 +3676,11 @@ function listSettings(opts)
 end
 
 function forgetSetting(key, opts)
+  local name = __storageName("ce.storage.forget", key, "nothing was deleted")
+  if name == nil then return false end
   local scope = __storageScope(opts, "ce.storage.forget")
   if scope == nil then return false end
-  return __forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) == true
+  return __forgetSetting(__storageKeyFor(scope, name), __storageStore(scope)) == true
 end
 
 -- Every setting as a table — the read every other module got. Listing keys and looping to fetch each
@@ -3516,13 +3836,31 @@ local function __jsonEnc(v, indent, depth, seen)
   return "{" .. nl .. table.concat(parts, "," .. nl) .. nl .. pad .. "}"
 end
 
-function encodeJson(value, opts)
-  if value == nil then return nil end
-  local indent = 0
-  if type(opts) == "table" then
-    local n = tonumber(opts.indent)
-    if n ~= nil and n > 0 then indent = math.floor(n) end
+-- encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+-- and held to 0 to 10; anything else one line. Each value it cannot use as written is said once.
+-- The WebView runtime's jsonIndent, word for word.
+local __storageWarned = {}
+local function __storageSaid(text)
+  if __storageWarned[text] then return end
+  __storageWarned[text] = true
+  logWarn(text .. " This is said only the first time.")
+end
+local function __jsonIndent(opts)
+  if type(opts) ~= "table" or opts.indent == nil then return 0 end
+  local raw = opts.indent
+  local n = __realNumber(raw)
+  local function said(why, used)
+    __storageSaid("ce.storage.encode: indent is " .. __shownValue(raw) .. ", which is " .. why .. ", so " .. used .. ".")
   end
+  if n == nil then said("not a number", "the text is on one line") return 0 end
+  if n < 0 then said("below 0", "the text is on one line") return 0 end
+  if n > 10 then said("above 10", "10 was used") return 10 end
+  return math.floor(n)
+end
+
+function encodeJson(value, opts)
+  local indent = __jsonIndent(opts)
+  if value == nil then return nil end
   local ok, res = pcall(__jsonEnc, value, indent, 0, {})
   if not ok then return nil end
   return res
@@ -3652,13 +3990,19 @@ __jsonValue = function(s, i)
   error("value", 0)
 end
 
+-- Text that is not JSON answers nothing and says so; nothing given, or a value that is not text, is
+-- refused the same way. The WebView runtime's decodeJson, word for word.
 function decodeJson(text)
-  local s = text == nil and "" or tostring(text)
-  local ok, value, rest = pcall(__jsonValue, s, 1)
-  if not ok then return nil end
+  local verb = "ce.storage.decode"
+  if text == nil then logError(verb .. ": no text was given, so there is no answer.") return nil end
+  if type(text) ~= "string" then logError(verb .. ": " .. __shownValue(text) .. " is not text, so there is no answer.") return nil end
+  local ok, value, rest = pcall(__jsonValue, text, 1)
   -- Trailing junk is malformed, not "the prefix parsed": telling a bad config from an empty one is
   -- the whole point of returning nothing.
-  if __jsonSpace(s, rest) <= #s then return nil end
+  if not ok or __jsonSpace(text, rest) <= #text then
+    logError(verb .. ": the text is not JSON, so there is no answer.")
+    return nil
+  end
   if value == __JSON_NULL then return nil end
   return value
 end
@@ -3786,13 +4130,13 @@ local __CE_MODULES = {
   ["ce.components.recorder"] = { bars = "recorderBars", clear = "recorderClear", countIn = "recorderCountIn", load = "recorderLoad", nudge = "recorderNudge", play = "recorderPlay", quantize = "recorderQuantize", read = "recorderRead", record = "recorderRecord", shift = "recorderShift", source = "recorderSource", stop = "recorderStop", store = "recorderStore", transpose = "recorderTranspose", undo = "recorderUndo" },
   ["ce.components.harmony"] = { channel = "harmonyChannel", degree = "harmonyDegree", inversion = "harmonyInversion", keepPlayed = "harmonyKeepPlayed", key = "harmonyKey", mode = "harmonyMode", octave = "harmonyOctave", outOfKey = "harmonyOutOfKey", read = "harmonyRead", scale = "harmonyScale", shape = "harmonyShape", size = "harmonySize", strum = "harmonyStrum", voiceLeading = "harmonyVoiceLeading", voicing = "harmonyVoicing" },
   ["ce.components.setlist"] = { crossfade = "setlistCrossfade", enable = "setlistEnable", jump = "setlistGoto", next = "setlistNext", prev = "setlistPrev", read = "setlistRead", wrap = "setlistWrap" },
-  ["ce.components.arp"] = { baseOctave = "arpBaseOctave", channel = "arpChannel", chordType = "arpChordType", degree = "arpDegree", division = "arpDivision", editable = "arpEditable", euclid = "arpEuclid", euclidPulses = "arpEuclidPulses", euclidRotate = "arpEuclidRotate", euclidSteps = "arpEuclidSteps", followPanelKey = "arpFollowPanelKey", gate = "arpGate", inputChannel = "arpInputChannel", key = "arpKey", latch = "arpLatch", link = "arpLink", mute = "arpMute", octaves = "arpOctaves", pattern = "arpPattern", phase = "arpPhase", rate = "arpRate", read = "arpRead", run = "arpRun", scale = "arpScale", showHeader = "arpShowHeader", showNotes = "arpShowNotes", source = "arpSource", swing = "arpSwing", sync = "arpSync", velocity = "arpVelocity" },
+  ["ce.components.arp"] = { baseOctave = "arpBaseOctave", channel = "arpChannel", chordType = "arpChordType", degree = "arpDegree", division = "arpDivision", editable = "arpEditable", euclid = "arpEuclid", euclidPulses = "arpEuclidPulses", euclidRotate = "arpEuclidRotate", euclidSteps = "arpEuclidSteps", followPanelKey = "arpFollowPanelKey", gate = "arpGate", inputChannel = "arpInputChannel", key = "arpKey", latch = "arpLatch", link = "arpLink", mute = "arpMute", octaves = "arpOctaves", pattern = "arpPattern", phase = "arpPhase", rate = "arpRate", read = "arpRead", run = "arpRun", scale = "arpScale", showHeader = "arpShowHeader", showNotes = "arpShowNotes", source = "arpSource", swing = "arpSwing", swingSource = "arpSwingSource", sync = "arpSync", velocity = "arpVelocity" },
   ["ce.components.chordpad"] = { baseOctave = "chordPadBaseOctave", channel = "chordPadChannel", chordType = "chordPadChordType", echo = "chordPadEcho", echoChannel = "chordPadEchoChannel", editable = "chordPadEditable", followPanelKey = "chordPadFollowPanelKey", gridCols = "chordPadGridCols", inversion = "chordPadInversion", key = "chordPadKey", latch = "chordPadLatch", layout = "chordPadLayout", mode = "chordPadMode", noteSpan = "chordPadNoteSpan", octave = "chordPadOctave", read = "chordPadRead", scale = "chordPadScale", showPiano = "chordPadShowPiano", showRomans = "chordPadShowRomans", strum = "chordPadStrum", velocity = "chordPadVelocity", voicing = "chordPadVoicing" },
   ["ce.components.noteribbon"] = { baseNote = "noteRibbonBaseNote", bendRange = "noteRibbonBendRange", channel = "noteRibbonChannel", echo = "noteRibbonEcho", echoChannel = "noteRibbonEchoChannel", editable = "noteRibbonEditable", followPanelKey = "noteRibbonFollowPanelKey", key = "noteRibbonKey", latch = "noteRibbonLatch", modAxis = "noteRibbonModAxis", modCc = "noteRibbonModCc", mode = "noteRibbonMode", octaves = "noteRibbonOctaves", orientation = "noteRibbonOrientation", read = "noteRibbonRead", scale = "noteRibbonScale", showHeader = "noteRibbonShowHeader", showNames = "noteRibbonShowNames", velocity = "noteRibbonVelocity", velocityFrom = "noteRibbonVelocityFrom" },
   ["ce.components.drumpads"] = { baseNote = "drumPadsBaseNote", channel = "drumPadsChannel", choke = "drumPadsChoke", colour = "drumPadsColour", cols = "drumPadsCols", cornerBottomLeft = "drumPadsCornerBottomLeft", cornerBottomRight = "drumPadsCornerBottomRight", cornerSize = "drumPadsCornerSize", cornerTopLeft = "drumPadsCornerTopLeft", cornerTopRight = "drumPadsCornerTopRight", echo = "drumPadsEcho", echoChannel = "drumPadsEchoChannel", editable = "drumPadsEditable", fill = "drumPadsFill", flamMs = "drumPadsFlamMs", gate = "drumPadsGate", ghostVelocity = "drumPadsGhostVelocity", label = "drumPadsLabel", map = "drumPadsMap", mode = "drumPadsMode", note = "drumPadsNote", origin = "drumPadsOrigin", read = "drumPadsRead", roll = "drumPadsRoll", rollDelay = "drumPadsRollDelay", rollHz = "drumPadsRollHz", rollRate = "drumPadsRollRate", rollSync = "drumPadsRollSync", rollVelocity = "drumPadsRollVelocity", rows = "drumPadsRows", showHeader = "drumPadsShowHeader", showLabels = "drumPadsShowLabels", showNotes = "drumPadsShowNotes", size = "drumPadsSize", velocity = "drumPadsVelocity", velocityFrom = "drumPadsVelocityFrom", zones = "drumPadsZones" },
   ["ce.components.turing"] = { division = "turingDivision", editable = "turingEditable", fill = "turingFill", gate = "turingGate", length = "turingLength", phase = "turingPhase", quantize = "turingQuantize", randomness = "turingRandomness", rate = "turingRate", read = "turingRead", run = "turingRun", showDivisions = "turingShowDivisions", showGate = "turingShowGate", size = "turingSize", step = "turingStep", sync = "turingSync" },
   ["ce.components.looper"] = { bars = "looperBars", editable = "looperEditable", fill = "looperFill", insert = "looperInsert", lane = "looperLane", laneRest = "looperLaneRest", phase = "looperPhase", quantize = "looperQuantize", read = "looperRead", remove = "looperRemove", run = "looperRun", seconds = "looperSeconds", showDivisions = "looperShowDivisions", showGrid = "looperShowGrid", showPlayhead = "looperShowPlayhead", size = "looperSize", sync = "looperSync" },
-  ["ce.components.orbit"] = { bars = "orbitBars", editable = "orbitEditable", fill = "orbitFill", insert = "orbitInsert", node = "orbitNode", nodeAngle = "orbitNodeAngle", nodeDepth = "orbitNodeDepth", nodeRadius = "orbitNodeRadius", nodeRatio = "orbitNodeRatio", phase = "orbitPhase", rate = "orbitRate", read = "orbitRead", remove = "orbitRemove", run = "orbitRun", showRings = "orbitShowRings", showSpokes = "orbitShowSpokes", showTrails = "orbitShowTrails", showValues = "orbitShowValues", size = "orbitSize", sync = "orbitSync" },
+  ["ce.components.orbit"] = { bars = "orbitBars", editable = "orbitEditable", fill = "orbitFill", insert = "orbitInsert", node = "orbitNode", nodeAngle = "orbitNodeAngle", nodeDepth = "orbitNodeDepth", nodeInvert = "orbitNodeInvert", nodeOutput = "orbitNodeOutput", nodeRadius = "orbitNodeRadius", nodeRatio = "orbitNodeRatio", phase = "orbitPhase", rate = "orbitRate", read = "orbitRead", remove = "orbitRemove", run = "orbitRun", showRings = "orbitShowRings", showSpokes = "orbitShowSpokes", showTrails = "orbitShowTrails", showValues = "orbitShowValues", size = "orbitSize", sync = "orbitSync" },
   ["ce.components.kinetic"] = { bounce = "kineticBounce", editable = "kineticEditable", friction = "kineticFriction", gravity = "kineticGravity", keepAlive = "kineticKeepAlive", launch = "kineticLaunch", read = "kineticRead", run = "kineticRun", showTrail = "kineticShowTrail", showWalls = "kineticShowWalls", sync = "kineticSync", velocity = "kineticVelocity" },
   ["ce.components.constellation"] = { bars = "constellationBars", blend = "constellationBlend", editable = "constellationEditable", links = "constellationLinks", mode = "constellationMode", probe = "constellationProbe", rate = "constellationRate", read = "constellationRead", run = "constellationRun", showField = "constellationShowField", showLabels = "constellationShowLabels", showLinks = "constellationShowLinks", sync = "constellationSync" },
   ["ce.components.timbre"] = { anchorX = "timbreAnchorX", anchorY = "timbreAnchorY", axisX = "timbreAxisX", axisY = "timbreAxisY", editable = "timbreEditable", fill = "timbreFill", insert = "timbreInsert", move = "timbreMove", power = "timbrePower", read = "timbreRead", remove = "timbreRemove", showAnchors = "timbreShowAnchors", showField = "timbreShowField", showReadout = "timbreShowReadout", size = "timbreSize" },
@@ -3804,11 +4148,11 @@ local __CE_MODULES = {
   ["ce.components.ribbon"] = { bipolar = "ribbonBipolar", editable = "ribbonEditable", label = "ribbonLabel", orientation = "ribbonOrientation", read = "ribbonRead", returnCurve = "ribbonReturnCurve", returnMode = "ribbonReturnMode", returnTime = "ribbonReturnTime", returnValue = "ribbonReturnValue", showGlow = "ribbonShowGlow", showValue = "ribbonShowValue", snap = "ribbonSnap", style = "ribbonStyle", value = "ribbonValue", valuePrecision = "ribbonValuePrecision" },
   ["ce.components.crossfader"] = { bipolar = "crossfaderBipolar", detent = "crossfaderDetent", editable = "crossfaderEditable", labelA = "crossfaderLabelA", labelB = "crossfaderLabelB", law = "crossfaderLaw", mix = "crossfaderMix", orientation = "crossfaderOrientation", read = "crossfaderRead", returnCurve = "crossfaderReturnCurve", returnMode = "crossfaderReturnMode", returnTime = "crossfaderReturnTime", returnValue = "crossfaderReturnValue", showGains = "crossfaderShowGains", showLabels = "crossfaderShowLabels" },
   ["ce.components.joystick"] = { bipolar = "joystickBipolar", cornerLabel = "joystickCornerLabel", editable = "joystickEditable", fill = "joystickFill", move = "joystickMove", read = "joystickRead", returnAxes = "joystickReturnAxes", returnCurve = "joystickReturnCurve", returnMode = "joystickReturnMode", returnTime = "joystickReturnTime", returnValue = "joystickReturnValue", showCorners = "joystickShowCorners", showCrosshair = "joystickShowCrosshair", showGrid = "joystickShowGrid", showTrail = "joystickShowTrail", size = "joystickSize" },
-  ["ce.components.meter"] = { dbCeil = "meterDbCeil", dbFloor = "meterDbFloor", decay = "meterDecay", fill = "meterFill", gradient = "meterGradient", holdMs = "meterHoldMs", insert = "meterInsert", label = "meterLabel", orientation = "meterOrientation", peakHold = "meterPeakHold", read = "meterRead", remove = "meterRemove", scale = "meterScale", showScaleLabels = "meterShowScaleLabels", showTicks = "meterShowTicks", showValue = "meterShowValue", size = "meterSize", source = "meterSource", value = "meterValue", valueMax = "meterValueMax", valueMin = "meterValueMin", valuePrecision = "meterValuePrecision", valuePrefix = "meterValuePrefix", valueSuffix = "meterValueSuffix", zoneAt = "meterZoneAt" },
+  ["ce.components.meter"] = { dbCeil = "meterDbCeil", dbFloor = "meterDbFloor", decay = "meterDecay", fill = "meterFill", gradient = "meterGradient", holdMs = "meterHoldMs", insert = "meterInsert", label = "meterLabel", labelPosition = "meterLabelPosition", orientation = "meterOrientation", peakHold = "meterPeakHold", read = "meterRead", remove = "meterRemove", scale = "meterScale", showScaleLabels = "meterShowScaleLabels", showTicks = "meterShowTicks", showValue = "meterShowValue", size = "meterSize", source = "meterSource", value = "meterValue", valueMax = "meterValueMax", valueMin = "meterValueMin", valuePrecision = "meterValuePrecision", valuePrefix = "meterValuePrefix", valueSuffix = "meterValueSuffix", zoneAt = "meterZoneAt" },
   ["ce.components.transport"] = { beatUnit = "transportBeatUnit", beatsPerBar = "transportBeatsPerBar", bpm = "transportBpm", clockDevice = "transportClockDevice", clockOut = "transportClockOut", countIn = "transportCountIn", editable = "transportEditable", loop = "transportLoop", loopBars = "transportLoopBars", loopStart = "transportLoopStart", read = "transportRead", runOnLoad = "transportRunOnLoad", showPosition = "transportShowPosition", showTap = "transportShowTap", source = "transportSource", swing = "transportSwing" },
   ["ce.components.panic"] = { centreBend = "panicSetCentreBend", channel = "panicSetChannel", clearLocal = "panicSetClearLocal", editable = "panicSetEditable", label = "panicSetLabel", read = "panicSetRead", resetControllers = "panicSetResetControllers", scope = "panicSetScope", showSummary = "panicSetShowSummary" },
-  ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
-  ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
+  ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", layout = "lcdLayout", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix", zoneAt = "lcdZoneAt", zoneKind = "lcdZoneKind", zoneLabel = "lcdZoneLabel", zoneShow = "lcdZoneShow", zoneSource = "lcdZoneSource", zoneText = "lcdZoneText" },
+  ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", kind = "pixelKind", label = "pixelLabel", layout = "pixelLayout", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", source = "pixelSource", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
 local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {

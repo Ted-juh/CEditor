@@ -13,7 +13,7 @@
 import { CROSSFADER_LAWS } from '../utils/crossfaderLayout.js';
 import { RETURN_CURVES, RETURN_MODES } from '../utils/returnToRest.js';
 import {
-  CHORDPAD_LAYOUTS, CROSSFADER_ORIENTATIONS, MATRIX_CELL_STYLES, METER_ORIENTATIONS, NOTERIBBON_MOD_AXES, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES,
+  CHORDPAD_LAYOUTS, CROSSFADER_ORIENTATIONS, MATRIX_CELL_STYLES, METER_LABEL_POSITIONS, METER_ORIENTATIONS, NOTERIBBON_MOD_AXES, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES,
   RIBBON_ORIENTATIONS, RIBBON_STYLES,
 } from '../scripting/componentTables.js';
 import { METER_SCALES } from '../utils/meterLayout.js';
@@ -31,14 +31,14 @@ export const KINETIC_FIELDS = [
   { slot: 'reset' },
   {
     key: 'gravity', kind: 'range', label: 'Gravity', span: 4, min: 0, max: 4, step: 0.05, default: 0, decimals: 2,
-    // A script can turn gravity round (−4..4); the inspector only offers a downward pull.
-    script: { min: -4, max: 4 },
+    // A script took −4..4 here, to turn gravity round, and the physics (kineticParams) plays 0..4:
+    // an upward pull played as none. A script takes what is played (the Kinetic's review).
     hint: 'Downward pull. 0 = zero-g; higher makes the ball fall and settle.',
   },
   {
     key: 'restitution', kind: 'range', label: 'Bounce', span: 4, percent: true, default: 0.92,
-    // A script can make a wall add energy (up to 1.5); the inspector stops at 100 %.
-    script: { min: 0, max: 1.5 },
+    // A script took up to 1.5, for a wall that adds energy, and the physics keeps at most all of it
+    // (kineticParams): 1.5 played as 1. A script takes what is played (the Kinetic's review).
     hint: 'Wall restitution — energy kept on each bounce. 100% = perpetual motion; lower = the ball loses energy and slows.',
   },
   {
@@ -308,7 +308,7 @@ export const METER_READOUT_FIELDS = [
   { slot: 'suffix', when: readout },
   { slot: 'caption' },
   {
-    key: 'labelPosition', kind: 'select', label: 'Position', span: 1, default: 'none',
+    key: 'labelPosition', kind: 'select', label: 'Position', span: 1, default: 'none', table: METER_LABEL_POSITIONS,
     hint: 'Where the caption sits.', options: [['none', 'None'], ['above', 'Above'], ['below', 'Below']],
   },
 ];

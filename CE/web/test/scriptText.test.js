@@ -273,6 +273,15 @@ test('style() refuses values outside the app\'s own vocabularies', () => {
   });
 });
 
+test('style() reads its words in any case, and stores them as the vocabulary spells them', () => {
+  withText((api) => {
+    assert.equal(api.textStyle('L', { caseMode: 'UPPERCASE', scriptMode: 'Superscript', justification: ' TOPLEFT ' }), true);
+    assert.equal(api.textRead('L', 'caseMode'), 'uppercase');
+    assert.equal(api.textRead('L', 'scriptMode'), 'superscript');
+    assert.equal(api.textRead('L', 'justification'), 'topLeft');
+  });
+});
+
 test('the reported vocabularies are the editor\'s own tables', () => {
   assert.deepEqual(CASE_MODES, TEXT_CASE_OPTIONS.map((o) => o.value));
   assert.deepEqual(SCRIPT_MODES, TEXT_SCRIPT_OPTIONS.map((o) => o.value));

@@ -55,8 +55,9 @@ test('nibbles split and recombine a byte', () => {
   assert.equal(api.fromNibbles(0xA, 0xB), 0xAB);
   assert.deepEqual(api.nibblize([0xAB, 0xCD]), [0xA, 0xB, 0xC, 0xD]);
   assert.deepEqual(api.denibblize([0xA, 0xB, 0xC, 0xD]), [0xAB, 0xCD]);
-  // Odd tail: the missing low nibble reads as zero rather than NaN.
-  assert.deepEqual(api.denibblize([0xA, 0xB, 0xC]), [0xAB, 0xC0]);
+  // An odd count has no low half to join the last one with: refused, where it read the missing half
+  // as 0 without a word (scriptPreludeAgreement.test.js has the words, in every engine).
+  assert.equal(api.denibblize([0xA, 0xB, 0xC]), undefined);
 });
 
 test('ASCII helpers pad to length and read back', () => {

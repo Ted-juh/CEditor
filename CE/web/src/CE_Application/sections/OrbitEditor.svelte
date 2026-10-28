@@ -7,12 +7,15 @@
   import SwatchCluster from '../properties/SwatchCluster.svelte';
   import TransportSyncCells from '../properties/TransportSyncCells.svelte';
   import { MIN_BARS, MAX_BARS } from '../utils/transportLayout.js';
+  import { ORBIT_OUTPUTS } from '../utils/orbitLayout.js';
   import Orbit from 'lucide-svelte/icons/orbit';
   import Satellite from 'lucide-svelte/icons/satellite';
   import Palette from 'lucide-svelte/icons/palette';
 
   import { componentListWithElement } from '../utils/componentElements.js';
   let { control = null } = $props();
+  // The engine's list (ORBIT_OUTPUTS), named as this select always named them.
+  const OUTPUT_LABELS = { y: 'Y (vert)', x: 'X (horiz)', sine: 'Sine', radius: 'Radius' };
 
   let core = $derived(getSection(control, 'Core'));
   let o = $derived(getSection(control, 'Orbit'));
@@ -116,10 +119,9 @@
               </label>
               <label class="fld"><span>Output</span>
                 <select class="val" value={s.output ?? 'y'} onchange={(e) => updateNode(i, 'output', e.target.value)}>
-                  <option value="y">Y (vert)</option>
-                  <option value="x">X (horiz)</option>
-                  <option value="sine">Sine</option>
-                  <option value="radius">Radius</option>
+                  {#each ORBIT_OUTPUTS as output (output)}
+                    <option value={output}>{OUTPUT_LABELS[output]}</option>
+                  {/each}
                 </select>
               </label>
               <label class="fld"><span>Depth %</span>

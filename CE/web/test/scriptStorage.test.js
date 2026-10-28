@@ -127,6 +127,14 @@ test('a panel listing hides other scripts’ private keys rather than showing an
   });
 });
 
+test('a scope is read in any case, as every word from a list is', () => {
+  withPanel((a) => {
+    a.saveSetting('count', 7, { scope: 'Script' });
+    assert.equal(a.loadSetting('count', null, { scope: ' SCRIPT ' }), 7, '"Script" was not a scope');
+    assert.equal(a.loadSetting('count', null, { scope: 'script' }), 7);
+  });
+});
+
 test('an unknown scope is refused, not quietly treated as panel', () => {
   withPanel((a, _b, panel) => {
     // The failure mode this prevents: a typo in a scope name turning a private setting into a

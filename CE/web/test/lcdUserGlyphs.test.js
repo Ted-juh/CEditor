@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 
 import {
   GLYPH_SLOTS, GLYPH_W, glyphSlotChar, parseGlyph, glyphPath, buildGlyphMap, emptyGlyphSlots,
-  glyphBits, toggleGlyphBit, invertGlyphBits, shiftGlyphBits, barGlyphSet,
+  glyphBits, toggleGlyphBit, invertGlyphBits, shiftGlyphBits, barGlyphSet, glyphBitsRefusal,
 } from '../src/CE_Application/utils/lcdUserGlyphs.js';
 import { BAR_CHARS } from '../src/CE_Application/utils/lcdZones.js';
 
@@ -44,6 +44,30 @@ test('a short glyph draws as far as it was drawn', () => {
   assert.equal(rows.length, 8);
   assert.deepEqual(rows[1], [true, true, true, true, true]);
   assert.deepEqual(rows[2], [false, false, false, false, false]);
+});
+
+test('each row between "|" is read on its own, a short one padded to five', () => {
+  // The separators used to be dropped and the rest read five at a time, so a short row ran into
+  // the next: "#|#|#" lit three cells of the top row rather than one cell of three rows.
+  const rows = parseGlyph('#|#|#');
+  assert.deepEqual(rows.slice(0, 4).map((row) => row.map((on) => (on ? '#' : '.')).join('')),
+    ['#....', '#....', '#....', '.....']);
+  assert.deepEqual(parseGlyph('##.|#')[0], [true, true, false, false, false]);
+  assert.deepEqual(parseGlyph('##.|#')[1], [true, false, false, false, false]);
+  assert.deepEqual(parseGlyph(' #.#. | .#.#. ')[1], [false, true, false, true, false], 'spaces are not cells');
+});
+
+test('a glyph that cannot be drawn as written says why; one that can says nothing', () => {
+  assert.equal(glyphBitsRefusal('abc'),
+    '"a", "b", "c" are not cells of a glyph: "#" or "1" is lit, "." or "0" unlit, and "|" ends a row.');
+  assert.equal(glyphBitsRefusal('#x###'),
+    '"x" is not a cell of a glyph: "#" or "1" is lit, "." or "0" unlit, and "|" ends a row.');
+  assert.equal(glyphBitsRefusal('#|#|#|#|#|#|#|#|#'), 'It has 9 rows, and a glyph has 8.');
+  assert.equal(glyphBitsRefusal('#####|######'), 'Row 2 has 6 cells, and a row has 5.');
+  assert.equal(glyphBitsRefusal('#'.repeat(41)), 'It has 41 cells, and a glyph has 40: eight rows of five.');
+  for (const fine of [BAR_FULL, BAR_FULL.replace(/\|/g, ''), '#|#|#', '0101', '', '.....|.....', ' #.#. | ### ']) {
+    assert.equal(glyphBitsRefusal(fine), null, JSON.stringify(fine));
+  }
 });
 
 test('the path merges horizontal runs instead of drawing a rect per pixel', () => {

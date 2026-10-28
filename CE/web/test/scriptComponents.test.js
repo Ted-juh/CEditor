@@ -15,8 +15,10 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
 
-import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptApiForTesting, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptTrace, clearScriptTrace } from '../src/CE_Application/stores/scriptConsole.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import {
@@ -390,8 +392,10 @@ test('the arp’s per-step mutes agree with the grid’s own toggle', () => {
     for (const step of [3, 5, 3]) {
       // The app's function, imported — the muted steps are a SET of indices, not a boolean per
       // step, so a script writing one and a click on the grid have to agree about the shape. Fed
-      // the CURRENT mutes each time, because the third call toggles step 3 back off.
-      const expected = toggleMute({ _children: { Arp: { mutes: api.arpRead('arp', 'mute') } } }, step - 1);
+      // the CURRENT mutes each time, because the third call toggles step 3 back off. read counts the
+      // steps from 1, as mute() does, and the grid stores them from 0.
+      const stored = api.arpRead('arp', 'mute').map((n) => n - 1);
+      const expected = toggleMute({ _children: { Arp: { mutes: stored } } }, step - 1).map((n) => n + 1);
       assert.equal(api.arpMute('arp', step), true);
       assert.deepEqual(api.arpRead('arp', 'mute'), expected);
     }
@@ -519,6 +523,36 @@ test('show and blink toggle when called with nothing to set', () => {
   });
 });
 
+test('read answers shown and steady for an element that stores neither, as it is drawn', () => {
+  withPixelScene((api) => {
+    api.set('pixel.Pixel.elements', [{ id: 'el_0', name: 'title', kind: 'static', text: 'INIT', x: 2, y: 2, w: 0, h: 8 }]);
+    api.set('pixel.Pixel.layouts', []);
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), true);
+    assert.equal(api.pixelRead('pixel', 'blink', 'title'), false);
+    assert.equal(api.pixelShow('pixel', 'title'), true);
+    assert.equal(api.pixelRead('pixel', 'show', 'title'), false, 'one bare call hides it');
+  });
+});
+
+test('an element\'s kind and source are set by name, as the LCD\'s zones\' are', () => {
+  // Item 4 of the owner's review of the pixel: what an element is and what it shows, on every page.
+  withPixelScene((api) => {
+    assert.equal(api.pixelKind('pixel', 'title', 'VBAR'), true, 'any case');
+    assert.equal(api.pixelRead('pixel', 'kind', 'title'), 'vbar');
+    assert.equal(api.get('pixel.Pixel.layouts')[0].elements[0].kind, 'vbar', 'on the page too');
+    assert.equal(api.pixelKind('pixel', 'title', 'blob'), false);
+    assert.equal(api.pixelSource('pixel', 'title', 'METER'), true, 'a control by name, in any case');
+    assert.equal(api.pixelRead('pixel', 'source', 'title'), 'meter', 'read gives the name back');
+    assert.match(api.get('pixel.Pixel.elements')[0].sourceId, /^ctrl_|^[a-z0-9_]+$/i, 'stored by id, as the picker stores it');
+    assert.notEqual(api.get('pixel.Pixel.elements')[0].sourceId, 'meter');
+    assert.equal(api.pixelSource('pixel', 'title', '@active#value'), true);
+    assert.equal(api.pixelRead('pixel', 'source', 'title'), '@active#value');
+    assert.equal(api.pixelSource('pixel', 'title', 'pixel'), false, 'not itself');
+    assert.equal(api.pixelSource('pixel', 'title', ''), true, 'unlinked');
+    assert.equal(api.pixelRead('pixel', 'source', 'title'), '');
+  });
+});
+
 test('the scene verbs clamp like every other number verb', () => {
   withPixelScene((api) => {
     assert.equal(api.pixelX('pixel', 'title', 999999), true);
@@ -528,6 +562,21 @@ test('the scene verbs clamp like every other number verb', () => {
     assert.equal(api.pixelRead('pixel', 'x', 'title'), -30);
     assert.equal(api.pixelW('pixel', 'title', -5), true, 'a width clamps to 0 rather than refusing');
     assert.equal(api.pixelRead('pixel', 'w', 'title'), 0);
+  });
+});
+
+test('an element\'s number past its range is said once, and one refused says why', () => {
+  // Clamped without a word, and refused with no reason, where every other number command says
+  // both (item 2 of the owner's review of the pixel).
+  resetScriptStateForTesting();
+  withPixelScene((api) => {
+    const said = (fn) => { clearScriptTrace(); fn(); return get(scriptTrace).filter((t) => t.kind !== 'log').map((t) => t.message); };
+    assert.deepEqual(said(() => api.pixelX('pixel', 'title', 5000)),
+      ['pixel pixel: x("title", 5000) — the x 5000 is outside -4096 to 4096, so 4096 was used. This is said only the first time.']);
+    assert.deepEqual(said(() => api.pixelX('pixel', 'title', 6000)), [], 'once');
+    assert.deepEqual(said(() => api.pixelH('pixel', 'title', 'big')), ['pixel pixel: h("title", "big") — refused, nothing changed. "big" is not a number.']);
+    assert.deepEqual(said(() => api.pixelY('pixel', 'title')), ['pixel pixel: y("title") — refused, nothing changed. No number was given.']);
+    assert.match(said(() => api.pixelW('pixel', 'tempo', -9))[0], /There is no element called "tempo"/, 'no element: refused, not clamped');
   });
 });
 

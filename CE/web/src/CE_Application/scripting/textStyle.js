@@ -21,7 +21,7 @@
 
 import { carriedFontFamilies } from '../utils/documentFonts.js';
 import { numberOr } from '../utils/primitives.js';
-import { normalizeScriptMode, normalizeTextCaseMode } from '../editor/canvasControlStyles.js';
+import { listWord } from '../utils/wordLists.js';
 import {
   TEXT_CASE_OPTIONS, TEXT_POSITION_OPTIONS, TEXT_SCRIPT_OPTIONS, TYPOGRAPHY_FEATURE_OPTIONS,
 } from '../sections/textEditorVocabulary.js';
@@ -212,20 +212,25 @@ export function planStyle(opts, { descriptor = null, catalogue = null } = {}) {
 
   if ('italic' in source) put('style', source.italic ? 'Italic' : 'Normal');
 
+  // The three lists are read in any case (utils/wordLists.js) and stored as each spells them:
+  // "UpperCase" is "uppercase", "TopLeft" is "topLeft".
   if ('caseMode' in source) {
-    if (normalizeTextCaseMode(source.caseMode) !== String(source.caseMode)) {
+    const mode = listWord(CASE_MODES, source.caseMode);
+    if (!mode) {
       refused.push({ option: 'caseMode', reason: `"${source.caseMode}" is not one of ${CASE_MODES.join(', ')}` });
-    } else put('caseMode', String(source.caseMode));
+    } else put('caseMode', mode);
   }
   if ('scriptMode' in source) {
-    if (normalizeScriptMode(source.scriptMode) !== String(source.scriptMode)) {
+    const mode = listWord(SCRIPT_MODES, source.scriptMode);
+    if (!mode) {
       refused.push({ option: 'scriptMode', reason: `"${source.scriptMode}" is not one of ${SCRIPT_MODES.join(', ')}` });
-    } else put('scriptMode', String(source.scriptMode));
+    } else put('scriptMode', mode);
   }
   if ('justification' in source) {
-    if (!JUSTIFICATIONS.includes(String(source.justification))) {
+    const where = listWord(JUSTIFICATIONS, source.justification);
+    if (!where) {
       refused.push({ option: 'justification', reason: `"${source.justification}" is not one of ${JUSTIFICATIONS.join(', ')}` });
-    } else put('justification', String(source.justification));
+    } else put('justification', where);
   }
 
   for (const key of FEATURE_KEYS) {

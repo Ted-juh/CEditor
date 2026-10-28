@@ -83,11 +83,16 @@ test('a character a segment or graphic display cannot draw is said, and a charac
   assert.equal(run({ panelType: 'segment', segmentType: '16' }, (api) => api.ce.components.lcd.text('Lcd', 1, `%${LONG}`)).lines.length, 2);
 });
 
-test('a display with layouts shows their zones, and a line written to it is said not to show', () => {
-  const layouts = [{ id: 'main', name: 'Main', zones: [{ id: 'z', show: 'static', text: 'HELLO', row: 1, colStart: 1, colEnd: 16 }] }];
-  assert.deepEqual(run({ layouts }, (api) => api.ce.components.lcd.text('Lcd', 1, `%${LONG}`)).lines, [
-    `lcd Lcd: text(1, "%${LONG}") — the display shows the zones of its layouts, not its lines, so this line is not shown.${ONCE}`,
-  ], 'nothing else about a line that is not shown');
+test('on a display with layouts a line is written to the layout showing, which never scrolls it', () => {
+  // It was written to lines the display never drew, and said not to show. A layout has text of its
+  // own now (lcdPositions.js), drawn where no zone paints; its rows are composed at the display's
+  // width, so scroll() does not bring the rest in.
+  const layouts = [{ id: 'main', name: 'Main', zones: [{ id: 'z', show: 'static', text: 'HELLO', row: 1, colStart: 1, colEnd: 5 }] }];
+  const done = run({ layouts, scroll: 'left' }, (api) => api.ce.components.lcd.text('Lcd', 2, `%${LONG}`));
+  assert.deepEqual(done.lines, [
+    `lcd Lcd: text(2, "%${LONG}") — the display is 16 characters wide and a layout's text does not scroll, so only "%THIS LINE IS MU" shows.${ONCE}`,
+  ]);
+  assert.deepEqual(done.control._children.Display.layouts[0].lines, ['', `%${LONG}`]);
 });
 
 test('the line\'s row draws it as the display shows it, and says what the runtime says', () => {

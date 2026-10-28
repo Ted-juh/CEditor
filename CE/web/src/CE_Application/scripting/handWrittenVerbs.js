@@ -24,7 +24,10 @@ import { MIN_STEPS, MAX_STEPS, MIN_ROWS, MAX_ROWS, PHRASE_SEEDS, PHRASE_DIRECTIO
 import { HARMONY_MODES, VOICINGS, OUT_OF_KEY, VOICE_LEADING, MEMORY_PRESETS } from '../utils/harmoniserLayout.js';
 import { setlistScenes } from '../utils/setlistLayout.js';
 import { SCALES } from '../utils/chordPadLayout.js';
+import { SCALE_NAMES, pitchClassOf, noteNumberOf } from './musicTheory.js';
+import { realNumber } from './scriptColours.js';
 import { shownValue } from './shownValue.js';
+import { listWord } from '../utils/wordLists.js';
 
 const clampInt = (v, lo, hi, fallback) => {
   const n = Math.round(Number(v));
@@ -37,24 +40,24 @@ const quoted = (names) => names.map((n) => `"${n}"`).join(', ');
 // too), and the kind of each argument the Values tab reads: an `index` (a zone, a cell, a slot, a
 // degree, a scene) or a `word` from a closed list (words names it).
 export const HAND_WRITTEN = {
-  splitPreset: { family: 'split', section: 'SplitZone', action: 'preset', args: (preset, lowNote, highNote) => ({ preset, lowNote, highNote }), kinds: ['word'] },
+  splitPreset: { family: 'split', section: 'SplitZone', action: 'preset', args: (preset, lowNote, highNote) => ({ preset: asWord('split preset', preset), lowNote, highNote }), kinds: ['word'] },
   splitMute: { family: 'split', section: 'SplitZone', action: 'mute', args: (zone, enabled) => ({ zone, enabled: enabled !== false }), kinds: ['index'] },
   splitChannel: { family: 'split', section: 'SplitZone', action: 'channel', args: (zone, channel) => ({ zone, channel }), kinds: ['index'] },
   splitTranspose: { family: 'split', section: 'SplitZone', action: 'transpose', args: (zone, semitones) => ({ zone, transpose: semitones }), kinds: ['index'] },
   splitPoint: { family: 'split', section: 'SplitZone', action: 'splitPoint', args: (zone, note) => ({ zone, note }), kinds: ['index'] },
-  phraseSeed: { family: 'phrase', section: 'Phrase', action: 'seed', args: (seed) => ({ seed }), kinds: ['word'] },
-  phraseKey: { family: 'phrase', section: 'Phrase', action: 'key', args: (key) => ({ key }), kinds: ['word'] },
-  phraseDirection: { family: 'phrase', section: 'Phrase', action: 'direction', args: (direction) => ({ direction }), kinds: ['word'] },
+  phraseSeed: { family: 'phrase', section: 'Phrase', action: 'seed', args: (seed) => ({ seed: asWord('phrase seed', seed) }), kinds: ['word'] },
+  phraseKey: { family: 'phrase', section: 'Phrase', action: 'key', args: (key) => ({ key: keyOf(key) }), kinds: ['word'] },
+  phraseDirection: { family: 'phrase', section: 'Phrase', action: 'direction', args: (direction) => ({ direction: asWord('phrase direction', direction) }), kinds: ['word'] },
   phraseCell: { family: 'phrase', section: 'Phrase', action: 'cell', args: (step, row, on) => ({ step, row, on }), kinds: ['index', 'index'] },
-  recorderSource: { family: 'recorder', section: 'Recorder', action: 'source', args: (source) => ({ source }), kinds: ['word'] },
+  recorderSource: { family: 'recorder', section: 'Recorder', action: 'source', args: (source) => ({ source: asWord('recorder source', source) }), kinds: ['word'] },
   recorderStore: { family: 'recorder', section: 'Recorder', action: 'store', args: (slot, name) => ({ slot, name }), kinds: ['index'] },
   recorderLoad: { family: 'recorder', section: 'Recorder', action: 'load', args: (slot) => ({ slot }), kinds: ['index'] },
-  harmonyMode: { family: 'harmoniser', section: 'Harmoniser', action: 'mode', args: (mode) => ({ mode }), kinds: ['word'] },
-  harmonyKey: { family: 'harmoniser', section: 'Harmoniser', action: 'key', args: (key) => ({ key }), kinds: ['word'] },
-  harmonyShape: { family: 'harmoniser', section: 'Harmoniser', action: 'shape', args: (shape) => ({ shape, preset: shape }), kinds: ['word'] },
-  harmonyVoicing: { family: 'harmoniser', section: 'Harmoniser', action: 'voicing', args: (voicing) => ({ voicing }), kinds: ['word'] },
-  harmonyOutOfKey: { family: 'harmoniser', section: 'Harmoniser', action: 'outOfKey', args: (mode) => ({ outOfKey: mode }), kinds: ['word'] },
-  harmonyVoiceLeading: { family: 'harmoniser', section: 'Harmoniser', action: 'voiceLeading', args: (mode) => ({ voiceLeading: mode }), kinds: ['word'] },
+  harmonyMode: { family: 'harmoniser', section: 'Harmoniser', action: 'mode', args: (mode) => ({ mode: asWord('harmoniser mode', mode) }), kinds: ['word'] },
+  harmonyKey: { family: 'harmoniser', section: 'Harmoniser', action: 'key', args: (key) => ({ key: keyOf(key) }), kinds: ['word'] },
+  harmonyShape: { family: 'harmoniser', section: 'Harmoniser', action: 'shape', args: (shape) => ({ shape: asWord('harmoniser shape', shape), preset: asWord('harmoniser shape', shape) }), kinds: ['word'] },
+  harmonyVoicing: { family: 'harmoniser', section: 'Harmoniser', action: 'voicing', args: (voicing) => ({ voicing: asWord('harmoniser voicing', voicing) }), kinds: ['word'] },
+  harmonyOutOfKey: { family: 'harmoniser', section: 'Harmoniser', action: 'outOfKey', args: (mode) => ({ outOfKey: asWord('harmoniser outOfKey', mode) }), kinds: ['word'] },
+  harmonyVoiceLeading: { family: 'harmoniser', section: 'Harmoniser', action: 'voiceLeading', args: (mode) => ({ voiceLeading: asWord('harmoniser voiceLeading', mode) }), kinds: ['word'] },
   harmonyDegree: { family: 'harmoniser', section: 'Harmoniser', action: 'degree', args: (degree, chord) => ({ degree, chord }), kinds: ['index', 'word'] },
   setlistGoto: { family: 'setlist', section: 'Setlist', action: 'goto', args: (scene) => ({ scene }), kinds: ['index'] },
   setlistEnable: { family: 'setlist', section: 'Setlist', action: 'enable', args: (scene, enabled) => ({ scene, enabled: enabled !== false }), kinds: ['index'] },
@@ -74,6 +77,13 @@ const WORDS = {
 };
 const WORD_ARG = { preset: 'preset', seed: 'seed', direction: 'direction', source: 'source', mode: 'mode',
   voicing: 'voicing', outOfKey: 'outOfKey', voiceLeading: 'voiceLeading', shape: 'shape' };
+
+/** A word from one of those lists in any case (utils/wordLists.js), as the list spells it, so the
+ *  reducer and the refusal see "up" for "Up"; anything else as given, for the refusal to name. A
+ *  zone's or a scene's name is the author's, and is matched as written. */
+function asWord(key, value) {
+  return typeof value === 'string' ? listWord(WORDS[key](), value) ?? value : value;
+}
 
 /** The words a hand-written verb's argument takes, or null when it takes no closed list. */
 export function handWrittenWords(memberId) {
@@ -119,6 +129,48 @@ function recorderSlotRefusal(cfg, action, slot) {
     : `There is no take in slot ${shownValue(slot)}: ${held ? `slots 1 to ${held} hold takes` : 'no slot holds one yet'}.`;
 }
 
+const KEY_REASON = 'A key is a note\'s name, such as "F#", in any case, or a number round the octave, 0 being C.';
+/** A key as the arp reads one (its review, item 8): a note's name in any case, or a number round the
+ *  octave; given back as it came when it is neither, for the refusal to name it. */
+const keyOf = (key) => pitchClassOf(key) ?? key;
+const NOTE_REASON = 'A note is a MIDI number from 0 to 127, or a name such as "C4".';
+/** A note as the Zone Splitter takes one: a number, or text that is one, or a note's name; else undefined. */
+function splitNote(v) {
+  if (typeof v === 'boolean' || v === null || v === undefined) return undefined;
+  const n = realNumber(v);
+  if (n !== undefined) return Math.round(n);
+  return typeof v === 'string' ? noteNumberOf(v) : undefined;
+}
+/** A preset's bottom and top notes, given: notes, or why not. They were stored as given: "x" as no
+ *  note at all, 200 past the keyboard. */
+function splitPresetNotesRefusal(a) {
+  if (a.lowNote !== undefined && a.lowNote !== null && splitNote(a.lowNote) === undefined) return { at: 1, reason: NOTE_REASON };
+  if (a.highNote !== undefined && a.highNote !== null && splitNote(a.highNote) === undefined) return { at: 2, reason: NOTE_REASON };
+  return null;
+}
+
+// The take-editing actions refuse while recording (the live take is committed when it stops) and
+// with no take to edit; they said "refused, nothing changed" and not why.
+const TAKE_ACTIONS = ['clear', 'undo', 'quantize', 'nudge', 'shift'];
+function recorderTakeRefusal(cfg) {
+  if (isRecordingState(String(cfg.state))) return 'It is recording; the take can be changed once it stops.';
+  const events = Array.isArray(cfg.take?.events) ? cfg.take.events : [];
+  return events.length ? null : 'It has no take: record one first.';
+}
+
+/** recorder.quantize's grid, scale and key, read; or why not. A grid as text ("1/16") was 1 division,
+ *  a scale it does not have no scale, and a key's name C, each without a word. */
+export function recorderQuantizeArgs({ grid, strength, scale, key }) {
+  const g = grid === undefined || grid === null ? undefined : realNumberOf(grid);
+  if (g === null) return { reason: 'A grid is a number of divisions per loop, from 1 to 64: 16 over one bar is sixteenth notes.' };
+  const word = scale === undefined || scale === null ? undefined : (listWord(SCALE_NAMES, String(scale)) ?? null);
+  if (word === null) return { reason: `One of: ${SCALE_NAMES.join(', ')}.` };
+  const pc = key === undefined || key === null ? undefined : pitchClassOf(key);
+  if (pc === null) return { reason: KEY_REASON };
+  return { args: { grid: g, strength, scale: word, key: pc } };
+}
+const realNumberOf = (v) => (typeof v === 'boolean' ? null : (realNumber(v) ?? null));
+
 function sceneRefusal(cfg, scene) {
   const scenes = setlistScenes({ _children: { Setlist: cfg } });
   if (!scenes.length) return 'It has no scenes.';
@@ -138,15 +190,27 @@ export function handWrittenRefusal(family, action, cfg, args) {
     const value = a[WORD_ARG[action]];
     if (family === 'harmoniser' && action === 'shape' && Array.isArray(value)) return null;
     const list = word();
-    if (list.includes(value)) return null;
+    if (list.includes(value)) return family === 'split' && action === 'preset' ? splitPresetNotesRefusal(a) : null;
     return { at: 0, reason: `One of: ${list.join(', ')}${family === 'harmoniser' && action === 'shape' ? ', or a list of intervals in semitones' : ''}.` };
   }
   if (action === 'key' && (family === 'phrase' || family === 'harmoniser')) {
-    return Number.isFinite(Number(a.key)) && a.key !== null && a.key !== '' && typeof a.key !== 'boolean'
-      ? null : { at: 0, reason: 'A key is a pitch class, a number from 0 to 11 where 0 is C.' };
+    return pitchClassOf(a.key) !== null ? null : { at: 0, reason: KEY_REASON };
   }
-  if (family === 'split') { const r = splitZoneRefusal(c.zones, a.zone); return r ? { at: 0, reason: r } : null; }
+  if (family === 'split') {
+    const r = splitZoneRefusal(c.zones, a.zone);
+    if (r) return { at: 0, reason: r };
+    // A number that is not one was taken as the bottom of its range, without a word: a transpose of
+    // "x" was -48, a split point of "x" the zone's lowest note (the Zone Splitter's review).
+    if (action === 'channel' && realNumber(a.channel) === undefined) return { at: 1, reason: 'A channel is a number from 1 to 16.' };
+    if (action === 'transpose' && realNumber(a.transpose) === undefined) return { at: 1, reason: 'A transpose is a number of semitones: 12 is an octave up, -12 down.' };
+    if (action === 'splitPoint' && splitNote(a.note) === undefined) return { at: 1, reason: NOTE_REASON };
+    return null;
+  }
   if (family === 'phrase' && action === 'cell') return phraseCellRefusal(c, a.step, a.row);
+  if (family === 'recorder' && TAKE_ACTIONS.includes(action)) {
+    const r = recorderTakeRefusal(c);
+    return r ? { at: 0, reason: r } : null;
+  }
   if (family === 'recorder' && (action === 'store' || action === 'load')) {
     const r = recorderSlotRefusal(c, action, a.slot);
     return r ? { at: 0, reason: r } : null;
@@ -160,18 +224,48 @@ export function handWrittenRefusal(family, action, cfg, args) {
     const ok = a.chord === null || a.chord === 'clear' || (Array.isArray(a.chord) && a.chord.some((n) => Number.isFinite(Number(n))));
     return ok ? null : { at: 1, reason: 'A chord is a list of intervals in semitones, such as { 0, 4, 7 }, or "clear" to take the override away.' };
   }
+  // At either end of the set, with wrap off, next and prev were refused and said nothing more.
+  if (family === 'setlist' && (action === 'next' || action === 'prev')) {
+    if (!setlistScenes({ _children: { Setlist: c } }).length) return { at: 0, reason: 'It has no scenes.' };
+    return { at: 0, reason: action === 'next' ? 'It is at the last scene it plays, and `wrap()` is off.' : 'It is at the first scene it plays, and `wrap()` is off.' };
+  }
   if (family === 'setlist' && (action === 'goto' || action === 'enable')) {
     const r = sceneRefusal(c, a.scene);
     return r ? { at: 0, reason: r } : null;
   }
+  // A number a command needs that is not one, or a scale there is none of: refused, and now said why
+  // (the hand-written families' reviews). It said "refused, nothing changed" and no more.
+  for (const [key, why] of NUMBER_ARGS) {
+    if (key in a && (typeof a[key] === 'boolean' || realNumber(a[key]) === undefined)) return { at: 0, reason: why };
+  }
+  if ('scale' in a && a.scale !== undefined && !listWord(SCALE_NAMES, String(a.scale ?? ''))) return { at: 0, reason: `One of: ${SCALE_NAMES.join(', ')}.` };
   return null;
 }
+const NUMBER_ARGS = [
+  ['channel', 'A channel is a number from 1 to 16.'], ['size', 'A size is a number of notes, from 2 to 6.'],
+  ['ms', 'A time is a number of milliseconds.'], ['transpose', 'A transpose is a number of semitones: 12 is an octave up, -12 down.'],
+  ['semitones', 'Semitones are a number: 12 is an octave up, -12 down.'], ['bars', 'Bars are a number.'],
+  ['inversion', 'An inversion is a number: 0 is root position.'], ['octave', 'An octave is a number: 1 is an octave up, -1 down.'],
+  ['by', 'A nudge is a part of the loop, a number: 0.01 is a hundredth later.'],
+];
 
 /** A hand-written verb's `args`, once handWrittenRefusal has passed them, as its reducer indexes
  *  them: a script's zone and phrase cell count from 1, and the reducers' from 0. */
 export function reducerArgs(family, action, cfg, args) {
   const a = args && typeof args === 'object' ? args : {};
-  if (family === 'split' && 'zone' in a) return { ...a, zone: scriptZoneIndex(cfg?.zones, a.zone) };
+  if (family === 'split' && action === 'preset') {
+    // Read as notes, held to the keyboard, lowest first.
+    const lo = a.lowNote === undefined || a.lowNote === null ? 36 : Math.min(127, Math.max(0, splitNote(a.lowNote)));
+    const hi = a.highNote === undefined || a.highNote === null ? 96 : Math.min(127, Math.max(0, splitNote(a.highNote)));
+    return { ...a, lowNote: Math.min(lo, hi), highNote: Math.max(lo, hi) };
+  }
+  if (family === 'split' && 'zone' in a) {
+    const zone = scriptZoneIndex(cfg?.zones, a.zone);
+    if (action === 'channel') return { ...a, zone, channel: realNumber(a.channel) };
+    if (action === 'transpose') return { ...a, zone, transpose: realNumber(a.transpose) };
+    if (action === 'splitPoint') return { ...a, zone, note: splitNote(a.note) };
+    return { ...a, zone };
+  }
   if (family === 'phrase' && action === 'cell') return { ...a, step: Math.round(Number(a.step)) - 1, row: Math.round(Number(a.row)) - 1 };
   return a;
 }
@@ -197,7 +291,12 @@ export function sectionFieldRefusal(label, cfg, field) {
   return `${label}.read: "${field}" is not a field of this component. One of: ${sectionFields(cfg).join(', ')}.`;
 }
 
-/** A hand-written verb's refusal line, as the runtime writes it: the call, then why. */
-export function sectionRefusalLine(family, target, action, args, reason) {
-  return `${family} ${target}: ${action} ${JSON.stringify(args ?? {})} — refused, nothing changed${reason ? `. ${reason}` : ''}`;
+/** A hand-written verb's refusal line, as the runtime writes it: the call as the script wrote it,
+ *  its short name and the arguments after the target, then why. The generated verbs' form
+ *  (componentRefusalLine); it named the reducer's action and its arguments as JSON. */
+export function sectionRefusalLine(family, target, verb, args, reason) {
+  const list = Array.isArray(args) ? [...args] : [];
+  while (list.length && list[list.length - 1] === undefined) list.pop();
+  const shown = list.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  return `${family} ${target}: ${verb}(${shown}) — refused, nothing changed${reason ? `. ${reason}` : ''}`;
 }

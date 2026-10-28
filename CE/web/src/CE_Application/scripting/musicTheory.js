@@ -84,13 +84,30 @@ const mod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
  * there. Undefined, not 0, because 0 is a real note (C-1).
  */
 export function noteNumberOf(name) {
-  const m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).replace(/\u266F/g, '#').replace(/\u266D/g, 'b'));
+  // In any case, as every word from a list is read: "c4", "eb4" and "BB3" (a B, then a flat) are
+  // C4, E♭4 and B♭3. The octave after the accidental is what keeps "b" the flat and not the letter.
+  const m = /^([A-Ga-g])([#bB]?)(-?\d+)$/.exec(String(name).replace(/\u266F/g, '#').replace(/\u266D/g, 'b').trim());
   if (!m) return undefined;
-  const pc = m[2] === 'b' ? FLAT_LETTER[m[1]] : NOTE_NAMES.indexOf(m[1] + m[2]);
+  const letter = m[1].toUpperCase();
+  const acc = m[2] === 'B' ? 'b' : m[2];
+  const pc = acc === 'b' ? FLAT_LETTER[letter] : NOTE_NAMES.indexOf(letter + acc);
   if (pc < 0) return undefined;
   // A flat lowers below the letter, so Cb3 is the B under C3 — one octave down, not up.
-  const oct = parseInt(m[3], 10) + (m[2] === 'b' && m[1] === 'C' ? 0 : 1);
+  const oct = parseInt(m[3], 10) + (acc === 'b' && letter === 'C' ? 0 : 1);
   return oct * 12 + pc;
+}
+
+/**
+ * A key's note as a pitch class, 0 (C) to 11 (B): a name, "C", "F#", "Eb", in any case and with or
+ * without an octave, read by noteNumberOf's rule; or a number, round the octave (12 is C, -1 is B).
+ * null for anything else: a name it cannot read is refused, not taken as C.
+ */
+export function pitchClassOf(value) {
+  if (typeof value === 'boolean' || value === null || value === undefined) return null;
+  const text = String(value).trim();
+  if (text !== '' && Number.isFinite(Number(text))) return mod12(Math.round(Number(text)));
+  const n = noteNumberOf(/\d$/.test(text) ? text : `${text}4`);
+  return n === undefined ? null : mod12(n);
 }
 
 /**

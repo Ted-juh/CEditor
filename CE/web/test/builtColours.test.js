@@ -22,9 +22,10 @@ const write = (src, lang, value) => {
 test('a colour built from numbers written out has a row of its own, with its swatch, under the call', () => {
   const src = 'set("Title.Text.colour", ce.math.hex(255, 128, 0))';
   const rows = rowsOf(src);
-  const shape = rows.map((r) => (r.type === 'call' ? `call ${r.call.path}` : `${r.arg.name} ${r.arg.kind}`));
-  assert.deepEqual(shape, ['call set', 'path path', 'value computed', 'call ce.math.hex', 'colour colour', 'r unknown', 'g unknown', 'b unknown']);
-  const colour = rows[4].arg;
+  // set's notes are said on a row after its arguments (valueRows' explain), before the call it holds.
+  const shape = rows.map((r) => (r.type === 'call' ? `call ${r.call.path}` : r.type === 'explain' ? `explain ${r.call.path}` : `${r.arg.name} ${r.arg.kind}`));
+  assert.deepEqual(shape, ['call set', 'path path', 'value computed', 'explain set', 'call ce.math.hex', 'colour colour', 'r unknown', 'g unknown', 'b unknown']);
+  const colour = rows[5].arg;
   assert.equal(colour.editable, 'colour');
   assert.deepEqual([colour.meaning.stored, colour.meaning.css, swatchHex(colour.meaning), colour.meaning.takesAlpha], ['#FF8000', '#FF8000', 'FFFF8000', false]);
   assert.equal(meaningLine(colour), '#FF8000, built from red 255, green 128, blue 0');

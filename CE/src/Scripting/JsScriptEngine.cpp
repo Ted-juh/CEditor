@@ -165,7 +165,24 @@ function __ceIn(id, name, args) {
   try { return __ceGlobal[name].apply(undefined, args || []); } finally { __ceCur = prev; }
 }
 
-function on(target, event, fn) { __listeners.push({ t: target, e: event, fn: fn }); }
+// Why on(), watch(), compute(), intercept() or defineAction() sets nothing up: the event, path or
+// name left out, or a function that is not one, each of which set nothing up without a word. The
+// WebView runtime's hookRefusal, word for word. A target left out is "*", as the editor reads it.
+function __hookRefused(verb, what, name, fn) {
+  var why = "";
+  if (name === undefined || name === null || (typeof name === "string" && !/\S/.test(name))) {
+    why = verb + ": no " + what + " was given, so nothing was set up.";
+  } else if (typeof fn !== "function") {
+    why = fn === undefined || fn === null ? verb + ": no function was given, so nothing was set up."
+      : verb + ": " + __shownValue(fn) + " is not a function, so nothing was set up.";
+  }
+  if (why) logError(why);
+  return why !== "";
+}
+function on(target, event, fn) {
+  if (__hookRefused("ce.core.on", "event", event, fn)) return;
+  __listeners.push({ t: target === undefined || target === null ? "*" : target, e: event, fn: fn });
+}
 // off(target, event) — __listeners is the calling script's own list (__CE_OWN), so filtering here
 // is already scoped to it.
 function off(target, event) {
@@ -196,12 +213,21 @@ function __putRule(list, rule) {
   for (var i = 0; i < list.length; i++) if (list[i].path === rule.path) { list[i] = rule; return; }
   list.push(rule);
 }
-function watch(path, fn) { __putRule(__watchers, { path: path, fn: fn, last: __sig(__read(path)), prev: undefined }); }
-function compute(path, fn) { __putRule(__computeds, { path: path, fn: fn, failed: false }); }
-function intercept(path, fn) { __putRule(__filters, { path: path, fn: fn }); }
+function watch(path, fn) {
+  if (__hookRefused("ce.core.watch", "path", path, fn)) return;
+  __putRule(__watchers, { path: path, fn: fn, last: __sig(__read(path)), prev: undefined });
+}
+function compute(path, fn) {
+  if (__hookRefused("ce.core.compute", "path", path, fn)) return;
+  __putRule(__computeds, { path: path, fn: fn, failed: false });
+}
+function intercept(path, fn) {
+  if (__hookRefused("ce.core.intercept", "path", path, fn)) return;
+  __putRule(__filters, { path: path, fn: fn });
+}
 function defineAction(name, fn) {
-  var id = String(name == null ? "" : name).replace(/^\s+|\s+$/g, "");
-  if (!id || typeof fn !== "function") return;
+  if (__hookRefused("ce.core.action", "name", name, fn)) return;
+  var id = String(name).replace(/^\s+|\s+$/g, "");
   __actions[id.toLowerCase()] = { name: id, fn: fn };
 }
 function __actionNames() { var out = []; for (var k in __actions) out.push(__actions[k].name); return out; }
@@ -431,12 +457,14 @@ function lerp(a, b, t) {
 }
 function curve(v, shape) {
   shape = shape || "linear";
-  if (shape === "exp") return v * v;
-  if (shape === "log") return Math.sqrt(Math.max(0, v));
-  if (shape === "s") return v * v * (3 - 2 * v);
+  // A name in any case, as every word from a list is read: "EXP" is "exp".
+  var name = String(shape).trim().toLowerCase();
+  if (name === "exp") return v * v;
+  if (name === "log") return Math.sqrt(Math.max(0, v));
+  if (name === "s") return v * v * (3 - 2 * v);
   // A shape the list does not have used to return v in SILENCE, which reads as a curve that does
   // nothing rather than as a name that was never applied.
-  if (shape !== "linear" && shape !== "")
+  if (name !== "linear" && name !== "")
     log("curve(v, \"" + shape + "\"): unknown shape — using linear. The names are \"linear\", "
         + "\"exp\", \"log\" and \"s\"; for any other shape use map(v, points).");
   return v;
@@ -583,7 +611,7 @@ function indexOfRange(t, count) {
 // that matters: a linear fade between two sounds dips in the middle, audibly.
 function crossfade(a, b, t, law) {
   var x = norm(t, 0, 1), from = __num(a), to = __num(b);
-  law = String(law === undefined || law === null ? "linear" : law).toLowerCase();
+  law = String(law === undefined || law === null ? "linear" : law).trim().toLowerCase();
   if (law === "equalpower") {
     var angle = x * Math.PI / 2;
     return from * Math.cos(angle) + to * Math.sin(angle);
@@ -714,7 +742,7 @@ function shapeCurve(v, curve, tension) {
   var t = norm(v, 0, 1);
   var ten = __num(tension, 0) || 1.6;
   var k = 1 + Math.max(0, ten);
-  var name = String(curve);
+  var name = String(curve).trim().toLowerCase();   // in any case: "SCurve" is "scurve"
   if (name === "exp") return Math.pow(t, k);
   if (name === "log") return 1 - Math.pow(1 - t, k);
   if (name === "scurve" || name === "s") return t * t * (3 - 2 * t);
@@ -821,7 +849,7 @@ function unshape(y, curve, tension) {
   var v = norm(y, 0, 1);
   var ten = __num(tension, 0) || 1.6;
   var k = 1 + Math.max(0, ten);
-  var name = String(curve);
+  var name = String(curve).trim().toLowerCase();
   if (name === "exp") return Math.pow(v, 1 / k);
   if (name === "log") return 1 - Math.pow(1 - v, 1 / k);
   // The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.
@@ -1218,20 +1246,40 @@ var __FLAT_LETTER = { C: 11, D: 1, E: 3, F: 4, G: 6, A: 8, B: 10 };
 // Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
 // plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
 // the same generated table the Chord Pad and Harmoniser print from — true "E♭4", false "C♯4".
+// A number, or text that is one, rounded down; anything else is no answer, and says why. A name
+// ("C4") gave "undefinedNaN", where the editor gave nothing.
 function noteName(n, flats) {
-  n = Math.floor(n);
+  var v = __realNumber(n);
+  if (v === undefined) {
+    if (n === undefined || n === null) logError('ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.');
+    else logError('ce.music.name: ' + __shownValue(n) + ' is not a note number, so there is no answer. A note is a MIDI number, such as 60.');
+    return undefined;
+  }
+  n = Math.floor(v);
   var tbl = (flats === undefined || flats === null) ? __NOTES : (flats ? __CE_NOTE_FLAT : __CE_NOTE_SHARP);
   return tbl[__m12(n)] + (Math.floor(n / 12) - 1);
 }
 // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is UNDEFINED, not 0 — 0 is a
 // real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
-function noteNumber(name) {
-  var m = /^([A-G])([#b]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b"));
+function __noteNumberOf(name) {
+  // In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E♭4 and B♭3.
+  var m = /^([A-Ga-g])([#bB]?)(-?\d+)$/.exec(String(name).split("♯").join("#").split("♭").join("b").trim());
   if (!m) return undefined;
-  var pc = m[2] === "b" ? __FLAT_LETTER[m[1]] : __NOTES.indexOf(m[1] + m[2]);
+  var letter = m[1].toUpperCase(), acc = m[2] === "B" ? "b" : m[2];
+  var pc = acc === "b" ? __FLAT_LETTER[letter] : __NOTES.indexOf(letter + acc);
   if (pc === undefined || pc < 0) return undefined;
-  var oct = parseInt(m[3], 10) + ((m[2] === "b" && m[1] === "C") ? 0 : 1);
+  var oct = parseInt(m[3], 10) + ((acc === "b" && letter === "C") ? 0 : 1);
   return oct * 12 + pc;
+}
+// ce.music.number. The senders and the other helpers read a name with __noteNumberOf, above, and
+// say their own why.
+function noteNumber(name) {
+  var n = typeof name === "string" ? __noteNumberOf(name) : undefined;
+  if (n === undefined) {
+    if (name === undefined || name === null) logError('ce.music.number: no note name was given, so there is no answer.');
+    else logError('ce.music.number: ' + __shownValue(name) + ' is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  }
+  return n;
 }
 
 // BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
@@ -1371,10 +1419,22 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55];
 // A number has to be a finite one: NaN, true or a table rooted the answer at C-1 just as an
 // unreadable name had. The answer itself may pass 127 (a chord on G9 does); a sender refuses that.
 function __pitch(v) {
-  if (typeof v === "string") return noteNumber(v);
+  if (typeof v === "string") return __noteNumberOf(v);
   return typeof v === "number" && isFinite(v) ? Math.floor(v) : undefined;
 }
-function __steps(tbl, name, fallback) { return tbl[name === undefined || name === null ? fallback : String(name)]; }
+// A word from a list, in any case and with spaces around it, as the list spells it (an array's
+// entries, or an object's keys), or undefined: "Dorian" is "dorian", "MAJ7" is "maj7".
+function __word(list, name) {
+  if (typeof name !== "string") return undefined;
+  var want = name.trim().toLowerCase(), keys = Array.isArray(list) ? list : Object.keys(list);
+  for (var i = 0; i < keys.length; i++) if (String(keys[i]).toLowerCase() === want) return keys[i];
+  return undefined;
+}
+function __steps(tbl, name, fallback) {
+  if (name === undefined || name === null) return tbl[fallback];
+  var key = __word(tbl, String(name));
+  return key === undefined ? undefined : tbl[key];
+}
 function __pitchOf(verb, v) {
   // A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
   if (v === undefined || v === null) {
@@ -1385,7 +1445,7 @@ function __pitchOf(verb, v) {
   if (n === undefined) {
     logError(typeof v === "string"
       ? verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
-        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+        + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
       : verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
         + 'number or a name, such as 60 or "C4".');
   }
@@ -1429,7 +1489,7 @@ function quantizeNote(note, root, scale) {
 // Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 // chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 function noteSpelling(root, scale) {
-  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var nm = (scale === undefined || scale === null) ? "major" : (__word(__CE_SCALES, String(scale)) || String(scale));
   if (!__setOf("ce.music.spelling", "scale", scale)) return undefined;
   var pitch = __pitchOf("ce.music.spelling", root); if (pitch === undefined) return undefined;
   var pc = __m12(pitch);
@@ -1495,13 +1555,13 @@ function __roman(rootSemitone, quality) {
 // The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 // scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
 function degreeChord(root, scale, degree, size) {
-  var nm = (scale === undefined || scale === null) ? "major" : String(scale);
+  var nm = (scale === undefined || scale === null) ? "major" : (__word(__CE_SCALES, String(scale)) || String(scale));
   var s = __setOf("ce.music.degreeChord", "scale", scale);
   if (!s || !s.length) return undefined;
   if (__pitchOf("ce.music.degreeChord", root) === undefined) return undefined;
   var n = s.length;
-  var d = __count(degree, 1) - 1;
-  var sz = Math.max(2, __count(size, 3));
+  var d = __musicStep("degree", degree, 1) - 1;
+  var sz = Math.max(2, __musicStep("size", size, 3));
   var offsets = [];
   for (var k = 0; k < sz; k++) {
     var idx = d + k * 2;
@@ -1519,9 +1579,16 @@ function degreeChord(root, scale, degree, size) {
     offsets: offsets, notes: notes, names: names
   };
 }
-// A count argument that is not a finite number falls back to its default. Written out rather than
-// leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
-function __count(v, fallback) { var n = Number(v); return isFinite(n) ? Math.floor(n) : fallback; }
+// degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+// anything else the default, said once. The WebView runtime's musicStep, word for word. Written out
+// rather than leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua.
+function __musicStep(what, v, fallback) {
+  if (v === undefined || v === null) return fallback;
+  var n = __realNumber(v);
+  if (n !== undefined) return Math.floor(n);
+  __musicSaid("ce.music.degreeChord: " + what + " is " + __shownValue(v) + ", which is not a number, so " + fallback + " was used.");
+  return fallback;
+}
 // ce.music's lists of notes, read as the WebView reads them (noteLists.js): a number, a note name
 // or text that is a number, and one that is neither refuses the call, saying where it is. They were
 // read with Number(), so a chord written by name was an empty one, and true was a note. null for a
@@ -1533,7 +1600,7 @@ var __NOTE_LISTS = {
 function __noteListItem(v) {
   if (typeof v === "number") return isFinite(v) ? v : undefined;
   if (typeof v !== "string") return undefined;
-  var n = noteNumber(v);
+  var n = __noteNumberOf(v);
   if (n !== undefined && n !== null) return n;
   return __realNumber(v);
 }
@@ -1547,7 +1614,7 @@ function __noteList(fn, name, list, mayBeAbsent) {
     var n = __noteListItem(list[i]);
     if (n === undefined) {
       var where = __shownValue(list[i]) + " at position " + (i + 1) + " of " + name;
-      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+      return typeof list[i] === "string" ? say(where + " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
         : say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".');
     }
     out.push(n);
@@ -1583,7 +1650,7 @@ function voiceLead(notes, previous, mode) {
   var before = read && __noteList("voiceLead", "previous", previous, true);
   if (!read || !before) return [];
   var chord = __sortedNotes(read), prev = __sortedNotes(before);
-  var how = (mode === undefined || mode === null) ? "closest" : String(mode);
+  var how = (mode === undefined || mode === null) ? "closest" : (__word(__VOICE_LEAD_MODES, String(mode)) || String(mode));
   if (__VOICE_LEAD_MODES.indexOf(how) < 0) {
     __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.');
     how = "closest";
@@ -1648,12 +1715,12 @@ function arpOrder(notes, pattern) {
   if (!asc) return [];
   var p, seq, i;
   if (pattern === undefined || pattern === null) {
-    __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
-    p = "up";
-  } else if (__ARP_ORDER_PATTERNS.indexOf(String(pattern)) < 0) {
+    logError('ce.music.arp: no pattern was given, so the answer is an empty list. One of: up, down, updown, downup, asPlayed, random, chord.');
+    return [];
+  } else if (__word(__ARP_ORDER_PATTERNS, String(pattern)) === undefined) {
     __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.');
     p = "up";
-  } else p = String(pattern);
+  } else p = __word(__ARP_ORDER_PATTERNS, String(pattern));
   if (!asc.length) return [];
   if (p === "chord") return [asc];
   if (p === "down") { seq = asc.slice().reverse(); }
@@ -1665,20 +1732,6 @@ function arpOrder(notes, pattern) {
   return out;
 }
 // @module ce.midi
-function to14bit(v) { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; }
-function from14bit(msb, lsb) { return msb * 128 + lsb; }
-function to7bit(v, count, order) { count = count || 2; order = order || "msb"; v = Math.floor(v); var out = []; for (var i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); } return order === "msb" ? out.reverse() : out; }
-function from7bit(bytes, order) { order = order || "msb"; var v = 0; var b = order === "msb" ? bytes : bytes.slice().reverse(); for (var i = 0; i < b.length; i++) v = v * 128 + b[i]; return v; }
-function toNibbles(b) { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; }
-function fromNibbles(hi, lo) { return hi * 16 + lo; }
-function nibblize(bytes) { var o = []; for (var i = 0; i < bytes.length; i++) { var n = toNibbles(bytes[i]); o.push(n.hi, n.lo); } return o; }
-function denibblize(bytes) { var o = []; for (var i = 0; i < bytes.length; i += 2) o.push(fromNibbles(bytes[i], bytes[i + 1] || 0)); return o; }
-function toAscii(str, length) { var o = []; for (var i = 0; i < str.length; i++) o.push(str.charCodeAt(i)); if (length) while (o.length < length) o.push(32); return o; }
-function fromAscii(bytes) { var s = ""; for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]); return s; }
-function toOffset(v, center) { return v + center; }
-function fromOffset(b, center) { return b - center; }
-function toSigned(v, bits) { var m = Math.pow(2, bits); return v < 0 ? v + m : v; }
-function fromSigned(b, bits) { var m = Math.pow(2, bits); return b >= m / 2 ? b - m : b; }
 
 // checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 // plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
@@ -1788,7 +1841,7 @@ function checksum(kind, bytes, opts) {
   if (bytes === undefined || bytes === null) {
     // checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
     if (kind === undefined || kind === null
-        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase()))) {
+        || (typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.trim().toLowerCase()))) {
       logError(verb + ": no bytes given, so there is no checksum.");
       return undefined;
     }
@@ -1797,8 +1850,8 @@ function checksum(kind, bytes, opts) {
   bytes = __scriptBytes(verb, bytes, "there is no checksum");
   if (bytes === undefined) return undefined;
   // An own key only: "constructor" or "toString" would otherwise be found on Object's prototype.
-  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.toLowerCase())
-    ? __CE_CKSUM_ALIAS[kind.toLowerCase()] : undefined;
+  var id = typeof kind === "string" && Object.prototype.hasOwnProperty.call(__CE_CKSUM_ALIAS, kind.trim().toLowerCase())
+    ? __CE_CKSUM_ALIAS[kind.trim().toLowerCase()] : undefined;
   if (id === undefined) {
     // The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
     var which = kind === undefined || kind === null ? ": no algorithm given" : "(" + __shownValue(kind) + "): no such algorithm";
@@ -1854,12 +1907,188 @@ function __doesNotFit(v, bits) {
   if (!__whole(v)) return __shownValue(v) + " is not a whole number";
   return v < 0 || v >= Math.pow(2, bits) ? v + " does not fit in " + __plural(bits, "bit") : "";
 }
+// The older encoding helpers, to7bit to fromSigned, held to the byte lists' rule: a value that does
+// not fit, a number that is not one and a list that is not bytes answer undefined and say why. The
+// WebView runtime's "older encoding helpers", rule for rule and message for message. A value to
+// split is rounded down first, as it always was; a part to join must be whole.
+function __packNumber(verb, what, v) {
+  var n = __realNumber(v);
+  if (n !== undefined) return n;
+  return __refuse(verb, what + " is a number, and " + (v === undefined || v === null ? "none was given" : __shownValue(v) + " is not"));
+}
+function __packRange(verb, what, n, bits, room, roundDown) {
+  var m = roundDown ? Math.floor(n) : n;
+  if (Math.floor(m) !== m) return __refuse(verb, what + " is " + String(n) + ", which is not a whole number");
+  if (m < 0 || m >= Math.pow(2, bits)) return __refuse(verb, what + " is " + String(n) + ", which does not fit in " + room);
+  return m;
+}
+function __packFit(verb, what, v, bits, room, roundDown) {
+  var n = __packNumber(verb, what, v);
+  return n === undefined ? undefined : __packRange(verb, what, n, bits, room, roundDown);
+}
+function __packSetting(verb, what, v, lo, hi, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  var n = __realNumber(v);
+  if (n === undefined || Math.floor(n) !== n || n < lo || n > hi) {
+    return __refuse(verb, what + " must be a whole number from " + lo + " to " + hi);
+  }
+  return n;
+}
+function __packOrder(verb, order) {
+  var o = order === undefined || order === null ? "msb" : typeof order === "string" ? order.trim().toLowerCase() : order;
+  return o === "msb" || o === "lsb" ? o : __refuse(verb, 'order must be "msb" or "lsb"');
+}
+function __packList(verb, input, bits, why) {
+  var list = __bytesIn(verb, input);
+  if (!list) return undefined;
+  for (var i = 0; i < list.length; i++) {
+    if (list[i] >= Math.pow(2, bits)) return __refuse(verb, list[i] + " at position " + i + " " + why);
+  }
+  return list;
+}
+function to14bit(v) {
+  var n = __packFit("ce.midi.to14bit", "v", v, 14, "14 bits", true);
+  return n === undefined ? undefined : { msb: Math.floor(n / 128), lsb: n % 128 };
+}
+function from14bit(msb, lsb) {
+  var verb = "ce.midi.from14bit";
+  var hi = __packFit(verb, "msb", msb, 7, "7 bits");
+  if (hi === undefined) return undefined;
+  var lo = __packFit(verb, "lsb", lsb, 7, "7 bits");
+  return lo === undefined ? undefined : hi * 128 + lo;
+}
+function to7bit(v, count, order) {
+  var verb = "ce.midi.to7bit";
+  var n = __packNumber(verb, "v", v);
+  if (n === undefined) return undefined;
+  var k = __packSetting(verb, "count", count, 1, 4, 2);
+  if (k === undefined) return undefined;
+  var o = __packOrder(verb, order);
+  if (o === undefined) return undefined;
+  var x = __packRange(verb, "v", n, 7 * k, __plural(k, "byte") + " of 7 bits", true);
+  if (x === undefined) return undefined;
+  var out = [];
+  for (var i = 0; i < k; i++) { out.push(x % 128); x = Math.floor(x / 128); }
+  return o === "msb" ? out.reverse() : out;
+}
+function from7bit(bytes, order) {
+  var verb = "ce.midi.from7bit";
+  var list = __packList(verb, bytes, 7, "does not fit in 7 bits");
+  if (!list) return undefined;
+  if (list.length < 1 || list.length > 4) return __refuse(verb, "it joins 1 to 4 bytes, and " + list.length + " were given");
+  var o = __packOrder(verb, order);
+  if (o === undefined) return undefined;
+  var b = o === "msb" ? list : list.slice().reverse();
+  var v = 0;
+  for (var i = 0; i < b.length; i++) v = v * 128 + b[i];
+  return v;
+}
+function toNibbles(b) {
+  var n = __packFit("ce.midi.toNibbles", "byte", b, 8, "8 bits", true);
+  return n === undefined ? undefined : { hi: Math.floor(n / 16), lo: n % 16 };
+}
+function fromNibbles(hi, lo) {
+  var verb = "ce.midi.fromNibbles";
+  var h = __packFit(verb, "hi", hi, 4, "4 bits");
+  if (h === undefined) return undefined;
+  var l = __packFit(verb, "lo", lo, 4, "4 bits");
+  return l === undefined ? undefined : h * 16 + l;
+}
+function nibblize(bytes) {
+  var list = __bytesIn("ce.midi.nibblize", bytes);
+  if (!list) return undefined;
+  var out = [];
+  for (var i = 0; i < list.length; i++) out.push(Math.floor(list[i] / 16), list[i] % 16);
+  return out;
+}
+function denibblize(bytes) {
+  var verb = "ce.midi.denibblize";
+  var list = __packList(verb, bytes, 4, "does not fit in 4 bits");
+  if (!list) return undefined;
+  if (list.length % 2 === 1) return __refuse(verb, "the halves come in pairs, and " + list.length + " is an odd count");
+  var out = [];
+  for (var i = 0; i < list.length; i += 2) out.push(list[i] * 16 + list[i + 1]);
+  return out;
+}
+// Text longer than the length is cut to it, and a length that is not one is no length; each said once.
+var __packWarned = {};
+function __packSaid(key, text) {
+  if (__packWarned[key]) return;
+  __packWarned[key] = true;
+  logWarn(text + " This is said only the first time.");
+}
+function toAscii(str, length) {
+  var verb = "ce.midi.toAscii";
+  if (typeof str !== "string") {
+    return __refuse(verb, "str is text, and " + (str === undefined || str === null ? "none was given" : __shownValue(str) + " is not"));
+  }
+  var out = [];
+  for (var i = 0; i < str.length; i++) {
+    var c = str.charCodeAt(i);
+    if (c > 127) return __refuse(verb, "the text has a character outside ASCII");
+    out.push(c);
+  }
+  if (length === undefined || length === null) return out;
+  var n = __realNumber(length);
+  if (n === undefined || Math.floor(n) !== n || n < 1) {
+    __packSaid("toAscii length", verb + ": length is " + __shownValue(length)
+      + ", which is not a whole number from 1, so the text was neither filled out nor cut.");
+    return out;
+  }
+  if (out.length > n) {
+    __packSaid("toAscii cut", verb + ': "' + str + '" is longer than ' + __plural(n, "character") + ", so it was cut to " + n + ".");
+    out.length = n;
+  }
+  while (out.length < n) out.push(32);
+  return out;
+}
+function fromAscii(bytes) {
+  var list = __packList("ce.midi.fromAscii", bytes, 7, "is not an ASCII character");
+  if (!list) return undefined;
+  var s = "";
+  for (var i = 0; i < list.length; i++) s += String.fromCharCode(list[i]);
+  return s;
+}
+function __packOffset(verb, what, v, center, sign) {
+  var n = __packNumber(verb, what, v);
+  if (n === undefined) return undefined;
+  var c = __packNumber(verb, "center", center);
+  return c === undefined ? undefined : n + sign * c;
+}
+function toOffset(v, center) { return __packOffset("ce.midi.toOffset", "v", v, center, 1); }
+function fromOffset(b, center) { return __packOffset("ce.midi.fromOffset", "b", b, center, -1); }
+function toSigned(v, bits) {
+  var verb = "ce.midi.toSigned";
+  var n = __packNumber(verb, "v", v);
+  if (n === undefined) return undefined;
+  var k = __packSetting(verb, "bits", bits, 1, 32);
+  if (k === undefined) return undefined;
+  var m = Math.floor(n);
+  var half = Math.pow(2, k - 1);
+  if (m < -half || m >= half) {
+    return __refuse(verb, "v is " + String(n) + ", and in " + __plural(k, "bit") + " a signed number is from "
+      + (-half) + " to " + (half - 1));
+  }
+  return m < 0 ? m + Math.pow(2, k) : m;
+}
+function fromSigned(b, bits) {
+  var verb = "ce.midi.fromSigned";
+  var n = __packNumber(verb, "b", b);
+  if (n === undefined) return undefined;
+  var k = __packSetting(verb, "bits", bits, 1, 32);
+  if (k === undefined) return undefined;
+  var m = __packRange(verb, "b", n, k, __plural(k, "bit"));
+  if (m === undefined) return undefined;
+  return m >= Math.pow(2, k - 1) ? m - Math.pow(2, k) : m;
+}
 function __shape(verb, opts) {
   var bits = 7, order = "msb";
   if (opts && typeof opts === "object") {
     if (opts.bits !== undefined && opts.bits !== null) bits = opts.bits;
     if (opts.order !== undefined && opts.order !== null) order = opts.order;
   }
+  // In any case, as every word from a list is read: "MSB" is "msb".
+  if (typeof order === "string") order = order.trim().toLowerCase();
   if (bits !== 7 && bits !== 8) return __refuse(verb, "bits must be 7 or 8");
   if (order !== "msb" && order !== "lsb") return __refuse(verb, 'order must be "msb" or "lsb"');
   return { bits: bits, order: order };
@@ -2100,10 +2329,10 @@ var __WEBVIEW_ONLY = [
   "setlistRead",
 // @module ce.components.arp
   "arpRun","arpPattern","arpRate","arpDivision","arpSync","arpOctaves","arpGate","arpSwing",
-  "arpLatch","arpKey","arpScale","arpFollowPanelKey","arpDegree","arpChordType","arpVelocity",
-  "arpChannel","arpEuclid","arpEuclidSteps","arpEuclidPulses","arpEuclidRotate","arpPhase",
-  "arpMute","arpInputChannel","arpBaseOctave","arpSource","arpLink","arpEditable","arpShowNotes",
-  "arpShowHeader","arpRead",
+  "arpSwingSource","arpLatch","arpKey","arpScale","arpFollowPanelKey","arpDegree","arpChordType",
+  "arpVelocity","arpChannel","arpEuclid","arpEuclidSteps","arpEuclidPulses","arpEuclidRotate",
+  "arpPhase","arpMute","arpInputChannel","arpBaseOctave","arpSource","arpLink","arpEditable",
+  "arpShowNotes","arpShowHeader","arpRead",
 // @module ce.components.chordpad
   "chordPadMode","chordPadKey","chordPadScale","chordPadFollowPanelKey","chordPadChordType",
   "chordPadVoicing","chordPadInversion","chordPadOctave","chordPadVelocity","chordPadChannel",
@@ -2136,9 +2365,9 @@ var __WEBVIEW_ONLY = [
   "looperShowDivisions","looperRead","looperSize","looperFill","looperInsert","looperRemove",
 // @module ce.components.orbit
   "orbitRun","orbitRate","orbitBars","orbitSync","orbitPhase","orbitNode","orbitNodeRadius",
-  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth","orbitEditable","orbitShowTrails",
-  "orbitShowSpokes","orbitShowRings","orbitShowValues","orbitRead","orbitSize","orbitFill",
-  "orbitInsert","orbitRemove",
+  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth","orbitNodeOutput","orbitNodeInvert",
+  "orbitEditable","orbitShowTrails","orbitShowSpokes","orbitShowRings","orbitShowValues",
+  "orbitRead","orbitSize","orbitFill","orbitInsert","orbitRemove",
 // @module ce.components.kinetic
   "kineticRun","kineticSync","kineticGravity","kineticBounce","kineticFriction","kineticKeepAlive",
   "kineticLaunch","kineticVelocity","kineticEditable","kineticShowTrail","kineticShowWalls",
@@ -2184,16 +2413,16 @@ var __WEBVIEW_ONLY = [
   "crossfaderLabelA","crossfaderLabelB","crossfaderEditable","crossfaderShowLabels",
   "crossfaderShowGains","crossfaderRead",
 // @module ce.components.joystick
-  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnAxes",
-  "joystickReturnTime","joystickReturnCurve","joystickCornerLabel","joystickEditable",
+  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnTime",
+  "joystickReturnCurve","joystickReturnAxes","joystickCornerLabel","joystickEditable",
   "joystickShowGrid","joystickShowCrosshair","joystickShowCorners","joystickShowTrail",
   "joystickRead","joystickSize","joystickFill",
 // @module ce.components.meter
   "meterValue","meterScale","meterPeakHold","meterHoldMs","meterDecay","meterValueMin",
   "meterValueMax","meterDbFloor","meterDbCeil","meterOrientation","meterGradient","meterLabel",
-  "meterValuePrecision","meterValuePrefix","meterValueSuffix","meterZoneAt","meterSource",
-  "meterShowTicks","meterShowScaleLabels","meterShowValue","meterRead","meterSize","meterFill",
-  "meterInsert","meterRemove",
+  "meterLabelPosition","meterValuePrecision","meterValuePrefix","meterValueSuffix","meterZoneAt",
+  "meterSource","meterShowTicks","meterShowScaleLabels","meterShowValue","meterRead","meterSize",
+  "meterFill","meterInsert","meterRemove",
 // @module ce.components.transport
   "transportBpm","transportSwing","transportSource","transportBeatsPerBar","transportBeatUnit",
   "transportLoop","transportLoopStart","transportLoopBars","transportCountIn","transportClockOut",
@@ -2208,13 +2437,14 @@ var __WEBVIEW_ONLY = [
   "lcdAnimFps","lcdAnimLoop","lcdScrollMode","lcdScrollRepeat","lcdBlinkRate","lcdCursorBlink",
   "lcdValueMin","lcdValueMax","lcdValuePrecision","lcdValuePrefix","lcdValueSuffix",
   "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText",
+  "lcdZoneText","lcdZoneLabel","lcdZoneShow","lcdZoneAt","lcdZoneSource","lcdZoneKind","lcdLayout",
   "lcdShowGlass","lcdShowGhost","lcdShowScanlines","lcdShowGrid","lcdRead","lcdSize","lcdFill",
 // @module ce.components.pixel
-  "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH",
-  "pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow",
-  "pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
+  "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH","pixelKind",
+  "pixelSource","pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma",
+  "pixelGlow","pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
   "pixelLayoutTransition","pixelTransitionMs","pixelBrightnessSource","pixelBacklightSource",
-  "pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
+  "pixelLayout","pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
 ];
 // @module -
 var __global = (typeof globalThis !== 'undefined') ? globalThis : this;
@@ -2301,7 +2531,7 @@ function __midiArg(verb, kind, v) {
 // name past the top, "C10", put 132 in the data byte, which a synth reads as a status byte; NaN or a
 // table played C-1 by the numeric path. __badNote refuses each in the WebView runtime's words.
 function __note(n) {
-  var v = typeof n === "string" ? noteNumber(n) : (typeof n === "number" && isFinite(n) ? Math.floor(n + 0.5) : undefined);
+  var v = typeof n === "string" ? __noteNumberOf(n) : (typeof n === "number" && isFinite(n) ? Math.floor(n + 0.5) : undefined);
   return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
 }
 function __badNote(verb, note) {
@@ -2310,8 +2540,8 @@ function __badNote(verb, note) {
   if (note === undefined || note === null) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === "string") {
-    why = noteNumber(note) === undefined
-      ? '"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+    why = __noteNumberOf(note) === undefined
+      ? '"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + range;
   } else if (typeof note === "number" && isFinite(note)) {
@@ -2425,7 +2655,7 @@ function sendTransport(action) {
     logError("sendTransport: no action given, so nothing was sent. " + actions);
     return;
   }
-  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.toLowerCase()] : undefined;
+  var status = typeof action === "string" ? { start: 0xFA, "continue": 0xFB, stop: 0xFC }[action.trim().toLowerCase()] : undefined;
   if (status === undefined) {
     logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions);
     return;
@@ -3011,7 +3241,21 @@ function deviceProfile(role) { return __deviceQuery("profile", { role: __role(ro
 // read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
 // query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
 // profile and sends; it returns whether the message went out, not whether the synth accepted it.
-function deviceRead(id, role) { return __deviceQuery("read", { role: __role(role), id: String(id) }); }
+// An id left out, or blank, is refused, where it answered nothing without a word; parameters() and
+// ports() take a table of options or nothing; ports() says once of a direction that is not one; and
+// setTiming takes a timing the profile has, in any case, written in its spelling. The WebView
+// runtime's words (deviceWords.js).
+function __deviceIdMissing(id) { return id === undefined || id === null || (typeof id === "string" && !/\S/.test(id)); }
+function __deviceNotOptions(verb, opts) {
+  if (opts === undefined || opts === null || (typeof opts === "object" && !Array.isArray(opts))) return false;
+  logError("ce.device." + verb + ": " + __shownValue(opts) + " is not a table of options, so the answer is an empty list.");
+  return true;
+}
+var __devicePortsWarned = {};
+function deviceRead(id, role) {
+  if (__deviceIdMissing(id)) { logError("ce.device.read: no parameter id was given, so there is no answer."); return undefined; }
+  return __deviceQuery("read", { role: __role(role), id: String(id) });
+}
 function deviceWrite(id, value, role) { return __api.deviceWrite(String(id), value, __role(role)) === true; }
 function deviceConnected(role) { return __deviceQuery("connected", { role: __role(role) }) === true; }
 // Preset recall, through the profile's own action — a Program Change, a Bank Select pair plus one,
@@ -3030,11 +3274,28 @@ function deviceCoverage(feature, role) {
 function deviceRecipes(role) { return __deviceQuery("recipes", { role: __role(role) }) || []; }
 function deviceRequests(role) { return __deviceQuery("requests", { role: __role(role) }) || []; }
 // The two writes. They land on THIS PROJECT's override, never on the shared profile.
+// A name left out reaches the host as "", which says a name is required; it was "undefined", and stored.
 function deviceSetVariable(name, value, role) {
-  return __deviceSet("variable", String(name), value, __role(role)) === true;
+  return __deviceSet("variable", name === undefined || name === null ? "" : String(name), value, __role(role)) === true;
 }
 function deviceSetTiming(name, ms, role) {
-  return __deviceSet("timing", String(name), ms, __role(role)) === true;
+  var r = __role(role);
+  var key = name === undefined || name === null ? "" : String(name).replace(/^\s+|\s+$/g, "");
+  if (key !== "") {
+    var timing = __deviceQuery("timing", { role: r });
+    if (timing && typeof timing === "object") {
+      var names = Object.keys(timing), known;
+      for (var i = 0; i < names.length; i++) if (names[i].toLowerCase() === key.toLowerCase()) known = names[i];
+      if (known === undefined) {
+        names.sort();
+        logError("ce.device.setTiming: the profile for " + r + " has no timing called \"" + key + "\", so nothing was changed. "
+          + (names.length ? "Its timings: " + names.join(", ") + "." : "It has none."));
+        return false;
+      }
+      key = known;
+    }
+  }
+  return __deviceSet("timing", key, ms, r) === true;
 }
 // An undefined property must not be SENT. juce::var::undefined() stringifies to "undefined", so
 // an omitted filter reached the host as the literal filter value "undefined" and matched nothing,
@@ -3049,20 +3310,30 @@ function __devOpts(role, opts) {
   return q;
 }
 function deviceParameters(opts) {
+  if (__deviceNotOptions("parameters", opts)) return [];
   opts = opts || {};
   var r = __deviceQuery("parameters", __devOpts(opts.role, opts));
   return r || [];
 }
 function deviceParameter(id, role) {
+  if (__deviceIdMissing(id)) { logError("ce.device.parameter: no parameter id was given, so there is no answer."); return undefined; }
   return __deviceQuery("parameter", { role: __role(role), id: String(id) });
 }
 // ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
 // configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
 // device that showed up.
 function devicePorts(opts) {
+  if (__deviceNotOptions("ports", opts)) return [];
   opts = opts || {};
   var q = {};
-  if (opts.direction !== undefined && opts.direction !== null) q.direction = opts.direction;
+  if (opts.direction !== undefined && opts.direction !== null) {
+    var d = typeof opts.direction === "string" ? opts.direction.replace(/^\s+|\s+$/g, "").toLowerCase() : "";
+    if (d === "in" || d === "input" || d === "out" || d === "output") q.direction = d;
+    else {
+      var said = "ce.device.ports: direction is " + __shownValue(opts.direction) + ", which is not \"in\" or \"out\", so every port was listed.";
+      if (!__devicePortsWarned[said]) { __devicePortsWarned[said] = true; logWarn(said + " This is said only the first time."); }
+    }
+  }
   return __deviceQuery("ports", q) || [];
 }
 // defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
@@ -3161,9 +3432,10 @@ function __storageScope(opts, verb) {
   }
   var raw = (typeof opts === "string") ? opts : (opts ? opts.scope : undefined);
   if (raw === undefined || raw === null || raw === "") return "panel";
-  var scope = String(raw);
+  // In any case, as every word from a list is read: "Local" is "local".
+  var scope = String(raw).trim().toLowerCase();
   if (__CE_SCOPES.indexOf(scope) >= 0) return scope;
-  logError(verb + ': "' + scope + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
+  logError(verb + ': "' + String(raw) + '" is not a scope, so nothing was done. One of: ' + __CE_SCOPES.join(", ") + ".");
   return undefined;
 }
 // Which of the host's two real stores a scope lives in.
@@ -3184,22 +3456,41 @@ function __storageKeyFrom(scope, stored) {
   return stored.indexOf("\u0001script:") === 0 ? undefined : stored;
 }
 
+// A setting's name: text, or a number used as text. Left out, or anything else, is refused. The
+// WebView runtime's storageName, word for word.
+function __storageName(verb, key, outcome) {
+  if (typeof key === "string") return key;
+  if (typeof key === "number" && isFinite(key)) return String(key);
+  logError(key === undefined || key === null ? verb + ": no name was given, so " + outcome + "."
+    : verb + ": " + __shownValue(key) + " is not a name, so " + outcome + ". A name is text, or a number used as text.");
+  return undefined;
+}
 function saveSetting(key, value, opts) {
-  var scope = __storageScope(opts, "ce.storage.saveSetting");
+  var verb = "ce.storage.saveSetting";
+  var name = __storageName(verb, key, "nothing was saved");
+  if (name === undefined) return false;
+  // Nothing to save is no value, where it answered true and saved nothing: a Lua table cannot hold nil.
+  if (value === undefined || value === null) {
+    logError(verb + ': no value was given for "' + name + '", so nothing was saved. ce.storage.forget() deletes a setting.');
+    return false;
+  }
+  var scope = __storageScope(opts, verb);
   if (!scope) return false;
   var store = __storageStore(scope);
   if (__api.settingsAvailable(store) !== true) {
-    logError('saveSetting("' + key + '"): the ' + scope + ' store is unavailable here, so nothing '
+    logError('saveSetting("' + name + '"): the ' + scope + ' store is unavailable here, so nothing '
              + "was saved. ce.storage.info() says which stores are available.");
     return false;
   }
-  __api.saveSetting(__storageKeyFor(scope, key), value, store);
+  __api.saveSetting(__storageKeyFor(scope, name), value, store);
   return true;
 }
 function loadSetting(key, fallback, opts) {
+  var name = __storageName("ce.storage.loadSetting", key, "the fallback was given back");
+  if (name === undefined) return fallback;
   var scope = __storageScope(opts, "ce.storage.loadSetting");
   if (!scope) return fallback;
-  var v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope));
+  var v = __api.loadSetting(__storageKeyFor(scope, name), __storageStore(scope));
   return (v === undefined || v === null) ? fallback : v;
 }
 // settings() lists every saved key; forget() deletes one and says whether there was one.
@@ -3215,9 +3506,11 @@ function listSettings(opts) {
   return out;
 }
 function forgetSetting(key, opts) {
+  var name = __storageName("ce.storage.forget", key, "nothing was deleted");
+  if (name === undefined) return false;
   var scope = __storageScope(opts, "ce.storage.forget");
   if (!scope) return false;
-  return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) === true;
+  return __api.forgetSetting(__storageKeyFor(scope, name), __storageStore(scope)) === true;
 }
 // Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 // one was the only way before.
@@ -3278,12 +3571,31 @@ function __jsonKeys(value, out, seen) {
   }
   return out;
 }
+// encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+// and held to 0 to 10; anything else one line. Each value it cannot use as written is said once.
+// The WebView runtime's jsonIndent, word for word.
+var __storageWarned = {};
+function __storageSaid(text) {
+  if (__storageWarned[text]) return;
+  __storageWarned[text] = true;
+  logWarn(text + " This is said only the first time.");
+}
+function __jsonIndent(opts) {
+  if (!opts || typeof opts !== "object" || Array.isArray(opts) || opts.indent === undefined || opts.indent === null) return 0;
+  var raw = opts.indent, n = __realNumber(raw);
+  function said(why, used) {
+    __storageSaid("ce.storage.encode: indent is " + __shownValue(raw) + ", which is " + why + ", so " + used + ".");
+  }
+  if (n === undefined) { said("not a number", "the text is on one line"); return 0; }
+  if (n < 0) { said("below 0", "the text is on one line"); return 0; }
+  if (n > 10) { said("above 10", "10 was used"); return 10; }
+  return Math.floor(n);
+}
 function encodeJson(value, opts) {
+  var indent = __jsonIndent(opts);
   try {
-    var indent = opts ? Number(opts.indent) : NaN;
     var keys = __jsonKeys(value, [], []).sort();
-    return JSON.stringify(value, keys.length ? keys : undefined,
-                          (isFinite(indent) && indent > 0) ? indent : undefined);
+    return JSON.stringify(value, keys.length ? keys : undefined, indent > 0 ? indent : undefined);
   } catch (e) {
     // A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
     // value — the same rule every "cannot read that" in this API follows.
@@ -3306,11 +3618,18 @@ function __jsonStripNulls(v) {
   }
   return v;
 }
+// Text that is not JSON answers nothing and says so; nothing given, or a value that is not text, is
+// refused the same way. The WebView runtime's decodeJson, word for word.
 function decodeJson(text) {
-  try {
-    var v = JSON.parse(String(text === undefined || text === null ? "" : text));
-    return v === null ? undefined : __jsonStripNulls(v);
-  } catch (e) { return undefined; }
+  var verb = "ce.storage.decode";
+  if (text === undefined || text === null) { logError(verb + ": no text was given, so there is no answer."); return undefined; }
+  if (typeof text !== "string") { logError(verb + ": " + __shownValue(text) + " is not text, so there is no answer."); return undefined; }
+  var v;
+  try { v = JSON.parse(text); } catch (e) {
+    logError(verb + ": the text is not JSON, so there is no answer.");
+    return undefined;
+  }
+  return v === null ? undefined : __jsonStripNulls(v);
 }
 
 // @module -
@@ -3419,13 +3738,13 @@ var __CE_MODULES = {
   "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "read": "recorderRead", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
   "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "read": "harmonyRead", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
   "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "read": "setlistRead", "wrap": "setlistWrap" },
-  "ce.components.arp": { "baseOctave": "arpBaseOctave", "channel": "arpChannel", "chordType": "arpChordType", "degree": "arpDegree", "division": "arpDivision", "editable": "arpEditable", "euclid": "arpEuclid", "euclidPulses": "arpEuclidPulses", "euclidRotate": "arpEuclidRotate", "euclidSteps": "arpEuclidSteps", "followPanelKey": "arpFollowPanelKey", "gate": "arpGate", "inputChannel": "arpInputChannel", "key": "arpKey", "latch": "arpLatch", "link": "arpLink", "mute": "arpMute", "octaves": "arpOctaves", "pattern": "arpPattern", "phase": "arpPhase", "rate": "arpRate", "read": "arpRead", "run": "arpRun", "scale": "arpScale", "showHeader": "arpShowHeader", "showNotes": "arpShowNotes", "source": "arpSource", "swing": "arpSwing", "sync": "arpSync", "velocity": "arpVelocity" },
+  "ce.components.arp": { "baseOctave": "arpBaseOctave", "channel": "arpChannel", "chordType": "arpChordType", "degree": "arpDegree", "division": "arpDivision", "editable": "arpEditable", "euclid": "arpEuclid", "euclidPulses": "arpEuclidPulses", "euclidRotate": "arpEuclidRotate", "euclidSteps": "arpEuclidSteps", "followPanelKey": "arpFollowPanelKey", "gate": "arpGate", "inputChannel": "arpInputChannel", "key": "arpKey", "latch": "arpLatch", "link": "arpLink", "mute": "arpMute", "octaves": "arpOctaves", "pattern": "arpPattern", "phase": "arpPhase", "rate": "arpRate", "read": "arpRead", "run": "arpRun", "scale": "arpScale", "showHeader": "arpShowHeader", "showNotes": "arpShowNotes", "source": "arpSource", "swing": "arpSwing", "swingSource": "arpSwingSource", "sync": "arpSync", "velocity": "arpVelocity" },
   "ce.components.chordpad": { "baseOctave": "chordPadBaseOctave", "channel": "chordPadChannel", "chordType": "chordPadChordType", "echo": "chordPadEcho", "echoChannel": "chordPadEchoChannel", "editable": "chordPadEditable", "followPanelKey": "chordPadFollowPanelKey", "gridCols": "chordPadGridCols", "inversion": "chordPadInversion", "key": "chordPadKey", "latch": "chordPadLatch", "layout": "chordPadLayout", "mode": "chordPadMode", "noteSpan": "chordPadNoteSpan", "octave": "chordPadOctave", "read": "chordPadRead", "scale": "chordPadScale", "showPiano": "chordPadShowPiano", "showRomans": "chordPadShowRomans", "strum": "chordPadStrum", "velocity": "chordPadVelocity", "voicing": "chordPadVoicing" },
   "ce.components.noteribbon": { "baseNote": "noteRibbonBaseNote", "bendRange": "noteRibbonBendRange", "channel": "noteRibbonChannel", "echo": "noteRibbonEcho", "echoChannel": "noteRibbonEchoChannel", "editable": "noteRibbonEditable", "followPanelKey": "noteRibbonFollowPanelKey", "key": "noteRibbonKey", "latch": "noteRibbonLatch", "modAxis": "noteRibbonModAxis", "modCc": "noteRibbonModCc", "mode": "noteRibbonMode", "octaves": "noteRibbonOctaves", "orientation": "noteRibbonOrientation", "read": "noteRibbonRead", "scale": "noteRibbonScale", "showHeader": "noteRibbonShowHeader", "showNames": "noteRibbonShowNames", "velocity": "noteRibbonVelocity", "velocityFrom": "noteRibbonVelocityFrom" },
   "ce.components.drumpads": { "baseNote": "drumPadsBaseNote", "channel": "drumPadsChannel", "choke": "drumPadsChoke", "colour": "drumPadsColour", "cols": "drumPadsCols", "cornerBottomLeft": "drumPadsCornerBottomLeft", "cornerBottomRight": "drumPadsCornerBottomRight", "cornerSize": "drumPadsCornerSize", "cornerTopLeft": "drumPadsCornerTopLeft", "cornerTopRight": "drumPadsCornerTopRight", "echo": "drumPadsEcho", "echoChannel": "drumPadsEchoChannel", "editable": "drumPadsEditable", "fill": "drumPadsFill", "flamMs": "drumPadsFlamMs", "gate": "drumPadsGate", "ghostVelocity": "drumPadsGhostVelocity", "label": "drumPadsLabel", "map": "drumPadsMap", "mode": "drumPadsMode", "note": "drumPadsNote", "origin": "drumPadsOrigin", "read": "drumPadsRead", "roll": "drumPadsRoll", "rollDelay": "drumPadsRollDelay", "rollHz": "drumPadsRollHz", "rollRate": "drumPadsRollRate", "rollSync": "drumPadsRollSync", "rollVelocity": "drumPadsRollVelocity", "rows": "drumPadsRows", "showHeader": "drumPadsShowHeader", "showLabels": "drumPadsShowLabels", "showNotes": "drumPadsShowNotes", "size": "drumPadsSize", "velocity": "drumPadsVelocity", "velocityFrom": "drumPadsVelocityFrom", "zones": "drumPadsZones" },
   "ce.components.turing": { "division": "turingDivision", "editable": "turingEditable", "fill": "turingFill", "gate": "turingGate", "length": "turingLength", "phase": "turingPhase", "quantize": "turingQuantize", "randomness": "turingRandomness", "rate": "turingRate", "read": "turingRead", "run": "turingRun", "showDivisions": "turingShowDivisions", "showGate": "turingShowGate", "size": "turingSize", "step": "turingStep", "sync": "turingSync" },
   "ce.components.looper": { "bars": "looperBars", "editable": "looperEditable", "fill": "looperFill", "insert": "looperInsert", "lane": "looperLane", "laneRest": "looperLaneRest", "phase": "looperPhase", "quantize": "looperQuantize", "read": "looperRead", "remove": "looperRemove", "run": "looperRun", "seconds": "looperSeconds", "showDivisions": "looperShowDivisions", "showGrid": "looperShowGrid", "showPlayhead": "looperShowPlayhead", "size": "looperSize", "sync": "looperSync" },
-  "ce.components.orbit": { "bars": "orbitBars", "editable": "orbitEditable", "fill": "orbitFill", "insert": "orbitInsert", "node": "orbitNode", "nodeAngle": "orbitNodeAngle", "nodeDepth": "orbitNodeDepth", "nodeRadius": "orbitNodeRadius", "nodeRatio": "orbitNodeRatio", "phase": "orbitPhase", "rate": "orbitRate", "read": "orbitRead", "remove": "orbitRemove", "run": "orbitRun", "showRings": "orbitShowRings", "showSpokes": "orbitShowSpokes", "showTrails": "orbitShowTrails", "showValues": "orbitShowValues", "size": "orbitSize", "sync": "orbitSync" },
+  "ce.components.orbit": { "bars": "orbitBars", "editable": "orbitEditable", "fill": "orbitFill", "insert": "orbitInsert", "node": "orbitNode", "nodeAngle": "orbitNodeAngle", "nodeDepth": "orbitNodeDepth", "nodeInvert": "orbitNodeInvert", "nodeOutput": "orbitNodeOutput", "nodeRadius": "orbitNodeRadius", "nodeRatio": "orbitNodeRatio", "phase": "orbitPhase", "rate": "orbitRate", "read": "orbitRead", "remove": "orbitRemove", "run": "orbitRun", "showRings": "orbitShowRings", "showSpokes": "orbitShowSpokes", "showTrails": "orbitShowTrails", "showValues": "orbitShowValues", "size": "orbitSize", "sync": "orbitSync" },
   "ce.components.kinetic": { "bounce": "kineticBounce", "editable": "kineticEditable", "friction": "kineticFriction", "gravity": "kineticGravity", "keepAlive": "kineticKeepAlive", "launch": "kineticLaunch", "read": "kineticRead", "run": "kineticRun", "showTrail": "kineticShowTrail", "showWalls": "kineticShowWalls", "sync": "kineticSync", "velocity": "kineticVelocity" },
   "ce.components.constellation": { "bars": "constellationBars", "blend": "constellationBlend", "editable": "constellationEditable", "links": "constellationLinks", "mode": "constellationMode", "probe": "constellationProbe", "rate": "constellationRate", "read": "constellationRead", "run": "constellationRun", "showField": "constellationShowField", "showLabels": "constellationShowLabels", "showLinks": "constellationShowLinks", "sync": "constellationSync" },
   "ce.components.timbre": { "anchorX": "timbreAnchorX", "anchorY": "timbreAnchorY", "axisX": "timbreAxisX", "axisY": "timbreAxisY", "editable": "timbreEditable", "fill": "timbreFill", "insert": "timbreInsert", "move": "timbreMove", "power": "timbrePower", "read": "timbreRead", "remove": "timbreRemove", "showAnchors": "timbreShowAnchors", "showField": "timbreShowField", "showReadout": "timbreShowReadout", "size": "timbreSize" },
@@ -3437,11 +3756,11 @@ var __CE_MODULES = {
   "ce.components.ribbon": { "bipolar": "ribbonBipolar", "editable": "ribbonEditable", "label": "ribbonLabel", "orientation": "ribbonOrientation", "read": "ribbonRead", "returnCurve": "ribbonReturnCurve", "returnMode": "ribbonReturnMode", "returnTime": "ribbonReturnTime", "returnValue": "ribbonReturnValue", "showGlow": "ribbonShowGlow", "showValue": "ribbonShowValue", "snap": "ribbonSnap", "style": "ribbonStyle", "value": "ribbonValue", "valuePrecision": "ribbonValuePrecision" },
   "ce.components.crossfader": { "bipolar": "crossfaderBipolar", "detent": "crossfaderDetent", "editable": "crossfaderEditable", "labelA": "crossfaderLabelA", "labelB": "crossfaderLabelB", "law": "crossfaderLaw", "mix": "crossfaderMix", "orientation": "crossfaderOrientation", "read": "crossfaderRead", "returnCurve": "crossfaderReturnCurve", "returnMode": "crossfaderReturnMode", "returnTime": "crossfaderReturnTime", "returnValue": "crossfaderReturnValue", "showGains": "crossfaderShowGains", "showLabels": "crossfaderShowLabels" },
   "ce.components.joystick": { "bipolar": "joystickBipolar", "cornerLabel": "joystickCornerLabel", "editable": "joystickEditable", "fill": "joystickFill", "move": "joystickMove", "read": "joystickRead", "returnAxes": "joystickReturnAxes", "returnCurve": "joystickReturnCurve", "returnMode": "joystickReturnMode", "returnTime": "joystickReturnTime", "returnValue": "joystickReturnValue", "showCorners": "joystickShowCorners", "showCrosshair": "joystickShowCrosshair", "showGrid": "joystickShowGrid", "showTrail": "joystickShowTrail", "size": "joystickSize" },
-  "ce.components.meter": { "dbCeil": "meterDbCeil", "dbFloor": "meterDbFloor", "decay": "meterDecay", "fill": "meterFill", "gradient": "meterGradient", "holdMs": "meterHoldMs", "insert": "meterInsert", "label": "meterLabel", "orientation": "meterOrientation", "peakHold": "meterPeakHold", "read": "meterRead", "remove": "meterRemove", "scale": "meterScale", "showScaleLabels": "meterShowScaleLabels", "showTicks": "meterShowTicks", "showValue": "meterShowValue", "size": "meterSize", "source": "meterSource", "value": "meterValue", "valueMax": "meterValueMax", "valueMin": "meterValueMin", "valuePrecision": "meterValuePrecision", "valuePrefix": "meterValuePrefix", "valueSuffix": "meterValueSuffix", "zoneAt": "meterZoneAt" },
+  "ce.components.meter": { "dbCeil": "meterDbCeil", "dbFloor": "meterDbFloor", "decay": "meterDecay", "fill": "meterFill", "gradient": "meterGradient", "holdMs": "meterHoldMs", "insert": "meterInsert", "label": "meterLabel", "labelPosition": "meterLabelPosition", "orientation": "meterOrientation", "peakHold": "meterPeakHold", "read": "meterRead", "remove": "meterRemove", "scale": "meterScale", "showScaleLabels": "meterShowScaleLabels", "showTicks": "meterShowTicks", "showValue": "meterShowValue", "size": "meterSize", "source": "meterSource", "value": "meterValue", "valueMax": "meterValueMax", "valueMin": "meterValueMin", "valuePrecision": "meterValuePrecision", "valuePrefix": "meterValuePrefix", "valueSuffix": "meterValueSuffix", "zoneAt": "meterZoneAt" },
   "ce.components.transport": { "beatUnit": "transportBeatUnit", "beatsPerBar": "transportBeatsPerBar", "bpm": "transportBpm", "clockDevice": "transportClockDevice", "clockOut": "transportClockOut", "countIn": "transportCountIn", "editable": "transportEditable", "loop": "transportLoop", "loopBars": "transportLoopBars", "loopStart": "transportLoopStart", "read": "transportRead", "runOnLoad": "transportRunOnLoad", "showPosition": "transportShowPosition", "showTap": "transportShowTap", "source": "transportSource", "swing": "transportSwing" },
   "ce.components.panic": { "centreBend": "panicSetCentreBend", "channel": "panicSetChannel", "clearLocal": "panicSetClearLocal", "editable": "panicSetEditable", "label": "panicSetLabel", "read": "panicSetRead", "resetControllers": "panicSetResetControllers", "scope": "panicSetScope", "showSummary": "panicSetShowSummary" },
-  "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
-  "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
+  "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "layout": "lcdLayout", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix", "zoneAt": "lcdZoneAt", "zoneKind": "lcdZoneKind", "zoneLabel": "lcdZoneLabel", "zoneShow": "lcdZoneShow", "zoneSource": "lcdZoneSource", "zoneText": "lcdZoneText" },
+  "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "kind": "pixelKind", "label": "pixelLabel", "layout": "pixelLayout", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "source": "pixelSource", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
 var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
 var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];

@@ -588,7 +588,21 @@ import ceditor as __api
 # on()/off() first: the prelude's own sections register listeners at load (onTransport, onTimer), and
 # with these defined further down every Python script stopped at load with "name 'on' is not
 # defined" from 23 September until it was found.
-def on(target, event, fn):        return __api.on(target, event, fn)
+# Why on(), watch(), compute(), intercept() or defineAction() sets nothing up: the event, path or
+# name left out, or a function that is not one, each of which set nothing up without a word. The
+# WebView runtime's hookRefusal, word for word. A target left out is "*", as the editor reads it.
+def __hookRefused(verb, what, name, fn):
+    why = ""
+    if name is None or (isinstance(name, str) and not name.strip()):
+        why = verb + ": no " + what + " was given, so nothing was set up."
+    elif not callable(fn):
+        why = (verb + ": no function was given, so nothing was set up.") if fn is None \
+            else (verb + ": " + __shownValue(fn) + " is not a function, so nothing was set up.")
+    if why: logError(why)
+    return why != ""
+def on(target=None, event=None, fn=None):
+    if __hookRefused("ce.core.on", "event", event, fn): return None
+    return __api.on("*" if target is None else target, event, fn)
 def off(target, event):           return __api.off(target, event)
 
 # @module ce.core
@@ -618,13 +632,19 @@ def __putRule(lst, rule):
             return
     lst.append(rule)
 
-def watch(path, fn):     __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(__read(path)), "prev": None})
-def compute(path, fn):   __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
-def intercept(path, fn): __putRule(__filters, {"path": path, "fn": fn})
+def watch(path=None, fn=None):
+    if __hookRefused("ce.core.watch", "path", path, fn): return
+    __putRule(__watchers, {"path": path, "fn": fn, "last": __sig(__read(path)), "prev": None})
+def compute(path=None, fn=None):
+    if __hookRefused("ce.core.compute", "path", path, fn): return
+    __putRule(__computeds, {"path": path, "fn": fn, "failed": False})
+def intercept(path=None, fn=None):
+    if __hookRefused("ce.core.intercept", "path", path, fn): return
+    __putRule(__filters, {"path": path, "fn": fn})
 
-def defineAction(name, fn):
-    key = str(name or "").strip()
-    if not key or not callable(fn): return
+def defineAction(name=None, fn=None):
+    if __hookRefused("ce.core.action", "name", name, fn): return
+    key = str(name).strip()
     __actions[key.lower()] = {"name": key, "fn": fn}
 
 def __actionNames(): return [a["name"] for a in __actions.values()]
@@ -1398,12 +1418,14 @@ def lerp(a=None, b=None, t=None):
     return x + (y - x) * f
 def curve(v, shape="linear"):
     import math
-    if shape == "exp": return v * v
-    if shape == "log": return math.sqrt(max(0, v))
-    if shape == "s":   return v * v * (3 - 2 * v)
+    # A name in any case, as every word from a list is read: "EXP" is "exp".
+    name = str(shape).strip().lower() if shape is not None else "linear"
+    if name == "exp": return v * v
+    if name == "log": return math.sqrt(max(0, v))
+    if name == "s":   return v * v * (3 - 2 * v)
     # A shape the list does not have used to return v in SILENCE, which reads as a curve that does
     # nothing rather than as a name that was never applied.
-    if shape not in ("linear", "", None):
+    if name not in ("linear", ""):
         log("curve(v, \"" + str(shape) + "\"): unknown shape — using linear. The names are "
             "\"linear\", \"exp\", \"log\" and \"s\"; for any other shape use map(v, points).")
     return v
@@ -1582,7 +1604,7 @@ def indexOfRange(t, count):
 def crossfade(a, b, t, law=None):
     import math
     x, frm, to = norm(t, 0, 1), __num(a), __num(b)
-    law = str(law if law is not None else "linear").lower()
+    law = str(law if law is not None else "linear").strip().lower()
     if law == "equalpower":
         angle = x * math.pi / 2
         return frm * math.cos(angle) + to * math.sin(angle)
@@ -1716,7 +1738,7 @@ def shapeCurve(v, curve, tension=None):
     t = norm(v, 0, 1)
     ten = __num(tension, 0) or 1.6
     k = 1 + max(0, ten)
-    name = str(curve)
+    name = str(curve).strip().lower()   # in any case: "SCurve" is "scurve"
     if name == "exp": return t ** k
     if name == "log": return 1 - (1 - t) ** k
     if name in ("scurve", "s"): return t * t * (3 - 2 * t)
@@ -1835,7 +1857,7 @@ def unshape(y, curve, tension=None):
     v = norm(y, 0, 1)
     ten = __num(tension, 0) or 1.6
     k = 1 + max(0, ten)
-    name = str(curve)
+    name = str(curve).strip().lower()
     if name == "exp": return v ** (1 / k)
     if name == "log": return 1 - (1 - v) ** (1 / k)
     # The closed-form inverse of smoothstep; a numeric solve would not agree to the last bit.
@@ -2254,23 +2276,40 @@ __FLAT_LETTER = { "C": 11, "D": 1, "E": 3, "F": 4, "G": 6, "A": 8, "B": 10 }
 # Two spellings, chosen by whether the second argument is there at all. Omitted: this module's
 # plain-ASCII names (C#4), what noteNumber has always round-tripped. Given: the PANEL's names, from
 # the same generated table the Chord Pad and Harmoniser print from - True "E♭4", False "C♯4".
+# A number, or text that is one, rounded down; anything else is no answer, and says why. A name
+# ("C4") went to math.floor and raised, where the editor gave nothing.
 def noteName(n, flats=None):
-    import math; n = math.floor(n)
+    import math
+    v = None if isinstance(n, bool) else __realNumber(n)
+    if v is None:
+        if n is None: logError('ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.')
+        else: logError('ce.music.name: ' + __shownValue(n) + ' is not a note number, so there is no answer. A note is a MIDI number, such as 60.')
+        return None
+    n = math.floor(v)
     tbl = __NOTES if flats is None else (__CE_NOTE_FLAT if flats else __CE_NOTE_SHARP)
     return tbl[__m12(n)] + str(math.floor(n / 12) - 1)
 # Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is None, not 0 - 0 is a
 # real MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in silence.
-def noteNumber(name):
+def __noteNumberOf(name):
     import re
-    m = re.match(r"^([A-G])([#b]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b"))
+    # In any case: "c4", "eb4" and "BB3" (a B, then a flat) are C4, E-flat 4 and B-flat 3.
+    m = re.match(r"^([A-Ga-g])([#bB]?)(-?\d+)$", str(name).replace("\u266f", "#").replace("\u266d", "b").strip())
     if not m: return None
-    letter, acc = m.group(1), m.group(2)
+    letter, acc = m.group(1).upper(), ("b" if m.group(2) == "B" else m.group(2))
     if acc == "b":
         pc = __FLAT_LETTER[letter]
     else:
         pc = __NOTES.index(letter + acc) if (letter + acc) in __NOTES else -1
     if pc < 0: return None
     return (int(m.group(3)) + (0 if (acc == "b" and letter == "C") else 1)) * 12 + pc
+# ce.music.number. The senders and the other helpers read a name with __noteNumberOf, above, and
+# say their own why.
+def noteNumber(name):
+    n = __noteNumberOf(name) if isinstance(name, str) else None
+    if n is None:
+        if name is None: logError('ce.music.number: no note name was given, so there is no answer.')
+        else: logError('ce.music.number: ' + __shownValue(name) + ' is not a note name, so there is no answer. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+    return n
 
 # BEGIN GENERATED music tables — tools/scripts/gen-script-modules.mjs. Do not edit by hand.
 # @module ce.music
@@ -2410,12 +2449,22 @@ __CE_EASINGS["inOutBack"] = [0.68,-0.55,0.265,1.55]
 def __pitch(v):
     import math
     if isinstance(v, str):
-        return noteNumber(v)
+        return __noteNumberOf(v)
     if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v):
         return math.floor(v)
     return None
+# A word from a list, in any case and with spaces around it, as the list spells it (a list's
+# entries, or a dict's keys), or None: "Dorian" is "dorian", "MAJ7" is "maj7".
+def __word(lst, name):
+    if not isinstance(name, str): return None
+    want = name.strip().lower()
+    for k in lst:
+        if isinstance(k, str) and k.lower() == want: return k
+    return None
 def __steps(tbl, name, fallback):
-    return tbl.get(fallback if name is None else str(name))
+    if name is None: return tbl.get(fallback)
+    key = __word(tbl, str(name))
+    return tbl.get(key) if key is not None else None
 def __pitchOf(verb, v):
     # A note left out altogether used to go the numeric way and become 0, the scale on C-1 again.
     if v is None:
@@ -2425,7 +2474,7 @@ def __pitchOf(verb, v):
     if n is None:
         if isinstance(v, str):
             logError(verb + ': "' + v + '" is not a note name, so there is no answer. A name is '
-                     + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+                     + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
             logError(verb + ': ' + __shownValue(v) + ' is not a note, so there is no answer. A note is a MIDI '
                      + 'number or a name, such as 60 or "C4".')
@@ -2473,7 +2522,7 @@ def quantizeNote(note, root, scale=None):
 # Arpeggiator each work out for themselves. Same algorithms, not second opinions: a script naming a
 # chord and the panel labelling the same chord have to agree or the panel contradicts itself.
 def noteSpelling(root, scale=None):
-    nm = "major" if scale is None else str(scale)
+    nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     if __setOf("ce.music.spelling", "scale", scale) is None: return None
     pitch = __pitchOf("ce.music.spelling", root)
     if pitch is None: return None
@@ -2518,7 +2567,7 @@ def __noteListItem(v):
     if isinstance(v, (int, float)):
         return v if math.isfinite(v) else None     # ints stay ints, so a note reads 60 and not 60.0
     if not isinstance(v, str): return None
-    n = noteNumber(v)
+    n = __noteNumberOf(v)
     if n is not None: return n
     r = __realNumber(v)
     return int(r) if r is not None and r == int(r) else r
@@ -2535,7 +2584,7 @@ def __noteList(fn, name, lst, mayBeAbsent=False):
         n = __noteListItem(v)
         if n is None:
             where = __shownValue(v) + " at position " + str(i + 1) + " of " + name
-            if isinstance(v, str): return say(where + " is not a note name", ' A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
+            if isinstance(v, str): return say(where + " is not a note name", ' A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".')
             return say(where + " is not a note", ' A note is a MIDI number or a name, such as 60 or "C4".')
         out.append(n)
     return out
@@ -2549,15 +2598,16 @@ def __musicSaid(text):
     logWarn(text + " This is said only the first time.")
 __VOICE_LEAD_MODES = ["closest", "smooth", "off"]
 __ARP_ORDER_PATTERNS = ["up", "down", "updown", "downup", "asPlayed", "random", "chord"]
-# A count argument that is not a finite number falls back to its default. Written out rather than
-# leaning on falsiness, because `0 or 3` is 3 in Python and JavaScript and 0 in Lua.
-def __count(v, fallback):
+# degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+# anything else the default, said once. The WebView runtime's musicStep, word for word. Written out
+# rather than leaning on falsiness, because `0 or 3` is 3 in Python and JavaScript and 0 in Lua.
+def __musicStep(what, v, fallback):
     import math
-    if isinstance(v, bool) or not isinstance(v, (int, float)):
-        try: v = float(v)
-        except (TypeError, ValueError): return fallback
-    if v != v or v in (float("inf"), float("-inf")): return fallback
-    return math.floor(v)
+    if v is None: return fallback
+    n = __realNumber(v)
+    if n is not None: return math.floor(n)
+    __musicSaid("ce.music.degreeChord: " + what + " is " + __shownValue(v) + ", which is not a number, so " + str(fallback) + " was used.")
+    return fallback
 # Name a chord from the notes in it, reading intervals above the lowest one: the inverse of
 # chordNotes, in the vocabulary the Chord Pad labels with.
 def chordQuality(notes):
@@ -2599,15 +2649,15 @@ def __roman(rootSemitone, quality):
     return acc + r
 # The chord the key builds ON a degree, by stacking scale thirds. Degrees are 1-based like
 # scaleDegree's. Past the top of the scale the stack keeps going an octave up rather than failing.
-def degreeChord(root, scale, degree, size=None):
+def degreeChord(root=None, scale=None, degree=None, size=None):
     import math
-    nm = "major" if scale is None else str(scale)
+    nm = "major" if scale is None else (__word(__CE_SCALES, str(scale)) or str(scale))
     s = __setOf("ce.music.degreeChord", "scale", scale)
     if not s: return None
     if __pitchOf("ce.music.degreeChord", root) is None: return None
     n = len(s)
-    d = __count(degree, 1) - 1
-    sz = max(2, __count(size, 3))
+    d = __musicStep("degree", degree, 1) - 1
+    sz = max(2, __musicStep("size", size, 3))
     offsets = []
     for k in range(sz):
         idx = d + k * 2
@@ -2635,7 +2685,7 @@ def voiceLead(notes, previous=None, mode=None):
     before = __noteList("voiceLead", "previous", previous, True) if read is not None else None
     if read is None or before is None: return []
     chord = __sortedNotes(read); prev = __sortedNotes(before)
-    how = "closest" if mode is None else str(mode)
+    how = "closest" if mode is None else (__word(__VOICE_LEAD_MODES, str(mode)) or str(mode))
     if how not in __VOICE_LEAD_MODES:
         __musicSaid("ce.music.lead: " + __shownValue(mode) + ' is not a mode, so "closest" was used. One of: closest, smooth, off.')
         how = "closest"
@@ -2685,17 +2735,17 @@ def expandOctaves(notes, octaves=None):
 # step, everything at once) has the same shape as the rest. Notes are taken in the order given,
 # which is what makes "asPlayed" mean anything. "random" returns the input order, exactly as the
 # panel's arpeggiator does; for a shuffled WALK there is shuffle(), which is seeded.
-def arpOrder(notes, pattern=None):
+def arpOrder(notes=None, pattern=None):
     asc = __noteList("arpOrder", "notes", notes)
     if asc is None: return []
     if pattern is None:
-        __musicSaid('ce.music.arp: no pattern was given, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
-        p = "up"
-    elif str(pattern) not in __ARP_ORDER_PATTERNS:
+        logError('ce.music.arp: no pattern was given, so the answer is an empty list. One of: up, down, updown, downup, asPlayed, random, chord.')
+        return []
+    elif __word(__ARP_ORDER_PATTERNS, str(pattern)) is None:
         __musicSaid("ce.music.arp: " + __shownValue(pattern) + ' is not a pattern, so "up" was used. One of: up, down, updown, downup, asPlayed, random, chord.')
         p = "up"
     else:
-        p = str(pattern)
+        p = __word(__ARP_ORDER_PATTERNS, str(pattern))
     if not asc: return []
     if p == "chord": return [list(asc)]
     if p == "down":
@@ -2708,40 +2758,6 @@ def arpOrder(notes, pattern=None):
         seq = list(asc)
     return [[x] for x in seq]
 # @module ce.midi
-def to14bit(v):
-    import math; v = math.floor(v); return { "msb": math.floor(v / 128) % 128, "lsb": v % 128 }
-def from14bit(msb, lsb): return msb * 128 + lsb
-def to7bit(v, count=2, order="msb"):
-    import math; v = math.floor(v); out = []
-    for _ in range(count): out.append(v % 128); v = math.floor(v / 128)
-    return list(reversed(out)) if order == "msb" else out
-def from7bit(b, order="msb"):
-    v = 0; seq = b if order == "msb" else list(reversed(b))
-    for x in seq: v = v * 128 + x
-    return v
-def toNibbles(b):
-    import math; b = math.floor(b); return { "hi": math.floor(b / 16) % 16, "lo": b % 16 }
-def fromNibbles(hi, lo): return hi * 16 + lo
-def nibblize(b):
-    o = []
-    for x in b: n = toNibbles(x); o.append(n["hi"]); o.append(n["lo"])
-    return o
-def denibblize(b):
-    o = []
-    for i in range(0, len(b), 2): o.append(fromNibbles(b[i], b[i + 1] if i + 1 < len(b) else 0))
-    return o
-def toAscii(s, length=None):
-    o = [ord(c) for c in s]
-    if length:
-        while len(o) < length: o.append(32)
-    return o
-def fromAscii(b): return "".join(chr(x) for x in b)
-def toOffset(v, center): return v + center
-def fromOffset(b, center): return b - center
-def toSigned(v, bits):
-    m = 2 ** bits; return v + m if v < 0 else v
-def fromSigned(b, bits):
-    m = 2 ** bits; return b - m if b >= m / 2 else b
 
 # checksum(kind, bytes) — "roland"/"yamaha" are the same two's-complement 7-bit sum; "sum" is the
 # plain 7-bit sum; "xor" is the running XOR. The one-argument form checksum(bytes) defaults to
@@ -2850,13 +2866,13 @@ def checksum(kind=None, bytes=None, opts=None):
     verb = "ce.midi.checksum"
     if bytes is None:
         # checksum("roland") with the bytes left out: the name is a name, and what is missing is the bytes.
-        if kind is None or (isinstance(kind, str) and kind.lower() in __CE_CKSUM_ALIAS):
+        if kind is None or (isinstance(kind, str) and kind.strip().lower() in __CE_CKSUM_ALIAS):
             logError(verb + ": no bytes given, so there is no checksum.")
             return None
         bytes = kind; kind = "roland"
     bytes = __scriptBytes(verb, bytes, "there is no checksum")
     if bytes is None: return None
-    cid = __CE_CKSUM_ALIAS.get(kind.lower()) if isinstance(kind, str) else None
+    cid = __CE_CKSUM_ALIAS.get(kind.strip().lower()) if isinstance(kind, str) else None
     if cid is None:
         # The names it does accept, sorted, as the WebView runtime lists them (checksumNames).
         which = ": no algorithm given" if kind is None else "(" + __shownValue(kind) + "): no such algorithm"
@@ -2917,11 +2933,169 @@ def __doesNotFit(v, bits):
     if not __whole(v): return __shownValue(v) + " is not a whole number"
     if v < 0 or v >= 2 ** bits: return __shown(v) + " does not fit in " + __plural(bits, "bit")
     return None
+# The older encoding helpers, to7bit to fromSigned, held to the byte lists' rule: a value that does
+# not fit, a number that is not one and a list that is not bytes answer None and say why. The
+# WebView runtime's "older encoding helpers", rule for rule and message for message. A value to
+# split is rounded down first, as it always was; a part to join must be whole.
+def __packNumber(verb, what, v):
+    n = __realNumber(v)
+    if n is not None:
+        return int(n) if isinstance(v, str) and float(n).is_integer() else n
+    if v is None: return __refuse(verb, what + " is a number, and none was given")
+    return __refuse(verb, what + " is a number, and " + __shownValue(v) + " is not")
+def __packRange(verb, what, n, bits, room, roundDown=False):
+    import math
+    m = math.floor(n) if roundDown else n
+    if m != math.floor(m): return __refuse(verb, what + " is " + __shown(n) + ", which is not a whole number")
+    if m < 0 or m >= 2 ** bits: return __refuse(verb, what + " is " + __shown(n) + ", which does not fit in " + room)
+    return int(m)
+def __packFit(verb, what, v, bits, room, roundDown=False):
+    n = __packNumber(verb, what, v)
+    if n is None: return None
+    return __packRange(verb, what, n, bits, room, roundDown)
+def __packSetting(verb, what, v, lo, hi, fallback=None):
+    import math
+    if v is None and fallback is not None: return fallback
+    n = __realNumber(v)
+    if n is None or n != math.floor(n) or n < lo or n > hi:
+        return __refuse(verb, what + " must be a whole number from " + str(lo) + " to " + str(hi))
+    return int(n)
+def __packOrder(verb, order):
+    o = "msb" if order is None else (order.strip().lower() if isinstance(order, str) else order)
+    if isinstance(o, str) and (o == "msb" or o == "lsb"): return o
+    return __refuse(verb, 'order must be "msb" or "lsb"')
+def __packList(verb, data, bits, why):
+    lst = __bytesIn(verb, data)
+    if lst is None: return None
+    for i, b in enumerate(lst):
+        if b >= 2 ** bits: return __refuse(verb, str(b) + " at position " + str(i) + " " + why)
+    return lst
+def to14bit(v=None):
+    n = __packFit("ce.midi.to14bit", "v", v, 14, "14 bits", True)
+    if n is None: return None
+    return { "msb": n // 128, "lsb": n % 128 }
+def from14bit(msb=None, lsb=None):
+    verb = "ce.midi.from14bit"
+    hi = __packFit(verb, "msb", msb, 7, "7 bits")
+    if hi is None: return None
+    lo = __packFit(verb, "lsb", lsb, 7, "7 bits")
+    if lo is None: return None
+    return hi * 128 + lo
+def to7bit(v=None, count=None, order=None):
+    verb = "ce.midi.to7bit"
+    n = __packNumber(verb, "v", v)
+    if n is None: return None
+    k = __packSetting(verb, "count", count, 1, 4, 2)
+    if k is None: return None
+    o = __packOrder(verb, order)
+    if o is None: return None
+    x = __packRange(verb, "v", n, 7 * k, __plural(k, "byte") + " of 7 bits", True)
+    if x is None: return None
+    out = []
+    for _ in range(k): out.append(x % 128); x = x // 128
+    return list(reversed(out)) if o == "msb" else out
+def from7bit(b=None, order=None):
+    verb = "ce.midi.from7bit"
+    lst = __packList(verb, b, 7, "does not fit in 7 bits")
+    if lst is None: return None
+    if len(lst) < 1 or len(lst) > 4: return __refuse(verb, "it joins 1 to 4 bytes, and " + str(len(lst)) + " were given")
+    o = __packOrder(verb, order)
+    if o is None: return None
+    v = 0
+    for x in (lst if o == "msb" else list(reversed(lst))): v = v * 128 + x
+    return v
+def toNibbles(b=None):
+    n = __packFit("ce.midi.toNibbles", "byte", b, 8, "8 bits", True)
+    if n is None: return None
+    return { "hi": n // 16, "lo": n % 16 }
+def fromNibbles(hi=None, lo=None):
+    verb = "ce.midi.fromNibbles"
+    h = __packFit(verb, "hi", hi, 4, "4 bits")
+    if h is None: return None
+    l = __packFit(verb, "lo", lo, 4, "4 bits")
+    if l is None: return None
+    return h * 16 + l
+def nibblize(b=None):
+    lst = __bytesIn("ce.midi.nibblize", b)
+    if lst is None: return None
+    out = []
+    for x in lst: out.append(x // 16); out.append(x % 16)
+    return out
+def denibblize(b=None):
+    verb = "ce.midi.denibblize"
+    lst = __packList(verb, b, 4, "does not fit in 4 bits")
+    if lst is None: return None
+    if len(lst) % 2 == 1: return __refuse(verb, "the halves come in pairs, and " + str(len(lst)) + " is an odd count")
+    return [lst[i] * 16 + lst[i + 1] for i in range(0, len(lst), 2)]
+# Text longer than the length is cut to it, and a length that is not one is no length; each said once.
+__packWarned = {}
+def __packSaid(key, text):
+    if key in __packWarned: return
+    __packWarned[key] = True
+    logWarn(text + " This is said only the first time.")
+def toAscii(s=None, length=None):
+    import math
+    verb = "ce.midi.toAscii"
+    if not isinstance(s, str):
+        if s is None: return __refuse(verb, "str is text, and none was given")
+        return __refuse(verb, "str is text, and " + __shownValue(s) + " is not")
+    out = []
+    for c in s:
+        if ord(c) > 127: return __refuse(verb, "the text has a character outside ASCII")
+        out.append(ord(c))
+    if length is None: return out
+    n = __realNumber(length)
+    if n is None or n != math.floor(n) or n < 1:
+        __packSaid("toAscii length", verb + ": length is " + __shownValue(length)
+                   + ", which is not a whole number from 1, so the text was neither filled out nor cut.")
+        return out
+    n = int(n)
+    if len(out) > n:
+        __packSaid("toAscii cut", verb + ': "' + s + '" is longer than ' + __plural(n, "character") + ", so it was cut to " + str(n) + ".")
+        out = out[:n]
+    while len(out) < n: out.append(32)
+    return out
+def fromAscii(b=None):
+    lst = __packList("ce.midi.fromAscii", b, 7, "is not an ASCII character")
+    if lst is None: return None
+    return "".join(chr(x) for x in lst)
+def __packOffset(verb, what, v, center, sign):
+    n = __packNumber(verb, what, v)
+    if n is None: return None
+    c = __packNumber(verb, "center", center)
+    if c is None: return None
+    return n + sign * c
+def toOffset(v=None, center=None): return __packOffset("ce.midi.toOffset", "v", v, center, 1)
+def fromOffset(b=None, center=None): return __packOffset("ce.midi.fromOffset", "b", b, center, -1)
+def toSigned(v=None, bits=None):
+    import math
+    verb = "ce.midi.toSigned"
+    n = __packNumber(verb, "v", v)
+    if n is None: return None
+    k = __packSetting(verb, "bits", bits, 1, 32)
+    if k is None: return None
+    m = math.floor(n)
+    half = 1 << (k - 1)
+    if m < -half or m >= half:
+        return __refuse(verb, "v is " + __shown(n) + ", and in " + __plural(k, "bit") + " a signed number is from "
+                        + str(-half) + " to " + str(half - 1))
+    return m + (1 << k) if m < 0 else m
+def fromSigned(b=None, bits=None):
+    verb = "ce.midi.fromSigned"
+    n = __packNumber(verb, "b", b)
+    if n is None: return None
+    k = __packSetting(verb, "bits", bits, 1, 32)
+    if k is None: return None
+    m = __packRange(verb, "b", n, k, __plural(k, "bit"))
+    if m is None: return None
+    return m - (1 << k) if m >= (1 << (k - 1)) else m
 def __shape(verb, opts):
     bits, order = 7, "msb"
     if isinstance(opts, dict):
         if opts.get("bits") is not None: bits = opts.get("bits")
         if opts.get("order") is not None: order = opts.get("order")
+    # In any case, as every word from a list is read: "MSB" is "msb".
+    if isinstance(order, str): order = order.strip().lower()
     if isinstance(bits, bool) or bits not in (7, 8): return __refuse(verb, "bits must be 7 or 8")
     if order not in ("msb", "lsb"): return __refuse(verb, 'order must be "msb" or "lsb"')
     return { "bits": int(bits), "order": order }
@@ -3151,10 +3325,10 @@ __WEBVIEW_ONLY = [
   "setlistRead",
 # @module ce.components.arp
   "arpRun","arpPattern","arpRate","arpDivision","arpSync","arpOctaves","arpGate","arpSwing",
-  "arpLatch","arpKey","arpScale","arpFollowPanelKey","arpDegree","arpChordType","arpVelocity",
-  "arpChannel","arpEuclid","arpEuclidSteps","arpEuclidPulses","arpEuclidRotate","arpPhase",
-  "arpMute","arpInputChannel","arpBaseOctave","arpSource","arpLink","arpEditable","arpShowNotes",
-  "arpShowHeader","arpRead",
+  "arpSwingSource","arpLatch","arpKey","arpScale","arpFollowPanelKey","arpDegree","arpChordType",
+  "arpVelocity","arpChannel","arpEuclid","arpEuclidSteps","arpEuclidPulses","arpEuclidRotate",
+  "arpPhase","arpMute","arpInputChannel","arpBaseOctave","arpSource","arpLink","arpEditable",
+  "arpShowNotes","arpShowHeader","arpRead",
 # @module ce.components.chordpad
   "chordPadMode","chordPadKey","chordPadScale","chordPadFollowPanelKey","chordPadChordType",
   "chordPadVoicing","chordPadInversion","chordPadOctave","chordPadVelocity","chordPadChannel",
@@ -3187,9 +3361,9 @@ __WEBVIEW_ONLY = [
   "looperShowDivisions","looperRead","looperSize","looperFill","looperInsert","looperRemove",
 # @module ce.components.orbit
   "orbitRun","orbitRate","orbitBars","orbitSync","orbitPhase","orbitNode","orbitNodeRadius",
-  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth","orbitEditable","orbitShowTrails",
-  "orbitShowSpokes","orbitShowRings","orbitShowValues","orbitRead","orbitSize","orbitFill",
-  "orbitInsert","orbitRemove",
+  "orbitNodeAngle","orbitNodeRatio","orbitNodeDepth","orbitNodeOutput","orbitNodeInvert",
+  "orbitEditable","orbitShowTrails","orbitShowSpokes","orbitShowRings","orbitShowValues",
+  "orbitRead","orbitSize","orbitFill","orbitInsert","orbitRemove",
 # @module ce.components.kinetic
   "kineticRun","kineticSync","kineticGravity","kineticBounce","kineticFriction","kineticKeepAlive",
   "kineticLaunch","kineticVelocity","kineticEditable","kineticShowTrail","kineticShowWalls",
@@ -3235,16 +3409,16 @@ __WEBVIEW_ONLY = [
   "crossfaderLabelA","crossfaderLabelB","crossfaderEditable","crossfaderShowLabels",
   "crossfaderShowGains","crossfaderRead",
 # @module ce.components.joystick
-  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnAxes",
-  "joystickReturnTime","joystickReturnCurve","joystickCornerLabel","joystickEditable",
+  "joystickMove","joystickBipolar","joystickReturnMode","joystickReturnValue","joystickReturnTime",
+  "joystickReturnCurve","joystickReturnAxes","joystickCornerLabel","joystickEditable",
   "joystickShowGrid","joystickShowCrosshair","joystickShowCorners","joystickShowTrail",
   "joystickRead","joystickSize","joystickFill",
 # @module ce.components.meter
   "meterValue","meterScale","meterPeakHold","meterHoldMs","meterDecay","meterValueMin",
   "meterValueMax","meterDbFloor","meterDbCeil","meterOrientation","meterGradient","meterLabel",
-  "meterValuePrecision","meterValuePrefix","meterValueSuffix","meterZoneAt","meterSource",
-  "meterShowTicks","meterShowScaleLabels","meterShowValue","meterRead","meterSize","meterFill",
-  "meterInsert","meterRemove",
+  "meterLabelPosition","meterValuePrecision","meterValuePrefix","meterValueSuffix","meterZoneAt",
+  "meterSource","meterShowTicks","meterShowScaleLabels","meterShowValue","meterRead","meterSize",
+  "meterFill","meterInsert","meterRemove",
 # @module ce.components.transport
   "transportBpm","transportSwing","transportSource","transportBeatsPerBar","transportBeatUnit",
   "transportLoop","transportLoopStart","transportLoopBars","transportCountIn","transportClockOut",
@@ -3259,13 +3433,14 @@ __WEBVIEW_ONLY = [
   "lcdAnimFps","lcdAnimLoop","lcdScrollMode","lcdScrollRepeat","lcdBlinkRate","lcdCursorBlink",
   "lcdValueMin","lcdValueMax","lcdValuePrecision","lcdValuePrefix","lcdValueSuffix",
   "lcdValueSource","lcdBrightnessSource","lcdBacklightSource","lcdGlyph","lcdEditText",
+  "lcdZoneText","lcdZoneLabel","lcdZoneShow","lcdZoneAt","lcdZoneSource","lcdZoneKind","lcdLayout",
   "lcdShowGlass","lcdShowGhost","lcdShowScanlines","lcdShowGrid","lcdRead","lcdSize","lcdFill",
 # @module ce.components.pixel
-  "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH",
-  "pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma","pixelGlow",
-  "pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
+  "pixelText","pixelLabel","pixelShow","pixelBlink","pixelX","pixelY","pixelW","pixelH","pixelKind",
+  "pixelSource","pixelEditText","pixelBacklight","pixelBrightness","pixelContrast","pixelGamma",
+  "pixelGlow","pixelAnim","pixelAnimPreset","pixelAnimSpeed","pixelAnimLoop","pixelAnimFps",
   "pixelLayoutTransition","pixelTransitionMs","pixelBrightnessSource","pixelBacklightSource",
-  "pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
+  "pixelLayout","pixelShowGlass","pixelShowGhost","pixelShowScanlines","pixelShowGrid","pixelRead",
 ]
 # @module -
 def __webviewOnly(name):
@@ -3353,15 +3528,15 @@ def __midiArg(verb, kind, v):
 # table raised or played C-1. __badNote refuses each in the WebView runtime's words.
 def __note(n):
     import math
-    v = noteNumber(n) if isinstance(n, str) else (int(math.floor(n + 0.5)) if __finite(n) else None)
+    v = __noteNumberOf(n) if isinstance(n, str) else (int(math.floor(n + 0.5)) if __finite(n) else None)
     return v if v is not None and 0 <= v <= 127 else None
 def __badNote(verb, note):
     rng = "MIDI notes run from 0 to 127, which is C-1 to G9."
     if note is None:
         why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".'
     elif isinstance(note, str):
-        if noteNumber(note) is None:
-            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it '
+        if __noteNumberOf(note) is None:
+            why = ('"' + note + '" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it '
                    + 'has one, then the octave: "C4", "Eb3", "F#-1".')
         else:
             why = '"' + note + '" is outside the MIDI notes, so nothing was sent. ' + rng
@@ -3495,7 +3670,7 @@ def sendTransport(action=None):
     if action is None:
         logError("sendTransport: no action given, so nothing was sent. " + actions)
         return
-    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.lower()) if isinstance(action, str) else None
+    status = {"start": 0xFA, "continue": 0xFB, "stop": 0xFC}.get(action.strip().lower()) if isinstance(action, str) else None
     if status is None:
         logError("sendTransport: " + __shownValue(action) + " is not a transport action, so nothing was sent. " + actions)
         return
@@ -3557,7 +3732,20 @@ def deviceProfile(role=None):
 # read / write. `read` is the LAST KNOWN value — what the synth most recently told us — not a live
 # query: asking the synth is asynchronous and this verb is not. `write` encodes through the device
 # profile and sends; it returns whether the message went out, not whether the synth accepted it.
-def deviceRead(id, role=None):
+# An id left out, or blank, is refused, where it answered nothing without a word; parameters() and
+# ports() take a table of options or nothing; ports() says once of a direction that is not one; and
+# setTiming takes a timing the profile has, in any case, written in its spelling. The WebView
+# runtime's words (deviceWords.js).
+def __deviceIdMissing(id):
+    return id is None or (isinstance(id, str) and not id.strip())
+def __deviceNotOptions(verb, opts):
+    if opts is None or isinstance(opts, dict): return False
+    logError("ce.device." + verb + ": " + __shownValue(opts) + " is not a table of options, so the answer is an empty list.")
+    return True
+__devicePortsWarned = {}
+def deviceRead(id=None, role=None):
+    if __deviceIdMissing(id):
+        logError("ce.device.read: no parameter id was given, so there is no answer."); return None
     return __deviceQuery("read", { "role": __role(role), "id": str(id) })
 def deviceWrite(id, value, role=None):
     return __api.deviceWrite(str(id), value, __role(role)) is True
@@ -3586,27 +3774,57 @@ def deviceRecipes(role=None):
 def deviceRequests(role=None):
     return __deviceQuery("requests", { "role": __role(role) }) or []
 # The two writes. They land on THIS PROJECT's override, never on the shared profile.
-def deviceSetVariable(name, value, role=None):
-    return __deviceSet("variable", str(name), value, __role(role)) is True
-def deviceSetTiming(name, ms, role=None):
-    return __deviceSet("timing", str(name), ms, __role(role)) is True
+# A name left out reaches the host as "", which says a name is required; it was "None", and stored.
+def deviceSetVariable(name=None, value=None, role=None):
+    return __deviceSet("variable", "" if name is None else str(name), value, __role(role)) is True
+def deviceSetTiming(name=None, ms=None, role=None):
+    r = __role(role)
+    key = "" if name is None else str(name).strip()
+    if key != "":
+        timing = __deviceQuery("timing", { "role": r })
+        if isinstance(timing, dict):
+            names = [str(k) for k in timing.keys()]
+            known = None
+            for n in names:
+                if n.lower() == key.lower(): known = n
+            if known is None:
+                names.sort()
+                logError("ce.device.setTiming: the profile for " + r + ' has no timing called "' + key + '", so nothing was changed. '
+                         + (("Its timings: " + ", ".join(names) + ".") if names else "It has none."))
+                return False
+            key = known
+    return __deviceSet("timing", key, ms, r) is True
 
 def deviceParameters(opts=None):
+    if __deviceNotOptions("parameters", opts): return []
     opts = opts or {}
     r = __deviceQuery("parameters", { "role": __role(opts.get("role")), "query": opts.get("query"),
                                       "group": opts.get("group"), "type": opts.get("type"),
                                       "access": opts.get("access"), "limit": opts.get("limit") })
     return r if r is not None else []
 
-def deviceParameter(id, role=None):
+def deviceParameter(id=None, role=None):
+    if __deviceIdMissing(id):
+        logError("ce.device.parameter: no parameter id was given, so there is no answer."); return None
     return __deviceQuery("parameter", { "role": __role(role), "id": str(id) })
 
 # ports() — what is actually plugged in. connected(role) only answers yes/no for a role somebody
 # configured in advance; this enumerates the real ports, so a panel can offer a choice or notice a
 # device that showed up.
 def devicePorts(opts=None):
+    if __deviceNotOptions("ports", opts): return []
     opts = opts or {}
-    r = __deviceQuery("ports", { "direction": opts.get("direction") })
+    q = {}
+    if opts.get("direction") is not None:
+        raw = opts.get("direction")
+        d = raw.strip().lower() if isinstance(raw, str) else ""
+        if d in ("in", "input", "out", "output"): q["direction"] = d
+        else:
+            said = "ce.device.ports: direction is " + __shownValue(raw) + ', which is not "in" or "out", so every port was listed.'
+            if said not in __devicePortsWarned:
+                __devicePortsWarned[said] = True
+                logWarn(said + " This is said only the first time.")
+    r = __deviceQuery("ports", q)
     return r if r is not None else []
 
 # defineParameter / defineDump — teaching the app a synth it was not shipped knowing. The ROLE
@@ -3718,10 +3936,11 @@ def __storageScope(opts, verb):
     raw = opts if isinstance(opts, str) else (opts.get("scope") if isinstance(opts, dict) else None)
     if raw is None or raw == "":
         return "panel"
-    scope = str(raw)
+    # In any case, as every word from a list is read: "Local" is "local".
+    scope = str(raw).strip().lower()
     if scope in __CE_SCOPES:
         return scope
-    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % scope)
+    logError(verb + ': "%s" is not a scope, so nothing was done. One of: panel, script, local.' % str(raw))
     return None
 
 # Which of the host's two real stores a scope lives in.
@@ -3742,23 +3961,46 @@ def __storageKeyFrom(scope, stored):
     # A panel listing hides other scripts' private keys rather than showing an unusable spelling.
     return None if stored.startswith(__CE_SCRIPT_PREFIX) else stored
 
-def saveSetting(key, value, opts=None):
-    scope = __storageScope(opts, "ce.storage.saveSetting")
+# A setting's name: text, or a number used as text. Left out, or anything else, is refused. The
+# WebView runtime's storageName, word for word.
+def __storageName(verb, key, outcome):
+    import math
+    if isinstance(key, str): return key
+    if isinstance(key, (int, float)) and not isinstance(key, bool) and math.isfinite(key): return __shown(key)
+    if key is None:
+        logError(verb + ": no name was given, so " + outcome + ".")
+    else:
+        logError(verb + ": " + __shownValue(key) + " is not a name, so " + outcome + ". A name is text, or a number used as text.")
+    return None
+
+def saveSetting(key=None, value=None, opts=None):
+    verb = "ce.storage.saveSetting"
+    name = __storageName(verb, key, "nothing was saved")
+    if name is None:
+        return False
+    # Nothing to save is no value, where it answered true and saved nothing: a Lua table cannot hold nil.
+    if value is None:
+        logError(verb + ': no value was given for "' + name + '", so nothing was saved. ce.storage.forget() deletes a setting.')
+        return False
+    scope = __storageScope(opts, verb)
     if scope is None:
         return False
     store = __storageStore(scope)
     if __api.settingsAvailable(store) is not True:
         logError('saveSetting("%s"): the %s store is unavailable here, so nothing was saved. '
-                 'ce.storage.info() says which stores are available.' % (key, scope))
+                 'ce.storage.info() says which stores are available.' % (name, scope))
         return False
-    __api.saveSetting(__storageKeyFor(scope, key), value, store)
+    __api.saveSetting(__storageKeyFor(scope, name), value, store)
     return True
 
-def loadSetting(key, fallback=None, opts=None):
+def loadSetting(key=None, fallback=None, opts=None):
+    name = __storageName("ce.storage.loadSetting", key, "the fallback was given back")
+    if name is None:
+        return fallback
     scope = __storageScope(opts, "ce.storage.loadSetting")
     if scope is None:
         return fallback
-    v = __api.loadSetting(__storageKeyFor(scope, key), __storageStore(scope))
+    v = __api.loadSetting(__storageKeyFor(scope, name), __storageStore(scope))
     return fallback if v is None else v
 
 # settings() lists every saved key; forget() deletes one and says whether there was one.
@@ -3773,11 +4015,14 @@ def listSettings(opts=None):
             out.append(k)
     return out
 
-def forgetSetting(key, opts=None):
+def forgetSetting(key=None, opts=None):
+    name = __storageName("ce.storage.forget", key, "nothing was deleted")
+    if name is None:
+        return False
     scope = __storageScope(opts, "ce.storage.forget")
     if scope is None:
         return False
-    return __api.forgetSetting(__storageKeyFor(scope, key), __storageStore(scope)) is True
+    return __api.forgetSetting(__storageKeyFor(scope, name), __storageStore(scope)) is True
 
 # Every setting as a table — the read every other module got. Listing keys and looping to fetch each
 # one was the only way before.
@@ -3919,15 +4164,31 @@ def __jsonEnc(v, indent, depth, seen):
         return "{}"
     return "{" + nl + ("," + nl).join(parts) + nl + pad + "}"
 
-def encodeJson(value, opts=None):
-    indent = 0
-    if isinstance(opts, dict):
-        try:
-            n = int(opts.get("indent") or 0)
-            if n > 0:
-                indent = n
-        except (TypeError, ValueError):
-            indent = 0
+# encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+# and held to 0 to 10; anything else one line. Each value it cannot use as written is said once.
+# The WebView runtime's jsonIndent, word for word.
+__storageWarned = {}
+def __storageSaid(text):
+    if text in __storageWarned: return
+    __storageWarned[text] = True
+    logWarn(text + " This is said only the first time.")
+def __jsonIndent(opts):
+    import math
+    if not isinstance(opts, dict) or opts.get("indent") is None: return 0
+    raw = opts.get("indent")
+    n = __realNumber(raw)
+    def said(why, used):
+        __storageSaid("ce.storage.encode: indent is " + __shownValue(raw) + ", which is " + why + ", so " + used + ".")
+    if n is None:
+        said("not a number", "the text is on one line"); return 0
+    if n < 0:
+        said("below 0", "the text is on one line"); return 0
+    if n > 10:
+        said("above 10", "10 was used"); return 10
+    return math.floor(n)
+
+def encodeJson(value=None, opts=None):
+    indent = __jsonIndent(opts)
     try:
         return __jsonEnc(value, indent, 0, frozenset())
     except (TypeError, ValueError, RecursionError):
@@ -3945,12 +4206,23 @@ def __jsonStripNulls(v):
         return { k: __jsonStripNulls(x) for k, x in v.items() if x is not None }
     return v
 
-def decodeJson(text):
-    # json.loads for the reading: it is the same strict grammar JSON.parse accepts, which is what
-    # the hand-written Lua reader had to be written to match.
+# Text that is not JSON answers nothing and says so; nothing given, or a value that is not text, is
+# refused the same way. The WebView runtime's decodeJson, word for word.
+def __jsonNoConstant(name):
+    raise ValueError(name)
+def decodeJson(text=None):
+    verb = "ce.storage.decode"
+    if text is None:
+        logError(verb + ": no text was given, so there is no answer."); return None
+    if not isinstance(text, str):
+        logError(verb + ": " + __shownValue(text) + " is not text, so there is no answer."); return None
+    # json.loads for the reading: the same strict grammar JSON.parse accepts, which is what the
+    # hand-written Lua reader had to be written to match, but for NaN and Infinity, which it reads
+    # and the other three refuse.
     try:
-        v = __ce_json.loads("" if text is None else str(text))
+        v = __ce_json.loads(text, parse_constant=__jsonNoConstant)
     except (ValueError, TypeError):
+        logError(verb + ": the text is not JSON, so there is no answer.")
         return None
     return None if v is None else __jsonStripNulls(v)
 
@@ -4061,13 +4333,13 @@ __CE_MODULES = {
     "ce.components.recorder": { "bars": "recorderBars", "clear": "recorderClear", "countIn": "recorderCountIn", "load": "recorderLoad", "nudge": "recorderNudge", "play": "recorderPlay", "quantize": "recorderQuantize", "read": "recorderRead", "record": "recorderRecord", "shift": "recorderShift", "source": "recorderSource", "stop": "recorderStop", "store": "recorderStore", "transpose": "recorderTranspose", "undo": "recorderUndo" },
     "ce.components.harmony": { "channel": "harmonyChannel", "degree": "harmonyDegree", "inversion": "harmonyInversion", "keepPlayed": "harmonyKeepPlayed", "key": "harmonyKey", "mode": "harmonyMode", "octave": "harmonyOctave", "outOfKey": "harmonyOutOfKey", "read": "harmonyRead", "scale": "harmonyScale", "shape": "harmonyShape", "size": "harmonySize", "strum": "harmonyStrum", "voiceLeading": "harmonyVoiceLeading", "voicing": "harmonyVoicing" },
     "ce.components.setlist": { "crossfade": "setlistCrossfade", "enable": "setlistEnable", "jump": "setlistGoto", "next": "setlistNext", "prev": "setlistPrev", "read": "setlistRead", "wrap": "setlistWrap" },
-    "ce.components.arp": { "baseOctave": "arpBaseOctave", "channel": "arpChannel", "chordType": "arpChordType", "degree": "arpDegree", "division": "arpDivision", "editable": "arpEditable", "euclid": "arpEuclid", "euclidPulses": "arpEuclidPulses", "euclidRotate": "arpEuclidRotate", "euclidSteps": "arpEuclidSteps", "followPanelKey": "arpFollowPanelKey", "gate": "arpGate", "inputChannel": "arpInputChannel", "key": "arpKey", "latch": "arpLatch", "link": "arpLink", "mute": "arpMute", "octaves": "arpOctaves", "pattern": "arpPattern", "phase": "arpPhase", "rate": "arpRate", "read": "arpRead", "run": "arpRun", "scale": "arpScale", "showHeader": "arpShowHeader", "showNotes": "arpShowNotes", "source": "arpSource", "swing": "arpSwing", "sync": "arpSync", "velocity": "arpVelocity" },
+    "ce.components.arp": { "baseOctave": "arpBaseOctave", "channel": "arpChannel", "chordType": "arpChordType", "degree": "arpDegree", "division": "arpDivision", "editable": "arpEditable", "euclid": "arpEuclid", "euclidPulses": "arpEuclidPulses", "euclidRotate": "arpEuclidRotate", "euclidSteps": "arpEuclidSteps", "followPanelKey": "arpFollowPanelKey", "gate": "arpGate", "inputChannel": "arpInputChannel", "key": "arpKey", "latch": "arpLatch", "link": "arpLink", "mute": "arpMute", "octaves": "arpOctaves", "pattern": "arpPattern", "phase": "arpPhase", "rate": "arpRate", "read": "arpRead", "run": "arpRun", "scale": "arpScale", "showHeader": "arpShowHeader", "showNotes": "arpShowNotes", "source": "arpSource", "swing": "arpSwing", "swingSource": "arpSwingSource", "sync": "arpSync", "velocity": "arpVelocity" },
     "ce.components.chordpad": { "baseOctave": "chordPadBaseOctave", "channel": "chordPadChannel", "chordType": "chordPadChordType", "echo": "chordPadEcho", "echoChannel": "chordPadEchoChannel", "editable": "chordPadEditable", "followPanelKey": "chordPadFollowPanelKey", "gridCols": "chordPadGridCols", "inversion": "chordPadInversion", "key": "chordPadKey", "latch": "chordPadLatch", "layout": "chordPadLayout", "mode": "chordPadMode", "noteSpan": "chordPadNoteSpan", "octave": "chordPadOctave", "read": "chordPadRead", "scale": "chordPadScale", "showPiano": "chordPadShowPiano", "showRomans": "chordPadShowRomans", "strum": "chordPadStrum", "velocity": "chordPadVelocity", "voicing": "chordPadVoicing" },
     "ce.components.noteribbon": { "baseNote": "noteRibbonBaseNote", "bendRange": "noteRibbonBendRange", "channel": "noteRibbonChannel", "echo": "noteRibbonEcho", "echoChannel": "noteRibbonEchoChannel", "editable": "noteRibbonEditable", "followPanelKey": "noteRibbonFollowPanelKey", "key": "noteRibbonKey", "latch": "noteRibbonLatch", "modAxis": "noteRibbonModAxis", "modCc": "noteRibbonModCc", "mode": "noteRibbonMode", "octaves": "noteRibbonOctaves", "orientation": "noteRibbonOrientation", "read": "noteRibbonRead", "scale": "noteRibbonScale", "showHeader": "noteRibbonShowHeader", "showNames": "noteRibbonShowNames", "velocity": "noteRibbonVelocity", "velocityFrom": "noteRibbonVelocityFrom" },
     "ce.components.drumpads": { "baseNote": "drumPadsBaseNote", "channel": "drumPadsChannel", "choke": "drumPadsChoke", "colour": "drumPadsColour", "cols": "drumPadsCols", "cornerBottomLeft": "drumPadsCornerBottomLeft", "cornerBottomRight": "drumPadsCornerBottomRight", "cornerSize": "drumPadsCornerSize", "cornerTopLeft": "drumPadsCornerTopLeft", "cornerTopRight": "drumPadsCornerTopRight", "echo": "drumPadsEcho", "echoChannel": "drumPadsEchoChannel", "editable": "drumPadsEditable", "fill": "drumPadsFill", "flamMs": "drumPadsFlamMs", "gate": "drumPadsGate", "ghostVelocity": "drumPadsGhostVelocity", "label": "drumPadsLabel", "map": "drumPadsMap", "mode": "drumPadsMode", "note": "drumPadsNote", "origin": "drumPadsOrigin", "read": "drumPadsRead", "roll": "drumPadsRoll", "rollDelay": "drumPadsRollDelay", "rollHz": "drumPadsRollHz", "rollRate": "drumPadsRollRate", "rollSync": "drumPadsRollSync", "rollVelocity": "drumPadsRollVelocity", "rows": "drumPadsRows", "showHeader": "drumPadsShowHeader", "showLabels": "drumPadsShowLabels", "showNotes": "drumPadsShowNotes", "size": "drumPadsSize", "velocity": "drumPadsVelocity", "velocityFrom": "drumPadsVelocityFrom", "zones": "drumPadsZones" },
     "ce.components.turing": { "division": "turingDivision", "editable": "turingEditable", "fill": "turingFill", "gate": "turingGate", "length": "turingLength", "phase": "turingPhase", "quantize": "turingQuantize", "randomness": "turingRandomness", "rate": "turingRate", "read": "turingRead", "run": "turingRun", "showDivisions": "turingShowDivisions", "showGate": "turingShowGate", "size": "turingSize", "step": "turingStep", "sync": "turingSync" },
     "ce.components.looper": { "bars": "looperBars", "editable": "looperEditable", "fill": "looperFill", "insert": "looperInsert", "lane": "looperLane", "laneRest": "looperLaneRest", "phase": "looperPhase", "quantize": "looperQuantize", "read": "looperRead", "remove": "looperRemove", "run": "looperRun", "seconds": "looperSeconds", "showDivisions": "looperShowDivisions", "showGrid": "looperShowGrid", "showPlayhead": "looperShowPlayhead", "size": "looperSize", "sync": "looperSync" },
-    "ce.components.orbit": { "bars": "orbitBars", "editable": "orbitEditable", "fill": "orbitFill", "insert": "orbitInsert", "node": "orbitNode", "nodeAngle": "orbitNodeAngle", "nodeDepth": "orbitNodeDepth", "nodeRadius": "orbitNodeRadius", "nodeRatio": "orbitNodeRatio", "phase": "orbitPhase", "rate": "orbitRate", "read": "orbitRead", "remove": "orbitRemove", "run": "orbitRun", "showRings": "orbitShowRings", "showSpokes": "orbitShowSpokes", "showTrails": "orbitShowTrails", "showValues": "orbitShowValues", "size": "orbitSize", "sync": "orbitSync" },
+    "ce.components.orbit": { "bars": "orbitBars", "editable": "orbitEditable", "fill": "orbitFill", "insert": "orbitInsert", "node": "orbitNode", "nodeAngle": "orbitNodeAngle", "nodeDepth": "orbitNodeDepth", "nodeInvert": "orbitNodeInvert", "nodeOutput": "orbitNodeOutput", "nodeRadius": "orbitNodeRadius", "nodeRatio": "orbitNodeRatio", "phase": "orbitPhase", "rate": "orbitRate", "read": "orbitRead", "remove": "orbitRemove", "run": "orbitRun", "showRings": "orbitShowRings", "showSpokes": "orbitShowSpokes", "showTrails": "orbitShowTrails", "showValues": "orbitShowValues", "size": "orbitSize", "sync": "orbitSync" },
     "ce.components.kinetic": { "bounce": "kineticBounce", "editable": "kineticEditable", "friction": "kineticFriction", "gravity": "kineticGravity", "keepAlive": "kineticKeepAlive", "launch": "kineticLaunch", "read": "kineticRead", "run": "kineticRun", "showTrail": "kineticShowTrail", "showWalls": "kineticShowWalls", "sync": "kineticSync", "velocity": "kineticVelocity" },
     "ce.components.constellation": { "bars": "constellationBars", "blend": "constellationBlend", "editable": "constellationEditable", "links": "constellationLinks", "mode": "constellationMode", "probe": "constellationProbe", "rate": "constellationRate", "read": "constellationRead", "run": "constellationRun", "showField": "constellationShowField", "showLabels": "constellationShowLabels", "showLinks": "constellationShowLinks", "sync": "constellationSync" },
     "ce.components.timbre": { "anchorX": "timbreAnchorX", "anchorY": "timbreAnchorY", "axisX": "timbreAxisX", "axisY": "timbreAxisY", "editable": "timbreEditable", "fill": "timbreFill", "insert": "timbreInsert", "move": "timbreMove", "power": "timbrePower", "read": "timbreRead", "remove": "timbreRemove", "showAnchors": "timbreShowAnchors", "showField": "timbreShowField", "showReadout": "timbreShowReadout", "size": "timbreSize" },
@@ -4079,11 +4351,11 @@ __CE_MODULES = {
     "ce.components.ribbon": { "bipolar": "ribbonBipolar", "editable": "ribbonEditable", "label": "ribbonLabel", "orientation": "ribbonOrientation", "read": "ribbonRead", "returnCurve": "ribbonReturnCurve", "returnMode": "ribbonReturnMode", "returnTime": "ribbonReturnTime", "returnValue": "ribbonReturnValue", "showGlow": "ribbonShowGlow", "showValue": "ribbonShowValue", "snap": "ribbonSnap", "style": "ribbonStyle", "value": "ribbonValue", "valuePrecision": "ribbonValuePrecision" },
     "ce.components.crossfader": { "bipolar": "crossfaderBipolar", "detent": "crossfaderDetent", "editable": "crossfaderEditable", "labelA": "crossfaderLabelA", "labelB": "crossfaderLabelB", "law": "crossfaderLaw", "mix": "crossfaderMix", "orientation": "crossfaderOrientation", "read": "crossfaderRead", "returnCurve": "crossfaderReturnCurve", "returnMode": "crossfaderReturnMode", "returnTime": "crossfaderReturnTime", "returnValue": "crossfaderReturnValue", "showGains": "crossfaderShowGains", "showLabels": "crossfaderShowLabels" },
     "ce.components.joystick": { "bipolar": "joystickBipolar", "cornerLabel": "joystickCornerLabel", "editable": "joystickEditable", "fill": "joystickFill", "move": "joystickMove", "read": "joystickRead", "returnAxes": "joystickReturnAxes", "returnCurve": "joystickReturnCurve", "returnMode": "joystickReturnMode", "returnTime": "joystickReturnTime", "returnValue": "joystickReturnValue", "showCorners": "joystickShowCorners", "showCrosshair": "joystickShowCrosshair", "showGrid": "joystickShowGrid", "showTrail": "joystickShowTrail", "size": "joystickSize" },
-    "ce.components.meter": { "dbCeil": "meterDbCeil", "dbFloor": "meterDbFloor", "decay": "meterDecay", "fill": "meterFill", "gradient": "meterGradient", "holdMs": "meterHoldMs", "insert": "meterInsert", "label": "meterLabel", "orientation": "meterOrientation", "peakHold": "meterPeakHold", "read": "meterRead", "remove": "meterRemove", "scale": "meterScale", "showScaleLabels": "meterShowScaleLabels", "showTicks": "meterShowTicks", "showValue": "meterShowValue", "size": "meterSize", "source": "meterSource", "value": "meterValue", "valueMax": "meterValueMax", "valueMin": "meterValueMin", "valuePrecision": "meterValuePrecision", "valuePrefix": "meterValuePrefix", "valueSuffix": "meterValueSuffix", "zoneAt": "meterZoneAt" },
+    "ce.components.meter": { "dbCeil": "meterDbCeil", "dbFloor": "meterDbFloor", "decay": "meterDecay", "fill": "meterFill", "gradient": "meterGradient", "holdMs": "meterHoldMs", "insert": "meterInsert", "label": "meterLabel", "labelPosition": "meterLabelPosition", "orientation": "meterOrientation", "peakHold": "meterPeakHold", "read": "meterRead", "remove": "meterRemove", "scale": "meterScale", "showScaleLabels": "meterShowScaleLabels", "showTicks": "meterShowTicks", "showValue": "meterShowValue", "size": "meterSize", "source": "meterSource", "value": "meterValue", "valueMax": "meterValueMax", "valueMin": "meterValueMin", "valuePrecision": "meterValuePrecision", "valuePrefix": "meterValuePrefix", "valueSuffix": "meterValueSuffix", "zoneAt": "meterZoneAt" },
     "ce.components.transport": { "beatUnit": "transportBeatUnit", "beatsPerBar": "transportBeatsPerBar", "bpm": "transportBpm", "clockDevice": "transportClockDevice", "clockOut": "transportClockOut", "countIn": "transportCountIn", "editable": "transportEditable", "loop": "transportLoop", "loopBars": "transportLoopBars", "loopStart": "transportLoopStart", "read": "transportRead", "runOnLoad": "transportRunOnLoad", "showPosition": "transportShowPosition", "showTap": "transportShowTap", "source": "transportSource", "swing": "transportSwing" },
     "ce.components.panic": { "centreBend": "panicSetCentreBend", "channel": "panicSetChannel", "clearLocal": "panicSetClearLocal", "editable": "panicSetEditable", "label": "panicSetLabel", "read": "panicSetRead", "resetControllers": "panicSetResetControllers", "scope": "panicSetScope", "showSummary": "panicSetShowSummary" },
-    "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
-    "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
+    "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "layout": "lcdLayout", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix", "zoneAt": "lcdZoneAt", "zoneKind": "lcdZoneKind", "zoneLabel": "lcdZoneLabel", "zoneShow": "lcdZoneShow", "zoneSource": "lcdZoneSource", "zoneText": "lcdZoneText" },
+    "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "kind": "pixelKind", "label": "pixelLabel", "layout": "pixelLayout", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "source": "pixelSource", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
 __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [

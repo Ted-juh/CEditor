@@ -539,8 +539,9 @@ test('a component verb\'s value is typed by its spec: the divisions, the scales,
   assert.equal(argOf(callOf(read(src, 'lua', 'scale(')), 'scale').kind, 'scale');
   const gate = argOf(callOf(read(src, 'lua', 'gate')), 'gate');
   // Past its range the verb uses the nearest end, and says so in the console's words: it is not refused.
-  assert.deepEqual([gate.kind, gate.meaning.min, gate.meaning.max, gate.problem?.severity], ['number', 0, 1, 'warning']);
-  assert.equal(gate.problem.message, 'arp Arp: gate(1.5) — the gate 1.5 is outside 0 to 1, so 1 was used.');
+  // The arp's gate is 0.05 to 1, the inspector's range (item 4 of the owner's review of the arp).
+  assert.deepEqual([gate.kind, gate.meaning.min, gate.meaning.max, gate.problem?.severity], ['number', 0.05, 1, 'warning']);
+  assert.equal(gate.problem.message, 'arp Arp: gate(1.5) — the gate 1.5 is outside 0.05 to 1, so 1 was used.');
   const colour = argOf(callOf(read(src, 'lua', 'drumpads')), 'colour');
   assert.deepEqual([colour.kind, colour.problem?.severity], ['colour', 'error']);
 });
@@ -648,14 +649,14 @@ test('a refusal is said in the words the runtime says it in', () => {
     ['ce.device.defineParameter("q", { nrpn = { msb = 200, lsb = 0 } })', 'ce.', (c) => optOf(optOf(argOf(c, 'spec'), 'nrpn'), 'msb'),
       (api) => api.ce.device.defineParameter('q', { nrpn: { msb: 200, lsb: 0 } })],
     ['ce.midi.sendSysex({ 0xF0, 300 })', 'ce.', (c) => argOf(c, 'bytes'), (api) => api.ce.midi.sendSysex([0xF0, 300])],
-    ['ce.midi.sendNote(1, "c4", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'c4', 100)],
+    ['ce.midi.sendNote(1, "H4", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'H4', 100)],
     ['ce.midi.sendNote(1, "C10", 100)', 'ce.', (c) => argOf(c, 'note'), (api) => api.ce.midi.sendNote(1, 'C10', 100)],
     ['ce.midi.sendCC(1, 200, 64)', 'ce.', (c) => argOf(c, 'cc'), (api) => api.ce.midi.sendCC(1, 200, 64)],
     ['ce.midi.sendCC(17, 74, 64)', 'ce.', (c) => argOf(c, 'channel'), (api) => api.ce.midi.sendCC(17, 74, 64)],
     // A note name where the channel goes: sendNote's channel comes first.
     ['ce.midi.sendNote("C4", 100, 1)', 'ce.', (c) => argOf(c, 'channel'), (api) => api.ce.midi.sendNote('C4', 100, 1)],
     ['ce.midi.sendCC(1, "Cutoff", 64)', 'ce.', (c) => argOf(c, 'cc'), (api) => api.ce.midi.sendCC(1, 'Cutoff', 64)],
-    ['ce.music.scale("c4")', 'ce.', (c) => argOf(c, 'root'), (api) => api.ce.music.scale('c4')],
+    ['ce.music.scale("H4")', 'ce.', (c) => argOf(c, 'root'), (api) => api.ce.music.scale('H4')],
     ['ce.music.scale("C3", "harmonicMinr")', 'ce.', (c) => argOf(c, 'scale'), (api) => api.ce.music.scale('C3', 'harmonicMinr')],
     ['ce.music.chord("C3", "maj8")', 'ce.', (c) => argOf(c, 'type'), (api) => api.ce.music.chord('C3', 'maj8')],
     ['ce.time.step(0, "1/6")', 'ce.', (c) => argOf(c, 'division'), (api) => api.ce.time.step(0, '1/6')],
@@ -775,10 +776,10 @@ test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in
   const cases = [
     // [the option in Lua, the option as the runtime is given it, what the overlay is handed]
     ['cap = "round"', { cap: 'round' }, 'round'], ['cap = "square"', { cap: 'square' }, 'square'],
-    ['cap = "sausage"', { cap: 'sausage' }, null], ['cap = "Round"', { cap: 'Round' }, null],
+    ['cap = "sausage"', { cap: 'sausage' }, null], ['cap = "Round"', { cap: 'Round' }, 'round'],
     ['cap = 5', { cap: 5 }, null], ['cap = true', { cap: true }, null], ['cap = false', { cap: false }, null],
     ['join = "bevel"', { join: 'bevel' }, 'bevel'], ['join = "mitre"', { join: 'mitre' }, null],
-    ['join = "ROUND"', { join: 'ROUND' }, null],
+    ['join = " ROUND "', { join: ' ROUND ' }, 'round'], ['join = "Rund"', { join: 'Rund' }, null],
   ];
   for (const [lua, opts, handed] of cases) {
     const name = Object.keys(opts)[0];
@@ -797,15 +798,18 @@ test('a cap or a join is read as ce.draw.stroke reads it, and what it says is in
     assert.equal(runtime.said[0].kind, 'warn', src);
     assert.equal(row.problem.severity, 'warning', src);
   }
-  assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Round" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
-    'ce.draw.stroke: the join is "Round", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');
-  // ce.draw.blend reads only its spelling as well, and its row now says so in its words.
-  const blend = argOf(callOf(readStatement('ce.draw.blend("Multiply")', 'lua', 3, {})), 'mode');
+  assert.equal(optOf(argOf(callOf(readStatement('ce.draw.stroke("#FFF", 1, { join = "Rund" })', 'lua', 3, {})), 'opts'), 'join').problem.message,
+    'ce.draw.stroke: the join is "Rund", not "miter", "round" or "bevel", so "miter" is drawn. Did you mean "round"?');
+  // ce.draw.blend reads its word in any case too, and its row refuses only what the call refuses.
+  assert.equal(argOf(callOf(readStatement('ce.draw.blend("Multiply")', 'lua', 3, {})), 'mode').problem, null);
+  const blend = argOf(callOf(readStatement('ce.draw.blend("Multiplied")', 'lua', 3, {})), 'mode');
   resetScriptStateForTesting();
   setRuntimeHost({ panel });
   try {
     clearScriptTrace();
-    assert.equal(scriptApiForTesting('screen', 'values-probe').ce.draw.blend('Multiply'), false);
+    const api = scriptApiForTesting('screen', 'values-probe');
+    assert.equal(api.ce.draw.blend('Multiply'), true, 'a capital letter is still the word');
+    assert.equal(api.ce.draw.blend('Multiplied'), false);
     const [line] = get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message);
     assert.ok(blend.problem.message.startsWith(line), `read: ${blend.problem.message}\nruntime: ${line}`);
   } finally { setRuntimeHost(null); resetScriptStateForTesting(); }
@@ -1111,14 +1115,18 @@ test('record example 6: an easing curve, and a duration in milliseconds', () => 
   assert.equal(writeValue(js, 'javascript', optOf(argOf(callOf(read(js, 'javascript', 'ce.')), 'opts'), 'curve'), [0.2, 0.9, 0.3, 1.4]).text, '[0.2, 0.9, 0.3, 1.4]');
   const drawn = 'ce.anim.to("cutoff", 127, { curve = { 0.2, 0.9, 0.3, 1.4 } })';
   assert.equal(writeValue(drawn, 'lua', optOf(argOf(callOf(read(drawn, 'lua', 'ce.')), 'opts'), 'curve'), 'outBack').text, '"outBack"');
+  assert.deepEqual(optOf(argOf(callOf(read('ce.anim.to("cutoff", 127, { curve = "OUTBACK" })', 'lua', 'ce.')), 'opts'), 'curve').meaning.bezier,
+    [0.175, 0.885, 0.32, 1.275], 'a name in any case is the name');
   const typo = optOf(argOf(callOf(read('ce.anim.to("cutoff", 127, { curve = "outBak" })', 'lua', 'ce.')), 'opts'), 'curve');
   assert.match(typo.problem.message, /^ce\.anim\.to: "outBak" is not a curve this build knows — animating linear\..* Did you mean "outBack"\?$/);
 });
 
 test('record example 7: note names, what was the silent C-1', () => {
-  const src = 'ce.midi.sendNote(1, "c4", 100, 250)\nlocal triad = ce.music.chord("C4", "major")\nce.midi.sendNote(1, 48, 100)';
-  assert.equal(argOf(callOf(read(src, 'lua', 'sendNote(1, "c4"')), 'note').problem.message,
-    'sendNote: "c4" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  // "c4" was the example until a note name was read in any case: it is C4 now, and "H4" is not one.
+  const src = 'ce.midi.sendNote(1, "H4", 100, 250)\nlocal triad = ce.music.chord("C4", "major")\nce.midi.sendNote(1, 48, 100)';
+  assert.equal(argOf(callOf(read(src, 'lua', 'sendNote(1, "H4"')), 'note').problem.message,
+    'sendNote: "H4" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+  assert.deepEqual(argOf(callOf(read('ce.midi.sendNote(1, "eb4", 100)', 'lua', 'sendNote(1, "eb4"')), 'note').meaning, { number: 63, name: 'D#4' });
   const c4 = argOf(callOf(read(src, 'lua', 'ce.music')), 'root');
   assert.deepEqual([c4.meaning.number, c4.meaning.hint, c4.editable], [60, 'middle C', null]);
   assert.deepEqual(argOf(callOf(read(src, 'lua', 'sendNote(1, 48')), 'note').meaning, { number: 48, name: 'C3' });

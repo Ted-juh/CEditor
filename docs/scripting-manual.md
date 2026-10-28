@@ -607,7 +607,12 @@ them. Choose one in a script's **Runs on** box and define the function of the sa
 
 ### `onPanelLoad()`
 
-Runs first, as soon as the panel is opened and before any controls exist. Use it to set up MIDI or send the synth a start-up message. Do not read or change controls here — they have not been created yet.
+Runs first, when the panel opens, before any control exists.
+
+Good to know:
+
+- Set up MIDI here, or send the synth a start-up message.
+- Controls cannot be read or changed yet.
 
 ```lua
 -- Lua
@@ -624,7 +629,12 @@ function onPanelLoad() {
 
 ### `onPanelBuild()`
 
-Runs after onPanelLoad and before onPanelReady. This is the place to create, copy and arrange controls from a script. Controls made by a script are removed before each run, so this always starts from the panel as you built it.
+Runs after `onPanelLoad`, to create, copy and arrange controls from a script.
+
+Good to know:
+
+- Controls a script made are removed before each run, so it starts from the panel as it was built.
+- Panel view only.
 
 *Panel window only.*
 
@@ -649,7 +659,12 @@ function onPanelBuild() {
 
 ### `onError(info)`
 
-Runs when any script on the panel fails. `info` says which script failed, what it was doing and what the error was. The error is always written to the log as well. If onError itself fails, that error is logged and onError is not called again, so it cannot get stuck in a loop.
+Runs when any script on the panel fails.
+
+Good to know:
+
+- The error is written to the console as well.
+- An error in `onError` itself is written to the console, and `onError` is not called for it, so it cannot loop.
 
 **`info`** holds:
 
@@ -678,7 +693,12 @@ function onError(info) {
 
 ### `onDraw(info)`
 
-Paints on top of the control this script is attached to; `info` gives the control's name and its current size. It runs when the control needs repainting, not on every frame: to animate, call `ce.draw.redraw()` from a timer.
+Paints on top of the control this script is attached to.
+
+Good to know:
+
+- Runs when the control needs painting, not every frame: to animate, call `ce.draw.redraw()` from a timer.
+- Panel view only.
 
 *Panel window only.*
 
@@ -711,7 +731,12 @@ function onDraw(info) {
 
 ### `onPanelReady(info)`
 
-Runs once the controls exist. This is the moment to ask the synth for its current settings and fill the controls. In a plugin it runs again each time the window is reopened, so put one-time work inside `if info.firstTime`.
+Runs once the controls exist.
+
+Good to know:
+
+- Ask the synth for its settings here, and fill the controls.
+- In a plug-in it runs again each time the window opens: put one-time work inside `if info.firstTime`.
 
 **`info`** holds:
 
@@ -738,7 +763,12 @@ function onPanelReady(info) {
 
 ### `onPanelClose()`
 
-Runs when the panel window closes: you stopped the preview, or the plugin window was closed in the DAW. Your scripts keep running after this — timers still tick and MIDI still arrives. To clean up when the scripts themselves are stopped, use onPanelDestroy.
+Runs when the panel window closes.
+
+Good to know:
+
+- The preview stopped, or the plug-in's window was closed in the DAW.
+- The scripts go on running: timers tick and MIDI arrives. `onPanelDestroy` runs when they stop.
 
 ```lua
 -- Lua
@@ -755,7 +785,13 @@ function onPanelClose() {
 
 ### `onPanelDestroy()`
 
-Runs when the scripts are about to be stopped: another panel was opened, the scripts were replaced, or the plugin was removed. It is the last hook to run, and timers, saved state and MIDI still work, so this is the place to restore the synth or send a final dump. It runs exactly once, even if onPanelClose never did.
+Runs when the scripts are about to stop.
+
+Good to know:
+
+- Another panel was opened, the scripts were replaced, or the plug-in was removed.
+- The last hook: timers, saved values and MIDI still work, so restore the synth or send a last dump here.
+- Once, even when `onPanelClose` never ran.
 
 ```lua
 -- Lua
@@ -772,7 +808,13 @@ function onPanelDestroy() {
 
 ### `onDawSaveState(store) -> object`
 
-Runs when the DAW saves the project. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.
+Runs when the DAW saves the project: return what to keep.
+
+Good to know:
+
+- Return a table holding what you want saved.
+- `store` shows what other scripts saved so far; it is to read only, and changing it saves nothing.
+- In an exported plug-in only.
 
 *Exported plugin only — never runs in the editor.*
 
@@ -791,7 +833,12 @@ function onDawSaveState(store) {
 
 ### `onDawRestoreState(store)`
 
-Runs when the DAW reopens the project. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.
+Runs when the DAW opens the project again: read your values back.
+
+Good to know:
+
+- `store` holds what your `onDawSaveState` returned, with every other script's.
+- In an exported plug-in only.
 
 *Exported plugin only — never runs in the editor.*
 
@@ -820,24 +867,24 @@ Raised by the control the script belongs to.
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onValueChange(value)` | Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control. |
-| `onValueChanged(value)` | Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth. |
-| `onActiveHandleChanged(info)` | A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
+| `onValueChange(value)` | Runs again and again while the value moves, as a knob is dragged: for what on screen follows the control. |
+| `onValueChanged(value)` | Runs once, when the value settles, as a knob is let go: the moment to tell the synth. |
+| `onActiveHandleChanged(info)` | A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end". |
 | `onClick(mouse)` | The control was clicked. `mouse.x` and `mouse.y` say where, inside the control. |
 | `onDoubleClick(mouse)` | The control was double-clicked. `mouse.x` and `mouse.y` say where. |
-| `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held. |
+| `onPointerDown(mouse)` | A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held. |
 | `onPointerMove(mouse)` | The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position. |
 | `onPointerUp(mouse)` | The mouse button was released. |
 | `onHoverStart()` | The mouse pointer moved onto the control. |
 | `onHoverEnd()` | The mouse pointer left the control. |
 | `onWheel(wheel)` | The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction. |
-| `onStateChanged(state)` | The control's look-state changed. `state` is one word: "normal", "hover", "pressed" or "disabled". |
+| `onStateChanged(state)` | The control's look changed. `state` is "normal", "hover", "pressed" or "disabled". |
 
 ### Panel events
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onControlChanged(info)` | Any control on the panel changed. `info.target` is the control's name and `info.value` its new value. Use it to react to many controls in one place. |
+| `onControlChanged(info)` | A control on the panel changed. `info.target` is its name and `info.value` its new value: one handler for many controls. |
 | `onTimer(info)` | A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`. |
 
 ### Time events
@@ -847,9 +894,9 @@ displays, not for timing audio.
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onBeat(time)` | A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound. |
-| `onBar(time)` | A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature's beats per bar. It fires on the downbeat, together with onBeat. |
-| `onTransport(time)` | The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it. |
+| `onBeat(time)` | A beat went by while the transport plays. `time.bar` and `time.beat` give where, `time.beats` the beats so far, and `time.bpm` the tempo. Within a thirtieth of a second: right for a light or a display, not for timing sound. |
+| `onBar(time)` | A bar began, on the downbeat, with onBeat. `time.bar` is its number, `time.beats` the beats so far, and `time.beatsPerBar` the beats in a bar. |
+| `onTransport(time)` | The transport started, stopped or changed tempo. `time.playing` says whether it runs, `time.bpm` gives the tempo and `time.source` what drives it. |
 
 ### Synth and MIDI events
 
@@ -858,16 +905,16 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
-| `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
-| `onPresetChange(preset)` | The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset. |
-| `onMidiIn(midi)` | Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
-| `onCcIn(cc)` | A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16. |
-| `onNoteIn(note)` | A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead. |
-| `onNoteOffIn(note)` | A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off. |
-| `onSysexIn(bytes)` | A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers. |
-| `onDeviceConnected(device)` | A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile. |
-| `onDeviceDisconnected(device)` | A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why. |
+| `onParameterReceived(info)` | The synth sent a parameter's value, read through its profile. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
+| `onDumpReceived(dump)` | A dump from the synth arrived and was read; the controls bound to it are filled in already. `dump.values` holds each value by parameter id, `dump.kind` names the dump, such as "patch", and `dump.role` the synth it came from. |
+| `onPresetChange(preset)` | The preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe it; `preset.source` is "device" when the synth sent a Program Change, "panel" when the panel called recallPreset. |
+| `onMidiIn(midi)` | A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0. |
+| `onCcIn(cc)` | A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16. |
+| `onNoteIn(note)` | A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn. |
+| `onNoteOffIn(note)` | A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0. |
+| `onSysexIn(bytes)` | A SysEx message arrived. `bytes` holds it as a list of numbers. |
+| `onDeviceConnected(device)` | A synth was connected and is ready. `device.role` names it and `device.profileId` its profile. |
+| `onDeviceDisconnected(device)` | A synth is no longer connected and ready. `device.role` names it, and `device.message` may say why. |
 
 ### Component events
 
@@ -876,17 +923,17 @@ component, or put the component's name in place of `"*"`. These need the panel w
 
 | Handler | When it runs, and what you get |
 |---|---|
-| `onStep(step)` | A sequencer moved to its next step. `step.target` is the component's name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper. |
-| `onCycle(cycle)` | A sequence or loop came back round to its start. `cycle.target` is the component's name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit. |
-| `onHit(hit)` | A pad, key or ribbon was struck. `hit.target` is the component's name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon. |
-| `onRelease(release)` | A pad, key or ribbon was let go. `release.target` is the component's name, `release.id` which pad or key, and `release.note` the note. |
-| `onScene(scene)` | The Setlist switched to a scene. `scene.target` is the component's name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch. |
-| `onStage(stage)` | A component moved into a new stage. `stage.target` is the component's name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports "idle", "armed", "recording" and "overdub"; the Envelope reports "sustain", "release" and "end". This is not the same as onStateChanged, which is about hover and press. |
-| `onSettled(settled)` | A spring-loaded control finished gliding back to its rest position. `settled.target` is the component's name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick. |
-| `onBounce(bounce)` | The Kinetic ball hit a wall. `bounce.target` is the component's name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down. |
-| `onRecall(recall)` | The Constellation snapped to one of its presets. `recall.target` is the component's name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode. |
-| `onZone(zone)` | A Meter's reading crossed into a different zone, such as from green into red. `zone.target` is the component's name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading. |
-| `onVoiced(voiced)` | A component turned one played note into other notes. `voiced.target` is the component's name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser. |
+| `onStep(step)` | A sequencer moved to its next step: an Arpeggiator, Turing Machine, Phrase Sequencer or Looper. `step.target` is its name, `step.index` the step, counted from 1, `step.of` how many there are, and `step.notes` the notes it plays. |
+| `onCycle(cycle)` | A sequence or loop came round to its start: an Arpeggiator, Turing Machine, Looper or Orbit. `cycle.target` is its name and `cycle.count` how many times it has come round since the panel opened. |
+| `onHit(hit)` | A pad, key or strip was struck: a Chord Pad, Drum Pads or Note Ribbon. `hit.target` is its name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. |
+| `onRelease(release)` | A pad, key or strip was let go. `release.target` is its name, `release.id` which pad or key, and `release.note` the note. |
+| `onScene(scene)` | The Setlist moved to a scene, however it was chosen. `scene.target` is its name, `scene.index` the scene, counted from 1, and `scene.name` its name. |
+| `onStage(stage)` | A Recorder or an Envelope moved to a new stage. `stage.target` is its name, `stage.stage` the new stage and `stage.previous` the old one: the Recorder's "idle", "armed", "recording" and "overdub", the Envelope's "sustain", "release" and "end". Not onStateChanged, which is hover and press. |
+| `onSettled(settled)` | A Ribbon, Crossfader or Vector Joystick finished going back to its rest. `settled.target` is its name and `settled.value` where it came to rest. |
+| `onBounce(bounce)` | The Kinetic ball hit a wall. `bounce.target` is its name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down. |
+| `onRecall(recall)` | The Constellation, in snap mode, moved to another preset. `recall.target` is its name, `recall.id` the preset and `recall.label` its label. |
+| `onZone(zone)` | A Meter's reading crossed into another zone, such as from green into red. `zone.target` is its name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading. |
+| `onVoiced(voiced)` | A Zone Splitter or Harmoniser turned a played note into other notes. `voiced.target` is its name, `voiced.note` and `voiced.velocity` the note played, and `voiced.out` the notes it made. |
 
 ## Commands: The basics
 
@@ -898,13 +945,25 @@ The commands nearly every script uses: reading and changing values, deciding whe
 
 #### `set(path, value [, opts])`
 
-Change a value on the panel — usually a control's value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A gradient stop is stored as RRGGBB and takes no alpha. The change is sent to the synth, except while your script reacts to MIDI from the synth, so it does not hear its own value echoed back.
+Change a value on the panel: a control's value, or any property a path reaches.
+
+Example: `set("Cutoff", 64)` turns the control called Cutoff to 64.
+
+- `path` (path, required): A control's name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.<br>"panel." and a property: the panel's own, such as "panel.width".<br>".normalizedValue" at the end: its position, 0 to 1, in place of the value.<br>Not a control on the panel, or a property it does not have: nothing is written, with a console error.
+- `value` (any value, required): The new value.<br>A Knob's, a Slider's, a Number's or a Range's value, and a position: a number. Text that is a number: read as one.<br>A colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".<br>A gradient stop: RRGGBB, without alpha.<br>Left out, a number in any other form, or a colour in any other form: nothing is written, with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Sent to the synth, except while a handler answers MIDI from the synth, so a value is not echoed back; `opts.transmit` decides otherwise.
+- A new property on a section with a fixed shape: written, with a console warning that nothing reads it.
+- Returns nothing.
 
 **`opts`** can contain:
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `transmit` | true or false | decided by where the write came from | Whether to send the change to the synth. Left out, a write made while handling something the synth sent stays silent and any other write is sent. Set it only when you need to override that. |
+| `transmit` | true or false | decided by where the write came from | Whether the change is sent to the synth: true sent, false not.<br>Left out: sent, except while a handler answers MIDI from the synth. |
 
 ```lua
 set("path", value)
@@ -912,7 +971,16 @@ set("path", value)
 
 #### `get(path [, form])`
 
-Read a value from the panel. A control's value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form's name as `form`. A `form` that is not one of the three is refused with a message that names them, and the one you meant when it is one written another way ("normalisedValue" is answered with "Write normalizedValue."), and nothing comes back. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.
+Read a value from the panel.
+
+Example: `get("Cutoff")` gives the value of the control called Cutoff.
+
+- `path` (path, required): A control's name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.<br>"panel." and a property: the panel's own, such as "panel.width".<br>Not a control on the panel, or a property it does not have: no result, with a console error.<br>A property with no value yet: no result, without a word.
+- `form` (text, optional): "value": the control's value.<br>"normalizedValue": its position, 0 to 1.<br>"midiValue": the number the synth is sent; only where the synth's profile is attached.<br>Case-insensitive.<br>Left out: "value", or the form the path ends with.<br>Any other: no result, with a console error naming the forms.
+
+Good to know:
+
+- Returns the value; a colour written out, as `set()` stores it.
 
 ```lua
 get("path")
@@ -920,7 +988,17 @@ get("path")
 
 #### `noTransmit(fn)`
 
-Run a block of code that changes controls without sending anything to the synth — for example an Init Patch button that resets twenty controls at once. Sending switches back on by itself when the block ends.
+Change controls without sending anything to the synth.
+
+Example: `noTransmit(function() set("Cutoff", 0) set("Reso", 0) end)` resets both, silently.
+
+- `fn` (function, required): The changes to make.<br>Not a function: a console error.
+
+Good to know:
+
+- For an Init Patch button that resets many controls at once.
+- Sending is back on when the function ends; an error in it is printed in the console.
+- Returns nothing.
 
 ```lua
 -- Lua
@@ -937,7 +1015,16 @@ noTransmit(() => {
 
 #### `transmit(fn)`
 
-Run a block of code whose changes are sent to the synth even while your script is reacting to MIDI from the synth, when they would normally stay silent.
+Send changes to the synth even while a handler answers MIDI from it.
+
+Example: `transmit(function() set("Cutoff", 64) end)` sends 64 from inside a MIDI handler.
+
+- `fn` (function, required): The changes to send.
+
+Good to know:
+
+- Outside such a handler changes are sent anyway.
+- Returns nothing.
 
 ```lua
 -- Lua
@@ -954,7 +1041,19 @@ transmit(() => {
 
 #### `on(target, event, fn)`
 
-Listen for an event from any script: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the handler name, such as "onValueChanged", and `fn` the function to call. Put it at the top of a script, outside any function, so it is set up once when the script loads. A script also answers the one event in its Runs on setting without this.
+Call a function whenever an event happens.
+
+Example: `on("*", "patchLoaded", fn)` calls fn each time any script emits patchLoaded.
+
+- `target` (control name, required): What the event comes from: a control's name, in any case, or "*" for anything.<br>Left out: "*".
+- `event` (event name, required): The event: a handler's name, such as "onValueChanged", or a name `emit()` announces.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with the event's information.<br>Not a function, or left out: nothing is set up, with a console error.
+
+Good to know:
+
+- Put it at the top of a script, outside any function: it is set up once, when the script loads; running the script again replaces it.
+- A script answers the event its Runs on setting names without it.
+- Returns nothing. A function left out: nothing is set up, without a word.
 
 ```lua
 -- Lua
@@ -971,7 +1070,17 @@ on("target", "event", (e) => {
 
 #### `off(target, event)`
 
-Stop listening to an event you started listening to with on. It removes this script's listeners for that target and event; other scripts' listeners are left alone. Naming something you were not listening to does nothing.
+Stop calling the functions `on()` set up for an event.
+
+Example: `off("Cutoff", "onValueChanged")` stops this script's calls for Cutoff's value changes.
+
+- `target` (control name, required): As `on()` was given it.<br>Left out: "*".
+- `event` (event name, required): As `on()` was given it.
+
+Good to know:
+
+- This script's only; other scripts' go on.
+- Returns nothing. One that was not set up: nothing, without a word.
 
 ```lua
 off("target", "event")
@@ -979,7 +1088,18 @@ off("target", "event")
 
 #### `watch(path, fn)`
 
-Call `fn(value, previous)` whenever a path on the panel changes — a control's value, a colour, a setting deep inside a section. It fires whatever made the change: a script, the user, or MIDI from the synth.
+Call a function whenever a value on the panel changes.
+
+Example: `watch("Cutoff", function(value, previous) log(value) end)` logs Cutoff's value each time it changes.
+
+- `path` (text, required): What to watch: a path, as `set()` takes it.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with the new value and the one before.<br>Not a function, or left out: nothing is set up, with a console error.
+
+Good to know:
+
+- Whatever made the change: a script, a drag, MIDI from the synth.
+- Running the script again replaces it.
+- Returns nothing. A function left out: nothing is set up, without a word.
 
 ```lua
 -- Lua
@@ -996,7 +1116,18 @@ watch("cutoff.value", (v, prev) => {
 
 #### `compute(path, fn)`
 
-Turn a property into a formula. `fn` is worked out again whenever anything on the panel changes, and its result is written to `path` — for example a label that always shows the cutoff frequency.
+Make a property follow a formula.
+
+Example: `compute("Readout.Text.content", function() return get("Cutoff") .. " Hz" end)` keeps Readout showing Cutoff's value.
+
+- `path` (text, required): The property to write: a path, as `set()` takes it.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Returns the value to write.<br>Not a function, or left out: nothing is set up, with a console error.
+
+Good to know:
+
+- Worked out again whenever anything on the panel changes, and written to the path.
+- Running the script again replaces it.
+- Returns nothing. A function left out: nothing is set up, without a word.
 
 ```lua
 -- Lua
@@ -1013,7 +1144,17 @@ compute("label.text.text", () => {
 
 #### `intercept(path, fn)`
 
-Check or change every value written to `path` before it lands. `fn(value, previous)` can return a different value to use instead (to clamp, round or snap it), return false to refuse the change, or return nothing to let it through unchanged.
+Check or change every value written to a property before it lands.
+
+Example: `intercept("Cutoff", function(value) return math.floor(value) end)` keeps Cutoff whole.
+
+- `path` (text, required): The property: a path, as `set()` takes it.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with the value and the one before.<br>A value returned: written in its place.<br>false: the change is refused.<br>Nothing: written as it is.<br>Not a function, or left out: nothing is set up, with a console error.
+
+Good to know:
+
+- Running the script again replaces it.
+- Returns nothing. A function left out: nothing is set up, without a word.
 
 ```lua
 -- Lua
@@ -1030,7 +1171,18 @@ intercept("cutoff.value", (v, prev) => {
 
 #### `ce.core.action(name, fn)`
 
-Give a function a name so other scripts can call it. Any script, in any language, can then run it with run("name"), and the panel offers it wherever controls can be set to trigger an action.
+Name a function, so other scripts and the panel can call it.
+
+Example: `defineAction("randomize", fn)` lets any script call fn with `run("randomize")`.
+
+- `name` (text, required): The action's name, in any case.<br>Left out: nothing is set up, with a console error.
+- `fn` (function, required): Called with what `run()` passes; what it returns goes back.<br>Not a function, or left out: nothing is set up, with a console error.
+
+Good to know:
+
+- The panel offers it wherever a control can trigger an action.
+- A name this script defined: replaced. One another script defined: this one is ignored, with a console error.
+- Returns nothing. A name or a function left out: nothing is defined, without a word.
 
 *Short name: `defineAction`.*
 
@@ -1049,7 +1201,18 @@ ce.core.action("initPatch", (args) => {
 
 #### `emit(name [, data])`
 
-Announce a custom event by name, optionally with some data. Every script listening for it with on("*", name, fn) is called. The announcing script does not wait for an answer; use run when you need one.
+Announce an event of your own, with data.
+
+Example: `emit("patchLoaded", { name = "Init" })` calls every function `on("*", "patchLoaded", fn)` set up.
+
+- `name` (text, required): The event's name, as `on()` listens for it.
+- `data` (any value, optional): Passed to each function.<br>Left out: nothing.
+
+Good to know:
+
+- It does not wait for an answer: `run()` gives one.
+- An emit inside an emit, 16 deep: dropped, with a console error.
+- Returns nothing.
 
 ```lua
 emit("name", data)
@@ -1057,7 +1220,17 @@ emit("name", data)
 
 #### `run(target.action [, args])`
 
-Call an action that another script has defined, and get its result back. Name it as "action", or as "control.action" to call the function of that name in a particular control's script. It works across languages, so only plain data — numbers, text, true/false, lists and tables — can be passed in and returned.
+Call an action another script defined, and give back what it returns.
+
+Example: `run("randomize")` calls the action randomize and gives its result.
+
+- `action` (text, required): The action's name, as `defineAction()` gave it; or "Control.action" for the function of that name in a control's script.
+- `args` (any value, optional): Passed to the action.<br>Left out: nothing.
+
+Good to know:
+
+- Works across languages: only numbers, text, true or false, lists and tables pass in and out.
+- Returns what the action returns. No script defines it: no result, with a console error.
 
 ```lua
 run("target.action")
@@ -1065,7 +1238,17 @@ run("target.action")
 
 #### `log(message [, value])`
 
-Print a message to the script console, optionally followed by a value. It changes nothing on the panel.
+Print a message to the script console.
+
+Example: `log("cutoff", 64)` prints cutoff 64.
+
+- `message` (text, required): The text.<br>A number or a table: written as text.
+- `value` (any value, optional): Printed after the message, with a space; a table written out.<br>Left out: the message alone.
+
+Good to know:
+
+- Changes nothing on the panel.
+- Returns nothing.
 
 ```lua
 log("message", value)
@@ -1073,7 +1256,17 @@ log("message", value)
 
 #### `ce.core.warn(message [, value])`
 
-Print a warning to the script console: something is not right, but the panel carries on. Warnings stand out from ordinary log lines.
+Print a warning to the script console.
+
+Example: `logWarn("no tempo yet")` prints no tempo yet as a warning.
+
+- `message` (text, required): The text.<br>A number or a table: written as text.
+- `value` (any value, optional): Printed after the message, with a space; a table written out.<br>Left out: the message alone.
+
+Good to know:
+
+- Shown as a warning; the handler goes on.
+- Returns nothing.
 
 *Short name: `logWarn`.*
 
@@ -1083,7 +1276,17 @@ ce.core.warn("message")
 
 #### `ce.core.error(message [, value])`
 
-Print an error to the script console: something the panel could not do. It only prints — your handler keeps running. To stop the handler, use your language's own way of raising an error (error() in Lua, throw in JavaScript).
+Print an error to the script console.
+
+Example: `logError("patch not found")` prints patch not found as an error.
+
+- `message` (text, required): The text.<br>A number or a table: written as text.
+- `value` (any value, optional): Printed after the message, with a space; a table written out.<br>Left out: the message alone.
+
+Good to know:
+
+- It only prints: the handler goes on. To stop it, raise an error your language's way: error() in Lua, throw in JavaScript, raise in Python.
+- Returns nothing.
 
 *Short name: `logError`.*
 
@@ -1222,7 +1425,7 @@ Play a note.
 Example: `sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.
 
 - `channel` (number, required): The MIDI channel, from 1 to 16.
-- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
 - `velocity` (number, required): How hard the note is played, from 0 to 127. 0 means note off.
 - `ms` (number, optional): How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.
 
@@ -1351,7 +1554,7 @@ Release a note.
 Example: `sendNoteOff(1, "C3")` releases C3 on channel 1.
 
 - `channel` (number, required): The MIDI channel, from 1 to 16.
-- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
+- `note` (note, required): A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.
 - `velocity` (number, optional): The release velocity, from 0 to 127. It is 0 when left out.
 
 Good to know:
@@ -1436,7 +1639,7 @@ Start, continue or stop a connected sequencer or drum machine.
 
 Example: `sendTransport("start")` starts it from the beginning.
 
-- `action` (text, required): "start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.
+- `action` (text, required): "start" (FA), "continue" (FB) or "stop" (FC). Case-insensitive. Any other action, or none, is refused with a message and nothing is sent.
 
 *Short name: `sendTransport`.*
 
@@ -1469,7 +1672,7 @@ Work out the checksum a synth expects at the end of a SysEx message.
 
 Example: `checksum("roland", {0x40, 0x00, 0x7F, 0x00})` gives 0x41.
 
-- `type` (text, required): How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.
+- `type` (text, required): How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". Case-insensitive. An unknown name, or none, returns nothing and prints the names it accepts.
 - `bytes` (bytes, required): The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.
 
 Good to know:
@@ -1513,20 +1716,20 @@ ce.midi.panic()
 
 | Function | What it does |
 |---|---|
-| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455. `count` (number, optional): How many bytes of 7 bits to make. Two when it is left out. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `to7bit`. |
-| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): The 7-bit bytes, as a list of numbers. `order` (text, optional): Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte. Short name: `from7bit`. |
-| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v` (number, required): The number, from 0 to 16383. Short name: `to14bit`. |
-| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb` (number, required): The high half, from 0 to 127. `lsb` (number, required): The low half, from 0 to 127. Short name: `from14bit`. |
-| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte` (number, required): A byte, from 0 to 255. Short name: `toNibbles`. |
-| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi` (number, required): The high half, from 0 to 15. `lo` (number, required): The low half, from 0 to 15. Short name: `fromNibbles`. |
-| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes` (list of bytes, required): The bytes, as a list. The high half comes first, so the list comes back twice as long. Short name: `nibblize`. |
-| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes` (list of bytes, required): Pairs of 4-bit halves, the high half first. The list comes back half as long. Short name: `denibblize`. |
-| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str` (text, required): The text to turn into codes. `length` (number, optional): The length to fill out to with spaces. Longer text is not cut. Short name: `toAscii`. |
-| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes` (list of bytes, required): The character codes, as a list. Short name: `fromAscii`. |
-| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v` (number, required): The value, which may be negative. `center` (number, required): The number that stands for zero, often 64. Short name: `toOffset`. |
-| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b` (number, required): The byte, as the synth sends it. `center` (number, required): The number that stands for zero, often 64. Short name: `fromOffset`. |
-| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v` (number, required): The number. A positive number comes back unchanged. `bits` (number, required): How many bits the synth uses for it, such as 7 or 8. This is called two's complement. fromSigned reads it back. Short name: `toSigned`. |
-| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b` (number, required): The stored value, as the synth sends it. `bits` (number, required): How many bits the synth uses for it, such as 7 or 8. This reads two's complement, as toSigned writes it. Short name: `fromSigned`. |
+| `ce.midi.to7bit(v, count, order)` | Split a number into SysEx bytes. Example: `to7bit(1000, 2)` gives {7, 104}. `v` (number, required): The number to split, from 0. Two bytes hold up to 16383, three up to 2097151, four up to 268435455.<br>A fraction: rounded down.<br>One that does not fit in the bytes, not a number, or left out: no result, with a console error. `count` (number, optional): How many bytes of 7 bits to make, from 1 to 4.<br>Left out: 2.<br>Any other: no result, with a console error. `order` (text, optional): "msb": the high byte first.<br>"lsb": the low byte first.<br>Case-insensitive.<br>Left out: "msb".<br>Any other: no result, with a console error. Returns a list of bytes, each from 0 to 127. from7bit joins them back. Short name: `to7bit`. |
+| `ce.midi.from7bit(bytes, order)` | Join SysEx bytes back into one number. Example: `from7bit({7, 104})` gives 1000. `bytes` (list of bytes, required): 1 to 4 bytes, each from 0 to 127, as a list or as hex text.<br>More or fewer, a byte above 127, not a list of bytes, or left out: no result, with a console error. `order` (text, optional): "msb": the high byte first.<br>"lsb": the low byte first.<br>Case-insensitive.<br>Left out: "msb".<br>Any other: no result, with a console error. Returns a number. Short name: `from7bit`. |
+| `ce.midi.to14bit(v)` | Split a number into two 7-bit halves, msb and lsb. Example: `to14bit(8192)` gives msb 64 and lsb 0. `v` (number, required): The number, from 0 to 16383.<br>A fraction: rounded down.<br>Outside 0 to 16383, not a number, or left out: no result, with a console error. Returns { msb, lsb }, each from 0 to 127. Short name: `to14bit`. |
+| `ce.midi.from14bit(msb, lsb)` | Join two 7-bit halves into one number. Example: `from14bit(64, 0)` gives 8192. `msb` (number, required): The high half, a whole number from 0 to 127.<br>Any other, or left out: no result, with a console error. `lsb` (number, required): The low half, a whole number from 0 to 127.<br>Any other, or left out: no result, with a console error. Returns a number from 0 to 16383. Short name: `from14bit`. |
+| `ce.midi.toNibbles(byte)` | Split a byte into its two 4-bit halves, its nibbles. Example: `toNibbles(0x4A)` gives hi 0x4 and lo 0xA. `byte` (number, required): A byte, from 0 to 255.<br>A fraction: rounded down.<br>Outside 0 to 255, not a number, or left out: no result, with a console error. Returns { hi, lo }, each from 0 to 15. Some synths send every byte this way. Short name: `toNibbles`. |
+| `ce.midi.fromNibbles(hi, lo)` | Join two 4-bit halves back into one byte. Example: `fromNibbles(0x4, 0xA)` gives 0x4A. `hi` (number, required): The high half, a whole number from 0 to 15.<br>Any other, or left out: no result, with a console error. `lo` (number, required): The low half, a whole number from 0 to 15.<br>Any other, or left out: no result, with a console error. Returns a byte, from 0 to 255. Short name: `fromNibbles`. |
+| `ce.midi.nibblize(bytes)` | Split every byte in a list into two 4-bit halves. Example: `nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}. `bytes` (list of bytes, required): The bytes, each from 0 to 255, as a list or as hex text.<br>Not a list of bytes, or left out: no result, with a console error. Returns a list twice as long, the high half of each byte first. Short name: `nibblize`. |
+| `ce.midi.denibblize(bytes)` | Join a list of 4-bit halves back into bytes. Example: `denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}. `bytes` (list of bytes, required): Pairs of halves, the high half first, each from 0 to 15, as a list or as hex text.<br>An odd count, a half above 15, not a list of bytes, or left out: no result, with a console error. Returns a list half as long. Short name: `denibblize`. |
+| `ce.midi.toAscii(str, length)` | Turn text, such as a patch name, into character codes. Example: `toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}. `str` (text, required): The text, in ASCII: letters without accents, digits, spaces and the signs on an English keyboard.<br>A character outside ASCII, not text, or left out: no result, with a console error. `length` (number, optional): The length of the field, from 1.<br>Shorter text: filled out with spaces.<br>Longer text: cut to the length, with a console warning the first time.<br>Left out: the text as it is.<br>Any other: the text as it is, with a console warning the first time. Returns a list of codes, each from 0 to 127. fromAscii turns them back into text. Short name: `toAscii`. |
+| `ce.midi.fromAscii(bytes)` | Turn character codes back into text, such as a patch name read from a dump. Example: `fromAscii({76, 101, 97, 100})` gives "Lead". `bytes` (list of bytes, required): The character codes, each from 0 to 127, as a list or as hex text.<br>A code above 127, not a list of bytes, or left out: no result, with a console error. Returns the text. Short name: `fromAscii`. |
+| `ce.midi.toOffset(v, center)` | Add a centre to a value that can go below zero, so it fits in a MIDI byte. Example: `toOffset(-10, 64)` gives 54. `v` (number, required): The value, which may be negative.<br>Not a number, or left out: no result, with a console error. `center` (number, required): The number that stands for zero, often 64.<br>Not a number, or left out: no result, with a console error. Returns the value plus the centre, not held to 0 to 127. Short name: `toOffset`. |
+| `ce.midi.fromOffset(b, center)` | Take the centre off a MIDI byte, to get back a value that can go below zero. Example: `fromOffset(54, 64)` gives -10. `b` (number, required): The byte, as the synth sends it.<br>Not a number, or left out: no result, with a console error. `center` (number, required): The number that stands for zero, often 64.<br>Not a number, or left out: no result, with a console error. Returns the byte minus the centre. Short name: `fromOffset`. |
+| `ce.midi.toSigned(v, bits)` | Turn a negative number into the bits a synth stores it as. Example: `toSigned(-1, 8)` gives 255. `v` (number, required): The number: -128 to 127 for 8 bits, -64 to 63 for 7.<br>From 0: comes back unchanged.<br>A fraction: rounded down.<br>Outside the range, not a number, or left out: no result, with a console error. `bits` (number, required): How many bits the synth uses for it, from 1 to 32, such as 7 or 8.<br>Any other, or left out: no result, with a console error. This is called two's complement. fromSigned reads it back. Returns a number from 0 below 2 to the power of bits: 0 to 255 for 8 bits. Short name: `toSigned`. |
+| `ce.midi.fromSigned(b, bits)` | Read a negative number from the bits a synth stores it as. Example: `fromSigned(255, 8)` gives -1. `b` (number, required): The stored value, as the synth sends it: a whole number from 0 below 2 to the power of bits, 0 to 255 for 8 bits.<br>Any other, or left out: no result, with a console error. `bits` (number, required): How many bits the synth uses for it, from 1 to 32, such as 7 or 8.<br>Any other, or left out: no result, with a console error. This reads two's complement, as toSigned writes it. Returns a number: -128 to 127 for 8 bits. Short name: `fromSigned`. |
 | `ce.midi.getBits(value, start, count) -> number` | Read a setting from a byte. Example: `getBits(0xB4, 4, 3)` gives 3. `value` (number, required): A number of up to 32 bits, or a list of bytes, where the bits run on from one byte into the next, eight to a byte. A list item that is not a byte from 0 to 255 is refused with a message. `start` (number, required): The first bit of the setting, counted from 0 at the right, the lowest bit. `count` (number, required): How many bits the setting has, from 1 to 32. Bits past the end of the value are refused with a message, not read as 0. Short name: `getBits`. |
 | `ce.midi.setBits(value, start, count, bits) -> number\|list` | Change a setting in a byte. Example: `setBits(0xB4, 4, 3, 5)` gives 0xD4. `value` (number, required): A number of up to 32 bits, or a list of bytes. A number gives back a number, and a list gives back a new list: the list passed in is not changed. `start` (number, required): The first bit of the setting, counted from 0 at the right, the lowest bit. `count` (number, required): How many bits the setting has, from 1 to 32. `bits` (number, required): The new setting. A value that does not fit in the bits is refused with a message, not cut down to fit. Short name: `setBits`. |
 | `ce.midi.read(bytes, offset, count [, opts]) -> number` | Read a number from a SysEx message. Example: `bytesRead(msg, 6, 2)` reads bytes 6 and 7. `bytes` (bytes, required): The message, as a list of bytes or as hex text. `offset` (number, required): Where the number starts, counted from 0. `count` (number, required): How many bytes the number takes, from 1 to 4. Bytes past the end of the message are refused with a message. Offsets count from 0 in every language, Lua included, as dump layouts count them. By default the bytes are SysEx's 7-bit bytes, high byte first, the way to7bit writes them. The options can say otherwise. Short name: `bytesRead`. |
@@ -1545,7 +1748,18 @@ Working with the synth through its device profile — the description of the syn
 
 #### `ce.device.requestDump(kind [, fn [, opts]])`
 
-Ask the synth to send a dump — all of a patch's settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request's own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.
+Ask the synth to send a dump: every setting of a patch in one message.
+
+Example: `requestDump("patch")` asks the synth for its patch dump.
+
+- `kind` (text, required): A dump the device profile defines, such as "system", or one declared with `deviceDefineDump()`; or a request's own id, such as "requestSystem".<br>Any other: rejected with a console error.
+- `fn` (function, optional): Called as fn(values, info) when the reply arrives, or when it does not.<br>`info.ok` false: nothing arrived within `opts.timeout`.<br>A request answered by several dumps at once: none is waited for; name the dump wanted.
+- `opts` (options, optional): The option below.
+
+Good to know:
+
+- When it arrives, the bound controls are filled and `onDumpReceived` runs.
+- Returns true when the request went out. Rejected: false, with a console error.
 
 *Short name: `requestDump`.*
 
@@ -1570,7 +1784,17 @@ ce.device.requestDump("patch", (values, info) => {
 
 #### `ce.device.recallPreset(slot [, opts])`
 
-Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank's first preset, whatever program number it uses.
+Switch the synth to a stored preset.
+
+Example: `recallPreset(64)` switches to preset 64, the first of the second bank on a synth whose banks hold 64.
+
+- `slot` (number, required): Preset number across all banks, counted from 0, as the device profile numbers them: not the MIDI program number.<br>Not a whole number from 0: rejected with a console error.
+- `opts` (options, optional): The option below.
+
+Good to know:
+
+- Sent as the device profile says the synth needs: a Program Change, a Bank Select and a Program Change, or a SysEx message.
+- Returns { ok, error, slot, name, category, messages }; refused: `ok` false, `error` saying why, and a console error.
 
 *Short name: `recallPreset`.*
 
@@ -1586,7 +1810,16 @@ ce.device.recallPreset(0)
 
 #### `ce.device.preset([role])`
 
-Describe the preset that is loaded now: { slot, program, name, category, bankId, bankLabel, writable, source }. Most synths do not announce their preset when they connect and cannot be asked, so this reports what the panel has seen — a Program Change arriving or a recallPreset going out. Until then `slot` is -1.
+Describe the preset loaded now.
+
+Example: `preset().name` gives the loaded preset's name.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns { slot, program, name, category, bankId, bankLabel, writable, source }.
+- What the panel has seen: a Program Change arriving or a `recallPreset()` going out. Until then `slot` is -1: most synths do not say, and cannot be asked.
 
 *Short name: `preset`.*
 
@@ -1601,7 +1834,15 @@ const p = ce.device.preset();
 
 #### `ce.device.applyDump(bytes)`
 
-Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth. Raw bytes can be a list of numbers or hex text, read a byte at a time as `sendSysex` reads it.
+Fill the panel from a dump, without sending anything to the synth.
+
+Example: `applyDump({ cutoff = 64 })` sets the controls bound to cutoff to 64.
+
+- `bytes` (bytes, required): A table of parameter ids and values: applied as they are.<br>Or the dump's bytes, a list of numbers or hex text read a byte at a time as `sendSysex()` reads it: decoded by the device profile.<br>Bytes in the panel view: not decoded, with a console line; the exported plug-in decodes them.
+
+Good to know:
+
+- Returns how many values were applied.
 
 *Short name: `applyDump`.*
 
@@ -1611,7 +1852,15 @@ ce.device.applyDump(bytes)
 
 #### `ce.device.sendDump(kind)`
 
-Build a dump from the panel's current values and send it to the synth. `kind` is a dump the device profile defines, by its id, as requestDump takes it; a kind the profile has no dump by is refused and nothing is sent.
+Build a dump from the panel's values and send it to the synth.
+
+Example: `sendDump("patch")` sends the panel's values to the synth as its patch dump.
+
+- `kind` (text, required): A dump the device profile defines, by its id, as `requestDump()` takes it.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Rejected: with a console error; nothing is sent.
 
 *Short name: `sendDump`.*
 
@@ -1621,7 +1870,16 @@ ce.device.sendDump("patch")
 
 #### `ce.device.buildDump(kind)`
 
-Build a dump from the panel's current values and return its bytes without sending them — for example to store it or change it first. `kind` is a dump the device profile defines, by its id, or one declared with defineDump; a kind it has no dump by is refused and nothing comes back.
+Build a dump from the panel's values, and give back its bytes without sending them.
+
+Example: `local bytes = buildDump("patch")` keeps the panel's values as a patch dump.
+
+- `kind` (text, required): A dump the device profile defines, by its id, or one declared with `deviceDefineDump()`.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- A profile's dump is built by the device host: in the panel view, only a dump declared with `deviceDefineDump()` is.
+- Returns a list of bytes. Rejected: no result, with a console error.
 
 *Short name: `buildDump`.*
 
@@ -1636,7 +1894,15 @@ const bytes = ce.device.buildDump("patch")
 
 #### `ce.device.profile([role])`
 
-Describe the device profile in use for a device: { id, name, role, connected, ... }. Returns nothing when no profile is chosen. `role` names the device and defaults to "mainSynth".
+Describe the device profile in use for a device.
+
+Example: `deviceProfile().name` gives the main synth's profile name.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns { id, name, role, connected, … }; no profile chosen: no result.
 
 *Short name: `deviceProfile`.*
 
@@ -1653,7 +1919,15 @@ if (p) log("device " + p.name);
 
 #### `ce.device.parameters([opts])`
 
-List the synth's parameters as the device profile describes them, each as { id, name, group, type, min, max, access }. Use `opts` to narrow the list, for example to one group. Returns an empty list when there is nothing to show, and nothing at all only when the ce.device module is switched off.
+List the synth's parameters, as the device profile describes them.
+
+Example: `deviceParameters({ group = "Filter" })` lists the filter's parameters.
+
+- `opts` (options, optional): The options below, every one of which must match.<br>Left out: every parameter.<br>Not a table: an empty list, with a console error.
+
+Good to know:
+
+- Returns a list of { id, name, group, type, min, max, access }; none to show: an empty list.
 
 *Short name: `deviceParameters`.*
 
@@ -1681,7 +1955,17 @@ for (const p of ce.device.parameters({ group: "Filter" })) log(p.id + " " + p.na
 
 #### `ce.device.parameter(id [, role])`
 
-Describe one of the synth's parameters by its id, or return nothing if the device profile has no such parameter. Use it to check whether a synth has something before you try to change it.
+Describe one of the synth's parameters, by its id.
+
+Example: `deviceParameter("cutoff").max` gives the highest value cutoff takes.
+
+- `id` (text, required): The parameter's id, as the device profile names it.<br>Not one of its parameters: no result, without a word.<br>Left out: no result, with a console error.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns { id, name, group, type, min, max, access }.
+- Use it to see whether a synth has a parameter before writing it.
 
 *Short name: `deviceParameter`.*
 
@@ -1698,7 +1982,16 @@ if (p) log("max " + p.max);
 
 #### `ce.device.read(id [, role]) -> value`
 
-The last value the synth reported for a parameter, from a dump or a parameter message. Not a live query of the synth: it does not ask the synth anything. Returns nothing if the synth has never reported that parameter, which is different from 0.
+Read the last value the synth reported for a parameter.
+
+Example: `deviceRead("cutoff")` gives the cutoff the synth last sent.
+
+- `id` (text, required): The parameter's id.<br>Never reported: no result, without a word; not 0.<br>Left out: no result, with a console error.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Not a live query: what arrived in a dump or a parameter message; the synth is not asked.
 
 *Short name: `deviceRead`.*
 
@@ -1715,7 +2008,18 @@ if (v !== undefined) {  }
 
 #### `ce.device.write(id, value [, role]) -> boolean`
 
-Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter's own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent; so is any id the panel did not declare when no device profile is chosen for `role`.
+Change a parameter on the synth by its id, without a control.
+
+Example: `deviceWrite("cutoff", 64)` sends cutoff 64 to the synth.
+
+- `id` (text, required): The parameter's id, as the device profile names it or `deviceDefineParameter()` declared it.<br>Not one of them: rejected with a console error.
+- `value` (number or text, required): In the parameter's own units: those `deviceParameter()` gives the min and max of.<br>A choice: its name, in any case, or its number.<br>One it cannot read: rejected with a console error.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- The device profile builds the message.
+- Returns true when the message was dispatched, not whether the synth took it. Rejected: false, with a console error; nothing is sent.
 
 *Short name: `deviceWrite`.*
 
@@ -1730,7 +2034,16 @@ ce.device.write("cutoff", 64);
 
 #### `ce.device.connected([role])`
 
-Check whether a device is connected and ready. It is quick to call, and the right thing to check before asking for a dump.
+Check whether a device is connected and ready.
+
+Example: `deviceConnected()` gives true once the main synth is.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Quick to call: check it before asking for a dump.
+- Returns true or false.
 
 *Short name: `deviceConnected`.*
 
@@ -1745,7 +2058,18 @@ if (ce.device.connected()) requestDump("patch");
 
 #### `ce.device.defineParameter(id, spec [, role]) -> boolean`
 
-Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with anything wrong in it is refused and nothing is defined, with a message saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry. A value that write() cannot read is refused the same way, and nothing is sent.
+Describe a synth parameter from the script.
+
+Example: `deviceDefineParameter("cutoff", { cc = 74 })` declares cutoff as CC 74.
+
+- `id` (text, required): The id to give it.<br>One the profile has: replaced, for this project.
+- `spec` (options, required): How it reaches the synth, `cc`, `nrpn` or `sysex`, and the options below.<br>Anything wrong in it: rejected with a console error saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- For a synth with no device profile, or a parameter a profile has wrong.
+- Returns true when it was defined. Rejected: false, with a console error; nothing is defined.
 
 *Short name: `deviceDefineParameter`.*
 
@@ -1784,7 +2108,19 @@ ce.device.defineParameter("cutoff", { name: "Cutoff", group: "Filter", min: 0, m
 
 #### `ce.device.defineDump(kind, spec [, role]) -> boolean`
 
-Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Bytes are read the way defineParameter reads them, and a layout with anything wrong in it, or with no prefix to recognise it by, is refused with a message saying what. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.
+Describe a SysEx dump layout from the script.
+
+Example: `deviceDefineDump("patch", { request = "F0 7D 01 F7", match = { prefix = "F0 7D 02" }, offset = 3, fields = { { parameter = "cutoff", offset = 0 } } })` declares a patch dump that starts with cutoff.
+
+- `kind` (text, required): The name to give the dump, as `requestDump()` and `buildDump()` take it.
+- `spec` (options, required): The options below: the bytes that ask for it, how to recognise it, and where each value sits.<br>Bytes are read as `deviceDefineParameter()` reads them.<br>Anything wrong in it, or no prefix to recognise it by: rejected with a console error saying what.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Every field's parameter must be declared with `deviceDefineParameter()` first.
+- A dump of the layout arriving fills the bound controls and runs `onDumpReceived`, as a device profile's does.
+- Returns true when it was defined. Rejected: false, with a console error; nothing is defined.
 
 *Short name: `deviceDefineDump`.*
 
@@ -1823,7 +2159,18 @@ ce.device.defineDump("patch", {
 
 #### `ce.device.bind(control, parameterId [, opts]) -> boolean`
 
-Connect a control to a synth parameter from your script, so moving the control changes the parameter. It replaces any existing connection on the same port rather than adding a second one, and switches the control's device binding back on if it was off. The port defaults to "value".
+Connect a control to a synth parameter, so moving the control changes it.
+
+Example: `deviceBind("Cutoff", "cutoff")` makes the control Cutoff send the synth's cutoff.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `parameterId` (text, required): The parameter's id, as the device profile names it or `deviceDefineParameter()` declares it.<br>Not one either knows yet: bound all the same, with a console warning; it works if the parameter arrives.
+- `opts` (options, optional): The options below.
+
+Good to know:
+
+- It replaces a binding on the same port, and switches the control's device binding back on.
+- Returns true when bound. Rejected: false, with a console error.
 
 *Short name: `deviceBind` · Panel window only.*
 
@@ -1845,7 +2192,16 @@ ce.device.bind("cutoffKnob", "cutoff");
 
 #### `ce.device.unbind(control [, port]) -> boolean`
 
-Disconnect a control from its synth parameter. Returns whether there was a connection to remove.
+Disconnect a control from its synth parameter.
+
+Example: `deviceUnbind("Cutoff")` stops Cutoff sending to the synth.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `port` (text, optional): The port to disconnect.<br>Left out: "value".
+
+Good to know:
+
+- Returns true when there was a binding to remove, false when not. Rejected: false, with a console error.
 
 *Short name: `deviceUnbind` · Panel window only.*
 
@@ -1860,7 +2216,16 @@ ce.device.unbind("cutoffKnob");
 
 #### `ce.device.ports([opts]) -> list`
 
-List the MIDI ports, each as { id, name, direction, type, hardware, role }. `hardware` is false for the two entries the app always shows ("No MIDI Input" and "Preview Only"); `role` names the device currently using the port, or is empty. Set `opts.direction` to "in" or "out" to list only one kind.
+List the MIDI ports.
+
+Example: `devicePorts({ direction = "out" })` lists the ports that send.
+
+- `opts` (options, optional): The option below.<br>Left out: every port.<br>Not a table: an empty list, with a console error.
+
+Good to know:
+
+- Returns a list of { id, name, direction, type, hardware, role }.
+- `hardware` is false for the two the app always shows, "No MIDI Input" and "Preview Only"; `role` names the device using the port, or is "".
 
 *Short name: `devicePorts`.*
 
@@ -1868,7 +2233,7 @@ List the MIDI ports, each as { id, name, direction, type, hardware, role }. `har
 
 | Name | Type | What it is |
 |---|---|---|
-| `direction` | text | List only the ports that receive, or only the ones that send.<br>One of "in" or "out". |
+| `direction` | text | "in": only the ports that receive.<br>"out": only the ones that send.<br>Case-insensitive.<br>Anything else: every port, with a console warning the first time. |
 
 ```lua
 -- Lua
@@ -1883,7 +2248,15 @@ for (const p of ce.device.ports({ direction: "out" })) if (p.hardware) log(p.nam
 
 #### `ce.device.variables([role]) -> table`
 
-The values the device profile fills into its messages — `channel`, `deviceId` and any others the profile has — with this project's own settings applied. Returns nothing when no profile is chosen for the device.
+Read the values the device profile fills into its messages.
+
+Example: `deviceVariables().deviceId` gives the device id the panel sends.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns `channel`, `deviceId` and any others the profile has, with this project's settings applied; no profile chosen: no result.
 
 *Short name: `deviceVariables`.*
 
@@ -1898,7 +2271,18 @@ log(`device id ${ce.device.variables().deviceId}`);
 
 #### `ce.device.setVariable(name, value [, role]) -> boolean`
 
-Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16). A number is used as the nearest whole number from 0 to 127, which is said the first time it is not the number given; text that is not a number is refused. Refused too, and nothing is changed, for a device no profile is chosen for.
+Change one of the values the device profile fills into its messages, for this project.
+
+Example: `deviceSetVariable("deviceId", 17)` talks to a second unit of the same synth.
+
+- `name` (text, required): The value's name, such as "deviceId" or "channel".<br>Left out: rejected with a console error.
+- `value` (number, required): A number.<br>Range: 0 ↔ 127, whole; a channel 1 ↔ 16.<br>A fraction: rounded.<br>Outside the range: the nearest end, with a console warning the first time.<br>Text that is not a number: rejected with a console error.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Saved with this project: the shared device profile is not changed, so two panels can use different device ids for one synth.
+- Returns true when it was set. Rejected: false, with a console error; nothing changes. A device no profile is chosen for: rejected.
 
 *Short name: `deviceSetVariable`.*
 
@@ -1913,7 +2297,15 @@ ce.device.setVariable("deviceId", 17);
 
 #### `ce.device.timing([role]) -> table`
 
-How fast the panel may send to this device: `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project's own settings applied.
+Read how fast the panel may send to the device.
+
+Example: `deviceTiming().minDelayBetweenMessagesMs` gives the least gap between messages.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project's settings applied.
 
 *Short name: `deviceTiming`.*
 
@@ -1928,7 +2320,18 @@ log(`gap ${ce.device.timing().minDelayBetweenMessagesMs} ms`);
 
 #### `ce.device.setTiming(name, ms [, role]) -> boolean`
 
-Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself, uses the nearest whole number in range, and is refused for a device no profile is chosen for.
+Change one timing setting, for this project.
+
+Example: `deviceSetTiming("minDelayBetweenMessagesMs", 20)` leaves at least 20 ms between messages.
+
+- `name` (text, required): The setting's name, as `deviceTiming()` lists it. Case-insensitive.<br>Not one of them, or left out: nothing is changed, with a console error.
+- `ms` (number, required): Milliseconds.<br>Range: 0 ↔ 60000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end, with a console warning the first time.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Saved with this project: the device profile is not changed.
+- Returns true when it was set. Rejected: false, with a console error. A device no profile is chosen for: rejected.
 
 *Short name: `deviceSetTiming`.*
 
@@ -1943,7 +2346,16 @@ ce.device.setTiming("minDelayBetweenMessagesMs", 40);
 
 #### `ce.device.coverage([feature [, role]]) -> table|string`
 
-What the device profile says it supports, as words rather than true/false. With no `feature`, returns the whole list — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Profiles answer "complete", "partial" or "notImplemented", and sometimes something more specific, so check for the words you care about.
+Read what the device profile says it supports.
+
+Example: `deviceCoverage("realtimeEditing")` gives "complete", "partial" or "notImplemented".
+
+- `feature` (text, optional): A feature's name, such as "singleParameterWrite", "realtimeEditing" or "editBufferDumpParse".<br>Left out: every feature, as a table.<br>Not one the profile names: no result.
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- A profile can answer in words of its own: check for the ones that matter.
 
 *Short name: `deviceCoverage`.*
 
@@ -1958,7 +2370,15 @@ if (ce.device.coverage("singleParameterWrite") === "complete") log("write one at
 
 #### `ce.device.recipes([role]) -> list`
 
-The names of the message templates this device profile can build — the formats its parameters are sent in. An empty list when no profile is chosen.
+List the message templates the device profile can build.
+
+Example: `deviceRecipes()` gives the formats the synth's parameters are sent in.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns a list of names; no profile chosen: an empty list.
 
 *Short name: `deviceRecipes`.*
 
@@ -1973,7 +2393,15 @@ for (const id of ce.device.recipes()) log(id);
 
 #### `ce.device.requests([role]) -> list`
 
-The names of the requests this device profile can send, such as an identity request or an edit-buffer request. Check here before assuming a synth supports one.
+List the requests the device profile can send.
+
+Example: `deviceRequests()` gives names such as an identity request.
+
+- `role` (text, optional): The device, by its role as the panel names it.<br>Left out: "mainSynth".
+
+Good to know:
+
+- Returns a list of names: check here before assuming a synth answers one.
 
 *Short name: `deviceRequests`.*
 
@@ -1995,19 +2423,19 @@ Helper functions for notes and harmony: note names and numbers, scales, chords, 
 
 | Function | What it does |
 |---|---|
-| `ce.music.name(n [, flats])` | Turn a MIDI note number into a name: 60 gives "C4" (middle C). With `flats` left out, you get plain text with # for sharps ("C#4"), which is easy to type and compare against. Pass `flats` to get the panel's own spelling instead: true gives flats ("D♭4") and false gives sharps ("C♯4"). `ce.music.spelling()` tells you which one a key uses. Short name: `noteName`. |
-| `ce.music.number(name) -> number` | Turn a note name into a MIDI note number: "C4" gives 60 (middle C is C4). Sharps and flats can be typed either way, so "C#4", "C♯4", "Db4" and "D♭4" all work. The letter must be a capital and the octave must be there. A name it cannot read returns nothing rather than 0, because 0 is a real note (C-1). Short name: `noteNumber`. |
-| `ce.music.scale(root [, scale]) -> list` | One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `scaleNotes`. |
-| `ce.music.chord(root [, type]) -> list` | The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. To build a chord on a step of a key, use `ce.music.degreeChord()`. Short name: `chordNotes`. |
-| `ce.music.quantize(note, root [, scale]) -> number` | Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `quantizeNote`. |
-| `ce.music.spelling(root [, scale]) -> boolean` | Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel's. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `noteSpelling`. |
-| `ce.music.inScale(note, root [, scale]) -> boolean` | Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `inScale`. |
-| `ce.music.degree(note, root [, scale]) -> number` | Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. Short name: `scaleDegree`. |
-| `ce.music.degreeChord(root, scale, degree [, size]) -> table` | The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. For a chord you already know by name, use `ce.music.chord()`. Short name: `degreeChord`. |
-| `ce.music.quality(notes) -> string` | Name a chord from its notes: [60, 63, 70] gives "min7". Each note is a MIDI number or a name, such as 60 or "C4"; a list with anything else in it is refused, and says where. It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list. Short name: `chordQuality`. |
-| `ce.music.lead(notes, previous [, mode]) -> list` | Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Notes are MIDI numbers or names, and come back as numbers; a list with anything else in it is refused and gives an empty list. A mode there is none of is "closest", which is said the first time. Short name: `voiceLead`. |
-| `ce.music.octaves(notes [, octaves]) -> list` | Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1; a number outside that, or not a whole one, is used as the nearest that is, which is said the first time. Notes that would go above 127 are left out, not squeezed onto 127. Notes are MIDI numbers or names, as chordQuality reads them. Short name: `expandOctaves`. |
-| `ce.music.arp(notes, pattern) -> list` | The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord; any other, or none, is "up", said the first time. Notes are used in the order given, so sort them first for a rising run, and come back as MIDI numbers. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel's arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`. Short name: `arpOrder`. |
+| `ce.music.name(n [, flats])` | Give the name of a MIDI note number. Example: `ce.music.name(61)` gives "C#4". `n` (note, required): Note number: 60 is middle C, C4.<br>A fraction: rounded down.<br>Outside 0 to 127: named the same way; -1 is "B-2".<br>Not a number, or left out: no result, with a console error. `flats` (true or false, optional): Left out: # for a sharp, as "C#4", plain text to type and compare.<br>true: flats, as the panel spells them: "D♭4".<br>false: sharps, as the panel spells them: "C♯4". Returns the name as text. `ce.music.spelling()` says whether a key is spelled with flats. Short name: `noteName`. |
+| `ce.music.number(name) -> number` | Give the MIDI note number of a note name. Example: `ce.music.number("Eb4")` gives 63. `name` (note, required): A letter from A to G, then #, ♯, b or ♭ if it has one, then the octave: "C4" is 60, middle C. Case-insensitive; spaces round it are ignored.<br>Cb is the B below; B# and E# are not read.<br>No octave, a name that cannot be read, a number, or left out: no result, with a console error. Returns the number. It can pass 127: "G#9" is 128. A name it cannot read gives no result rather than 0, since 0 is a note: C-1. Short name: `noteNumber`. |
+| `ce.music.scale(root [, scale]) -> list` | Give the notes of a scale, one octave up from its root. Example: `ce.music.scale("D4", "dorian")` gives {62, 64, 65, 67, 69, 71, 72}. `root` (note, required): The first note.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns 7 notes; 5 for the pentatonic scales, 6 for "blues". The root is not repeated at the top. Notes past 127 are given as they are; `sendNote()` refuses them. Short name: `scaleNotes`. |
+| `ce.music.chord(root [, type]) -> list` | Give the notes of a chord of a type, up from its root. Example: `ce.music.chord("D4", "min7")` gives {62, 65, 69, 72}. `root` (note, required): The lowest note.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `type` (text, optional): One of "major", "minor", "dim", "aug", "sus2", "sus4", "power", "maj6", "min6", "dom7", "maj7", "min7", "minMaj7", "dim7", "m7b5", "aug7", "add9", "dom9", "maj9" and "min9". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns the notes, lowest first. Notes past 127 are given as they are. A chord on a step of a key: `ce.music.degreeChord()`. Short name: `chordNotes`. |
+| `ce.music.quantize(note, root [, scale]) -> number` | Move a note to the nearest note of a key. Example: `ce.music.quantize(61, "C4")` gives 62. `note` (note, required): The note to move.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns the note. A note in the key is returned as it is. Equally near two notes of the key: the higher. Short name: `quantizeNote`. |
+| `ce.music.spelling(root [, scale]) -> boolean` | Tell whether a key is spelled with flats. Example: `ce.music.spelling("F4")` gives true. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns true for the keys of F, B♭, E♭, A♭, D♭ and G♭; false for the others. A minor-type scale ("minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "locrian", "pentatonicMin") is judged by the key a minor third above its root, as the Chord Pad judges it: C minor is spelled as E♭ major. Pass it to `ce.music.name()` to spell as the panel does. Short name: `noteSpelling`. |
+| `ce.music.inScale(note, root [, scale]) -> boolean` | Tell whether a note is in a key. Example: `ce.music.inScale(66, "C4")` gives false. `note` (note, required): The note.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns true or false. In any octave: C2 is in the key of C5. Short name: `inScale`. |
+| `ce.music.degree(note, root [, scale]) -> number` | Give which step of a key a note is. Example: `ce.music.degree("G4", "C4")` gives 5. `note` (note, required): The note, in any octave.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `root` (note, required): The key's note; its octave does not matter.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. Returns the step, counted from 1: 1 the root, 5 the fifth. A note not in the key: no result, without a word. `ce.music.quantize()` moves it into the key first. Short name: `scaleDegree`. |
+| `ce.music.degreeChord(root [, scale [, degree [, size]]]) -> table` | Give the chord a key builds on one of its steps. Example: `ce.music.degreeChord("C4", "major", 5).name` gives "G". `root` (note, required): The key's note; its octave places the chord.<br>A MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.<br>A fraction: rounded down.<br>A name that cannot be read, not a note, or left out: no result, with a console error. `scale` (text, optional): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out: "major".<br>Any other: no result, with a console error. `degree` (number, optional): Step, counted from 1: 1 the root, 5 the fifth.<br>Past the last step: on into the octave above; 8 is the root an octave up.<br>0 and below: the octave below; 0 is the last step.<br>A fraction: rounded down.<br>Left out: 1.<br>Not a number: 1, with a console warning the first time. `size` (number, optional): Notes: 3 a triad, 4 a seventh chord.<br>Below 2: 2.<br>A fraction: rounded down.<br>Left out: 3.<br>Not a number: 3, with a console warning the first time. Returns { notes, names, name, quality, roman, degree, rootNote, offsets }: the notes; their names without the octave, and the chord's ("E♭m7"), spelled as the key is; its quality, as `ce.music.quality()` names it; its roman numeral ("V", "vii°"); the step; its lowest note; the notes as semitones above the root. Built from every other note of the scale, as the Chord Pad builds it. Named from its first four notes: a chord of 5 or more is named as its seventh chord. A chord of a type: `ce.music.chord()`. Short name: `degreeChord`. |
+| `ce.music.quality(notes) -> string` | Name a chord from its notes. Example: `ce.music.quality({60, 63, 67, 70})` gives "min7". `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: no result, with a console error that says where. Returns one of "maj", "min", "dim", "aug", "sus2", "sus4", "maj7", "dom7", "min7", "minMaj7", "dim7" and "m7b5", as the Chord Pad names chords. Named from the lowest note: an inverted chord is named from its bass. A chord it cannot place, such as a bare fifth or one note: "maj". An empty list: no result, without a word. Short name: `chordQuality`. |
+| `ce.music.lead(notes [, previous [, mode]]) -> list` | Rearrange a chord so its notes move as little as they can from the chord before. Example: `ce.music.lead({72, 76, 79}, {60, 64, 67})` gives {60, 64, 67}. `notes` (list of notes, required): The chord to rearrange: MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `previous` (list of notes, optional): The chord before, as `notes`.<br>Left out, or empty: the notes sorted, low to high.<br>Not a list, or a list with anything else in it: an empty list, with a console error. `mode` (text, optional): "closest": all the notes together move as little as they can.<br>"smooth": the top note moves as little as it can; the others may jump.<br>"off": the notes sorted, low to high.<br>Case-insensitive.<br>Left out: "closest".<br>Any other: "closest", with a console warning the first time. Returns the notes as numbers. As the Harmoniser leads its voices. Short name: `voiceLead`. |
+| `ce.music.octaves(notes [, octaves]) -> list` | Repeat notes in the octaves above, as an Arpeggiator spreads them. Example: `ce.music.octaves({60, 64}, 2)` gives {60, 64, 72, 76}. `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `octaves` (number, optional): Octaves, counting the notes' own.<br>Range: 1 ↔ 4, whole.<br>Outside the range: the nearest end, with a console warning the first time.<br>A fraction: rounded down, with a console warning the first time.<br>Not a number: 1, with a console warning the first time.<br>Left out: 1. Returns the notes sorted, low to high, then again an octave up for each octave more. A note that would pass 127 is left out. The step before `ce.music.arp()`. Short name: `expandOctaves`. |
+| `ce.music.arp(notes, pattern) -> list` | Give the order an arpeggiator pattern plays notes in. Example: `ce.music.arp({60, 64, 67}, "updown")` gives {{60}, {64}, {67}, {64}}. `notes` (list of notes, required): MIDI note numbers or names, such as {60, "E4", 67}.<br>Not a list, a list with anything else in it, or left out: an empty list, with a console error that says where. `pattern` (text, required): "up": in the order given.<br>"down": the order given, reversed.<br>"updown": up, then down, not playing the top or the bottom twice.<br>"downup": down, then up, the same way.<br>"asPlayed": in the order given.<br>"random": in the order given; the Arpeggiator picks each step as it plays.<br>"chord": every note at once, in one step.<br>Case-insensitive.<br>Any other: "up", with a console warning the first time.<br>Left out: an empty list, with a console error. Returns a list of steps, each a list of notes. Sort the notes first for a rising run; `ce.music.octaves()` sorts them. Shuffled: `ce.math.shuffle()`. Short name: `arpOrder`. |
 
 ### ce.time: timers and musical time
 
@@ -2695,7 +3123,7 @@ Good to know:
 | `ce.math.clamp(v, lo, hi)` | Keep a value inside a range. Example: `clamp(140, 0, 127)` gives 127. `v` (number, required): The value to keep in range. `lo` (number, required): The bottom of the range. Must be below hi. A value below it gives lo. `hi` (number, required): The top of the range. A value above it gives hi. Short name: `clamp`. |
 | `ce.math.round(v)` | Round to the nearest whole number. Example: `round(2.5)` gives 3. `v` (number, required): The number to round. A half always rounds up, so -2.5 gives -2. To keep decimal places, use `ce.math.roundTo`. Short name: `round`. |
 | `ce.math.snap(v, step)` | Round a value to the nearest step. Example: `snap(37, 10)` gives 40. `v` (number, required): The value to round. `step` (number, required): The size of the steps, such as 10 or 0.25. 0 leaves the value unchanged.<br>Left out: an error in the console and no result. Halfway rounds up, as with `ce.math.round`: 35 gives 40. For steps that are not evenly spaced, use `ce.math.quantize`. Short name: `snap`. |
-| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: not held at 0 or 1. `shape` (text, optional): "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends).<br>Left out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
+| `ce.math.curve(v, shape)` | Bend a value from 0 to 1 with a response curve. Example: `curve(0.5, "exp")` gives 0.25. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: not held at 0 or 1. `shape` (text, optional): "linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Case-insensitive.<br>Left out: "linear". An unknown name: a note in the console, and "linear" is used. For a curve of your own, use `ce.math.map`. For the curves the panel's Envelopes use, use `ce.math.shape`. Short name: `curve`. |
 | `ce.math.lerp(a, b, t)` | Blend between two numbers. Example: `lerp(10, 20, 0.25)` gives 12.5. `a` (number, required): The first number. `b` (number, required): The second number. `t` (number, required): Range: 0 ↔ 1 (a ↔ b). 0.5 is halfway.<br>Left out: an error in the console and no result.<br>Outside the range: not held at 0 or 1, so the result goes past a or b. For whole lists of numbers, use `ce.math.blend`. Short name: `lerp`. |
 | `ce.math.wrap(v, lo, hi)` | Wrap a value into a range, so going past the top starts again from the bottom. Example: `wrap(-1, 0, 12)` gives 11. `v` (number, required): The value to wrap. `lo` (number, required): The bottom of the range. Must be below hi. The result can equal lo. `hi` (number, required): The top of the range.<br>The result never equals hi: wrap(12, 0, 12) gives 0. Use it for pitch classes, LFO phase and step numbers instead of your language's % operator. With a negative number, % differs between languages: -1 % 12 gives 11 in Lua and -1 in JavaScript. Short name: `wrap`. |
 | `ce.math.map(v, points)` | Map a value through a curve you draw as points. Example: `mapCurve(0.25, {{0, 0}, {0.5, 0.9}, {1, 1}})` gives 0.45. `v` (number, required): The value to map. `points` (list, optional): A list of points, each {x, y}, joined by straight lines and sorted by x first. A third entry bends the line that ends at the point: "exp", "log", "s" or "hold", as in ce.math.shape. A fourth sets how far it bends.<br>Left out or empty: the value is returned unchanged. Below the first point or above the last: held at that point's y. Two points with the same x make a step, and the later one wins. {1, 1, "exp"} rises slowly, then fast. Short name: `mapCurve`. |
@@ -2709,7 +3137,7 @@ Good to know:
 | `ce.math.unipolar(v)` | Turn a value from -1 to +1 into one from 0 to 1. Example: `unipolar(0.5)` gives 0.75. `v` (number, required): Range: -1 ↔ +1 (0 ↔ 1). 0 gives 0.5.<br>Outside the range: not held. The reverse of `ce.math.bipolar`. Short name: `unipolar`. |
 | `ce.math.fold(v, lo, hi)` | Bounce a value back off the ends of a range. Example: `fold(12, 0, 10)` gives 8. `v` (number, required): The value. Past the top it heads back down; below the bottom it heads back up. `lo` (number, required): The bottom of the range. Must be below hi. `hi` (number, required): The top of the range. Where `ce.math.wrap` jumps from the top to the bottom, fold keeps the movement smooth. Fold suits modulation depths; wrap suits pitch classes. Short name: `fold`. |
 | `ce.math.index(t, count)` | Turn a position from 0 to 1 into a slot number, such as which of eight waveforms a knob picks. Example: `indexOfRange(0.5, 8)` gives 4. `t` (number, required): Range: 0 ↔ 1 (first slot ↔ last slot).<br>Outside the range: held at the first or last slot. `count` (number, required): How many slots. They count from 0, so the last is count - 1. Short name: `indexOfRange`. |
-| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a` (number, required): The value at 0. `b` (number, required): The value at 1. `t` (number, required): Range: 0 ↔ 1 (a ↔ b).<br>Left out: 0.<br>Outside the range: held at 0 or 1. `law` (text, optional): "linear", "equalPower" or "sharp".<br>Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
+| `ce.math.crossfade(a, b, t [, law])` | Fade from one value to another with one of the Crossfader's fade laws. Example: `crossfade(0, 1, 0.5, "equalPower")` gives about 0.71. `a` (number, required): The value at 0. `b` (number, required): The value at 1. `t` (number, required): Range: 0 ↔ 1 (a ↔ b).<br>Left out: 0.<br>Outside the range: held at 0 or 1. `law` (text, optional): "linear", "equalPower" or "sharp". Case-insensitive.<br>Default: "linear". An unknown name is used as "linear". A linear fade between two sounds dips audibly in the middle; "equalPower" does not. "equalPower" adds the two values, weighted, so halfway it gives more than either: (10, 20, 0.5) gives about 21.2. That is right for two volumes. Short name: `crossfade`. |
 | `ce.math.approach(current, target, maxStep)` | Move a value toward a target by no more than a set step. Example: `approach(10, 50, 15)` gives 25. `current` (number, required): The value now. `target` (number, required): Where it is going.<br>Within one step of it: the target exactly. `maxStep` (number, required): The most it moves in one call. 0 or left out: straight to the target. A negative step counts as positive. It keeps nothing between calls, so it works in any handler without a timer, such as each time an expression pedal sends a value. Short name: `approach`. |
 | `ce.math.roundTo(v, decimals)` | Round to a number of decimal places. Example: `roundTo(3.14159, 2)` gives 3.14. `v` (number, required): The number to round. `decimals` (number, optional): How many decimal places to keep.<br>Default: 0.<br>Below 0: 0. It returns a number, not text, so you can keep calculating with it. Short name: `roundTo`. |
 | `ce.math.almost(a, b [, epsilon])` | Check whether two numbers are equal to within a small margin. Example: `almost(0.1 + 0.2, 0.3)` gives true. `a` (number, required): The first number. `b` (number, required): The second number. `epsilon` (number, optional): How far apart they may be.<br>Default: 0.000000001. Use it instead of == on numbers that have been through arithmetic such as `ce.math.scale`, where rounding can leave two numbers that should match very slightly apart. Short name: `almost`. |
@@ -2728,7 +3156,7 @@ Good to know:
 | `ce.math.distance(x1, y1, x2, y2)` | Measure the straight-line distance between two points. Example: `distance(0, 0, 3, 4)` gives 5. `x1` (number, required): The first point's x. `y1` (number, required): The first point's y. `x2` (number, required): The second point's x. `y2` (number, required): The second point's y. Use it for XY pads, joysticks and the Orbit, or to check whether a click landed on something you drew. Short name: `distance`. |
 | `ce.math.angle(x1, y1, x2, y2)` | Find the angle from one point to another. Example: `angleOf(0, 0, 10, 0)` gives 90. `x1` (number, required): The first point's x. `y1` (number, required): The first point's y. `x2` (number, required): The second point's x. `y2` (number, required): The second point's y. It returns degrees in the range 0 ↔ 360: 0 at twelve o'clock, increasing clockwise, as ce.draw measures them. y counts downwards, as on screen, so a point straight above gives 0. The same point twice gives 0. Short name: `angleOf`. |
 | `ce.math.polar(angle, radius)` | Turn an angle and a distance into x and y offsets from a centre. Example: `polar(0, 10)` gives x 0 and y -10: straight up, as y counts downwards. `angle` (number, required): The angle in degrees: 0 at twelve o'clock, increasing clockwise, as ce.math.angle returns it. `radius` (number, required): The distance from the centre.<br>Left out: 0. Add the offsets to your centre to find, for example, the tip of a knob's pointer. Short name: `polar`. |
-| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `curve` (text, optional): "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1).<br>Left out or unknown: "linear". `tension` (number, optional): How strongly "exp" and "log" bend.<br>Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
+| `ce.math.shape(v, curve [, tension])` | Bend a value from 0 to 1 with the curves the panel's Envelope segments and Router breakpoints use. Example: `shapeCurve(0.5, "exp")` gives about 0.16. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `curve` (text, optional): "linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Case-insensitive.<br>Left out or unknown: "linear". `tension` (number, optional): How strongly "exp" and "log" bend.<br>Default: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses. This is a different family from `ce.math.curve`. `ce.math.unshape` reverses it. Short name: `shapeCurve`. |
 | `ce.math.deadzone(v, amount [, invert])` | Add a dead zone to the bottom of a value from 0 to 1, as the Expression Router does. Example: `deadzone(0.55, 0.1)` gives 0.5. `v` (number, required): The value.<br>Range: 0 ↔ 1.<br>Outside the range: held at 0 or 1. `amount` (number, required): The size of the dead zone.<br>At or below it: 0. The rest is stretched to fill 0 ↔ 1. `invert` (true or false, optional): true flips the value first.<br>Default: false. The response starts at the edge of the dead zone instead of jumping up from it. Short name: `deadzone`. |
 | `ce.math.weights(points, x, y [, power])` | Work out how much each anchor point counts at a position, as a Timbre Space or Preset Constellation does. `points` (list, required): The anchors, as a list of {x, y}.<br>Empty: an empty list. `x` (number, required): The position's x.<br>Range: 0 ↔ 1. `y` (number, required): The position's y.<br>Range: 0 ↔ 1. `power` (number, optional): How sharp the blend is: higher lets the nearest anchor take over sooner.<br>Default: 2. It returns one weight per anchor, adding up to 1: the closer the anchor, the bigger its share. Pass the result to `ce.math.blendBy` to morph values. Short name: `weightsFor`. |
 | `ce.math.blendBy(values, weights)` | Combine many values into one weighted average. Example: `blendBy({0, 100}, {3, 1})` gives 25. `values` (list of numbers, required): The values to combine. `weights` (list of numbers, required): How much each value counts. They need not add up to 1.<br>Adding up to 0 or less: 0. If the lists differ in length, the shorter one decides. This is how a morph pad turns its weights into one value. `ce.math.blend` blends two lists instead. Short name: `blendBy`. |
@@ -2775,7 +3203,7 @@ Good to know:
 | `duration` | number (milliseconds) | 300 | Length of the animation.<br>Range: ≥ 0.<br>0 or below: immediate jump.<br>Invalid: default. |
 | `beats` | number (beats) | — | Length in beats, overriding duration.<br>Range: > 0.<br>Tempo: read at the start; with sync, followed.<br>Outside the range, or invalid: duration. |
 | `sync` | true or false | false | `true`: moves only while the transport plays, and follows tempo changes.<br>Invalid: false. |
-| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". |
+| `curve` | text or list | "linear" | Easing curve: a name, or cubic Bézier control points {x1, y1, x2, y2}.<br>Range: x1, x2: 0 ↔ 1; y1, y2: -2 ↔ 3.<br>Invalid: linear.<br>One of "linear", "exp", "log", "s", "inQuad", "outQuad", "inOutQuad", "inCubic", "outCubic", "inOutCubic", "inBack", "outBack", "inOutBack" or "spring". Case-insensitive. |
 | `damping` | number | 6 | Spring damping (curve = "spring").<br>Range: ≥ 0.<br>0: undamped.<br>Invalid: default. |
 | `frequency` | number | 12 | Spring oscillation frequency (curve = "spring").<br>Range: ≥ 0.<br>0: no oscillation.<br>Below 0: sign ignored.<br>Invalid: default. |
 | `from` | number | — | Start value.<br>Default: the current value.<br>Invalid: default. |
@@ -3038,7 +3466,17 @@ Changing the panel itself from a script: creating, copying and removing controls
 
 #### `ce.panel.create(type, props)`
 
-Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.
+Create a control of a type, and give back its name.
+
+Example: `ce.panel.create("Knob", { name = "Cutoff", x = 20, y = 40 })` makes a knob called Cutoff at 20, 40.
+
+- `type` (text, required): The control's type, such as "Knob": one of `ce.panel.types()`. Case-insensitive.<br>Not a type, or left out: rejected with a console error.
+- `props` (options, optional): Its name, place, size and container, and any of its sections' settings: the options below.<br>Left out: the type's own, at the top level.
+
+Good to know:
+
+- Returns its name. Rejected: no result, with a console error; nothing is created.
+- A control a script creates is not saved with the panel, and is cleared before each `onPanelBuild`, which is where to create it.
 
 *Short name: `panelCreate` · Panel window only.*
 
@@ -3046,13 +3484,13 @@ Create a new control of the given `type`, such as "Knob", and return its name, o
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `name` | text | one derived from the type | The control's name. Every other command addresses the control by this name. |
-| `x` | number (pixels) | 0 | Distance from the left edge of whatever contains it. |
-| `y` | number (pixels) | 0 | Distance from the top edge. |
-| `width` | number (pixels) | the type's own | How wide to make it. |
-| `height` | number (pixels) | the type's own | How tall to make it. |
-| `parent` | text | the panel itself | The name of a container to put it inside. |
-| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals and all (Behavior, not behavior), and one the control does not have refuses the call. Inside one, names are read in any capitals, as a path is: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour is stored as set() stores it, and a setting the section does not have is written with a warning, as set() writes one. |
+| `name` | text | one derived from the type | The name every other command reaches it by.<br>Taken already: a number is added; use the name given back. |
+| `x` | number (pixels) | 0 | Pixels from the left edge of its container.<br>Not a number: as it was, with a console warning the first time. |
+| `y` | number (pixels) | 0 | Pixels from the top edge of its container.<br>Not a number: as it was, with a console warning the first time. |
+| `width` | number (pixels) | the type's own | Pixels.<br>0 or below, or not a number: as it was, with a console warning the first time. |
+| `height` | number (pixels) | the type's own | Pixels.<br>0 or below, or not a number: as it was, with a console warning the first time. |
+| `parent` | text | the panel itself | The name of a container to put it in: a control with a Children section, such as a Container or a Group.<br>Not a control, or not a container: rejected with a console error. |
+| `<section>` | object | — | Any section of the control, by the name set() uses, such as { Behavior = { min = 0, max = 127 } }.<br>The section's name as written: Behavior, not behavior.<br>A section the control does not have: rejected with a console error.<br>Inside one, names in any case, as in a path; a child given is merged into the one there: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest.<br>A colour: stored as set() stores it; one it would refuse: rejected with a console error.<br>A setting the section does not have: written, with a console warning, as set() writes one. |
 
 ```lua
 -- Lua
@@ -3065,7 +3503,16 @@ ce.panel.create("Knob", { name: "cutoff", x: 20, y: 40 });
 
 #### `ce.panel.clone(name, props)`
 
-Copy an existing control, with all its settings, and return the copy's name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it, and a colour in them that `set()` would refuse means no copy is made.
+Copy a control, with all its settings, and give back the copy's name.
+
+Example: `ce.panel.clone("Cutoff", { name = "Cutoff2", y = 120 })` makes a copy of Cutoff called Cutoff2, at y 120.
+
+- `name` (text, required): The control to copy.<br>Not a control, or left out: rejected with a console error.
+- `props` (options, optional): As `ce.panel.create()`'s: the options below.<br>Left out: a copy called its name with "_copy" added, in the same container.
+
+Good to know:
+
+- Returns the copy's name. Rejected: no result, with a console error; nothing is copied.
 
 *Short name: `panelClone` · Panel window only.*
 
@@ -3073,13 +3520,13 @@ Copy an existing control, with all its settings, and return the copy's name, or 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `name` | text | the original's name with _copy added | The control's name. Every other command addresses the control by this name. |
-| `x` | number (pixels) | 0 | Distance from the left edge of whatever contains it. |
-| `y` | number (pixels) | 0 | Distance from the top edge. |
-| `width` | number (pixels) | the type's own | How wide to make it. |
-| `height` | number (pixels) | the type's own | How tall to make it. |
-| `parent` | text | the original's container | The name of a container to put it inside. |
-| `<section>` | object | — | Any section of the control, to set up as you make it — for example { Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals and all (Behavior, not behavior), and one the control does not have refuses the call. Inside one, names are read in any capitals, as a path is: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A colour is stored as set() stores it, and a setting the section does not have is written with a warning, as set() writes one. |
+| `name` | text | the original's name with _copy added | The name every other command reaches it by.<br>Taken already: a number is added; use the name given back. |
+| `x` | number (pixels) | 0 | Pixels from the left edge of its container.<br>Not a number: as it was, with a console warning the first time. |
+| `y` | number (pixels) | 0 | Pixels from the top edge of its container.<br>Not a number: as it was, with a console warning the first time. |
+| `width` | number (pixels) | the type's own | Pixels.<br>0 or below, or not a number: as it was, with a console warning the first time. |
+| `height` | number (pixels) | the type's own | Pixels.<br>0 or below, or not a number: as it was, with a console warning the first time. |
+| `parent` | text | the original's container | The name of a container to put it in: a control with a Children section, such as a Container or a Group.<br>Not a control, or not a container: rejected with a console error. |
+| `<section>` | object | — | Any section of the control, by the name set() uses, such as { Behavior = { min = 0, max = 127 } }.<br>The section's name as written: Behavior, not behavior.<br>A section the control does not have: rejected with a console error.<br>Inside one, names in any case, as in a path; a child given is merged into the one there: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest.<br>A colour: stored as set() stores it; one it would refuse: rejected with a console error.<br>A setting the section does not have: written, with a console warning, as set() writes one. |
 
 ```lua
 -- Lua
@@ -3092,7 +3539,16 @@ ce.panel.clone("template", { name: "copy", y: 120 });
 
 #### `ce.panel.destroy(name)`
 
-Remove a control, together with everything inside it. Returns true if the control was there and has been removed, false if there was no such control. It works on any control: the ones you placed in the editor as well as the ones a script created.
+Remove a control, and everything inside it.
+
+Example: `ce.panel.destroy("Cutoff")` removes the control called Cutoff.
+
+- `name` (text, required): The control's name.<br>Not a control: false, without a word.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Any control: placed in the editor or made by a script.
+- Returns true when it was removed; false when there was no control of that name.
 
 *Short name: `panelDestroy` · Panel window only.*
 
@@ -3107,7 +3563,16 @@ ce.panel.destroy("name");
 
 #### `ce.panel.parent(name [, containerName])`
 
-Move a control into a container, or back to the top level of the panel when `containerName` is left out. Returns true on success. A container is any control with a Children section, such as a Container or a Group. A control cannot be moved into itself or into one of the controls it contains.
+Move a control into a container, or out to the top level of the panel.
+
+Example: `ce.panel.parent("Cutoff", "Row")` moves Cutoff into the container called Row.
+
+- `name` (text, required): The control to move.<br>Not a control, or left out: rejected with a console error.
+- `containerName` (text, optional): A control with a Children section, such as a Container or a Group.<br>Left out, or "": the top level of the panel.<br>Not a control, not a container, or the control itself or one inside it: rejected with a console error.
+
+Good to know:
+
+- Returns true when it moved. Rejected: false, with a console error; nothing moves.
 
 *Short name: `panelParent` · Panel window only.*
 
@@ -3122,7 +3587,16 @@ ce.panel.parent("knob", "row");
 
 #### `ce.panel.find([query])`
 
-List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.
+List the names of the controls that match a query.
+
+Example: `ce.panel.find({ type = "Knob" })` gives the name of every knob.
+
+- `query` (options, optional): Part of a name, in any case; or a table of the filters below, every one of which must match.<br>Left out: every control.<br>Anything else, or a filter it does not have: rejected with a console error.
+
+Good to know:
+
+- Containers and the controls inside them are both listed.
+- Returns a list of names, in panel order. Rejected: an empty list, with a console error.
 
 *Short name: `panelFind` · Panel window only.*
 
@@ -3130,10 +3604,10 @@ List the names of the controls that match `query`, including controls inside con
 
 | Name | Type | What it is |
 |---|---|---|
-| `name` | text | Match controls whose name contains this. |
-| `type` | text | Match one kind of control, such as "Knob". ce.panel.types() lists the spellings. |
-| `generated` | true or false | `true` matches only controls a script created, `false` only the ones you placed by hand. The text "true" is refused. |
-| `parent` | text | Match only what is inside the container of this name. |
+| `name` | text | Part of a name, in any case. |
+| `type` | text | A control type, such as "Knob": one of ce.panel.types(). Case-insensitive.<br>Not a type: rejected with a console error. |
+| `generated` | true or false | Whether a script made the control.<br>true: only the controls a script made.<br>false: only the ones placed in the editor.<br>Not true or false, such as the text "true": rejected with a console error. |
+| `parent` | text | A container's name, in any case: only the controls directly inside it. |
 
 ```lua
 -- Lua
@@ -3150,7 +3624,15 @@ for (const n of ce.panel.find({ type: "Knob" })) {
 
 #### `ce.panel.info(name)`
 
-Describe a control: { name, id, type, x, y, width, height, parent, generated }, or nothing if there is no such control. `x` and `y` are measured from the control's container; use `ce.panel.rect()` for its position on the panel. `generated` is true for a control a script created.
+Describe a control: its name, id, type, place, size and container, and whether a script made it.
+
+Example: `ce.panel.info("Cutoff").type` gives "Knob".
+
+- `name` (text, required): The control's name.<br>Not a control: no result, without a word.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns { name, id, type, x, y, width, height, parent, generated }. `x` and `y` are from its container's corner; `ce.panel.rect()` gives its place on the panel.
 
 *Short name: `panelInfo` · Panel window only.*
 
@@ -3165,7 +3647,13 @@ const c = ce.panel.info("name");
 
 #### `ce.panel.types()`
 
-List the names of every control type `ce.panel.create()` accepts.
+List every control type `ce.panel.create()` takes.
+
+Example: `ce.panel.types()` gives { "Background", "Label", "Button", … }.
+
+Good to know:
+
+- Returns a list of type names.
 
 *Short name: `panelTypes` · Panel window only.*
 
@@ -3180,7 +3668,17 @@ log(ce.panel.types().join(", "));
 
 #### `ce.panel.align(names, edge [, opts]) -> number`
 
-Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.
+Line controls up on one edge or centre line.
+
+Example: `ce.panel.align({ "Cutoff", "Res" }, "top")` lines up the tops of Cutoff and Res.
+
+- `names` (list, required): Control names: a list, or one name.<br>A name that is not a control: said in the console, and skipped.<br>No control: rejected with a console error.
+- `edge` (text, required): "left", "right", "top" or "bottom": that edge.<br>"hCenter": the centre line across; "vCenter": the centre line down.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: each its default.
+
+Good to know:
+
+- Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.
 
 *Short name: `panelAlign` · Panel window only.*
 
@@ -3188,7 +3686,7 @@ Line controls up on one edge or centre line: "left", "hCenter", "right", "top", 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `to` | text | the box the whole group occupies | Name one of the controls to line the others up on, instead of on the group as a whole. This is what the canvas calls the key object. |
+| `to` | text | the box the whole group occupies | One of the names given: the others line up on it, the canvas's key object.<br>Not one of the names: rejected with a console error. |
 
 ```lua
 -- Lua
@@ -3201,7 +3699,18 @@ ce.panel.align(["knob1", "knob2"], "left");
 
 #### `ce.panel.distribute(names, what [, opts]) -> number`
 
-Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control's ("hSpacing") or every left edge in line with the topmost control's ("vSpacing"). Needs at least two controls; returns how many it moved.
+Space controls out evenly between the first and the last.
+
+Example: `ce.panel.distribute({ "A", "B", "C" }, "hSpacing")` makes the gaps between A, B and C equal.
+
+- `names` (list, required): Control names: a list of two or more.<br>A name that is not a control: said in the console, and skipped.<br>Fewer than two controls: rejected with a console error.
+- `what` (text, required): "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" or "bottomEdges": those positions evened out.<br>"hSpacing" or "vSpacing": the gaps between them evened out, for controls of different sizes.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: each its default.
+
+Good to know:
+
+- The first and the last stay where they are, unless `opts.gap` is given.
+- Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.
 
 *Short name: `panelDistribute` · Panel window only.*
 
@@ -3209,12 +3718,22 @@ Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "v
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `gap` | number (pixels) | worked out from the space available | Force a fixed gap between the controls rather than spreading them to fill what is there. |
-| `align` | true or false | false | With "hSpacing" or "vSpacing" only. true also lines them up across the other axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge level with the leftmost control's, and "vSpacing" puts every left edge in line with the topmost control's. It is not an edge name: "top" or "left" does nothing. |
+| `gap` | number (pixels) | worked out from the space available | Pixels between one control and the next, with "hSpacing" or "vSpacing": the last control moves too.<br>Not a number: as left out, with a console warning the first time. |
+| `align` | true or false | false | With "hSpacing" or "vSpacing" only.<br>true: also lined up across: every top edge level with the leftmost control's, or every left edge with the topmost's.<br>Anything but true, such as "top": not. |
 
 #### `ce.panel.match(names, what [, opts]) -> number`
 
-Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.
+Make controls the same width, height, or both.
+
+Example: `ce.panel.match({ "A", "B" }, "both")` gives B the size of A.
+
+- `names` (list, required): Control names: a list of two or more.<br>A name that is not a control: said in the console, and skipped.<br>Fewer than two controls: rejected with a console error.
+- `what` (text, required): "width", "height" or "both".<br>Case-insensitive.<br>Invalid: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: each its default.
+
+Good to know:
+
+- Returns how many controls it sized, whether or not they changed. Rejected: 0, with a console error; nothing changes.
 
 *Short name: `panelMatch` · Panel window only.*
 
@@ -3222,11 +3741,22 @@ Make controls the same size: "width", "height" or "both". The first name in the 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `to` | text | the first name you gave | Name the control whose size the others should copy. It is not resized itself. |
+| `to` | text | the first name you gave | One of the names given: the others take its size, and it keeps its own.<br>Not one of the names: rejected with a console error. |
 
 #### `ce.panel.grid(names [, opts]) -> number`
 
-Arrange controls in a grid of equal cells, each as big as the largest control. They are placed in reading order (top to bottom, then left to right, with controls at about the same height, within roughly 20 pixels, counted as one row), not in the order you list them. The first control in that order stays where it is and the grid grows from there. Needs at least two controls; returns how many it moved.
+Arrange controls in a grid of equal cells, each as big as the largest.
+
+Example: `ce.panel.grid(pads, { columns = 4 })` lays the pads out four to a row.
+
+- `names` (list, required): Control names: a list of two or more.<br>A name that is not a control: said in the console, and skipped.<br>Fewer than two controls: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: each its default.
+
+Good to know:
+
+- In reading order, not the order listed: top to bottom, then left to right; controls within about 20 pixels of the same height are one row.
+- The first in that order stays where it is, and the grid grows from there.
+- Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.
 
 *Short name: `panelGrid` · Panel window only.*
 
@@ -3234,9 +3764,9 @@ Arrange controls in a grid of equal cells, each as big as the largest control. T
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `columns` | number | 3 | How many controls per row. |
-| `gapX` | number (pixels) | 10 | The gap between columns. |
-| `gapY` | number (pixels) | 10 | The gap between rows. |
+| `columns` | number | 3 | Controls to a row.<br>A fraction: rounded.<br>Below 1: 1, with a console warning the first time.<br>Not a number: 3, with a console warning the first time. |
+| `gapX` | number (pixels) | 10 | Pixels between columns.<br>Not a number: 10, with a console warning the first time. |
+| `gapY` | number (pixels) | 10 | Pixels between rows.<br>Not a number: 10, with a console warning the first time. |
 
 ```lua
 -- Lua
@@ -3249,7 +3779,18 @@ ce.panel.grid(pads, { columns: 4, gapX: 8, gapY: 8 });
 
 #### `ce.panel.circle(names [, opts]) -> number`
 
-Arrange controls evenly around a circle, centred on the middle of the box they currently fill, in the order you list them. Each control's centre sits on the circle. `opts.startAngle` is in degrees, with 0 at three o'clock and angles running clockwise, which differs from `ce.draw.arc()`, where 0 is twelve o'clock. Needs at least two controls; returns how many it moved.
+Arrange controls evenly round a circle, in the order listed.
+
+Example: `ce.panel.circle(knobs, { radius = 80 })` sets the knobs round a circle of radius 80.
+
+- `names` (list, required): Control names: a list of two or more.<br>A name that is not a control: said in the console, and skipped.<br>Fewer than two controls: rejected with a console error.
+- `opts` (options, optional): The options below.<br>Left out: each its default.
+
+Good to know:
+
+- Centred on the middle of the box they fill now; each control's centre on the circle.
+- 0 degrees is three o'clock here, where `ce.draw.arc()` has twelve.
+- Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.
 
 *Short name: `panelCircle` · Panel window only.*
 
@@ -3257,24 +3798,53 @@ Arrange controls evenly around a circle, centred on the middle of the box they c
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `radius` | number (pixels) | 100 | How far from the centre to place each control. |
-| `startAngle` | number (degrees) | 0 | Where the first control goes, clockwise from three o'clock. |
+| `radius` | number (pixels) | 100 | Pixels from the centre to each control's centre.<br>Below 0: rejected with a console error.<br>Not a number: 100, with a console warning the first time. |
+| `startAngle` | number (degrees) | 0 | Degrees, clockwise from three o'clock: where the first control goes.<br>Not a number: 0, with a console warning the first time. |
 
 #### `ce.panel.flip(names, axis) -> number`
 
-Mirror the positions of controls across the middle of the box they fill: "horizontal" swaps left and right, "vertical" swaps top and bottom. Only their positions change; the controls themselves are not turned or mirrored. Needs at least two controls; returns how many it moved.
+Mirror the positions of controls across the middle of the box they fill.
+
+Example: `ce.panel.flip({ "A", "B" }, "horizontal")` swaps A and B left for right.
+
+- `names` (list, required): Control names: a list of two or more.<br>A name that is not a control: said in the console, and skipped.<br>Fewer than two controls: rejected with a console error.
+- `axis` (text, required): "horizontal": left and right swap.<br>"vertical": top and bottom swap.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only their places change: the controls are not turned.
+- Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.
 
 *Short name: `panelFlip` · Panel window only.*
 
 #### `ce.panel.rect(name) -> table`
 
-Get a control's position on the panel: { x, y, width, height, right, bottom }. Unlike Transform.x and Transform.y, this includes the offset of any container the control sits in. Give a list of names to get the box around the whole group. Returns nothing if none of the names is a control.
+Get a control's box on the panel, or the box around several.
+
+Example: `ce.panel.rect("Cutoff").right` gives Cutoff's right edge, in panel pixels.
+
+- `name` (text or list, required): A control's name, or a list of names.<br>A name that is not a control: said in the console, and skipped.<br>No control: rejected with a console error.
+
+Good to know:
+
+- Returns { x, y, width, height, right, bottom }, from the panel's corner: a container's offset included, which Transform.x and Transform.y leave out.
+- Rejected: no result, with a console error.
 
 *Short name: `panelRect` · Panel window only.*
 
 #### `ce.panel.order(names, where) -> number`
 
-Change which controls are drawn on top of which: "front", "forward", "backward" or "back". Controls only move among the others in the same container. Controls that come later in the panel are drawn over earlier ones, so "front" moves a control to the end of its container. Returns how many controls it moved.
+Bring controls to the front, or send them to the back, among the controls in their container.
+
+Example: `ce.panel.order({ "Glow" }, "back")` draws Glow behind the other controls in its container.
+
+- `names` (list, required): Control names: a list, or one name.<br>A name that is not a control: said in the console, and skipped.<br>No control: rejected with a console error.
+- `where` (text, required): "front": over all the others.<br>"forward": over one more.<br>"backward": under one more.<br>"back": under all the others.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A control later in its container is drawn over the ones before it.
+- Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.
 
 *Short name: `panelOrder` · Panel window only.*
 
@@ -3282,13 +3852,16 @@ Change which controls are drawn on top of which: "front", "forward", "backward" 
 
 Make a set of changes count as one step, so one undo takes them all back.
 
-- `fn` (function, required): The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.
+Example: `ce.panel.batch(function() ce.panel.grid(pads) end)` makes the grid one undo step.
+
+- `fn` (function, required): The function that makes the changes: run at once.<br>If it fails with an error: the step is closed all the same.<br>Not a function, or left out: rejected with a console error.
 
 Good to know:
 
 - Code after an `await` in the function is not part of the batch.
 - The panel shows the changes together when the function ends. Code inside it already sees its own earlier changes.
 - The exported plugin has no undo: there the function just runs.
+- Returns true. Rejected: false, with a console error; nothing runs.
 
 *Short name: `panelBatch` · Panel window only.*
 
@@ -3307,7 +3880,17 @@ ce.panel.batch(() => {
 
 #### `ce.panel.keep([path]) -> boolean`
 
-Keep a change made during preview. Preview is a rehearsal: when it stops, the panel goes back to how you built it, and anything a script changed is undone with it. `ce.panel.keep("Cutoff.Background.Fill.colour")` keeps one property; `ce.panel.keep()` with no path keeps everything this run changed. A control the script created cannot be kept, because the next run builds it again and keeping it would leave an extra copy every time. Returns false when nothing could be kept, including when the panel is not being previewed.
+Keep a change made in preview, so it stays when preview stops.
+
+Example: `ce.panel.keep("Cutoff.Background.Fill.colour")` keeps the colour a script gave Cutoff's fill.
+
+- `path` (path, optional): A property's path, as `set()` takes it.<br>Left out: every change this run made.
+
+Good to know:
+
+- Preview is a rehearsal: when it stops, the panel goes back to how it was built, and a script's changes with it.
+- A control a script made cannot be kept: the next run makes it again.
+- Returns true when something was kept; false when nothing could be, as when the panel is not previewing.
 
 *Short name: `panelKeep` · Panel window only.*
 
@@ -3317,7 +3900,16 @@ ce.panel.keep("Cutoff.Background.Fill.colour")
 
 #### `ce.panel.entries(control, section)`
 
-List the names of the entries in one of a control's collection sections (States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants), in the order the control holds them. Any other section name is refused with a message listing the ones that work.
+List the names of the entries in one of a control's collection sections.
+
+Example: `ce.panel.entries("Cutoff", "States")` gives { "Hover", "Pressed", … }.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `section` (text, required): One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns the names, in the control's order. Rejected: an empty list, with a console error.
 
 *Short name: `panelEntries` · Panel window only.*
 
@@ -3332,7 +3924,17 @@ for (const s of ce.panel.entries("knob", "States")) log(s);
 
 #### `ce.panel.entry(control, section, name)`
 
-Get one entry from a collection section, or nothing if there is no entry of that name. Capitals in `name` do not matter, just as in a path.
+Get one entry of a collection section, by its name.
+
+Example: `ce.panel.entry("Cutoff", "States", "Hover")` gives Cutoff's Hover state.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `section` (text, required): One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.<br>Any other: rejected with a console error.
+- `name` (text, required): The entry's name. Case-insensitive.<br>Not one of the section's: no result, without a word.
+
+Good to know:
+
+- Returns the entry as a table. Rejected: no result, with a console error.
 
 *Short name: `panelEntry` · Panel window only.*
 
@@ -3347,7 +3949,20 @@ const st = ce.panel.entry("knob", "States", "Hover");
 
 #### `ce.panel.define(control, section, name, spec)`
 
-Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, or with `kind = "keyframes"` one that plays all the time over the frames you give. A state applies while its `when` flags hold and its `rule` is true, and a rule can compare the control's value: `rule = "value > 64"`. A key the section's entries do not have, capitals included, is refused with the keys it takes, and nothing is defined. Returns true if the entry was written.
+Add an entry to a collection section, or replace the one of that name.
+
+Example: `ce.panel.define("Cutoff", "States", "Held", { when = { pressed = true } })` adds a state that applies while Cutoff is pressed.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `section` (text, required): One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.<br>Any other: rejected with a console error.
+- `name` (text, required): The entry's name. Case-insensitive: one of that name is replaced.
+- `spec` (table, optional): The entry's settings, only those to set: the rest are the section's defaults.<br>A key the section's entries do not have, in any case: rejected with a console error that lists the ones they take.<br>Left out: every setting its default.
+
+Good to know:
+
+- A new state has no condition and no changes; it applies while its `when` flags hold and its `rule` is true, such as `rule = "value > 64"`.
+- A new animation is a 120 ms change into hover and back; with `kind = "keyframes"`, one that plays all the time over the frames given.
+- Returns true when it was written. Rejected: false, with a console error; nothing is defined.
 
 *Short name: `panelDefine` · Panel window only.*
 
@@ -3362,7 +3977,18 @@ ce.panel.define("knob", "States", "Held", { when: { pressed: true } });
 
 #### `ce.panel.undefine(control, section, name)`
 
-Remove an entry from a collection section. Returns true if the entry was there, false if not. `set(path, nil)` does not remove an entry; this command does.
+Remove an entry from a collection section.
+
+Example: `ce.panel.undefine("Cutoff", "States", "Disabled")` removes Cutoff's Disabled state.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `section` (text, required): One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.<br>Any other: rejected with a console error.
+- `name` (text, required): The entry's name. Case-insensitive.<br>Not one of the section's: false, without a word.
+
+Good to know:
+
+- `set(path, nil)` does not remove an entry: this does.
+- Returns true when it was removed; false when there was none. Rejected: false, with a console error.
 
 *Short name: `panelUndefine` · Panel window only.*
 
@@ -3377,7 +4003,19 @@ ce.panel.undefine("knob", "States", "Disabled");
 
 #### `ce.panel.patch(control, state, patch [, part])`
 
-Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.
+Change how a control looks in one of its states, such as hovered or pressed.
+
+Example: `ce.panel.patch("Cutoff", "Hover", { ["Background.Fill.colour"] = "red" })` turns Cutoff's fill red while it is hovered.
+
+- `control` (text, required): The control's name.<br>Not a control: rejected with a console error.
+- `state` (text, required): The state's name, as `ce.panel.entries(control, "States")` lists them.<br>Not one of its states: rejected with a console error.
+- `patch` (table, required): Property paths, such as "Background.Fill.colour", with their values in that state: added to what it changes already.<br>A path in any case.<br>A path that leads nowhere, a whole section, or a property its section lacks: not applied, with a console line saying why.<br>A colour: stored as `set()` stores it; one it would refuse: rejected with a console error, and nothing is applied.
+- `part` (text, optional): One part of a custom component, to change in that state.<br>Not one of its parts: rejected with a console error.
+
+Good to know:
+
+- This reaches the settings inside a state, which `set()` cannot.
+- Returns how many settings were applied. Rejected: 0, with a console error.
 
 *Short name: `panelPatch` · Panel window only.*
 
@@ -3392,7 +4030,15 @@ ce.panel.patch("knob", "Hover", { "Background.Fill.colour": "FFFF0000" });
 
 #### `ce.panel.snapshot() -> object`
 
-Capture every control's current value, as an object keyed by control name. Controls that have no value of their own are left out. Store it with `ce.storage.saveSetting()` to keep it, or hold it in `state` for an A/B comparison, and put it back with `ce.panel.restore()`.
+Capture every control's value, by name.
+
+Example: `local before = ce.panel.snapshot()` keeps the panel's values, to put back with `ce.panel.restore(before)`.
+
+Good to know:
+
+- A control without a value of its own is left out.
+- Keep it with `ce.storage.saveSetting()`, or in `state` for an A/B comparison.
+- Returns a table of control names and their values.
 
 *Short name: `panelSnapshot`.*
 
@@ -3407,7 +4053,16 @@ const before = ce.panel.snapshot();
 
 #### `ce.panel.each(fn) -> number`
 
-Call `fn(name)` once for every control on the panel, including containers and the controls inside them, in the order they appear in the panel. Returns how many controls it visited. The list of names is taken before the first call, so `fn` can safely create or remove controls. To find out more about a control than its name, use `ce.panel.info()`.
+Call a function once for every control, with its name.
+
+Example: `ce.panel.each(function(name) log(name) end)` logs every control's name.
+
+- `fn` (function, required): Called as fn(name) for every control, those inside containers too, in panel order.<br>The names are taken first, so it can make or remove controls.<br>Not a function, or left out: rejected with a console error.
+
+Good to know:
+
+- `ce.panel.info()` tells more about each.
+- Returns how many controls it was called for. Rejected: 0, with a console error.
 
 *Short name: `panelEach`.*
 
@@ -3426,7 +4081,15 @@ ce.panel.each(function (name) {
 
 #### `ce.panel.restore(snapshot) -> number`
 
-Write the values from a `ce.panel.snapshot()` back to the controls. Returns how many values were written. A control the panel no longer has is skipped rather than stopping the whole restore.
+Write the values of a `ce.panel.snapshot()` back to the controls.
+
+Example: `ce.panel.restore(before)` puts back the values `before` holds.
+
+- `snapshot` (table, required): A table of control names and values, as `ce.panel.snapshot()` gives.<br>A control the panel no longer has: skipped.<br>Not a table, or left out: rejected with a console error.
+
+Good to know:
+
+- Returns how many values were written. Rejected: 0, with a console error.
 
 *Short name: `panelRestore`.*
 
@@ -3445,7 +4108,14 @@ Three ways to keep values for later. `state` holds them between one run of a han
 
 #### `ce.storage.state`
 
-A table your script can keep its own values in from one handler call to the next. Only this script can see it. It is emptied when the script reloads, so use `ce.storage.saveSetting()` for anything that must last longer.
+A table the script keeps its own values in between handler calls.
+
+Example: `state.count = (state.count or 0) + 1` counts the calls.
+
+Good to know:
+
+- This script's only.
+- Emptied when the script loads again; `ce.storage.saveSetting()` keeps a value longer.
 
 *Short name: `state`.*
 
@@ -3460,7 +4130,18 @@ ce.storage.state.count = (ce.storage.state.count ?? 0) + 1;
 
 #### `ce.storage.saveSetting(key, value [, opts]) -> boolean`
 
-Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel; in an exported plugin, only this instance of it). Returns false if the value could not be saved, for example because storage is not available.
+Save a value under a name, to keep it when the script loads again.
+
+Example: `saveSetting("lastPatch", 12)` keeps 12 under lastPatch.
+
+- `key` (text, required): A name you choose, matched as written.<br>A number: used as text.<br>Left out, or anything else: nothing is saved, with a console error.
+- `value` (any value, required): Numbers, text, true or false, lists and tables.<br>Left out: nothing is saved, with a console error. `ce.storage.forget()` deletes a setting.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Kept with the panel; in an exported plug-in, in the DAW project.
+- Returns true; false when it could not be saved, such as where storage is not available.
 
 *Short name: `saveSetting`.*
 
@@ -3468,7 +4149,7 @@ Save a value under `key` so it outlasts the script — unlike `ce.storage.state`
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 ```lua
 ce.storage.saveSetting("key", value)
@@ -3476,7 +4157,18 @@ ce.storage.saveSetting("key", value)
 
 #### `ce.storage.loadSetting(key [, fallback [, opts]])`
 
-Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if nothing has been saved under `key` (or nothing, if you did not give a fallback). `opts.scope` must match the scope the value was saved in — the same key in two scopes holds two separate values.
+Read a value saved with `ce.storage.saveSetting()`.
+
+Example: `loadSetting("lastPatch", 1)` gives the saved patch, or 1 if none was saved.
+
+- `key` (text, required): The name it was saved under, matched as written.<br>A number: used as text.<br>Left out, or anything else: the fallback, with a console error.
+- `fallback` (any value, optional): Given back when nothing is saved under the name.<br>Left out: no result.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns the value.
+- Each scope keeps its own: the same name in two scopes is two values.
 
 *Short name: `loadSetting`.*
 
@@ -3484,7 +4176,7 @@ Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if n
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 ```lua
 -- Lua
@@ -3497,7 +4189,16 @@ const v = ce.storage.loadSetting("key", default);
 
 #### `ce.storage.settings([opts]) -> list`
 
-List the keys saved in one scope, in no particular order. An empty list only means nothing has been saved yet; to check whether storage is working at all, use `ce.storage.info()`. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`. The "panel" scope leaves out every script's private keys, including this script's own.
+List the names saved in one scope.
+
+Example: `listSettings()` gives the names saved for the panel.
+
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns a list of names, in no order. An empty list: nothing saved yet; `ce.storage.info()` says whether storage works.
+- The "panel" scope leaves out every script's own.
 
 *Short name: `listSettings`.*
 
@@ -3505,7 +4206,7 @@ List the keys saved in one scope, in no particular order. An empty list only mea
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 ```lua
 -- Lua
@@ -3518,7 +4219,16 @@ for (const k of ce.storage.settings()) {  }
 
 #### `ce.storage.forget(key [, opts]) -> boolean`
 
-Delete a saved setting. Returns true if there was a value to delete and false if there was not. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`.
+Delete one saved value.
+
+Example: `forgetSetting("lastPatch")` deletes lastPatch.
+
+- `key` (text, required): The name it was saved under, matched as written.<br>A number: used as text.<br>Left out, or anything else: false, with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns true if there was one to delete; false if not.
 
 *Short name: `forgetSetting`.*
 
@@ -3526,7 +4236,7 @@ Delete a saved setting. Returns true if there was a value to delete and false if
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 ```lua
 -- Lua
@@ -3539,7 +4249,16 @@ ce.storage.forget("key");
 
 #### `ce.storage.all([opts]) -> table`
 
-Return every setting in one scope as a table of keys and values. `opts.scope` is "panel" (the default), "script" or "local". The "panel" scope leaves out every script's private settings, including this script's own.
+Give every value saved in one scope, by name.
+
+Example: `allSettings().lastPatch` gives the saved lastPatch.
+
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns a table of names and values.
+- The "panel" scope leaves out every script's own.
 
 *Short name: `allSettings`.*
 
@@ -3547,7 +4266,7 @@ Return every setting in one scope as a table of keys and values. `opts.scope` is
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 ```lua
 -- Lua
@@ -3560,7 +4279,16 @@ for (const [k, v] of Object.entries(ce.storage.all())) log(k, v);
 
 #### `ce.storage.clear([opts]) -> number`
 
-Delete every setting in one scope and return how many were deleted. Clearing the "panel" scope does not touch any script's private settings.
+Delete every value saved in one scope.
+
+Example: `clearSettings({ scope = "script" })` deletes this script's own.
+
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns how many were deleted.
+- Clearing "panel" leaves every script's own.
 
 *Short name: `clearSettings`.*
 
@@ -3568,11 +4296,22 @@ Delete every setting in one scope and return how many were deleted. Clearing the
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 #### `ce.storage.info([opts]) -> table`
 
-Describe where one scope's settings are kept: `scope`, `backing`, `available`, `count` (how many settings) and `bytes` (their size as JSON text). `backing` is "panel" (stored with the panel, in the editor), "project" (in the DAW project, in an exported plugin) or "machine" (on this computer only). If `available` is false, nothing you save in this scope will be kept.
+Tell where one scope's values are kept, and whether they will last.
+
+Example: `storageInfo().available` gives true where saved values are kept.
+
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns { scope, backing, available, count, bytes }.
+- `backing`: "panel", with the panel, in the editor; "project", in the DAW project, in an exported plug-in; "machine", on this computer.
+- `available` false: nothing saved there is kept.
+- `count`: how many; `bytes`: their size as JSON text.
 
 *Short name: `storageInfo`.*
 
@@ -3580,11 +4319,22 @@ Describe where one scope's settings are kept: `scope`, `backing`, `available`, `
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `scope` | text | "panel" | Which store to use. "panel" is shared by every script on the panel and travels with it; "script" is private to this one; "local" stays on this machine and is never written into the panel document. A scope that is not one of these is refused, and so is an options table with any other key, such as a misspelled `scop`: nothing is saved or read, and a message says why, because falling back to "panel" would share a private setting. |
+| `scope` | text | "panel" | "panel": every script on the panel; kept with the panel.<br>"script": this script only.<br>"local": this computer only, never written into the panel; in an exported plug-in, this instance only.<br>Case-insensitive.<br>Left out: "panel".<br>Any other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value. |
 
 #### `ce.storage.encode(value [, opts]) -> string`
 
-Turn a value — a table, a list, a number, some text — into JSON text, for example to keep a structure in a setting or copy it to the clipboard. `opts.indent` lays it out over several lines, indented by that many spaces. Keys are always written in sorted order, so the same data always gives the same text. Returns nothing for a value that has no JSON form, such as a function or a table that contains itself. It works the same in every scripting language, including Lua, which has no JSON support of its own.
+Write a value as JSON text.
+
+Example: `encodeJson({ b = 1, a = 2 })` gives {"a":2,"b":1}.
+
+- `value` (any value, required): Numbers, text, true or false, lists and tables.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns the text, the keys sorted, so the same data gives the same text.
+- A value with no JSON form, such as a function or a table inside itself, or left out: no result, without a word.
+- The same in every language; Lua has no JSON of its own.
 
 *Short name: `encodeJson`.*
 
@@ -3592,7 +4342,7 @@ Turn a value — a table, a list, a number, some text — into JSON text, for ex
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `indent` | number | 0 | Lay the JSON out over several lines, indented by this many spaces. 0 keeps it on one line. |
+| `indent` | number | 0 | Spaces to indent each level, laid out over several lines.<br>0: one line.<br>Range: 0 ↔ 10.<br>A fraction: rounded down.<br>Above 10: 10, with a console warning the first time.<br>Below 0, or not a number: one line, with a console warning the first time. |
 
 ```lua
 -- Lua
@@ -3605,7 +4355,16 @@ sendSysex(toAscii(ce.storage.encode(patch)));
 
 #### `ce.storage.decode(text) -> value`
 
-Turn JSON text back into a value. Text that is not valid JSON returns nothing. A JSON null also reads back as nothing: `{"a":1,"b":null}` comes back with only the key `a`, and `[1,null,2]` as a list of two items. So encoding and then decoding is not a full round trip when nulls are involved.
+Read JSON text back into a value.
+
+Example: `decodeJson("[1, 2]")` gives {1, 2}.
+
+- `text` (text, required): JSON text.<br>Text that is not JSON, not text, or left out: no result, with a console error.
+
+Good to know:
+
+- Returns the value.
+- A JSON null is nothing: {"a":1,"b":null} gives a table with a only, and [1,null,2] a list of two.
 
 *Short name: `decodeJson`.*
 
@@ -3709,8 +4468,8 @@ Good to know:
 |---|---|---|---|
 | `dash` | list of numbers | a solid line | On and off lengths in pixels, alternating.<br>A length < 0, or invalid: 0.<br>Not a list: solid line. |
 | `dashOffset` | number (pixels) | 0 | Where the dash pattern starts.<br>Advanced on a timer: the dashes move.<br>Invalid: 0. |
-| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-sensitive.<br>Invalid: default. |
-| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-sensitive.<br>Invalid: default. |
+| `cap` | text | "butt" | Line ends: "butt", "round" or "square". Case-insensitive.<br>Invalid: default. |
+| `join` | text | "miter" | Corners: "miter", "round" or "bevel". Case-insensitive.<br>Invalid: default. |
 
 ```lua
 -- Lua
@@ -4148,7 +4907,7 @@ Good to know:
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.<br>Invalid: default. |
+| `fit` | text | "fill" | How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-insensitive.<br>Invalid: default. |
 
 #### `ce.draw.clip([x, y, w, h]) -> boolean`
 
@@ -4176,7 +4935,7 @@ Set how the shapes drawn after it mix with what is under them.
 
 Example: `drawBlend("multiply")` darkens what is under the shapes drawn after it.
 
-- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.<br>Invalid: rejected with a console error.
+- `mode` (text, required): One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive.<br>Invalid: rejected with a console error.
 
 Good to know:
 
@@ -4235,7 +4994,7 @@ Good to know:
 | Name | Type | Default | What it does |
 |---|---|---|---|
 | `size` | number (pixels) | 12 | Text size in pixels.<br>Range: > 0.<br>≤ 0, or invalid: default. |
-| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".<br>Invalid: rejected with a console error. |
+| `align` | text | "left" | Which part of the text sits at x: "left", "middle" or "right". Case-insensitive.<br>"center", "centre" and "centred": "middle".<br>Invalid: rejected with a console error. |
 | `family` | text | — | Font family.<br>Left out: the control's font. |
 
 ```lua
@@ -4279,7 +5038,18 @@ Everything in this chapter needs the panel window. With the window closed these 
 
 #### `ce.image.assets([opts]) -> list`
 
-List the images in your icon library, then any icons the panel carries with it. Each entry is { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `source` is "panel" for a carried icon, and `portable` says whether the picture is already in the panel: true for those, false for your library's. Sharing or exporting copies a library icon into the panel if a control shows it or a script names it in quotes, but not one whose name a script builds while it runs. `embeddable` says whether the entry has image data that can be copied into the panel.
+List the images a control can show: the icon library's, then the panel's own.
+
+Example: `imageAssets({ vector = true })` gives the vector icons.
+
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns a list of { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }.
+- `source` "panel": carried with the panel. `portable`: in the panel already; true for those, false for the library's.
+- A library icon is copied into the panel on sharing or export when a control shows it or a script names it in quotes; not one whose name a script builds as it runs.
+- `embeddable`: it has image data that `ce.image.embed()` can copy into the panel.
 
 *Short name: `imageAssets`.*
 
@@ -4292,13 +5062,34 @@ List the images in your icon library, then any icons the panel carries with it. 
 
 #### `ce.image.asset(idOrName) -> table|nil`
 
-Look up one image in the icon library or among the icons the panel carries, by id first and then by name (capitals do not matter), the same way the panel finds an icon when it draws one. Returns the entry, in the same form as `ce.image.assets()`, or nothing if there is no such image, so check with it before pointing a control at an asset. Be aware that a name which happens to match is returned just as an id match would be.
+Find one image by its id or name.
+
+Example: `imageAsset("Logo")` gives the image called Logo.
+
+- `idOrName` (text, required): The image's id or name; a name in any case.<br>Not an image: no result, without a word.<br>Left out: no result, with a console error.
+
+Good to know:
+
+- Returns the entry, as `ce.image.assets()` gives each.
+- By id first, then by name, as the panel finds an icon to draw.
 
 *Short name: `imageAsset`.*
 
 #### `ce.image.set(target, src [, opts]) -> boolean`
 
-Put a picture on one of a control's four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option it does not take at all refuses the whole call; one the chosen layer does not have is refused with a message. Either way the command returns false.
+Put a picture on one of a control's image layers, and switch the layer on.
+
+Example: `imageSet("Pad", "textures/metal.png", { opacity = 60 })` shows the picture behind Pad at 60%.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `src` (text, required): The picture: a file's path or address, or a data URL ("data:image/png;base64,…").<br>Only a data URL survives an export; `ce.image.embed()` copies a file in.<br>Left out: the picture is kept; only the options are set.<br>"": the layer is emptied and switched off.<br>Left out, with no option: nothing is set, with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- The picture and the switch are set together: a layer is never on with nothing in it.
+- A text layer replaces the text's fill.
+- Returns true. An option the layer does not have: refused, with a console error, and false.
 
 *Short name: `imageSet`.*
 
@@ -4306,12 +5097,12 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported.<br>One of "image", "overlay", "textImage" or "textTexture". |
-| `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit.<br>One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". |
-| `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens.<br>One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". |
+| `layer` | text | "image" | Which of the control's four image layers to write. The first two are background layers and stack; the last two fill the text and are exclusive. Each option below applies only to layers that have it; an unsupported option is refused and reported.<br>One of "image", "overlay", "textImage" or "textTexture". Case-insensitive. |
+| `fit` | text | "fill" on a background, "cover" on text | How the image fills the layer. The meaning differs by layer type: on a background it is one of fill, fit, stretch, tile, original and "fill" means COVER; on text it is one of cover, contain, fill and "fill" means stretch. The text texture layer always tiles and takes no fit.<br>One of "fill", "fit", "stretch", "tile", "original", "cover" or "contain". Case-insensitive. |
+| `align` | text | "center" | Where the image sits when it does not fill the layer. Background layers only — on a text layer use offsetX and offsetY instead. Note the hyphens.<br>One of "top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom" or "bottom-right". Case-insensitive. |
 | `opacity` | number (0 to 100) | 100 | How solid the layer is, on the panel's own 0 to 100 scale — not 0 to 1. A value above 0 and up to 1 is applied as written, which is almost invisible, and writes a warning. |
 | `tint` | colour | — | Tint colour, as "#RRGGBB", or "AARRGGBB" with its alpha first; the "#" is optional. A web colour with only one meaning is taken too and stored as those digits, as `set()` stores one: "#000" as "000000", "red" as "FF0000", and rgb(), rgba(), hsl() or hsla() the same way, as AARRGGBB when it is see-through. Anything else, a number or "#" with four digits included, is refused with a message, and the other options still apply. Omit it to leave the image untinted. |
-| `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only.<br>One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". |
+| `blend` | text | "normal" | How the layer mixes with what is underneath it. Background layers only.<br>One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive. |
 | `blur` | number (pixels) | 0 | Soften the image. Background layers only. |
 | `offsetX` | number (pixels) | 0 | Nudge the image sideways. |
 | `offsetY` | number (pixels) | 0 | Nudge it up or down. |
@@ -4323,24 +5114,59 @@ Put a picture on one of a control's four image layers and switch that layer on. 
 | `brightness` | number | 1 | Lighten above 1, darken below. Background layers only. |
 | `contrast` | number | 1 | Increase above 1, flatten below. Background layers only. |
 | `tileScale` | number | 1 | How big each tile is when the image repeats. Never less than 0.1. |
-| `clipMode` | text | "shape" | Whether the image is clipped to the control's drawn shape or to its plain rectangle. Background layers only.<br>One of "shape" or "box". |
+| `clipMode` | text | "shape" | Whether the image is clipped to the control's drawn shape or to its plain rectangle. Background layers only.<br>One of "shape" or "box". Case-insensitive. |
 | `muted` | true or false | false | Keep the layer configured but hide it, so you can switch it back on without setting it up again. Background layers only. |
 
 #### `ce.image.clear(target [, layer]) -> boolean`
 
-Switch an image layer off and empty it in one step. `layer` is "image" unless you name another. Clearing "textImage" or "textTexture" also sets the text fill back to "solid", because a text fill with no picture would show nothing.
+Switch an image layer off and empty it.
+
+Example: `imageClear("Pad", "overlay")` takes the overlay away.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `layer` (text, optional): "image" or "overlay": the background layers, which stack.<br>"textImage" or "textTexture": the text's fill.<br>Case-insensitive.<br>Left out: "image".<br>Any other: rejected with a console error.
+
+Good to know:
+
+- A text layer sets the text's fill back to "solid": a text fill with no picture shows nothing.
+- Returns true; false with a console error.
 
 *Short name: `imageClear`.*
 
 #### `ce.image.read(target [, layer]) -> table`
 
-Read all the settings of one image layer (`layer` is "image" unless you name another), plus three extra fields. `active` says whether the layer will actually be drawn; for a text layer that depends on the text's fill mode, not on its Enabled switch. `source` is "data", "file" or "none". `portable` says whether the image survives an export, which only embedded image data does.
+Read every setting of one image layer.
+
+Example: `imageRead("Pad").source` gives "data", "file" or "none".
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `layer` (text, optional): "image" or "overlay": the background layers, which stack.<br>"textImage" or "textTexture": the text's fill.<br>Case-insensitive.<br>Left out: "image".<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns the layer's settings, with three more:
+- `active`: whether it is drawn; a text layer's by the text's fill, not its switch.
+- `source`: "data", "file" or "none".
+- `portable`: whether it survives an export; only embedded data does.
 
 *Short name: `imageRead`.*
 
 #### `ce.image.icon(target, idOrName [, opts]) -> boolean`
 
-Show an image from the icon library (or one the panel carries) in a control's Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. A control that shows only its text is switched to show the icon beside it (or alone, when there is no text). Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset's id and name together, so the control finds exactly that image.
+Show an image in a control's Icon section, by its id or name.
+
+Example: `imageIcon("Play", "play-circle", { size = 24 })` shows the play-circle icon on Play.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `idOrName` (text, required): The image's id or name; a name in any case.<br>Not an image: rejected with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- A control showing only its text is switched to show the icon beside it, or alone with no text.
+- Write the id or name in quotes: sharing and exporting find the icon that way, and copy it into the panel.
+- Use it rather than `set()`: it writes the asset's id and name together.
+- Returns true; false with a console error.
 
 *Short name: `imageIcon`.*
 
@@ -4356,13 +5182,32 @@ Show an image from the icon library (or one the panel carries) in a control's Ic
 
 #### `ce.image.embed(target [, layer]) -> boolean`
 
-Copy a layer's image into the panel itself, in place of a file path that only exists on this computer, so the image survives export. If the layer already holds embedded image data, it returns true and changes nothing. If the file has not been read yet, it returns false and starts reading it; call it again once the file has loaded and it will succeed.
+Copy a layer's picture into the panel, so it survives an export.
+
+Example: `imageEmbed("Pad")` copies Pad's background picture into the panel.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `layer` (text, optional): "image" or "overlay": the background layers, which stack.<br>"textImage" or "textTexture": the text's fill.<br>Case-insensitive.<br>Left out: "image".<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true; the picture already in the panel: true, changing nothing.
+- A file not read yet: false, and its reading starts; call it again once it has loaded.
 
 *Short name: `imageEmbed`.*
 
 #### `ce.image.load(path) -> boolean`
 
-Start reading an image file and report whether it is ready. A layer that points at a file shows nothing until the file has been read, and reading happens in the background, so this returns false the first time and true once the image has arrived. A data URL needs no reading and returns true straight away.
+Start reading an image file, and say whether it is ready.
+
+Example: `imageLoad("textures/metal.png")` gives false at first, then true once the file is read.
+
+- `path` (text, required): The file's path, or a data URL.<br>Left out, or "": false, with a console error.
+
+Good to know:
+
+- A layer that points at a file shows nothing until it is read, which happens in the background.
+- Returns true when it is ready; a data URL at once.
 
 *Short name: `imageLoad`.*
 
@@ -4374,7 +5219,18 @@ Everything in this chapter needs the panel window. With the window closed these 
 
 #### `ce.text.fonts([opts]) -> list`
 
-List every font the panel can use, with what each one supports: the built-in fonts, your font library, and any font the panel carries with it (`source` "panel"). `portable` says whether a font is already there wherever the panel goes: true for the built-in fonts and the carried ones, false for your library's. Sharing or exporting packs a library font into the panel if a control uses it or a script names it in quotes. `featuresKnown` says whether the font's typographic features have actually been checked; when it is false, an empty `features` list means they are unknown, not that there are none.
+List every font the panel can use, and what each supports.
+
+Example: `textFonts({ variable = true })` gives the variable fonts.
+
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns a list: the built-in fonts, the font library's, and the panel's own, `source` "panel".
+- `portable`: there wherever the panel goes; true for the built-in fonts and the panel's own, false for the library's.
+- A library font is copied into the panel on sharing or export when a control uses it or a script names it in quotes.
+- `featuresKnown` false: an empty `features` list means they are not known, not that there are none.
 
 *Short name: `textFonts`.*
 
@@ -4387,13 +5243,33 @@ List every font the panel can use, with what each one supports: the built-in fon
 
 #### `ce.text.font(family) -> table|nil`
 
-Look up one font by family name. Returns its description, with the same fields as `ce.text.fonts()`, or nothing if no such font is available. Capitals do not matter, and the font's display name works too, just as in the Properties panel. Use it to check that a font exists before you set it, or to see which variable axes it has.
+Find one font by its family name.
+
+Example: `textFont("Inter").variable` gives true for a variable Inter.
+
+- `family` (text, required): The family, or its display name, as the Properties panel shows it, in any case.<br>Not a font the panel has: no result, without a word.<br>Left out: no result, with a console error.
+
+Good to know:
+
+- Returns its description, as `ce.text.fonts()` gives each.
+- Use it to see that a font is there before setting it, or which axes it has.
 
 *Short name: `textFont`.*
 
 #### `ce.text.style(target, opts) -> boolean`
 
-Set a control's typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. An option it does not take refuses the whole call. A font that is not available, or a typographic feature the font does not have, is refused with a message while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.
+Set a control's typography in one call: font, size, weight, spacing, alignment and the rest.
+
+Example: `textStyle("Title", { family = "Inter", size = 18, weight = "Bold" })` sets Title in 18-point Inter Bold.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Use it rather than `set()` for the weight: it is two fields that must agree, and this writes both.
+- Name the font in quotes: sharing and exporting find a library font that way, and copy it into the panel.
+- Returns true. A font the panel has not, or a feature the font has not: refused, with a console error, the other options set, and false.
 
 *Short name: `textStyle`.*
 
@@ -4406,9 +5282,9 @@ Set a control's typography in one call: font, size, weight, spacing, alignment a
 | `weight` | number or text | — | How heavy the text is, either as a number from 100 to 900 or as a name such as "Bold". The panel stores this as a pair of fields that must agree, and this always writes both. |
 | `bold` | true or false | — | A shorthand for a heavy weight. |
 | `italic` | true or false | — | Slant the text over. |
-| `caseMode` | text | "normal" | Re-case the text as it is drawn, without changing what it says.<br>One of "normal", "uppercase", "lowercase", "title", "sentence" or "smallcaps". |
-| `scriptMode` | text | "normal" | Draw the text smaller and raised or lowered, as superscript or subscript.<br>One of "normal", "superscript" or "subscript". |
-| `justification` | text | — | Where the text sits inside the control.<br>One of "topLeft", "top", "topRight", "left", "centred", "right", "bottomLeft", "bottom" or "bottomRight". |
+| `caseMode` | text | "normal" | Re-case the text as it is drawn, without changing what it says.<br>One of "normal", "uppercase", "lowercase", "title", "sentence" or "smallcaps". Case-insensitive. |
+| `scriptMode` | text | "normal" | Draw the text smaller and raised or lowered, as superscript or subscript.<br>One of "normal", "superscript" or "subscript". Case-insensitive. |
+| `justification` | text | — | Where the text sits inside the control.<br>One of "topLeft", "top", "topRight", "left", "centred", "right", "bottomLeft", "bottom" or "bottomRight". Case-insensitive. |
 | `letterSpacing` | number (pixels) | 0 | Extra space between letters. Negative tightens them up. |
 | `wordSpacing` | number (pixels) | 0 | Extra space between words. |
 | `baselineShift` | number (pixels) | 0 | Move the text off its baseline, up for positive. |
@@ -4430,25 +5306,68 @@ Set a control's typography in one call: font, size, weight, spacing, alignment a
 
 #### `ce.text.axis(target, tag, value) -> boolean`
 
-Set one axis of a variable font by its four-letter tag, such as "wght" for weight. The value is kept within the range the font allows, and an axis the font does not have is refused rather than stored. Setting "wght" also updates the control's weight, as the Properties panel's own axis slider does; otherwise the text would still be drawn at its old weight.
+Set one axis of a variable font, by its four-letter tag.
+
+Example: `textAxis("Title", "wght", 650)` sets Title's weight axis to 650.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `tag` (text, required): The axis's tag, such as "wght" or "wdth".<br>Not one the font has: rejected with a console error.
+- `value` (number, required): The axis's value.<br>Outside the font's range: the nearest end.
+
+Good to know:
+
+- "wght" sets the control's weight too, as the Properties panel's slider does.
+- Returns true; false with a console error.
 
 *Short name: `textAxis`.*
 
 #### `ce.text.read(target [, name]) -> value|table`
 
-Read one text setting by name, such as "size" or "lineHeight", without having to know which part of the Text section (Font, Multiline or Position) holds it. With no name, returns everything as { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the text is actually drawn at, worked out from the two stored weight fields.
+Read one text setting by name, or every one.
+
+Example: `textRead("Title", "size")` gives Title's text size.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `name` (text, optional): A setting's name, such as "size" or "lineHeight", wherever in the Text section it is.<br>Left out: every setting, as a table.<br>Not a setting: no result, with a console error.
+
+Good to know:
+
+- Returns the value; left out, { content, resolvedWeight, font, multiline, position }.
+- `resolvedWeight`: the weight the text is drawn at, from its two weight fields.
 
 *Short name: `textRead`.*
 
 #### `ce.text.measure(target [, text]) -> table`
 
-Measure how much room a control's text takes up in its own font. Returns { width, height, lines, truncated, exact }, where `truncated` says whether some of the text is cut off. It lays the text out exactly as the panel does, so spacing, wrapping and line limits all count. Pass `text` to measure something the control does not hold yet. `exact` is false when the text could not actually be measured and the answer is an estimate.
+Measure how much room a control's text takes, in its own font.
+
+Example: `textMeasure("Title").truncated` gives true when some of the text is cut off.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `text` (text, optional): Text to measure in the control's font.<br>Left out: the control's own.
+
+Good to know:
+
+- Returns { width, height, lines, truncated, exact }.
+- Laid out as the panel lays it out: spacing, wrapping and the line limit count.
+- `exact` false: it could not be measured, and the answer is an estimate.
 
 *Short name: `textMeasure`.*
 
 #### `ce.text.fit(target [, opts]) -> table`
 
-Find the largest text size at which a control's text fits inside its box, write that size to the control, and return { size, fits, changed, exact }. It tries whole-number sizes from `opts.max` (the current size) down to `opts.min` (6). Setting Text.Multiline.fitMode to "shrink" only shrinks the text as it is drawn and never changes the stored size; this writes the size, so other code can read it and line things up with it. If even `opts.min` overflows, `fits` is false and the size is set to `opts.min`; the call still succeeds.
+Find the largest text size at which a control's text fits, and set it.
+
+Example: `textFit("Title", { min = 8 })` makes Title's text as large as fits, and 8 at least.
+
+- `target` (text, required): The control's name.<br>Not a control on the panel: rejected with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns { size, fits, changed, exact }.
+- Tries whole sizes from `max` down to `min`. Even `min` too large: set to `min`, `fits` false.
+- Unlike Text.Multiline.fitMode "shrink", which only draws the text smaller, this writes the size.
 
 *Short name: `textFit`.*
 
@@ -4468,7 +5387,18 @@ Everything in this chapter needs the panel window. With the window closed these 
 
 #### `ce.ui.notify(message [, opts])`
 
-Show a short pop-up message to the person using the panel, and return its ID. It disappears after 3 seconds unless you set `opts.duration` (in milliseconds); 0 or less keeps it up until it is dismissed. Use it for things the user should know about, not for debugging — that is what `log()` is for. Pass the ID to `ce.ui.update()` to change the message in place, or to `ce.ui.dismiss()` to remove it.
+Show a short message to the person using the panel.
+
+Example: `uiNotify("Patch saved")` shows Patch saved for three seconds.
+
+- `message` (text, required): The text.<br>A number: written as text.<br>Left out, or "": nothing is shown, with a console error.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- Returns its id, for `ce.ui.update()` and `ce.ui.dismiss()`.
+- For what the player should know; `log()` is for you.
+- A click on it removes it.
 
 *Short name: `uiNotify`.*
 
@@ -4476,7 +5406,7 @@ Show a short pop-up message to the person using the panel, and return its ID. It
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `duration` | number (milliseconds) | 3000 | How long the message stays up. 0 or less keeps it visible until something dismisses it. |
 
 ```lua
@@ -4490,7 +5420,18 @@ ce.ui.notify("Patch loaded");
 
 #### `ce.ui.status([message] [, opts])`
 
-Show a line of text in the status bar. It stays until you replace it; call this with no message to clear it. Use it for an ongoing state, such as "Recording" or "Synced" — for a one-off event, use `ce.ui.notify()`. Read the current status back with `ce.ui.state()`.
+Show a line of text in the status bar, until it is replaced.
+
+Example: `uiStatus("Recording", { kind = "warn" })` shows Recording in the status bar.
+
+- `message` (text, optional): The text.<br>Left out, or "": the status bar is cleared.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- For a state that lasts, such as "Synced"; `ce.ui.notify()` is for an event.
+- `ce.ui.state()` reads it back.
+- Returns true.
 
 *Short name: `uiStatus`.*
 
@@ -4498,7 +5439,7 @@ Show a line of text in the status bar. It stays until you replace it; call this 
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 
 ```lua
 -- Lua
@@ -4511,7 +5452,18 @@ ce.ui.status("Recording");
 
 #### `ce.ui.dialog(opts [, onChoice]) -> boolean`
 
-Ask a question with buttons. The answer arrives later through `onChoice`, which receives the label of the button that was clicked, or nothing if the dialog was closed without a choice. Only one dialog can be open at a time. The call itself returns true if the dialog appeared; if it returns false, nothing was shown — for example because another dialog is already open — and `onChoice` has already been called with nothing.
+Ask a question with buttons.
+
+Example: `uiDialog({ title = "Overwrite the patch?", buttons = { "Cancel", "Overwrite" } }, fn)` asks, and calls fn with the button clicked.
+
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+- `onChoice` (function, optional): Called later with the label of the button clicked; nothing when it was closed without one.
+
+Good to know:
+
+- One dialog at a time.
+- Returns true if it appeared. Another dialog open: false, and `onChoice` called with nothing; `ce.ui.state()` says so.
+- No title and no message: false, with a console error, and `onChoice` called with nothing.
 
 *Short name: `uiDialog`.*
 
@@ -4522,7 +5474,7 @@ Ask a question with buttons. The answer arrives later through `onChoice`, which 
 | `title` | text | — | The bold line at the top. |
 | `message` | text | — | The body text under the heading. |
 | `buttons` | list of text | one button labelled "OK" | The button labels, left to right. Whichever is clicked is what `onChoice` is given. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `default` | text | the first button | The label of the button focused when the dialog opens. |
 
 ```lua
@@ -4544,7 +5496,18 @@ ce.ui.dialog({ title: "Overwrite?", buttons: ["Overwrite", "Cancel"] }, function
 
 #### `ce.ui.prompt(opts [, onAnswer]) -> boolean`
 
-Ask the user to type some text. The answer arrives through `onAnswer`: the text they typed, or nothing if they cancelled. An empty answer (they accepted an empty field) is not the same as no answer. Pressing Enter accepts. Returns true if the dialog appeared; if it returns false, `onAnswer` has already been called with nothing.
+Ask for a line of text.
+
+Example: `uiPrompt({ title = "Name this patch", value = "Init" }, fn)` asks, and calls fn with what was typed.
+
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+- `onAnswer` (function, optional): Called later with the text typed; "" when an empty field was accepted; nothing when it was cancelled.
+
+Good to know:
+
+- Enter accepts.
+- Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.
+- No title and no message: false, with a console error, and `onAnswer` called with nothing.
 
 *Short name: `uiPrompt`.*
 
@@ -4558,7 +5521,7 @@ Ask the user to type some text. The answer arrives through `onAnswer`: the text 
 | `placeholder` | text | — | Grey hint text shown while the field is empty. |
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `default` | text | the accept label | Which of the two buttons is drawn as the default one: the accept label or the cancel label. Pressing Enter in the field accepts either way. |
 
 ```lua
@@ -4576,7 +5539,18 @@ ce.ui.prompt({ title: "Name this patch", value: get("patchName") }, (name) => {
 
 #### `ce.ui.choose(opts [, onAnswer]) -> boolean`
 
-Ask the user to pick from a list. The answer arrives through `onAnswer`: the chosen item, a list of items if `opts.multiple` is set, or nothing if they cancelled. A long list scrolls rather than making the dialog taller. Returns true if the dialog appeared; if it returns false — for example because `opts.items` is empty — `onAnswer` has already been called with nothing.
+Ask for a choice from a list.
+
+Example: `uiChoose({ title = "Load which bank?", items = { "A", "B", "C" } }, fn)` asks, and calls fn with the bank chosen.
+
+- `opts` (options, required): Options, below.<br>An option it does not have: nothing is done, with a console error.
+- `onAnswer` (function, optional): Called later with the item chosen; a list of them with `multiple`; nothing when it was cancelled.
+
+Good to know:
+
+- A long list scrolls.
+- Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.
+- No title and no message, or no items: false, with a console error, and `onAnswer` called with nothing.
 
 *Short name: `uiChoose`.*
 
@@ -4591,7 +5565,7 @@ Ask the user to pick from a list. The answer arrives through `onAnswer`: the cho
 | `multiple` | true or false | false | Allow more than one to be picked, in which case the answer is a list. |
 | `accept` | text | "OK" | The label on the confirm button. |
 | `cancel` | text | "Cancel" | The label on the cancel button. |
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 
 ```lua
 -- Lua
@@ -4608,7 +5582,15 @@ ce.ui.choose({ title: "Load which preset?", items: names }, (pick) => {
 
 #### `ce.ui.dismiss([id]) -> number`
 
-Remove a message shown with `ce.ui.notify()`; the user can also remove one by clicking it. With no `id`, every message is removed. Returns how many were removed.
+Remove a message `ce.ui.notify()` showed, or every one.
+
+Example: `uiDismiss(id)` removes that message.
+
+- `id` (number, optional): The id `ce.ui.notify()` gave.<br>Left out: every message.<br>Not a number: nothing is removed, with a console error.
+
+Good to know:
+
+- Returns how many were removed.
 
 *Short name: `uiDismiss`.*
 
@@ -4623,7 +5605,19 @@ ce.ui.dismiss(id);
 
 #### `ce.ui.update(id, message [, opts]) -> boolean`
 
-Change the text of a message that is already showing, in place. To show progress, show the first message with an `opts.duration` of 0 so it stays up, then update it as you go. Returns false once the message has gone — for example because the user dismissed it — so you know to stop updating.
+Change the text of a message that is showing.
+
+Example: `uiUpdate(id, "Sending 3 of 8")` changes the message in place.
+
+- `id` (number, required): The id `ce.ui.notify()` gave.
+- `message` (text, required): The new text.
+- `opts` (options, optional): Options, below.<br>An option it does not have: nothing is done, with a console error.
+
+Good to know:
+
+- For progress: show the first with `duration = 0`, so it stays, then change it as you go.
+- Returns true; false once the message has gone, such as when it was clicked away, so you know to stop.
+- No id, or no message: false, with a console error.
 
 *Short name: `uiUpdate`.*
 
@@ -4631,7 +5625,7 @@ Change the text of a message that is already showing, in place. To show progress
 
 | Name | Type | Default | What it does |
 |---|---|---|---|
-| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". |
+| `kind` | text | "info" | Severity of the message. Sets the colour and the icon.<br>One of "info", "warn" or "error". Case-insensitive. |
 | `duration` | number | unchanged | A new lifetime for the message. If omitted, a sticky message stays sticky and a timed one gets its full time back. |
 
 ```lua
@@ -4649,7 +5643,14 @@ ce.ui.update(id, "Working… done");
 
 #### `ce.ui.state() -> table`
 
-Return what is on screen: `status`, `statusKind`, `notifications` (a list, each with `id`, `message`, `kind` and `sticky`) and `dialog`. `dialog` is true while a dialog is open, which tells you why `ce.ui.dialog()` returned false: another dialog was already showing, rather than there being no panel window to show it in.
+Give what is on screen: the status bar, the messages and whether a dialog is open.
+
+Example: `uiState().dialog` gives true while a dialog is open.
+
+Good to know:
+
+- Returns { status, statusKind, notifications, dialog }; each notification { id, message, kind, sticky }.
+- `dialog` true: why `ce.ui.dialog()` gave false, rather than there being no panel window.
 
 *Short name: `uiState`.*
 
@@ -4664,7 +5665,17 @@ if (!ce.ui.state().dialog) {  }
 
 #### `ce.ui.copy(text) -> boolean`
 
-Copy text to the clipboard. The copy happens in the background, and the system may refuse it unless it follows a click by the user, so true means the copy was attempted, not that it worked; a refusal is written to the script console. Scripts cannot read the clipboard.
+Copy text to the clipboard.
+
+Example: `uiCopy(encodeJson(allSettings()))` copies the panel's settings as JSON.
+
+- `text` (text, required): The text.<br>A number: written as text.
+
+Good to know:
+
+- Returns true when it was tried, not that it worked: the system may refuse a copy that does not follow a click, which the console says.
+- Scripts cannot read the clipboard.
+- No text: false, with a console error.
 
 *Short name: `uiCopy`.*
 
@@ -4692,66 +5703,9021 @@ can be driven from a script. Each component has a module of its own, named after
   `ce.components.arp.run("myArp")` starts a stopped arpeggiator and stops a running one.
 - `read` gives you the component's current settings.
 
-Components live in the panel window, so these commands need the window open. The Script Editor's
-picker lists every one of them with its description; here is what each component offers.
+Components live in the panel window, so these commands need the window open. Each component's
+commands follow, grouped by what the component does, with what each one takes.
 
 ### Note sources
 
 Components that produce notes.
 
-- **Arpeggiator** — `ce.components.arp`. Drive the Arpeggiator: pattern, rate, gate, swing and the Euclidean generator. Commands: `run`, `pattern`, `rate`, `division`, `sync`, `octaves`, `gate`, `swing`, `latch`, `key`, `scale`, `followPanelKey`, `degree`, `chordType`, `velocity`, `channel`, `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`, `phase`, `mute`, `inputChannel`, `baseOctave`, `source`, `link`, `editable`, `showNotes`, `showHeader`, `read`.
-- **Chord Pad** — `ce.components.chordpad`. Re-key, re-voice and re-channel the Chord Pad without touching the layout. Commands: `mode`, `key`, `scale`, `followPanelKey`, `chordType`, `voicing`, `inversion`, `octave`, `velocity`, `channel`, `strum`, `latch`, `layout`, `baseOctave`, `noteSpan`, `gridCols`, `echo`, `echoChannel`, `editable`, `showPiano`, `showRomans`, `read`.
-- **Note Ribbon** — `ce.components.noteribbon`. Re-key and re-range the Note Ribbon: scale, span, bend depth, channel. Commands: `mode`, `key`, `scale`, `followPanelKey`, `baseNote`, `octaves`, `bendRange`, `velocity`, `channel`, `latch`, `orientation`, `velocityFrom`, `modAxis`, `modCc`, `echo`, `echoChannel`, `editable`, `showNames`, `showHeader`, `read`.
-- **Drum Pads** — `ce.components.drumpads`. Re-map the Drum Pads — the grid, the kit, and each pad's own note, name and choke group. Commands: `map`, `baseNote`, `mode`, `gate`, `velocity`, `channel`, `rows`, `cols`, `origin`, `velocityFrom`, `echo`, `echoChannel`, `note`, `label`, `choke`, `colour`, `roll`, `rollRate`, `rollSync`, `rollHz`, `rollDelay`, `rollVelocity`, `zones`, `cornerSize`, `cornerTopLeft`, `cornerTopRight`, `cornerBottomLeft`, `cornerBottomRight`, `flamMs`, `ghostVelocity`, `editable`, `showNotes`, `showLabels`, `showHeader`, `read`, `size`, `fill`.
-- **Phrase Sequencer** — `ce.components.phrase`. A step grid whose rows are the notes of a scale. Commands: `seed`, `clear`, `key`, `scale`, `transpose`, `direction`, `run`, `cell`, `read`.
-- **Phrase Recorder** — `ce.components.recorder`. Records what you play and loops it back. Commands: `record`, `stop`, `play`, `clear`, `undo`, `quantize`, `transpose`, `bars`, `source`, `nudge`, `shift`, `store`, `load`, `countIn`, `read`.
-- **Harmoniser** — `ce.components.harmony`. Turns one played note into a whole chord. Commands: `mode`, `key`, `scale`, `size`, `shape`, `voicing`, `inversion`, `octave`, `outOfKey`, `keepPlayed`, `channel`, `voiceLeading`, `strum`, `degree`, `read`.
+#### ce.components.arp: Arpeggiator
+
+Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm.
+
+##### `ce.components.arp.run(target [, run]) -> boolean`
+
+Start or stop the arp.
+
+Example: `ce.components.arp.run("Arp", false)` stops it.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `run` (true or false, optional): true: plays.<br>false: stops.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Free-running: it starts again where it stopped.
+- Synced: it plays only while the Transport runs.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpRun`.*
+
+##### `ce.components.arp.pattern(target, pattern) -> boolean`
+
+Set the order the notes are played in.
+
+Example: `ce.components.arp.pattern("Arp", "updown")` plays the notes low to high, then back down.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `pattern` (text, required): "up": low to high.<br>"down": high to low.<br>"updown": up, then down; the top and bottom notes once.<br>"downup": down, then up; the same.<br>"asPlayed": in the order the notes were pressed. Its own chord: as "up".<br>"random": one note at random each step.<br>"chord": every note at once, each step.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "up".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpPattern`.*
+
+##### `ce.components.arp.rate(target, rate) -> boolean`
+
+Set how many steps a second it plays, while not synced.
+
+Example: `ce.components.arp.rate("Arp", 8)` plays eight steps a second.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `rate` (number, required): Steps per second.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced to the Transport: no effect; `division()` sets the step.
+- Default: 6.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpRate`.*
+
+##### `ce.components.arp.division(target, division) -> boolean`
+
+Set how long each step is while synced.
+
+Example: `ce.components.arp.division("Arp", "1/8T")` plays eighth-note triplets.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `division` (text, required): A note value, "1/1" a whole note to "1/32".<br>"D" after it: dotted, half as long again.<br>"T" after it: a triplet, two-thirds as long.<br>One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced only: free-running, `rate()` sets the step.
+- Default: "1/16".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpDivision`.*
+
+##### `ce.components.arp.sync(target [, sync]) -> boolean`
+
+Follow the Transport's tempo, or run at its own rate.
+
+Example: `ce.components.arp.sync("Arp", true)` steps in time with the Transport, one step per `division()`.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `sync` (true or false, optional): true: one step per `division()` at the Transport's tempo, in step with its position.<br>false: `rate()` steps a second.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Synced: silent while the Transport is stopped.
+- Synced: `rate()` and `phase()` have no effect, and the Transport's swing plays unless `swingSource()` is "own".
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpSync`.*
+
+##### `ce.components.arp.octaves(target, octaves) -> boolean`
+
+Set how many octaves the notes are repeated over, upward.
+
+Example: `ce.components.arp.octaves("Arp", 2)` plays the notes, then the same notes an octave up.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `octaves` (number, required): Octaves, from the notes up.<br>1: the notes only.<br>Range: 1 ↔ 4, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A note above 127 is left out.
+- With "chord": every octave at once.
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpOctaves`.*
+
+##### `ce.components.arp.gate(target, gate) -> boolean`
+
+Set how long each note is held, as a part of its step.
+
+Example: `ce.components.arp.gate("Arp", 0.5)` holds each note for half its step.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `gate` (number, required): Part of the step.<br>1: held to the next step; 99% of it, so a repeated note sounds again.<br>Range: 0.05 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.6.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpGate`.*
+
+##### `ce.components.arp.swing(target, swing) -> boolean`
+
+Set how far every second step is delayed.
+
+Example: `ce.components.arp.swing("Arp", 0.5)` delays every second step by a quarter of a step.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `swing` (number, required): Part of half a step: 1 delays every second step by half a step.<br>0: straight.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced: the Transport's swing, unless `swingSource()` is "own".
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpSwing`.*
+
+##### `ce.components.arp.swingSource(target, swingSource) -> boolean`
+
+Set whose swing a synced arp plays: the Transport's or its own.
+
+Example: `ce.components.arp.swingSource("Arp", "own")` plays its own swing while synced.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `swingSource` (text, required): "transport": the Transport's swing, while synced.<br>"own": `swing()`, always.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Not synced: its own swing, either way.
+- Default: "transport".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpSwingSource`.*
+
+##### `ce.components.arp.latch(target [, latch]) -> boolean`
+
+Keep playing the last notes held after they are let go.
+
+Example: `ce.components.arp.latch("Arp", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `latch` (true or false, optional): true: the last notes held keep playing.<br>false: it stops when they are let go.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- With `source()` "link" or "input" only: its own chord always plays.
+- Notes held again replace the latched ones.
+- A Panic lets them go.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpLatch`.*
+
+##### `ce.components.arp.key(target, key) -> boolean`
+
+Set the key of its own chord.
+
+Example: `ce.components.arp.key("Arp", "F#")` builds its chord in F♯.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its own chord only: with `source()` "link" or "input" the notes come from there.
+- Following the panel's key: replaced at its next change.
+- Default: 0 (C).
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpKey`.*
+
+##### `ce.components.arp.scale(target, scale) -> boolean`
+
+Set the scale of its own chord.
+
+Example: `ce.components.arp.scale("Arp", "dorian")` builds its chord from the Dorian scale.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its own chord only.
+- Following the panel's key: replaced at its next change.
+- Default: "minor".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpScale`.*
+
+##### `ce.components.arp.followPanelKey(target [, followPanelKey]) -> boolean`
+
+Follow the panel's key and scale, or keep its own.
+
+Example: `ce.components.arp.followPanelKey("Arp", true)` takes the panel's key and scale, and changes with them.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpFollowPanelKey`.*
+
+##### `ce.components.arp.degree(target, degree) -> boolean`
+
+Set which step of the scale its chord is built on.
+
+Example: `ce.components.arp.degree("Arp", 5)` builds its chord on the fifth step.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `degree` (number, required): Step of the scale, counted from 1: 1 is the key's own chord.<br>Range: 1 ↔ the scale's notes: 7, 6 for "blues", 5 for the pentatonics.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its own chord only.
+- A scale changed to a shorter one: its last step.
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpDegree`.*
+
+##### `ce.components.arp.chordType(target, chordType) -> boolean`
+
+Set how many notes its chord has.
+
+Example: `ce.components.arp.chordType("Arp", "seventh")` adds the seventh: four notes.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `chordType` (text, required): "triad": three notes.<br>"seventh": four, the seventh added.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its own chord only.
+- Default: "triad".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpChordType`.*
+
+##### `ce.components.arp.velocity(target, velocity) -> boolean`
+
+Set how hard every note it plays is struck.
+
+Example: `ce.components.arp.velocity("Arp", 110)` plays every note at velocity 110.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The same for every note: the velocity the notes were held at is not used.
+- Default: 96.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpVelocity`.*
+
+##### `ce.components.arp.channel(target, channel) -> boolean`
+
+Set which MIDI channel it plays on.
+
+Example: `ce.components.arp.channel("Arp", 10)` plays its notes on channel 10.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpChannel`.*
+
+##### `ce.components.arp.euclid(target [, euclid]) -> boolean`
+
+Switch the Euclidean rhythm on or off.
+
+Example: `ce.components.arp.euclid("Arp", true)` plays only the steps the rhythm hits.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `euclid` (true or false, optional): true: the rhythm decides which steps sound.<br>false: every step sounds.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`.
+- It runs against the notes: an 8-step rhythm over a 3-note chord lands on different notes each time round.
+- Hand mutes stay silent either way.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpEuclid`.*
+
+##### `ce.components.arp.euclidSteps(target, euclidSteps) -> boolean`
+
+Set how many steps the rhythm is long.
+
+Example: `ce.components.arp.euclidSteps("Arp", 8)` makes an 8-step rhythm.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `euclidSteps` (number, required): Steps in the rhythm.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 8.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpEuclidSteps`.*
+
+##### `ce.components.arp.euclidPulses(target, euclidPulses) -> boolean`
+
+Set how many of the rhythm's steps sound.
+
+Example: `ce.components.arp.euclidPulses("Arp", 3)` sounds 3 steps, spread as evenly as they go.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `euclidPulses` (number, required): Hits, spread as evenly as they go.<br>0: none sound.<br>Range: 0 ↔ `euclidSteps()`, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Steps lowered below it later: every step sounds.
+- Default: 5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpEuclidPulses`.*
+
+##### `ce.components.arp.euclidRotate(target, euclidRotate) -> boolean`
+
+Turn the rhythm by a number of steps.
+
+Example: `ce.components.arp.euclidRotate("Arp", 1)` moves every hit a step earlier.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `euclidRotate` (number, required): Steps to turn it: each hit that many steps earlier.<br>Past the steps, or below 0: round them; -1 is the last.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpEuclidRotate`.*
+
+##### `ce.components.arp.phase(target, phase) -> boolean`
+
+Move the arp to a point in its sequence.
+
+Example: `ce.components.arp.phase("Arp", 0.5)` moves it halfway through its sequence.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `phase` (number, required): Where in the sequence: 0 the start, 0.5 halfway.<br>1: the start again.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Running: the next step plays from there. Stopped: it starts from there.
+- While synced: no effect; the Transport's position decides.
+- `read(target, "phase")` gives where it is now.
+- Nothing is written to the panel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpPhase`.*
+
+##### `ce.components.arp.mute(target, index [, on]) -> boolean`
+
+Mute or unmute one step.
+
+Example: `ce.components.arp.mute("Arp", 3)` mutes step 3 if it plays, and lets it play if it is muted.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `index` (number, required): Step number, counted from 1, as the cells are drawn from the left.<br>A fraction: rounded.<br>Past the last step: kept, for when the sequence grows.<br>Below 1, or invalid: rejected with a console error.
+- `on` (true or false, optional): true: muted.<br>false: plays.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.
+- `read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.
+- Default: none muted.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpMute`.*
+
+##### `ce.components.arp.inputChannel(target, inputChannel) -> boolean`
+
+Set which MIDI channel it takes notes from.
+
+Example: `ce.components.arp.inputChannel("Arp", 2)` plays only the notes held on channel 2.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `inputChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `source()` is "input".
+- Default: 0, any channel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpInputChannel`.*
+
+##### `ce.components.arp.baseOctave(target, baseOctave) -> boolean`
+
+Set the octave its chord starts in.
+
+Example: `ce.components.arp.baseOctave("Arp", 4)` puts the chord's root in octave 4, as in C4, middle C.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `baseOctave` (number, required): The root's octave, as in C3. Middle C is C4.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its own chord only.
+- A note above 127 is left out.
+- Default: 3.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpBaseOctave`.*
+
+##### `ce.components.arp.source(target, source) -> boolean`
+
+Set where the notes come from.
+
+Example: `ce.components.arp.source("Arp", "input")` plays the notes held on the MIDI input.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `source` (text, required): "chord": its own chord, from `key()`, `scale()` and `degree()`.<br>"link": the notes held on the Chord Pad set by `link()`.<br>"input": the notes held on the MIDI input, on `inputChannel()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "chord".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpSource`.*
+
+##### `ce.components.arp.link(target [, name]) -> boolean`
+
+Set the Chord Pad it plays from.
+
+Example: `ce.components.arp.link("Arp", "Pads")` plays the chords held on the Chord Pad called Pads.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `name` (text, optional): The Chord Pad's name. Case-insensitive.<br>Left out, or "": none.<br>Not on this panel, or not a Chord Pad: rejected with a console error.
+
+Good to know:
+
+- Played only while `source()` is "link".
+- The Chord Pad stays silent while the arp plays from it.
+- Default: none.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "link")` gives the Chord Pad's name.
+
+*Short name: `arpLink`.*
+
+##### `ce.components.arp.editable(target [, editable]) -> boolean`
+
+Let a click on a step mute it, or not.
+
+Example: `ce.components.arp.editable("Arp", false)` stops clicks muting steps.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `editable` (true or false, optional): true: a click on a step mutes or unmutes it.<br>false: clicks do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Only clicks are locked: `mute()` still works.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpEditable`.*
+
+##### `ce.components.arp.showNotes(target [, showNotes]) -> boolean`
+
+Show or hide the note names in the steps.
+
+Example: `ce.components.arp.showNotes("Arp", false)` hides the note names.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `showNotes` (true or false, optional): true: each step shows its note, "C3", or a chord's count, "3♪".<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- A step narrower than 22 or shorter than 26 pixels shows no name either way.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpShowNotes`.*
+
+##### `ce.components.arp.showHeader(target [, showHeader]) -> boolean`
+
+Show or hide the strip above the steps.
+
+Example: `ce.components.arp.showHeader("Arp", false)` hides the strip, and the steps take its room.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `showHeader` (true or false, optional): true: the strip shows the pattern, where the notes come from and the rate.<br>false: hidden; the steps take its room.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `arpShowHeader`.*
+
+##### `ce.components.arp.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.arp.read("Arp")` gives every setting as a table.
+
+- `target` (control name, required): The Arpeggiator's control, by name.<br>Not an Arpeggiator: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): For "mute": a step number, counted from 1; true if that step is muted.<br>A fraction: rounded.<br>Below 1, or invalid: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- `read(target, "phase")`: where it is now.
+- `read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `arpRead`.*
+
+#### ce.components.chordpad: Chord Pad
+
+Play a chord, or a note of the scale, from each pad: the key and scale they are built from, their voicing, and what they send.
+
+##### `ce.components.chordpad.mode(target, mode) -> boolean`
+
+Set what a pad plays: a chord, or one note of the scale.
+
+Example: `ce.components.chordpad.mode("ChordPad", "notes")` gives each pad one note of the scale.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `mode` (text, required): "chords": one chord per step of the scale.<br>"notes": one note of the scale per pad, over `noteSpan()` octaves.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- With `layout()` "wheel": chords either way.
+- Default: "chords".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadMode`.*
+
+##### `ce.components.chordpad.key(target, key) -> boolean`
+
+Set the key the pads are built in.
+
+Example: `ce.components.chordpad.key("ChordPad", "F#")` builds the pads in F♯.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Following the panel's key: replaced at its next change.
+- Default: 0 (C).
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadKey`.*
+
+##### `ce.components.chordpad.scale(target, scale) -> boolean`
+
+Set the scale the pads are built from.
+
+Example: `ce.components.chordpad.scale("ChordPad", "dorian")` builds the pads from the Dorian scale.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Following the panel's key: replaced at its next change.
+- Default: "major".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadScale`.*
+
+##### `ce.components.chordpad.followPanelKey(target [, followPanelKey]) -> boolean`
+
+Follow the panel's key and scale, or keep its own.
+
+Example: `ce.components.chordpad.followPanelKey("ChordPad", true)` takes the panel's key and scale, and changes with them.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadFollowPanelKey`.*
+
+##### `ce.components.chordpad.chordType(target, chordType) -> boolean`
+
+Set how many notes each chord has.
+
+Example: `ce.components.chordpad.chordType("ChordPad", "seventh")` adds the seventh: four notes.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `chordType` (text, required): "triad": three notes.<br>"seventh": four, the seventh added.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only in "chords" mode.
+- Default: "triad".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadChordType`.*
+
+##### `ce.components.chordpad.voicing(target, voicing) -> boolean`
+
+Set how each chord's notes are spread.
+
+Example: `ce.components.chordpad.voicing("ChordPad", "drop2")` drops each chord's second note from the top an octave.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `voicing` (text, required): "close": stacked as built.<br>"spread": every second note an octave up.<br>"drop2": the second note from the top an octave down.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only in "chords" mode.
+- Applied after `inversion()`.
+- Default: "close".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadVoicing`.*
+
+##### `ce.components.chordpad.inversion(target, inversion) -> boolean`
+
+Set how many of each chord's lowest notes move up an octave.
+
+Example: `ce.components.chordpad.inversion("ChordPad", 1)` plays each chord in first inversion.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `inversion` (number, required): Inversions: each moves the lowest note up an octave.<br>0: root position.<br>Range: 0 ↔ 3, whole; a triad stops at 2.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only in "chords" mode.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadInversion`.*
+
+##### `ce.components.chordpad.octave(target, octave) -> boolean`
+
+Transpose every pad by whole octaves.
+
+Example: `ce.components.chordpad.octave("ChordPad", -1)` plays every pad an octave lower.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `octave` (number, required): Octaves, up or down from `baseOctave()`.<br>Range: -3 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- With `baseOctave()`, stops at octaves -1 and 8.
+- A note past the MIDI range sounds at its end, 0 or 127.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadOctave`.*
+
+##### `ce.components.chordpad.velocity(target, velocity) -> boolean`
+
+Set how hard every note is struck.
+
+Example: `ce.components.chordpad.velocity("ChordPad", 110)` plays every note at velocity 110.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While an Arp plays its chords (`arp.link()`), the pads sound nothing themselves.
+- Default: 96.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadVelocity`.*
+
+##### `ce.components.chordpad.channel(target, channel) -> boolean`
+
+Set which MIDI channel the pads play on.
+
+Example: `ce.components.chordpad.channel("ChordPad", 10)` plays the pads on channel 10.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While an Arp plays its chords (`arp.link()`), the pads sound nothing themselves.
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadChannel`.*
+
+##### `ce.components.chordpad.strum(target, strum) -> boolean`
+
+Set the time between a chord's notes, lowest first.
+
+Example: `ce.components.chordpad.strum("ChordPad", 30)` plays each chord's notes 30 ms apart, from the lowest.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `strum` (number, required): Milliseconds from one note to the next.<br>0: all at once.<br>Range: 0 ↔ 2000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The inspector stops at 200.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadStrum`.*
+
+##### `ce.components.chordpad.latch(target [, latch]) -> boolean`
+
+Keep a pad sounding after it is let go, until it is tapped again.
+
+Example: `ce.components.chordpad.latch("ChordPad")` switches the latch on if it is off, and off if it is on.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `latch` (true or false, optional): true: a tap starts a pad, the next tap stops it.<br>false: a pad sounds while it is held.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadLatch`.*
+
+##### `ce.components.chordpad.layout(target, layout) -> boolean`
+
+Set how the pads are laid out: a circle of fifths, or a grid.
+
+Example: `ce.components.chordpad.layout("ChordPad", "grid")` lays the pads out in rows.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `layout` (text, required): "wheel": the circle of fifths, each major chord with its relative minor inside; the chords in the key lit.<br>"grid": one pad per chord or note of the key, `gridCols()` to a row.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "wheel".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadLayout`.*
+
+##### `ce.components.chordpad.baseOctave(target, baseOctave) -> boolean`
+
+Set the octave the key's root is in.
+
+Example: `ce.components.chordpad.baseOctave("ChordPad", 3)` puts the key's root in octave 3, as in C3.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `baseOctave` (number, required): The root's octave, as in C4: middle C.<br>Range: -1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- `octave()` moves the pads from here.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadBaseOctave`.*
+
+##### `ce.components.chordpad.noteSpan(target, noteSpan) -> boolean`
+
+Set how many octaves of the scale the pads cover.
+
+Example: `ce.components.chordpad.noteSpan("ChordPad", 3)` lays out three octaves of the scale.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `noteSpan` (number, required): Octaves.<br>Range: 1 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only in "notes" mode.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadNoteSpan`.*
+
+##### `ce.components.chordpad.gridCols(target, gridCols) -> boolean`
+
+Set how many pads a row of the grid has.
+
+Example: `ce.components.chordpad.gridCols("ChordPad", 7)` puts seven pads in a row.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `gridCols` (number, required): Pads to a row.<br>Range: 1 ↔ 12, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `layout()` is "grid".
+- The inspector stops at 8.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadGridCols`.*
+
+##### `ce.components.chordpad.echo(target [, echo]) -> boolean`
+
+Light the pads from the notes held on the MIDI input, as well as from taps.
+
+Example: `ce.components.chordpad.echo("ChordPad")` switches the echo on if it is off, and off if it is on.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `echo` (true or false, optional): true: a pad is ringed while its notes are held on the input.<br>false: only taps light it.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadEcho`.*
+
+##### `ce.components.chordpad.echoChannel(target, echoChannel) -> boolean`
+
+Set which MIDI channel the echo listens to.
+
+Example: `ce.components.chordpad.echoChannel("ChordPad", 2)` lights the pads from channel 2 only.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `echoChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `echo()` is on.
+- Default: 0, any channel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadEchoChannel`.*
+
+##### `ce.components.chordpad.editable(target [, editable]) -> boolean`
+
+Let the pads be played by touch, or not.
+
+Example: `ce.components.chordpad.editable("ChordPad")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `editable` (true or false, optional): true: a tap plays a pad.<br>false: taps do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadEditable`.*
+
+##### `ce.components.chordpad.showPiano(target [, showPiano]) -> boolean`
+
+Show or hide the keyboard strip of the notes sounding.
+
+Example: `ce.components.chordpad.showPiano("ChordPad")` shows the piano if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `showPiano` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadShowPiano`.*
+
+##### `ce.components.chordpad.showRomans(target [, showRomans]) -> boolean`
+
+Show or hide the roman numerals on the pads, such as "I", "ii" and "♭VII".
+
+Example: `ce.components.chordpad.showRomans("ChordPad")` shows the romans if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `showRomans` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `chordPadShowRomans`.*
+
+##### `ce.components.chordpad.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.chordpad.read("ChordPad")` gives every setting as a table.
+
+- `target` (control name, required): The Chord Pad's control, by name.<br>Not a Chord Pad: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `chordPadRead`.*
+
+#### ce.components.noteribbon: Note Ribbon
+
+Play notes, or glide between them, along a strip: its key and range, how it is touched, and what it sends.
+
+##### `ce.components.noteribbon.mode(target, mode) -> boolean`
+
+Set how the strip plays: the notes of the scale, every semitone, or a gliding pitch.
+
+Example: `ce.components.noteribbon.mode("NoteRibbon", "glide")` bends the pitch as the finger moves.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `mode` (text, required): "snap": the notes of the scale only, one zone each.<br>"chromatic": every semitone, one zone each.<br>"glide": the pitch follows the finger, by pitch bend; past `bendRange()` the note starts again from a new one.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "snap".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonMode`.*
+
+##### `ce.components.noteribbon.key(target, key) -> boolean`
+
+Set the key whose scale is in key on the strip.
+
+Example: `ce.components.noteribbon.key("NoteRibbon", "F#")` puts the strip in F♯.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `key` (number or name, required): The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.<br>Past 11 or below 0: round the octave; 12 is C.<br>A fraction: rounded.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The notes in key: the zones of "snap", the marked ones otherwise.
+- Following the panel's key: replaced at its next change.
+- Default: 0 (C).
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonKey`.*
+
+##### `ce.components.noteribbon.scale(target, scale) -> boolean`
+
+Set the scale whose notes are in key.
+
+Example: `ce.components.noteribbon.scale("NoteRibbon", "dorian")` puts the Dorian scale's notes in key.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Following the panel's key: replaced at its next change.
+- Default: "major".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonScale`.*
+
+##### `ce.components.noteribbon.followPanelKey(target [, followPanelKey]) -> boolean`
+
+Follow the panel's key and scale, or keep its own.
+
+Example: `ce.components.noteribbon.followPanelKey("NoteRibbon", true)` takes the panel's key and scale, and changes with them.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `followPanelKey` (true or false, optional): true: the panel's key and scale, at once and at every change.<br>false: its own.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonFollowPanelKey`.*
+
+##### `ce.components.noteribbon.baseNote(target, baseNote) -> boolean`
+
+Set the note at the low end of the strip.
+
+Example: `ce.components.noteribbon.baseNote("NoteRibbon", 60)` starts the strip at middle C.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `baseNote` (number, required): MIDI note: 60 is middle C.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 48 (C3).
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonBaseNote`.*
+
+##### `ce.components.noteribbon.octaves(target, octaves) -> boolean`
+
+Set how many octaves the strip covers, up from `baseNote()`.
+
+Example: `ce.components.noteribbon.octaves("NoteRibbon", 3)` spreads three octaves along the strip.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `octaves` (number, required): Octaves.<br>Range: 1 ↔ 5, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The strip stops at note 127.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonOctaves`.*
+
+##### `ce.components.noteribbon.bendRange(target, bendRange) -> boolean`
+
+Set the synth's pitch-bend range, which "glide" bends within.
+
+Example: `ce.components.noteribbon.bendRange("NoteRibbon", 12)` bends up to an octave either way before a new note.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `bendRange` (number, required): Semitones: the synth's own bend range. Set to match it, or the glide is the wrong distance.<br>Range: 1 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only in "glide" mode.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonBendRange`.*
+
+##### `ce.components.noteribbon.velocity(target, velocity) -> boolean`
+
+Set how hard every note is struck.
+
+Example: `ce.components.noteribbon.velocity("NoteRibbon", 110)` plays every note at velocity 110.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `velocityFrom()` is "position": not used.
+- Default: 96.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonVelocity`.*
+
+##### `ce.components.noteribbon.channel(target, channel) -> boolean`
+
+Set which MIDI channel the notes, the bend and the CC go out on.
+
+Example: `ce.components.noteribbon.channel("NoteRibbon", 2)` plays on channel 2.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonChannel`.*
+
+##### `ce.components.noteribbon.latch(target [, latch]) -> boolean`
+
+Keep the note sounding after the finger lifts, until the strip is touched again.
+
+Example: `ce.components.noteribbon.latch("NoteRibbon")` switches the latch on if it is off, and off if it is on.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `latch` (true or false, optional): true: it keeps sounding; the next touch silences it.<br>false: it stops when the finger lifts.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonLatch`.*
+
+##### `ce.components.noteribbon.orientation(target, orientation) -> boolean`
+
+Set which way the strip runs.
+
+Example: `ce.components.noteribbon.orientation("NoteRibbon", "vertical")` runs the strip from low at the bottom to high at the top.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `orientation` (text, required): "horizontal": low at the left.<br>"vertical": low at the bottom.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "horizontal".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonOrientation`.*
+
+##### `ce.components.noteribbon.velocityFrom(target, velocityFrom) -> boolean`
+
+Set where each note's velocity comes from: fixed, or where across the strip it is touched.
+
+Example: `ce.components.noteribbon.velocityFrom("NoteRibbon", "position")` plays harder the nearer the top edge it is touched.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `velocityFrom` (text, required): "fixed": `velocity()`.<br>"position": 8 at the bottom edge to 127 at the top; a vertical strip's left edge to its right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "fixed".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonVelocityFrom`.*
+
+##### `ce.components.noteribbon.modAxis(target, modAxis) -> boolean`
+
+Set what a touch across the strip sends: nothing, or a CC.
+
+Example: `ce.components.noteribbon.modAxis("NoteRibbon", "cc")` sends `modCc()` from where across the strip it is touched.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `modAxis` (text, required): "none": nothing.<br>"cc": `modCc()`, 0 at the bottom edge to 127 at the top; a vertical strip's left edge to its right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonModAxis`.*
+
+##### `ce.components.noteribbon.modCc(target, modCc) -> boolean`
+
+Set which CC a touch across the strip sends.
+
+Example: `ce.components.noteribbon.modCc("NoteRibbon", 74)` sends CC 74, often a synth's filter.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `modCc` (number, required): Controller number: 1 is the mod wheel.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `modAxis()` is "cc".
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonModCc`.*
+
+##### `ce.components.noteribbon.echo(target [, echo]) -> boolean`
+
+Outline the zones of the notes held on the MIDI input.
+
+Example: `ce.components.noteribbon.echo("NoteRibbon")` switches the echo on if it is off, and off if it is on.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `echo` (true or false, optional): true: a zone is outlined while its note is held on the input.<br>false: not.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonEcho`.*
+
+##### `ce.components.noteribbon.echoChannel(target, echoChannel) -> boolean`
+
+Set which MIDI channel the echo listens to.
+
+Example: `ce.components.noteribbon.echoChannel("NoteRibbon", 2)` outlines the notes held on channel 2 only.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `echoChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `echo()` is on.
+- Default: 0, any channel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonEchoChannel`.*
+
+##### `ce.components.noteribbon.editable(target [, editable]) -> boolean`
+
+Let the strip be played by touch, or not.
+
+Example: `ce.components.noteribbon.editable("NoteRibbon")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `editable` (true or false, optional): true: a touch plays it.<br>false: touches do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonEditable`.*
+
+##### `ce.components.noteribbon.showNames(target [, showNames]) -> boolean`
+
+Show or hide the note names on the zones.
+
+Example: `ce.components.noteribbon.showNames("NoteRibbon")` shows the names if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `showNames` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- A zone too narrow for its name shows none either way.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonShowNames`.*
+
+##### `ce.components.noteribbon.showHeader(target [, showHeader]) -> boolean`
+
+Show or hide the strip above the zones: the key, the mode and the note playing.
+
+Example: `ce.components.noteribbon.showHeader("NoteRibbon")` shows the header if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `showHeader` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `noteRibbonShowHeader`.*
+
+##### `ce.components.noteribbon.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.noteribbon.read("NoteRibbon")` gives every setting as a table.
+
+- `target` (control name, required): The Note Ribbon's control, by name.<br>Not a Note Ribbon: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `noteRibbonRead`.*
+
+#### ce.components.drumpads: Drum Pads
+
+Play a fixed note from each pad of a grid: the notes and their names, how a hit is struck, rolls, and what the corners of a pad do.
+
+##### `ce.components.drumpads.map(target, map) -> boolean`
+
+Set how the pads are named, and whether the hi-hats choke each other.
+
+Example: `ce.components.drumpads.map("DrumPads", "chromatic")` names the pads by pitch.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `map` (text, required): "gm": General MIDI drum names; the closed, pedal and open hi-hats choke each other.<br>"chromatic": named by pitch.<br>"custom": named as "gm", no choke groups.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- In every map pad 1 plays `baseNote()` and each pad after it a semitone higher; `note()`, `label()` and `choke()` change one pad.
+- Default: "gm".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsMap`.*
+
+##### `ce.components.drumpads.baseNote(target, baseNote) -> boolean`
+
+Set the note pad 1 plays; each pad after it plays a semitone higher.
+
+Example: `ce.components.drumpads.baseNote("DrumPads", 36)` starts the pads at 36, the GM bass drum.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `baseNote` (number, required): MIDI note: 36 is the GM bass drum.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A pad past 127 plays 127.
+- Default: 36.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsBaseNote`.*
+
+##### `ce.components.drumpads.mode(target, mode) -> boolean`
+
+Set how long a hit sounds.
+
+Example: `ce.components.drumpads.mode("DrumPads", "toggle")` keeps a pad sounding until it is hit again.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `mode` (text, required): "momentary": while the pad is held.<br>"oneShot": for `gate()` milliseconds.<br>"toggle": until the pad is hit again.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "momentary".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsMode`.*
+
+##### `ce.components.drumpads.gate(target, gate) -> boolean`
+
+Set how long a one-shot hit sounds.
+
+Example: `ce.components.drumpads.gate("DrumPads", 200)` holds each one-shot note for 200 ms.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `gate` (number, required): Milliseconds from the note-on to the note-off.<br>Range: 5 ↔ 2000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `mode()` is "oneShot".
+- Default: 60.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsGate`.*
+
+##### `ce.components.drumpads.velocity(target, velocity) -> boolean`
+
+Set how hard a hit is struck.
+
+Example: `ce.components.drumpads.velocity("DrumPads", 110)` strikes every pad at velocity 110.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `velocity` (number, required): MIDI velocity.<br>Range: 1 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- With `velocityFrom()` "position": not used; with "centre": a hit in the middle of a pad.
+- Default: 100.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsVelocity`.*
+
+##### `ce.components.drumpads.channel(target, channel) -> boolean`
+
+Set which MIDI channel the pads play on.
+
+Example: `ce.components.drumpads.channel("DrumPads", 10)` plays the pads on channel 10, the GM drum channel.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 10.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsChannel`.*
+
+##### `ce.components.drumpads.rows(target, rows) -> boolean`
+
+Set how many rows of pads the grid has.
+
+Example: `ce.components.drumpads.rows("DrumPads", 2)` makes the grid two rows high.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `rows` (number, required): Rows.<br>Range: 1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Pads beyond the grid keep what `note()` and the others set for them.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRows`.*
+
+##### `ce.components.drumpads.cols(target, cols) -> boolean`
+
+Set how many pads a row has.
+
+Example: `ce.components.drumpads.cols("DrumPads", 8)` puts eight pads in a row.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `cols` (number, required): Pads to a row.<br>Range: 1 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsCols`.*
+
+##### `ce.components.drumpads.origin(target, origin) -> boolean`
+
+Set which corner of the grid pad 1 sits in.
+
+Example: `ce.components.drumpads.origin("DrumPads", "topLeft")` numbers the pads in reading order.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `origin` (text, required): "bottomLeft": as hardware grids, row 1 at the bottom.<br>"topLeft": in reading order.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "bottomLeft".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsOrigin`.*
+
+##### `ce.components.drumpads.velocityFrom(target, velocityFrom) -> boolean`
+
+Set where a hit's velocity comes from.
+
+Example: `ce.components.drumpads.velocityFrom("DrumPads", "centre")` strikes hardest in the middle of a pad.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `velocityFrom` (text, required): "fixed": `velocity()`.<br>"position": how high up the pad it lands, 10 at the bottom to 127 at the top.<br>"centre": `velocity()` in the middle, down to 28% of it at the edges.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "fixed".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsVelocityFrom`.*
+
+##### `ce.components.drumpads.echo(target [, echo]) -> boolean`
+
+Outline the pads of the notes held on the MIDI input.
+
+Example: `ce.components.drumpads.echo("DrumPads")` switches the echo on if it is off, and off if it is on.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `echo` (true or false, optional): true: a pad is outlined while its note is held on the input.<br>false: not.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsEcho`.*
+
+##### `ce.components.drumpads.echoChannel(target, echoChannel) -> boolean`
+
+Set which MIDI channel the echo listens to.
+
+Example: `ce.components.drumpads.echoChannel("DrumPads", 10)` outlines the notes held on channel 10 only.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `echoChannel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `echo()` is on.
+- Default: 0, any channel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsEchoChannel`.*
+
+##### `ce.components.drumpads.note(target, index, note) -> boolean`
+
+Set the note one pad plays, by its number.
+
+Example: `ce.components.drumpads.note("DrumPads", 3, 38)` makes pad 3 play 38, the GM snare.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
+- `note` (number, required): MIDI note.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- `read(target, "note", 3)` gives the note pad 3 plays, from the map when none is set.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsNote`.*
+
+##### `ce.components.drumpads.label(target, index, label) -> boolean`
+
+Set the name one pad shows, by its number.
+
+Example: `ce.components.drumpads.label("DrumPads", 3, "SNARE")` names pad 3 SNARE.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
+- `label` (text, required): The name.<br>"": the name the map gives it.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsLabel`.*
+
+##### `ce.components.drumpads.choke(target, index, choke) -> boolean`
+
+Put one pad in a choke group, by its number.
+
+Example: `ce.components.drumpads.choke("DrumPads", 3, 1)` puts pad 3 in choke group 1.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
+- `choke` (number, required): Choke group: a hit silences the other pads in the same group.<br>0: none.<br>Range: 0 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- With `map()` "gm", the hi-hats start in group 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsChoke`.*
+
+##### `ce.components.drumpads.colour(target, index, colour) -> boolean`
+
+Set the colour of one pad, by its number.
+
+Example: `ce.components.drumpads.colour("DrumPads", 3, "red")` colours pad 3 red.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
+- `colour` (colour, required): A colour, as `set()` takes one: a name, or "RRGGBB" or "AARRGGBB", with or without "#".<br>"": the grid's accent.<br>Not a colour: rejected with a console error.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsColour`.*
+
+##### `ce.components.drumpads.roll(target, index [, roll]) -> boolean`
+
+Make one pad roll, by its number: it strikes again and again while it is on.
+
+Example: `ce.components.drumpads.roll("DrumPads", 2, true)` makes pad 2 roll.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `index` (number, required): Pad number, counted from 1.<br>A fraction: rounded.<br>Not one of the pads: rejected with a console error.
+- `roll` (true or false, optional): true: it rolls while held, or while toggled on.<br>false: one strike.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Not in "oneShot" mode: the pad stops at its gate.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRoll`.*
+
+##### `ce.components.drumpads.rollRate(target, rollRate) -> boolean`
+
+Set how fast a rolling pad strikes, as a note value against the Transport.
+
+Example: `ce.components.drumpads.rollRate("DrumPads", "1/32")` rolls in 32nd notes.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `rollRate` (text, required): One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `rollSync()` is on and the Transport has a tempo; otherwise `rollHz()`.
+- Default: "1/16".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRollRate`.*
+
+##### `ce.components.drumpads.rollSync(target [, rollSync]) -> boolean`
+
+Roll in time with the Transport, or at a fixed speed.
+
+Example: `ce.components.drumpads.rollSync("DrumPads")` switches the roll sync on if it is off, and off if it is on.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `rollSync` (true or false, optional): true: at `rollRate()` against the Transport's tempo.<br>false: at `rollHz()`.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- With no tempo to follow: `rollHz()` either way.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRollSync`.*
+
+##### `ce.components.drumpads.rollHz(target, rollHz) -> boolean`
+
+Set how fast a rolling pad strikes while it is not synced.
+
+Example: `ce.components.drumpads.rollHz("DrumPads", 12)` rolls at 12 strikes a second.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `rollHz` (number, required): Strikes per second.<br>Range: 0.5 ↔ 50.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 8.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRollHz`.*
+
+##### `ce.components.drumpads.rollDelay(target, rollDelay) -> boolean`
+
+Set how long a pad is held before its roll begins.
+
+Example: `ce.components.drumpads.rollDelay("DrumPads", 250)` starts the roll after a quarter of a second.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `rollDelay` (number, required): Milliseconds.<br>0: it rolls from the first strike.<br>Range: 0 ↔ 4000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRollDelay`.*
+
+##### `ce.components.drumpads.rollVelocity(target, rollVelocity) -> boolean`
+
+Set how hard a roll strikes after the first hit.
+
+Example: `ce.components.drumpads.rollVelocity("DrumPads", 0.5)` strikes the repeats at half the first hit's velocity.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `rollVelocity` (number, required): Part of the first hit's velocity.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.75.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsRollVelocity`.*
+
+##### `ce.components.drumpads.zones(target [, zones]) -> boolean`
+
+Let the corners of every pad do their own actions.
+
+Example: `ce.components.drumpads.zones("DrumPads")` switches the zones on if they are off, and off if they are on.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `zones` (true or false, optional): true: a hit in a corner does what its corner command says.<br>false: every hit is a plain hit.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsZones`.*
+
+##### `ce.components.drumpads.cornerSize(target, cornerSize) -> boolean`
+
+Set how much of a pad each corner covers.
+
+Example: `ce.components.drumpads.cornerSize("DrumPads", 0.2)` makes each corner a fifth of the pad each way.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `cornerSize` (number, required): Part of the pad's width and of its height, in from the corner.<br>Range: 0.05 ↔ 0.45: the middle is always a plain hit.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.28.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsCornerSize`.*
+
+##### `ce.components.drumpads.cornerTopLeft(target, cornerTopLeft) -> boolean`
+
+Set what a hit in the top left corner of a pad does.
+
+Example: `ce.components.drumpads.cornerTopLeft("DrumPads", "flam")` plays a flam from the top left corner.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `cornerTopLeft` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `zones()` is on.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsCornerTopLeft`.*
+
+##### `ce.components.drumpads.cornerTopRight(target, cornerTopRight) -> boolean`
+
+Set what a hit in the top right corner of a pad does.
+
+Example: `ce.components.drumpads.cornerTopRight("DrumPads", "flam")` plays a flam from the top right corner.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `cornerTopRight` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `zones()` is on.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsCornerTopRight`.*
+
+##### `ce.components.drumpads.cornerBottomLeft(target, cornerBottomLeft) -> boolean`
+
+Set what a hit in the bottom left corner of a pad does.
+
+Example: `ce.components.drumpads.cornerBottomLeft("DrumPads", "flam")` plays a flam from the bottom left corner.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `cornerBottomLeft` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `zones()` is on.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsCornerBottomLeft`.*
+
+##### `ce.components.drumpads.cornerBottomRight(target, cornerBottomRight) -> boolean`
+
+Set what a hit in the bottom right corner of a pad does.
+
+Example: `ce.components.drumpads.cornerBottomRight("DrumPads", "flam")` plays a flam from the bottom right corner.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `cornerBottomRight` (text, required): "none": a plain hit.<br>"roll": rolls while held, as `roll()` does.<br>"flam": a grace note `flamMs()` before the hit, at `ghostVelocity()`.<br>"choke": silences the pad's choke group, and plays nothing.<br>"accent": at `velocity()`, wherever the pad is struck.<br>"ghost": at `ghostVelocity()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `zones()` is on.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsCornerBottomRight`.*
+
+##### `ce.components.drumpads.flamMs(target, flamMs) -> boolean`
+
+Set how long before the main hit a flam's grace note lands.
+
+Example: `ce.components.drumpads.flamMs("DrumPads", 30)` lands the grace note 30 ms early.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `flamMs` (number, required): Milliseconds.<br>Range: 1 ↔ 500, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 22.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsFlamMs`.*
+
+##### `ce.components.drumpads.ghostVelocity(target, ghostVelocity) -> boolean`
+
+Set how hard a ghost hit, and a flam's grace note, is struck.
+
+Example: `ce.components.drumpads.ghostVelocity("DrumPads", 0.2)` strikes ghost notes at a fifth of the velocity.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `ghostVelocity` (number, required): Part of the velocity the hit would have had.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.35.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsGhostVelocity`.*
+
+##### `ce.components.drumpads.editable(target [, editable]) -> boolean`
+
+Let the pads be struck by touch, or not.
+
+Example: `ce.components.drumpads.editable("DrumPads")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `editable` (true or false, optional): true: a hit plays a pad; a drag across the grid rolls through them.<br>false: hits do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsEditable`.*
+
+##### `ce.components.drumpads.showNotes(target [, showNotes]) -> boolean`
+
+Show or hide the MIDI note number on each pad.
+
+Example: `ce.components.drumpads.showNotes("DrumPads")` shows the notes if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `showNotes` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsShowNotes`.*
+
+##### `ce.components.drumpads.showLabels(target [, showLabels]) -> boolean`
+
+Show or hide the name on each pad.
+
+Example: `ce.components.drumpads.showLabels("DrumPads")` shows the labels if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `showLabels` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- A pad too small for its name shows none either way.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsShowLabels`.*
+
+##### `ce.components.drumpads.showHeader(target [, showHeader]) -> boolean`
+
+Show or hide the strip above the pads: the map, the grid and the last hit.
+
+Example: `ce.components.drumpads.showHeader("DrumPads")` shows the header if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `showHeader` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsShowHeader`.*
+
+##### `ce.components.drumpads.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.drumpads.read("DrumPads")` gives every setting as a table.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "choke")`: the whole list; `read(target, "choke", 3)`: one pad, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `drumPadsRead`.*
+
+##### `ce.components.drumpads.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.drumpads.size("DrumPads")` gives the length of every list as a table.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "choke")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `drumPadsSize`.*
+
+##### `ce.components.drumpads.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.drumpads.fill("DrumPads", "note", {32, 64, 95})` writes pads 1 to 3.
+
+- `target` (control name, required): The Drum Pads's control, by name.<br>Not a Drum Pads: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `drumPadsFill`.*
+
+#### ce.components.phrase: Phrase Sequencer
+
+A step grid whose rows are the notes of a scale.
+
+##### `ce.components.phrase.seed(target, seed)`
+
+Fill the grid with a pattern: "clear", "octaves", "arpUp", "riff", "random".
+
+Example: `ce.components.phrase.seed("Phrase", "riff")` fills the grid with a riff.
+
+- `seed` (text, required): "clear": empty.<br>"octaves": the root and the octave above, by turns.<br>"arpUp": the chord walked upward across the bar.<br>"riff": a one-bar line, off the beat, with ties.<br>"random": a note of the scale on each step.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- What the grid held is replaced.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseSeed`.*
+
+##### `ce.components.phrase.clear(target)`
+
+Empty the grid.
+
+Example: `ce.components.phrase.clear("Phrase")` switches every cell off.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseClear`.*
+
+##### `ce.components.phrase.key(target, key)`
+
+Set the key its rows play in.
+
+Example: `ce.components.phrase.key("Phrase", "D")` plays the pattern in D.
+
+- `key` (number, required): The key's note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Row 1 is the key's note; each row up is the next step of the scale.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseKey`.*
+
+##### `ce.components.phrase.scale(target, scale)`
+
+Set the scale its rows play.
+
+Example: `ce.components.phrase.scale("Phrase", "dorian")` plays the pattern in the dorian mode.
+
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseScale`.*
+
+##### `ce.components.phrase.transpose(target, semitones)`
+
+Transpose what the pattern plays, leaving the grid as it is.
+
+Example: `ce.components.phrase.transpose("Phrase", 12)` plays the pattern an octave up.
+
+- `semitones` (number, required): Semitones: 12 an octave up.<br>Range: -48 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseTranspose`.*
+
+##### `ce.components.phrase.direction(target, direction)`
+
+Set the order it plays the steps in: "forward", "reverse", "pingpong", "random".
+
+Example: `ce.components.phrase.direction("Phrase", "pingpong")` plays forward and back.
+
+- `direction` (text, required): "forward": first to last.<br>"reverse": last to first.<br>"pingpong": forward, then back.<br>"random": a step at random each time.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseDirection`.*
+
+##### `ce.components.phrase.run(target, running)`
+
+Start or stop the sequencer.
+
+Example: `ce.components.phrase.run("Phrase", false)` stops the sequencer.
+
+- `running` (true or false, required): true: it plays.<br>false: it stops.<br>Left out: it plays.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseRun`.*
+
+##### `ce.components.phrase.cell(target, step, row, on)`
+
+Switch one cell of the grid on or off.
+
+Example: `ce.components.phrase.cell("Phrase", 1, 3, true)` plays row 3 on the first step.
+
+- `step` (number, required): Step, counted from 1, left to right.<br>A fraction: rounded.<br>Not a step of the grid: rejected with a console error.
+- `row` (number, required): Row, counted from 1, from the bottom: a step of the scale; a semitone in chromatic mode, set in the inspector.<br>A fraction: rounded.<br>Not a row of the grid: rejected with a console error.
+- `on` (true or false, required): true: on.<br>false: off.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `phraseCell`.*
+
+##### `ce.components.phrase.read(target [, field])`
+
+Read the Phrase Sequencer's settings.
+
+Example: `ce.components.phrase.read("Phrase", "key")` gives the key, 0 being C.
+
+- `field` (text, optional): A setting's name, in any case, such as "key" or "pattern".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- Returns the value.
+
+*Short name: `phraseRead`.*
+
+#### ce.components.recorder: Phrase Recorder
+
+Records what you play and loops it back.
+
+##### `ce.components.recorder.record(target [, on])`
+
+Arm the recorder, or stop it.
+
+Example: `ce.components.recorder.record("Recorder")` arms it, or stops it if it is armed or recording.
+
+- `on` (true or false, optional): true: armed; it records from the top of the next loop, after `countIn()`.<br>false: stopped.<br>Left out: armed if stopped, stopped if armed or recording.
+
+Good to know:
+
+- A take that has notes is recorded over: layered on, until it is stopped.
+- Returns true. Already that way: true, with a console line.
+
+*Short name: `recorderRecord`.*
+
+##### `ce.components.recorder.stop(target)`
+
+Stop recording, or arming.
+
+Example: `ce.components.recorder.stop("Recorder")` stops recording; the loop goes on playing.
+
+Good to know:
+
+- The take plays on: `play(target, false)` stops it.
+- Returns true. Already stopped: true, with a console line.
+
+*Short name: `recorderStop`.*
+
+##### `ce.components.recorder.play(target [, playing])`
+
+Start or stop playing the take.
+
+Example: `ce.components.recorder.play("Recorder", false)` silences the take.
+
+- `playing` (true or false, optional): true: it plays.<br>false: it is silent.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+
+*Short name: `recorderPlay`.*
+
+##### `ce.components.recorder.clear(target)`
+
+Delete the take.
+
+Example: `ce.components.recorder.clear("Recorder")` empties the take.
+
+Good to know:
+
+- The stored slots are kept.
+- Returns true. Recording, or no take: false, with a console error.
+
+*Short name: `recorderClear`.*
+
+##### `ce.components.recorder.undo(target)`
+
+Delete the last pass recorded over the take.
+
+Example: `ce.components.recorder.undo("Recorder")` takes away what the last pass added.
+
+Good to know:
+
+- Returns true. Recording, or no take: false, with a console error.
+
+*Short name: `recorderUndo`.*
+
+##### `ce.components.recorder.quantize(target, grid [, strength, scale, key])`
+
+Move the take's notes toward a grid, and into a key.
+
+Example: `ce.components.recorder.quantize("Recorder", 16, 1)` puts every note on a sixteenth of the loop.
+
+- `grid` (number, required): Divisions of the loop: 16 over one bar is sixteenth notes.<br>Range: 1 ↔ 64, whole.<br>Outside the range: the nearest end.<br>Text, such as "1/16": rejected with a console error.
+- `strength` (number, optional): How far each note moves: 1 onto the grid, 0.5 halfway, 0 not at all.<br>Range: 0 ↔ 1.<br>Left out: the inspector's Strength, 0 unless it is set, which moves nothing.
+- `scale` (text, optional): With `key`, notes outside the key are moved to the nearest in it, ties down.<br>One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Left out, with `key` given: the inspector's scale.<br>Any other: rejected with a console error.
+- `key` (text, optional): The key's note: a name, such as "F#", in any case, or a number round the octave, 0 being C.<br>Left out, with `scale` given: the inspector's key.<br>Both left out: the pitches are kept.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- The lengths are kept.
+- Returns true. Recording, or no take: false, with a console error.
+
+*Short name: `recorderQuantize`.*
+
+##### `ce.components.recorder.transpose(target, semitones)`
+
+Transpose what the take plays, leaving the take as recorded.
+
+Example: `ce.components.recorder.transpose("Recorder", -12)` plays the take an octave down.
+
+- `semitones` (number, required): Semitones: 12 an octave up.<br>Range: -48 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- `shift()` changes the notes of the take itself.
+- Returns true. Already that way: true, with a console line.
+
+*Short name: `recorderTranspose`.*
+
+##### `ce.components.recorder.bars(target, bars)`
+
+Set how many bars the loop is, while it follows the Transport.
+
+Example: `ce.components.recorder.bars("Recorder", 4)` makes the loop four bars long.
+
+- `bars` (number, required): Bars.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Following the Transport is set in the inspector; otherwise the loop is a length in seconds.
+- Returns true. Already that way: true, with a console line.
+
+*Short name: `recorderBars`.*
+
+##### `ce.components.recorder.source(target, source)`
+
+Set where the notes it records come from: "input", "panel", "both".
+
+Example: `ce.components.recorder.source("Recorder", "input")` records only the keyboard played into it.
+
+- `source` (text, required): "input": the MIDI input.<br>"panel": the panel's own note controls, such as a Chord Pad.<br>"both": either.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+
+*Short name: `recorderSource`.*
+
+##### `ce.components.recorder.nudge(target, by)`
+
+Move every note of the take earlier or later.
+
+Example: `ce.components.recorder.nudge("Recorder", -0.005)` moves a late take a little earlier.
+
+- `by` (number, required): Part of the loop: 0.01 is a hundredth later; below 0, earlier.<br>Past the end of the loop: round to its start.<br>0, or not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Recording, or no take: false, with a console error.
+
+*Short name: `recorderNudge`.*
+
+##### `ce.components.recorder.shift(target, semitones)`
+
+Transpose the notes of the take itself.
+
+Example: `ce.components.recorder.shift("Recorder", 7)` moves the take up a fifth.
+
+- `semitones` (number, required): Semitones: 12 an octave up.<br>A fraction: rounded.<br>A note that would pass 0 or 127: deleted.<br>0, or not a number: rejected with a console error.
+
+Good to know:
+
+- Its timing is kept: nothing is quantized.
+- `transpose()` changes only what it plays.
+- Returns true. Recording, or no take: false, with a console error.
+
+*Short name: `recorderShift`.*
+
+##### `ce.components.recorder.store(target, slot [, name])`
+
+Keep a copy of the take in a slot.
+
+Example: `ce.components.recorder.store("Recorder", 2, "Verse")` keeps the take in slot 2, called Verse.
+
+- `slot` (number, required): Slot, counted from 1.<br>Range: 1 ↔ 8.<br>A fraction: rounded.<br>Any other: rejected with a console error.
+- `name` (text, optional): The slot's name.<br>Left out: its name as it was; a new slot is "Take" and its number.
+
+Good to know:
+
+- A slot that holds a take: replaced.
+- Returns true. Recording: false, with a console error.
+
+*Short name: `recorderStore`.*
+
+##### `ce.components.recorder.load(target, slot)`
+
+Make a stored take the take.
+
+Example: `ce.components.recorder.load("Recorder", 2)` plays the take stored in slot 2.
+
+- `slot` (number, required): Slot, counted from 1.<br>A fraction: rounded.<br>A slot that holds no take: rejected with a console error.
+
+Good to know:
+
+- A copy: the slot is kept as it was.
+- Returns true. Recording: false, with a console error.
+
+*Short name: `recorderLoad`.*
+
+##### `ce.components.recorder.countIn(target, bars)`
+
+Set how many bars it waits, once armed, before it records.
+
+Example: `ce.components.recorder.countIn("Recorder", 1)` waits a bar before recording.
+
+- `bars` (number, required): Bars.<br>0: none; it records from the top of the next loop.<br>Range: 0 ↔ 4, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Counted in whole loops: a loop longer than the count-in waits one loop.
+- Returns true. Already that way: true, with a console line.
+
+*Short name: `recorderCountIn`.*
+
+##### `ce.components.recorder.read(target [, field])`
+
+Read the Phrase Recorder's settings and take.
+
+Example: `ce.components.recorder.read("Recorder", "state")` gives "idle", "armed", "recording" or "overdub".
+
+- `field` (text, optional): A setting's name, in any case, such as "state" or "take".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- "take": { events }, each note { t, note, velocity, dur, pass }, `t` and `dur` as parts of the loop.
+- Returns the value.
+
+*Short name: `recorderRead`.*
+
+#### ce.components.harmony: Harmoniser
+
+Turns one played note into a whole chord.
+
+##### `ce.components.harmony.mode(target, mode)`
+
+Set how it builds the harmony: "diatonic", "memory".
+
+Example: `ce.components.harmony.mode("Harmoniser", "memory")` plays one chord shape on every note.
+
+- `mode` (text, required): "diatonic": the chord the played note's step of the key has; always in the key.<br>"memory": a fixed shape, `shape()`, on whatever note is played, in the key or not.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyMode`.*
+
+##### `ce.components.harmony.key(target, key)`
+
+Set the key it harmonises in.
+
+Example: `ce.components.harmony.key("Harmoniser", "Bb")` harmonises in B♭.
+
+- `key` (number, required): The key's note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyKey`.*
+
+##### `ce.components.harmony.scale(target, scale)`
+
+Set the scale it harmonises in.
+
+Example: `ce.components.harmony.scale("Harmoniser", "minor")` harmonises in the minor key.
+
+- `scale` (text, required): One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyScale`.*
+
+##### `ce.components.harmony.size(target, size)`
+
+Set how many notes each chord has.
+
+Example: `ce.components.harmony.size("Harmoniser", 4)` plays seventh chords.
+
+- `size` (number, required): Notes: 3 a triad, 4 a seventh chord.<br>Range: 2 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonySize`.*
+
+##### `ce.components.harmony.shape(target, shape)`
+
+Set the chord shape it plays: "major", "minor", "sus4", "maj7", "min7", "fifths", "octaves", or a list of intervals.
+
+Example: `ce.components.harmony.shape("Harmoniser", "min7")` plays a minor seventh on every note.
+
+- `shape` (text, required): A shape by name, case-insensitive; or a list of semitones above the played note, such as {0, 4, 7}, -36 to 36 each, 6 at most.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "memory".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyShape`.*
+
+##### `ce.components.harmony.voicing(target, voicing)`
+
+Set how the notes of each chord are spread: "close", "open", "drop2".
+
+Example: `ce.components.harmony.voicing("Harmoniser", "open")` spreads each chord wider.
+
+- `voicing` (text, required): "close": as close together as they go.<br>"open": the middle note an octave up.<br>"drop2": the second note from the top an octave down.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyVoicing`.*
+
+##### `ce.components.harmony.inversion(target, inversion)`
+
+Set which note of each chord is lowest.
+
+Example: `ce.components.harmony.inversion("Harmoniser", 1)` puts the third lowest.
+
+- `inversion` (number, required): 0: the root lowest. 1: the third. 2: the fifth. 3: the seventh.<br>Past the chord's notes: the highest inversion it has, 2 for a triad.<br>Range: 0 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyInversion`.*
+
+##### `ce.components.harmony.octave(target, octave)`
+
+Move the added notes by whole octaves.
+
+Example: `ce.components.harmony.octave("Harmoniser", -1)` puts the harmony an octave below.
+
+- `octave` (number, required): Octaves: 1 up, -1 down.<br>Range: -3 ↔ 3, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- The played note stays where it is.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyOctave`.*
+
+##### `ce.components.harmony.outOfKey(target, mode)`
+
+Set what a played note outside the key does: "pass", "nearest", "mute".
+
+Example: `ce.components.harmony.outOfKey("Harmoniser", "nearest")` harmonises a wrong note as the nearest right one.
+
+- `mode` (text, required): "pass": the note sounds alone, without harmony.<br>"nearest": harmonised as the nearest note of the key.<br>"mute": nothing sounds.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyOutOfKey`.*
+
+##### `ce.components.harmony.keepPlayed(target [, keep])`
+
+Sound the played note with its harmony, or only the harmony.
+
+Example: `ce.components.harmony.keepPlayed("Harmoniser", false)` plays the harmony without the note played.
+
+- `keep` (true or false, optional): true: the played note sounds too.<br>false: only the added notes.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyKeepPlayed`.*
+
+##### `ce.components.harmony.channel(target, channel)`
+
+Set the MIDI channel the chords play on.
+
+Example: `ce.components.harmony.channel("Harmoniser", 2)` plays the chords on channel 2.
+
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyChannel`.*
+
+##### `ce.components.harmony.voiceLeading(target, mode)`
+
+Set how each chord moves from the one before: "off", "closest", "smooth".
+
+Example: `ce.components.harmony.voiceLeading("Harmoniser", "closest")` keeps the chords close together.
+
+- `mode` (text, required): "off": each chord as `inversion()` sets it.<br>"closest": the notes move as little as they can, all together.<br>"smooth": the top note moves as little as it can.<br>Case-insensitive.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyVoiceLeading`.*
+
+##### `ce.components.harmony.strum(target, ms)`
+
+Spread the notes of each chord out in time, as a strum.
+
+Example: `ce.components.harmony.strum("Harmoniser", 60)` strums each chord over 60 ms.
+
+- `ms` (number, required): Milliseconds from the first note to the last.<br>0: all together.<br>Range: 0 ↔ 400.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Up or down: set in the inspector.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyStrum`.*
+
+##### `ce.components.harmony.degree(target, degree, chord)`
+
+Play a chord of your own on one step of the key.
+
+Example: `ce.components.harmony.degree("Harmoniser", 6, {0, 5, 7})` plays a sus4 on the sixth step.
+
+- `degree` (number, required): Step of the scale, counted from 1.<br>A fraction: rounded.<br>Not a step of the scale: rejected with a console error.
+- `chord` (text, required): Semitones above the step's note, such as {0, 5, 7}, -36 to 36 each, 6 at most.<br>"clear": the key's own chord again.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- While `mode()` is "diatonic".
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `harmonyDegree`.*
+
+##### `ce.components.harmony.read(target [, field])`
+
+Read the Harmoniser's settings.
+
+Example: `ce.components.harmony.read("Harmoniser", "mode")` gives "diatonic" or "memory".
+
+- `field` (text, optional): A setting's name, in any case, such as "mode" or "degreeChords".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- Returns the value.
+
+*Short name: `harmonyRead`.*
+
 
 ### Movement and randomness
 
 Components that keep changing on their own.
 
-- **Turing Machine** — `ce.components.turing`. Drive the Turing Machine: run, rate, length, randomness, and individual steps. Commands: `run`, `rate`, `division`, `sync`, `length`, `randomness`, `quantize`, `gate`, `step`, `phase`, `editable`, `showGate`, `showDivisions`, `read`, `size`, `fill`.
-- **Looper** — `ce.components.looper`. Drive the Looper: run, loop length, sync, and per-lane enable. Commands: `run`, `seconds`, `bars`, `sync`, `quantize`, `lane`, `laneRest`, `phase`, `editable`, `showPlayhead`, `showGrid`, `showDivisions`, `read`, `size`, `fill`, `insert`, `remove`.
-- **Orbit** — `ce.components.orbit`. Drive the Orbit: run, rate, phase, and each node's radius, angle and depth. Commands: `run`, `rate`, `bars`, `sync`, `phase`, `node`, `nodeRadius`, `nodeAngle`, `nodeRatio`, `nodeDepth`, `editable`, `showTrails`, `showSpokes`, `showRings`, `showValues`, `read`, `size`, `fill`, `insert`, `remove`.
-- **Kinetic** — `ce.components.kinetic`. Drive the Kinetic field: run, gravity, bounce, friction — and launch the ball. Commands: `run`, `sync`, `gravity`, `bounce`, `friction`, `keepAlive`, `launch`, `velocity`, `editable`, `showTrail`, `showWalls`, `read`.
-- **Constellation** — `ce.components.constellation`. Move the Constellation probe, change how it blends, and let it wander. Commands: `probe`, `mode`, `blend`, `run`, `rate`, `sync`, `bars`, `links`, `editable`, `showLinks`, `showField`, `showLabels`, `read`.
-- **Timbre Pad** — `ce.components.timbre`. Move the Timbre puck and change how sharply it favours the nearest anchor. Commands: `move`, `power`, `anchorX`, `anchorY`, `axisX`, `axisY`, `editable`, `showField`, `showAnchors`, `showReadout`, `read`, `size`, `fill`, `insert`, `remove`.
+#### ce.components.turing: Turing Machine
+
+Run a loop of stepped values that can change as it comes round: its speed, length, randomness, output levels and gate, and each step.
+
+##### `ce.components.turing.run(target [, run]) -> boolean`
+
+Start or stop the sequence.
+
+Example: `ce.components.turing.run("Turing", false)` stops it on the step it is at.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `run` (true or false, optional): true: it advances.<br>false: it holds its step.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Synced: it advances only while the Transport runs.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingRun`.*
+
+##### `ce.components.turing.rate(target, rate) -> boolean`
+
+Set how many steps a second it advances, while not synced.
+
+Example: `ce.components.turing.rate("Turing", 4)` advances four steps a second.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `rate` (number, required): Steps per second.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced to the Transport: no effect; `division()` sets the step.
+- The inspector stops at 30.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingRate`.*
+
+##### `ce.components.turing.division(target, division) -> boolean`
+
+Set how long a step is while synced to the Transport.
+
+Example: `ce.components.turing.division("Turing", "1/16")` advances a step every sixteenth note.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `division` (text, required): One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `sync()` is on.
+- Default: "1/8".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingDivision`.*
+
+##### `ce.components.turing.sync(target [, sync]) -> boolean`
+
+Follow the Transport, or run at its own rate.
+
+Example: `ce.components.turing.sync("Turing")` switches the sync to transport on if it is off, and off if it is on.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `sync` (true or false, optional): true: a step every `division()`, where the Transport's position puts it.<br>false: at `rate()`.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingSync`.*
+
+##### `ce.components.turing.length(target, length) -> boolean`
+
+Set how many steps the loop has.
+
+Example: `ce.components.turing.length("Turing", 16)` makes the loop sixteen steps long.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `length` (number, required): Steps.<br>Range: 2 ↔ 64, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A step added by a longer loop starts at 0.
+- Default: 8.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingLength`.*
+
+##### `ce.components.turing.randomness(target, randomness) -> boolean`
+
+Set how likely a step is to change as the loop comes round to it.
+
+Example: `ce.components.turing.randomness("Turing", 0.1)` lets the loop change slowly.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `randomness` (number, required): Chance a step is given a new value, each time it is reached.<br>0: a locked loop.<br>1: a new value every step.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.25.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingRandomness`.*
+
+##### `ce.components.turing.quantize(target, quantize) -> boolean`
+
+Set how many levels each step's output is snapped to.
+
+Example: `ce.components.turing.quantize("Turing", 2)` makes every step's output on or off.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `quantize` (number, required): Levels, spread evenly from 0 to 1.<br>0 or 1: not snapped.<br>2: 0 or 1.<br>Range: 0 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The output only: the steps keep their own values.
+- The inspector stops at 24.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingQuantize`.*
+
+##### `ce.components.turing.gate(target, gate) -> boolean`
+
+Set the level at which a step opens the gate.
+
+Example: `ce.components.turing.gate("Turing", 0.7)` opens the gate only at the higher steps.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `gate` (number, required): Level: the gate output is 1 at a step at or above it, 0 below.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingGate`.*
+
+##### `ce.components.turing.step(target, index, value) -> boolean`
+
+Set the value of one step, by its number.
+
+Example: `ce.components.turing.step("Turing", 3, 0.75)` sets step 3 to 0.75.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `index` (number, required): Step number, counted from 1.<br>A fraction: rounded.<br>Not one of the steps: rejected with a console error.
+- `value` (number, required): Value.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A running loop goes on from the steps as they now are; `randomness()` can change them as it comes round.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingStep`.*
+
+##### `ce.components.turing.phase(target, phase) -> boolean`
+
+Move the loop to a point in its sequence.
+
+Example: `ce.components.turing.phase("Turing", 0.5)` moves it halfway through its loop.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `phase` (number, required): Where in the loop: 0 the start, 0.5 halfway.<br>1: the start again.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Running: it advances from there. Stopped: it starts from there.
+- While synced: no effect; the Transport's position decides.
+- `read(target, "phase")` gives where it is now.
+- Nothing is written to the panel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingPhase`.*
+
+##### `ce.components.turing.editable(target [, editable]) -> boolean`
+
+Let the steps be drawn by dragging, or not.
+
+Example: `ce.components.turing.editable("Turing")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `editable` (true or false, optional): true: a drag across the bars sets the steps.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingEditable`.*
+
+##### `ce.components.turing.showGate(target [, showGate]) -> boolean`
+
+Show or hide the row of gate dots under the steps.
+
+Example: `ce.components.turing.showGate("Turing")` shows the gate if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `showGate` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingShowGate`.*
+
+##### `ce.components.turing.showDivisions(target [, showDivisions]) -> boolean`
+
+Show or hide the level lines across the steps.
+
+Example: `ce.components.turing.showDivisions("Turing")` shows the divisions if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `showDivisions` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How many: set in the inspector, under Divisions.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingShowDivisions`.*
+
+##### `ce.components.turing.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.turing.read("Turing")` gives every setting as a table.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- `read(target, "phase")`: where it is now.
+- `read(target, "step")`: every step; `read(target, "step", 3)`: one.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `turingRead`.*
+
+##### `ce.components.turing.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.turing.size("Turing")` gives the length of every list as a table.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "step")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `turingSize`.*
+
+##### `ce.components.turing.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.turing.fill("Turing", "step", {0.25, 0.5, 0.75})` writes steps 1 to 3.
+
+- `target` (control name, required): The Turing Machine's control, by name.<br>Not a Turing Machine: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `turingFill`.*
+
+#### ce.components.looper: Looper
+
+Loop movements recorded by hand, each lane sending its value round the loop: the loop's length and sync, and each lane.
+
+##### `ce.components.looper.run(target [, run]) -> boolean`
+
+Start or stop the loop.
+
+Example: `ce.components.looper.run("Looper", false)` stops the loop where it is.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `run` (true or false, optional): true: it plays.<br>false: it stops where it is.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Synced: it plays only while the Transport runs.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperRun`.*
+
+##### `ce.components.looper.seconds(target, seconds) -> boolean`
+
+Set how long the loop is while not synced.
+
+Example: `ce.components.looper.seconds("Looper", 8)` makes the loop eight seconds long.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `seconds` (number, required): Seconds.<br>Range: 0.05 ↔ 600.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced to the Transport: no effect; `bars()` sets the loop.
+- The inspector takes 0.1 to 60.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperSeconds`.*
+
+##### `ce.components.looper.bars(target, bars) -> boolean`
+
+Set how many bars the loop is while synced to the Transport.
+
+Example: `ce.components.looper.bars("Looper", 4)` makes the loop four bars long.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `bars` (number, required): Bars: 0.25 is one beat in 4/4.<br>Range: 0.25 ↔ 64.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `sync()` is on.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperBars`.*
+
+##### `ce.components.looper.sync(target [, sync]) -> boolean`
+
+Follow the Transport, or loop in its own time.
+
+Example: `ce.components.looper.sync("Looper")` switches the sync to transport on if it is off, and off if it is on.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `sync` (true or false, optional): true: the loop is `bars()` long, and starts on the bar line.<br>false: `seconds()` long.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Synced: the grid in each lane marks the bars and beats.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperSync`.*
+
+##### `ce.components.looper.quantize(target [, quantize]) -> boolean`
+
+Round the loop's length to whole beats at the panel's tempo, or not.
+
+Example: `ce.components.looper.quantize("Looper")` switches the quantize loop on if it is off, and off if it is on.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `quantize` (true or false, optional): true: `seconds()` is played to the nearest whole beat, one beat at least.<br>false: as set.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- While not synced; `seconds()` keeps the number set.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperQuantize`.*
+
+##### `ce.components.looper.lane(target, index [, enabled]) -> boolean`
+
+Switch one lane on or off, by its number.
+
+Example: `ce.components.looper.lane("Looper", 2, false)` holds lane 2 at its rest value.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `index` (number, required): Lane number, counted from 1.<br>A fraction: rounded.<br>Not one of the lanes: rejected with a console error.
+- `enabled` (true or false, optional): true: it plays its recording.<br>false: it sends its rest value, and is drawn faded.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperLane`.*
+
+##### `ce.components.looper.laneRest(target, index, rest) -> boolean`
+
+Set the value one lane sends while it has no recording or is off, by its number.
+
+Example: `ce.components.looper.laneRest("Looper", 1, 0.5)` makes lane 1 send 0.5 until something is recorded.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `index` (number, required): Lane number, counted from 1.<br>A fraction: rounded.<br>Not one of the lanes: rejected with a console error.
+- `rest` (number, required): Value.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A recording is made by dragging across the lane: left to right is the loop, the height the value.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperLaneRest`.*
+
+##### `ce.components.looper.phase(target, phase) -> boolean`
+
+Move the loop to a point in its length.
+
+Example: `ce.components.looper.phase("Looper", 0)` moves the loop back to its start.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `phase` (number, required): Where in the loop: 0 the start, 0.5 halfway.<br>1: the start again.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Running: it plays on from there. Stopped: it starts from there, and its lanes send their values there.
+- While synced: no effect; the Transport's position decides.
+- `read(target, "phase")` gives where it is now.
+- Nothing is written to the panel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperPhase`.*
+
+##### `ce.components.looper.editable(target [, editable]) -> boolean`
+
+Let a lane be recorded by dragging, or not.
+
+Example: `ce.components.looper.editable("Looper")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `editable` (true or false, optional): true: a drag across a lane records it, replacing what it had.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperEditable`.*
+
+##### `ce.components.looper.showPlayhead(target [, showPlayhead]) -> boolean`
+
+Show or hide the line that moves across the lanes as the loop plays.
+
+Example: `ce.components.looper.showPlayhead("Looper")` shows the playhead if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `showPlayhead` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperShowPlayhead`.*
+
+##### `ce.components.looper.showGrid(target [, showGrid]) -> boolean`
+
+Show or hide the time lines across the lanes.
+
+Example: `ce.components.looper.showGrid("Looper")` shows the grid if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Quarters of the loop; while synced, its bars and beats.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperShowGrid`.*
+
+##### `ce.components.looper.showDivisions(target [, showDivisions]) -> boolean`
+
+Show or hide the level lines across each lane.
+
+Example: `ce.components.looper.showDivisions("Looper")` shows the divisions if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `showDivisions` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How many: set in the inspector, under Major and Minor.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperShowDivisions`.*
+
+##### `ce.components.looper.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.looper.read("Looper")` gives every setting as a table.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- `read(target, "phase")`: where it is now.
+- `read(target, "laneRest")`: every lane's; `read(target, "laneRest", 2)`: one.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `looperRead`.*
+
+##### `ce.components.looper.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.looper.size("Looper")` gives the length of every list as a table.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "lane")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `looperSize`.*
+
+##### `ce.components.looper.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.looper.fill("Looper", "lane", {true, false, true})` writes lanes 1 to 3.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperFill`.*
+
+##### `ce.components.looper.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.looper.insert("Looper", "lane")` adds a lane at the end.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperInsert`.*
+
+##### `ce.components.looper.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.looper.remove("Looper", "lane")` removes the last lane.
+
+- `target` (control name, required): The Looper's control, by name.<br>Not a Looper: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `looperRemove`.*
+
+#### ce.components.orbit: Orbit
+
+Turn satellites round a centre as modulation sources, each sending a value from where it is: their speed, and each one's orbit and depth.
+
+##### `ce.components.orbit.run(target [, run]) -> boolean`
+
+Start or stop the satellites.
+
+Example: `ce.components.orbit.run("Orbit", false)` stops the satellites where they are.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `run` (true or false, optional): true: they turn.<br>false: they stop where they are.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Synced: they turn only while the Transport runs.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitRun`.*
+
+##### `ce.components.orbit.rate(target, rate) -> boolean`
+
+Set how many cycles a second it turns, while not synced.
+
+Example: `ce.components.orbit.rate("Orbit", 0.5)` turns once every two seconds.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `rate` (number, required): Cycles per second. In one cycle a node turns as many times as `nodeRatio()` says.<br>Range: 0.1 ↔ 40.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced to the Transport: no effect; `bars()` sets the cycle.
+- The inspector stops at 10.
+- Default: 0.25.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitRate`.*
+
+##### `ce.components.orbit.bars(target, bars) -> boolean`
+
+Set how many bars one cycle takes while synced to the Transport.
+
+Example: `ce.components.orbit.bars("Orbit", 2)` turns once every two bars.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `bars` (number, required): Bars: 0.25 is one beat in 4/4.<br>Range: 0.25 ↔ 64.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `sync()` is on.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitBars`.*
+
+##### `ce.components.orbit.sync(target [, sync]) -> boolean`
+
+Follow the Transport, or turn at its own rate.
+
+Example: `ce.components.orbit.sync("Orbit")` switches the sync to transport on if it is off, and off if it is on.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `sync` (true or false, optional): true: a cycle every `bars()`, where the Transport's position puts it.<br>false: at `rate()`.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitSync`.*
+
+##### `ce.components.orbit.phase(target, phase) -> boolean`
+
+Move the satellites to a point in their cycle.
+
+Example: `ce.components.orbit.phase("Orbit", 0)` puts every satellite back where its angle starts it.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `phase` (number, required): Where in the cycle: 0 the start, 0.5 halfway.<br>1: the start again.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Running: they turn on from there. Stopped: they start from there.
+- While synced: no effect; the Transport's position decides.
+- `read(target, "phase")` gives where it is now.
+- Nothing is written to the panel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitPhase`.*
+
+##### `ce.components.orbit.node(target, index [, enabled]) -> boolean`
+
+Switch one node on or off, by its number.
+
+Example: `ce.components.orbit.node("Orbit", 2, false)` silences node 2.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `enabled` (true or false, optional): true: it turns and sends.<br>false: it sends 0 and is drawn as an outline.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNode`.*
+
+##### `ce.components.orbit.nodeRadius(target, index, radius) -> boolean`
+
+Set how far from the centre one node turns, by its number.
+
+Example: `ce.components.orbit.nodeRadius("Orbit", 1, 0.5)` puts node 1 halfway out.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `radius` (number, required): Distance: 0 the centre, 1 the edge.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A node that sends its radius sends this; one that sends its place across or its height swings wider at a larger radius.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeRadius`.*
+
+##### `ce.components.orbit.nodeAngle(target, index, angle) -> boolean`
+
+Set where one node starts its orbit, by its number.
+
+Example: `ce.components.orbit.nodeAngle("Orbit", 1, 90)` starts node 1 at the top.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `angle` (number, required): Degrees, counter-clockwise: 0 the right, 90 the top.<br>Below 0: clockwise; -90 is 270.<br>Range: -360 ↔ 360.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Where it is at phase 0; a drag sets it too.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeAngle`.*
+
+##### `ce.components.orbit.nodeRatio(target, index, ratio) -> boolean`
+
+Set how many turns one node makes in a cycle, by its number.
+
+Example: `ce.components.orbit.nodeRatio("Orbit", 3, -2)` turns node 3 twice a cycle, clockwise.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `ratio` (number, required): Turns per cycle.<br>Above 0: counter-clockwise. Below 0: clockwise.<br>0: it stands still.<br>Range: -16 ↔ 16.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A whole number comes back to where it started every cycle.
+- The inspector stops at -8 and 8.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeRatio`.*
+
+##### `ce.components.orbit.nodeDepth(target, index, depth) -> boolean`
+
+Set how much of its value one node sends, by its number.
+
+Example: `ce.components.orbit.nodeDepth("Orbit", 2, 0.5)` sends half of node 2's value.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `depth` (number, required): Part of the value: 1 all of it, 0.5 half.<br>0: nothing.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- What it sends: `nodeOutput()`. Turned upside down: `nodeInvert()`, before the depth is taken.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeDepth`.*
+
+##### `ce.components.orbit.nodeOutput(target, index, output) -> boolean`
+
+Set what one node sends, by its number.
+
+Example: `ce.components.orbit.nodeOutput("Orbit", 2, "sine")` makes node 2 send a sine of its angle.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `output` (text, required): "y": its height: 0.5 level with the centre, 1 at the top of a ring of radius 1.<br>"x": its place across, the same way: 1 at the right.<br>"sine": a sine of its angle: 0 to 1, whatever its radius.<br>"radius": its distance from the centre, which stays the same as it turns.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "y".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeOutput`.*
+
+##### `ce.components.orbit.nodeInvert(target, index [, invert]) -> boolean`
+
+Turn what one node sends upside down, or back, by its number.
+
+Example: `ce.components.orbit.nodeInvert("Orbit", 3, true)` makes node 3 send 1 where it would send 0.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `index` (number, required): Node number, counted from 1.<br>A fraction: rounded.<br>Not one of the nodes: rejected with a console error.
+- `invert` (true or false, optional): true: upside down: 1 less what it would send.<br>false: as it is.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Turned before `nodeDepth()` takes its part.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitNodeInvert`.*
+
+##### `ce.components.orbit.editable(target [, editable]) -> boolean`
+
+Let the satellites be dragged, or not.
+
+Example: `ce.components.orbit.editable("Orbit")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `editable` (true or false, optional): true: a drag moves a satellite to a new radius and angle.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitEditable`.*
+
+##### `ce.components.orbit.showTrails(target [, showTrails]) -> boolean`
+
+Show or hide the trail behind each satellite.
+
+Example: `ce.components.orbit.showTrails("Orbit")` shows the trails if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `showTrails` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitShowTrails`.*
+
+##### `ce.components.orbit.showSpokes(target [, showSpokes]) -> boolean`
+
+Show or hide the line from the centre to each satellite.
+
+Example: `ce.components.orbit.showSpokes("Orbit")` shows the spokes if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `showSpokes` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitShowSpokes`.*
+
+##### `ce.components.orbit.showRings(target [, showRings]) -> boolean`
+
+Show or hide the ring each satellite turns on.
+
+Example: `ce.components.orbit.showRings("Orbit")` shows the rings if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `showRings` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitShowRings`.*
+
+##### `ce.components.orbit.showValues(target [, showValues]) -> boolean`
+
+Show or hide each satellite's value, as a percentage, above it.
+
+Example: `ce.components.orbit.showValues("Orbit")` shows the values if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `showValues` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitShowValues`.*
+
+##### `ce.components.orbit.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.orbit.read("Orbit")` gives every setting as a table.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- `read(target, "phase")`: where it is now.
+- `read(target, "nodeRadius")`: every node's; `read(target, "nodeRadius", 2)`: one.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `orbitRead`.*
+
+##### `ce.components.orbit.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.orbit.size("Orbit")` gives the length of every list as a table.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "node")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `orbitSize`.*
+
+##### `ce.components.orbit.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.orbit.fill("Orbit", "node", {true, false, true})` writes nodes 1 to 3.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitFill`.*
+
+##### `ce.components.orbit.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.orbit.insert("Orbit", "node")` adds a node at the end.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitInsert`.*
+
+##### `ce.components.orbit.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.orbit.remove("Orbit", "node")` removes the last node.
+
+- `target` (control name, required): The Orbit's control, by name.<br>Not an Orbit: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `orbitRemove`.*
+
+#### ce.components.kinetic: Kinetic
+
+Bounce a ball round a box as a modulation source: its gravity, bounce and drag, and where and how hard it is thrown.
+
+##### `ce.components.kinetic.run(target [, run]) -> boolean`
+
+Start or stop the ball.
+
+Example: `ce.components.kinetic.run("Kinetic", false)` stops the ball where it is.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `run` (true or false, optional): true: it moves.<br>false: it stops where it is.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticRun`.*
+
+##### `ce.components.kinetic.sync(target [, sync]) -> boolean`
+
+Move the ball in the Transport's time, or in its own.
+
+Example: `ce.components.kinetic.sync("Kinetic")` switches the sync to transport on if it is off, and off if it is on.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `sync` (true or false, optional): true: a faster tempo speeds it up, and a stopped Transport holds it.<br>false: in real time.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticSync`.*
+
+##### `ce.components.kinetic.gravity(target, gravity) -> boolean`
+
+Set how hard the ball is pulled down.
+
+Example: `ce.components.kinetic.gravity("Kinetic", 1)` lets the ball fall and settle.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `gravity` (number, required): Pull, in boxes a second, a second.<br>0: none.<br>Range: 0 ↔ 4.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticGravity`.*
+
+##### `ce.components.kinetic.bounce(target, bounce) -> boolean`
+
+Set how much of its speed the ball keeps at a wall.
+
+Example: `ce.components.kinetic.bounce("Kinetic", 0.5)` halves its speed at every wall.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `bounce` (number, required): Part kept: 1 all of it, 0 none.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.92.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticBounce`.*
+
+##### `ce.components.kinetic.friction(target, friction) -> boolean`
+
+Set how fast the ball slows as it moves.
+
+Example: `ce.components.kinetic.friction("Kinetic", 0.2)` slows the ball sooner.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `friction` (number, required): Drag through the air.<br>0: none.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.04.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticFriction`.*
+
+##### `ce.components.kinetic.keepAlive(target, keepAlive) -> boolean`
+
+Set how hard the ball is kicked when it nearly stops.
+
+Example: `ce.components.kinetic.keepAlive("Kinetic", 0)` lets the ball settle.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `keepAlive` (number, required): Strength of a kick in a random direction.<br>0: none; it settles.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.35.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticKeepAlive`.*
+
+##### `ce.components.kinetic.launch(target [, x] [, y]) -> boolean`
+
+Put the ball at a point and throw it from there.
+
+Example: `ce.components.kinetic.launch("Kinetic", 0.5, 0.9)` throws the ball from the top middle of the box.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `x` (number, optional): Across the box: 0 the left, 1 the right.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+- `y` (number, optional): Up the box: 0 the bottom, 1 the top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+
+Good to know:
+
+- With the speed `velocity()` sets. A running ball is thrown again at once.
+- Default: 0.5, 0.7.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticLaunch`.*
+
+##### `ce.components.kinetic.velocity(target [, vx] [, vy]) -> boolean`
+
+Set how fast, and which way, the ball is thrown.
+
+Example: `ce.components.kinetic.velocity("Kinetic", 1, 0.5)` throws the ball to the right and up.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `vx` (number, optional): Boxes a second across: below 0 to the left.<br>Range: -4 ↔ 4.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+- `vy` (number, optional): Boxes a second up: below 0 down.<br>Range: -4 ↔ 4.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+
+Good to know:
+
+- Its speed stops at 2.5 boxes a second.
+- A running ball is thrown again at once, from where `launch()` puts it.
+- Default: 0.6, 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticVelocity`.*
+
+##### `ce.components.kinetic.editable(target [, editable]) -> boolean`
+
+Let the ball be thrown by dragging, or not.
+
+Example: `ce.components.kinetic.editable("Kinetic")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `editable` (true or false, optional): true: a drag throws it.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticEditable`.*
+
+##### `ce.components.kinetic.showTrail(target [, showTrail]) -> boolean`
+
+Show or hide the trail behind the ball.
+
+Example: `ce.components.kinetic.showTrail("Kinetic")` shows the trail if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `showTrail` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticShowTrail`.*
+
+##### `ce.components.kinetic.showWalls(target [, showWalls]) -> boolean`
+
+Show or hide the walls of the box.
+
+Example: `ce.components.kinetic.showWalls("Kinetic")` shows the walls if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `showWalls` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `kineticShowWalls`.*
+
+##### `ce.components.kinetic.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.kinetic.read("Kinetic")` gives every setting as a table.
+
+- `target` (control name, required): The Kinetic's control, by name.<br>Not a Kinetic: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `kineticRead`.*
+
+#### ce.components.constellation: Constellation
+
+Move a probe over a map of presets, each a star with a value for every target, and send the presets' values from where it is: the probe, how it blends, and its wander.
+
+##### `ce.components.constellation.probe(target [, x] [, y]) -> boolean`
+
+Move the probe to a point on the map.
+
+Example: `ce.components.constellation.probe("Constellation", 0.25, 0.75)` moves the probe to the upper left.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `x` (number, optional): Across the map: 0 the left, 1 the right.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+- `y` (number, optional): Up the map: 0 the bottom, 1 the top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+
+Good to know:
+
+- Every target is sent its value from there, as `mode()` says.
+- While `run()` is on, the wander places the probe; it comes back here when it stops.
+- Default: 0.5, 0.5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationProbe`.*
+
+##### `ce.components.constellation.mode(target, mode) -> boolean`
+
+Set whether the probe recalls the nearest preset or blends them.
+
+Example: `ce.components.constellation.mode("Constellation", "snap")` sends the nearest preset's values exactly.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `mode` (text, required): "blend": a mix of every preset's values, the nearer the more.<br>"snap": the nearest preset's values, and `onRecall` when that changes.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "blend".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationMode`.*
+
+##### `ce.components.constellation.blend(target, blend) -> boolean`
+
+Set how strongly the nearer presets win in a blend.
+
+Example: `ce.components.constellation.blend("Constellation", 6)` lets the nearest preset take over sooner.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `blend` (number, required): Power of the distance.<br>Low: an even mix. High: the nearest preset wins.<br>Range: 0.5 ↔ 16.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `mode()` is "blend".
+- The inspector takes 1 to 6.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationBlend`.*
+
+##### `ce.components.constellation.run(target [, run]) -> boolean`
+
+Let the probe wander over the map on its own, or not.
+
+Example: `ce.components.constellation.run("Constellation")` switches the running on if it is off, and off if it is on.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `run` (true or false, optional): true: it wanders, in a loop across the map.<br>false: it stays where `probe()` puts it.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- A drag moves the probe all the same.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationRun`.*
+
+##### `ce.components.constellation.rate(target, rate) -> boolean`
+
+Set how many times a second the wander goes round, while not synced.
+
+Example: `ce.components.constellation.rate("Constellation", 0.05)` goes round once in twenty seconds.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `rate` (number, required): Times round per second.<br>0: it stands still.<br>Range: 0 ↔ 4.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While synced to the Transport: no effect; `bars()` sets it.
+- The inspector takes 0.01 to 2.
+- Default: 0.08.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationRate`.*
+
+##### `ce.components.constellation.sync(target [, sync]) -> boolean`
+
+Time the wander by the Transport, or by its own rate.
+
+Example: `ce.components.constellation.sync("Constellation")` switches the sync to transport on if it is off, and off if it is on.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `sync` (true or false, optional): true: once round every `bars()`, where the Transport's position puts it.<br>false: at `rate()`.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationSync`.*
+
+##### `ce.components.constellation.bars(target, bars) -> boolean`
+
+Set how many bars the wander takes to go round, while synced to the Transport.
+
+Example: `ce.components.constellation.bars("Constellation", 16)` goes round once in sixteen bars.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `bars` (number, required): Bars: 0.25 is one beat in 4/4.<br>Range: 0.25 ↔ 64.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `sync()` is on.
+- Default: 8.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationBars`.*
+
+##### `ce.components.constellation.links(target, links) -> boolean`
+
+Set how many lines each preset draws to the presets that sound most like it.
+
+Example: `ce.components.constellation.links("Constellation", 3)` links each preset to its three closest.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `links` (number, required): Presets, by how close their values are.<br>0: no lines.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Drawn while `showLinks()` is on.
+- The inspector takes 1 to 6.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationLinks`.*
+
+##### `ce.components.constellation.editable(target [, editable]) -> boolean`
+
+Let the probe and the presets be dragged, or not.
+
+Example: `ce.components.constellation.editable("Constellation")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `editable` (true or false, optional): true: a drag on a preset moves it; anywhere else, it moves the probe.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationEditable`.*
+
+##### `ce.components.constellation.showLinks(target [, showLinks]) -> boolean`
+
+Show or hide the lines between presets that sound alike.
+
+Example: `ce.components.constellation.showLinks("Constellation")` shows the links if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `showLinks` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How many: `links()`.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationShowLinks`.*
+
+##### `ce.components.constellation.showField(target [, showField]) -> boolean`
+
+Show or hide the glow round each preset.
+
+Example: `ce.components.constellation.showField("Constellation")` shows the field if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `showField` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationShowField`.*
+
+##### `ce.components.constellation.showLabels(target [, showLabels]) -> boolean`
+
+Show or hide the presets' names.
+
+Example: `ce.components.constellation.showLabels("Constellation")` shows the labels if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `showLabels` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- The nearest preset's is always shown; the others' only while there are 8 or fewer.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constellationShowLabels`.*
+
+##### `ce.components.constellation.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.constellation.read("Constellation")` gives every setting as a table.
+
+- `target` (control name, required): The Constellation's control, by name.<br>Not a Constellation: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `constellationRead`.*
+
+#### ce.components.timbre: Timbre Pad
+
+Move a puck over anchors, each a patch with a value for every target, and send their values blended by how near it is: the puck, the blend and each anchor.
+
+##### `ce.components.timbre.move(target [, x] [, y]) -> boolean`
+
+Move the puck to a point on the pad.
+
+Example: `ce.components.timbre.move("TimbrePad", 0.8, 0.8)` moves the puck to the upper right.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `x` (number, optional): Across the pad: 0 the left, 1 the right.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+- `y` (number, optional): Up the pad: 0 the bottom, 1 the top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+
+Good to know:
+
+- Every target is sent a mix of the anchors' values, the nearer the more.
+- Default: 0.5, 0.5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreMove`.*
+
+##### `ce.components.timbre.power(target, power) -> boolean`
+
+Set how strongly the nearer anchors win the blend.
+
+Example: `ce.components.timbre.power("TimbrePad", 6)` lets the nearest anchor take over sooner.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `power` (number, required): Power of the distance.<br>Low: an even mix. High: the nearest anchor wins.<br>Range: 0.5 ↔ 16.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The inspector takes 1 to 6.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbrePower`.*
+
+##### `ce.components.timbre.anchorX(target, index, x) -> boolean`
+
+Move one anchor across the pad, by its number.
+
+Example: `ce.components.timbre.anchorX("TimbrePad", 2, 0.9)` moves anchor 2 to the right edge.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `index` (number, required): Anchor number, counted from 1.<br>A fraction: rounded.<br>Not one of the anchors: rejected with a console error.
+- `x` (number, required): Across the pad: 0 the left, 1 the right.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreAnchorX`.*
+
+##### `ce.components.timbre.anchorY(target, index, y) -> boolean`
+
+Move one anchor up or down the pad, by its number.
+
+Example: `ce.components.timbre.anchorY("TimbrePad", 2, 0.1)` moves anchor 2 near the bottom.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `index` (number, required): Anchor number, counted from 1.<br>A fraction: rounded.<br>Not one of the anchors: rejected with a console error.
+- `y` (number, required): Up the pad: 0 the bottom, 1 the top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreAnchorY`.*
+
+##### `ce.components.timbre.axisX(target, axisX) -> boolean`
+
+Set the name written along the bottom, for what the pad changes from left to right.
+
+Example: `ce.components.timbre.axisX("TimbrePad", "dark → bright")` writes dark → bright along the bottom.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `axisX` (text, required): The name.<br>"": none.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Default: "dark → bright".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreAxisX`.*
+
+##### `ce.components.timbre.axisY(target, axisY) -> boolean`
+
+Set the name written up the left side, for what the pad changes from bottom to top.
+
+Example: `ce.components.timbre.axisY("TimbrePad", "soft → aggressive")` writes soft → aggressive up the left side.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `axisY` (text, required): The name.<br>"": none.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Default: "soft → aggressive".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreAxisY`.*
+
+##### `ce.components.timbre.editable(target [, editable]) -> boolean`
+
+Let the puck and the anchors be dragged, or not.
+
+Example: `ce.components.timbre.editable("TimbrePad")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `editable` (true or false, optional): true: a drag on an anchor moves it; anywhere else, it moves the puck.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreEditable`.*
+
+##### `ce.components.timbre.showField(target [, showField]) -> boolean`
+
+Show or hide the coloured glow round each anchor.
+
+Example: `ce.components.timbre.showField("TimbrePad")` shows the field if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `showField` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreShowField`.*
+
+##### `ce.components.timbre.showAnchors(target [, showAnchors]) -> boolean`
+
+Show or hide the anchors and their names.
+
+Example: `ce.components.timbre.showAnchors("TimbrePad")` shows the anchors if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `showAnchors` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Hidden, they still blend.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreShowAnchors`.*
+
+##### `ce.components.timbre.showReadout(target [, showReadout]) -> boolean`
+
+Show or hide how many targets are bound to a parameter, as "2/3 MIDI" at the top right.
+
+Example: `ce.components.timbre.showReadout("TimbrePad")` shows the readout if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `showReadout` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreShowReadout`.*
+
+##### `ce.components.timbre.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.timbre.read("TimbrePad")` gives every setting as a table.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "anchorX")`: the whole list; `read(target, "anchorX", 3)`: one anchor, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `timbreRead`.*
+
+##### `ce.components.timbre.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.timbre.size("TimbrePad")` gives the length of every list as a table.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "anchorX")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `timbreSize`.*
+
+##### `ce.components.timbre.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.timbre.fill("TimbrePad", "anchorX", {0.25, 0.5, 0.75})` writes anchors 1 to 3.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreFill`.*
+
+##### `ce.components.timbre.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.timbre.insert("TimbrePad", "anchorX")` adds an anchor at the end.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreInsert`.*
+
+##### `ce.components.timbre.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.timbre.remove("TimbrePad", "anchorX")` removes the last anchor.
+
+- `target` (control name, required): The Timbre Pad's control, by name.<br>Not a Timbre Pad: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `timbreRemove`.*
+
 
 ### Routing and modulation
 
 Components that send one value somewhere else, or shape it on the way.
 
-- **Router** — `ce.components.router`. Re-point the Router: source, CC, channel, deadzone, and each destination's depth. Commands: `source`, `cc`, `channel`, `poly`, `invert`, `deadzone`, `input`, `dest`, `destDepth`, `curveX`, `curveY`, `curveShape`, `sourceControl`, `editable`, `showGrid`, `showDivisions`, `read`, `size`, `fill`, `insert`, `remove`.
-- **Macro** — `ce.components.macro`. Turn the Macro, and re-weight what it drives. Commands: `value`, `slot`, `slotDepth`, `slotCurve`, `slotMin`, `slotMax`, `label`, `editable`, `showLanes`, `showValues`, `showDivisions`, `read`, `size`, `fill`, `insert`, `remove`.
-- **Mod Matrix** — `ce.components.matrix`. Patch the modulation matrix from a script: one cell at a time, or clear the lot. Commands: `cell`, `clear`, `bipolar`, `step`, `cellStyle`, `editable`, `showLabels`, `showValues`, `read`, `size`, `fill`.
-- **Constraint** — `ce.components.constraint`. Move one member of a Constraint group — the others rebalance around it. Commands: `mode`, `gap`, `member`, `editable`, `showValues`, `showBadge`, `read`, `size`, `fill`, `insert`, `remove`.
-- **Envelope** — `ce.components.envelope`. Reshape an Envelope: a preset, a single breakpoint, the sustain point, the loop. Commands: `preset`, `pointX`, `pointY`, `pointCurve`, `sustain`, `loop`, `loopStart`, `loopEnd`, `timeMax`, `phase`, `addOnDoubleClick`, `snapX`, `snapY`, `fillUnder`, `phaseSource`, `editable`, `showPlayhead`, `showGrid`, `read`, `size`, `fill`, `insert`, `remove`.
-- **Zone Splitter** — `ce.components.split`. Splits the keyboard into zones, each with its own channel and transpose. Commands: `preset`, `mute`, `channel`, `transpose`, `point`, `read`.
+#### ce.components.router: Router
+
+Take a signal from the MIDI input or a control, shape it through a curve, and send it to several destinations, each with its own depth.
+
+##### `ce.components.router.source(target, source) -> boolean`
+
+Set the signal it follows.
+
+Example: `ce.components.router.source("Router", "aftertouch")` follows channel aftertouch.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `source` (text, required): "modwheel": CC 1.<br>"aftertouch": channel aftertouch.<br>"polyAftertouch": per-note aftertouch, one note's, as `poly()` picks it.<br>"breath": CC 2.<br>"expression": CC 11.<br>"foot": CC 4.<br>"velocity": the velocity of the last note played.<br>"cc": the CC set by `cc()`.<br>"link": the control set by `sourceControl()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- From the MIDI input on `channel()`; until one arrives, `input()` stands in.
+- Default: "modwheel".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerSource`.*
+
+##### `ce.components.router.cc(target, cc) -> boolean`
+
+Set the CC it follows while `source()` is "cc".
+
+Example: `ce.components.router.cc("Router", 74)` follows CC 74.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `cc` (number, required): Controller number.<br>Range: 0 ↔ 127, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `source()` is "cc".
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerCc`.*
+
+##### `ce.components.router.channel(target, channel) -> boolean`
+
+Set which MIDI channel it listens to.
+
+Example: `ce.components.router.channel("Router", 2)` follows channel 2 only.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `channel` (number, required): Channel 1 ↔ 16, or 0: any channel.<br>Range: 0 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0, any channel.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerChannel`.*
+
+##### `ce.components.router.poly(target, poly) -> boolean`
+
+Set which note's aftertouch it follows while `source()` is "polyAftertouch".
+
+Example: `ce.components.router.poly("Router", "last")` follows the note pressed last.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `poly` (text, required): "highest": the note pressed hardest.<br>"last": the note pressed last.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "highest".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerPoly`.*
+
+##### `ce.components.router.invert(target [, invert]) -> boolean`
+
+Turn the signal upside down before the curve.
+
+Example: `ce.components.router.invert("Router")` switches the invert on if it is off, and off if it is on.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `invert` (true or false, optional): true: 0 becomes 1 and 1 becomes 0.<br>false: as it comes.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Before `deadzone()`.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerInvert`.*
+
+##### `ce.components.router.deadzone(target, deadzone) -> boolean`
+
+Set how much of the bottom of the signal is ignored.
+
+Example: `ce.components.router.deadzone("Router", 0.1)` ignores the bottom tenth of the signal.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `deadzone` (number, required): Part of the signal, from 0: 0 up to it gives 0, and the rest is spread over 0 to 1.<br>0: none.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerDeadzone`.*
+
+##### `ce.components.router.input(target, input) -> boolean`
+
+Set the signal it uses until the MIDI input sends one.
+
+Example: `ce.components.router.input("Router", 0.8)` drives it at 80% until a controller moves.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `input` (number, required): Signal: 0 ↔ 1.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Not used once the source has arrived, or while `source()` is "link".
+- Default: 0.5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerInput`.*
+
+##### `ce.components.router.dest(target, index [, enabled]) -> boolean`
+
+Switch one destination on or off, by its number.
+
+Example: `ce.components.router.dest("Router", 2, false)` stops sending to destination 2.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `index` (number, required): Destination number, counted from 1.<br>A fraction: rounded.<br>Not one of the destinations: rejected with a console error.
+- `enabled` (true or false, optional): true: it is sent to.<br>false: not.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerDest`.*
+
+##### `ce.components.router.destDepth(target, index, depth) -> boolean`
+
+Set how strongly one destination follows, by its number.
+
+Example: `ce.components.router.destDepth("Router", 1, -0.5)` sends half of the curve, upside down, to destination 1.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `index` (number, required): Destination number, counted from 1.<br>A fraction: rounded.<br>Not one of the destinations: rejected with a console error.
+- `depth` (number, required): Part of the curve: 1 all of it, 0.5 half.<br>Below 0: the curve upside down.<br>0: nothing.<br>Range: -1 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The result is spread over the destination's own range, set in the inspector.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerDestDepth`.*
+
+##### `ce.components.router.curveX(target, index, x) -> boolean`
+
+Move one point of the curve along the signal axis, by its number.
+
+Example: `ce.components.router.curveX("Router", 2, 0.3)` moves point 2 to a signal of 0.3.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `index` (number, required): Point number, counted from 1.<br>A fraction: rounded.<br>Not one of the points: rejected with a console error.
+- `x` (number, required): Signal: 0 ↔ 1.<br>Range: between the points either side; the first point at 0, the last at 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerCurveX`.*
+
+##### `ce.components.router.curveY(target, index, y) -> boolean`
+
+Set the output of one point of the curve, by its number.
+
+Example: `ce.components.router.curveY("Router", 2, 0.8)` sends 0.8 at point 2.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `index` (number, required): Point number, counted from 1.<br>A fraction: rounded.<br>Not one of the points: rejected with a console error.
+- `y` (number, required): Output: 0 ↔ 1.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerCurveY`.*
+
+##### `ce.components.router.curveShape(target, index, curve) -> boolean`
+
+Set the shape of the segment of the curve that ends at one point, by its number.
+
+Example: `ce.components.router.curveShape("Router", 2, "exp")` curves the segment into point 2.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `index` (number, required): Point number, counted from 1.<br>A fraction: rounded.<br>Not one of the points: rejected with a console error.
+- `curve` (text, required): "linear": straight.<br>"exp": slow, then fast.<br>"log": fast, then slow.<br>"scurve": slow at both ends.<br>"hold": flat, then a jump at the point.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerCurveShape`.*
+
+##### `ce.components.router.sourceControl(target [, name]) -> boolean`
+
+Name the control it follows while `source()` is "link".
+
+Example: `ce.components.router.sourceControl("Router", "Expression")` makes the control called Expression the signal.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Its range is the signal's 0 to 1.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "sourceControl")` gives the control's name.
+
+*Short name: `routerSourceControl`.*
+
+##### `ce.components.router.editable(target [, editable]) -> boolean`
+
+Let the curve's points be dragged, or not.
+
+Example: `ce.components.router.editable("Router")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `editable` (true or false, optional): true: a drag moves a point.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerEditable`.*
+
+##### `ce.components.router.showGrid(target [, showGrid]) -> boolean`
+
+Show or hide the grid behind the curve.
+
+Example: `ce.components.router.showGrid("Router")` shows the grid if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerShowGrid`.*
+
+##### `ce.components.router.showDivisions(target [, showDivisions]) -> boolean`
+
+Show or hide the level lines across the curve.
+
+Example: `ce.components.router.showDivisions("Router")` shows the divisions if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `showDivisions` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerShowDivisions`.*
+
+##### `ce.components.router.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.router.read("Router")` gives every setting as a table.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "curveShape")`: the whole list; `read(target, "curveShape", 3)`: one point, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `routerRead`.*
+
+##### `ce.components.router.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.router.size("Router")` gives the length of every list as a table.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "curveShape")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `routerSize`.*
+
+##### `ce.components.router.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.router.fill("Router", "dest", {true, false, true})` writes destinations 1 to 3.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerFill`.*
+
+##### `ce.components.router.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.router.insert("Router", "curveShape")` adds a point at the end.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerInsert`.*
+
+##### `ce.components.router.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.router.remove("Router", "curveShape")` removes the last point.
+
+- `target` (control name, required): The Router's control, by name.<br>Not a Router: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `routerRemove`.*
+
+#### ce.components.macro: Macro
+
+Turn one knob that drives several parameters, each slot with its own depth, curve and range.
+
+##### `ce.components.macro.value(target, value) -> boolean`
+
+Turn the knob.
+
+Example: `ce.components.macro.value("Macro", 0.75)` turns the knob three quarters of the way.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `value` (number, required): Position: 0 fully left, 1 fully right.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Every slot that is on is sent its value from there.
+- Default: 0.28.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroValue`.*
+
+##### `ce.components.macro.slot(target, index [, enabled]) -> boolean`
+
+Switch one slot on or off, by its number.
+
+Example: `ce.components.macro.slot("Macro", 2, false)` stops slot 2 following the knob.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `index` (number, required): Slot number, counted from 1.<br>A fraction: rounded.<br>Not one of the slots: rejected with a console error.
+- `enabled` (true or false, optional): true: it follows the knob.<br>false: it sends 0.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroSlot`.*
+
+##### `ce.components.macro.slotDepth(target, index, depth) -> boolean`
+
+Set how much of the knob's turn one slot follows, by its number.
+
+Example: `ce.components.macro.slotDepth("Macro", 3, -0.5)` makes slot 3 fall half as far as the knob turns.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `index` (number, required): Slot number, counted from 1.<br>A fraction: rounded.<br>Not one of the slots: rejected with a console error.
+- `depth` (number, required): Part of the turn: 1 all of it, 0.5 half.<br>Below 0: it goes down as the knob turns up.<br>0: it stays at `slotMin()`.<br>Range: -1 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroSlotDepth`.*
+
+##### `ce.components.macro.slotCurve(target, index, curve) -> boolean`
+
+Set how one slot follows the turn, by its number.
+
+Example: `ce.components.macro.slotCurve("Macro", 1, "exp")` makes slot 1 change slowly at first.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `index` (number, required): Slot number, counted from 1.<br>A fraction: rounded.<br>Not one of the slots: rejected with a console error.
+- `curve` (text, required): "linear": evenly.<br>"exp": slowly, then fast.<br>"log": fast, then slowly.<br>"scurve": slowly at both ends.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroSlotCurve`.*
+
+##### `ce.components.macro.slotMin(target, index, min) -> boolean`
+
+Set the value one slot sends with the knob at 0, by its number.
+
+Example: `ce.components.macro.slotMin("Macro", 1, 0.2)` keeps slot 1 at 0.2 or more.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `index` (number, required): Slot number, counted from 1.<br>A fraction: rounded.<br>Not one of the slots: rejected with a console error.
+- `min` (number, required): Value.<br>Above `slotMax()`: the slot runs the other way.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroSlotMin`.*
+
+##### `ce.components.macro.slotMax(target, index, max) -> boolean`
+
+Set the value one slot sends with the knob at 1, by its number.
+
+Example: `ce.components.macro.slotMax("Macro", 1, 0.8)` keeps slot 1 at 0.8 or less.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `index` (number, required): Slot number, counted from 1.<br>A fraction: rounded.<br>Not one of the slots: rejected with a console error.
+- `max` (number, required): Value.<br>Below `slotMin()`: the slot runs the other way.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroSlotMax`.*
+
+##### `ce.components.macro.label(target, label) -> boolean`
+
+Set the caption above the knob.
+
+Example: `ce.components.macro.label("Macro", "TONE")` captions the knob TONE.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `label` (text, required): The caption, drawn in capitals.<br>"": none.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Default: "Macro".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroLabel`.*
+
+##### `ce.components.macro.editable(target [, editable]) -> boolean`
+
+Let the knob be turned by dragging, or not.
+
+Example: `ce.components.macro.editable("Macro")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `editable` (true or false, optional): true: a drag up turns it up.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroEditable`.*
+
+##### `ce.components.macro.showLanes(target [, showLanes]) -> boolean`
+
+Show or hide a lane for each slot beside the knob.
+
+Example: `ce.components.macro.showLanes("Macro")` shows the lanes if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `showLanes` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Hidden, the knob fills the control.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroShowLanes`.*
+
+##### `ce.components.macro.showValues(target [, showValues]) -> boolean`
+
+Show or hide the knob's value and each slot's.
+
+Example: `ce.components.macro.showValues("Macro")` shows the values if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `showValues` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroShowValues`.*
+
+##### `ce.components.macro.showDivisions(target [, showDivisions]) -> boolean`
+
+Show or hide the level lines along each slot's lane.
+
+Example: `ce.components.macro.showDivisions("Macro")` shows the divisions if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `showDivisions` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How many: set in the inspector, under Major and Minor.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroShowDivisions`.*
+
+##### `ce.components.macro.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.macro.read("Macro")` gives every setting as a table.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "slot")`: the whole list; `read(target, "slot", 3)`: one slot, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `macroRead`.*
+
+##### `ce.components.macro.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.macro.size("Macro")` gives the length of every list as a table.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "slot")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `macroSize`.*
+
+##### `ce.components.macro.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.macro.fill("Macro", "slot", {true, false, true})` writes slots 1 to 3.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroFill`.*
+
+##### `ce.components.macro.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.macro.insert("Macro", "slot")` adds a slot at the end.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroInsert`.*
+
+##### `ce.components.macro.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.macro.remove("Macro", "slot")` removes the last slot.
+
+- `target` (control name, required): The Macro's control, by name.<br>Not a Macro: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `macroRemove`.*
+
+#### ce.components.matrix: Mod Matrix
+
+Route sources to destinations, each crosspoint with its own amount: one at a time, or all set to 0.
+
+##### `ce.components.matrix.cell(target, row, col, amount) -> boolean`
+
+Set how much one source sends to one destination.
+
+Example: `ce.components.matrix.cell("ModMatrix", 2, 3, -0.5)` sends source 2 to destination 3 at half, upside down.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `row` (number, required): Row, counted from 1.<br>A fraction: rounded.<br>Not a row the grid has: rejected with a console error.
+- `col` (number, required): Column, counted from 1.<br>A fraction: rounded.<br>Not a column the grid has: rejected with a console error.
+- `amount` (number, required): Amount: 1 all of it, 0.5 half, 0 none; below 0, upside down.<br>Range: -1 ↔ 1; 0 ↔ 1 while `bipolar()` is off.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The rows are the sources and the columns the destinations, as the grid labels them.
+- Not snapped: `step()` snaps a drag.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixCell`.*
+
+##### `ce.components.matrix.clear(target) -> boolean`
+
+Set every crosspoint to 0.
+
+Example: `ce.components.matrix.clear("ModMatrix")` routes nothing anywhere.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixClear`.*
+
+##### `ce.components.matrix.bipolar(target [, bipolar]) -> boolean`
+
+Let amounts go below 0, or keep them 0 to 1.
+
+Example: `ce.components.matrix.bipolar("ModMatrix")` switches the bipolar on if it is off, and off if it is on.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `bipolar` (true or false, optional): true: -1 to 1; below 0 sends the source upside down.<br>false: 0 to 1.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Amounts already below 0 are kept as they are.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixBipolar`.*
+
+##### `ce.components.matrix.step(target, step) -> boolean`
+
+Set the step a drag snaps an amount to.
+
+Example: `ce.components.matrix.step("ModMatrix", 0.25)` snaps a drag to quarters.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `step` (number, required): Amount.<br>0: no snap.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A drag only: `cell()` is not snapped.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixStep`.*
+
+##### `ce.components.matrix.cellStyle(target, cellStyle) -> boolean`
+
+Set how each crosspoint shows its amount.
+
+Example: `ce.components.matrix.cellStyle("ModMatrix", "dot")` shows each amount as a dot.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `cellStyle` (text, required): "bar": a bar, from the middle while bipolar.<br>"fill": the cell filled.<br>"dot": a dot.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "bar".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixCellStyle`.*
+
+##### `ce.components.matrix.editable(target [, editable]) -> boolean`
+
+Let the crosspoints be dragged, or not.
+
+Example: `ce.components.matrix.editable("ModMatrix")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `editable` (true or false, optional): true: a drag up a cell raises its amount.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixEditable`.*
+
+##### `ce.components.matrix.showLabels(target [, showLabels]) -> boolean`
+
+Show or hide the sources' and destinations' names.
+
+Example: `ce.components.matrix.showLabels("ModMatrix")` shows the labels if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `showLabels` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixShowLabels`.*
+
+##### `ce.components.matrix.showValues(target [, showValues]) -> boolean`
+
+Show or hide each amount, as a number, in its cell.
+
+Example: `ce.components.matrix.showValues("ModMatrix")` shows the values if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `showValues` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Not 0s.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixShowValues`.*
+
+##### `ce.components.matrix.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.matrix.read("ModMatrix")` gives every setting as a table.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "cell")`: the whole grid, as rows; `read(target, "cell", 2, 3)`: row 2, column 3.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `matrixRead`.*
+
+##### `ce.components.matrix.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.matrix.size("ModMatrix")` gives the length of every list as a table.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "cell")`: { rows, cols }.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `matrixSize`.*
+
+##### `ce.components.matrix.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.matrix.fill("ModMatrix", "cell", {{0.5, 0}, {0, 0.5}})` writes rows 1 and 2 of the grid.
+
+- `target` (control name, required): The Mod Matrix's control, by name.<br>Not a Mod Matrix: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `matrixFill`.*
+
+#### ce.components.constraint: Constraint
+
+Keep several values to a rule as one of them moves: adding up to 1, in order, in proportion, or mirrored.
+
+##### `ce.components.constraint.mode(target, mode) -> boolean`
+
+Set the rule the members keep.
+
+Example: `ce.components.constraint.mode("Constraint", "order")` keeps each member at or above the one before.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `mode` (text, required): "sum": they add up to 1; the others share what is left, as they stood.<br>"order": each at or above the one before, by `gap()` at least.<br>"ratio": all scaled together, keeping their proportions.<br>"mirror": member 2 is 1 minus member 1; the others are free.<br>"free": no rule.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Kept from the next move on: the values are not changed now.
+- Default: "sum".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintMode`.*
+
+##### `ce.components.constraint.gap(target, gap) -> boolean`
+
+Set the least space between members, while `mode()` is "order".
+
+Example: `ce.components.constraint.gap("Constraint", 0.1)` keeps each member 0.1 above the one before.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `gap` (number, required): Space.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `mode()` is "order".
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintGap`.*
+
+##### `ce.components.constraint.member(target, index, value) -> boolean`
+
+Move one member, by its number; the others move to keep the rule.
+
+Example: `ce.components.constraint.member("Constraint", 1, 0.8)` sets member 1 to 0.8, and the others share 0.2 under "sum".
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `index` (number, required): Member number, counted from 1.<br>A fraction: rounded.<br>Not one of the members: rejected with a console error.
+- `value` (number, required): Value.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- As a drag moves it: under "ratio", a member at 0 moves alone.
+- `fill(target, "member", …)` writes every value as given, without the rule.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintMember`.*
+
+##### `ce.components.constraint.editable(target [, editable]) -> boolean`
+
+Let the members be dragged, or not.
+
+Example: `ce.components.constraint.editable("Constraint")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `editable` (true or false, optional): true: a drag on a bar moves that member, and the others keep the rule.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintEditable`.*
+
+##### `ce.components.constraint.showValues(target [, showValues]) -> boolean`
+
+Show or hide each member's value.
+
+Example: `ce.components.constraint.showValues("Constraint")` shows the values if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `showValues` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintShowValues`.*
+
+##### `ce.components.constraint.showBadge(target [, showBadge]) -> boolean`
+
+Show or hide the rule's sign, such as "Σ = 100%".
+
+Example: `ce.components.constraint.showBadge("Constraint")` shows the badge if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `showBadge` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintShowBadge`.*
+
+##### `ce.components.constraint.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.constraint.read("Constraint")` gives every setting as a table.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "member")`: the whole list; `read(target, "member", 3)`: one member, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `constraintRead`.*
+
+##### `ce.components.constraint.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.constraint.size("Constraint")` gives the length of every list as a table.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "member")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `constraintSize`.*
+
+##### `ce.components.constraint.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.constraint.fill("Constraint", "member", {0.25, 0.5, 0.75})` writes members 1 to 3.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintFill`.*
+
+##### `ce.components.constraint.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.constraint.insert("Constraint", "member")` adds a member at the end.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintInsert`.*
+
+##### `ce.components.constraint.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.constraint.remove("Constraint", "member")` removes the last member.
+
+- `target` (control name, required): The Constraint's control, by name.<br>Not a Constraint: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `constraintRemove`.*
+
+#### ce.components.envelope: Envelope
+
+Shape an envelope from its points: a preset, each point's place, level and curve, the sustain point, the loop and the playhead.
+
+##### `ce.components.envelope.preset(target, preset) -> boolean`
+
+Give the envelope a preset shape.
+
+Example: `ce.components.envelope.preset("Envelope", "ad")` makes the envelope an attack and a decay.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `preset` (text, required): "adsr": attack, decay, sustain, release; the sustain at point 3.<br>"ad": attack and decay.<br>"ar": attack and release.<br>"dahdsr": delay, attack, hold, decay, sustain, release; the sustain at point 5.<br>"mseg" or "free": five points, every one free to move.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its points and sustain point are replaced, as the inspector's Preset does.
+- Default: "adsr".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopePreset`.*
+
+##### `ce.components.envelope.pointX(target, index, x) -> boolean`
+
+Move one point along the time axis, by its number.
+
+Example: `ce.components.envelope.pointX("Envelope", 2, 0.1)` moves point 2 to a tenth of the way along.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `index` (number, required): Point number, counted from 1.<br>A fraction: rounded.<br>Not one of the points: rejected with a console error.
+- `x` (number, required): Part of the time axis: 0 the start, 1 the end.<br>Range: between the points either side; the first point at 0, the last at 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- 1 on the time axis is `timeMax()` milliseconds.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopePointX`.*
+
+##### `ce.components.envelope.pointY(target, index, y) -> boolean`
+
+Set the level of one point, by its number.
+
+Example: `ce.components.envelope.pointY("Envelope", 3, 0.6)` puts point 3 at 60%.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `index` (number, required): Point number, counted from 1.<br>A fraction: rounded.<br>Not one of the points: rejected with a console error.
+- `y` (number, required): Level: 0 the bottom, 1 the top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The canvas keeps the levels a preset fixes, such as an ADSR's first and last at 0; a script can move them.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopePointY`.*
+
+##### `ce.components.envelope.pointCurve(target, index, curve) -> boolean`
+
+Set the shape of the segment that ends at one point, by its number.
+
+Example: `ce.components.envelope.pointCurve("Envelope", 2, "exp")` curves the rise into point 2.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `index` (number, required): Point number, counted from 1.<br>A fraction: rounded.<br>Not one of the points: rejected with a console error.
+- `curve` (text, required): "linear": straight.<br>"exp": slow, then fast.<br>"log": fast, then slow.<br>"scurve": slow at both ends.<br>"hold": flat, then a jump at the point.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Point 1 starts the envelope: its curve is not drawn.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopePointCurve`.*
+
+##### `ce.components.envelope.sustain(target, sustain) -> boolean`
+
+Set which point holds while a note is held.
+
+Example: `ce.components.envelope.sustain("Envelope", 3)` holds at point 3.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `sustain` (number, required): Point number, counted from 1.<br>0 or -1: no sustain point.<br>Range: -1 ↔ the number of points, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 3, as "adsr" puts it.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeSustain`.*
+
+##### `ce.components.envelope.loop(target [, loop]) -> boolean`
+
+Mark a loop on the curve, from `loopStart()` to `loopEnd()`, or not.
+
+Example: `ce.components.envelope.loop("Envelope")` switches the loop enabled on if it is off, and off if it is on.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `loop` (true or false, optional): true: marked.<br>false: not.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeLoop`.*
+
+##### `ce.components.envelope.loopStart(target, loopStart) -> boolean`
+
+Set the point the loop starts at.
+
+Example: `ce.components.envelope.loopStart("Envelope", 2)` starts the loop at point 2.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `loopStart` (number, required): Point number, counted from 1.<br>Range: 1 ↔ the number of points, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeLoopStart`.*
+
+##### `ce.components.envelope.loopEnd(target, loopEnd) -> boolean`
+
+Set the point the loop ends at.
+
+Example: `ce.components.envelope.loopEnd("Envelope", 3)` ends the loop at point 3.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `loopEnd` (number, required): Point number, counted from 1.<br>Range: 1 ↔ the number of points, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeLoopEnd`.*
+
+##### `ce.components.envelope.timeMax(target, timeMax) -> boolean`
+
+Set how many milliseconds the whole time axis stands for.
+
+Example: `ce.components.envelope.timeMax("Envelope", 2000)` makes the time axis two seconds long.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `timeMax` (number, required): Milliseconds, at 1 on the time axis.<br>Range: 1 ↔ 600000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The times read out only: it does not change the shape.
+- Default: 1000.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeTimeMax`.*
+
+##### `ce.components.envelope.phase(target, phase) -> boolean`
+
+Put the playhead at a point along the time axis.
+
+Example: `ce.components.envelope.phase("Envelope", 0.5)` puts the playhead halfway along.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `phase` (number, required): Part of the time axis: 0 the start, 1 the end.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Shown while `showPlayhead()` is on.
+- While `phaseSource()` links a control, that control places it.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopePhase`.*
+
+##### `ce.components.envelope.addOnDoubleClick(target [, addOnDoubleClick]) -> boolean`
+
+Let a double-click on the curve add a point, or not.
+
+Example: `ce.components.envelope.addOnDoubleClick("Envelope")` switches the add on double click on if it is off, and off if it is on.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `addOnDoubleClick` (true or false, optional): true: a double-click adds a point there.<br>false: it does nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeAddOnDoubleClick`.*
+
+##### `ce.components.envelope.snapX(target, snapX) -> boolean`
+
+Set the step a dragged point snaps to along the time axis.
+
+Example: `ce.components.envelope.snapX("Envelope", 0.125)` snaps points to eighths of the time axis.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `snapX` (number, required): Part of the time axis.<br>0: no snap.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Dragging only: `pointX()` is not snapped.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeSnapX`.*
+
+##### `ce.components.envelope.snapY(target, snapY) -> boolean`
+
+Set the step a dragged point snaps to in level.
+
+Example: `ce.components.envelope.snapY("Envelope", 0.25)` snaps points to quarters of the level.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `snapY` (number, required): Part of the level.<br>0: no snap.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Dragging only: `pointY()` is not snapped.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeSnapY`.*
+
+##### `ce.components.envelope.fillUnder(target [, fillUnder]) -> boolean`
+
+Shade the area under the curve, or not.
+
+Example: `ce.components.envelope.fillUnder("Envelope")` switches the fill under on if it is off, and off if it is on.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `fillUnder` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: on.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeFillUnder`.*
+
+##### `ce.components.envelope.phaseSource(target [, name]) -> boolean`
+
+Name the control that places the playhead.
+
+Example: `ce.components.envelope.phaseSource("Envelope", "Position")` makes the control called Position move the playhead.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Its range sets 0 to 1.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "phaseSource")` gives the control's name.
+
+*Short name: `envelopePhaseSource`.*
+
+##### `ce.components.envelope.editable(target [, editable]) -> boolean`
+
+Let the points be dragged, added and removed by touch, or not.
+
+Example: `ce.components.envelope.editable("Envelope")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `editable` (true or false, optional): true: they can be.<br>false: touches do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Only touch is locked: the commands still work.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeEditable`.*
+
+##### `ce.components.envelope.showPlayhead(target [, showPlayhead]) -> boolean`
+
+Show or hide the playhead: a dot on the curve at `phase()`.
+
+Example: `ce.components.envelope.showPlayhead("Envelope")` shows the playhead if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `showPlayhead` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeShowPlayhead`.*
+
+##### `ce.components.envelope.showGrid(target [, showGrid]) -> boolean`
+
+Show or hide the grid behind the curve.
+
+Example: `ce.components.envelope.showGrid("Envelope")` shows the grid if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Its divisions are set in the inspector. Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeShowGrid`.*
+
+##### `ce.components.envelope.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.envelope.read("Envelope")` gives every setting as a table.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "pointCurve")`: the whole list; `read(target, "pointCurve", 3)`: one point, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `envelopeRead`.*
+
+##### `ce.components.envelope.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.envelope.size("Envelope")` gives the length of every list as a table.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "pointCurve")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `envelopeSize`.*
+
+##### `ce.components.envelope.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.envelope.fill("Envelope", "pointX", {0.25, 0.5, 0.75})` writes points 1 to 3.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeFill`.*
+
+##### `ce.components.envelope.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.envelope.insert("Envelope", "pointCurve")` adds a point at the end.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeInsert`.*
+
+##### `ce.components.envelope.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.envelope.remove("Envelope", "pointCurve")` removes the last point.
+
+- `target` (control name, required): The Envelope's control, by name.<br>Not an Envelope: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `envelopeRemove`.*
+
+#### ce.components.split: Zone Splitter
+
+Splits the keyboard into zones, each with its own channel and transpose.
+
+##### `ce.components.split.preset(target, preset [, lowNote, highNote])`
+
+Replace every zone with a layout: "whole", "classic", "splitLayer", "threeWay", "velLayer".
+
+Example: `ce.components.split.preset("Split", "classic", "C2", "C6")` splits C2 to C6 in two halves.
+
+- `preset` (text, required): "whole": one zone, channel 1.<br>"classic": the lower half on channel 1, an octave down; the upper half on channel 2.<br>"splitLayer": a bass below; two channels layered above.<br>"threeWay": bass, pad and lead across channels 1 to 3.<br>"velLayer": the same keys, played softly on channel 1 and hard on channel 2.<br>Case-insensitive.<br>Any other: rejected with a console error.
+- `lowNote` (note, optional): The lowest note of the layout.<br>A MIDI note number, or a name such as "C4".<br>Range: 0 ↔ 127.<br>Outside the range: the nearest end.<br>Any other: rejected with a console error.<br>Left out: 36, C2.
+- `highNote` (note, optional): The highest note of the layout.<br>A MIDI note number, or a name such as "C4".<br>Range: 0 ↔ 127.<br>Outside the range: the nearest end.<br>Any other: rejected with a console error.<br>Left out: 96, C7.<br>Below `lowNote`: the two are swapped.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `splitPreset`.*
+
+##### `ce.components.split.mute(target, zone, enabled)`
+
+Let one zone sound, or mute it.
+
+Example: `ce.components.split.mute("Split", "Bass", false)` mutes the zone called Bass.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `enabled` (true or false, required): true: it sounds.<br>false: muted.<br>Left out: it sounds.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `splitMute`.*
+
+##### `ce.components.split.channel(target, zone, channel)`
+
+Set the MIDI channel one zone plays on.
+
+Example: `ce.components.split.channel("Split", 2, 5)` sends zone 2 on channel 5.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `splitChannel`.*
+
+##### `ce.components.split.transpose(target, zone, semitones)`
+
+Transpose one zone.
+
+Example: `ce.components.split.transpose("Split", 1, -12)` plays zone 1 an octave down.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `semitones` (number, required): Semitones: 12 an octave up.<br>Range: -48 ↔ 48, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `splitTranspose`.*
+
+##### `ce.components.split.point(target, zone, note)`
+
+Move the top note of one zone.
+
+Example: `ce.components.split.point("Split", 1, "B3")` ends zone 1 at B3.
+
+- `zone` (number, required): The zone: its number, counted from 1, as the panel labels it, or its name, in any case.<br>Not a zone: rejected with a console error naming them.
+- `note` (note, required): Its new top note.<br>A MIDI note number, or a name such as "C4".<br>Range: 0 ↔ 127.<br>Outside the range: the nearest end.<br>Any other: rejected with a console error.
+
+Good to know:
+
+- A zone that starts just above it moves with it, as a drag of the split point does.
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `splitPoint`.*
+
+##### `ce.components.split.read(target [, field])`
+
+Read the Zone Splitter's settings.
+
+Example: `ce.components.split.read("Split", "zones")` gives the zones, each { label, lowNote, highNote, channel, transpose, enabled, … }.
+
+- `field` (text, optional): A setting's name, in any case, such as "zones" or "lowNote".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- Returns the value.
+
+*Short name: `splitRead`.*
+
 
 ### Hands-on controls
 
 Components you play with directly.
 
-- **Ribbon** — `ce.components.ribbon`. Drive a Ribbon, and change what it does when you let go. Commands: `value`, `bipolar`, `returnMode`, `returnValue`, `returnTime`, `returnCurve`, `snap`, `orientation`, `style`, `label`, `valuePrecision`, `editable`, `showGlow`, `showValue`, `read`.
-- **Crossfader** — `ce.components.crossfader`. Drive a Crossfader and change its law. Commands: `mix`, `law`, `bipolar`, `detent`, `returnMode`, `returnValue`, `returnTime`, `returnCurve`, `orientation`, `labelA`, `labelB`, `editable`, `showLabels`, `showGains`, `read`.
-- **Vector Joystick** — `ce.components.joystick`. Move a Vector Joystick puck, and change what it does when released. Commands: `move`, `bipolar`, `returnMode`, `returnValue`, `returnAxes`, `returnTime`, `returnCurve`, `cornerLabel`, `editable`, `showGrid`, `showCrosshair`, `showCorners`, `showTrail`, `read`, `size`, `fill`.
-- **Meter** — `ce.components.meter`. Drive a Meter from a script — a level a panel computes itself has nowhere else to go. Commands: `value`, `scale`, `peakHold`, `holdMs`, `decay`, `valueMin`, `valueMax`, `dbFloor`, `dbCeil`, `orientation`, `gradient`, `label`, `valuePrecision`, `valuePrefix`, `valueSuffix`, `zoneAt`, `source`, `showTicks`, `showScaleLabels`, `showValue`, `read`, `size`, `fill`, `insert`, `remove`.
+#### ce.components.ribbon: Ribbon
+
+Drive a touch strip or wheel, such as a pitch or mod wheel: its value, its style, and where it goes when let go.
+
+##### `ce.components.ribbon.value(target, value) -> boolean`
+
+Set its position.
+
+Example: `ce.components.ribbon.value("Ribbon", 0.75)` puts it three quarters of the way.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `value` (number, required): Position: 0 the start, 1 the end.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- `snap()` steps a drag, not this.
+- Default: 0.5; a Mod Wheel's: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonValue`.*
+
+##### `ce.components.ribbon.bipolar(target [, bipolar]) -> boolean`
+
+Send its value as -1 to 1, as a pitch wheel does, or as 0 to 1.
+
+Example: `ce.components.ribbon.bipolar("Ribbon")` switches the bipolar on if it is off, and off if it is on.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `bipolar` (true or false, optional): true: -1 at the start, 0 in the middle, 1 at the end; filled from the middle.<br>false: 0 to 1.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- The readout shows it the same way.
+- Default: false; a Pitch Wheel's: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonBipolar`.*
+
+##### `ce.components.ribbon.returnMode(target, returnMode) -> boolean`
+
+Set where it goes when it is let go.
+
+Example: `ce.components.ribbon.returnMode("Ribbon", "center")` springs back to the middle when let go.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `returnMode` (text, required): "none": it stays where it is let go.<br>"center": back to the middle.<br>"min": back to the start.<br>"max": back to the end.<br>"rest": back to `returnValue()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- On letting go of a drag: a script's value stays.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonReturnMode`.*
+
+##### `ce.components.ribbon.returnValue(target, returnValue) -> boolean`
+
+Set the position it goes back to with `returnMode()` "rest".
+
+Example: `ce.components.ribbon.returnValue("Ribbon", 0.25)` goes back to a quarter of the way.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `returnValue` (number, required): Position: 0 the start, 1 the end.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is "rest".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonReturnValue`.*
+
+##### `ce.components.ribbon.returnTime(target, returnTime) -> boolean`
+
+Set how long it takes to go back when let go.
+
+Example: `ce.components.ribbon.returnTime("Ribbon", 500)` takes half a second to go back.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `returnTime` (number, required): Milliseconds for the whole way back.<br>0: at once.<br>Range: 0 ↔ 5000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonReturnTime`.*
+
+##### `ce.components.ribbon.returnCurve(target, returnCurve) -> boolean`
+
+Set how it moves on the way back.
+
+Example: `ce.components.ribbon.returnCurve("Ribbon", "exp")` springs back fast, then settles.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `returnCurve` (text, required): "linear": at one speed.<br>"exp": fast, then settling, as a spring.<br>"ease": slow, fast, slow.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonReturnCurve`.*
+
+##### `ce.components.ribbon.snap(target, snap) -> boolean`
+
+Set the step a drag snaps to.
+
+Example: `ce.components.ribbon.snap("Ribbon", 0.25)` snaps a drag to quarters.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `snap` (number, required): Part of the travel.<br>0: no snap.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A drag only: `value()` is not snapped.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonSnap`.*
+
+##### `ce.components.ribbon.orientation(target, orientation) -> boolean`
+
+Set which way it runs.
+
+Example: `ce.components.ribbon.orientation("Ribbon", "horizontal")` runs it from left to right.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `orientation` (text, required): "vertical": from the bottom up.<br>"horizontal": from left to right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "vertical".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonOrientation`.*
+
+##### `ce.components.ribbon.style(target, style) -> boolean`
+
+Set how it looks: a strip, a flat wheel, or a wheel drawn in 3D.
+
+Example: `ce.components.ribbon.style("Ribbon", "wheel3d")` draws it as a wheel in 3D.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `style` (text, required): "ribbon": a touch strip.<br>"wheel": a flat wheel.<br>"wheel3d": a wheel drawn in 3D.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "ribbon"; a Pitch or Mod Wheel's: "wheel".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonStyle`.*
+
+##### `ce.components.ribbon.label(target, label) -> boolean`
+
+Set the caption under it.
+
+Example: `ce.components.ribbon.label("Ribbon", "PITCH")` captions it PITCH.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `label` (text, required): The caption.<br>"": none.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonLabel`.*
+
+##### `ce.components.ribbon.valuePrecision(target, valuePrecision) -> boolean`
+
+Set how many decimal places the readout shows.
+
+Example: `ce.components.ribbon.valuePrecision("Ribbon", 0)` shows the readout as a whole number.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `valuePrecision` (number, required): Decimal places.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The readout shows while `showValue()` is on.
+- Default: 2.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonValuePrecision`.*
+
+##### `ce.components.ribbon.editable(target [, editable]) -> boolean`
+
+Let it be dragged, or not.
+
+Example: `ce.components.ribbon.editable("Ribbon")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `editable` (true or false, optional): true: a drag moves it.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonEditable`.*
+
+##### `ce.components.ribbon.showGlow(target [, showGlow]) -> boolean`
+
+Show or hide the glow while it is held.
+
+Example: `ce.components.ribbon.showGlow("Ribbon")` shows the glow if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `showGlow` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonShowGlow`.*
+
+##### `ce.components.ribbon.showValue(target [, showValue]) -> boolean`
+
+Show or hide the readout: its value as a number.
+
+Example: `ce.components.ribbon.showValue("Ribbon")` shows the value if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `showValue` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- -1 to 1 while `bipolar()` is on.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `ribbonShowValue`.*
+
+##### `ce.components.ribbon.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.ribbon.read("Ribbon")` gives every setting as a table.
+
+- `target` (control name, required): The Ribbon's control, by name.<br>Not a Ribbon: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `ribbonRead`.*
+
+#### ce.components.crossfader: Crossfader
+
+Blend between two sides, A and B: the blend, how the two levels follow it, its centre snap, and where it goes when let go.
+
+##### `ce.components.crossfader.mix(target, mix) -> boolean`
+
+Set the blend between A and B.
+
+Example: `ce.components.crossfader.mix("Crossfader", 0.25)` blends mostly A, a quarter B.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `mix` (number, required): Position: 0 all A, 0.5 the middle, 1 all B.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- `detent()` snaps a drag, not this.
+- Default: 0.5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderMix`.*
+
+##### `ce.components.crossfader.law(target, law) -> boolean`
+
+Set how the levels of A and B follow the blend.
+
+Example: `ce.components.crossfader.law("Crossfader", "linear")` makes the two levels add up to the whole.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `law` (text, required): "equalPower": constant loudness; each side at 71% (-3 dB) in the middle.<br>"linear": the two add up to 1; each side at half (-6 dB) in the middle.<br>"sharp": both full through the middle; a side cut only towards the far end.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "equalPower".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderLaw`.*
+
+##### `ce.components.crossfader.bipolar(target [, bipolar]) -> boolean`
+
+Send the Mix output as -1 to 1, or as 0 to 1.
+
+Example: `ce.components.crossfader.bipolar("Crossfader")` switches the bipolar on if it is off, and off if it is on.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `bipolar` (true or false, optional): true: -1 all A, 0 the middle, 1 all B.<br>false: 0 to 1.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- The A and B outputs, the two levels, are 0 to 1 either way.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderBipolar`.*
+
+##### `ce.components.crossfader.detent(target, detent) -> boolean`
+
+Set how near the middle a drag snaps to it.
+
+Example: `ce.components.crossfader.detent("Crossfader", 0.05)` snaps a drag within 5% of the middle to it.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `detent` (number, required): Distance from the middle, as part of the whole travel.<br>0: no snap.<br>0.5 or more: every drag lands in the middle.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A drag only: `mix()` is not snapped.
+- The inspector stops at 0.5.
+- Default: 0.03.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderDetent`.*
+
+##### `ce.components.crossfader.returnMode(target, returnMode) -> boolean`
+
+Set where it goes when it is let go.
+
+Example: `ce.components.crossfader.returnMode("Crossfader", "center")` springs back to the middle when let go.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `returnMode` (text, required): "none": it stays where it is let go.<br>"center": back to the middle.<br>"min": back to all A.<br>"max": back to all B.<br>"rest": back to `returnValue()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- On letting go of a drag: a script's value stays.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderReturnMode`.*
+
+##### `ce.components.crossfader.returnValue(target, returnValue) -> boolean`
+
+Set the blend it goes back to with `returnMode()` "rest".
+
+Example: `ce.components.crossfader.returnValue("Crossfader", 0.25)` goes back to a quarter of the way.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `returnValue` (number, required): Position: 0 all A, 1 all B.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is "rest".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderReturnValue`.*
+
+##### `ce.components.crossfader.returnTime(target, returnTime) -> boolean`
+
+Set how long it takes to go back when let go.
+
+Example: `ce.components.crossfader.returnTime("Crossfader", 500)` takes half a second to go back.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `returnTime` (number, required): Milliseconds for the whole way back.<br>0: at once.<br>Range: 0 ↔ 5000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderReturnTime`.*
+
+##### `ce.components.crossfader.returnCurve(target, returnCurve) -> boolean`
+
+Set how it moves on the way back.
+
+Example: `ce.components.crossfader.returnCurve("Crossfader", "exp")` springs back fast, then settles.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `returnCurve` (text, required): "linear": at one speed.<br>"exp": fast, then settling, as a spring.<br>"ease": slow, fast, slow.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderReturnCurve`.*
+
+##### `ce.components.crossfader.orientation(target, orientation) -> boolean`
+
+Set which way the fader runs.
+
+Example: `ce.components.crossfader.orientation("Crossfader", "vertical")` puts A at the bottom and B at the top.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `orientation` (text, required): "horizontal": A at the left.<br>"vertical": A at the bottom.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "horizontal".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderOrientation`.*
+
+##### `ce.components.crossfader.labelA(target, labelA) -> boolean`
+
+Set the name shown at the A end.
+
+Example: `ce.components.crossfader.labelA("Crossfader", "DRY")` names the A end DRY.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `labelA` (text, required): The name.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Shown while `showLabels()` is on.
+- Default: "A".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderLabelA`.*
+
+##### `ce.components.crossfader.labelB(target, labelB) -> boolean`
+
+Set the name shown at the B end.
+
+Example: `ce.components.crossfader.labelB("Crossfader", "WET")` names the B end WET.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `labelB` (text, required): The name.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Shown while `showLabels()` is on.
+- Default: "B".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderLabelB`.*
+
+##### `ce.components.crossfader.editable(target [, editable]) -> boolean`
+
+Let the handle be dragged, or not.
+
+Example: `ce.components.crossfader.editable("Crossfader")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `editable` (true or false, optional): true: a drag moves it.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderEditable`.*
+
+##### `ce.components.crossfader.showLabels(target [, showLabels]) -> boolean`
+
+Show or hide the names at the two ends.
+
+Example: `ce.components.crossfader.showLabels("Crossfader")` shows the labels if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `showLabels` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderShowLabels`.*
+
+##### `ce.components.crossfader.showGains(target [, showGains]) -> boolean`
+
+Show or hide a bar for each side's level.
+
+Example: `ce.components.crossfader.showGains("Crossfader")` shows the gains if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `showGains` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `crossfaderShowGains`.*
+
+##### `ce.components.crossfader.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.crossfader.read("Crossfader")` gives every setting as a table.
+
+- `target` (control name, required): The Crossfader's control, by name.<br>Not a Crossfader: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `crossfaderRead`.*
+
+#### ce.components.joystick: Vector Joystick
+
+Move a puck over a square, sending where it is on each axis and how near it is to each corner, and where it goes when let go.
+
+##### `ce.components.joystick.move(target [, x] [, y]) -> boolean`
+
+Move the puck to a point.
+
+Example: `ce.components.joystick.move("VectorJoystick", 0.25, 0.75)` moves the puck to the upper left.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `x` (number, optional): Across: 0 the left, 1 the right.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+- `y` (number, optional): Up: 0 the bottom, 1 the top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+
+Good to know:
+
+- Sends x and y as `bipolar()` says, and each corner how near the puck is to it: 0 to 1, the four adding up to 1.
+- Default: 0.5, 0.5.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickMove`.*
+
+##### `ce.components.joystick.bipolar(target [, bipolar]) -> boolean`
+
+Send x and y as -1 to 1, or as 0 to 1.
+
+Example: `ce.components.joystick.bipolar("VectorJoystick")` switches the bipolar on if it is off, and off if it is on.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `bipolar` (true or false, optional): true: -1 at the left or bottom, 0 in the middle, 1 at the right or top.<br>false: 0 to 1.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- The corners send 0 to 1 either way.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickBipolar`.*
+
+##### `ce.components.joystick.returnMode(target, returnMode) -> boolean`
+
+Set where it goes when it is let go.
+
+Example: `ce.components.joystick.returnMode("VectorJoystick", "center")` springs back to the middle when let go.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `returnMode` (text, required): "none": it stays where it is let go.<br>"center": back to the middle.<br>"min": back to 0 on each axis that goes back.<br>"max": back to 1 on each axis that goes back.<br>"rest": back to `returnValue()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- On letting go of a drag: a script's value stays.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickReturnMode`.*
+
+##### `ce.components.joystick.returnValue(target, returnValue) -> boolean`
+
+Set the position it goes back to with `returnMode()` "rest".
+
+Example: `ce.components.joystick.returnValue("VectorJoystick", 0.25)` goes back to a quarter of the way.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `returnValue` (number, required): Position on each axis that goes back: 0 the left or bottom, 1 the right or top.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is "rest".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickReturnValue`.*
+
+##### `ce.components.joystick.returnTime(target, returnTime) -> boolean`
+
+Set how long it takes to go back when let go.
+
+Example: `ce.components.joystick.returnTime("VectorJoystick", 500)` takes half a second to go back.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `returnTime` (number, required): Milliseconds for the whole way back.<br>0: at once.<br>Range: 0 ↔ 5000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickReturnTime`.*
+
+##### `ce.components.joystick.returnCurve(target, returnCurve) -> boolean`
+
+Set how it moves on the way back.
+
+Example: `ce.components.joystick.returnCurve("VectorJoystick", "exp")` springs back fast, then settles.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `returnCurve` (text, required): "linear": at one speed.<br>"exp": fast, then settling, as a spring.<br>"ease": slow, fast, slow.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickReturnCurve`.*
+
+##### `ce.components.joystick.returnAxes(target, returnAxes) -> boolean`
+
+Set which axes go back when the puck is let go.
+
+Example: `ce.components.joystick.returnAxes("VectorJoystick", "x")` sends the puck back across, and leaves its height.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `returnAxes` (text, required): "both": both, in a straight line.<br>"x": across only.<br>"y": up and down only.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `returnMode()` is not "none".
+- Default: "both".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickReturnAxes`.*
+
+##### `ce.components.joystick.cornerLabel(target, index, text) -> boolean`
+
+Name one corner, by its number.
+
+Example: `ce.components.joystick.cornerLabel("VectorJoystick", 4, "Brass")` names the bottom right corner Brass.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `index` (number, required): Corner: 1 the top left, 2 the top right, 3 the bottom left, 4 the bottom right.<br>A fraction: rounded.<br>Not one of the corners: rejected with a console error.
+- `text` (text, required): The name.<br>"": none.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Drawn while `showCorners()` is on.
+- Default: "A", "B", "C" and "D".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickCornerLabel`.*
+
+##### `ce.components.joystick.editable(target [, editable]) -> boolean`
+
+Let the puck be dragged, or not.
+
+Example: `ce.components.joystick.editable("VectorJoystick")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `editable` (true or false, optional): true: a drag moves it.<br>false: drags do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickEditable`.*
+
+##### `ce.components.joystick.showGrid(target [, showGrid]) -> boolean`
+
+Show or hide the grid behind the puck.
+
+Example: `ce.components.joystick.showGrid("VectorJoystick")` shows the grid if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How many lines: set in the inspector, under Divisions.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickShowGrid`.*
+
+##### `ce.components.joystick.showCrosshair(target [, showCrosshair]) -> boolean`
+
+Show or hide the lines through the puck.
+
+Example: `ce.components.joystick.showCrosshair("VectorJoystick")` shows the crosshair if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `showCrosshair` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickShowCrosshair`.*
+
+##### `ce.components.joystick.showCorners(target [, showCorners]) -> boolean`
+
+Show or hide the corners' marks and names.
+
+Example: `ce.components.joystick.showCorners("VectorJoystick")` shows the corners if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `showCorners` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickShowCorners`.*
+
+##### `ce.components.joystick.showTrail(target [, showTrail]) -> boolean`
+
+Show or hide the fading trail behind the puck.
+
+Example: `ce.components.joystick.showTrail("VectorJoystick")` shows the trail if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `showTrail` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickShowTrail`.*
+
+##### `ce.components.joystick.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.joystick.read("VectorJoystick")` gives every setting as a table.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "cornerLabel")`: the whole list; `read(target, "cornerLabel", 3)`: one corner, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `joystickRead`.*
+
+##### `ce.components.joystick.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.joystick.size("VectorJoystick")` gives the length of every list as a table.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "cornerLabel")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `joystickSize`.*
+
+##### `ce.components.joystick.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.joystick.fill("VectorJoystick", "cornerLabel", {"One", "Two"})` writes corners 1 and 2.
+
+- `target` (control name, required): The Vector Joystick's control, by name.<br>Not a Vector Joystick: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `joystickFill`.*
+
+#### ce.components.meter: Meter
+
+Show a level on a bar or an arc: its value and range, scale, colour zones, peak marker, caption and readout.
+
+##### `ce.components.meter.value(target, value) -> boolean`
+
+Set the level shown, in the meter's own units.
+
+Example: `ce.components.meter.value("Meter", 0.5)` fills the meter halfway while its range is 0 to 1.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `value` (number, required): The level, between `valueMin()` and `valueMax()`.<br>Outside them: drawn at the nearest end; the readout shows it as it is.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `source()` links a control, that control sets the value and its range.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterValue`.*
+
+##### `ce.components.meter.scale(target, scale) -> boolean`
+
+Set how the level is placed along the meter: in proportion, or in decibels.
+
+Example: `ce.components.meter.scale("Meter", "db")` places the level in decibels.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `scale` (text, required): "linear": in proportion to the value.<br>"db": the value's part of its range as a level in decibels, the top of the range being 0 dB, placed between `dbFloor()` and `dbCeil()`.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "linear".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterScale`.*
+
+##### `ce.components.meter.peakHold(target [, peakHold]) -> boolean`
+
+Show or hide the peak marker: a line at the highest recent level.
+
+Example: `ce.components.meter.peakHold("Meter")` switches the peak hold on if it is off, and off if it is on.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `peakHold` (true or false, optional): true: shown; it holds for `holdMs()`, then falls at `decay()`.<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterPeakHold`.*
+
+##### `ce.components.meter.holdMs(target, holdMs) -> boolean`
+
+Set how long the peak marker holds before it falls.
+
+Example: `ce.components.meter.holdMs("Meter", 2000)` holds the peak for two seconds.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `holdMs` (number, required): Milliseconds.<br>0: it falls at once.<br>Range: 0 ↔ 60000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1200.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterHoldMs`.*
+
+##### `ce.components.meter.decay(target, decay) -> boolean`
+
+Set how fast the peak marker falls.
+
+Example: `ce.components.meter.decay("Meter", 1)` drops the peak the meter's whole length in a second.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `decay` (number, required): Lengths of the meter per second.<br>0: it does not fall.<br>Range: 0 ↔ 100.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterDecay`.*
+
+##### `ce.components.meter.valueMin(target, valueMin) -> boolean`
+
+Set the value at which the meter is empty.
+
+Example: `ce.components.meter.valueMin("Meter", -1)` empties the meter at -1.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `valueMin` (number, required): The value at the empty end.<br>Equal to `valueMax()`: the meter stays empty.<br>Above it: the meter fills the other way.<br>Range: -1000000000 ↔ 1000000000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `source()` links a control, that control sets the value and its range.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterValueMin`.*
+
+##### `ce.components.meter.valueMax(target, valueMax) -> boolean`
+
+Set the value at which the meter is full.
+
+Example: `ce.components.meter.valueMax("Meter", 127)` fills the meter at 127.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `valueMax` (number, required): The value at the full end.<br>Equal to `valueMin()`: the meter stays empty.<br>Below it: the meter fills the other way.<br>Range: -1000000000 ↔ 1000000000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `source()` links a control, that control sets the value and its range.
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterValueMax`.*
+
+##### `ce.components.meter.dbFloor(target, dbFloor) -> boolean`
+
+Set the level in decibels at which the meter is empty, on a dB scale.
+
+Example: `ce.components.meter.dbFloor("Meter", -48)` empties the meter at -48 dB.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `dbFloor` (number, required): Decibels.<br>Range: -200 ↔ 0.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `scale()` is "db".
+- Default: -60.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterDbFloor`.*
+
+##### `ce.components.meter.dbCeil(target, dbCeil) -> boolean`
+
+Set the level in decibels at which the meter is full, on a dB scale.
+
+Example: `ce.components.meter.dbCeil("Meter", 0)` fills the meter at 0 dB, the top of the value's range.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `dbCeil` (number, required): Decibels.<br>Above 0: the meter is not full at the top of the value's range.<br>Equal to `dbFloor()`: the meter stays empty; below it: the meter fills the other way.<br>Range: -200 ↔ 60.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `scale()` is "db".
+- Default: 6.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterDbCeil`.*
+
+##### `ce.components.meter.orientation(target, orientation) -> boolean`
+
+Set which way the meter runs: across, up, or round an arc.
+
+Example: `ce.components.meter.orientation("Meter", "vertical")` fills the meter from the bottom up.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `orientation` (text, required): "horizontal": left to right.<br>"vertical": bottom to top.<br>"arc": clockwise round an arc; its angles are set in the inspector, under Arc.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "horizontal".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterOrientation`.*
+
+##### `ce.components.meter.gradient(target [, gradient]) -> boolean`
+
+Blend the zone colours into each other, or step from one to the next.
+
+Example: `ce.components.meter.gradient("Meter")` switches the gradient on if it is off, and off if it is on.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `gradient` (true or false, optional): true: blended.<br>false: each zone in its own colour.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: on; a Progress Bar's: off.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterGradient`.*
+
+##### `ce.components.meter.label(target, label) -> boolean`
+
+Set the caption shown with the meter.
+
+Example: `ce.components.meter.label("Meter", "OUT")` captions the meter OUT.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `label` (text, required): The caption.<br>Shown above or below the meter, as `labelPosition()` says.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterLabel`.*
+
+##### `ce.components.meter.labelPosition(target, labelPosition) -> boolean`
+
+Set where the caption sits.
+
+Example: `ce.components.meter.labelPosition("Meter", "below")` puts the caption under the meter.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `labelPosition` (text, required): "none": hidden.<br>"above": above the meter.<br>"below": below it.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterLabelPosition`.*
+
+##### `ce.components.meter.valuePrecision(target, valuePrecision) -> boolean`
+
+Set how many decimal places the readout shows.
+
+Example: `ce.components.meter.valuePrecision("Meter", 2)` shows the readout with two decimal places.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `valuePrecision` (number, required): Decimal places.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The readout shows while `showValue()` is on.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterValuePrecision`.*
+
+##### `ce.components.meter.valuePrefix(target, valuePrefix) -> boolean`
+
+Set the text before the number in the readout and the scale labels.
+
+Example: `ce.components.meter.valuePrefix("Meter", "Gain ")` shows the readout as Gain 1.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `valuePrefix` (text, required): The text.<br>On a dB scale, the scale labels say "dB" instead.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterValuePrefix`.*
+
+##### `ce.components.meter.valueSuffix(target, valueSuffix) -> boolean`
+
+Set the text after the number in the readout and the scale labels.
+
+Example: `ce.components.meter.valueSuffix("Meter", " ms")` writes ms after the number.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `valueSuffix` (text, required): The text.<br>On a dB scale, the scale labels say "dB" instead.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterValueSuffix`.*
+
+##### `ce.components.meter.zoneAt(target, index, from) -> boolean`
+
+Set where a colour zone starts along the meter, by its number.
+
+Example: `ce.components.meter.zoneAt("Meter", 2, 0.8)` starts zone 2 at 80% of the meter.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `index` (number, required): Zone number, counted from 1.<br>A fraction: rounded.<br>Not one of the zones: rejected with a console error.
+- `from` (number, required): Part of the meter's length: 0 the empty end, 1 the full end.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- A zone colours the fill from its start up to the next zone's; the lowest also from 0.
+- Their colours are set in the inspector, under Zones.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterZoneAt`.*
+
+##### `ce.components.meter.source(target [, name]) -> boolean`
+
+Name the control that drives the level.
+
+Example: `ce.components.meter.source("Meter", "Volume")` makes the control called Volume drive the meter.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Its value and range are the meter's.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "source")` gives the control's name.
+
+*Short name: `meterSource`.*
+
+##### `ce.components.meter.showTicks(target [, showTicks]) -> boolean`
+
+Show or hide the tick marks along the meter.
+
+Example: `ce.components.meter.showTicks("Meter")` shows the ticks if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `showTicks` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How many divisions: set in the inspector, under Scale & readout. Default: 4.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterShowTicks`.*
+
+##### `ce.components.meter.showScaleLabels(target [, showScaleLabels]) -> boolean`
+
+Show or hide the values at the tick marks.
+
+Example: `ce.components.meter.showScaleLabels("Meter")` shows the scale labels if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `showScaleLabels` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- On a dB scale in decibels; otherwise with `valuePrefix()` and `valueSuffix()`.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterShowScaleLabels`.*
+
+##### `ce.components.meter.showValue(target [, showValue]) -> boolean`
+
+Show or hide the readout: the value as a number.
+
+Example: `ce.components.meter.showValue("Meter")` shows the value if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `showValue` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Written with `valuePrecision()`, `valuePrefix()` and `valueSuffix()`, as the value is: not in decibels.
+- Default: hidden; a Progress Bar's: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterShowValue`.*
+
+##### `ce.components.meter.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.meter.read("Meter")` gives every setting as a table.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "zoneAt")`: the whole list; `read(target, "zoneAt", 3)`: one zone, counted from 1.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `meterRead`.*
+
+##### `ce.components.meter.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.meter.size("Meter")` gives the length of every list as a table.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "zoneAt")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `meterSize`.*
+
+##### `ce.components.meter.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.meter.fill("Meter", "zoneAt", {0.25, 0.5, 0.75})` writes zones 1 to 3.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterFill`.*
+
+##### `ce.components.meter.insert(target, name [, index]) -> boolean`
+
+Add one element to a list.
+
+Example: `ce.components.meter.insert("Meter", "zoneAt")` adds a zone at the end.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot grow: rejected with a console error.
+- `index` (number, optional): Position of the new element, counted from 1.<br>A fraction: rounded.<br>Left out: after the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The new element is the canvas's own template. Appended; with an index, inserted before that position, counted from 1.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterInsert`.*
+
+##### `ce.components.meter.remove(target, name [, index]) -> boolean`
+
+Remove one element from a list.
+
+Example: `ce.components.meter.remove("Meter", "zoneAt")` removes the last zone.
+
+- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb, or a list that cannot shrink: rejected with a console error.
+- `index` (number, optional): Element number, counted from 1.<br>A fraction: rounded.<br>Left out: the last.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- The last; with an index, that one, counted from 1. An element the component needs stays: an envelope keeps its endpoints.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `meterRemove`.*
+
 
 ### Displays
 
 Components that show something rather than set it.
 
-- **LCD Display** — `ce.components.lcd`. Write to a character LCD: a line at a time, plus backlight, brightness and scrolling. Commands: `text`, `clear`, `backlight`, `brightness`, `contrast`, `scroll`, `scrollSpeed`, `blink`, `cursor`, `cursorAt`, `value`, `anim`, `animPreset`, `animSpeed`, `animFps`, `animLoop`, `scrollMode`, `scrollRepeat`, `blinkRate`, `cursorBlink`, `valueMin`, `valueMax`, `valuePrecision`, `valuePrefix`, `valueSuffix`, `valueSource`, `brightnessSource`, `backlightSource`, `glyph`, `editText`, `showGlass`, `showGhost`, `showScanlines`, `showGrid`, `read`, `size`, `fill`.
-- **Pixel Display** — `ce.components.pixel`. Drive a pixel display: its elements' text, visibility and position, plus backlight, brightness and animation. Commands: `text`, `label`, `show`, `blink`, `x`, `y`, `w`, `h`, `editText`, `backlight`, `brightness`, `contrast`, `gamma`, `glow`, `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`, `layoutTransition`, `transitionMs`, `brightnessSource`, `backlightSource`, `showGlass`, `showGhost`, `showScanlines`, `showGrid`, `read`.
+#### ce.components.lcd: LCD Display
+
+Write to a character LCD by layout, row and column, plus backlight, brightness and scrolling.
+
+##### `ce.components.lcd.text(target, at, text) -> boolean`
+
+Write one row of the display.
+
+Example: `ce.components.lcd.text("Screen", 1, "PATCH 12")` writes PATCH 12 on the first row.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `at` (number or table, required): Row, counted from 1, of the layout showing.<br>Or a table: {layout = 2, row = 4, col = 15}, `layout` and `col` optional.<br>`layout`: its number, counted from 1, or its name. Left out: the layout showing.<br>`col`: written from that column on, the rest of the row kept.<br>`col` as a range {5, 10}: written into those columns, padded with blanks or cut.<br>A fraction: rounded.<br>A range past the display: to its last column.<br>Not on the display: rejected with a console error.
+- `text` (text, required): The text.<br>Longer than the display: cut at its width, with a console warning the first time.<br>On a display without layouts that scrolls: scrolled in instead.<br>A character the display cannot draw: a blank cell, with a console warning the first time.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- On a display with layouts: written on the layout, shown where no zone paints.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdText`.*
+
+##### `ce.components.lcd.clear(target [, at]) -> boolean`
+
+Blank the layout showing, or part of it.
+
+Example: `ce.components.lcd.clear("Screen")` blanks the display.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `at` (number or table, optional): Row, counted from 1, of the layout showing.<br>Or a table: {layout = 2, row = 4, col = 15}, each part optional.<br>`layout`: its number, counted from 1, or its name. Left out: the layout showing.<br>`row`, `col`: a number, or a range {5, 10}. Left out: every row, every column.<br>A fraction: rounded.<br>A range past the display: to its last row or column.<br>Left out: the whole layout showing.<br>Not on the display: rejected with a console error.
+
+Good to know:
+
+- Only text is blanked: a zone still shows its control.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdClear`.*
+
+##### `ce.components.lcd.backlight(target [, backlight]) -> boolean`
+
+Switch the backlight on or off.
+
+Example: `ce.components.lcd.backlight("Screen")` switches the backlight on if it is off, and off if it is on.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `backlight` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdBacklight`.*
+
+##### `ce.components.lcd.brightness(target, brightness) -> boolean`
+
+Set the brightness of the lit segments or pixels.
+
+Example: `ce.components.lcd.brightness("Screen", 80)` sets the brightness to 80.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `brightness` (number, required): How bright the lit characters are.<br>Range: 0 ↔ 100.<br>0: the dimmest, still lit.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `brightnessSource()` links a control, that control sets the brightness.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdBrightness`.*
+
+##### `ce.components.lcd.contrast(target, contrast) -> boolean`
+
+Set the contrast, which is how visible the unlit segments are.
+
+Example: `ce.components.lcd.contrast("Screen", 55)` sets the contrast to 55.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `contrast` (number, required): How visible the unlit segments are.<br>Also how strongly the backlight glows.<br>Range: 0 ↔ 100.<br>0: unlit segments hidden.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdContrast`.*
+
+##### `ce.components.lcd.scroll(target, scroll) -> boolean`
+
+Set which way the rows scroll, or stop them scrolling.
+
+Example: `ce.components.lcd.scroll("Screen", "left")` scrolls the rows to the left.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `scroll` (text, required): One of "off", "left" or "right". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only a row longer than the display moves.
+- On a display with layouts: no effect. A zone set to scroll does so at `scrollSpeed()`.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdScroll`.*
+
+##### `ce.components.lcd.scrollSpeed(target, scrollSpeed) -> boolean`
+
+Set the scrolling speed, in characters per second.
+
+Example: `ce.components.lcd.scrollSpeed("Screen", 30)` sets the scroll speed to 30.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `scrollSpeed` (number, required): Characters per second.<br>Range: 0 ↔ 60.<br>0: no scrolling.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdScrollSpeed`.*
+
+##### `ce.components.lcd.blink(target [, blink]) -> boolean`
+
+Switch the text blinking on or off.
+
+Example: `ce.components.lcd.blink("Screen", true)` makes the text blink.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `blink` (true or false, optional): true: the text blinks.<br>false: the text is steady.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.
+- The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdBlink`.*
+
+##### `ce.components.lcd.cursor(target, cursor) -> boolean`
+
+Set the cursor's shape, or hide it.
+
+Example: `ce.components.lcd.cursor("Screen", "block")` shows a block cursor.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `cursor` (text, required): One of "off", "block" or "underline". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdCursor`.*
+
+##### `ce.components.lcd.cursorAt(target [, col] [, row]) -> boolean`
+
+Put the cursor on a cell.
+
+Example: `ce.components.lcd.cursorAt("Screen", 5, 2)` puts the cursor on column 5 of row 2.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `col` (number, optional): Column, counted from 1.<br>Range: 1 ↔ the display's columns.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+- `row` (number, optional): Row, counted from 1.<br>Range: 1 ↔ the display's rows.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Left out: unchanged.<br>Invalid: rejected with a console error.<br>Both left out: rejected with a console error.
+
+Good to know:
+
+- The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdCursorAt`.*
+
+##### `ce.components.lcd.value(target, value) -> boolean`
+
+Set the value the {value}, {pct} and {bar} tokens show.
+
+Example: `ce.components.lcd.value("Screen", 64)` shows 64 wherever a row has {value}.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `value` (number, required): The number shown.<br>Outside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `valueSource()` links a control, that control sets the value and its range.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdValue`.*
+
+##### `ce.components.lcd.anim(target, anim) -> boolean`
+
+Set the animation behind the text of a graphic display: off, a file, or a preset.
+
+Example: `ce.components.lcd.anim("Screen", "preset")` plays the chosen preset animation.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `anim` (text, required): One of "off", "file" or "preset". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdAnim`.*
+
+##### `ce.components.lcd.animPreset(target, animPreset) -> boolean`
+
+Choose the preset animation.
+
+Example: `ce.components.lcd.animPreset("Screen", "rain")` plays the rain animation.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `animPreset` (text, required): One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Plays only on a graphic display, while `anim()` is "preset".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdAnimPreset`.*
+
+##### `ce.components.lcd.animSpeed(target, animSpeed) -> boolean`
+
+Set the speed of the preset animation, as a multiple of its normal speed.
+
+Example: `ce.components.lcd.animSpeed("Screen", 2)` plays the preset animation at twice its normal speed.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `animSpeed` (number, required): Speed factor.<br>Range: 0.1 ↔ 5.<br>1: normal.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdAnimSpeed`.*
+
+##### `ce.components.lcd.animFps(target, animFps) -> boolean`
+
+Set the frame rate of a sprite-sheet animation.
+
+Example: `ce.components.lcd.animFps("Screen", 24)` plays the sheet at 24 frames per second.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `animFps` (number, required): Frames per second.<br>Only for a sprite sheet: a GIF or APNG plays at its own speed.<br>Range: 1 ↔ 120.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdAnimFps`.*
+
+##### `ce.components.lcd.animLoop(target [, animLoop]) -> boolean`
+
+Switch looping of the animation on or off.
+
+Example: `ce.components.lcd.animLoop("Screen")` switches the anim loop on if it is off, and off if it is on.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `animLoop` (true or false, optional): Left out: toggles.<br>false: the last frame holds.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdAnimLoop`.*
+
+##### `ce.components.lcd.scrollMode(target, scrollMode) -> boolean`
+
+Set whether scrolled text loops round or bounces.
+
+Example: `ce.components.lcd.scrollMode("Screen", "bounce")` bounces the text between its ends.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `scrollMode` (text, required): One of "loop" or "bounce". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdScrollMode`.*
+
+##### `ce.components.lcd.scrollRepeat(target, scrollRepeat) -> boolean`
+
+Set how many times the text scrolls through.
+
+Example: `ce.components.lcd.scrollRepeat("Screen", 3)` scrolls the text through three times, then stops.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `scrollRepeat` (number, required): Number of times.<br>Range: 0 ↔ 999, whole.<br>0: forever.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdScrollRepeat`.*
+
+##### `ce.components.lcd.blinkRate(target, blinkRate) -> boolean`
+
+Set how fast the text blinks.
+
+Example: `ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `blinkRate` (number, required): Time on, then the same time off, in milliseconds.<br>Range: 60 ↔ 5000.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Has an effect only while `blink()` is on. Default: off.
+- The cursor blinks at its own fixed speed.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdBlinkRate`.*
+
+##### `ce.components.lcd.cursorBlink(target [, cursorBlink]) -> boolean`
+
+Switch blinking of the cursor on or off.
+
+Example: `ce.components.lcd.cursorBlink("Screen")` switches the cursor blink on if it is off, and off if it is on.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `cursorBlink` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdCursorBlink`.*
+
+##### `ce.components.lcd.valueMin(target, valueMin) -> boolean`
+
+Set the low end of the value's range, for the {pct} and {bar} tokens.
+
+Example: `ce.components.lcd.valueMin("Screen", 0)` makes 0 the empty end of the bar.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `valueMin` (number, required): Value min.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdValueMin`.*
+
+##### `ce.components.lcd.valueMax(target, valueMax) -> boolean`
+
+Set the high end of the value's range, for the {pct} and {bar} tokens.
+
+Example: `ce.components.lcd.valueMax("Screen", 127)` makes 127 the full end of the bar.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `valueMax` (number, required): Value max.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdValueMax`.*
+
+##### `ce.components.lcd.valuePrecision(target, valuePrecision) -> boolean`
+
+Set how many decimal places the value shows.
+
+Example: `ce.components.lcd.valuePrecision("Screen", 2)` shows the value with two decimal places.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `valuePrecision` (number, required): Decimal places `{value}` shows. `{pct}` is always whole.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdValuePrecision`.*
+
+##### `ce.components.lcd.valuePrefix(target, valuePrefix) -> boolean`
+
+Set the text written before the value.
+
+Example: `ce.components.lcd.valuePrefix("Screen", "Vol ")` shows the value as Vol 64.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `valuePrefix` (text, required): Text before the number in `{value}`. Not used by `{pct}` or `{bar}`.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdValuePrefix`.*
+
+##### `ce.components.lcd.valueSuffix(target, valueSuffix) -> boolean`
+
+Set the text written after the value.
+
+Example: `ce.components.lcd.valueSuffix("Screen", " dB")` shows the value as 64 dB.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `valueSuffix` (text, required): Text after the number in `{value}`. Not used by `{pct}` or `{bar}`.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdValueSuffix`.*
+
+##### `ce.components.lcd.valueSource(target [, name]) -> boolean`
+
+Name the control that drives the value.
+
+Example: `ce.components.lcd.valueSource("Screen", "Cutoff")` makes the control called Cutoff drive the value.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "valueSource")` gives the control's name.
+
+*Short name: `lcdValueSource`.*
+
+##### `ce.components.lcd.brightnessSource(target [, name]) -> boolean`
+
+Name the control that drives the brightness.
+
+Example: `ce.components.lcd.brightnessSource("Screen", "Cutoff")` makes the control called Cutoff drive the brightness.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "brightnessSource")` gives the control's name.
+
+*Short name: `lcdBrightnessSource`.*
+
+##### `ce.components.lcd.backlightSource(target [, name]) -> boolean`
+
+Name the control that drives the backlight.
+
+Example: `ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>On while the control is on, or past halfway.<br>Not on this panel: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "backlightSource")` gives the control's name.
+
+*Short name: `lcdBacklightSource`.*
+
+##### `ce.components.lcd.glyph(target, index, bits) -> boolean`
+
+Define one of the eight user glyphs.
+
+Example: `ce.components.lcd.glyph("Screen", 1, ".#.#.|#####|#####|.###.|..#..|.....|.....|.....")` puts a heart in slot 1, shown in a row by \x00.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `index` (number, required): Glyph slot.<br>Range: 1 ↔ 8.<br>A fraction: rounded.<br>Outside the range: rejected with a console error.
+- `bits` (text, required): Eight rows of five: "#" lit, "." unlit, rows separated by "|".<br>Shown in a row by \x00 to \x07 for slots 1 to 8.<br>"1" and "0": the same as "#" and ".".<br>Fewer than eight rows, or fewer than five cells in a row: the rest unlit.<br>Empty, or nothing lit: the slot is cleared.<br>Other characters: rejected with a console error.<br>More than eight rows, or a row longer than five: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdGlyph`.*
+
+##### `ce.components.lcd.editText(target, editText) -> boolean`
+
+Set the text in the display's editable field.
+
+Example: `ce.components.lcd.editText("Screen", "INIT VOICE")` puts INIT VOICE in the field.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `editText` (text, required): The text in the field.<br>Not held to the field's characters or length: those apply to typing.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- `read(target, "editText")` gives what is in the field, typed at the screen or set here.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdEditText`.*
+
+##### `ce.components.lcd.zoneText(target, name, text) -> boolean`
+
+Set the text of a fixed-text zone, by its name.
+
+Example: `ce.components.lcd.zoneText("Screen", "Title", "VOL")` writes VOL in the zone called Title.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `text` (text, required): The text.<br>Shown by a zone that shows fixed text.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneText`.*
+
+##### `ce.components.lcd.zoneLabel(target, name, label) -> boolean`
+
+Set the name a name zone shows in place of its control's, by its name.
+
+Example: `ce.components.lcd.zoneLabel("Screen", "Cutoff", "CUT")` shows CUT in the zone called Cutoff, in place of the control's name.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `label` (text, required): The name shown.<br>"": the control's own name.<br>Shown by a zone that shows a name.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneLabel`.*
+
+##### `ce.components.lcd.zoneShow(target, name [, on]) -> boolean`
+
+Show or hide a zone, by its name.
+
+Example: `ce.components.lcd.zoneShow("Screen", "Cutoff")` hides the zone called Cutoff if it is shown, and shows it if it is hidden.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `on` (true or false, optional): true: shown.<br>false: hidden; the layout's text shows through.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneShow`.*
+
+##### `ce.components.lcd.zoneAt(target, name, place) -> boolean`
+
+Move a zone, by its name.
+
+Example: `ce.components.lcd.zoneAt("Screen", "Cutoff", {row = 2, col = {1, 8}})` moves the zone called Cutoff to columns 1 to 8 of row 2.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `place` (number or table, required): A table: {row = 2, col = {1, 8}}, each part optional.<br>`row`: one row, counted from 1.<br>`col`: the first column, the zone keeping its width up to the display's edge; or a range {1, 8}.<br>A row number alone: the row.<br>A part left out: unchanged.<br>A fraction: rounded.<br>A range past the display: to its last column.<br>Not on the display: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneAt`.*
+
+##### `ce.components.lcd.zoneSource(target, name, control) -> boolean`
+
+Link a zone to another control, by its name.
+
+Example: `ce.components.lcd.zoneSource("Screen", "Cutoff", "Resonance")` makes the zone called Cutoff show the control called Resonance.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `control` (text, required): The control's name. Case-insensitive.<br>"": unlinked.<br>"@active": the control last touched.<br>"@active#value", "@active#switch" or "@active#choice": the last of that kind.<br>"@edit": the display's editable field.<br>This display, or not on this panel: rejected with a console error.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- `read(target, "zoneSource", "Cutoff")` gives the control's name.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneSource`.*
+
+##### `ce.components.lcd.zoneKind(target, name, kind) -> boolean`
+
+Set what a zone shows, by its name.
+
+Example: `ce.components.lcd.zoneKind("Screen", "Cutoff", "bar")` makes the zone called Cutoff show its control as a bar.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): The zone's name, as given in the zone table. Case-insensitive.<br>Every zone with that name, on every layout.<br>Not a zone of the display: rejected with a console error.
+- `kind` (text, required): One of "static", "name", "value", "pct", "bar", "midiValue", "note", "text", "state", "address", "edit", "hbar", "vbar", "hslider", "vslider" or "needle". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdZoneKind`.*
+
+##### `ce.components.lcd.layout(target, layout) -> boolean`
+
+Show one of the display's layouts.
+
+Example: `ce.components.lcd.layout("Screen", 2)` shows layout 2.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `layout` (number or name, required): Its number, counted from 1, or its name.<br>A name: case-insensitive.<br>A fraction: rounded.<br>A display without layouts: 1, its own rows.<br>Not a layout of the display: rejected with a console error.
+
+Good to know:
+
+- Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "layout")` gives the number of the layout showing.
+
+*Short name: `lcdLayout`.*
+
+##### `ce.components.lcd.showGlass(target [, showGlass]) -> boolean`
+
+Show or hide the glass: a sheen across the screen.
+
+Example: `ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `showGlass` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Its tint is set in the inspector, under Colour ▸ Glass. Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdShowGlass`.*
+
+##### `ce.components.lcd.showGhost(target [, showGhost]) -> boolean`
+
+Show or hide the ghost: the faint unlit cells behind the text.
+
+Example: `ce.components.lcd.showGhost("Screen")` shows the ghost if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `showGhost` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How faint is set by `contrast()`. Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdShowGhost`.*
+
+##### `ce.components.lcd.showScanlines(target [, showScanlines]) -> boolean`
+
+Show or hide the scanlines: thin horizontal lines across the screen.
+
+Example: `ce.components.lcd.showScanlines("Screen")` shows the scanlines if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `showScanlines` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdShowScanlines`.*
+
+##### `ce.components.lcd.showGrid(target [, showGrid]) -> boolean`
+
+Show or hide the grid: faint lines between the cells or pixels.
+
+Example: `ce.components.lcd.showGrid("Screen")` shows the grid if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdShowGrid`.*
+
+##### `ce.components.lcd.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.lcd.read("Screen")` gives every setting as a table.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>For "text": a row or a table, as `text()` takes it.<br>For a zone verb, such as "zoneText": the zone's name, case-insensitive.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. `read(target, "zoneText")`: every zone's, by name; `read(target, "zoneText", "Title")`: one zone's.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `lcdRead`.*
+
+##### `ce.components.lcd.size(target [, name]) -> number|table`
+
+Read how many elements a list has.
+
+Example: `ce.components.lcd.size("Screen")` gives the length of every list as a table.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, optional): A list verb of this component, by name.<br>Left out: every list, as a table.<br>Not a list verb: rejected with a console error.
+
+Good to know:
+
+- `size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number.
+- Returns the number.
+- Rejected: no result, with a console error.
+
+*Short name: `lcdSize`.*
+
+##### `ce.components.lcd.fill(target, name, values) -> boolean`
+
+Write a whole list in one call.
+
+Example: `ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2.
+
+- `target` (control name, required): The LCD Display's control, by name.<br>Not an LCD Display: rejected with a console error.
+- `name` (text, required): A list verb of this component, by name.<br>Not a list verb: rejected with a console error.
+- `values` (list, required): A list, one value per element from the first.<br>Longer than the list: rejected with a console error.<br>Not a list: rejected with a console error.
+
+Good to know:
+
+- One undo step for the whole list, instead of one per element.
+- Returns true.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `lcdFill`.*
+
+#### ce.components.pixel: Pixel Display
+
+Draw on a pixel screen by named elements: what each is, shows and where, plus its layouts, backlight, brightness and animation.
+
+##### `ce.components.pixel.text(target, name, text) -> boolean`
+
+Set the text of a "static" element, by its name.
+
+Example: `ce.components.pixel.text("Screen", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `text` (text, required): The text.<br>Shown by "static", between its prefix and suffix.<br>Shown by "name" while it has no label and no control, and by "edit" while its control has no text.<br>"\n": a new line while the element wraps; a blank otherwise.<br>A character the font cannot draw: a blank. The built-in font has none for $ & ^ ` { | } ~ and letters with accents.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelText`.*
+
+##### `ce.components.pixel.label(target, name, label) -> boolean`
+
+Set an element's caption, or the name a "name" element shows, by its name.
+
+Example: `ce.components.pixel.label("Screen", "Cutoff", "CUT")` shows CUT under the element called Cutoff.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `label` (text, required): The text.<br>"name": shown in place of its control's name; "": the control's name.<br>"hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none.<br>Other kinds: not shown.<br>A character the font cannot draw: a blank.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelLabel`.*
+
+##### `ce.components.pixel.show(target, name [, on]) -> boolean`
+
+Show or hide an element, by its name.
+
+Example: `ce.components.pixel.show("Screen", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `on` (true or false, optional): true: shown.<br>false: hidden.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelShow`.*
+
+##### `ce.components.pixel.blink(target, name [, on]) -> boolean`
+
+Make an element blink, by its name.
+
+Example: `ce.components.pixel.blink("Screen", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `on` (true or false, optional): true: blinks: 530 ms shown, 530 ms hidden.<br>false: steady.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Every blinking element blinks in step. A hidden element does not blink.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelBlink`.*
+
+##### `ce.components.pixel.x(target, name, x) -> boolean`
+
+Set an element's left edge, by its name.
+
+Example: `ce.components.pixel.x("Screen", "Title", 10)` puts the element called Title 10 pixels from the screen's left edge.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `x` (number, required): Pixels of the grid, from the screen's left edge; 0: at the edge.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelX`.*
+
+##### `ce.components.pixel.y(target, name, y) -> boolean`
+
+Set an element's top edge, by its name.
+
+Example: `ce.components.pixel.y("Screen", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `y` (number, required): Pixels of the grid, from the screen's top edge; 0: at the edge.<br>Range: -4096 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelY`.*
+
+##### `ce.components.pixel.w(target, name, w) -> boolean`
+
+Set an element's width, by its name.
+
+Example: `ce.components.pixel.w("Screen", "Title", 64)` makes the element called Title 64 pixels wide.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `w` (number, required): Pixels of the grid.<br>A text kind: the box its text is aligned and cut in; 0: as wide as the text.<br>Any other kind: its width; drawn at least 1 wide, 4 for "anim".<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".
+- A text kind 0 wide is not wrapped or scrolled.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelW`.*
+
+##### `ce.components.pixel.h(target, name, h) -> boolean`
+
+Set an element's height, by its name.
+
+Example: `ce.components.pixel.h("Screen", "Title", 16)` draws the text of the element called Title at twice the size.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `h` (number, required): Pixels of the grid.<br>A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.<br>Any other kind: its height; drawn at least 1 high, 4 for "anim".<br>Range: 0 ↔ 4096, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelH`.*
+
+##### `ce.components.pixel.kind(target, name, kind) -> boolean`
+
+Set what an element is, by its name.
+
+Example: `ce.components.pixel.kind("Screen", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `kind` (text, required): One of "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon", "clock", "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope", "adsr", "anim" or "bitmap". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Its other settings are kept: its place, size, text and source.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelKind`.*
+
+##### `ce.components.pixel.source(target, name, control) -> boolean`
+
+Link an element to a control, by its name.
+
+Example: `ce.components.pixel.source("Screen", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, required): The element's name, as given in the element table. Case-insensitive.<br>Every element with that name, on every layout.<br>Not an element of the display: rejected with a console error.
+- `control` (text, required): The control's name. Case-insensitive.<br>"": unlinked.<br>"@active": the control last touched.<br>"@active#value", "@active#switch" or "@active#choice": the last of that kind.<br>"@edit": the display's editable field.<br>This display, or not on this panel: rejected with a console error.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"'s level and "scope". Not used by "adsr", "anim" or "bitmap".
+- "wave"'s cutoff, resonance, LFO and pitch, and "adsr"'s four: set in the inspector.
+- `read(target, "source", "Cutoff")` gives the control's name.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelSource`.*
+
+##### `ce.components.pixel.editText(target, editText) -> boolean`
+
+Set the text in the display's editable field.
+
+Example: `ce.components.pixel.editText("Screen", "INIT VOICE")` puts INIT VOICE in the field.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `editText` (text, required): The text in the field.<br>Shown by an "edit" element linked to "@edit".<br>Not held to the field's characters or length: those apply to typing.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- `read(target, "editText")` gives what is in the field, typed at the screen or set here.
+- Default: "INIT".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelEditText`.*
+
+##### `ce.components.pixel.backlight(target [, backlight]) -> boolean`
+
+Switch the backlight on or off.
+
+Example: `ce.components.pixel.backlight("Screen")` switches the backlight on if it is off, and off if it is on.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `backlight` (true or false, optional): true: the backlight colour washes the screen.<br>false: off.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- While `backlightSource()` links a control, that control switches it.
+- Default: on.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelBacklight`.*
+
+##### `ce.components.pixel.brightness(target, brightness) -> boolean`
+
+Set how bright the lit pixels are.
+
+Example: `ce.components.pixel.brightness("Screen", 80)` sets the brightness to 80.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `brightness` (number, required): How bright the lit pixels are.<br>Range: 0 ↔ 100.<br>0: the dimmest, still lit: a tenth as bright.<br>Shaped by `gamma()`.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- While `brightnessSource()` links a control, that control sets the brightness.
+- Default: 100.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelBrightness`.*
+
+##### `ce.components.pixel.contrast(target, contrast) -> boolean`
+
+Set the contrast: how visible the unlit pixels are.
+
+Example: `ce.components.pixel.contrast("Screen", 55)` sets the contrast to 55.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `contrast` (number, required): How visible the unlit pixels are.<br>Also how strongly the backlight glows.<br>Range: 0 ↔ 100.<br>0: the unlit pixels at their faintest, still visible.<br>100: the unlit pixels half opaque.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The unlit pixels show only while `showGhost()` is on.
+- Default: 55.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelContrast`.*
+
+##### `ce.components.pixel.gamma(target, gamma) -> boolean`
+
+Set the brightness curve.
+
+Example: `ce.components.pixel.gamma("Screen", 2)` lifts the dimmer brightnesses.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `gamma` (number, required): The curve between `brightness()` and how bright the lit pixels are drawn.<br>1: straight.<br>Above 1: the lower brightnesses lifted.<br>Below 1: lowered.<br>Range: 0.2 ↔ 4.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelGamma`.*
+
+##### `ce.components.pixel.glow(target, glow) -> boolean`
+
+Set the glow: a halo around the lit pixels.
+
+Example: `ce.components.pixel.glow("Screen", 0.5)` gives the lit pixels a halo.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `glow` (number, required): How large and strong the halo is.<br>0: none.<br>1: the largest, 2.6 times a pixel's size.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelGlow`.*
+
+##### `ce.components.pixel.anim(target, anim) -> boolean`
+
+Set the animation behind the elements: off, a file, or a preset.
+
+Example: `ce.components.pixel.anim("Screen", "preset")` plays the chosen preset animation.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `anim` (text, required): One of "off", "file" or "preset". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The file is chosen in the inspector.
+- Default: "off".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelAnim`.*
+
+##### `ce.components.pixel.animPreset(target, animPreset) -> boolean`
+
+Choose the preset animation.
+
+Example: `ce.components.pixel.animPreset("Screen", "rain")` plays the rain animation.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `animPreset` (text, required): One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Plays while `anim()` is "preset".
+- Default: "wave".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelAnimPreset`.*
+
+##### `ce.components.pixel.animSpeed(target, animSpeed) -> boolean`
+
+Set the speed of the preset animation, as a multiple of its normal speed.
+
+Example: `ce.components.pixel.animSpeed("Screen", 2)` plays the preset animation at twice its normal speed.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `animSpeed` (number, required): Speed factor.<br>Range: 0.1 ↔ 5.<br>1: normal.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelAnimSpeed`.*
+
+##### `ce.components.pixel.animLoop(target [, animLoop]) -> boolean`
+
+Switch looping of the animation on or off.
+
+Example: `ce.components.pixel.animLoop("Screen")` switches the anim loop on if it is off, and off if it is on.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `animLoop` (true or false, optional): Left out: toggles.<br>false: the last frame holds.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: on.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelAnimLoop`.*
+
+##### `ce.components.pixel.animFps(target, animFps) -> boolean`
+
+Set the frame rate of a sprite-sheet animation.
+
+Example: `ce.components.pixel.animFps("Screen", 24)` plays the sheet at 24 frames per second.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `animFps` (number, required): Frames per second.<br>Only for a sprite sheet: a GIF or APNG plays at its own speed.<br>Range: 1 ↔ 120.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 12.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelAnimFps`.*
+
+##### `ce.components.pixel.layoutTransition(target, layoutTransition) -> boolean`
+
+Set how a layout comes in when it is shown.
+
+Example: `ce.components.pixel.layoutTransition("Screen", "fade")` fades each layout in.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `layoutTransition` (text, required): "none": at once.<br>"fade": faded in.<br>"slide": faded in, sliding from the right.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Over `transitionMs()`.
+- Default: "none".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelLayoutTransition`.*
+
+##### `ce.components.pixel.transitionMs(target, transitionMs) -> boolean`
+
+Set how long a layout takes to come in.
+
+Example: `ce.components.pixel.transitionMs("Screen", 500)` brings each layout in over half a second.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `transitionMs` (number, required): Milliseconds.<br>0: at once.<br>Range: 0 ↔ 2000, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- With `layoutTransition()` "none": no effect.
+- Default: 250.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelTransitionMs`.*
+
+##### `ce.components.pixel.brightnessSource(target [, name]) -> boolean`
+
+Name the control that drives the brightness.
+
+Example: `ce.components.pixel.brightnessSource("Screen", "Cutoff")` makes the control called Cutoff drive the brightness.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>Its range sets 0 to 100.<br>Not on this panel, or not a knob, slider or other range control: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "brightnessSource")` gives the control's name.
+
+*Short name: `pixelBrightnessSource`.*
+
+##### `ce.components.pixel.backlightSource(target [, name]) -> boolean`
+
+Name the control that drives the backlight.
+
+Example: `ce.components.pixel.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, optional): The driving control's name.<br>Left out, or "": unlinked.<br>On while the control is on, or past halfway.<br>Not on this panel: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "backlightSource")` gives the control's name.
+
+*Short name: `pixelBacklightSource`.*
+
+##### `ce.components.pixel.layout(target, layout) -> boolean`
+
+Show one of the display's layouts.
+
+Example: `ce.components.pixel.layout("Screen", 2)` shows layout 2.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `layout` (number or name, required): Its number, counted from 1, or its name.<br>A name: case-insensitive.<br>A fraction: rounded.<br>A display without layouts: 1, its elements.<br>Not a layout of the display: rejected with a console error.
+
+Good to know:
+
+- Shown until an overlay or the Selector changes it.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+- `read(target, "layout")` gives the number of the layout showing.
+
+*Short name: `pixelLayout`.*
+
+##### `ce.components.pixel.showGlass(target [, showGlass]) -> boolean`
+
+Show or hide the glass: a sheen across the screen.
+
+Example: `ce.components.pixel.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `showGlass` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Its tint is set in the inspector, under Screen colours ▸ Glass. Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelShowGlass`.*
+
+##### `ce.components.pixel.showGhost(target [, showGhost]) -> boolean`
+
+Show or hide the ghost: the faint unlit pixels behind the elements.
+
+Example: `ce.components.pixel.showGhost("Screen")` shows the ghost if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `showGhost` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- How faint is set by `contrast()`. Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelShowGhost`.*
+
+##### `ce.components.pixel.showScanlines(target [, showScanlines]) -> boolean`
+
+Show or hide the scanlines: thin horizontal lines across the screen.
+
+Example: `ce.components.pixel.showScanlines("Screen")` shows the scanlines if they are hidden, and hides them if they are shown.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `showScanlines` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelShowScanlines`.*
+
+##### `ce.components.pixel.showGrid(target [, showGrid]) -> boolean`
+
+Show or hide the design grid: lines every few pixels, in the editor only.
+
+Example: `ce.components.pixel.showGrid("Screen")` shows the grid if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `showGrid` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Not drawn in the preview or an exported plug-in.
+- Its spacing is the inspector's Snap: 8 pixels while that is 0.
+- Default: hidden.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `pixelShowGrid`.*
+
+##### `ce.components.pixel.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.pixel.read("Screen")` gives every setting as a table.
+
+- `target` (control name, required): The Pixel Display's control, by name.<br>Not a Pixel Display: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (text, optional): For an element verb, such as "text": the element's name. Case-insensitive.<br>Left out: every element's, by name.<br>Not an element of the display: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- `read(target, "text")`: every element's, by name; `read(target, "text", "Title")`: one element's.
+- `read(target, "layout")`: the number of the layout showing.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `pixelRead`.*
+
 
 ### Panel-wide
 
 Components that act on the whole panel rather than one value.
 
-- **Transport** — `ce.components.transport`. Set the panel Transport: tempo, swing, time signature, loop. Reading it is ce.time. Commands: `bpm`, `swing`, `source`, `beatsPerBar`, `beatUnit`, `loop`, `loopStart`, `loopBars`, `countIn`, `clockOut`, `clockDevice`, `runOnLoad`, `editable`, `showPosition`, `showTap`, `read`.
-- **Panic** — `ce.components.panic`. Configure what a Panic button sends. Sending it is the global panic(). Commands: `scope`, `channel`, `resetControllers`, `centreBend`, `clearLocal`, `label`, `editable`, `showSummary`, `read`.
-- **Setlist** — `ce.components.setlist`. Scenes you step through, for example from a footswitch. Commands: `next`, `prev`, `jump`, `enable`, `wrap`, `crossfade`, `read`.
+#### ce.components.transport: Transport
+
+Set the panel's clock: its tempo, swing, time signature, loop and count-in, where it follows, and its MIDI clock out. Reading it is ce.time.
+
+##### `ce.components.transport.bpm(target, bpm) -> boolean`
+
+Set the tempo.
+
+Example: `ce.components.transport.bpm("Transport", 128)` sets the tempo to 128 beats a minute.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `bpm` (number, required): Beats a minute; a beat is a quarter note.<br>Range: 20 ↔ 300.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- The position does not jump: only what comes after the current beat speeds up or slows down.
+- While `source()` is "external" or "host": not used.
+- Default: 120.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportBpm`.*
+
+##### `ce.components.transport.swing(target, swing) -> boolean`
+
+Set how far every second step is delayed, for every component following the clock.
+
+Example: `ce.components.transport.swing("Transport", 0.5)` delays every second step by a quarter of a step.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `swing` (number, required): Part of half a step: 1 delays every second step by half a step.<br>0: straight.<br>Range: 0 ↔ 1.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- An Arp with `swingSource()` "own" plays its own instead.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportSwing`.*
+
+##### `ce.components.transport.source(target, source) -> boolean`
+
+Set which clock the panel follows: its own, a MIDI clock, or the host.
+
+Example: `ce.components.transport.source("Transport", "host")` follows the DAW's playhead.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `source` (text, required): "internal": its own, at `bpm()`.<br>"external": a MIDI clock arriving on the input.<br>"host": the DAW's playhead, in a plug-in.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Following, `bpm()` is ignored, tapping sets nothing and no clock is sent.
+- Default: "internal".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportSource`.*
+
+##### `ce.components.transport.beatsPerBar(target, beatsPerBar) -> boolean`
+
+Set how many beats a bar has: the time signature's upper number.
+
+Example: `ce.components.transport.beatsPerBar("Transport", 3)` makes each bar three beats long.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `beatsPerBar` (number, required): Beats.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Sets the bar for the position, the loop and the count-in, and where the downbeat falls.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportBeatsPerBar`.*
+
+##### `ce.components.transport.beatUnit(target, beatUnit) -> boolean`
+
+Set the time signature's lower number.
+
+Example: `ce.components.transport.beatUnit("Transport", 8)` shows the time signature over 8.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `beatUnit` (number, required): The note value of a beat in the time signature: 4 a quarter, 8 an eighth.<br>Range: 1 ↔ 32, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Shown only: a beat is a quarter note whatever it says.
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportBeatUnit`.*
+
+##### `ce.components.transport.loop(target [, loop]) -> boolean`
+
+Switch the loop on or off.
+
+Example: `ce.components.transport.loop("Transport")` switches the loop enabled on if it is off, and off if it is on.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `loop` (true or false, optional): true: the position runs from `loopStart()` for `loopBars()` and back, over and over.<br>false: it runs on.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Before the loop's first bar, the position runs into it.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportLoop`.*
+
+##### `ce.components.transport.loopStart(target, loopStart) -> boolean`
+
+Set the bar the loop starts on.
+
+Example: `ce.components.transport.loopStart("Transport", 5)` starts the loop at bar 5.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `loopStart` (number, required): Bar, counted from 1.<br>Range: 1 ↔ 999, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportLoopStart`.*
+
+##### `ce.components.transport.loopBars(target, loopBars) -> boolean`
+
+Set how long the loop is.
+
+Example: `ce.components.transport.loopBars("Transport", 0.5)` loops half a bar.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `loopBars` (number, required): Bars: 0.25 is one beat in 4/4.<br>Range: 0.25 ↔ 64.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Default: 4.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportLoopBars`.*
+
+##### `ce.components.transport.countIn(target, countIn) -> boolean`
+
+Set how many bars of silence come before the clock runs.
+
+Example: `ce.components.transport.countIn("Transport", 1)` counts one bar in.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `countIn` (number, required): Bars.<br>0: none.<br>Range: 0 ↔ 8, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Every component following the clock holds and is quiet until it ends.
+- Default: 0.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportCountIn`.*
+
+##### `ce.components.transport.clockOut(target [, clockOut]) -> boolean`
+
+Send MIDI clock, start, stop and song position, so hardware follows the panel.
+
+Example: `ce.components.transport.clockOut("Transport")` switches the clock out on if it is off, and off if it is on.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `clockOut` (true or false, optional): true: sent to `clockDevice()`, 24 clocks a quarter note.<br>false: not sent.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- While `source()` is "external" or "host": not used.
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportClockOut`.*
+
+##### `ce.components.transport.clockDevice(target, clockDevice) -> boolean`
+
+Set which device the MIDI clock is sent to.
+
+Example: `ce.components.transport.clockDevice("Transport", "Drum Machine")` sends the clock to the device called Drum Machine.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `clockDevice` (text, required): The device's name, as the panel's devices list it.<br>"": the panel's own device, when it has exactly one; otherwise none.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Default: "".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportClockDevice`.*
+
+##### `ce.components.transport.runOnLoad(target [, runOnLoad]) -> boolean`
+
+Start the clock as soon as the panel opens.
+
+Example: `ce.components.transport.runOnLoad("Transport")` switches the run on load on if it is off, and off if it is on.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `runOnLoad` (true or false, optional): true: running from the start, as an exported plug-in is.<br>false: stopped until played.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: false.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportRunOnLoad`.*
+
+##### `ce.components.transport.editable(target [, editable]) -> boolean`
+
+Let the Transport be played and tapped by touch, or not.
+
+Example: `ce.components.transport.editable("Transport")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `editable` (true or false, optional): true: its play button and tap tempo work.<br>false: touches do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportEditable`.*
+
+##### `ce.components.transport.showPosition(target [, showPosition]) -> boolean`
+
+Show or hide the position, as bar.beat.tick, and the beat pulse.
+
+Example: `ce.components.transport.showPosition("Transport")` shows the position if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `showPosition` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportShowPosition`.*
+
+##### `ce.components.transport.showTap(target [, showTap]) -> boolean`
+
+Let a tap on the face set the tempo, or not.
+
+Example: `ce.components.transport.showTap("Transport")` shows the tap if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `showTap` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Not while following another clock.
+- Default: on.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `transportShowTap`.*
+
+##### `ce.components.transport.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.transport.read("Transport")` gives every setting as a table.
+
+- `target` (control name, required): The Transport's control, by name.<br>Not a Transport: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `transportRead`.*
+
+#### ce.components.panic: Panic
+
+Set what a Panic button sends when pressed: which channels, and whether it also resets the controllers, centres pitch bend and stops the panel's own notes.
+
+##### `ce.components.panic.scope(target, scope) -> boolean`
+
+Set whether the button silences every channel or one.
+
+Example: `ce.components.panic.scope("Panic", "channel")` silences only the channel `channel()` sets.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `scope` (text, required): "all": channels 1 to 16.<br>"channel": the channel `channel()` sets.<br>Case-insensitive.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Each channel is sent All Sound Off (CC 120), then All Notes Off (CC 123).
+- Default: "all".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetScope`.*
+
+##### `ce.components.panic.channel(target, channel) -> boolean`
+
+Set the channel the button silences while `scope()` is "channel".
+
+Example: `ce.components.panic.channel("Panic", 10)` silences channel 10.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `channel` (number, required): MIDI channel.<br>Range: 1 ↔ 16, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
+
+Good to know:
+
+- Only while `scope()` is "channel".
+- Default: 1.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetChannel`.*
+
+##### `ce.components.panic.resetControllers(target [, resetControllers]) -> boolean`
+
+Also send Reset All Controllers (CC 121), or not.
+
+Example: `ce.components.panic.resetControllers("Panic")` switches the reset controllers on if they are off, and off if they are on.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `resetControllers` (true or false, optional): true: sent, after the notes are stopped; a mod wheel or pedal left up is released.<br>false: not sent.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetResetControllers`.*
+
+##### `ce.components.panic.centreBend(target [, centreBend]) -> boolean`
+
+Also put pitch bend back to the centre, or not.
+
+Example: `ce.components.panic.centreBend("Panic")` switches the centre bend on if it is off, and off if it is on.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `centreBend` (true or false, optional): true: a centred pitch bend is sent on each channel.<br>false: not sent.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetCentreBend`.*
+
+##### `ce.components.panic.clearLocal(target [, clearLocal]) -> boolean`
+
+Also stop the notes this panel's own controls are playing, or not.
+
+Example: `ce.components.panic.clearLocal("Panic")` switches the clear local on if it is off, and off if it is on.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `clearLocal` (true or false, optional): true: the Chord Pads, Keyboards, Arps, Note Ribbons, Drum Pads and the panel's other note controls stop.<br>false: they play on.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetClearLocal`.*
+
+##### `ce.components.panic.label(target, label) -> boolean`
+
+Set the text on the button.
+
+Example: `ce.components.panic.label("Panic", "ALL OFF")` writes ALL OFF on the button.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `label` (text, required): The text.<br>"": PANIC.<br>A number: written as text.<br>Left out: rejected with a console error.
+
+Good to know:
+
+- Default: "PANIC".
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetLabel`.*
+
+##### `ce.components.panic.editable(target [, editable]) -> boolean`
+
+Let the button be pressed, or not.
+
+Example: `ce.components.panic.editable("Panic")` switches the editable on if it is off, and off if it is on.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `editable` (true or false, optional): true: a press sends it.<br>false: presses do nothing.<br>Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- The panic key, Escape unless the panel sets another, works either way, and sends the most: every channel, every message.
+- Default: true.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetEditable`.*
+
+##### `ce.components.panic.showSummary(target [, showSummary]) -> boolean`
+
+Show or hide the line under the label that says what the button sends.
+
+Example: `ce.components.panic.showSummary("Panic")` shows the summary if it is hidden, and hides it if it is shown.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `showSummary` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
+
+Good to know:
+
+- Drawn only on a button 46 pixels tall or more.
+- Default: shown.
+- Returns true. Already set: true, with a console line.
+- Rejected: false, with a console error. Nothing changes.
+
+*Short name: `panicSetShowSummary`.*
+
+##### `ce.components.panic.read(target [, name [, index]]) -> value`
+
+Read back a setting, or every setting.
+
+Example: `ce.components.panic.read("Panic")` gives every setting as a table.
+
+- `target` (control name, required): The Panic's control, by name.<br>Not a Panic: rejected with a console error.
+- `name` (text, optional): A verb of this component, by name.<br>Left out: every setting, as a table.<br>Not a verb that sets something: rejected with a console error.
+- `index` (number, optional): Element number of a list verb, counted from 1.<br>A fraction: rounded.<br>Left out: the whole list.<br>Not one the list has: rejected with a console error.
+
+Good to know:
+
+- `read(target)`: every setting as a table, by verb name.
+- Returns the value.
+- Rejected: no result, with a console error.
+
+*Short name: `panicSetRead`.*
+
+#### ce.components.setlist: Setlist
+
+Scenes you step through, for example from a footswitch.
+
+##### `ce.components.setlist.next(target)`
+
+Go to the next scene it plays.
+
+Example: `ce.components.setlist.next("Setlist")` recalls the next scene.
+
+Good to know:
+
+- Scenes switched off with `enable()` are passed over.
+- At the last: to the first while `wrap()` is on; else rejected with a console error.
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `setlistNext`.*
+
+##### `ce.components.setlist.prev(target)`
+
+Go back to the scene before.
+
+Example: `ce.components.setlist.prev("Setlist")` recalls the scene before.
+
+Good to know:
+
+- Scenes switched off with `enable()` are passed over.
+- At the first: to the last while `wrap()` is on; else rejected with a console error.
+- Returns true. Rejected: false, with a console error.
+
+*Short name: `setlistPrev`.*
+
+##### `ce.components.setlist.jump(target, scene)`
+
+Go to a scene by its number or name.
+
+Example: `ce.components.setlist.jump("Setlist", "Ballad")` recalls the scene called Ballad.
+
+- `scene` (number or text, required): Its number, counted from 1, or its name, as written.<br>Not a scene: rejected with a console error naming them.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `setlistGoto`.*
+
+##### `ce.components.setlist.enable(target, scene, enabled)`
+
+Play a scene in the set, or pass over it.
+
+Example: `ce.components.setlist.enable("Setlist", 2, false)` skips scene 2 tonight.
+
+- `scene` (number or text, required): Its number, counted from 1, or its name, as written.<br>Not a scene: rejected with a console error naming them.
+- `enabled` (true or false, required): true: played.<br>false: passed over by `next()` and `prev()`.<br>Left out: played.
+
+Good to know:
+
+- `jump()` still goes to it.
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `setlistEnable`.*
+
+##### `ce.components.setlist.wrap(target [, wrap])`
+
+Go round from the last scene to the first, or stop at the ends.
+
+Example: `ce.components.setlist.wrap("Setlist", true)` goes from the last scene to the first.
+
+- `wrap` (true or false, optional): true: round.<br>false: stops at the ends.<br>Left out: toggles.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `setlistWrap`.*
+
+##### `ce.components.setlist.crossfade(target, ms)`
+
+Set how long a scene's values take to fade in.
+
+Example: `ce.components.setlist.crossfade("Setlist", 800)` fades each scene in over 0.8 s.
+
+- `ms` (number, required): Milliseconds.<br>0: at once.<br>Range: 0 ↔ 10000.<br>Outside the range: the nearest end.<br>Not a number: rejected with a console error.
+
+Good to know:
+
+- Returns true. Already that way: true, with a console line.
+- Rejected: false, with a console error.
+
+*Short name: `setlistCrossfade`.*
+
+##### `ce.components.setlist.read(target [, field])`
+
+Read the Setlist's settings and scenes.
+
+Example: `ce.components.setlist.read("Setlist", "index")` gives the scene in front, counted from 0.
+
+- `field` (text, optional): A setting's name, in any case, such as "index" or "scenes".<br>Left out: every setting, as a table.<br>Not one of its settings: no result, with a console error naming them.
+
+Good to know:
+
+- "scenes": each { name, values, enabled, … }.
+- Returns the value.
+
+*Short name: `setlistRead`.*
+
 
 ---
 

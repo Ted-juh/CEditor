@@ -94,7 +94,7 @@ export const EMPTY_OBJECT_NOTE = 'an empty table encodes as [] in Lua and {} in 
 
 /** Text the four decoders must all refuse: telling a malformed config from an empty one is the
  *  whole reason decode returns nothing rather than an empty table. */
-export const JSON_REJECTS = ['{oops', '', '[1,', '"unterminated', 'nul', '{"a":1,}', '01', '1.', '[1,]'];
+export const JSON_REJECTS = ['{oops', '', '[1,', '"unterminated', 'nul', '{"a":1,}', '01', '1.', '[1,]', 'NaN', 'Infinity', '[-Infinity]'];
 
 /** …and text they must all read the same way, including what a JSON null does. */
 export const JSON_DECODE_CASES = [

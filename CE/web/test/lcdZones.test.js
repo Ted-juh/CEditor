@@ -419,6 +419,34 @@ test('visibleWhen shows a zone only on its own index — how a menu marks its se
   assert.equal(zoneVisibleWith(arrow(2, 0), {}), true);
 });
 
+test('a layout\'s own text shows wherever no zone paints', () => {
+  // What a script writes on a layout (its `lines`) is the grid composeLayout starts from: a zone's
+  // region paints over it, and a zone that paints nothing leaves it showing.
+  const zones = [
+    { row: 1, colStart: 1, colEnd: 4, show: 'static', text: 'COMP' },
+    { row: 2, colStart: 1, colEnd: 6, show: 'value', sourceId: 'GONE' },
+  ];
+  const text = ['abcdefghij', 'KLMNOPQRST', 'past the last row'];
+  assert.deepEqual(composeLayout(zones, 2, 8, () => null, 0, {}, text), ['COMPefgh', 'KLMNOPQR']);
+  assert.deepEqual(composeLayout([], 2, 4, null, 0, {}, ['ab']), ['ab  ', '    '], 'short rows and missing rows are blank');
+  assert.deepEqual(composeLayout(zones.slice(0, 1), 1, 6, null), ['COMP  '], 'no text: a blank grid, as before');
+});
+
+test('a backlight source lights the display while on, or at or past halfway along its range', () => {
+  // It was 0.5 of the control's own number: a 0..127 knob lit it at 1, a -64..63 one stayed dark
+  // up to 0. A switch reports `on`, and its 0..1 says the same.
+  const { backlightOnFrom } = ZONES;
+  assert.equal(backlightOnFrom({ on: true, value: 0, min: 0, max: 1 }), true);
+  assert.equal(backlightOnFrom({ on: false, value: 0, min: 0, max: 1 }), false);
+  assert.equal(backlightOnFrom({ value: 1, min: 0, max: 127 }), false, 'a knob just off zero');
+  assert.equal(backlightOnFrom({ value: 63, min: 0, max: 127 }), false);
+  assert.equal(backlightOnFrom({ value: 64, min: 0, max: 127 }), true);
+  assert.equal(backlightOnFrom({ value: 0, min: -64, max: 63 }), true, 'a bipolar knob at its centre');
+  assert.equal(backlightOnFrom({ value: -1, min: -64, max: 63 }), false);
+  assert.equal(backlightOnFrom({ value: 5, min: 5, max: 5 }), false, 'no range: off');
+  assert.equal(backlightOnFrom(null), false);
+});
+
 test('composeLayout paints only the zones state allows', () => {
   const rows = [
     { id: 'i0', show: 'static', text: 'ONE', row: 1, colStart: 3, colEnd: 5 },

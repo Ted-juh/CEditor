@@ -27,7 +27,7 @@ import {
   SCRIPT_LANGUAGES, SELF, VALUE_ACCESSORS,
   LIFECYCLE_HOOKS, CONTROL_EVENTS, PANEL_EVENTS, TIME_EVENTS, DEVICE_EVENTS, COMPONENT_EVENTS,
   MODULE_GROUPS, COMPONENT_GROUPS, moduleById, membersByModule, memberPath, memberRuntime,
-  memberMapFor, namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER, paramTypeLine,
+  namespacedSnippet, RUNTIME_ANY, RUNTIME_WEBVIEW, RUNTIME_PLAYER, paramTypeLine,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { COMPONENT_FAMILIES } from '../src/CE_Application/scripting/componentVerbs.js';
 // The canonical handler in every language — REAL, toolchain-validated source (the fixture
@@ -202,9 +202,13 @@ function fieldTable(param, lifecycle) {
     : ['| Name | Type | What it is |', '|---|---|---|'];
   const rows = param.fields.map((f) => {
     const type = f.unit ? `${f.type} (${f.unit})` : f.type;
-    // The list, unless the description already names every value in it.
+    // The list, unless the description already names every value in it. Every word from a list is
+    // read in any case (utils/wordLists.js), and the line says so, as a description that names its
+    // words does.
     const named = f.values?.every((v) => f.summary.includes(`"${v}"`));
-    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.` : '';
+    // (Not of what a handler is handed: that is read, not written.)
+    const words = !lifecycle && f.values?.every((v) => typeof v === 'string') ? ' Case-insensitive.' : '';
+    const values = f.values?.length && !named ? `\nOne of ${valuesText(f.values)}.${words}` : '';
     const what = `${f.summary}${values}`;
     if (!withDefault) return `| \`${f.name}\` | ${cell(type)} | ${cell(what)} |`;
     const def = f.required ? 'required' : (f.default ?? '—');
@@ -326,14 +330,19 @@ function moduleChapter(module, members) {
 
 function componentChapter(byModule, label) {
   const famById = Object.fromEntries(COMPONENT_FAMILIES.map((f) => [f.id, f]));
+  // Every component's commands in full, as every other module's are (the owner's word on the LCD's
+  // review, item 12): they were listed by name only, so the texts the picker, the hover card and
+  // the explorer show were in the manual nowhere.
   const sections = COMPONENT_GROUPS.map((group) => {
     const items = group.modules.map((short) => {
       const id = `ce.components.${short}`;
       const fam = famById[short] ?? HAND_WRITTEN_COMPONENTS[short];
       if (!fam) throw new Error(`generate-scripting-manual: no description for component "${short}"`);
-      if (!byModule.get(id)) throw new Error(`generate-scripting-manual: component module "${id}" has no members`);
-      const names = Object.keys(memberMapFor(id)).map((n) => `\`${n}\``).join(', ');
-      return `- **${fam.label}** — \`${id}\`. ${fam.summary} Commands: ${names}.`;
+      const members = byModule.get(id);
+      if (!members) throw new Error(`generate-scripting-manual: component module "${id}" has no members`);
+      const entries = members.filter((m) => m.kind !== 'helper')
+        .map((m) => memberEntry(m, 5, { moduleRuntime: RUNTIME_WEBVIEW })).join('\n');
+      return `#### ${id}: ${fam.label}\n\n${fam.summary}\n\n${entries}`;
     });
     return `### ${group.label}\n\n${group.blurb}\n\n${items.join('\n')}`;
   });
@@ -352,8 +361,8 @@ can be driven from a script. Each component has a module of its own, named after
   \`ce.components.arp.run("myArp")\` starts a stopped arpeggiator and stops a running one.
 - \`read\` gives you the component's current settings.
 
-Components live in the panel window, so these commands need the window open. The Script Editor's
-picker lists every one of them with its description; here is what each component offers.
+Components live in the panel window, so these commands need the window open. Each component's
+commands follow, grouped by what the component does, with what each one takes.
 
 ${sections.join('\n\n')}
 `;

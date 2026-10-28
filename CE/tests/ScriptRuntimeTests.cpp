@@ -635,20 +635,20 @@ int main()
     check (host.rawSends[1] == "E0 00 00", "ce.midi.sendPitchBend agrees across engines");
     check (errors.isEmpty(), "no errors from the message verbs");
 
-    // A note name the senders cannot read is refused, not sent as note 0. "c4" (the letter must be
-    // a capital) used to become 0 and play C-1 with nothing to say why; the WebView runtime refuses
-    // it in the same words (scriptMusic.test.js).
+    // A note name the senders cannot read is refused, not sent as note 0. "c4" used to become 0 and
+    // play C-1 with nothing to say why; a name is read in any case now, so "c4" is C4, and "H4" is
+    // the example. The WebView runtime refuses it in the same words (scriptMusic.test.js).
     juce::Array<juce::var> badNoteScripts;
     badNoteScripts.add (makeScript ("badnotes", "lua", "panel", "onBadNotes", "*",
         "function onBadNotes()\n"
-        "  sendNote(1, \"c4\", 100)\n"
-        "  sendNoteOff(1, \"c4\")\n"
-        "  sendAftertouch(1, 90, \"c4\")\n"
+        "  sendNote(1, \"H4\", 100)\n"
+        "  sendNoteOff(1, \"H4\")\n"
+        "  sendAftertouch(1, 90, \"H4\")\n"
         "  sendNote(1, \"C-1\", 100)\n"       // note 0 by NAME is still a real note
         "end\n"));
     badNoteScripts.add (makeScript ("badnotesjs", "javascript", "panel", "onBadNotesJs", "*",
-        "function onBadNotesJs() { ce.midi.sendNote(1, 'c4', 100); ce.midi.sendNoteOff(1, 'c4');"
-        " ce.midi.sendAftertouch(1, 90, 'c4'); }"));
+        "function onBadNotesJs() { ce.midi.sendNote(1, 'H4', 100); ce.midi.sendNoteOff(1, 'H4');"
+        " ce.midi.sendAftertouch(1, 90, 'H4'); }"));
     runtime.loadScripts (juce::var (badNoteScripts));
     for (const auto* event : { "onBadNotes", "onBadNotesJs" })
     {
@@ -662,8 +662,8 @@ int main()
         if (lua) check (host.rawSends[0] == "90 00 64", "C-1 by name is note 0 and still plays");
         check (host.levelled.size() == 3, "each refusal is an error line" + engine);
         for (const auto* verb : { "sendNote", "sendNoteOff", "sendAftertouch" })
-            check (host.levelled.contains (juce::String ("error:") + verb + ": \"c4\" is not a note name, so nothing was sent. "
-                                           "A name is a capital letter, then # or b if it has one, then the octave: "
+            check (host.levelled.contains (juce::String ("error:") + verb + ": \"H4\" is not a note name, so nothing was sent. "
+                                           "A name is a letter from A to G, then # or b if it has one, then the octave: "
                                            "\"C4\", \"Eb3\", \"F#-1\"."),
                    juce::String (verb) + " names the note it refused" + engine);
     }
@@ -821,6 +821,9 @@ int main()
         "  saveSetting(\"lastPatch\", 42)\n"
         "  log(\"read \" .. tostring(loadSetting(\"lastPatch\")))\n"
         "  log(\"fallback \" .. tostring(loadSetting(\"never\", \"none\")))\n"
+        // A scope in any case is the scope, as every word from a list is: "Script" was refused.
+        "  saveSetting(\"mine\", 5, { scope = \"Script\" })\n"
+        "  log(\"scoped \" .. tostring(loadSetting(\"mine\", nil, { scope = \" SCRIPT \" })))\n"
         "end\n"));
     runtime.loadScripts (juce::var (storeScripts));
 
@@ -830,6 +833,7 @@ int main()
     check (host.logs.contains ("count 1"), "state starts empty");
     check (host.logs.contains ("read 42"), "saveSetting/loadSetting round-trip through the host");
     check (host.logs.contains ("fallback none"), "loadSetting returns the fallback for an unknown key");
+    check (host.logs.contains ("scoped 5"), "a scope in any case is the scope (got " + host.logs.joinIntoString (" | ") + ")");
 
     // state must SURVIVE the next dispatch — that is the whole point of it.
     host.logs.clear();
@@ -3328,6 +3332,11 @@ int main()
         timing.startAnimation ("to", juce::var ("k"), 100.0, opts ({ { "duration", -1.0 } }));
         check (said() == "warn:ce.anim.to: a duration of -1 is less than 0, so the move takes 1 ms: it jumps." + once,
                "a script set loaded afresh is told again");
+        // A curve's name is read in any case, as every word from a list is: "OutCubic" and "EXP"
+        // were not curves this build knew, and the move was linear.
+        timing.startAnimation ("to", juce::var ("p1"), 100.0, opts ({ { "curve", " OutCubic " } }));
+        timing.startAnimation ("to", juce::var ("p2"), 100.0, opts ({ { "curve", "EXP" } }));
+        check (said().isEmpty(), "a curve's name in any case is the curve, and nothing is said");
         // A curve that cannot be used is said once per command too. It was a line on every call,
         // and a curve that was neither a name nor numbers was linear without a word.
         timing.startAnimation ("to", juce::var ("p"), 100.0, opts ({ { "curve", "outBak" } }));

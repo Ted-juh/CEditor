@@ -16,7 +16,7 @@
 
   let { show = false, onclose = () => {} } = $props();
 
-  // The bundle is 124 KB of documentation and is loaded on first open, not at startup. Everything
+  // The bundle is about 780 KB of documentation and is loaded on first open, not at startup. Everything
   // in the eager entry chunk is parsed on every launch whether it is used or not, and help is the
   // clearest case in the app of something most sessions never touch. `main` is already the largest
   // chunk and the build config's note says approaching its limit is the thing worth investigating.

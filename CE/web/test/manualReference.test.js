@@ -211,7 +211,7 @@ const TYPE_WORDS = new Set([
   'number', 'text', 'true or false', 'function', 'list', 'options', 'table', 'path', 'colour', 'note',
   'bytes', 'control name', 'event name', 'any value', 'number or text', 'text or list',
   'list of numbers', 'list of bytes', 'list of notes', 'list of text', 'text or object',
-  'list of objects',
+  'list of objects', 'number or table', 'number or name',
 ]);
 
 test('every parameter\'s type is shown in a word from one short list', () => {
@@ -243,7 +243,7 @@ test('the contract\'s own type names are not shown', () => {
 test('the manual names each parameter with its type and whether it is required', () => {
   const manual = generateManual();
   assert.match(manual, /`v` \(number, required\): The value to move\./);
-  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make\./);
+  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make, from 1 to 4\./);
 });
 
 /* -------------------------------------------------------------------- the tree */

@@ -23,6 +23,16 @@ export function infoFraction(info) {
   return span === 0 ? 0 : clamp((numberOr(info?.value, 0) - min) / span, 0, 1);
 }
 
+/**
+ * Whether a control linked as a display's backlight source lights it: while the control is on (a
+ * switch, a button held), or while its value is at or past halfway along its range. It was 0.5 of
+ * the control's own number, so a knob from 0 to 127 lit it at 1, and one from -64 to 63 stayed dark
+ * up to 0 (the owner's decision on ce.components.lcd.backlightSource).
+ */
+export function backlightOnFrom(info) {
+  return info?.on === true || infoFraction(info) >= 0.5;
+}
+
 const BAR_EIGHTHS = ' ▏▎▍▌▋▊▉';
 
 /**
@@ -366,11 +376,16 @@ export function zoneScrollWindow(content, width, elapsedChars) {
 // priority) zones paint over earlier ones. getInfo(sourceId) -> info | null.
 // `elapsedChars` drives per-zone marquee: a zone with scroll:true whose content
 // overflows its region scrolls within it instead of truncating.
-export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0, state = {}) {
+// `text` is the layout's own text, one string per row (a layout's `lines`, which a script writes):
+// the grid starts from it, so it shows wherever no zone paints.
+export function composeLayout(zones, rows, cols, getInfo, elapsedChars = 0, state = {}, text = []) {
   const nRows = Math.max(0, Math.round(rows));
   const nCols = Math.max(0, Math.round(cols));
   const grid = [];
-  for (let r = 0; r < nRows; r += 1) grid.push(new Array(nCols).fill(' '));
+  for (let r = 0; r < nRows; r += 1) {
+    const line = String((Array.isArray(text) ? text[r] : '') ?? '');
+    grid.push(Array.from({ length: nCols }, (_, c) => line[c] ?? ' '));
+  }
 
   const ordered = (Array.isArray(zones) ? zones : [])
     .filter((z) => zoneVisibleWith(z, state))

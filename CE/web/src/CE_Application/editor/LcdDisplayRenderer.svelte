@@ -373,7 +373,10 @@
       const zones = isGraphic
         ? (layout?.zones ?? []).filter((z) => !WIDGET_ZONE_KINDS.has(String(z?.show ?? '')))
         : (layout?.zones ?? []);
-      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed, display?.__state ?? {});
+      // The layout's own text (what a script wrote there) is drawn as lines are, tokens filled in,
+      // and shows wherever no zone paints.
+      const text = (Array.isArray(layout?.lines) ? layout.lines : []).map((line) => expandTokens(String(line ?? '')));
+      return composeLayout(zones, rows, cols, controlInfo, zoneElapsed, display?.__state ?? {}, text);
     }
     const source = Array.isArray(display?.lines) ? display.lines : [];
     const out = [];
