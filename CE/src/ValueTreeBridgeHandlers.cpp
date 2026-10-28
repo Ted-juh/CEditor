@@ -1,4 +1,5 @@
 #include "ValueTreeBridge.h"
+#include "Osc/OscQuestion.h"
 #include "AppSettings.h"
 #include "AtomicFileWrite.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
@@ -1659,6 +1660,8 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             });
         });
 
+    // ce.osc asks the user before the network is used; the editor asks in a dialog of its own.
+    deviceProfileService.askAboutNetwork = ceditor::osc::askAboutNetworkWithDialog;
     options = ceditor::device::withDeviceRuntimeEvents (std::move (options), deviceProfileService,
         [this] (const juce::String& eventName, const juce::var& payload)
         {

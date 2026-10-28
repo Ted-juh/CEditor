@@ -50,7 +50,7 @@ var __ceCur = {
   __listeners: [], __watchers: [], __computeds: [], __filters: [], __actions: {},
   __filterDepth: 0, __reactiveDepth: 0, __timerIds: {}, __syncFollow: {},
   __rndStates: {}, __streamOverride: "", __midiIn: [], __midiOut: [], __lastSyncBpm: null,
-  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [], __ciWaiters: {},
+  __after: {}, __afterN: 0, __animDone: {}, __dumpWaiters: [], __ciWaiters: {}, __oscListeners: [],
   __globals: {}
 };
 var __CE_OWN = Object.keys(__ceCur);
@@ -4893,6 +4893,302 @@ function dawAssign(slot, path, opts) { return __daw.assign(slot, path, opts); }
 function dawMarkChanged() { return __daw.markChanged(); }
 // END GENERATED ce.daw
 
+// BEGIN GENERATED ce.osc — tools/scripts/gen-osc-prelude.mjs, from oscCore.js. Do not edit by hand.
+// @module ce.osc
+var __oscCore = (function () {
+  // ce.osc — Open Sound Control for scripts: the part that is the same in every runtime. The port, the
+  // reading and writing of OSC and the user's yes for the network live once, in C++ (Osc/OscService);
+  // this file checks a script's call, works out the types of what it sends, and hands each message
+  // that arrives to the functions whose pattern matches its address. The JavaScript prelude runs this
+  // file itself (tools/scripts/gen-osc-prelude.mjs); the Lua and Python preludes are ports held to the
+  // same answers by test/oscParity.test.js.
+  //
+  // Design record: docs/design/ce-osc-module.md.
+  //
+  // The host: `{ say(level, text), query(op, fields) -> answer, listeners() -> list, call(fn, value) }`.
+  // `query` asks the transport (listen, stop, status, target, send, bundle); its answer is
+  // { ok, error?, why?, ... }. `listeners` is the running script's own list of { id, pattern, fn }, so a
+  // script's patterns go when it reloads.
+
+  const PORT_MIN = 1024;
+  const PORT_MAX = 65535;
+  const TAGS = 'ihfdsSTFNIbrmtc';
+
+  function present(v) {
+    return v !== undefined && v !== null;
+  }
+
+  function opt(opts, key) {
+    return opts && typeof opts === 'object' && !Array.isArray(opts) ? opts[key] : undefined;
+  }
+
+  function whole(v) {
+    return typeof v === 'number' && Number.isFinite(v) && Math.floor(v) === v;
+  }
+
+  function isBytes(v, count) {
+    if (!Array.isArray(v) || (count >= 0 && v.length !== count)) return false;
+    for (const b of v) if (!whole(b) || b < 0 || b > 255) return false;
+    return true;
+  }
+
+  /** Whether `tag` can carry `v` (OscCodec.h's fits, in the same words). */
+  function fits(tag, v) {
+    const number = typeof v === 'number' && Number.isFinite(v);
+    if (tag === 'i') return whole(v) && v >= -2147483648 && v <= 2147483647;
+    if (tag === 'h') return whole(v);
+    if (tag === 'f' || tag === 'd' || tag === 't') return number;
+    if (tag === 's' || tag === 'S') return typeof v === 'string';
+    if (tag === 'c') return typeof v === 'string' && v !== '';
+    if (tag === 'b') return isBytes(v, -1);
+    if (tag === 'm') return isBytes(v, 4);
+    if (tag === 'r') return typeof v === 'string' && /^#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(v);
+    return TAGS.includes(tag) && tag !== '';
+  }
+
+  const WHAT = {
+    i: 'a whole number', h: 'a whole number', f: 'a number', d: 'a number', t: 'a number', s: 'text', S: 'text',
+    c: 'one character of text', b: 'a list of bytes', m: 'a list of four bytes', r: 'a colour such as "#FF8000"',
+  };
+
+  /** One part of an address against one part of a pattern: * ? [a-z] [!a] {one,two}. */
+  function partMatches(p, pi, s, si) {
+    while (pi < p.length) {
+      const c = p[pi];
+      if (c === '*') {
+        for (let k = s.length; k >= si; k -= 1) if (partMatches(p, pi + 1, s, k)) return true;
+        return false;
+      }
+      if (c === '?') {
+        if (si >= s.length) return false;
+        pi += 1; si += 1;
+        continue;
+      }
+      if (c === '[') {
+        const close = p.indexOf(']', pi + 1);
+        if (close < 0 || si >= s.length) return false;
+        let set = p.slice(pi + 1, close);
+        const negate = set.startsWith('!');
+        if (negate) set = set.slice(1);
+        let found = false;
+        for (let k = 0; k < set.length; k += 1) {
+          if (k + 2 < set.length && set[k + 1] === '-') {
+            if (s[si] >= set[k] && s[si] <= set[k + 2]) found = true;
+            k += 2;
+          } else if (s[si] === set[k]) found = true;
+        }
+        if (found === negate) return false;
+        pi = close + 1; si += 1;
+        continue;
+      }
+      if (c === '{') {
+        const close = p.indexOf('}', pi + 1);
+        if (close < 0) return false;
+        for (const alt of p.slice(pi + 1, close).split(',')) {
+          if (s.startsWith(alt, si) && partMatches(p, close + 1, s, si + alt.length)) return true;
+        }
+        return false;
+      }
+      if (si >= s.length || s[si] !== c) return false;
+      pi += 1; si += 1;
+    }
+    return si === s.length;
+  }
+
+  /** Whether an OSC address matches a pattern, part by part between the slashes. */
+  function __oscMatches(pattern, address) {
+    if (typeof pattern !== 'string' || typeof address !== 'string') return false;
+    const p = pattern.split('/');
+    const a = address.split('/');
+    if (p.length !== a.length) return false;
+    for (let i = 0; i < p.length; i += 1) if (!partMatches(p[i], 0, a[i], 0)) return false;
+    return true;
+  }
+
+  function __oscCommands(host) {
+    const say = (level, text) => host.say(level, text);
+    let nextId = 1;
+
+    /** The transport's answer: true, or false having said why. */
+    function answered(verb, answer, what) {
+      if (answer === true || (answer && typeof answer === 'object' && answer.ok === true)) return true;
+      const why = answer && typeof answer.why === 'string' && answer.why !== '' ? answer.why : 'OSC is not available here';
+      say('error', `ce.osc.${verb}: ${why}, so ${what}.`);
+      return false;
+    }
+
+    /** `to` as the transport takes it: a target's name or "host:port", or { host, port }. */
+    function destination(verb, to) {
+      if (typeof to === 'string' && to.trim() !== '') return to.trim();
+      if (to && typeof to === 'object' && !Array.isArray(to) && typeof to.host === 'string' && whole(to.port)) {
+        return { host: to.host, port: to.port };
+      }
+      say('error', `ce.osc.${verb}: to must be a target's name, "host:port", or a message's from, so nothing was sent.`);
+      return null;
+    }
+
+    /** A message's values and their types, worked out and checked; null having said why. */
+    function message(verb, address, args, types, which) {
+      const where = which ? `message ${which}: ` : '';
+      if (typeof address !== 'string' || !address.startsWith('/')) {
+        say('error', `ce.osc.${verb}: ${where}address must be text starting with /, such as "/fader/1", so nothing was sent.`);
+        return null;
+      }
+      const values = !present(args) ? [] : (Array.isArray(args) ? args : [args]);
+      let tags = '';
+      if (present(types)) {
+        if (typeof types !== 'string' || types.length !== values.length || [...types].some((t) => !TAGS.includes(t))) {
+          say('error', `ce.osc.${verb}: ${where}types must be text with one OSC type for each value, such as "if", so nothing was sent.`);
+          return null;
+        }
+        tags = types;
+      } else {
+        for (let i = 0; i < values.length; i += 1) {
+          const v = values[i];
+          if (typeof v === 'number') tags += 'f';
+          else if (typeof v === 'string') tags += 's';
+          else if (typeof v === 'boolean') tags += v ? 'T' : 'F';
+          else if (v === null || v === undefined) tags += 'N';
+          else if (isBytes(v, -1)) tags += 'b';
+          else {
+            say('error', `ce.osc.${verb}: ${where}value ${i + 1} is not a number, text, true or false, or a list of bytes, so nothing was sent.`);
+            return null;
+          }
+        }
+      }
+      for (let i = 0; i < values.length; i += 1) {
+        if (!fits(tags[i], values[i])) {
+          say('error', `ce.osc.${verb}: ${where}value ${i + 1} is not ${WHAT[tags[i]] ?? 'what its type needs'}, as type "${tags[i]}" needs, so nothing was sent.`);
+          return null;
+        }
+      }
+      return { address, args: values.map((v) => (v === undefined ? null : v)), types: tags };
+    }
+
+    function listen(opts) {
+      const port = present(opt(opts, 'port')) ? opt(opts, 'port') : 8000;
+      if (!whole(port) || port < PORT_MIN || port > PORT_MAX) {
+        say('error', `ce.osc.listen: port must be a whole number from ${PORT_MIN} to ${PORT_MAX}, so it is not listening.`);
+        return false;
+      }
+      const network = opt(opts, 'network') === true;
+      const nextFree = opt(opts, 'nextFree') === true;
+      return answered('listen', host.query('listen', { port, network, nextFree }), 'it is not listening');
+    }
+
+    function stop() {
+      return host.query('stop', {}) === true;
+    }
+
+    function on(pattern, fn) {
+      if (typeof pattern !== 'string' || !pattern.startsWith('/')) {
+        say('error', 'ce.osc.on: pattern must be an address starting with /, such as "/fader/*", so nothing will run.');
+        return undefined;
+      }
+      if (typeof fn !== 'function') {
+        say('error', 'ce.osc.on: fn must be a function to call with each message, so nothing will run.');
+        return undefined;
+      }
+      const id = nextId;
+      nextId += 1;
+      host.listeners().push({ id, pattern, fn });
+      return id;
+    }
+
+    function off(id) {
+      const list = host.listeners();
+      for (let i = 0; i < list.length; i += 1) {
+        if (list[i].id === id) { list.splice(i, 1); return true; }
+      }
+      return false;
+    }
+
+    function target(name, address) {
+      if (typeof name !== 'string' || name === '') {
+        say('error', 'ce.osc.target: name must be text, such as "tablet", so nothing was set.');
+        return false;
+      }
+      if (!present(address)) return answered('target', host.query('target', { name, host: '', port: 0 }), 'nothing was set');
+      let where = null;
+      if (typeof address === 'string') {
+        const at = address.lastIndexOf(':');
+        const port = Number(address.slice(at + 1));
+        if (at > 0 && whole(port) && port >= 1 && port <= PORT_MAX) where = { host: address.slice(0, at).trim(), port };
+      } else if (address && typeof address === 'object' && typeof address.host === 'string' && whole(address.port)
+        && address.port >= 1 && address.port <= PORT_MAX) {
+        where = { host: address.host, port: address.port };
+      }
+      if (!where || where.host === '') {
+        say('error', 'ce.osc.target: address must be "host:port", { host, port } or a message\'s from, so nothing was set.');
+        return false;
+      }
+      return answered('target', host.query('target', { name, host: where.host, port: where.port }), 'nothing was set');
+    }
+
+    function send(to, address, args, types) {
+      const where = destination('send', to);
+      if (where === null) return false;
+      const m = message('send', address, args, types, 0);
+      if (m === null) return false;
+      return answered('send', host.query('send', { to: where, address: m.address, args: m.args, types: m.types }), 'nothing was sent');
+    }
+
+    function bundle(to, messages, opts) {
+      const where = destination('bundle', to);
+      if (where === null) return false;
+      if (!Array.isArray(messages) || messages.length === 0) {
+        say('error', 'ce.osc.bundle: messages must be a list of { address, args, types }, so nothing was sent.');
+        return false;
+      }
+      const out = [];
+      for (let i = 0; i < messages.length; i += 1) {
+        const x = messages[i];
+        const m = message('bundle', x && typeof x === 'object' ? x.address : undefined, x?.args, x?.types, i + 1);
+        if (m === null) return false;
+        out.push(m);
+      }
+      const time = opt(opts, 'time');
+      if (present(time) && !(typeof time === 'number' && Number.isFinite(time) && time >= 0)) {
+        say('error', 'ce.osc.bundle: time must be a number of seconds, so nothing was sent.');
+        return false;
+      }
+      return answered('bundle', host.query('bundle', { to: where, messages: out, time: present(time) ? time : 0 }), 'nothing was sent');
+    }
+
+    function status() {
+      const s = host.query('status', {});
+      return s && typeof s === 'object' && !Array.isArray(s) ? s : { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+    }
+
+    /** A message arrived: each of this script's functions whose pattern matches it runs, in order. */
+    function receive(msg) {
+      if (!msg || typeof msg !== 'object' || typeof msg.address !== 'string') return;
+      for (const l of host.listeners().slice()) {
+        if (__oscMatches(l.pattern, msg.address)) host.call(l.fn, msg);
+      }
+    }
+
+    return { listen, stop, on, off, target, send, bundle, status, receive };
+  }
+return { oscCommands: __oscCommands, oscMatches: __oscMatches };
+})();
+var __osc = __oscCore.oscCommands({
+  say: function (level, text) { if (level === "warn") logWarn(text); else logError(text); },
+  query: function (op, fields) { var q = {}; for (var k in fields) q[k] = fields[k]; q.op = op; return __deviceQuery("osc", q); },
+  listeners: function () { return __oscListeners; },
+  call: function (fn, value) { try { fn(value); } catch (e) { logError("ce.osc: the function given to on failed: " + e); } }
+});
+on("*", "__oscIn", function (msg) { __osc.receive(msg); });
+function oscListen(opts) { return __osc.listen(opts); }
+function oscStop() { return __osc.stop(); }
+function oscOn(pattern, fn) { return __osc.on(pattern, fn); }
+function oscOff(id) { return __osc.off(id); }
+function oscTarget(name, address) { return __osc.target(name, address); }
+function oscSend(to, address, args, types) { return __osc.send(to, address, args, types); }
+function oscBundle(to, messages, opts) { return __osc.bundle(to, messages, opts); }
+function oscStatus() { return __osc.status(); }
+// END GENERATED ce.osc
+
 // @module ce.music
 var __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
 function __m12(n) { return ((Math.floor(n) % 12) + 12) % 12; }
@@ -7043,6 +7339,8 @@ var __CE_OPTIONS = {
   "ciSet": { path: "ce.ci.set", at: 3, refusal: "false", names: ["resId", "timeoutMs", "partial", "mediaType"] },
   "ciSubscribe": { path: "ce.ci.subscribe", at: 2, refusal: "nothing", names: ["resId"] },
   "ciSetProfile": { path: "ce.ci.setProfile", at: 3, refusal: "false", names: ["channel"] },
+  "oscListen": { path: "ce.osc.listen", at: 0, refusal: "false", names: ["port", "network", "nextFree"] },
+  "oscBundle": { path: "ce.osc.bundle", at: 2, refusal: "false", names: ["time"] },
   "dawAssign": { path: "ce.daw.assign", at: 2, refusal: "false", names: ["name"] },
   "mpeZone": { path: "ce.mpe.zone", at: 0, refusal: "false", names: ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
   "mpeNoteOn": { path: "ce.mpe.noteOn", at: 2, refusal: "nothing", names: ["bend", "pressure", "timbre"] },
@@ -7160,6 +7458,7 @@ var __CE_MODULES = {
   "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
   "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
   "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+  "ce.osc": { "bundle": "oscBundle", "listen": "oscListen", "off": "oscOff", "on": "oscOn", "send": "oscSend", "status": "oscStatus", "stop": "oscStop", "target": "oscTarget" },
   "ce.daw": { "assign": "dawAssign", "beginGesture": "dawBeginGesture", "endGesture": "dawEndGesture", "host": "dawHost", "markChanged": "dawMarkChanged", "parameter": "dawParameter", "parameters": "dawParameters", "program": "dawProgram", "programs": "dawPrograms", "rename": "dawRename" },
   "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
   "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
@@ -7196,8 +7495,8 @@ var __CE_MODULES = {
   "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
   "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 };
-var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
-var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.daw","version":"1.0","runtime":"any"},{"id":"ce.mpe","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
+var __CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.osc","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"];
+var __CE_META = [{"id":"ce.core","version":"1.1","runtime":"any"},{"id":"ce.midi","version":"1.3","runtime":"any"},{"id":"ce.device","version":"1.3","runtime":"any"},{"id":"ce.math","version":"1.8","runtime":"any"},{"id":"ce.format","version":"1.1","runtime":"any"},{"id":"ce.music","version":"1.2","runtime":"any"},{"id":"ce.time","version":"1.3","runtime":"any"},{"id":"ce.anim","version":"1.1","runtime":"any"},{"id":"ce.ui","version":"1.2","runtime":"webview"},{"id":"ce.draw","version":"1.2","runtime":"webview"},{"id":"ce.panel","version":"1.4","runtime":"any"},{"id":"ce.storage","version":"1.2","runtime":"any"},{"id":"ce.image","version":"1.0","runtime":"webview"},{"id":"ce.patch","version":"1.0","runtime":"any"},{"id":"ce.osc","version":"1.0","runtime":"any"},{"id":"ce.daw","version":"1.0","runtime":"any"},{"id":"ce.mpe","version":"1.0","runtime":"any"},{"id":"ce.ci","version":"1.0","runtime":"any"},{"id":"ce.file","version":"1.0","runtime":"any"},{"id":"ce.verify","version":"1.0","runtime":"any"},{"id":"ce.keys","version":"1.0","runtime":"webview"},{"id":"ce.text","version":"1.0","runtime":"webview"},{"id":"ce.components.split","version":"1.0","runtime":"webview"},{"id":"ce.components.phrase","version":"1.0","runtime":"webview"},{"id":"ce.components.recorder","version":"1.0","runtime":"webview"},{"id":"ce.components.harmony","version":"1.0","runtime":"webview"},{"id":"ce.components.setlist","version":"1.0","runtime":"webview"},{"id":"ce.components.arp","version":"1.0","runtime":"webview"},{"id":"ce.components.chordpad","version":"1.0","runtime":"webview"},{"id":"ce.components.noteribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.drumpads","version":"1.0","runtime":"webview"},{"id":"ce.components.turing","version":"1.0","runtime":"webview"},{"id":"ce.components.looper","version":"1.0","runtime":"webview"},{"id":"ce.components.orbit","version":"1.0","runtime":"webview"},{"id":"ce.components.kinetic","version":"1.0","runtime":"webview"},{"id":"ce.components.constellation","version":"1.0","runtime":"webview"},{"id":"ce.components.timbre","version":"1.0","runtime":"webview"},{"id":"ce.components.router","version":"1.0","runtime":"webview"},{"id":"ce.components.macro","version":"1.0","runtime":"webview"},{"id":"ce.components.matrix","version":"1.0","runtime":"webview"},{"id":"ce.components.constraint","version":"1.0","runtime":"webview"},{"id":"ce.components.envelope","version":"1.0","runtime":"webview"},{"id":"ce.components.ribbon","version":"1.0","runtime":"webview"},{"id":"ce.components.crossfader","version":"1.0","runtime":"webview"},{"id":"ce.components.joystick","version":"1.0","runtime":"webview"},{"id":"ce.components.meter","version":"1.0","runtime":"webview"},{"id":"ce.components.transport","version":"1.0","runtime":"webview"},{"id":"ce.components.panic","version":"1.0","runtime":"webview"},{"id":"ce.components.lcd","version":"1.0","runtime":"webview"},{"id":"ce.components.pixel","version":"1.0","runtime":"webview"}];
 var __CE_VALUES = {"state":true};
 var __CE_GATE_MSG = "{member}() needs the {module} module, which this panel has not enabled. Add \"{module}\" to the panel's Scripting Modules (Export tab) — or clear the list to let it follow the scripts automatically.";
 // The real implementation of every member, captured before anything is gated, so turning a module

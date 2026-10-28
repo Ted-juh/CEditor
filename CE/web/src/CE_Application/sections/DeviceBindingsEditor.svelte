@@ -13,6 +13,8 @@
   import { previewModeEnabled } from '../stores/interactionPreview.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { parseMidiHex } from '../utils/midiNoteInput.js';
+  import { OSC_CONTROL_KIND, oscControlBinding } from '../utils/oscControlBindings.js';
+  import { oscLearnNext } from '../scripting/panelRuntime.js';
 
   let { control = null } = $props();
 
@@ -32,6 +34,10 @@
     if (!selectedBinding) return 'Add a binding, or drag a parameter from Device or a learned control from MIDI onto this component.';
     if (!ports.some((port) => port.id === selectedBinding.port)) return 'Choose a value port exposed by this component.';
     if (!roleMapping?.profileId) return `No profile is mapped to ${bindingRole}. Configure it in Settings → MIDI.`;
+    if (selectedBinding.kind === OSC_CONTROL_KIND) {
+      if (!String(selectedBinding.address ?? '').startsWith('/')) return 'Press Learn and move the control on the tablet, or type its OSC address.';
+      return `Follows ${selectedBinding.address} on the panel's OSC port${selectedBinding.sendBack === false ? '' : ', and sends its value back'}.`;
+    }
     if (selectedBinding.kind === MIDI_CONTROL_KIND) {
       if (!isMidiControlBinding(selectedBinding)) return 'Choose a valid MIDI message and controller number.';
       if (!canSendMidiControl(selectedBinding)) return 'This message is input only. Move the hardware control to update it.';
@@ -128,10 +134,22 @@
   }
 
   let isMidiControl = $derived(selectedBinding?.kind === MIDI_CONTROL_KIND);
+  let isOscControl = $derived(selectedBinding?.kind === OSC_CONTROL_KIND);
+  let oscLearning = $state(false);
+
+  // OSC learn: the next message that arrives on the panel's port names the address.
+  function learnOsc() {
+    const index = selectedIndex;
+    oscLearning = oscLearnNext((address) => {
+      oscLearning = false;
+      writeBindings(bindings.map((binding, i) => (i === index ? { ...binding, address } : binding)));
+    });
+  }
 
   /** What a binding is, in one phrase, for the picker. */
   function bindingSummary(binding) {
     if (binding?.kind === MIDI_CONTROL_KIND) return midiControlLabel(binding) || 'CC ?';
+    if (binding?.kind === OSC_CONTROL_KIND) return binding.address || 'OSC ?';
     return binding?.parameterId || 'unassigned';
   }
 
@@ -160,7 +178,8 @@
     if (!selectedBinding) return;
     const port = selectedBinding.port ?? 'value';
     const deviceRole = selectedBinding.deviceRole ?? DEFAULT_DEVICE_ROLE;
-    const next = kind === MIDI_CONTROL_KIND
+    const next = kind === OSC_CONTROL_KIND ? oscControlBinding(port)
+      : kind === MIDI_CONTROL_KIND
       ? midiControlBindingFrom({ controller: selectedBinding.controller ?? 0, port, deviceRole })
       : {
         kind: 'deviceParameter', port, deviceRole,
@@ -241,9 +260,32 @@
         <select class="val" value={selectedBinding?.kind ?? 'deviceParameter'} onchange={(e) => setBindingKind(e.target.value)}>
           <option value="deviceParameter">Device parameter</option>
           <option value="midiControl">MIDI control (raw CC)</option>
+          <option value="oscControl">OSC address</option>
         </select>
       </PropertyCell>
-      {#if isMidiControl}
+      {#if isOscControl}
+        <PropertyCell label="Address" span={3} hint="The OSC address that moves this control, such as /fader/1. Learn takes the next message that arrives on the panel's OSC port; OSC wildcards are allowed.">
+          <input class="val" value={selectedBinding?.address ?? ''} placeholder="/fader/1" onchange={(e) => setBindingProp('address', e.target.value.trim())} />
+        </PropertyCell>
+        <PropertyCell label="Learn" span={1} hint="Wait for the next OSC message and take its address. Move the control on the tablet.">
+          <button class="action-btn" onclick={learnOsc}>{oscLearning ? 'Waiting…' : 'Learn'}</button>
+        </PropertyCell>
+        <PropertyCell label="Value" span={1} hint="Which of the message's values to use, for a message that carries several (an XY pad sends two). 1 is the first.">
+          <input class="val" type="number" min="1" value={selectedBinding?.valueIndex ?? 1} onchange={(e) => setBindingProp('valueIndex', Math.max(1, Math.round(Number(e.target.value) || 1)))} />
+        </PropertyCell>
+        <PropertyCell label="From" span={1} hint="The lowest value the sender sends. TouchOSC sends 0 to 1.">
+          <input class="val" type="number" value={selectedBinding?.min ?? 0} onchange={(e) => setBindingProp('min', Number(e.target.value) || 0)} />
+        </PropertyCell>
+        <PropertyCell label="To" span={1} hint="The highest value the sender sends. It is scaled to this control's own range.">
+          <input class="val" type="number" value={selectedBinding?.max ?? 1} onchange={(e) => setBindingProp('max', Number.isFinite(Number(e.target.value)) ? Number(e.target.value) : 1)} />
+        </PropertyCell>
+        <PropertyCell label="Send back" span={1} hint="When this control moves for any other reason (a hand, a dump, the DAW), send its value to the address, so the tablet follows. Never for a move that came from that address.">
+          <PropertyToggle value={selectedBinding?.sendBack !== false} onchange={() => setBindingProp('sendBack', !(selectedBinding?.sendBack !== false))} />
+        </PropertyCell>
+        <PropertyCell label="Send to" span={2} hint="Where to send back: a target named in the panel's OSC settings, or host:port. Empty: the computer the last message came from.">
+          <input class="val" value={selectedBinding?.sendTo ?? ''} placeholder="the sender" onchange={(e) => setBindingProp('sendTo', e.target.value.trim())} />
+        </PropertyCell>
+      {:else if isMidiControl}
         <PropertyCell label="Message" span={2} hint="Which MIDI message. CC and aftertouch are two-way; velocity, poly pressure and bend can only be followed.">
           <select class="val" value={selectedBinding?.message ?? 'cc'} onchange={(e) => setBindingMessage(e.target.value)}>
             {#each MIDI_CONTROL_MESSAGES as message}
@@ -280,7 +322,7 @@
           <input class="val" value={selectedBinding?.parameterId ?? ''} placeholder="filter.cutoff" onchange={(e) => setBindingProp('parameterId', e.target.value)} />
         </PropertyCell>
       {/if}
-      {#if !isMidiControl}
+      {#if !isMidiControl && !isOscControl}
       <PropertyCell label="Type" span={2} hint="Semantic parameter type. Dragging from the parameter browser fills this automatically.">
         <select class="val" value={selectedBinding?.parameterType ?? ''} onchange={(e) => setBindingProp('parameterType', e.target.value)}>
           <option value="">Auto / unspecified</option>
@@ -296,6 +338,7 @@
         <PropertyToggle value={selectedBinding?.adoptMetadata !== false} onchange={() => setBindingProp('adoptMetadata', !(selectedBinding?.adoptMetadata !== false))} />
       </PropertyCell>
       {/if}
+      {#if !isOscControl}
       <PropertyCell label="Dry Run" span={1} hint="Compile and monitor the transaction without sending to hardware.">
         <PropertyToggle value={selectedBinding?.dryRun !== false} onchange={() => setBindingProp('dryRun', !(selectedBinding?.dryRun !== false))} />
       </PropertyCell>
@@ -305,6 +348,7 @@
       <PropertyCell label="Echo" span={1} hint="Ignore obvious echoes of messages sent by CEditor.">
         <PropertyToggle value={selectedBinding?.feedback?.ignoreOwnEchoes !== false} onchange={() => setFeedbackProp('ignoreOwnEchoes', !(selectedBinding?.feedback?.ignoreOwnEchoes !== false))} />
       </PropertyCell>
+      {/if}
     </PropertySection>
   {:else}
     <div class="placeholder">No device bindings yet.</div>

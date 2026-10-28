@@ -5502,6 +5502,272 @@ def dawAssign(slot=None, path=None, opts=None):
 def dawMarkChanged():
     return _DAW["markChanged"]()
 
+# @module ce.osc
+# ce.osc, ported line for line from oscCore.js (the panel view's; the JavaScript prelude runs that
+# file itself). Held to the panel view's answers by test/oscParity.test.js and the scenario in
+# test/support/oscScenario.mjs. The port, the reading and writing of OSC and the user's yes live in
+# the transport (__deviceQuery "osc"); what arrives comes back as "__oscIn" events. Every Python
+# script runs this prelude for itself, so its patterns are its own.
+_OSC_TAGS = "ihfdsSTFNIbrmtc"
+_OSC_WHAT = {
+    "i": "a whole number", "h": "a whole number", "f": "a number", "d": "a number", "t": "a number", "s": "text", "S": "text",
+    "c": "one character of text", "b": "a list of bytes", "m": "a list of four bytes", "r": "a colour such as \"#FF8000\"",
+}
+
+def _osc_number(v):
+    import math
+    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+
+def _osc_whole(v):
+    return _osc_number(v) and int(v) == v
+
+def _osc_bytes(v, count):
+    if not isinstance(v, (list, tuple)) or (count >= 0 and len(v) != count):
+        return False
+    return all(_osc_whole(b) and 0 <= b <= 255 for b in v)
+
+def _osc_fits(tag, v):
+    import re
+    if tag == "i": return _osc_whole(v) and -2147483648 <= v <= 2147483647
+    if tag == "h": return _osc_whole(v)
+    if tag in ("f", "d", "t"): return _osc_number(v)
+    if tag in ("s", "S"): return isinstance(v, str)
+    if tag == "c": return isinstance(v, str) and v != ""
+    if tag == "b": return _osc_bytes(v, -1)
+    if tag == "m": return _osc_bytes(v, 4)
+    if tag == "r": return isinstance(v, str) and re.fullmatch(r"#([0-9a-fA-F]{6}|[0-9a-fA-F]{8})", v) is not None
+    return tag != "" and tag in _OSC_TAGS
+
+def _osc_part(p, pi, s, si):
+    while pi < len(p):
+        c = p[pi]
+        if c == "*":
+            for k in range(len(s), si - 1, -1):
+                if _osc_part(p, pi + 1, s, k): return True
+            return False
+        if c == "?":
+            if si >= len(s): return False
+            pi += 1; si += 1
+            continue
+        if c == "[":
+            close = p.find("]", pi + 1)
+            if close < 0 or si >= len(s): return False
+            chars = p[pi + 1:close]
+            negate = chars.startswith("!")
+            if negate: chars = chars[1:]
+            found = False
+            k = 0
+            while k < len(chars):
+                if k + 2 < len(chars) and chars[k + 1] == "-":
+                    if chars[k] <= s[si] <= chars[k + 2]: found = True
+                    k += 3
+                else:
+                    if s[si] == chars[k]: found = True
+                    k += 1
+            if found == negate: return False
+            pi = close + 1; si += 1
+            continue
+        if c == "{":
+            close = p.find("}", pi + 1)
+            if close < 0: return False
+            for alt in p[pi + 1:close].split(","):
+                if s.startswith(alt, si) and _osc_part(p, close + 1, s, si + len(alt)): return True
+            return False
+        if si >= len(s) or s[si] != c: return False
+        pi += 1; si += 1
+    return si == len(s)
+
+def _osc_matches(pattern, address):
+    if not isinstance(pattern, str) or not isinstance(address, str): return False
+    p, a = pattern.split("/"), address.split("/")
+    if len(p) != len(a): return False
+    return all(_osc_part(p[i], 0, a[i], 0) for i in range(len(p)))
+
+def _osc_commands(host):
+    state = {"next": 1}
+
+    def say(level, text):
+        host["say"](level, text)
+
+    def answered(verb, answer, what):
+        if answer is True or (isinstance(answer, dict) and answer.get("ok") is True): return True
+        why = answer.get("why") if isinstance(answer, dict) and isinstance(answer.get("why"), str) and answer.get("why") != "" else "OSC is not available here"
+        say("error", "ce.osc." + verb + ": " + why + ", so " + what + ".")
+        return False
+
+    def destination(verb, to):
+        if isinstance(to, str) and to.strip() != "": return to.strip()
+        if isinstance(to, dict) and isinstance(to.get("host"), str) and _osc_whole(to.get("port")):
+            return {"host": to["host"], "port": to["port"]}
+        say("error", "ce.osc." + verb + ": to must be a target's name, \"host:port\", or a message's from, so nothing was sent.")
+        return None
+
+    def message(verb, address, args, types, which):
+        where = ("message " + str(which) + ": ") if which else ""
+        if not isinstance(address, str) or not address.startswith("/"):
+            say("error", "ce.osc." + verb + ": " + where + "address must be text starting with /, such as \"/fader/1\", so nothing was sent.")
+            return None
+        values = [] if args is None else (list(args) if isinstance(args, (list, tuple)) else [args])
+        if types is not None:
+            if not isinstance(types, str) or len(types) != len(values) or any(t not in _OSC_TAGS for t in types):
+                say("error", "ce.osc." + verb + ": " + where + "types must be text with one OSC type for each value, such as \"if\", so nothing was sent.")
+                return None
+            tags = types
+        else:
+            tags = ""
+            for i, v in enumerate(values):
+                if isinstance(v, bool): tags += "T" if v else "F"
+                elif isinstance(v, (int, float)): tags += "f"
+                elif isinstance(v, str): tags += "s"
+                elif v is None: tags += "N"
+                elif _osc_bytes(v, -1): tags += "b"
+                else:
+                    say("error", "ce.osc." + verb + ": " + where + "value " + str(i + 1) + " is not a number, text, true or false, or a list of bytes, so nothing was sent.")
+                    return None
+        for i, v in enumerate(values):
+            if not _osc_fits(tags[i], v):
+                say("error", "ce.osc." + verb + ": " + where + "value " + str(i + 1) + " is not " + _OSC_WHAT.get(tags[i], "what its type needs")
+                    + ", as type \"" + tags[i] + "\" needs, so nothing was sent.")
+                return None
+        return {"address": address, "args": values, "types": tags}
+
+    def opt(opts, key):
+        return opts.get(key) if isinstance(opts, dict) else None
+
+    def listen(opts=None):
+        port = opt(opts, "port")
+        if port is None: port = 8000
+        if not _osc_whole(port) or port < 1024 or port > 65535:
+            say("error", "ce.osc.listen: port must be a whole number from 1024 to 65535, so it is not listening.")
+            return False
+        return answered("listen", host["query"]("listen", {"port": port, "network": opt(opts, "network") is True,
+                                                           "nextFree": opt(opts, "nextFree") is True}), "it is not listening")
+
+    def on(pattern=None, fn=None):
+        if not isinstance(pattern, str) or not pattern.startswith("/"):
+            say("error", "ce.osc.on: pattern must be an address starting with /, such as \"/fader/*\", so nothing will run.")
+            return None
+        if not callable(fn):
+            say("error", "ce.osc.on: fn must be a function to call with each message, so nothing will run.")
+            return None
+        oid = state["next"]
+        state["next"] += 1
+        host["listeners"]().append({"id": oid, "pattern": pattern, "fn": fn})
+        return oid
+
+    def off(oid=None):
+        lst = host["listeners"]()
+        for i, l in enumerate(lst):
+            if l["id"] == oid:
+                del lst[i]
+                return True
+        return False
+
+    def target(name=None, address=None):
+        if not isinstance(name, str) or name == "":
+            say("error", "ce.osc.target: name must be text, such as \"tablet\", so nothing was set.")
+            return False
+        if address is None:
+            return answered("target", host["query"]("target", {"name": name, "host": "", "port": 0}), "nothing was set")
+        where = None
+        if isinstance(address, str):
+            at = address.rfind(":")
+            try:
+                port = float(address[at + 1:]) if at > 0 else None
+            except ValueError:
+                port = None
+            if at > 0 and port is not None and _osc_whole(port) and 1 <= port <= 65535:
+                where = {"host": address[:at].strip(), "port": int(port)}
+        elif isinstance(address, dict) and isinstance(address.get("host"), str) and _osc_whole(address.get("port")) \
+                and 1 <= address["port"] <= 65535:
+            where = {"host": address["host"], "port": address["port"]}
+        if where is None or where["host"] == "":
+            say("error", "ce.osc.target: address must be \"host:port\", { host, port } or a message's from, so nothing was set.")
+            return False
+        return answered("target", host["query"]("target", {"name": name, "host": where["host"], "port": where["port"]}), "nothing was set")
+
+    def send(to=None, address=None, args=None, types=None):
+        where = destination("send", to)
+        if where is None: return False
+        m = message("send", address, args, types, 0)
+        if m is None: return False
+        return answered("send", host["query"]("send", {"to": where, "address": m["address"], "args": m["args"], "types": m["types"]}), "nothing was sent")
+
+    def bundle(to=None, messages=None, opts=None):
+        where = destination("bundle", to)
+        if where is None: return False
+        if not isinstance(messages, (list, tuple)) or len(messages) == 0:
+            say("error", "ce.osc.bundle: messages must be a list of { address, args, types }, so nothing was sent.")
+            return False
+        out = []
+        for i, x in enumerate(messages):
+            d = x if isinstance(x, dict) else {}
+            m = message("bundle", d.get("address"), d.get("args"), d.get("types"), i + 1)
+            if m is None: return False
+            out.append(m)
+        time = opt(opts, "time")
+        if time is not None and not (_osc_number(time) and time >= 0):
+            say("error", "ce.osc.bundle: time must be a number of seconds, so nothing was sent.")
+            return False
+        return answered("bundle", host["query"]("bundle", {"to": where, "messages": out, "time": time if time is not None else 0}), "nothing was sent")
+
+    def status():
+        s = host["query"]("status", {})
+        return s if isinstance(s, dict) else {"listening": False, "waiting": False, "received": 0, "sent": 0, "dropped": 0}
+
+    def receive(msg):
+        if not isinstance(msg, dict) or not isinstance(msg.get("address"), str): return
+        for l in list(host["listeners"]()):
+            if _osc_matches(l["pattern"], msg["address"]): host["call"](l["fn"], msg)
+
+    return {"listen": listen, "stop": lambda: host["query"]("stop", {}) is True, "on": on, "off": off,
+            "target": target, "send": send, "bundle": bundle, "status": status, "receive": receive}
+
+_OSC_LISTENERS = []
+
+def _osc_query(op, fields):
+    q = dict(fields)
+    q["op"] = op
+    return __deviceQuery("osc", q)
+
+def _osc_call(fn, value):
+    try:
+        fn(value)
+    except Exception as e:
+        logError("ce.osc: the function given to on failed: " + str(e))
+
+_OSC = _osc_commands({
+    "say": lambda level, text: logWarn(text) if level == "warn" else logError(text),
+    "query": lambda op, fields: _osc_query(op, fields),
+    "listeners": lambda: _OSC_LISTENERS,
+    "call": _osc_call,
+})
+on("*", "__oscIn", lambda msg: _OSC["receive"](msg))
+
+def oscListen(opts=None):
+    return _OSC["listen"](opts)
+
+def oscStop():
+    return _OSC["stop"]()
+
+def oscOn(pattern=None, fn=None):
+    return _OSC["on"](pattern, fn)
+
+def oscOff(id=None):
+    return _OSC["off"](id)
+
+def oscTarget(name=None, address=None):
+    return _OSC["target"](name, address)
+
+def oscSend(to=None, address=None, args=None, types=None):
+    return _OSC["send"](to, address, args, types)
+
+def oscBundle(to=None, messages=None, opts=None):
+    return _OSC["bundle"](to, messages, opts)
+
+def oscStatus():
+    return _OSC["status"]()
+
 # @module ce.music
 __NOTES = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"]
 def __m12(n):
@@ -7261,6 +7527,8 @@ __CE_OPTIONS = {
     "ciSet": { "path": "ce.ci.set", "at": 3, "param": "opts", "refusal": "false", "names": ["resId", "timeoutMs", "partial", "mediaType"] },
     "ciSubscribe": { "path": "ce.ci.subscribe", "at": 2, "param": "opts", "refusal": "nothing", "names": ["resId"] },
     "ciSetProfile": { "path": "ce.ci.setProfile", "at": 3, "param": "opts", "refusal": "false", "names": ["channel"] },
+    "oscListen": { "path": "ce.osc.listen", "at": 0, "param": "opts", "refusal": "false", "names": ["port", "network", "nextFree"] },
+    "oscBundle": { "path": "ce.osc.bundle", "at": 2, "param": "opts", "refusal": "false", "names": ["time"] },
     "dawAssign": { "path": "ce.daw.assign", "at": 2, "param": "opts", "refusal": "false", "names": ["name"] },
     "mpeZone": { "path": "ce.mpe.zone", "at": 0, "param": "opts", "refusal": "false", "names": ["zone", "members", "bendRange", "managerBendRange", "send", "role"] },
     "mpeNoteOn": { "path": "ce.mpe.noteOn", "at": 2, "param": "opts", "refusal": "nothing", "names": ["bend", "pressure", "timbre"] },
@@ -7378,6 +7646,7 @@ __CE_MODULES = {
     "ce.storage": { "all": "allSettings", "clear": "clearSettings", "decode": "decodeJson", "encode": "encodeJson", "forget": "forgetSetting", "info": "storageInfo", "loadSetting": "loadSetting", "saveSetting": "saveSetting", "settings": "listSettings", "state": "state" },
     "ce.image": { "asset": "imageAsset", "assets": "imageAssets", "clear": "imageClear", "embed": "imageEmbed", "icon": "imageIcon", "load": "imageLoad", "read": "imageRead", "set": "imageSet" },
     "ce.patch": { "apply": "patchApply", "blend": "patchBlend", "current": "patchCurrent", "define": "patchDefine", "diff": "patchDiff", "equal": "patchEqual", "forget": "patchForget", "list": "patchList", "load": "patchLoad", "merge": "patchMerge", "morph": "patchMorph", "mutate": "patchMutate", "random": "patchRandom", "read": "patchRead", "save": "patchSave", "scopes": "patchScopes", "write": "patchWrite" },
+    "ce.osc": { "bundle": "oscBundle", "listen": "oscListen", "off": "oscOff", "on": "oscOn", "send": "oscSend", "status": "oscStatus", "stop": "oscStop", "target": "oscTarget" },
     "ce.daw": { "assign": "dawAssign", "beginGesture": "dawBeginGesture", "endGesture": "dawEndGesture", "host": "dawHost", "markChanged": "dawMarkChanged", "parameter": "dawParameter", "parameters": "dawParameters", "program": "dawProgram", "programs": "dawPrograms", "rename": "dawRename" },
     "ce.mpe": { "allOff": "mpeAllOff", "express": "mpeExpress", "listen": "mpeListen", "noteOff": "mpeNoteOff", "noteOn": "mpeNoteOn", "notes": "mpeNotes", "zone": "mpeZone" },
     "ce.ci": { "devices": "ciDevices", "discover": "ciDiscover", "draftProfile": "ciDraftProfile", "get": "ciGet", "profiles": "ciProfiles", "set": "ciSet", "setProfile": "ciSetProfile", "subscribe": "ciSubscribe", "unsubscribe": "ciUnsubscribe" },
@@ -7414,7 +7683,7 @@ __CE_MODULES = {
     "ce.components.lcd": { "anim": "lcdAnim", "animFps": "lcdAnimFps", "animLoop": "lcdAnimLoop", "animPreset": "lcdAnimPreset", "animSpeed": "lcdAnimSpeed", "backlight": "lcdBacklight", "backlightSource": "lcdBacklightSource", "blink": "lcdBlink", "blinkRate": "lcdBlinkRate", "brightness": "lcdBrightness", "brightnessSource": "lcdBrightnessSource", "clear": "lcdClear", "contrast": "lcdContrast", "cursor": "lcdCursor", "cursorAt": "lcdCursorAt", "cursorBlink": "lcdCursorBlink", "editText": "lcdEditText", "fill": "lcdFill", "glyph": "lcdGlyph", "read": "lcdRead", "scroll": "lcdScroll", "scrollMode": "lcdScrollMode", "scrollRepeat": "lcdScrollRepeat", "scrollSpeed": "lcdScrollSpeed", "showGhost": "lcdShowGhost", "showGlass": "lcdShowGlass", "showGrid": "lcdShowGrid", "showScanlines": "lcdShowScanlines", "size": "lcdSize", "text": "lcdText", "value": "lcdValue", "valueMax": "lcdValueMax", "valueMin": "lcdValueMin", "valuePrecision": "lcdValuePrecision", "valuePrefix": "lcdValuePrefix", "valueSource": "lcdValueSource", "valueSuffix": "lcdValueSuffix" },
     "ce.components.pixel": { "anim": "pixelAnim", "animFps": "pixelAnimFps", "animLoop": "pixelAnimLoop", "animPreset": "pixelAnimPreset", "animSpeed": "pixelAnimSpeed", "backlight": "pixelBacklight", "backlightSource": "pixelBacklightSource", "blink": "pixelBlink", "brightness": "pixelBrightness", "brightnessSource": "pixelBrightnessSource", "contrast": "pixelContrast", "editText": "pixelEditText", "gamma": "pixelGamma", "glow": "pixelGlow", "h": "pixelH", "label": "pixelLabel", "layoutTransition": "pixelLayoutTransition", "read": "pixelRead", "show": "pixelShow", "showGhost": "pixelShowGhost", "showGlass": "pixelShowGlass", "showGrid": "pixelShowGrid", "showScanlines": "pixelShowScanlines", "text": "pixelText", "transitionMs": "pixelTransitionMs", "w": "pixelW", "x": "pixelX", "y": "pixelY" },
 }
-__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
+__CE_ORDER = ["ce.core","ce.midi","ce.device","ce.math","ce.format","ce.music","ce.time","ce.anim","ce.ui","ce.draw","ce.panel","ce.storage","ce.image","ce.patch","ce.osc","ce.daw","ce.mpe","ce.ci","ce.file","ce.verify","ce.keys","ce.text","ce.components.split","ce.components.phrase","ce.components.recorder","ce.components.harmony","ce.components.setlist","ce.components.arp","ce.components.chordpad","ce.components.noteribbon","ce.components.drumpads","ce.components.turing","ce.components.looper","ce.components.orbit","ce.components.kinetic","ce.components.constellation","ce.components.timbre","ce.components.router","ce.components.macro","ce.components.matrix","ce.components.constraint","ce.components.envelope","ce.components.ribbon","ce.components.crossfader","ce.components.joystick","ce.components.meter","ce.components.transport","ce.components.panic","ce.components.lcd","ce.components.pixel"]
 __CE_META = [
     { "id": "ce.core", "version": "1.1", "runtime": "any" },
     { "id": "ce.midi", "version": "1.3", "runtime": "any" },
@@ -7430,6 +7699,7 @@ __CE_META = [
     { "id": "ce.storage", "version": "1.2", "runtime": "any" },
     { "id": "ce.image", "version": "1.0", "runtime": "webview" },
     { "id": "ce.patch", "version": "1.0", "runtime": "any" },
+    { "id": "ce.osc", "version": "1.0", "runtime": "any" },
     { "id": "ce.daw", "version": "1.0", "runtime": "any" },
     { "id": "ce.mpe", "version": "1.0", "runtime": "any" },
     { "id": "ce.ci", "version": "1.0", "runtime": "any" },

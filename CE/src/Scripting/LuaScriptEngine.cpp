@@ -4627,6 +4627,317 @@ function dawAssign(slot, path, opts) return D.assign(slot, path, opts) end
 function dawMarkChanged() return D.markChanged() end
 end
 
+-- @module ce.osc
+-- ce.osc, ported line for line from oscCore.js (the panel view's; the JavaScript prelude runs that
+-- file itself). Held to the panel view's answers by test/oscParity.test.js and the scenario in
+-- test/support/oscScenario.mjs. The port, the reading and writing of OSC and the user's yes live in
+-- the transport (__deviceQuery "osc"); what arrives comes back as "__oscIn" events.
+do
+  local PORT_MIN, PORT_MAX = 1024, 65535
+  local TAGS = "ihfdsSTFNIbrmtc"
+  local INF = math.huge
+  local function present(v) return v ~= nil end
+  local function opt(opts, key) if type(opts) == "table" then return opts[key] end return nil end
+  local function whole(v) return type(v) == "number" and v == v and v ~= INF and v ~= -INF and math.floor(v) == v end
+  local function isList(t) return type(t) == "table" and (#t > 0 or next(t) == nil) end
+  local function isBytes(v, count)
+    if not isList(v) or (count >= 0 and #v ~= count) then return false end
+    for _, b in ipairs(v) do if not whole(b) or b < 0 or b > 255 then return false end end
+    return true
+  end
+  local function fits(tag, v)
+    local number = type(v) == "number" and v == v and v ~= INF and v ~= -INF
+    if tag == "i" then return whole(v) and v >= -2147483648 and v <= 2147483647 end
+    if tag == "h" then return whole(v) end
+    if tag == "f" or tag == "d" or tag == "t" then return number end
+    if tag == "s" or tag == "S" then return type(v) == "string" end
+    if tag == "c" then return type(v) == "string" and v ~= "" end
+    if tag == "b" then return isBytes(v, -1) end
+    if tag == "m" then return isBytes(v, 4) end
+    if tag == "r" then
+      return type(v) == "string" and (v:match("^#%x%x%x%x%x%x$") ~= nil or v:match("^#%x%x%x%x%x%x%x%x$") ~= nil)
+    end
+    return tag ~= "" and TAGS:find(tag, 1, true) ~= nil
+  end
+  local WHAT = {
+    i = "a whole number", h = "a whole number", f = "a number", d = "a number", t = "a number", s = "text", S = "text",
+    c = "one character of text", b = "a list of bytes", m = "a list of four bytes", r = "a colour such as \"#FF8000\"",
+  }
+
+  -- One part of an address against one part of a pattern: * ? [a-z] [!a] {one,two}. Positions from 1.
+  local function partMatches(p, pi, s, si)
+    while pi <= #p do
+      local c = p:sub(pi, pi)
+      if c == "*" then
+        for k = #s + 1, si, -1 do if partMatches(p, pi + 1, s, k) then return true end end
+        return false
+      end
+      if c == "?" then
+        if si > #s then return false end
+        pi = pi + 1; si = si + 1
+      elseif c == "[" then
+        local close = p:find("]", pi + 1, true)
+        if close == nil or si > #s then return false end
+        local set = p:sub(pi + 1, close - 1)
+        local negate = set:sub(1, 1) == "!"
+        if negate then set = set:sub(2) end
+        local ch = s:sub(si, si)
+        local found = false
+        local k = 1
+        while k <= #set do
+          if k + 2 <= #set and set:sub(k + 1, k + 1) == "-" then
+            if ch >= set:sub(k, k) and ch <= set:sub(k + 2, k + 2) then found = true end
+            k = k + 3
+          else
+            if ch == set:sub(k, k) then found = true end
+            k = k + 1
+          end
+        end
+        if found == negate then return false end
+        pi = close + 1; si = si + 1
+      elseif c == "{" then
+        local close = p:find("}", pi + 1, true)
+        if close == nil then return false end
+        local alts = p:sub(pi + 1, close - 1)
+        for alt in (alts .. ","):gmatch("([^,]*),") do
+          if s:sub(si, si + #alt - 1) == alt and partMatches(p, close + 1, s, si + #alt) then return true end
+        end
+        return false
+      else
+        if si > #s or s:sub(si, si) ~= c then return false end
+        pi = pi + 1; si = si + 1
+      end
+    end
+    return si == #s + 1
+  end
+
+  local function split(text)
+    local parts = {}
+    for part in (text .. "/"):gmatch("([^/]*)/") do parts[#parts + 1] = part end
+    return parts
+  end
+
+  local function matches(pattern, address)
+    if type(pattern) ~= "string" or type(address) ~= "string" then return false end
+    local p, a = split(pattern), split(address)
+    if #p ~= #a then return false end
+    for i = 1, #p do if not partMatches(p[i], 1, a[i], 1) then return false end end
+    return true
+  end
+
+  local function commands(host)
+    local function say(level, text) host.say(level, text) end
+    local nextId = 1
+
+    local function answered(verb, answer, what)
+      if answer == true or (type(answer) == "table" and answer.ok == true) then return true end
+      local why = "OSC is not available here"
+      if type(answer) == "table" and type(answer.why) == "string" and answer.why ~= "" then why = answer.why end
+      say("error", "ce.osc." .. verb .. ": " .. why .. ", so " .. what .. ".")
+      return false
+    end
+
+    local function trim(s) return (s:gsub("^%s+", ""):gsub("%s+$", "")) end
+
+    local function destination(verb, to)
+      if type(to) == "string" and trim(to) ~= "" then return trim(to) end
+      if type(to) == "table" and type(to.host) == "string" and whole(to.port) then return { host = to.host, port = to.port } end
+      say("error", "ce.osc." .. verb .. ": to must be a target's name, \"host:port\", or a message's from, so nothing was sent.")
+      return nil
+    end
+
+    local function message(verb, address, args, types, which)
+      local where = ""
+      if which ~= 0 then where = "message " .. which .. ": " end
+      if type(address) ~= "string" or address:sub(1, 1) ~= "/" then
+        say("error", "ce.osc." .. verb .. ": " .. where .. "address must be text starting with /, such as \"/fader/1\", so nothing was sent.")
+        return nil
+      end
+      local values
+      if args == nil then values = {}
+      elseif type(args) == "table" then values = args
+      else values = { args } end
+      local n = #values
+      local tags = ""
+      if types ~= nil then
+        local okTypes = type(types) == "string" and #types == n
+        if okTypes then
+          for i = 1, #types do if not TAGS:find(types:sub(i, i), 1, true) then okTypes = false end end
+        end
+        if not okTypes then
+          say("error", "ce.osc." .. verb .. ": " .. where .. "types must be text with one OSC type for each value, such as \"if\", so nothing was sent.")
+          return nil
+        end
+        tags = types
+      else
+        for i = 1, n do
+          local v = values[i]
+          if type(v) == "number" then tags = tags .. "f"
+          elseif type(v) == "string" then tags = tags .. "s"
+          elseif type(v) == "boolean" then tags = tags .. (v and "T" or "F")
+          elseif v == nil then tags = tags .. "N"
+          elseif isBytes(v, -1) then tags = tags .. "b"
+          else
+            say("error", "ce.osc." .. verb .. ": " .. where .. "value " .. i .. " is not a number, text, true or false, or a list of bytes, so nothing was sent.")
+            return nil
+          end
+        end
+      end
+      for i = 1, n do
+        local tag = tags:sub(i, i)
+        if not fits(tag, values[i]) then
+          say("error", "ce.osc." .. verb .. ": " .. where .. "value " .. i .. " is not " .. (WHAT[tag] or "what its type needs")
+            .. ", as type \"" .. tag .. "\" needs, so nothing was sent.")
+          return nil
+        end
+      end
+      local out = {}
+      for i = 1, n do out[i] = values[i] end
+      return { address = address, args = out, types = tags }
+    end
+
+    local C = {}
+    function C.listen(opts)
+      local port = opt(opts, "port")
+      if port == nil then port = 8000 end
+      if not whole(port) or port < PORT_MIN or port > PORT_MAX then
+        say("error", "ce.osc.listen: port must be a whole number from " .. PORT_MIN .. " to " .. PORT_MAX .. ", so it is not listening.")
+        return false
+      end
+      return answered("listen", host.query("listen", { port = port, network = opt(opts, "network") == true,
+        nextFree = opt(opts, "nextFree") == true }), "it is not listening")
+    end
+    function C.stop() return host.query("stop", {}) == true end
+    function C.on(pattern, fn)
+      if type(pattern) ~= "string" or pattern:sub(1, 1) ~= "/" then
+        say("error", "ce.osc.on: pattern must be an address starting with /, such as \"/fader/*\", so nothing will run.")
+        return nil
+      end
+      if type(fn) ~= "function" then
+        say("error", "ce.osc.on: fn must be a function to call with each message, so nothing will run.")
+        return nil
+      end
+      local id = nextId
+      nextId = nextId + 1
+      local list = host.listeners()
+      list[#list + 1] = { id = id, pattern = pattern, fn = fn }
+      return id
+    end
+    function C.off(id)
+      local list = host.listeners()
+      for i = 1, #list do
+        if list[i].id == id then table.remove(list, i) return true end
+      end
+      return false
+    end
+    function C.target(name, address)
+      if type(name) ~= "string" or name == "" then
+        say("error", "ce.osc.target: name must be text, such as \"tablet\", so nothing was set.")
+        return false
+      end
+      if address == nil then return answered("target", host.query("target", { name = name, host = "", port = 0 }), "nothing was set") end
+      local where = nil
+      if type(address) == "string" then
+        local at = nil
+        for i = #address, 1, -1 do if address:sub(i, i) == ":" then at = i break end end
+        local port = at and tonumber(address:sub(at + 1)) or nil
+        if at ~= nil and at > 1 and whole(port) and port >= 1 and port <= PORT_MAX then
+          where = { host = trim(address:sub(1, at - 1)), port = port }
+        end
+      elseif type(address) == "table" and type(address.host) == "string" and whole(address.port)
+          and address.port >= 1 and address.port <= PORT_MAX then
+        where = { host = address.host, port = address.port }
+      end
+      if where == nil or where.host == "" then
+        say("error", "ce.osc.target: address must be \"host:port\", { host, port } or a message's from, so nothing was set.")
+        return false
+      end
+      return answered("target", host.query("target", { name = name, host = where.host, port = where.port }), "nothing was set")
+    end
+    function C.send(to, address, args, types)
+      local where = destination("send", to)
+      if where == nil then return false end
+      local m = message("send", address, args, types, 0)
+      if m == nil then return false end
+      return answered("send", host.query("send", { to = where, address = m.address, args = m.args, types = m.types }), "nothing was sent")
+    end
+    function C.bundle(to, messages, opts)
+      local where = destination("bundle", to)
+      if where == nil then return false end
+      if type(messages) ~= "table" or #messages == 0 then
+        say("error", "ce.osc.bundle: messages must be a list of { address, args, types }, so nothing was sent.")
+        return false
+      end
+      local out = {}
+      for i = 1, #messages do
+        local x = messages[i]
+        local m
+        if type(x) == "table" then m = message("bundle", x.address, x.args, x.types, i)
+        else m = message("bundle", nil, nil, nil, i) end
+        if m == nil then return false end
+        out[i] = m
+      end
+      local time = opt(opts, "time")
+      if time ~= nil and not (type(time) == "number" and time == time and time ~= INF and time >= 0) then
+        say("error", "ce.osc.bundle: time must be a number of seconds, so nothing was sent.")
+        return false
+      end
+      return answered("bundle", host.query("bundle", { to = where, messages = out, time = time or 0 }), "nothing was sent")
+    end
+    function C.status()
+      local s = host.query("status", {})
+      if type(s) == "table" then return s end
+      return { listening = false, waiting = false, received = 0, sent = 0, dropped = 0 }
+    end
+    function C.receive(msg)
+      if type(msg) ~= "table" or type(msg.address) ~= "string" then return end
+      local list = host.listeners()
+      local copy = {}
+      for i = 1, #list do copy[i] = list[i] end
+      for _, l in ipairs(copy) do
+        if matches(l.pattern, msg.address) then host.call(l.fn, msg) end
+      end
+    end
+    return C
+  end
+
+  -- One Lua state serves every script on the panel, and a function keeps the script it was made in,
+  -- so one list of patterns serves them all.
+  local listening = {}
+  local O = commands({
+    say = function(level, text) if level == "warn" then logWarn(text) else logError(text) end end,
+    query = function(op, fields)
+      local q = {}
+      for k, v in pairs(fields) do q[k] = v end
+      q.op = op
+      return __deviceQuery("osc", q)
+    end,
+    listeners = function() return listening end,
+    call = function(fn, value)
+      local fine, err = pcall(fn, value)
+      if not fine then logError("ce.osc: the function given to on failed: " .. tostring(err)) end
+    end,
+  })
+  on("*", "__oscIn", function(msg) O.receive(msg) end)
+
+-- (global; at the line start, where the option check looks for it)
+function oscListen(opts) return O.listen(opts) end
+-- (global; at the line start, where the option check looks for it)
+function oscStop() return O.stop() end
+-- (global; at the line start, where the option check looks for it)
+function oscOn(pattern, fn) return O.on(pattern, fn) end
+-- (global; at the line start, where the option check looks for it)
+function oscOff(id) return O.off(id) end
+-- (global; at the line start, where the option check looks for it)
+function oscTarget(name, address) return O.target(name, address) end
+-- (global; at the line start, where the option check looks for it)
+function oscSend(to, address, args, types) return O.send(to, address, args, types) end
+-- (global; at the line start, where the option check looks for it)
+function oscBundle(to, messages, opts) return O.bundle(to, messages, opts) end
+-- (global; at the line start, where the option check looks for it)
+function oscStatus() return O.status() end
+end
+
 -- @module ce.music
 local NOTE_NAMES = {"C","C#","D","D#","E","F","F#","G","G#","A","A#","B"}
 local function __m12(n) return (math.floor(n) % 12 + 12) % 12 end
@@ -7192,6 +7503,8 @@ local __CE_OPTIONS = {
   ["ciSet"] = { path = "ce.ci.set", at = 4, refusal = "false", names = { "resId", "timeoutMs", "partial", "mediaType" } },
   ["ciSubscribe"] = { path = "ce.ci.subscribe", at = 3, refusal = "nothing", names = { "resId" } },
   ["ciSetProfile"] = { path = "ce.ci.setProfile", at = 4, refusal = "false", names = { "channel" } },
+  ["oscListen"] = { path = "ce.osc.listen", at = 1, refusal = "false", names = { "port", "network", "nextFree" } },
+  ["oscBundle"] = { path = "ce.osc.bundle", at = 3, refusal = "false", names = { "time" } },
   ["dawAssign"] = { path = "ce.daw.assign", at = 3, refusal = "false", names = { "name" } },
   ["mpeZone"] = { path = "ce.mpe.zone", at = 1, refusal = "false", names = { "zone", "members", "bendRange", "managerBendRange", "send", "role" } },
   ["mpeNoteOn"] = { path = "ce.mpe.noteOn", at = 3, refusal = "nothing", names = { "bend", "pressure", "timbre" } },
@@ -7326,6 +7639,7 @@ local __CE_MODULES = {
   ["ce.storage"] = { all = "allSettings", clear = "clearSettings", decode = "decodeJson", encode = "encodeJson", forget = "forgetSetting", info = "storageInfo", loadSetting = "loadSetting", saveSetting = "saveSetting", settings = "listSettings", state = "state" },
   ["ce.image"] = { asset = "imageAsset", assets = "imageAssets", clear = "imageClear", embed = "imageEmbed", icon = "imageIcon", load = "imageLoad", read = "imageRead", set = "imageSet" },
   ["ce.patch"] = { apply = "patchApply", blend = "patchBlend", current = "patchCurrent", define = "patchDefine", diff = "patchDiff", equal = "patchEqual", forget = "patchForget", list = "patchList", load = "patchLoad", merge = "patchMerge", morph = "patchMorph", mutate = "patchMutate", random = "patchRandom", read = "patchRead", save = "patchSave", scopes = "patchScopes", write = "patchWrite" },
+  ["ce.osc"] = { bundle = "oscBundle", listen = "oscListen", off = "oscOff", on = "oscOn", send = "oscSend", status = "oscStatus", stop = "oscStop", target = "oscTarget" },
   ["ce.daw"] = { assign = "dawAssign", beginGesture = "dawBeginGesture", endGesture = "dawEndGesture", host = "dawHost", markChanged = "dawMarkChanged", parameter = "dawParameter", parameters = "dawParameters", program = "dawProgram", programs = "dawPrograms", rename = "dawRename" },
   ["ce.mpe"] = { allOff = "mpeAllOff", express = "mpeExpress", listen = "mpeListen", noteOff = "mpeNoteOff", noteOn = "mpeNoteOn", notes = "mpeNotes", zone = "mpeZone" },
   ["ce.ci"] = { devices = "ciDevices", discover = "ciDiscover", draftProfile = "ciDraftProfile", get = "ciGet", profiles = "ciProfiles", set = "ciSet", setProfile = "ciSetProfile", subscribe = "ciSubscribe", unsubscribe = "ciUnsubscribe" },
@@ -7362,7 +7676,7 @@ local __CE_MODULES = {
   ["ce.components.lcd"] = { anim = "lcdAnim", animFps = "lcdAnimFps", animLoop = "lcdAnimLoop", animPreset = "lcdAnimPreset", animSpeed = "lcdAnimSpeed", backlight = "lcdBacklight", backlightSource = "lcdBacklightSource", blink = "lcdBlink", blinkRate = "lcdBlinkRate", brightness = "lcdBrightness", brightnessSource = "lcdBrightnessSource", clear = "lcdClear", contrast = "lcdContrast", cursor = "lcdCursor", cursorAt = "lcdCursorAt", cursorBlink = "lcdCursorBlink", editText = "lcdEditText", fill = "lcdFill", glyph = "lcdGlyph", read = "lcdRead", scroll = "lcdScroll", scrollMode = "lcdScrollMode", scrollRepeat = "lcdScrollRepeat", scrollSpeed = "lcdScrollSpeed", showGhost = "lcdShowGhost", showGlass = "lcdShowGlass", showGrid = "lcdShowGrid", showScanlines = "lcdShowScanlines", size = "lcdSize", text = "lcdText", value = "lcdValue", valueMax = "lcdValueMax", valueMin = "lcdValueMin", valuePrecision = "lcdValuePrecision", valuePrefix = "lcdValuePrefix", valueSource = "lcdValueSource", valueSuffix = "lcdValueSuffix" },
   ["ce.components.pixel"] = { anim = "pixelAnim", animFps = "pixelAnimFps", animLoop = "pixelAnimLoop", animPreset = "pixelAnimPreset", animSpeed = "pixelAnimSpeed", backlight = "pixelBacklight", backlightSource = "pixelBacklightSource", blink = "pixelBlink", brightness = "pixelBrightness", brightnessSource = "pixelBrightnessSource", contrast = "pixelContrast", editText = "pixelEditText", gamma = "pixelGamma", glow = "pixelGlow", h = "pixelH", label = "pixelLabel", layoutTransition = "pixelLayoutTransition", read = "pixelRead", show = "pixelShow", showGhost = "pixelShowGhost", showGlass = "pixelShowGlass", showGrid = "pixelShowGrid", showScanlines = "pixelShowScanlines", text = "pixelText", transitionMs = "pixelTransitionMs", w = "pixelW", x = "pixelX", y = "pixelY" },
 }
-local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.daw", "ce.mpe", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
+local __CE_ORDER = { "ce.core", "ce.midi", "ce.device", "ce.math", "ce.format", "ce.music", "ce.time", "ce.anim", "ce.ui", "ce.draw", "ce.panel", "ce.storage", "ce.image", "ce.patch", "ce.osc", "ce.daw", "ce.mpe", "ce.ci", "ce.file", "ce.verify", "ce.keys", "ce.text", "ce.components.split", "ce.components.phrase", "ce.components.recorder", "ce.components.harmony", "ce.components.setlist", "ce.components.arp", "ce.components.chordpad", "ce.components.noteribbon", "ce.components.drumpads", "ce.components.turing", "ce.components.looper", "ce.components.orbit", "ce.components.kinetic", "ce.components.constellation", "ce.components.timbre", "ce.components.router", "ce.components.macro", "ce.components.matrix", "ce.components.constraint", "ce.components.envelope", "ce.components.ribbon", "ce.components.crossfader", "ce.components.joystick", "ce.components.meter", "ce.components.transport", "ce.components.panic", "ce.components.lcd", "ce.components.pixel" }
 local __CE_META = {
   { id = "ce.core", version = "1.1", runtime = "any" },
   { id = "ce.midi", version = "1.3", runtime = "any" },
@@ -7378,6 +7692,7 @@ local __CE_META = {
   { id = "ce.storage", version = "1.2", runtime = "any" },
   { id = "ce.image", version = "1.0", runtime = "webview" },
   { id = "ce.patch", version = "1.0", runtime = "any" },
+  { id = "ce.osc", version = "1.0", runtime = "any" },
   { id = "ce.daw", version = "1.0", runtime = "any" },
   { id = "ce.mpe", version = "1.0", runtime = "any" },
   { id = "ce.ci", version = "1.0", runtime = "any" },

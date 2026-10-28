@@ -261,6 +261,29 @@ export const WRITTEN = {
     lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
     js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
   },
+  oscListen: {
+    lua: `function onPanelReady()\n  ce.osc.listen({ port = 8000, network = true })\nend`,
+    js: `function onPanelReady() {\n  ce.osc.listen({ port: 8000, network: true });\n}`,
+  },
+  oscStop: { code: 'ce.osc.stop()' },
+  oscOn: {
+    lua: `state.faders = ce.osc.on("/fader/[1-8]", function(msg)\n  local n = tonumber(msg.address:match("(%d)$"))\n  set("Slider" .. n .. ".value", msg.args[1] * 127)\nend)`,
+    js: `state.faders = ce.osc.on("/fader/[1-8]", (msg) => {\n  const n = Number(msg.address.slice(-1));\n  set(\`Slider\${n}.value\`, msg.args[0] * 127);\n});`,
+  },
+  oscOff: { code: 'ce.osc.off(state.faders)' },
+  oscTarget: { code: 'ce.osc.target("tablet", "192.168.1.20:9000")' },
+  oscSend: {
+    lua: `function onValueChanged(value)\n  if origin() ~= "osc" then ce.osc.send("tablet", "/fader/1", value / 127) end\nend`,
+    js: `function onValueChanged(value) {\n  if (origin() !== "osc") ce.osc.send("tablet", "/fader/1", value / 127);\n}`,
+  },
+  oscBundle: {
+    lua: `ce.osc.bundle("tablet", {\n  { address = "/fader/1", args = { 0.5 } },\n  { address = "/label/1", args = { "64" } },\n})`,
+    js: `ce.osc.bundle("tablet", [\n  { address: "/fader/1", args: [0.5] },\n  { address: "/label/1", args: ["64"] },\n]);`,
+  },
+  oscStatus: {
+    lua: `ce.components.lcd.text("Display", 1, "OSC port " .. tostring(ce.osc.status().port))`,
+    js: `ce.components.lcd.text("Display", 1, \`OSC port \${ce.osc.status().port}\`);`,
+  },
   origin: {
     lua: `function onValueChanged(value)\n  if origin() ~= "device" then sendCC(1, 74, value) end\nend`,
     js: `function onValueChanged(value) {\n  if (origin() !== "device") sendCC(1, 74, value);\n}`,

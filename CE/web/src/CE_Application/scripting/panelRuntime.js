@@ -36,6 +36,8 @@ import { createCiBridge } from './ciHost.js';
 import { createMidiInDecoder } from './midiInDecoder.js';
 import { mpeCommands } from './mpeCore.js';
 import { dawCommands } from './dawCore.js';
+import { oscCommands, oscMatches } from './oscCore.js';
+import { OSC_CONTROL_KIND, parseOscTargets } from '../utils/oscControlBindings.js';
 import { collectExportParameters } from '../utils/exportParameters.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
@@ -337,6 +339,7 @@ export function setRuntimeHost(h) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
     seedSessionSnapshot();
+    syncOscBindings();   // the player's panel: open its OSC port when it has OSC bindings
   }
 }
 
@@ -8368,6 +8371,7 @@ export function clearDeviceRuntimeDefinitions() {
   midiInDecode.reset();     // …and a bend half way through its thinning belongs to no panel
   mpeShared = null;         // …and a new panel sets its own zone
   dawPageGestures.clear();  // …and the plug-in ended the window's gestures with it
+  forgetOsc();              // …and its OSC port closes, and its targets are forgotten
   controlOrigins.clear();
   if (midiInTimer !== null) { clearTimeout(midiInTimer); midiInTimer = null; }
 }
@@ -9364,6 +9368,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     dawRename: (path, name) => daw.rename(path, name),
     dawAssign: (slot, path, opts) => daw.assign(slot, path, opts),
     dawMarkChanged: () => daw.markChanged(),
+
+    // ce.osc: oscCore.js over the device layer's OSC transport.
+    oscListen: (opts) => oscFor(scriptId).listen(opts),
+    oscStop: () => oscFor(scriptId).stop(),
+    oscOn: (pattern, fn) => oscFor(scriptId).on(pattern, fn),
+    oscOff: (id) => oscFor(scriptId).off(id),
+    oscTarget: (name, address) => oscFor(scriptId).target(name, address),
+    oscSend: (to, address, args, types) => oscFor(scriptId).send(to, address, args, types),
+    oscBundle: (to, messages, opts) => oscFor(scriptId).bundle(to, messages, opts),
+    oscStatus: () => oscFor(scriptId).status(),
 
     // ce.mpe: mpeCore.js, one per panel; reading MPE back in is the input decoder's.
     mpeZone: (opts) => mpeFor(scriptId).zone(opts),
@@ -10461,6 +10475,7 @@ function resetScriptState() {
   }
   handlerCache.clear();
   listeners.length = 0;
+  oscInstances.clear();   // a script's OSC patterns go when it reloads
   watchers.length = 0;
   computeds.length = 0;
   filters.length = 0;
@@ -10758,6 +10773,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       // origin(): who made the change this event is for. Inbound events came from the device.
       currentOrigin = ev.origin ?? (inbound ? 'device' : null);
       if (ev.event === 'onValueChange' && currentOrigin !== 'host' && currentOrigin !== 'load') dawFollowSpare(ev.controlName, ev.payload);
+      if (ev.event === 'onValueChange' && currentOrigin !== 'osc') oscFollowBinding(ev.controlName, ev.payload);
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
@@ -10838,6 +10854,7 @@ function onPanelsChanged() {
     }
   }
   live.last = next;
+  syncOscBindings();   // a binding or the panel's OSC settings may have changed
   // Who made the change: a script's set() outside a handler, a spare parameter the DAW moved, or a
   // hand in the editor's inspector.
   const why = panelsOrigin ?? 'user';
@@ -11348,6 +11365,215 @@ function mpeFor(scriptId) {
   });
   return mpeShared;
 }
+
+
+/* ------------------------------------------------------------------------------- ce.osc */
+// docs/design/ce-osc-module.md. The port, the reading and writing of OSC and the user's yes live with
+// the device layer in C++ (Osc/OscService.h). The page sends each command over the bridge
+// ("oscCommand") and cannot wait for the answer while a script runs, so a command answers true when
+// sent, a refusal arrives a moment later as a console line, and status() answers from the last status
+// the transport gave. Each script's patterns are its own, and go when the scripts reload.
+
+const oscInstances = new Map();   // scriptId -> oscCommands
+const oscAsked = new Map();       // requestId -> { scriptId, op }
+let oscStatusSeen = { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+let oscRequests = 0;
+let oscBridgeListening = false;
+
+/** Which panel a yes for the network is for: its name, as the exported plug-in names it too (a saved
+    panel keeps no id), so the window open and shut ask once between them. */
+function oscPanelKey() {
+  const panel = livePanel();
+  return String(panel?.name || panel?.id || 'panel');
+}
+
+function ensureOscBridge() {
+  const backend = window.__JUCE__?.backend;
+  if (oscBridgeListening || typeof backend?.addEventListener !== 'function') return;
+  oscBridgeListening = true;
+  backend.addEventListener('oscCommandAnswered', (p) => oscHeard('oscCommandAnswered', p));
+  backend.addEventListener('oscMessage', (p) => oscHeard('oscMessage', p));
+}
+
+/** One command to the transport; false when there is no app or plug-in to send it to. */
+function oscSendCommand(fields, scriptId) {
+  if (!isJuceAvailable()) return false;
+  oscRequests += 1;
+  const requestId = `osc${oscRequests}`;
+  if (scriptId !== null) oscAsked.set(requestId, { scriptId, op: fields.op });
+  ensureOscBridge();
+  window.__JUCE__.backend.emitEvent('oscCommand', { ...fields, requestId, panel: oscPanelKey() });
+  return true;
+}
+
+/** What the transport sends back: an answer to a command, or a message that arrived. */
+function oscHeard(name, payload) {
+  if (name === 'oscCommandAnswered') {
+    const key = String(payload?.requestId ?? '');
+    const asked = oscAsked.get(key);
+    oscAsked.delete(key);
+    const answer = payload?.answer;
+    if (payload?.op === 'status') {
+      if (answer && typeof answer === 'object') oscStatusSeen = { ...answer };
+      return;
+    }
+    if (asked && answer && typeof answer === 'object' && answer.ok === false) {
+      addScriptTrace('error', asked.scriptId, `ce.osc.${asked.op}: ${answer.why || answer.error || 'it was refused'}.`);
+    }
+    oscSendCommand({ op: 'status' }, null);   // and the picture after it
+    return;
+  }
+  if (name !== 'oscMessage' || !payload || typeof payload.address !== 'string') return;
+  oscStatusSeen = { ...oscStatusSeen, received: (Number(oscStatusSeen.received) || 0) + 1 };
+  const outer = currentOrigin;
+  currentOrigin = 'osc';
+  try {
+    for (const o of oscInstances.values()) o.receive(payload);
+  } finally {
+    currentOrigin = outer;
+  }
+  oscBindingsHeard(payload);
+  dispatchEvents([{ event: 'onOscIn', controlName: null, payload, origin: 'osc' }]);
+}
+
+/** Tests stand in for the native side: what it sends back, as it would arrive. */
+export function oscHeardForTesting(name, payload) { oscHeard(name, payload); }
+
+function oscFor(scriptId) {
+  const known = oscInstances.get(scriptId);
+  if (known) return known;
+  const listenersOwn = [];
+  const o = oscCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    listeners: () => listenersOwn,
+    call: (fn, value) => runScriptCallback(scriptId, 'osc', () => fn(value)),
+    query(op, fields) {
+      if (op === 'status') {
+        oscSendCommand({ op: 'status' }, null);
+        return { ...oscStatusSeen };
+      }
+      if (!isJuceAvailable()) return { ok: false, why: 'OSC needs the app or the plug-in, which have a network port' };
+      oscSendCommand({ ...fields, op }, scriptId);
+      if (op === 'stop') {
+        const was = oscStatusSeen.listening === true || oscStatusSeen.waiting === true;
+        oscStatusSeen = { ...oscStatusSeen, listening: false, waiting: false };
+        return was;
+      }
+      return { ok: true };
+    },
+  });
+  oscInstances.set(scriptId, o);
+  return o;
+}
+
+/** The panel went: the transport stops listening and forgets its targets. */
+function forgetOsc() {
+  oscBindingsSignature = '';
+  oscLearnWaiter = null;
+  oscLastSender.clear();
+  oscInstances.clear();
+  oscAsked.clear();
+  if (oscStatusSeen.listening || oscStatusSeen.waiting || oscRequests > 0) oscSendCommand({ op: 'reset' }, null);
+  oscStatusSeen = { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+}
+
+
+/* ---------------------------------------------------------------------- OSC learn (no script) */
+// docs/design/ce-osc-module.md, "Panel side". A control with an oscControl binding follows an OSC
+// address and, unless told not to, sends its value back there when anything else moves it. The panel's
+// settings (panel.osc: port, network, targets) say where to listen and the names to send to. A
+// control moved by OSC is written as a script's set() is, with origin() giving "osc", so it reaches
+// the synth through its own binding and is never sent back to the address it came from.
+
+const oscLastSender = new Map();   // control name -> { host, port } the last message for it came from
+let oscBindingsSignature = '';
+let oscLearnWaiter = null;
+
+/** Every OSC binding on the panel, with the control it is on. */
+function oscBindingsOf(panel) {
+  const out = [];
+  for (const control of flatControls(panel?.controls ?? [])) {
+    const bindings = control?._children?.DeviceBindings;
+    if (!bindings || bindings.enabled === false || !Array.isArray(bindings.bindings)) continue;
+    for (const b of bindings.bindings) {
+      if (b?.kind !== OSC_CONTROL_KIND || typeof b.address !== 'string' || !b.address.startsWith('/')) continue;
+      out.push({ control, name: String(control._children.Core?.name ?? control._children.Core?.id), binding: b });
+    }
+  }
+  return out;
+}
+
+/** The panel's OSC settings, read as the editor writes them. */
+function panelOscSettings(panel) {
+  const osc = panel?.osc && typeof panel.osc === 'object' ? panel.osc : {};
+  const port = Number.isInteger(osc.port) && osc.port >= 1024 && osc.port <= 65535 ? osc.port : 8000;
+  return { port, network: osc.network === true, targets: parseOscTargets(osc.targets) };
+}
+
+/** Open the panel's port when it has OSC bindings (or a learn is waiting), and name its targets.
+    Sent again only when something it depends on changed. */
+function syncOscBindings() {
+  const panel = livePanel();
+  const settings = panelOscSettings(panel);
+  const wanted = oscBindingsOf(panel).length > 0 || oscLearnWaiter !== null;
+  const signature = wanted ? JSON.stringify(settings) : '';
+  if (signature === oscBindingsSignature) return;
+  oscBindingsSignature = signature;
+  if (!wanted) return;
+  oscSendCommand({ op: 'listen', port: settings.port, network: settings.network, nextFree: true }, null);
+  for (const t of settings.targets) oscSendCommand({ op: 'target', name: t.name, host: t.host, port: t.port }, null);
+}
+
+/** A message for the bindings: each control whose address matches takes the value. */
+function oscBindingsHeard(message) {
+  if (oscLearnWaiter) {
+    const waiter = oscLearnWaiter;
+    oscLearnWaiter = null;
+    try { waiter(message.address, message); } catch { /* the editor's, not a script's */ }
+  }
+  for (const { name, binding } of oscBindingsOf(livePanel())) {
+    if (!oscMatches(binding.address, message.address)) continue;
+    const at = Math.max(1, Math.floor(Number(binding.valueIndex) || 1)) - 1;
+    let v = message.args?.[at];
+    if (typeof v === 'boolean') v = v ? 1 : 0;
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const min = Number.isFinite(Number(binding.min)) ? Number(binding.min) : 0;
+    const max = Number.isFinite(Number(binding.max)) ? Number(binding.max) : 1;
+    const t = max === min ? 0 : Math.max(0, Math.min(1, (v - min) / (max - min)));
+    if (message.from) oscLastSender.set(name, message.from);
+    panelsOrigin = 'osc';
+    setValue(`${name}.value`, t, 'normalizedValue');
+    panelsOrigin = null;
+  }
+}
+
+/** A control with an OSC binding moved, not by OSC: its value goes back to the address. */
+function oscFollowBinding(controlName, value) {
+  if (controlName == null) return;
+  for (const { control, name, binding } of oscBindingsOf(livePanel())) {
+    if (name !== controlName || binding.sendBack === false) continue;
+    const range = rangeOf(control);
+    const v = Number(value);
+    if (!range || !Number.isFinite(v)) continue;
+    const t = Math.max(0, Math.min(1, (v - range.min) / (range.max - range.min)));
+    const min = Number.isFinite(Number(binding.min)) ? Number(binding.min) : 0;
+    const max = Number.isFinite(Number(binding.max)) ? Number(binding.max) : 1;
+    const to = typeof binding.sendTo === 'string' && binding.sendTo.trim() !== '' ? binding.sendTo.trim() : oscLastSender.get(name);
+    if (!to) continue;   // nobody has sent to it yet, and no target is named
+    oscSendCommand({ op: 'send', to, address: binding.address.replace(/[*?[\]{}]/g, ''), args: [min + t * (max - min)], types: 'f' }, null);
+  }
+}
+
+/** The editor's Learn: the next message's address goes to `fn`. Opens the panel's port for it. */
+export function oscLearnNext(fn) {
+  oscLearnWaiter = typeof fn === 'function' ? fn : null;
+  oscBindingsSignature = '';
+  syncOscBindings();
+  return oscLearnWaiter !== null && Boolean(isJuceAvailable());
+}
+
+/** Tests: what the runtime does when the panel loads or changes. */
+export function syncOscBindingsForTesting() { syncOscBindings(); }
 
 /* ------------------------------------------------------------------ ce.daw and origin() */
 // docs/design/ce-daw-module.md. With the plug-in's window open the page reads the DAW from what the

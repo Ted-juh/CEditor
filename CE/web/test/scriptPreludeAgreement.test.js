@@ -1310,6 +1310,7 @@ const OPTION_ANSWER_CASES = [
   ['ciSubscribe', [7, 'R', { resid: 'a' }, 'fn']], ['ciSetProfile', [7, 'X', true, { chanel: 1 }]],
   ['mpeZone', [{ membrs: 7 }]], ['mpeNoteOn', [60, 100, { bnd: 1 }]], ['mpeExpress', [1, { presure: 1 }]],
   ['mpeListen', [{ form: 'controller' }]], ['dawAssign', [1, 'x.value', { nmae: 'x' }]],
+  ['oscListen', [{ prot: 9000 }]], ['oscBundle', ['127.0.0.1:9000', [{ address: '/a' }], { tme: 1 }]],
   ['fileSyxSplit', [[0xF0, 0xF7], { partal: true }]], ['fileMidiRead', [[1], { trak: 1 }]], ['fileMidiWrite', [[], { tempoo: 90 }]],
 ];
 

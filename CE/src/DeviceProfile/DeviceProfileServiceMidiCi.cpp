@@ -232,6 +232,24 @@ void DeviceProfileService::pollCiSessions()
     if (busy) startTimerHz (30);
 }
 
+juce::var DeviceProfileService::oscCommand (const juce::var& payload)
+{
+    if (oscTransport == nullptr)
+    {
+        oscTransport = std::make_unique<ceditor::osc::OscService>();
+        oscTransport->emit = [this] (const juce::String& name, const juce::var& message) { emitDeviceEvent (name, message); };
+        oscTransport->ask = [this] (const juce::String& question, std::function<void (bool)> answer)
+        {
+            if (askAboutNetwork == nullptr) return false;   // nobody to ask: not taken for a no
+            askAboutNetwork (question, std::move (answer));
+            return true;
+        };
+        oscTransport->grantsFile = juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+                                       .getChildFile ("CEditor").getChildFile ("osc-grants.json");
+    }
+    return oscTransport->command (payload);
+}
+
 juce::var DeviceProfileService::ciCommand (const juce::var& payload)
 {
     auto* p = payload.getDynamicObject();

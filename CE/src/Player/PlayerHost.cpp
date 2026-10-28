@@ -1,4 +1,5 @@
 #include "PlayerHost.h"
+#include "Osc/OscQuestion.h"
 #include "WebViewProfileFolders.h"
 #include "TrustedWebBrowser.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
@@ -161,6 +162,9 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         .withWinWebView2Options (webview2Options)
         .withNativeIntegrationEnabled();
 
+    // ce.osc asks the user before the network is used. The plug-in's processor sets this for itself,
+    // since it asks with the window shut too; the standalone player asks here.
+    if (service.askAboutNetwork == nullptr) service.askAboutNetwork = ceditor::osc::askAboutNetworkWithDialog;
     // Shared device-runtime surface (Phase B1), reporting to this player's WebView.
     options = ceditor::device::withDeviceRuntimeEvents (
         std::move (options), service,

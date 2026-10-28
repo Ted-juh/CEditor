@@ -637,6 +637,9 @@ export const DEVICE_EVENTS = [
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
+  // ce.osc: every OSC message that arrives, whether or not a pattern matched it.
+  { id: 'oscIn', fn: 'onOscIn', payload: 'message', decoded: false,
+    summary: 'An OSC message arrived on the port ce.osc.listen() opened. `message.address` is where it was sent, `message.args` its values, `message.types` their OSC types, `message.from` who sent it ({ host, port }), and `message.time` a bundle\'s time. origin() gives "osc".' },
   // ce.daw: the DAW moved a parameter, or chose a program (docs/design/ce-daw-module.md). Raised by an
   // exported plug-in, with its window open or shut; never in the editor, which has no DAW.
   { id: 'automationIn', fn: 'onAutomationIn', payload: 'move', decoded: false,
@@ -2652,6 +2655,119 @@ export const COMMANDS = [
       { name: 'muid', type: 'number', required: true, summary: 'The device.' },
       { name: 'fn', type: 'function', required: true, summary: 'Called with the draft.' },
     ],
+    scopes: 'any',
+  },
+  // osc
+  // Open Sound Control (docs/design/ce-osc-module.md). The port, OSC's reading and writing and the
+  // user's yes for the network live once, in C++ (Osc/OscService.h); oscCore.js checks a call and runs
+  // each pattern's function, the same in every runtime.
+  {
+    id: 'oscListen', category: 'OSC', signature: 'oscListen([opts]) -> boolean', refusal: 'false',
+    summary: 'Start receiving OSC on a port.',
+    example: '`ce.osc.listen({ port = 8000, network = true })` receives from a tablet on the same network, after the user says yes.',
+    notes: [
+      'This computer only, unless `network` is on; then the user is asked the first time, and listening starts when they say yes. The answer is kept on this computer for the panel, never in the panel file.',
+      'The port in use is in status().port: show it where the user types it into the tablet. Calling it again moves to the new port.',
+      'Returns true when listening, or waiting for the user. In an exported plug-in with its window shut, false when the port is in use or the user said no; in the panel view that comes a moment later, as a console line and status().error.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'port', type: 'number', default: '8000', summary: 'The port, 1024 to 65535.' },
+        { name: 'network', type: 'boolean', default: 'false', summary: 'Receive from other computers too, after the user says yes.' },
+        { name: 'nextFree', type: 'boolean', default: 'false', summary: 'Take the next free port when this one is in use, as a second copy of the panel must.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscStop', category: 'OSC', signature: 'oscStop() -> boolean', refusal: 'false',
+    summary: 'Stop receiving OSC, and close the port.',
+    example: '`ce.osc.stop()` from an "OSC off" switch.',
+    notes: ['Closed by itself when the panel closes. Returns true when a port was open.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'oscOn', category: 'OSC', signature: 'oscOn(pattern, fn) -> number', refusal: 'nothing',
+    summary: 'Run a function for every OSC message to an address; wildcards allowed.',
+    example: '`ce.osc.on("/fader/*", fn)` runs `fn` for `/fader/1`, `/fader/2` and so on.',
+    notes: [
+      'OSC\'s wildcards, inside one part of the address: `*` any text, `?` one character, `[1-4]` one of a range, `[!0]` anything but, `{cutoff,reso}` one of a list.',
+      'fn is called with the message: { address, args, types, from, time }. `args` are its values; `types` the OSC type of each, such as "if"; `from` { host, port }, which ce.osc.send() takes to answer; `time` a bundle\'s time.',
+      'Several patterns can match one message; each function runs, in the order they were made. A script\'s patterns go when it reloads.',
+      'Returns an id for ce.osc.off().',
+    ],
+    params: [
+      { name: 'pattern', type: 'string', required: true, summary: 'An address, starting with /.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with each message.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscOff', category: 'OSC', signature: 'oscOff(id) -> boolean', refusal: 'false',
+    summary: 'Remove a pattern ce.osc.on() made.',
+    example: '`ce.osc.off(state.faders)`.',
+    notes: ['Returns true when there was one.'],
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id ce.osc.on() gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'oscTarget', category: 'OSC', signature: 'oscTarget(name [, address]) -> boolean', refusal: 'false',
+    summary: 'Give a destination a name, so ce.osc.send() can use it.',
+    example: '`ce.osc.target("tablet", "192.168.1.20:9000")`.',
+    notes: [
+      'Another computer asks the user once, as listening on the network does; this computer ("127.0.0.1" or "localhost") does not.',
+      'Names belong to the panel and are shared by its scripts, until the panel closes.',
+      'Returns true when set, or waiting for the user\'s answer.',
+    ],
+    params: [
+      { name: 'name', type: 'string', required: true, summary: 'The name scripts will use.' },
+      { name: 'address', type: 'value', required: false, default: 'forget the name', summary: '"host:port", { host, port }, or a message\'s from.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscSend', category: 'OSC', signature: 'oscSend(to, address [, args] [, types]) -> boolean', refusal: 'false',
+    summary: 'Send one OSC message.',
+    example: '`ce.osc.send("tablet", "/label/1", "Cutoff")` sets a label in TouchOSC.',
+    notes: [
+      'Every number goes as `f`, the type most receivers expect; text as `s`, true and false as `T` and `F`, nothing as `N`, a list of bytes as `b`. A whole number needs `types` "i", because some languages cannot tell 1 from 1.0.',
+      '`types` gives one OSC type for each value instead: i h f d s S T F N I b r m t c.',
+      'Sending never waits; messages go out in the order sent. A destination on another computer asks the user first, and the message waits for the answer.',
+      'Returns true when sent; false for an address without a leading /, types that do not fit the values, or a destination the user refused.',
+    ],
+    params: [
+      { name: 'to', type: 'value', required: true, summary: 'A name from ce.osc.target(), "host:port", or a message\'s from.' },
+      { name: 'address', type: 'string', required: true, summary: 'Where to send it, starting with /.' },
+      { name: 'args', type: 'value', required: false, default: 'no values', summary: 'One value, or a list of them.' },
+      { name: 'types', type: 'string', required: false, default: 'worked out from the values', summary: 'The OSC types, one per value, such as "if".' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscBundle', category: 'OSC', signature: 'oscBundle(to, messages [, opts]) -> boolean', refusal: 'false',
+    summary: 'Send several OSC messages as one packet, so they arrive together.',
+    example: '`ce.osc.bundle("tablet", { { address = "/fader/1", args = { 0.5 } }, { address = "/label/1", args = { "64" } } })`.',
+    notes: [
+      'For a tablet showing many values: one bundle for a page of faders is one packet, not twenty. A bundle larger than 64 KB is refused; split it.',
+      'Returns true when sent.',
+    ],
+    params: [
+      { name: 'to', type: 'value', required: true, summary: 'As ce.osc.send() takes it.' },
+      { name: 'messages', type: 'list', required: true, summary: 'A list of { address, args, types }.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'time', type: 'number', default: 'at once', unit: 'seconds since 1900', summary: 'When the receiver should act on it, for a receiver that schedules bundles.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscStatus', category: 'OSC', signature: 'oscStatus() -> table', refusal: 'nothing',
+    summary: 'What OSC is doing: listening or not, on which port, what was received, sent and dropped.',
+    example: '`ce.osc.status().port` is the port to type into the tablet.',
+    notes: [
+      'Returns { listening, waiting, port, network, received, sent, dropped, error }: `waiting` while the user has not answered; the counts since the panel opened; `error` the last reason something was refused: "portInUse", "refusedByUser", "badPort", "badAddress", "badMessage", "tooLarge" or "badPacket".',
+      'In the panel view it answers from what the transport last said, a moment behind.',
+    ],
+    params: [],
     scopes: 'any',
   },
   // daw
@@ -4814,10 +4930,10 @@ export const COMMANDS = [
   // languages' handlers.
   {
     id: 'origin', category: 'Events', signature: 'origin() -> text', refusal: 'nothing',
-    summary: 'Who made the change the running handler is for: "user", "script", "host", "device" or "load".',
+    summary: 'Who made the change the running handler is for: "user", "script", "host", "device", "osc" or "load".',
     example: 'In `onValueChanged`, `origin() == "host"` means the DAW\'s automation moved the knob.',
     notes: [
-      '"user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "load": the panel, a preset or the project being opened.',
+      '"user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "osc": an OSC message. "load": the panel, a preset or the project being opened.',
       'Outside a handler, and for an event no change caused (a timer, a key): nothing.',
       'With the plug-in\'s window shut, a change a hand made while it was open is not raised again; and a script\'s set() raises no value events there, as inside a handler with the window open.',
     ],
@@ -6346,8 +6462,8 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, and the DAW an exported plug-in runs in.',
-    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time', 'ce.daw'] },
+    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, the DAW an exported plug-in runs in, and OSC.',
+    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time', 'ce.daw', 'ce.osc'] },
   { id: 'numbers', label: 'Working out values',
     blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
     modules: ['ce.math', 'ce.format', 'ce.anim'] },
@@ -6443,6 +6559,9 @@ export const MODULES = [
   // requires the four whose commands it reads and sends through, so they are there whenever it is.
   { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
     summary: 'A synth\'s sound as a value: capture it, morph and blend patches, randomize and mutate, merge parts of two, compare, send it the way the synth takes a patch, keep patches by name, and write one to a slot.' },
+  // requires ce.core only: the transport is the device layer's, and messages arrive as events.
+  { id: 'ce.osc', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Open Sound Control in and out: receive from a tablet, Max or Pure Data, run a function for the addresses a script wants, and send to a DAW, a lighting desk or the tablet. The network is used only after the user says yes.' },
   // requires ce.core only: it asks the plug-in, and names controls as set does.
   { id: 'ce.daw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
     summary: 'The exported plug-in and its DAW: what the DAW is, its parameters and programs, one gesture around a change a script makes over time, new names for parameters, and spare parameters a script puts controls on.' },
@@ -6659,6 +6778,10 @@ const MODULE_MEMBERS = {
     random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
     apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
     scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.osc': {
+    listen: 'oscListen', stop: 'oscStop', on: 'oscOn', off: 'oscOff', target: 'oscTarget', send: 'oscSend',
+    bundle: 'oscBundle', status: 'oscStatus',
   },
   'ce.daw': {
     host: 'dawHost', parameters: 'dawParameters', parameter: 'dawParameter', program: 'dawProgram',

@@ -7,6 +7,7 @@
 #include <set>
 #include <vector>
 #include "PlayerHost.h"
+#include "Osc/OscQuestion.h"
 
 #include "PlayerPanelFile.h"
 #include "StateLoadReport.h"
@@ -99,6 +100,8 @@ private:
         restorePolicy = ce::readPanelRestorePolicy (panelDocument);
         programBank = ce::parseProgramBank (panelDocument);
         spareCount = ce::readSpareParameterCount (panelDocument);
+        // ce.osc asks the user before the network is used, with the window open or shut.
+        deviceService.askAboutNetwork = ceditor::osc::askAboutNetworkWithDialog;
         // Window-CLOSED automation -> MIDI: a message-thread timer that sends bound parameters to the
         // synth when there is no editor (when open, the WebView/JS does the sending). The MIDI service
         // lives here on the processor, so it persists across the editor window being closed.
@@ -453,6 +456,10 @@ public:
             // "local" scope, per machine (localSettingsForState).
             root.createNewChildElement ("ScriptLocal")->addTextElement (localJson);
         }
+        // OSC learn: the port this instance listens on, so a reopened project's instances each find
+        // their own again rather than taking turns on the panel's.
+        if (const auto oscPort = oscPortInUse.load(); oscPort > 0)
+            root.createNewChildElement ("OscPort")->addTextElement (juce::String (oscPort));
        #endif
         copyXmlToBinary (root, destData);
 #else
@@ -521,6 +528,8 @@ public:
                     pendingScriptLocalJson = sloc->getAllSubText();
                     pendingScriptLocalPresent = true;
                 }
+                if (auto* op = xml->getChildByName ("OscPort"))
+                    oscPortRestored.store (op->getAllSubText().getIntValue());
                 if (auto* sx = xml->getChildByName ("ScriptState"))
                 {
                     pendingScriptStateJson = sx->getAllSubText();
@@ -801,6 +810,9 @@ private:
                #endif
                 scriptRuntime->onPanelClose();
                 installScriptDeviceCallback();   // PlayerHost nulled it on close — reclaim
+                // The window's panel may have closed the OSC port, or moved it, as it went: the
+                // bindings listen again on this instance's port, and name their targets again.
+                listenForOscBindings (oscPortInUse.load());
             }
             scriptWindowWasOpen = windowOpen;
             // A host can construct and destroy an editor to query it between timer ticks.
@@ -809,6 +821,10 @@ private:
         }
         if (scriptStateDirty.exchange (false))
             refreshScriptStateCache();
+        // A project's OSC port, once the scripts are up: listen there again.
+        if (scriptRuntime != nullptr)
+            if (const auto oscPort = oscPortRestored.exchange (0); oscPort > 0 && oscPort != oscPortInUse.load())
+                listenForOscBindings (oscPort);
        #endif
         // The service's existing callback routes to the WebView while open and to the native
         // script runtime while closed. Use that same path for DAW input and device input.
@@ -1358,6 +1374,7 @@ private:
                               const juce::String& parameterId)
     {
         if (scriptRuntime == nullptr) return;
+        if (origin != "osc") oscFollowBinding (path, value);   // a tablet following the control sees it move
         OriginScope scope (scriptOrigin, origin);
         const auto control = controlNameOf (path);
         scriptRuntime->dispatchEvent ("onValueChange", control, value);
@@ -1395,6 +1412,148 @@ private:
                 }
             }
         dispatchValueEvents (a.path, value, origin, "spare" + juce::String (slot));
+    }
+
+    // --- OSC learn with the window shut (docs/design/ce-osc-module.md, "Panel side") ---------------
+    //
+    // The same as the panel view does with the window open (panelRuntime.js, oscBindingsHeard): a
+    // control with an oscControl binding takes the value of a message to its address, and sends its
+    // value back when anything else moves it. Read once from the panel; the port is the instance's own,
+    // kept with the project, so two instances in one project do not take turns on one port.
+    struct OscBinding
+    {
+        juce::String name, path, address, sendTo;
+        int valueIndex = 1;
+        double min = 0.0, max = 1.0;
+        bool sendBack = true;
+    };
+    std::vector<OscBinding> oscBindings;
+    std::map<juce::String, juce::var> oscLastSender;   // control name -> { host, port }
+    int oscPanelPort = 8000;
+    bool oscPanelNetwork = false;
+
+    void readOscBindings()
+    {
+        oscBindings.clear();
+        const auto settings = scriptValues.panel().getProperty ("osc", juce::var());
+        const auto port = (int) settings.getProperty ("port", 8000);
+        oscPanelPort = port >= 1024 && port <= 65535 ? port : 8000;
+        oscPanelNetwork = (bool) settings.getProperty ("network", false);
+        scriptValues.eachControl ([this] (const juce::var& control)
+        {
+            const auto bindings = ceditor::PanelValueModel::readChildValue (control, "DeviceBindings");
+            if (! (bool) bindings.getProperty ("enabled", true)) return;
+            const auto core = ceditor::PanelValueModel::readChildValue (control, "Core");
+            auto name = core.getProperty ("name", juce::var()).toString();
+            if (name.isEmpty()) name = core.getProperty ("id", "").toString();
+            if (auto* list = bindings.getProperty ("bindings", juce::var()).getArray())
+                for (const auto& b : *list)
+                {
+                    const auto address = b.getProperty ("address", "").toString();
+                    if (b.getProperty ("kind", "").toString() != "oscControl" || ! address.startsWithChar ('/')) continue;
+                    OscBinding o;
+                    o.name = name;
+                    o.path = name + ".value";
+                    o.address = address;
+                    o.sendTo = b.getProperty ("sendTo", "").toString().trim();
+                    o.valueIndex = juce::jmax (1, (int) b.getProperty ("valueIndex", 1));
+                    o.min = (double) b.getProperty ("min", 0.0);
+                    o.max = (double) b.getProperty ("max", 1.0);
+                    o.sendBack = (bool) b.getProperty ("sendBack", true);
+                    oscBindings.push_back (o);
+                }
+        });
+    }
+    std::atomic<int> oscPortInUse { 0 };      // what a save writes: this instance's port
+    std::atomic<int> oscPortRestored { 0 };   // what a load read, until the timer listens on it
+
+    /** Open the panel's port for its bindings, and name its targets. `wanted` 0: the panel's port. */
+    void listenForOscBindings (int wanted = 0)
+    {
+        if (oscBindings.empty()) return;
+        auto* q = new juce::DynamicObject();
+        q->setProperty ("op", "listen");
+        q->setProperty ("port", wanted > 0 ? wanted : oscPanelPort);
+        q->setProperty ("network", oscPanelNetwork);
+        q->setProperty ("nextFree", true);
+        q->setProperty ("panel", oscPanelKey());
+        const auto answer = deviceService.oscCommand (juce::var (q));
+        if ((bool) answer.getProperty ("ok", false) && answer.hasProperty ("port"))
+            oscPortInUse.store ((int) answer.getProperty ("port", 0));
+        else if (answer.getProperty ("why", "").toString().isNotEmpty())
+            scriptLogLine ("[osc] the panel's OSC bindings are not listening: " + answer.getProperty ("why", "").toString());
+        const auto targets = scriptValues.panel().getProperty ("osc", juce::var()).getProperty ("targets", "").toString();
+        for (const auto& line : juce::StringArray::fromLines (targets))
+        {
+            const auto name = line.upToFirstOccurrenceOf ("=", false, false).trim();
+            const auto where = line.fromFirstOccurrenceOf ("=", false, false).trim();
+            const auto colon = where.lastIndexOfChar (':');
+            if (name.isEmpty() || colon <= 0) continue;
+            auto* t = new juce::DynamicObject();
+            t->setProperty ("op", "target");
+            t->setProperty ("name", name);
+            t->setProperty ("host", where.substring (0, colon));
+            t->setProperty ("port", where.substring (colon + 1).getIntValue());
+            t->setProperty ("panel", oscPanelKey());
+            deviceService.oscCommand (juce::var (t));
+        }
+    }
+
+    /** A message for the bindings, with the window shut: each control whose address matches takes the
+        value, as a hand's move would reach the DAW and the synth, with origin() giving "osc". */
+    void oscBindingHeard (const juce::var& message)
+    {
+        const auto address = message.getProperty ("address", "").toString();
+        const auto* args = message.getProperty ("args", juce::var()).getArray();
+        if (args == nullptr) return;
+        for (const auto& b : oscBindings)
+        {
+            if (! ceditor::osc::addressMatches (b.address, address)) continue;
+            if (b.valueIndex - 1 >= args->size()) continue;
+            const auto& v = args->getReference (b.valueIndex - 1);
+            double x = 0.0;
+            if (v.isBool()) x = (bool) v ? 1.0 : 0.0;
+            else if (v.isInt() || v.isInt64() || v.isDouble()) x = (double) v;
+            else continue;
+            const auto t = b.max == b.min ? 0.0 : juce::jlimit (0.0, 1.0, (x - b.min) / (b.max - b.min));
+            const auto control = scriptValues.controlByName (b.name);
+            double lo = 0.0, hi = 0.0;
+            if (! ceditor::PanelValueModel::rangeOf (control, lo, hi)) continue;
+            oscLastSender[b.name] = message.getProperty ("from", juce::var());
+            const auto value = lo + t * (hi - lo);
+            scriptValues.setValue (b.path, value);
+            if (const auto bound = scriptBoundParamByPath.find (b.path); bound != scriptBoundParamByPath.end())
+            {
+                setParamFromUi (bound->second, (float) value);   // the DAW records it; the next tick sends its MIDI
+                if (auto* raw = apvts.getRawParameterValue (bound->second)) lastScriptValue[bound->second] = raw->load();
+            }
+            followSpare (b.path);
+            dispatchValueEvents (b.path, juce::var (value), "osc", {});
+        }
+    }
+
+    /** A control with an OSC binding moved, not by OSC: its value goes back to the address. */
+    void oscFollowBinding (const juce::String& pathIn, const juce::var& valueIn)
+    {
+        if (oscBindings.empty() || ! (valueIn.isInt() || valueIn.isInt64() || valueIn.isDouble() || valueIn.isBool())) return;
+        const auto path = controlPath (pathIn);
+        for (const auto& b : oscBindings)
+        {
+            if (b.path != path || ! b.sendBack) continue;
+            double lo = 0.0, hi = 0.0;
+            if (! ceditor::PanelValueModel::rangeOf (scriptValues.controlByName (b.name), lo, hi)) continue;
+            const auto t = juce::jlimit (0.0, 1.0, ((double) valueIn - lo) / (hi - lo));
+            const juce::var to = b.sendTo.isNotEmpty() ? juce::var (b.sendTo) : oscLastSender[b.name];
+            if (to.isVoid()) continue;   // nobody has sent to it yet, and no target is named
+            auto* q = new juce::DynamicObject();
+            q->setProperty ("op", "send");
+            q->setProperty ("to", to);
+            q->setProperty ("address", b.address.removeCharacters ("*?[]{}"));
+            q->setProperty ("args", juce::Array<juce::var> { b.min + t * (b.max - b.min) });
+            q->setProperty ("types", "f");
+            q->setProperty ("panel", oscPanelKey());
+            deviceService.oscCommand (juce::var (q));
+        }
     }
    #endif
 
@@ -2040,8 +2199,10 @@ private:
      * THE ONE FUNNEL every raw MIDI send leaves through, script or not.
      *
      * Queues the bytes onto the plugin's MIDI OUTPUT BUS (drained in processBlock). The DAW routes
-     * that track to the synth's hardware port — the plugin never opens a port itself; that is the
-     * standalone's job, and a plugin opening hardware ports fights the host and is not portable.
+     * that track to the synth's hardware port; this funnel opens no port itself, since a plugin
+     * opening hardware ports fights the host and is not portable. (The plug-in does open other
+     * ports: a profile-bound send reaches a mapped MIDI output, audit finding C-27, and ce.osc
+     * opens a UDP port when a script or an OSC binding asks for one.)
      * `bytes` may be a multi-message stream (an NRPN is four CCs), so it is split into messages.
      *
      * IT LIVES HERE, NOT IN THE SCRIPTING BLOCK, and that is the whole point of this shape. It used
@@ -2306,6 +2467,17 @@ private:
             if (name == "ciDeviceRemoved") { scriptRuntime->dispatchEvent ("onCiDeviceRemoved", "", payload); return; }
             if (name == "ciProfileChanged") { scriptRuntime->dispatchEvent ("onCiProfileChanged", "", payload); return; }
 
+            // ce.osc: a message arrived. Each script's patterns hear it (__oscIn), then onOscIn, with
+            // origin() giving "osc".
+            if (name == "oscMessage")
+            {
+                oscBindingHeard (payload);   // OSC learn: the controls bound to its address move first
+                OriginScope origin (scriptOrigin, "osc");
+                scriptRuntime->dispatchEvent ("__oscIn", "", payload);
+                scriptRuntime->dispatchEvent ("onOscIn", "", payload);
+                return;
+            }
+
             if (name != "dumpMessageParsed") return;
             if (o == nullptr) return;
 
@@ -2415,7 +2587,11 @@ private:
                                "not lead anywhere on this panel. A state patch key like "
                                "\"Background.Fill.colour\" is ONE map key rather than three path steps.");
            #if CEDITOR_VALUE_LAYER
-            else if (transmit) followSpare (path);   // a control on a spare parameter: the DAW sees it move
+            else
+            {
+                if (transmit) followSpare (path);   // a control on a spare parameter: the DAW sees it move
+                oscFollowBinding (path, scriptValues.getValue (controlPath (path)));   // and a tablet following it
+            }
            #endif
         };
         // Only a control bound to a host parameter sends anything window-closed (setValue above), so
@@ -2942,6 +3118,15 @@ private:
             // Answers at once; what the device says comes later as the "__ciReply" event.
             if (kind == "ci") return deviceService.ciCommand (payload);
 
+            // ce.osc: the panel's OSC transport, kept with the device layer (Osc/OscService.h). The
+            // user's yes for the network is kept per panel, so the panel is named here.
+            if (kind == "osc")
+            {
+                juce::var q = payload.isObject() ? payload : juce::var (new juce::DynamicObject());
+                if (auto* o = q.getDynamicObject()) o->setProperty ("panel", oscPanelKey());
+                return deviceService.oscCommand (q);
+            }
+
            #if CEDITOR_VALUE_LAYER
             // ce.daw: what the DAW is and sees, and the changes a script may make to it.
             if (kind == "daw") return dawQuery (payload, false);
@@ -3213,6 +3398,9 @@ private:
                 scriptDumpParamPaths[desc.deviceParameterId] = desc.path;
         }
         installScriptDeviceCallback();   // receive window-closed device events (PlayerHost owns it open)
+        // OSC learn: a panel whose controls follow OSC addresses listens on its port from the start.
+        readOscBindings();
+        listenForOscBindings (oscPortRestored.exchange (0));
        #endif
 
         // Third-party modules FIRST — a module that is not installed cannot be enabled, and the
@@ -3261,6 +3449,14 @@ private:
     }
 
     ceditor::PanelValueModel scriptValues;
+    /** Which panel a yes for the network is for: its name, as the window names it too (a saved panel
+        keeps no id), so the window open and shut ask once between them. */
+    juce::String oscPanelKey() const
+    {
+        const auto& doc = scriptValues.panel();
+        const auto name = doc.getProperty ("name", juce::var()).toString();
+        return name.isNotEmpty() ? name : doc.getProperty ("id", "panel").toString();
+    }
     // origin(): who made the change the handlers dispatched now are for. Set by OriginScope around
     // each dispatch that has a "who": the DAW, the synth, a project being opened.
     juce::String scriptOrigin;

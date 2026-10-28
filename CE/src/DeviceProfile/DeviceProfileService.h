@@ -2,6 +2,7 @@
 
 #include "DeviceProfileEngine.h"
 #include "MidiCiSession.h"
+#include "Osc/OscService.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -77,6 +78,13 @@ public:
         payload: { op, role, muid, resource, body, opts, token, id, on, channel, timeoutMs }; a
         caller that names `token` gets its replies under it (the panel view's own ids). */
     juce::var ciCommand (const juce::var& payload);
+    /** ce.osc (docs/design/ce-osc-module.md): one command for the panel's OSC transport
+        (Osc/OscService.h), made on first use, since nothing opens until asked. A message that arrives
+        is raised as an "oscMessage" device event. */
+    juce::var oscCommand (const juce::var& payload);
+    /** How to ask the user a yes-or-no question about the network, set by whoever has a window to
+        ask in (the editor, the player, the plug-in). Unset: nobody to ask, and the answer is no. */
+    std::function<void (const juce::String& question, std::function<void (bool yes)> answer)> askAboutNetwork;
     /** Tests stand in for the MIDI output: a role's raw MIDI (MIDI-CI) goes here instead of a port. */
     std::function<void (const juce::String& role, const juce::MidiMessage&)> rawMidiTapForTesting;
     juce::var parseDumpMessage (const juce::var& payload, bool updateState);
@@ -288,6 +296,7 @@ private:
     // ce.ci: one session per role, kept while the service lives, so replies, later reads and
     // subscriptions are heard at any time, and the app keeps one MUID (ciSessionFor).
     std::map<juce::String, std::unique_ptr<MidiCiSession>> ciSessions;
+    std::unique_ptr<ceditor::osc::OscService> oscTransport;   // made on the first ce.osc command
     struct CiDiscovery { juce::var token; juce::String role; double deadline = 0.0; };
     std::vector<CiDiscovery> ciDiscoveries;
     std::map<juce::String, std::pair<juce::String, int>> ciSubscriptions;   // token -> (role, session id)

@@ -168,6 +168,16 @@ juce::WebBrowserComponent::Options withDeviceRuntimeEvents (
             o->setProperty ("answer", s.ciCommand (p));
             e ("ciCommandAnswered", juce::var (o));
         }))
+        // ce.osc: one script command for the panel's OSC transport (Osc/OscService.h). The answer comes
+        // back under the page's requestId; what arrives later comes as "oscMessage" device events.
+        .withEventListener ("oscCommand", on ([] (S& s, E e, const juce::var& p)
+        {
+            auto* o = new juce::DynamicObject();
+            o->setProperty ("requestId", p.getProperty ("requestId", {}));
+            o->setProperty ("op", p.getProperty ("op", {}));
+            o->setProperty ("answer", s.oscCommand (p));
+            e ("oscCommandAnswered", juce::var (o));
+        }))
         .withEventListener ("setMidiCiProfile", on ([] (S& s, E e, const juce::var& p)
         {
             e ("midiCiProfileSet", s.setMidiCiProfile (p));

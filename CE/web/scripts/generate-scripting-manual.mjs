@@ -71,6 +71,19 @@ const MODULE_INTROS = {
     + '-- Lua: a 16-character LCD line, a label on the left and the value on the right\n'
     + 'ce.components.lcd.text("Display", 1, ce.format.line("Cutoff", ce.format.hz(cutoffHz, { space = false }), 16))\n'
     + '```',
+  'ce.osc': 'Open Sound Control lets a panel talk to a tablet running TouchOSC or Lemur, to Max or Pure Data, to a DAW or a lighting desk. A message is an address, such as `/fader/1`, and its values.\n\n'
+    + 'Nothing opens until asked: `listen` opens a port, on this computer only unless `network` is on, and the network is used only after the user says yes, once for the panel. `on` runs a function for the messages to an address, with OSC\'s wildcards; `oscIn` is raised for every one. `send` and `bundle` send, to a name `target` gave, to `"host:port"`, or back to a message\'s `from`. Every common OSC type is read and written, both ways; a number goes out as a decimal unless `types` says otherwise.\n\n'
+    + 'A change a message makes is from `"osc"`, as `origin()` says, so a panel can send its values to the tablet without sending a tablet\'s own move back to it.\n\n'
+    + '```lua\n'
+    + '-- Lua: eight faders on a tablet move the eight sliders on the panel\n'
+    + 'function onPanelReady()\n'
+    + '  ce.osc.listen({ port = 8000, network = true })\n'
+    + '  ce.osc.on("/fader/[1-8]", function(msg)\n'
+    + '    local n = tonumber(msg.address:match("(%d)$"))\n'
+    + '    set("Slider" .. n .. ".value", msg.args[1] * 127)\n'
+    + '  end)\n'
+    + 'end\n'
+    + '```',
   'ce.daw': 'For a panel exported as a plug-in: what the DAW is, its parameters and programs, and the changes a script may make to what the DAW sees. In the editor there is no DAW; the questions that need one answer nothing, and `parameters` gives the list the next export would bake, so a panel can be tested.\n\n'
     + 'A DAW keys automation by a parameter\'s id and its place in the list, so the list is fixed at export. A script can rename a parameter, and fill the spare parameters the author reserved in the export settings (`assign`); it cannot add or remove one. A parameter is named by its control\'s path, such as `"Cutoff.value"`, and its values are the control\'s own, as `set` and `get` give them.\n\n'
     + '`origin()`, beside this module, says who made the change a handler is running for: a hand, a script, the DAW, the synth, or a project being opened. `automationIn` is raised when the DAW moved a parameter, and never for a change a script or a hand made.\n\n'
@@ -254,6 +267,7 @@ const MODULE_TITLES = {
   'ce.verify': 'checking what the synth holds',
   'ce.file': 'files, through the person\'s own dialogs',
   'ce.daw': 'The DAW',
+  'ce.osc': 'OSC',
   'ce.mpe': 'MPE',
   'ce.ci': 'MIDI-CI',
   'ce.keys': 'the computer keyboard',

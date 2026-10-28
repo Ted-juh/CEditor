@@ -249,7 +249,7 @@ test('what each checked member answers when it refuses', () => {
     false: ['ce.anim.envelope', 'ce.anim.spring', 'ce.anim.to', 'ce.ci.discover', 'ce.ci.get', 'ce.ci.set', 'ce.ci.setProfile', 'ce.daw.assign', 'ce.device.bind', 'ce.device.defineDump',
       'ce.device.defineParameter', 'ce.device.requestDump', 'ce.draw.curve', 'ce.draw.grid', 'ce.draw.image',
       'ce.draw.polygon', 'ce.draw.text', 'ce.file.folder', 'ce.file.open', 'ce.file.save', 'ce.file.saveIn',
-      'ce.image.icon', 'ce.keys.piano', 'ce.mpe.express', 'ce.mpe.listen', 'ce.mpe.zone', 'ce.patch.forget',
+      'ce.image.icon', 'ce.keys.piano', 'ce.mpe.express', 'ce.mpe.listen', 'ce.mpe.zone', 'ce.osc.bundle', 'ce.osc.listen', 'ce.patch.forget',
       'ce.patch.read', 'ce.patch.save', 'ce.ui.status', 'ce.ui.update', 'ce.verify.check', 'ce.verify.dump',
       'ce.verify.patch', 'ce.verify.probe', 'ce.verify.write'],
     zero: ['ce.panel.align', 'ce.panel.circle', 'ce.panel.distribute', 'ce.panel.grid', 'ce.panel.match'],

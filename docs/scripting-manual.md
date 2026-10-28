@@ -862,6 +862,7 @@ back to the synth ([chapter 5](#5-talking-to-your-synth)).
 |---|---|
 | `onParameterReceived(info)` | The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter's id and `info.value` its value, in the parameter's own units. |
 | `onDumpReceived(dump)` | A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from. |
+| `onOscIn(message)` | An OSC message arrived on the port ce.osc.listen() opened. `message.address` is where it was sent, `message.args` its values, `message.types` their OSC types, `message.from` who sent it ({ host, port }), and `message.time` a bundle's time. origin() gives "osc". |
 | `onAutomationIn(move)` | The DAW moved a parameter. `move.control` is the control's name, `move.path` its path, `move.value` the new value in the control's own range and `move.id` the DAW parameter's id. The control's own value events fire too, with origin() giving "host". Never for a change a script or a hand made. |
 | `onDawProgramIn(program)` | The DAW chose a program from the plug-in's bank, and the plug-in has sent it to the synth. `program.index` counts from 0, `program.number` from 1, and `program.name` is its name. |
 | `onCiDiscovered(device)` | A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them. |
@@ -1109,19 +1110,19 @@ ce.core.error("message")
 
 #### `origin() -> text`
 
-Who made the change the running handler is for: "user", "script", "host", "device" or "load".
+Who made the change the running handler is for: "user", "script", "host", "device", "osc" or "load".
 
 Example: In `onValueChanged`, `origin() == "host"` means the DAW's automation moved the knob.
 
 Good to know:
 
-- "user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "load": the panel, a preset or the project being opened.
+- "user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "osc": an OSC message. "load": the panel, a preset or the project being opened.
 - Outside a handler, and for an event no change caused (a timer, a key): nothing.
 - With the plug-in's window shut, a change a hand made while it was open is not raised again; and a script's set() raises no value events there, as inside a handler with the window open.
 
 ## Commands: Notes, MIDI and time
 
-MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, and the DAW an exported plug-in runs in.
+MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, the DAW an exported plug-in runs in, and OSC.
 
 ### ce.midi: sending and filtering MIDI
 
@@ -3739,6 +3740,163 @@ Good to know:
 - Returns true when the DAW was told; in the editor, false.
 
 *Short name: `dawMarkChanged`.*
+
+### ce.osc: OSC
+
+Open Sound Control lets a panel talk to a tablet running TouchOSC or Lemur, to Max or Pure Data, to a DAW or a lighting desk. A message is an address, such as `/fader/1`, and its values.
+
+Nothing opens until asked: `listen` opens a port, on this computer only unless `network` is on, and the network is used only after the user says yes, once for the panel. `on` runs a function for the messages to an address, with OSC's wildcards; `oscIn` is raised for every one. `send` and `bundle` send, to a name `target` gave, to `"host:port"`, or back to a message's `from`. Every common OSC type is read and written, both ways; a number goes out as a decimal unless `types` says otherwise.
+
+A change a message makes is from `"osc"`, as `origin()` says, so a panel can send its values to the tablet without sending a tablet's own move back to it.
+
+```lua
+-- Lua: eight faders on a tablet move the eight sliders on the panel
+function onPanelReady()
+  ce.osc.listen({ port = 8000, network = true })
+  ce.osc.on("/fader/[1-8]", function(msg)
+    local n = tonumber(msg.address:match("(%d)$"))
+    set("Slider" .. n .. ".value", msg.args[1] * 127)
+  end)
+end
+```
+
+#### `ce.osc.listen([opts]) -> boolean`
+
+Start receiving OSC on a port.
+
+Example: `ce.osc.listen({ port = 8000, network = true })` receives from a tablet on the same network, after the user says yes.
+
+Good to know:
+
+- This computer only, unless `network` is on; then the user is asked the first time, and listening starts when they say yes. The answer is kept on this computer for the panel, never in the panel file.
+- The port in use is in status().port: show it where the user types it into the tablet. Calling it again moves to the new port.
+- Returns true when listening, or waiting for the user. In an exported plug-in with its window shut, false when the port is in use or the user said no; in the panel view that comes a moment later, as a console line and status().error.
+
+*Short name: `oscListen`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `port` | number | 8000 | The port, 1024 to 65535. |
+| `network` | boolean | false | Receive from other computers too, after the user says yes. |
+| `nextFree` | boolean | false | Take the next free port when this one is in use, as a second copy of the panel must. |
+
+#### `ce.osc.stop() -> boolean`
+
+Stop receiving OSC, and close the port.
+
+Example: `ce.osc.stop()` from an "OSC off" switch.
+
+Good to know:
+
+- Closed by itself when the panel closes. Returns true when a port was open.
+
+*Short name: `oscStop`.*
+
+#### `ce.osc.on(pattern, fn) -> number`
+
+Run a function for every OSC message to an address; wildcards allowed.
+
+Example: `ce.osc.on("/fader/*", fn)` runs `fn` for `/fader/1`, `/fader/2` and so on.
+
+- `pattern` (text, required): An address, starting with /.
+- `fn` (function, required): Called with each message.
+
+Good to know:
+
+- OSC's wildcards, inside one part of the address: `*` any text, `?` one character, `[1-4]` one of a range, `[!0]` anything but, `{cutoff,reso}` one of a list.
+- fn is called with the message: { address, args, types, from, time }. `args` are its values; `types` the OSC type of each, such as "if"; `from` { host, port }, which ce.osc.send() takes to answer; `time` a bundle's time.
+- Several patterns can match one message; each function runs, in the order they were made. A script's patterns go when it reloads.
+- Returns an id for ce.osc.off().
+
+*Short name: `oscOn`.*
+
+#### `ce.osc.off(id) -> boolean`
+
+Remove a pattern ce.osc.on() made.
+
+Example: `ce.osc.off(state.faders)`.
+
+- `id` (number, required): The id ce.osc.on() gave.
+
+Good to know:
+
+- Returns true when there was one.
+
+*Short name: `oscOff`.*
+
+#### `ce.osc.target(name [, address]) -> boolean`
+
+Give a destination a name, so ce.osc.send() can use it.
+
+Example: `ce.osc.target("tablet", "192.168.1.20:9000")`.
+
+- `name` (text, required): The name scripts will use.
+- `address` (any value, optional): "host:port", { host, port }, or a message's from.
+
+Good to know:
+
+- Another computer asks the user once, as listening on the network does; this computer ("127.0.0.1" or "localhost") does not.
+- Names belong to the panel and are shared by its scripts, until the panel closes.
+- Returns true when set, or waiting for the user's answer.
+
+*Short name: `oscTarget`.*
+
+#### `ce.osc.send(to, address [, args] [, types]) -> boolean`
+
+Send one OSC message.
+
+Example: `ce.osc.send("tablet", "/label/1", "Cutoff")` sets a label in TouchOSC.
+
+- `to` (any value, required): A name from ce.osc.target(), "host:port", or a message's from.
+- `address` (text, required): Where to send it, starting with /.
+- `args` (any value, optional): One value, or a list of them.
+- `types` (text, optional): The OSC types, one per value, such as "if".
+
+Good to know:
+
+- Every number goes as `f`, the type most receivers expect; text as `s`, true and false as `T` and `F`, nothing as `N`, a list of bytes as `b`. A whole number needs `types` "i", because some languages cannot tell 1 from 1.0.
+- `types` gives one OSC type for each value instead: i h f d s S T F N I b r m t c.
+- Sending never waits; messages go out in the order sent. A destination on another computer asks the user first, and the message waits for the answer.
+- Returns true when sent; false for an address without a leading /, types that do not fit the values, or a destination the user refused.
+
+*Short name: `oscSend`.*
+
+#### `ce.osc.bundle(to, messages [, opts]) -> boolean`
+
+Send several OSC messages as one packet, so they arrive together.
+
+Example: `ce.osc.bundle("tablet", { { address = "/fader/1", args = { 0.5 } }, { address = "/label/1", args = { "64" } } })`.
+
+- `to` (any value, required): As ce.osc.send() takes it.
+- `messages` (list, required): A list of { address, args, types }.
+
+Good to know:
+
+- For a tablet showing many values: one bundle for a page of faders is one packet, not twenty. A bundle larger than 64 KB is refused; split it.
+- Returns true when sent.
+
+*Short name: `oscBundle`.*
+
+**`opts`** can contain:
+
+| Name | Type | Default | What it does |
+|---|---|---|---|
+| `time` | number (seconds since 1900) | at once | When the receiver should act on it, for a receiver that schedules bundles. |
+
+#### `ce.osc.status() -> table`
+
+What OSC is doing: listening or not, on which port, what was received, sent and dropped.
+
+Example: `ce.osc.status().port` is the port to type into the tablet.
+
+Good to know:
+
+- Returns { listening, waiting, port, network, received, sent, dropped, error }: `waiting` while the user has not answered; the counts since the panel opened; `error` the last reason something was refused: "portInUse", "refusedByUser", "badPort", "badAddress", "badMessage", "tooLarge" or "badPacket".
+- In the panel view it answers from what the transport last said, a moment behind.
+
+*Short name: `oscStatus`.*
 
 ## Commands: Working out values
 
