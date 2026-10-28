@@ -10,16 +10,26 @@
  * In production, serves from the ResourceProvider.
  */
 class AppSettings;
+namespace ceditor { class DocumentationWindow; }
 
 class WebViewHost : public juce::Component
 {
 public:
     WebViewHost (AppSettings* settings = nullptr);
+    ~WebViewHost() override;
 
     void resized() override;
 
 private:
     void showStatusMessage (const juce::String& title, const juce::String& message);
+
+    // The manual's own window (DocumentationWindow.h). Opened and brought forward by the editor
+    // page; closed by its close button or by its page asking to go back into a tab.
+    void openDocumentationWindow (const juce::String& doc, const juce::String& anchor);
+    void closeDocumentationWindow();
+    void dockDocumentation (const juce::String& doc, const juce::String& anchor);
+
+    AppSettings* appSettings = nullptr;
 
     ValueTreeBridge bridge;
     // Declared after the bridge ON PURPOSE: members destroy in reverse order, so the pane —
@@ -29,4 +39,6 @@ private:
     ceditor::host::PluginEditorHost editorPane;
     std::unique_ptr<juce::WebBrowserComponent> webView;
     std::unique_ptr<juce::Label> statusLabel;
+    // After the webView, so it goes first: its browser shares the editor's WebView2 profile.
+    std::unique_ptr<ceditor::DocumentationWindow> documentationWindow;
 };

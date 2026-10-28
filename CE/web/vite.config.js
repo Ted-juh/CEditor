@@ -217,13 +217,15 @@ export default defineConfig(({ command }) => ({
       // and 5.76 MB of duplicated licence text, and none of it changed how the app behaved, which
       // is why test/bundleHygiene.test.js guards the rule rather than a reviewer's memory.
       treeshake: false,
-      // Three entries: the editor (index.html), the standalone player (player.html), and the
-      // generated instrument-host product's interface (host.html) — the last two served from the
-      // embedded bundle (PlayerWebData: what they reach, compressed, by scripts/embed-web.mjs).
+      // Four entries: the editor (index.html), the standalone player (player.html), the
+      // generated instrument-host product's interface (host.html) — those two served from the
+      // embedded bundle (PlayerWebData: what they reach, compressed, by scripts/embed-web.mjs) —
+      // and the manual's own window (help.html), which the editor serves from dist/ like itself.
       input: {
         main: fileURLToPath(new URL('./index.html', import.meta.url)),
         player: fileURLToPath(new URL('./player.html', import.meta.url)),
         host: fileURLToPath(new URL('./host.html', import.meta.url)),
+        help: fileURLToPath(new URL('./help.html', import.meta.url)),
       },
       output: {
         manualChunks: {
