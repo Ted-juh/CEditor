@@ -30,6 +30,7 @@ import {
   insertOffset,
   duplicateOffset,
   keyboardNudgeSmall,
+  importComponentFileAtOnce,
   keyboardNudgeLarge,
 } from './runtimePreferences.js';
 import { restoreSessionFromPreferences } from './panels.js';
@@ -710,6 +711,7 @@ function syncGeneralSettingValue(key, value) {
   ['duplicateOffset', duplicateOffset],
   ['keyboardNudgeSmall', keyboardNudgeSmall],
   ['keyboardNudgeLarge', keyboardNudgeLarge],
+  ['importComponentFileAtOnce', importComponentFileAtOnce],
 ].forEach(([key, store]) => {
   store.subscribe((value) => {
     if (!settingsLoaded) return;

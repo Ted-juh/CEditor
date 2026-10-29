@@ -23,6 +23,13 @@ test('normalizeGeneralSettings clamps numeric runtime preferences', () => {
   assert.equal(normalized.showPreviewSelectionRing, false);
 });
 
+test('a component file is imported when chosen only when the setting says so', () => {
+  // Off unless set: File then puts the file in the import box, to read before Import.
+  assert.equal(normalizeGeneralSettings({}).importComponentFileAtOnce, false);
+  assert.equal(normalizeGeneralSettings({ importComponentFileAtOnce: 'yes' }).importComponentFileAtOnce, false);
+  assert.equal(normalizeGeneralSettings({ importComponentFileAtOnce: true }).importComponentFileAtOnce, true);
+});
+
 test('normalizeSettings filters invalid assets', () => {
   const normalized = normalizeSettings({
     general: {},

@@ -364,6 +364,7 @@ export function normalizeGeneralSettings(general) {
       1,
       200
     ),
+    importComponentFileAtOnce: general?.importComponentFileAtOnce === true,
     keyboardNudgeLarge: clampInteger(
       general?.keyboardNudgeLarge,
       DEFAULT_GENERAL_SETTINGS.keyboardNudgeLarge,

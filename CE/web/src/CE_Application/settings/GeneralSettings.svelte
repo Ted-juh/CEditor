@@ -250,6 +250,17 @@
         />
       </div>
     </div>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Import a Component File When Chosen</strong>
+        <span>
+          In Package &amp; Library, File imports the file into the library at once. Off, it goes into
+          the import box first, to read before you press Import.
+        </span>
+      </div>
+      <input type="checkbox" checked={general.importComponentFileAtOnce} onchange={(event) => setBool('importComponentFileAtOnce', event)} />
+    </label>
   </section>
 
   <section class="settings-card">

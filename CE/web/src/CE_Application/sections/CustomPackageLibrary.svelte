@@ -7,6 +7,7 @@
   import OpenInDock from '../properties/OpenInDock.svelte';
   import { creatorMode } from '../stores/creatorMode.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { importComponentFileAtOnce } from '../stores/runtimePreferences.js';
   import {
     createCustomComponentLibraryEnvelope,
     createCustomComponentExportEnvelope,
@@ -539,6 +540,9 @@
       if (request !== importFileRequest) return;
       importText = text;
       libraryStatus = `Loaded file ${file.name}`;
+      // Settings → General → Import a Component File When Chosen. Only a file that reads as
+      // packages goes straight in; one that does not stays in the box, where the preview says why.
+      if ($importComponentFileAtOnce && importPreview.state === 'ready') importPackageJson();
     } catch (error) {
       if (request !== importFileRequest) return;
       libraryStatus = error?.message ?? 'File import failed';
@@ -813,7 +817,7 @@
     <PropertyCell label="Import" span={3} hint="Paste one package JSON, a package array, or a ceditor-component-library bundle.">
       <textarea class="val package-text" rows="4" bind:value={importText} placeholder="paste package or library JSON"></textarea>
     </PropertyCell>
-    <PropertyCell label="" span={1} hint="Validate and import pasted package JSON." compact>
+    <PropertyCell label="" span={1} hint={$importComponentFileAtOnce ? 'File imports the chosen file at once (Settings → General). Import takes pasted package JSON.' : 'File puts the chosen file in the box above; Import then adds it to the library.'} compact>
       <div class="import-actions">
         <label class="library-btn file-btn">
           File
