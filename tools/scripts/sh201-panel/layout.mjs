@@ -169,3 +169,92 @@ export const SECTION_ROWS = [
   { h: 214, sections: ['osc1', 'osc2', 'mixMod', 'lfo1', 'lfo2'] },
   { h: 196, sections: ['pitchEnv', 'filter', 'amp', 'performance', 'effects'] },
 ];
+
+/* ------------------------------------------------------------------ the hardware look */
+
+// What the tutorial in the draft's notepad ends at: the same parameters on the same packages, in
+// the SH-201's own colours and arrangement. The top row is the silver signal path — OSC 1, OSC 2,
+// Mix/Mod, Filter, Amp — with Effects on the black body beside it; the bottom row is the black
+// modulation row — Pitch Env, the LFOs, and the two envelopes, which on the instrument are sections
+// of their own rather than part of Filter and Amp.
+
+export const HARDWARE_SKIN = {
+  ...SKIN,
+  panelBg: 'FF121314',
+  plate: 'FF1B1C1E',
+  plateEdge: 'FF2E3033',
+  silver: 'FFCBCCC7',
+  black: 'FF1E1F21',
+  blackEdge: 'FF45484C',
+  onSilver: 'FF141516',
+  onBlack: 'FFE6E7E8',
+  flow: 'FFD9402B',
+  brand: 'FFF2F3F4',
+  model: 'FFF2F3F4',
+  toneLit: 'FFE8432D',
+};
+
+const pick = (key, overrides) => ({ ...SECTIONS[key], ...overrides });
+const stages = ['attack', 'decay', 'sustain', 'release'];
+
+export const HARDWARE_SECTIONS = {
+  osc1: pick('osc1', { surface: 'silver', h: 196 }),
+  osc2: pick('osc2', { surface: 'silver', h: 196 }),
+  mixMod: pick('mixMod', { surface: 'silver', h: 196 }),
+  filter: {
+    title: 'FILTER',
+    surface: 'silver',
+    about: 'The filter. Its envelope is the FILTER ENV section below, as on the instrument.',
+    w: 300,
+    h: 196,
+    items: [
+      { p: 'upper.filter.type', kind: 'combo', x: 12, y: 42, w: 100, label: 'TYPE' },
+      { p: 'upper.filter.slope', kind: 'combo', x: 126, y: 42, w: 90, label: 'SLOPE' },
+      { p: 'upper.filter.cutoff', kind: 'knob', x: 20, y: 100, label: 'CUTOFF' },
+      { p: 'upper.filter.resonance', kind: 'knob', x: 88, y: 100, label: 'RESONANCE' },
+      { p: 'upper.filter.cutoffKeyfollow', kind: 'knob', x: 156, y: 100, label: 'KEY FOLLOW' },
+      { p: 'upper.filter.cutoffVelocity', kind: 'knob', x: 224, y: 100, label: 'VELO SENS' },
+    ],
+  },
+  amp: {
+    title: 'AMP',
+    surface: 'silver',
+    about: 'The level, its overdrive and its pan. Its envelope is the AMP ENV section below.',
+    w: 300,
+    h: 196,
+    items: SECTIONS.amp.items.filter((item) => item.kind !== 'fader'),
+  },
+  effects: pick('effects', { surface: 'black', w: 166, h: 196, items: [
+    { p: 'upper.delay.depth', kind: 'knob', x: 24, y: 100, label: 'DELAY' },
+    { p: 'upper.reverb.depth', kind: 'knob', x: 92, y: 100, label: 'REVERB' },
+  ] }),
+  pitchEnv: pick('pitchEnv', { surface: 'black', h: 214 }),
+  lfo1: pick('lfo1', { surface: 'black' }),
+  lfo2: pick('lfo2', { surface: 'black' }),
+  filterEnv: {
+    title: 'FILTER ENV',
+    surface: 'black',
+    about: 'The envelope that moves the filter\'s cutoff, by DEPTH.',
+    w: 214,
+    h: 214,
+    items: [
+      ...stages.map((stage, i) => ({ p: `upper.filterEnv.${stage}`, kind: 'fader', x: 16 + i * 38, y: 40, label: stage[0].toUpperCase() })),
+      { p: 'upper.filterEnv.depth', kind: 'fader', x: 170, y: 40, label: 'DEPTH' },
+    ],
+  },
+  ampEnv: {
+    title: 'AMP ENV',
+    surface: 'black',
+    about: 'The envelope that shapes the level.',
+    w: 172,
+    h: 214,
+    items: stages.map((stage, i) => ({ p: `upper.ampEnv.${stage}`, kind: 'fader', x: 16 + i * 38, y: 40, label: stage[0].toUpperCase() })),
+  },
+  performance: pick('performance', { surface: 'black', h: 214 }),
+};
+
+export const HARDWARE_ROWS = [
+  { h: 196, sections: ['osc1', 'osc2', 'mixMod', 'filter', 'amp', 'effects'], flow: true },
+  // As tall as the draft's LFO row: the LFOs' destination lists sit under their depth knobs.
+  { h: 214, sections: ['pitchEnv', 'lfo1', 'lfo2', 'filterEnv', 'ampEnv', 'performance'] },
+];

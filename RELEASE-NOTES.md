@@ -163,6 +163,13 @@ compiled. Scripts on top-level controls and panel scripts were never affected.
   28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents. Every block of an SH-201
   patch has a request of its own, so a script's `requestDump("upperToneDump")` is sent and
   answered; for 21 of the 23 blocks there was no request to send.
+- **An SH-201 panel to learn the editor from.** `Roland SH-201.cepanel` is the Upper tone, built the
+  way the editor builds by hand: three library components placed as linked copies, one binding per
+  control, sections named after the front panel, a State on the tone button, no scripts. Its
+  notepad has a tutorial that takes it from the GAIA panel's look to the instrument's own — a
+  reference photo in Viewer, colours on many controls at once, the knob redesigned once and
+  updated on all its copies, new sections with Ctrl+G — and `Roland SH-201 (hardware look).cepanel`
+  is where it ends up. Bring your own photo of the instrument; none is included.
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
   Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
   and reports the actual send result. Changing ports preserves its profile and parameter values.
