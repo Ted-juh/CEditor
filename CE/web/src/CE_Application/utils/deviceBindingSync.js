@@ -5,6 +5,7 @@ import { panelPreviewSessions, updatePanelPreviewSessions } from '../stores/inte
 import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { shouldAcceptFeedback } from './displayMode.js';
 import { flatControls } from './containment.js';
+import { hasPatternEditing } from './arpPatternLayouts.js';
 
 function getControlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -27,7 +28,7 @@ function activeDeviceBindings(control) {
 function patchForBinding(control, binding, value) {
   const port = String(binding?.port ?? 'value');
   // Staged pattern editing is atomic: individual hardware replies must not replace its loop length.
-  if (port === 'arpEndStep' && control?._children?.Designer?.patternEditing?.kind === 'gaia') return null;
+  if (port === 'arpEndStep' && hasPatternEditing(control)) return null;
   // Named custom channels are independent ports, not the component's main value.
   if (control?._children?.ValueChannels?._children?.[port]) {
     return { customValues: { [port]: value } };

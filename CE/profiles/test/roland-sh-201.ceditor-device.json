@@ -14,9 +14,17 @@
   },
   "identity": {
     "requestDeviceId": "$deviceId",
-    "manufacturerId": ["41"],
-    "familyCode": ["16", "02"],
-    "modelNumber": ["00", "00"],
+    "manufacturerId": [
+      "41"
+    ],
+    "familyCode": [
+      "16",
+      "02"
+    ],
+    "modelNumber": [
+      "00",
+      "00"
+    ],
     "timeoutMs": 1000,
     "retries": 0
   },
@@ -32170,6 +32178,657 @@
       ],
       "response": {
         "dump": "patchCommonDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestUpperTone",
+      "name": "Request Upper Tone",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "01",
+        "00",
+        "00",
+        "00",
+        "00",
+        "40",
+        "2F",
+        "F7"
+      ],
+      "address": "10 00 01 00",
+      "size": "00 00 00 40",
+      "response": {
+        "dump": "upperToneDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestLowerTone",
+      "name": "Request Lower Tone",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "02",
+        "00",
+        "00",
+        "00",
+        "00",
+        "40",
+        "2E",
+        "F7"
+      ],
+      "address": "10 00 02 00",
+      "size": "00 00 00 40",
+      "response": {
+        "dump": "lowerToneDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestDelay",
+      "name": "Request Delay",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "03",
+        "00",
+        "00",
+        "00",
+        "00",
+        "05",
+        "68",
+        "F7"
+      ],
+      "address": "10 00 03 00",
+      "size": "00 00 00 05",
+      "response": {
+        "dump": "delayDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestReverb",
+      "name": "Request Reverb",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "04",
+        "00",
+        "00",
+        "00",
+        "00",
+        "0A",
+        "62",
+        "F7"
+      ],
+      "address": "10 00 04 00",
+      "size": "00 00 00 0A",
+      "response": {
+        "dump": "reverbDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioCommon",
+      "name": "Request Arpeggio Common",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "05",
+        "00",
+        "00",
+        "00",
+        "00",
+        "08",
+        "63",
+        "F7"
+      ],
+      "address": "10 00 05 00",
+      "size": "00 00 00 08",
+      "response": {
+        "dump": "arpeggioCommonDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern01",
+      "name": "Request Arpeggio Pattern 01",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "06",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "28",
+        "F7"
+      ],
+      "address": "10 00 06 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern01Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern02",
+      "name": "Request Arpeggio Pattern 02",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "07",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "27",
+        "F7"
+      ],
+      "address": "10 00 07 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern02Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern03",
+      "name": "Request Arpeggio Pattern 03",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "08",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "26",
+        "F7"
+      ],
+      "address": "10 00 08 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern03Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern04",
+      "name": "Request Arpeggio Pattern 04",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "09",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "25",
+        "F7"
+      ],
+      "address": "10 00 09 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern04Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern05",
+      "name": "Request Arpeggio Pattern 05",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0A",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "24",
+        "F7"
+      ],
+      "address": "10 00 0A 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern05Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern06",
+      "name": "Request Arpeggio Pattern 06",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0B",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "23",
+        "F7"
+      ],
+      "address": "10 00 0B 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern06Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern07",
+      "name": "Request Arpeggio Pattern 07",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0C",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "22",
+        "F7"
+      ],
+      "address": "10 00 0C 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern07Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern08",
+      "name": "Request Arpeggio Pattern 08",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0D",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "21",
+        "F7"
+      ],
+      "address": "10 00 0D 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern08Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern09",
+      "name": "Request Arpeggio Pattern 09",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0E",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "20",
+        "F7"
+      ],
+      "address": "10 00 0E 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern09Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern10",
+      "name": "Request Arpeggio Pattern 10",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0F",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1F",
+        "F7"
+      ],
+      "address": "10 00 0F 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern10Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern11",
+      "name": "Request Arpeggio Pattern 11",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "10",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1E",
+        "F7"
+      ],
+      "address": "10 00 10 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern11Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern12",
+      "name": "Request Arpeggio Pattern 12",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "11",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1D",
+        "F7"
+      ],
+      "address": "10 00 11 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern12Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern13",
+      "name": "Request Arpeggio Pattern 13",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "12",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1C",
+        "F7"
+      ],
+      "address": "10 00 12 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern13Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern14",
+      "name": "Request Arpeggio Pattern 14",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "13",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1B",
+        "F7"
+      ],
+      "address": "10 00 13 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern14Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern15",
+      "name": "Request Arpeggio Pattern 15",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "14",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1A",
+        "F7"
+      ],
+      "address": "10 00 14 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern15Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern16",
+      "name": "Request Arpeggio Pattern 16",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "15",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "19",
+        "F7"
+      ],
+      "address": "10 00 15 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern16Dump"
       },
       "timeoutMs": 3000,
       "retries": 1

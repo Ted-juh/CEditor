@@ -1,7 +1,9 @@
 import { getCustomArpeggiator, syncCustomArpeggiatorValues, revealArpeggiatorNote } from './customComponentArpeggiator.js';
 import { gaiaPatternFingerprint, gaiaExpectedArpValues } from './gaiaSyncStatus.js';
+import { ARP_PATTERN_LAYOUTS, layoutFor } from './arpPatternLayouts.js';
 
-export const hasGaiaPatternEditing = control => control?._children?.Designer?.patternEditing?.kind === 'gaia';
+// Named for the GAIA, where it was written; it edits any synth arpPatternLayouts.js describes.
+export { hasPatternEditing } from './arpPatternLayouts.js';
 const clone = value => JSON.parse(JSON.stringify(value));
 export function patternSnapshot(control, values) {
   return { __arpeggiator: getCustomArpeggiator(control, values), arpEndStep: values.arpEndStep ?? 32,
@@ -54,47 +56,52 @@ export function editSelectedPatternNote(control, values, action) {
   return { values: syncCustomArpeggiatorValues(control, { ...values, __arpeggiator: active ? revealArpeggiatorNote(next, active.note) : next }) };
 }
 
-export const gaiaPatternReadGroups = [
-  { request: 'requestArpeggioCommon', ids: ['arp.endStep'] },
-  ...Array.from({ length: 16 }, (_, i) => ({ request: `requestArpPattern${i + 1}`,
-    ids: [`arpPattern.note${i + 1}.originalNote`, ...Array.from({ length: 32 }, (_, s) => `arpPattern.note${i + 1}.step${s + 1}Data`)] })),
-];
+/** What Read Pattern asks for, in order: the End Step's block, then one request per lane. */
+export function patternReadGroups(layout = ARP_PATTERN_LAYOUTS.gaia) {
+  return [
+    { request: layout.endStepRequest, ids: [layout.endStep] },
+    ...Array.from({ length: layout.lanes }, (_, i) => ({ request: layout.laneRequest(i + 1),
+      ids: [layout.originalNote(i + 1), ...Array.from({ length: layout.steps }, (_, s) => layout.step(i + 1, s + 1))] })),
+  ];
+}
+
+export const gaiaPatternReadGroups = patternReadGroups(ARP_PATTERN_LAYOUTS.gaia);
 
 /** Decode only a complete, valid snapshot. No guessed velocity for orphan/wrapping ties. */
-export function decodeGaiaPattern(raw) {
-  for (const { ids } of gaiaPatternReadGroups) for (const id of ids) {
+export function decodeGaiaPattern(raw, layout = ARP_PATTERN_LAYOUTS.gaia) {
+  for (const { ids } of patternReadGroups(layout)) for (const id of ids) {
     const value = raw[id];
-    const valid = Number.isInteger(value) && (id === 'arp.endStep' ? value >= 1 && value <= 32 : value >= 0 && value <= 128);
+    const valid = Number.isInteger(value) && (id === layout.endStep ? value >= 1 && value <= layout.steps : value >= 0 && value <= 128);
     if (!valid) throw new Error(`Incomplete or invalid pattern: ${id}`);
   }
   const blocks = [];
-  for (let lane = 1; lane <= 16; lane++) {
-    const prefix = `arpPattern.note${lane}`, note = raw[`${prefix}.originalNote`];
+  for (let lane = 1; lane <= layout.lanes; lane++) {
+    const note = raw[layout.originalNote(lane)];
     if (note === 128) continue;
     let active = null;
-    for (let step = 0; step < 32; step++) {
-      const value = raw[`${prefix}.step${step + 1}Data`];
+    for (let step = 0; step < layout.steps; step++) {
+      const value = raw[layout.step(lane, step + 1)];
       if (value === 128) {
         if (!active) throw new Error(`Lane ${lane} has an orphan/wrapping tie at step ${step + 1}; editor left unchanged.`);
         active.length++;
       } else if (value) {
-        active = { id: `gaia_read_${lane}_${step}`, note, step, length: 1, velocity: value };
+        active = { id: `${layout.kind}_read_${lane}_${step}`, note, step, length: 1, velocity: value };
         blocks.push(active);
       } else active = null;
     }
   }
-  return { blocks, endStep: raw['arp.endStep'], source: { kind: 'hardware', fingerprint: gaiaPatternFingerprint(blocks), raw: { ...raw } } };
+  return { blocks, endStep: raw[layout.endStep], source: { kind: 'hardware', fingerprint: gaiaPatternFingerprint(blocks), raw: { ...raw } } };
 }
 
 export function patternValuesForSend(control, values) {
-  const arp = getCustomArpeggiator(control, values);
+  const arp = getCustomArpeggiator(control, values), layout = layoutFor(control);
   // An untouched import retains the exact hardware lane ordering and unused lane data.
   if (values.__arpPatternSource?.fingerprint === gaiaPatternFingerprint(arp.blocks) && values.__arpPatternSource?.raw) {
-    decodeGaiaPattern(values.__arpPatternSource.raw);
-    return { ...values.__arpPatternSource.raw, 'arp.endStep': values.arpEndStep ?? 32 };
+    decodeGaiaPattern(values.__arpPatternSource.raw, layout);
+    return { ...values.__arpPatternSource.raw, [layout.endStep]: values.arpEndStep ?? layout.steps };
   }
   const { expected, dropped } = gaiaExpectedArpValues(control, values);
-  if (dropped.length) throw new Error('Not sent: GAIA supports at most 16 distinct pitches.');
+  if (dropped.length) throw new Error(`Not sent: ${layout.synth} supports at most ${layout.lanes} distinct pitches.`);
   for (let i = 0; i < arp.blocks.length; i++) for (const other of arp.blocks.slice(i + 1)) {
     const b = arp.blocks[i];
     if (b.note === other.note && b.step < other.step + other.length && b.step + b.length > other.step)

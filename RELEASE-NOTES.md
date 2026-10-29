@@ -160,7 +160,9 @@ compiled. Scripts on top-level controls and panel scripts were never affected.
   devices inside CEditor; other programs cannot see them (on Windows, loopMIDI still does that).
   The SH-201 profile now describes the synth's identity, so **Test** can recognise it, and its
   42 offset parameters read what the synth's display reads: Coarse Tune −36…+36 rather than
-  28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents.
+  28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents. Every block of an SH-201
+  patch has a request of its own, so a script's `requestDump("upperToneDump")` is sent and
+  answered; for 21 of the 23 blocks there was no request to send.
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
   Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
   and reports the actual send result. Changing ports preserves its profile and parameter values.

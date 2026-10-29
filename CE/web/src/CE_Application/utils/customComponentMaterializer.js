@@ -2,6 +2,7 @@ import { createBackground, createPartNode, createText } from './customComponentF
 import { getCustomArpeggiator, noteNameFromMidi, arpeggiatorInspectorLayout } from './customComponentArpeggiator.js';
 import { deepClone } from './deepClone.js';
 import { numberOr, clamp } from './primitives.js';
+import { hasPatternEditing } from './arpPatternLayouts.js';
 
 const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -238,7 +239,7 @@ function materializeArpeggiator(parts, hitZones, control, signals = {}) {
   const gridLeft = labelWidth;
   const gridTop = rulerHeight;
   const numericFields = control?._children?.Designer?.arpeggiator?.numericFields === true;
-  const editing = control?._children?.Designer?.patternEditing?.kind === 'gaia';
+  const editing = hasPatternEditing(control);
   const inspector = arpeggiatorInspectorLayout(width, editing);
   const gridWidth = Math.max(1, inspector.contentWidth - labelWidth - 8);
   const gridHeight = Math.max(1, height - rulerHeight - 8 - (numericFields ? inspector.height : 0));

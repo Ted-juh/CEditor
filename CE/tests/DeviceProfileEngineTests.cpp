@@ -2090,6 +2090,21 @@ int runWithinProcessMidiTests()
         fail ("Request Upper Tone did not bring back the written cutoff (got "
               + parsedValue ("upperToneDump", "upper.filter.cutoff").toString() + ")");
 
+    // Every block has a request of its own now, waited for and resolved like Patch Common: the
+    // seventeen a Read Pattern makes, and the tones a panel reads.
+    for (const auto* request : { "requestUpperTone", "requestArpeggioCommon", "requestArpeggioPattern01", "requestArpeggioPattern16" })
+    {
+        const auto before = count ("deviceRequestResolved", "sh201");
+        auto* block = new juce::DynamicObject();
+        block->setProperty ("deviceRole", "sh201");
+        block->setProperty ("request", request);
+        const auto sent = service.startDeviceSync (juce::var (block));
+        DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+        if (! (bool) sent.getProperty ("pending", false) || count ("deviceRequestResolved", "sh201") != before + 1)
+            fail (juce::String (request) + " was not resolved by the simulated device (status "
+                  + sent.getProperty ("status", {}).toString() + ")");
+    }
+
     // The whole temporary patch is answered block by block, every one a dump the profile parses.
     const auto parsedBefore = count ("dumpMessageParsed", "sh201");
     auto* bulk = new juce::DynamicObject();
