@@ -13,7 +13,6 @@ import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
 
-const SESSION = '/@fs' + fileURLToPath(new URL('../src/CE_Application/stores/deviceProfileSession.js', import.meta.url));
 const server = await createServer({ configFile: fileURLToPath(new URL('./vite.config.mjs', import.meta.url)),
   server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
 await server.listen();
@@ -21,13 +20,14 @@ const browser = await chromium.launch(chromiumLaunchOptions());
 const page = await browser.newPage({ viewport: { width: 1920, height: 1000 } });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e)));
-const connect = (id, role = 'Roland GAIA SH-01') => page.evaluate(async ({ url, id, role }) => {
-  const session = await import(url);
-  session.mapDeviceRole(role, 'roland-gaia-sh01', {
+// Through the harness, not import() in the page: the GAIA panel's scripts run here (approved, as an
+// author's own panel is), and once they start the sandbox's lockdown refuses an evaluated import().
+const connect = (id, role = 'Roland GAIA SH-01') => page.evaluate(({ id, role }) => {
+  window.__gaia.mapRole(role, 'roland-gaia-sh01', {
     midiDestination: { type: 'hardwareOutput', id, name: 'GAIA' },
     midiInput: { type: 'hardwareInput', id: `${id}-in`, name: 'GAIA' },
   });
-}, { url: SESSION, id, role });
+}, { id, role });
 const reads = () => page.evaluate(() => window.__gaia.feedbackSent()
   .filter((e) => e.name === 'startDeviceSync').map((e) => e.payload));
 

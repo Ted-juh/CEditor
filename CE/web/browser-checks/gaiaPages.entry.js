@@ -14,7 +14,7 @@ import { deviceRoleMappings, profileSources } from '../src/CE_Application/stores
 import profile from '../../profiles/test/roland-gaia-sh01.ceditor-device.json';
 import { syncDeviceParameterToPanelPreview } from '../src/CE_Application/utils/deviceBindingSync.js';
 import { deviceParameterValues } from '../src/CE_Application/stores/deviceParameterValues.js';
-import { initDeviceProfileBridge } from '../src/CE_Application/stores/deviceProfileSession.js';
+import { initDeviceProfileBridge, mapDeviceRole } from '../src/CE_Application/stores/deviceProfileSession.js';
 import { gaiaExpectedArpValues } from '../src/CE_Application/utils/gaiaSyncStatus.js';
 import { sceneryMarkupStats } from '../src/CE_Application/utils/sceneryMarkupCache.js';
 window.__JUCE__ = undefined;
@@ -31,7 +31,7 @@ window.__gaia = {
   preview: setPreviewModeEnabled,
   mountEnvelopeDesignCheck() { mount(GaiaEnvelopeDesignHarness,{target:document.getElementById('host'),props:{panelId:window.__gaia.panel.id}}); },
   editModelChannel(name,value) { updateControlProperty(window.__gaia.id(name),'ValueChannels.value.currentValue',value); },
-  async load(url, { fullApp = false, monitor = false, preview = true } = {}) {
+  async load(url, { fullApp = false, monitor = false, preview = true, approve = true } = {}) {
     const panel=deserializePanel(await (await fetch(url)).text(),'gaia.cepanel','gaia');
     panels.set([]); addPanel(panel); setActivePanel(panel.id);
     const controls=flatControls(panel.controls);
@@ -57,6 +57,12 @@ window.__gaia = {
     deviceRoleMappings.set({ 'Roland GAIA SH-01': { profileId: profile.id } });
     profileSources.set({ [profile.id]: { source: JSON.stringify(profile) } });
     runtime.initPanelRuntime();
+    // A panel's scripts run once its author has approved them (the security pass: the editor never
+    // infers trust from the document). The editor asks; the harness answers yes, as an author
+    // opening their own panel does. Without it no panel script ran here at all, and every check
+    // that reads a script's work (bank names, arpeggio captions, the names scan) failed as if the
+    // scripts were broken. `approve: false` keeps the blocked panel reachable.
+    if (approve) runtime.approveCurrentPanelScripts();
     // Exercise ordinary editor preview, not the script-editor override or a manual Run.
     setPreviewModeEnabled(preview);
     window.__gaia.panel=panel;
@@ -81,6 +87,9 @@ window.__gaia = {
     return { x: r.x + r.w / 2, y: r.y + r.h / 2 };
   },
   session(name) { return get(panelPreviewSessions)[window.__gaia.id(name)]; },
+  // Map a device role as Settings → MIDI does. Here rather than by importing the session store from
+  // the page: once the panel's scripts start, the sandbox's lockdown refuses import() in evaluated code.
+  mapRole(role, profileId, options) { return mapDeviceRole(role, profileId, options); },
   receive(bytes) { runtime.deliverSysexForTesting({ hex: bytes.map(b=>b.toString(16).padStart(2,'0')).join(' ') }); },
   actions() { return runtime.registeredActions(); },
   endStep(value) { syncDeviceParameterToPanelPreview('Roland GAIA SH-01', 'arp.endStep', value); },

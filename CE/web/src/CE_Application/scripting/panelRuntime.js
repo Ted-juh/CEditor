@@ -10225,8 +10225,15 @@ function executionRequest(extraScript = null) {
   const scripts = activeScripts();
   const effective = extraScript
     ? [...scripts.filter(s => s.id !== extraScript.id), extraScript] : [...scripts];
-  // Canonical order makes explicit Run and event dispatch use the same approval.
-  effective.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  // Canonical order makes explicit Run and event dispatch use the same approval. By code unit, not
+  // localeCompare: the script sandbox's lockdown (SES) replaces localeCompare with a plain
+  // comparison when it starts, so a panel approved before its first script loaded fingerprinted in
+  // the locale's order ("gaia_tone_copy" before "gaia_tone1_copy_click") and checked in the other,
+  // lost its approval the moment its scripts began, and had to be approved twice.
+  effective.sort((a, b) => {
+    const x = String(a.id), y = String(b.id);
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
   const embedded = flatControls(panel?.controls ?? []).flatMap(c => c?._children?.Scripts?.scripts ?? []);
   const all = [...effective, ...embedded];
   const extensions = [...registeredExtensions(), ...(panel?.scripting?.extensions ?? [])];

@@ -150,6 +150,13 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 editor and was left out of the plug-in: not loaded, its modules not built in, its TypeScript not
 compiled. Scripts on top-level controls and panel scripts were never affected.
 
+**A panel's scripts are approved once.** On a panel whose script names sort differently in the
+locale than letter by letter (the GAIA panel's do: `gaia_tone_copy`, `gaia_tone1_copy_click`), the
+approval lapsed the moment the first script started. The script sandbox changes how text is
+compared when it starts, and the approval was a fingerprint of the scripts in that order. The
+scripts were reset and the panel asked to be approved again. The order no longer depends on the
+locale.
+
 **The SH-201's startup read completes.** It asks for the whole temporary patch, which the synth
 answers as 22 blocks, and it waited for a collection no block belonged to, so it always timed out.
 The blocks are now that collection, and a request for one of them is still answered by its own
