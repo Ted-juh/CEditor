@@ -150,6 +150,14 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 editor and was left out of the plug-in: not loaded, its modules not built in, its TypeScript not
 compiled. Scripts on top-level controls and panel scripts were never affected.
 
+**A panel with many scripts answers a click at once, and a double-click on a stepper resets.**
+Every script re-checked its approval before running, and each check rebuilt a fingerprint of all of
+the panel's scripts, so an event cost one fingerprint per script. On the GAIA panel (232 scripts)
+that was about half a second of main thread per click in Preview, and two quick presses on a
+stepper's − or + arrived as two steps instead of a reset. The check is reused within one task, and
+rebuilt whenever the panel, a script document or the installed extensions change. A double-click is
+also timed by when the presses happened, not when they were handled.
+
 **A panel's scripts are approved once.** On a panel whose script names sort differently in the
 locale than letter by letter (the GAIA panel's do: `gaia_tone_copy`, `gaia_tone1_copy_click`), the
 approval lapsed the moment the first script started. The script sandbox changes how text is

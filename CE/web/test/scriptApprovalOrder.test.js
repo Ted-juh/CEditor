@@ -17,7 +17,9 @@ import { approveCurrentPanelScripts, ensurePanelExecutionApproved, initPanelRunt
 const script = (id) => ({ id, name: id, event: 'onPanelLoad', language: 'javascript', scope: 'panel', enabled: true,
   source: `function onPanelLoad() { log('${id}'); }` });
 
-test('an approval made before the sandbox starts holds after localeCompare is replaced', () => {
+const nextTask = () => new Promise((resolve) => setTimeout(resolve, 5));
+
+test('an approval made before the sandbox starts holds after localeCompare is replaced', async () => {
   const ids = ['gaia_tone_copy', 'gaia_tone1_copy_click'];
   // The premise: the locale and code units order these two differently.
   assert.notDeepEqual([...ids].sort((a, b) => a.localeCompare(b)), [...ids].sort());
@@ -38,9 +40,30 @@ test('an approval made before the sandbox starts holds after localeCompare is re
     return a < b ? -1 : a > b ? 1 : 0;
   };
   try {
+    // A later task, as the scripts' own loading is: the request is built again, not reused.
+    await nextTask();
     assert.equal(ensurePanelExecutionApproved(), true, 'still approved once the scripts have started');
     assert.equal(ensurePanelExecutionApproved(panel.scripts[1]), true, 'and for each script as its handlers load');
   } finally {
     String.prototype.localeCompare = original;
   }
+});
+
+test('the request reused within a task is rebuilt when the panel is replaced, even in that task', () => {
+  const panel = { id: 'approval-memo', name: 'approval memo', controls: [], scripts: [script('one'), script('two')] };
+  panels.set([panel]);
+  activePanelId.set(panel.id);
+  activeEditorTab.set({ type: 'panel', id: panel.id });
+  approveCurrentPanelScripts();
+  for (let i = 0; i < 500; i++) assert.equal(ensurePanelExecutionApproved(panel.scripts[i % 2]), true);
+
+  // Changed code, in the same task: a new document, so not the request that was approved.
+  const edited = { ...panel, scripts: [panel.scripts[0], { ...panel.scripts[1], source: 'function onPanelLoad() { log("changed"); }' }] };
+  panels.set([edited]);
+  assert.equal(ensurePanelExecutionApproved(), false, 'an edited script is not covered by the earlier approval');
+  assert.equal(ensurePanelExecutionApproved(edited.scripts[1]), false);
+  // A copy of a script that is not the set's own is checked as it is, never against the reuse.
+  approveCurrentPanelScripts();
+  assert.equal(ensurePanelExecutionApproved({ ...edited.scripts[0], source: 'function onPanelLoad() { log("other"); }' }), false);
+  assert.equal(ensurePanelExecutionApproved(edited.scripts[0]), true);
 });

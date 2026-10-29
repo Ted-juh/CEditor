@@ -7994,8 +7994,12 @@
     if (isReadOnly(control)) return;
 
     // Double-click: two presses on the same control within 350ms (CanvasControl has no native dblclick).
+    // Timed by when each press HAPPENED (the event's own timestamp), not when it was handled: with a
+    // panel's scripts busy on the main thread, two quick presses on a stepper were handled more than
+    // 350ms apart and counted as two steps instead of a reset.
     const downId = getControlId(control);
-    const downAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const downAt = Number.isFinite(event?.timeStamp) && event.timeStamp > 0 ? event.timeStamp
+      : (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const isDoubleTap = downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350;
     if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));

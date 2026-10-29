@@ -10220,9 +10220,48 @@ function activeScripts() {
 }
 
 let pendingApprovalScript = null;
+
+/**
+ * The request for the active set, reused within one task.
+ *
+ * Every script's handlers check approval before they load and again before they run, and a
+ * dispatch visits every script, so building the request — every script's source in one string,
+ * and a walk of every control for the ones they carry — once per check made each event cost one
+ * fingerprint per script. On the GAIA panel (232 scripts) that was about half a second of main
+ * thread per click in Preview: two quick presses arrived as two clicks, and a double-click on a
+ * stepper stepped twice instead of resetting.
+ *
+ * Reused only while nothing it was built from has been replaced — the panel document, the live
+ * edit override, the panel's script document and the installed extensions, compared by identity —
+ * and only until the current task ends, so an edit, which arrives as a task of its own, is always
+ * checked against a freshly built request.
+ */
+let requestMemo = null;
+function requestInputs(panel) {
+  const doc = host ? null : get(scriptDocuments).find((d) => String(d.panelId) === String(panel?.id)) ?? null;
+  return [host, panel, live.editOverride, doc, ...registeredExtensions()];
+}
+function sameInputs(a, b) {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 function executionRequest(extraScript = null) {
   const panel = livePanel();
   const scripts = activeScripts();
+  // A script of the active set, as the set holds it, adds nothing: the request is the set's own.
+  const member = !extraScript || scripts.find((s) => s.id === extraScript.id) === extraScript;
+  if (member) {
+    const inputs = requestInputs(panel);
+    if (requestMemo && sameInputs(requestMemo.inputs, inputs)) return requestMemo.request;
+    const request = buildExecutionRequest(panel, scripts, null);
+    requestMemo = { inputs, request };
+    setTimeout(() => { if (requestMemo?.request === request) requestMemo = null; }, 0);
+    return request;
+  }
+  return buildExecutionRequest(panel, scripts, extraScript);
+}
+
+function buildExecutionRequest(panel, scripts, extraScript) {
   const effective = extraScript
     ? [...scripts.filter(s => s.id !== extraScript.id), extraScript] : [...scripts];
   // Canonical order makes explicit Run and event dispatch use the same approval. By code unit, not
