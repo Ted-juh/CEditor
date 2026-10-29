@@ -165,3 +165,20 @@ test('the destination is judged on its type, not its name', () => {
     midiInput: { type: 'hardwareInput', id: 'y', name: 'anything' },
   }), '');
 });
+
+test('the simulated device is tested without an input, and a cable is an input', () => {
+  // The simulated device answers on the role itself (DeviceProfileServiceLoopback.cpp), so the
+  // "nothing to hear the answer on" refusal would be wrong for it — Test would never be allowed.
+  assert.equal(identityTestBlocker({
+    midiDestination: { type: 'simulatedDevice', id: 'simulatedDevice', name: 'Simulated device' },
+    midiInput: { type: 'none', id: 'none', name: 'No MIDI Input' },
+  }), '');
+  assert.equal(identityTestBlocker({
+    midiDestination: { type: 'internalCable', id: 'cable1', name: 'Internal cable 1' },
+    midiInput: { type: 'internalCable', id: 'cable2', name: 'Internal cable 2' },
+  }), '', 'whatever answers on cable 2 is heard');
+  assert.match(identityTestBlocker({
+    midiDestination: { type: 'internalCable', id: 'cable1', name: 'Internal cable 1' },
+    midiInput: { type: 'none', id: 'none', name: 'No MIDI Input' },
+  }), /Listen To is not set/, 'a cable out and nothing in still has nowhere to hear the answer');
+});

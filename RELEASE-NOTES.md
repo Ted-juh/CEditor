@@ -152,6 +152,13 @@ compiled. Scripts on top-level controls and panel scripts were never affected.
 
 ## What you get
 
+- **A simulated device, for a panel without its synth.** Choose **Simulated device** as a device's
+  output (Settings → MIDI, or Ports) and it answers from the profile: it keeps what the controls
+  send, sends the patch back when the panel asks for it, and answers **Test**. For profiles with
+  Roland-style addresses (GAIA SH-01, SH-201); other profiles get identity only. It makes no sound
+  and is not a check of the profile against the instrument. **Internal cables 1–4** connect
+  devices inside CEditor; other programs cannot see them (on Windows, loopMIDI still does that).
+  The SH-201 profile now describes the synth's identity, so **Test** can recognise it.
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
   Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
   and reports the actual send result. Changing ports preserves its profile and parameter values.

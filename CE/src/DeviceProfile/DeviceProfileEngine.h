@@ -244,6 +244,44 @@ public:
     };
     [[nodiscard]] PresetSlotInfo presetSlotInfo (int slot) const;
     IdentityMatchResult matchIdentityReply (const juce::String& hex) const;
+
+    /**
+     * The Universal Identity Reply the profile's `identity` block describes, sent as device
+     * `deviceId`: matchIdentityReply's inverse, the way buildDumpMessage is parseDumpMessage's, and
+     * built so the one accepts what the other produces. The revision is the block's own, or four
+     * zero bytes when it gives none. Empty when the profile declares no identity.
+     */
+    [[nodiscard]] juce::Array<int> buildIdentityReply (int deviceId) const;
+
+    /**
+     * The addressed-memory protocol a profile speaks, when it speaks one — the Roland DT1 / RQ1
+     * shape: a write recipe whose template is a header, `$address`, `$encodedValue`, `$checksum`,
+     * F7, and a request recipe whose template is a header, `$address`, `$size`, `$checksum`, F7,
+     * both checksummed from the address to the end of the value.
+     *
+     * The headers are the template bytes before `$address`, with each `$variable` resolved; the
+     * positions that came from a variable are listed, because those are the bytes a device matches
+     * against its own setting (the device id) rather than as constants.
+     */
+    struct AddressedProtocol
+    {
+        bool ok = false;
+        juce::Array<int> writeHeader;
+        juce::Array<int> requestHeader;
+        juce::Array<int> writeVariablePositions;
+        juce::Array<int> requestVariablePositions;
+        int addressBytes = 4;
+        int sizeBytes = 4;
+        juce::String checksumType;
+        int checksumOffset = 0xa5;
+        int checksumBytes = 1;
+    };
+    [[nodiscard]] AddressedProtocol addressedProtocol() const;
+
+    /** A profile variable's value (`deviceId`, `channel` …) as a template's `$name` resolves it;
+        void when the profile has no such variable. */
+    [[nodiscard]] juce::var variableValue (const juce::String& name) const { return resolveVariable (name); }
+
     DumpParseResult parseDumpMessage (const juce::String& hex) const;
     DumpCollectionResult collectDumpMessages (const juce::StringArray& hexMessages) const;
 

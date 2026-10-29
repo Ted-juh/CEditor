@@ -13,6 +13,7 @@
   import { previewModeEnabled } from '../stores/interactionPreview.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { parseMidiHex } from '../utils/midiNoteInput.js';
+  import { repliesCanArrive, SIMULATED_DEVICE } from '../utils/midiEndpoints.js';
 
   let { control = null } = $props();
 
@@ -63,9 +64,11 @@
         : `Ch ${channel} · ${message.hex}`;
     });
   });
-  let inputStatus = $derived(roleMapping?.midiInput?.type !== 'hardwareInput'
+  let inputStatus = $derived(!repliesCanArrive(roleMapping)
     ? 'No MIDI input selected. Choose an input in Ports or Settings → MIDI.'
-    : lastReceived || 'Waiting for MIDI. Move a control on the instrument.');
+    : lastReceived || (roleMapping?.midiDestination?.type === SIMULATED_DEVICE
+      ? 'The simulated device answers requests on its own. It does not send anything unasked.'
+      : 'Waiting for MIDI. Move a control on the instrument.'));
 
   $effect(() => {
     if (selectedIndex >= bindings.length) selectedIndex = Math.max(0, bindings.length - 1);

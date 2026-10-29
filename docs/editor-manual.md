@@ -466,6 +466,20 @@ Set up the ports in either of two places:
 is received. The port choices are saved with the panel and with CEditor's settings. MIDI only works in
 the desktop app.
 
+Two kinds of output never leave CEditor, and they are listed after your computer's ports:
+
+- **Simulated device** stands in for the synth when it is not connected. It answers from the device's
+  profile: it keeps what your controls send, sends a patch back when the panel asks for one, and
+  answers **Test**. It needs no input; its answers arrive on the device itself. It makes no sound,
+  sends nothing unless asked, and knows only what the profile says. That makes it good for building
+  and trying a panel, and no proof that the profile matches the real instrument. It does this for
+  profiles that use Roland-style addresses, such as the GAIA SH-01 and SH-201. For other profiles it
+  only answers **Test**, and only if the profile describes the synth's identity.
+- **Internal cable 1** to **4** connect devices inside CEditor. What one device sends to a cable arrives
+  on every device whose **Listen To** is that cable. Other programs cannot see these cables. To
+  connect CEditor to another program on Windows, use a virtual MIDI port program such as loopMIDI;
+  its ports then appear in the lists like any other.
+
 ### Binding a control
 
 A control does nothing to the synth until it is bound. Select it and open the **Device** tab of the

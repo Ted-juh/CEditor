@@ -36,6 +36,8 @@ juce::var DeviceProfileService::listMidiDestinations() const
         destinations.add (juce::var (hardware));
     }
 
+    // After the computer's ports: the ones that never leave CEditor (DeviceProfileServiceLoopback.cpp).
+    addWithinProcessDestinations (destinations);
     return destinations;
 }
 
@@ -60,6 +62,7 @@ juce::var DeviceProfileService::listMidiInputs() const
         inputs.add (juce::var (hardware));
     }
 
+    addWithinProcessInputs (inputs);
     return inputs;
 }
 
@@ -162,6 +165,8 @@ juce::var DeviceProfileService::getTransportCapabilities() const
     endpointTypes.add ("previewOnly");
     endpointTypes.add ("hardwareOutput");
     endpointTypes.add ("hardwareInput");
+    endpointTypes.add ("internalCable");
+    endpointTypes.add ("simulatedDevice");
     capabilities->setProperty ("supportedEndpointTypes", juce::var (endpointTypes));
 
     juce::Array<juce::var> pluginTransports;
@@ -308,12 +313,26 @@ void DeviceProfileService::syncMidiInputForRole (const juce::String& role)
     if (inputToStop != nullptr)
         inputToStop->stop();
 
+    // The simulated device answers on the role itself, so it needs no input — but an input the
+    // user chose is still opened below. A cable is an input with nothing to open.
+    if (mapping->second.destination.type == "simulatedDevice" && mapping->second.input.type != "hardwareInput")
+    {
+        updateRoleSessionState (role, "linked", "Simulated device linked; identity not verified");
+        return;
+    }
+
+    if (mapping->second.input.type == "internalCable")
+    {
+        updateRoleSessionState (role, "linked", mapping->second.input.name + " linked");
+        return;
+    }
+
     if (mapping->second.input.type != "hardwareInput")
     {
+        const auto sends = mapping->second.destination.type == "hardwareOutput" || isWithinProcess (mapping->second.destination.type);
         updateRoleSessionState (role,
-                                mapping->second.destination.type == "hardwareOutput" ? "linked" : "preview",
-                                mapping->second.destination.type == "hardwareOutput" ? "MIDI output linked; no input selected"
-                                                                                       : "Preview only");
+                                sends ? "linked" : "preview",
+                                sends ? "MIDI output linked; no input selected" : "Preview only");
         return;
     }
 
@@ -345,7 +364,8 @@ bool DeviceProfileService::sendTransactionNow (const juce::String& deviceRole,
                                                int startMessageIndex)
 {
     auto destination = resolveDestination (deviceRole);
-    if (destination.type != "hardwareOutput")
+    const auto withinProcess = isWithinProcess (destination.type);
+    if (destination.type != "hardwareOutput" && ! withinProcess)
     {
         error = destination.type == "none" ? "MIDI destination is disabled"
                                            : "MIDI destination is preview-only";
@@ -358,15 +378,20 @@ bool DeviceProfileService::sendTransactionNow (const juce::String& deviceRole,
         return false;
     }
 
-    auto& output = midiOutputs[destination.id];
-    if (output == nullptr)
+    juce::MidiOutput* output = nullptr;
+    if (! withinProcess)
     {
-        output = juce::MidiOutput::openDevice (destination.id);
-        if (output == nullptr)
+        auto& opened = midiOutputs[destination.id];
+        if (opened == nullptr)
         {
-            error = "Could not open MIDI output: " + destination.name;
-            return false;
+            opened = juce::MidiOutput::openDevice (destination.id);
+            if (opened == nullptr)
+            {
+                error = "Could not open MIDI output: " + destination.name;
+                return false;
+            }
         }
+        output = opened.get();
     }
 
     const auto key = deviceRole + ":" + transaction.parameterId;
@@ -384,7 +409,17 @@ bool DeviceProfileService::sendTransactionNow (const juce::String& deviceRole,
         if (bytes.empty())
             continue;
 
-        output->sendMessageNow (juce::MidiMessage (bytes.data(), static_cast<int> (bytes.size())));
+        if (output != nullptr)
+        {
+            output->sendMessageNow (juce::MidiMessage (bytes.data(), static_cast<int> (bytes.size())));
+        }
+        else
+        {
+            juce::Array<int> sent;
+            for (auto byte : bytes)
+                sent.add (byte);
+            sendWithinProcess (deviceRole, destination, sent);
+        }
         ++sentCount;
         lastSentAtMs[key] = nowMs();
 
@@ -460,6 +495,15 @@ juce::String DeviceProfileService::sendOrQueueTransaction (const juce::String& d
 void DeviceProfileService::sendRawMidiToRole (const juce::String& deviceRole, const juce::MidiMessage& message)
 {
     const auto destination = resolveDestination (deviceRole);
+    if (isWithinProcess (destination.type))
+    {
+        juce::Array<int> bytes;
+        for (int index = 0; index < message.getRawDataSize(); ++index)
+            bytes.add (message.getRawData()[index]);
+        sendWithinProcess (deviceRole, destination, bytes);
+        return;
+    }
+
     if (destination.type != "hardwareOutput" || destination.id.isEmpty())
         return;
 
@@ -473,6 +517,7 @@ void DeviceProfileService::sendRawMidiToRole (const juce::String& deviceRole, co
 void DeviceProfileService::timerCallback()
 {
     processSysexAssemblyTimeouts();
+    processLoopbackDeliveries();
     processPendingRequestTimeouts();
     processBulkSendJobs();
     pollMidiCiDiscovery();
@@ -519,7 +564,7 @@ void DeviceProfileService::timerCallback()
     publishPendingRequests();
 
     if (! monitorEmitPending && queuedTransactions.empty() && pendingDeviceRequests.empty() && sysexAssemblies.empty() && ! hasRunningBulkSendJobs() && ! midiCiActive
-        && answeredReplies.empty() && publishedRequests.isEmpty())
+        && answeredReplies.empty() && publishedRequests.isEmpty() && loopbackDeliveries.empty())
         stopTimer();
 }
 

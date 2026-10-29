@@ -2,6 +2,7 @@
 
 #include "DeviceProfileEngine.h"
 #include "MidiCiSession.h"
+#include "SimulatedDevice.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -263,6 +264,33 @@ private:
     std::map<juce::String, juce::Time> refusedProfiles;  // path -> mtime of the copy we already refused
     EventCallback eventCallback;
     mutable juce::CriticalSection midiInputLock;
+
+    // MIDI that never leaves the process (DeviceProfileServiceLoopback.cpp): the internal cables, and
+    // the simulated device each role can send to. What either delivers is queued and handed to
+    // ingestIncomingMidiBytes from the timer, never during the send — a reply that arrived inside
+    // the send would land before the request it answers had been registered as waiting.
+    struct LoopbackDelivery
+    {
+        juce::String deviceRole;
+        juce::Array<int> bytes;
+        double dueTimeMs = 0.0;
+        juce::String origin;
+    };
+    struct RoleSimulator
+    {
+        juce::String profileId;
+        std::unique_ptr<SimulatedDevice> device;
+    };
+    std::deque<LoopbackDelivery> loopbackDeliveries;
+    std::map<juce::String, RoleSimulator> simulatorsByRole;
+    static constexpr int internalCableCount = 4;
+    static constexpr double simulatedReplyIntervalMs = 20.0;   // the SH-201's own pace between packets
+    static bool isWithinProcess (const juce::String& endpointType);
+    static void addWithinProcessDestinations (juce::Array<juce::var>& destinations);
+    static void addWithinProcessInputs (juce::Array<juce::var>& inputs);
+    void sendWithinProcess (const juce::String& deviceRole, const MidiDestination& destination, const juce::Array<int>& bytes);
+    SimulatedDevice* simulatorForRole (const juce::String& deviceRole);
+    void processLoopbackDeliveries (bool deliverAll = false);
 
     // MIDI-CI live discovery (MIDI 2.0 plan, phase M1). The session is driven entirely on the message
     // thread: pumped from timerCallback, fed incoming SysEx from processIncomingMidiMessage.

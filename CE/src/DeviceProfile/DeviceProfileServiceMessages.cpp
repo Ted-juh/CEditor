@@ -539,8 +539,9 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
 
     // A reply to another instance's request, on an input this one shares with it: that instance's
     // to apply. Stopped before anything is emitted, because the page applies incoming SysEx from
-    // the raw event too (replyBelongsToAnotherInstance says more).
-    if (messageType == "sysex" && replyBelongsToAnotherInstance (role, hex))
+    // the raw event too (replyBelongsToAnotherInstance says more). What came from inside this
+    // process — a cable, or this role's own simulated device — was on no shared input.
+    if (messageType == "sysex" && ! isWithinProcess (origin) && replyBelongsToAnotherInstance (role, hex))
     {
         appendMonitorEvent ("in", role, "sysex", "reply to another instance's request", hex,
                             "Left to the instance that asked for it");

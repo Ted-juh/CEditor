@@ -187,6 +187,7 @@ import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, mapControlsTree, removeControlFromTree, remintControlIds, controlPanelOffset,
 } from '../utils/containment.js';
+import { isHardwareEndpoint } from '../utils/midiEndpoints.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -8035,10 +8036,11 @@ function devicePortsRead(opts = {}) {
       name: String(port?.name ?? port?.id ?? ''),
       direction: dir,
       type,
-      // The two placeholder rows the app always lists are choices, not hardware. Both are reported
-      // — they are what a mapping can be set to — but a script asking "did a device show up" wants
-      // this flag, not a list of magic type strings to compare against.
-      hardware: type !== 'none' && type !== 'previewOnly',
+      // The placeholder rows the app always lists are choices, not hardware, and so are the
+      // internal cables and the simulated device. All are reported — they are what a mapping can be
+      // set to — but a script asking "did a device show up" wants this flag, not a list of magic
+      // type strings to compare against.
+      hardware: isHardwareEndpoint(port),
       role: roleUsing(port?.id, which),
     });
   };
