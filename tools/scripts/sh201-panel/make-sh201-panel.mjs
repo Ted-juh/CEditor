@@ -29,9 +29,10 @@
 // come after the owner has judged this one in the editor.
 //
 // The library file goes beside the panel. The library lives inside CEditor rather than in the
-// panel, and File → Share Panel does not carry it: a copy keeps its whole design and works anywhere,
-// but on a machine without the package its Source card says "Not in this library". Importing the
-// library file (Library → Package & Library → Import) restores the link.
+// panel: a copy keeps its whole design and works anywhere, but on a machine without the package its
+// Source card says "Not in this library". A .cepanel opened from this folder has nothing else to
+// find it by, so importing the library file (Library → Package & Library → Import) restores the
+// link; a panel passed on with File → Share Panel carries its packages and needs no file beside it.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';

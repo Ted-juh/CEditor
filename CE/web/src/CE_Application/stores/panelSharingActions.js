@@ -25,6 +25,8 @@ import { cerror, cinfo, cwarn } from './console.js';
 import { deserializePanel, panelOpenReport, serializePanel } from './panelModel.js';
 import { resolveDrawings } from './documentDrawings.js';
 import { openSharedPanel, packagePanelForSharing, panelPackageFile } from './panelSharing.js';
+import { customComponentLibrary } from './customComponentLibrary.js';
+import { componentPackagesToAdd } from '../utils/panelComponentPackages.js';
 import { notify } from './scriptUi.js';
 
 function sharingError(message) {
@@ -119,9 +121,16 @@ async function prepareSharedPanel(metadata) {
     notify(`Shared panel is missing ${result.missing.length} file(s). Check the Console for file names before sending it.`, { kind: 'warn', duration: 0 });
   }
 
+  if (result.componentsNotInLibrary?.length) {
+    // Not an error: the copies hold their whole design and work anywhere. Only the link to their
+    // package cannot travel, since this library does not hold it either.
+    cwarn(`[share] Copies of ${result.componentsNotInLibrary.join(', ')} were placed from packages this library `
+      + 'does not hold, so the package cannot go with them; on the other computer their Source card says "Not in this library".');
+  }
+
   const file = panelPackageFile(result.envelope);
-  cinfo(`[share] ${result.assetCount} asset(s), ${result.fontCount} font(s) and ${result.iconCount} icon(s) embedded, `
-    + `${(file.text.length / 1024).toFixed(0)} KB.`);
+  cinfo(`[share] ${result.assetCount} asset(s), ${result.fontCount} font(s), ${result.iconCount} icon(s) and `
+    + `${result.componentCount ?? 0} library component(s) embedded, ${(file.text.length / 1024).toFixed(0)} KB.`);
   ensurePanelSharingListeners();
   bridgeSavePanelPackageAs(file.fileName, file.text);
   return result;
@@ -171,10 +180,35 @@ export async function openPackageText(text, fallbackName = '') {
   }
   for (const warning of panelOpenReport().warnings) notify(`"${name}": ${warning}`, { kind: 'warn', duration: 0 });
 
+  await addCarriedComponents(opened.components, name);
   addPanel(panel);
   cinfo(`[share] Opened "${name}" from a package. Save it to keep it.`);
   notify(`Opened "${name}". Use Save to keep an editable copy.`, { duration: 6000 });
   return panel;
+}
+
+/**
+ * Put the library packages a shared panel carries into this library, so its copies are linked here
+ * as they were on the author's computer (utils/panelComponentPackages.js). A package the library
+ * already holds under the same name and version, but with another design, stays as it is.
+ */
+async function addCarriedComponents(components, panelName) {
+  if (!components?.length) return;
+  await customComponentLibrary.ready();
+  const { add, conflicting } = componentPackagesToAdd(components, customComponentLibrary.snapshot());
+  const added = add.map((envelope) => customComponentLibrary.importEnvelope(envelope)).filter(Boolean)
+    .map((entry) => `${entry.name} ${entry.version}`);
+  if (added.length) {
+    cinfo(`[share] Added to your library from "${panelName}": ${added.join(', ')}.`);
+    notify(`Added ${added.length} component${added.length === 1 ? '' : 's'} to your library: ${added.join(', ')}.`, { duration: 6000 });
+  }
+  if (conflicting.length) {
+    const list = conflicting.join(', ');
+    cwarn(`[share] Your library already has ${list} with a different design, and keeps it. `
+      + `The copies in "${panelName}" are compared against yours.`);
+    notify(`Your library already has ${list} with a different design; it was kept. Check the Console for details.`,
+      { kind: 'warn', duration: 0 });
+  }
 }
 
 /** Register the two package listeners. Idempotent; called by both commands and by app startup. */

@@ -779,6 +779,12 @@ the fonts and icons it brought stay in that copy, so it can be shared on again. 
 read for themselves are not included. See [Fonts and icons](#fonts-and-icons) for which fonts and
 icons go along.
 
+Custom components placed from your library go along with their library package, the version each
+copy was placed from. Opening the shared panel adds the packages your library does not have and says
+which, so the copies are linked there as they were on the author's computer: their Source card can
+update them, and the Library dock can place more. A package your library already has under the same
+name and version, but with a different design, is kept as it is, and you are told.
+
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
 
@@ -1016,7 +1022,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Open Script Workspace** | | Opens a saved script workspace file. |
 | **Save** | Ctrl+S | Saves the panel (or the script workspace in front). |
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
-| **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts and icons inside, for another computer. |
+| **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts, icons and library components inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |
 | **Close Tab** | Ctrl+W | Closes the tab in front, asking first if it has unsaved changes. |
 | **Hostage...** | | Opens HoSTage, the instrument host. |

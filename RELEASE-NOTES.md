@@ -156,6 +156,12 @@ The blocks are now that collection, and a request for one of them is still answe
 block. A second whole-patch request waits for its own answer instead of being resolved by the first
 block of it.
 
+**A shared panel brings its library components.** File → Share Panel carried images, fonts and
+icons, not the library packages its custom components were placed from, so on another computer every
+copy said "Not in this library" until the library file was sent and imported too. The package now
+carries each version a copy was placed from, and opening it adds the ones your library lacks. One
+you already have under the same name and version, with another design, is kept.
+
 ## What you get
 
 - **A simulated device, for a panel without its synth.** Choose **Simulated device** as a device's
