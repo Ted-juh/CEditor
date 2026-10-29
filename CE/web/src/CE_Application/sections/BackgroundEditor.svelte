@@ -19,6 +19,7 @@
   import { deepClone } from '../utils/deepClone.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import LayerEffectsSection from '../panels/LayerEffectsSection.svelte';
+  import { browseGoesToSelection } from '../utils/browseTargets.js';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import { browseImage, onImageBrowsed } from '../bridge/bridge.js';
   import BlendModeSelect from '../properties/BlendModeSelect.svelte';
@@ -144,9 +145,20 @@
     });
   }
 
+  // The selection a Browse was started for. With several controls selected, the chosen image goes
+  // on all of them, as every other change on this tab does — while they are still the selection.
+  let browseStartedWith = null;
+
   function chooseFillAsset(layerId) {
-    if ($selectedComponentIds.size > 1) return;
+    browseStartedWith = new Set($selectedComponentIds);
     browseImage(`${imageRequestPrefix}:${core?.id ?? 'unknown'}:${editorKey()}:${layerId}`);
+  }
+
+  function placeBrowsed(path, filePath) {
+    const toSelection = browseGoesToSelection(browseStartedWith, $selectedComponentIds);
+    browseStartedWith = null;
+    if (toSelection) updateSelectedProperty(path, filePath);
+    else updateControlProperty(core.id, path, filePath);
   }
 
   const removeImageBrowsedListener = onImageBrowsed((result) => {
@@ -154,9 +166,9 @@
     const imageRequestId = `${imageRequestPrefix}:${core.id}:${editorKey()}:image`;
     const overlayRequestId = `${imageRequestPrefix}:${core.id}:${editorKey()}:overlay`;
     if (result.requestId === imageRequestId) {
-      set(`${pathPrefix}.Fill.imageSrc`, result.filePath);
+      placeBrowsed(`${pathPrefix}.Fill.imageSrc`, result.filePath);
     } else if (result.requestId === overlayRequestId) {
-      set(`${pathPrefix}.Fill.overlaySrc`, result.filePath);
+      placeBrowsed(`${pathPrefix}.Fill.overlaySrc`, result.filePath);
     }
   });
 

@@ -618,9 +618,11 @@ You need a photo of the instrument. Use your own: a photo from Roland or from th
 
 2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Upper, Lower, Patch and System in the component tree (Ctrl+click) and give them a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate.
 
-3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, then on the Background tab set the fill to silver and switch the border off: with several controls selected, the Background tab changes all of them. Then select the others and make them black, with a thin grey border.
+3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, in Upper and in Lower, so ten are selected. On the Background tab set the fill to silver, and on the Border tab click one of the lit sides to switch the border off: with several controls selected, both tabs change all of them.
 
-A flat silver reads as grey plastic; the instrument's is brushed aluminium. Give the silver sections a transparent metallic overlay: select OSC 1, and on the Background tab turn on the Overlay layer and press its ... button to choose a brushed-metal texture (Roland SH-201 brushed metal.png, beside this file, or your own). Set its Blend to Overlay and its Opacity to about 60: Overlay lightens and darkens the silver without changing its colour. Press C on the layer to copy it, select the other silver sections, turn on their Overlay layer and press P: the layer is pasted on all of them.
+A flat silver reads as grey plastic; the instrument's is brushed aluminium. While the silver sections are still selected, give them a transparent metallic overlay: on the Background tab turn on the Overlay layer and choose a brushed-metal texture (Roland SH-201 brushed metal.png, beside this file, or your own). It goes on every selected section. Set its Blend to Overlay and its Opacity to about 60: Overlay lightens and darkens the silver without changing its colour. (C and P on a layer copy it from one control to others, for a silver section you add later.)
+
+Then select all the other sections, in both tones, Patch and System, and make them black, with a thin grey border.
 
 4. Lettering. The instrument prints black on silver and white on black, and puts no tabs behind its section names. Double-click a section to reach its title (Esc goes back up), clear the title's fill, and set its text black and bold in the dock's Text tool. Select a section's captions in the component tree (Ctrl+click, or Shift+click for a range) and make them black and bold too. On the black sections, white.
 
@@ -632,7 +634,7 @@ A flat silver reads as grey plastic; the instrument's is brushed aluminium. Give
 
 8. The signal path. The instrument draws it in red: Insert → Layout & Display → Background, 2 pixels high, red, under the black row; and a ▶ label in each gap between the silver sections.
 
-Steps 3, 4, 6 and 8 are for one tone. Do them on Upper, then again on Lower, below it; in step 3 you can Ctrl+click the silver sections of both tones at once. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Patch and System, under both, need steps 3 and 4 once: all their sections are black. Step 5 needs no second round: the Lower tone's knobs, the patch's and the system's are copies of the same package, and Update takes them too.
+Steps 4, 6 and 8 are for one tone. Do them on Upper, then again on Lower, below it; step 3 takes both tones at once. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Patch and System, under both, need step 4 once too: their sections are among the black ones of step 3. Step 5 needs no second round: the Lower tone's knobs, the patch's and the system's are copies of the same package, and Update takes them too.
 
 What stays: the LED switches are already the instrument's red lamps, the faders its black slots, and the named lists stay lists — on the SH-201 they are rows of lamps, which is a tutorial of its own.`;
 
