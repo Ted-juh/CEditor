@@ -33,8 +33,9 @@
 // The library file goes beside the panel. The library lives inside CEditor rather than in the
 // panel: a copy keeps its whole design and works anywhere, but on a machine without the package its
 // Source card says "Not in this library". A .cepanel opened from this folder has nothing else to
-// find it by, so importing the library file (Library → Package & Library → Import) restores the
-// link; a panel passed on with File → Share Panel carries its packages and needs no file beside it.
+// find it by, so importing the library file (in the Component Designer: Publish › Package & Library
+// › Import) restores the link; a panel passed on with File → Share Panel carries its packages and
+// needs no file beside it.
 
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -603,7 +604,7 @@ No hardware needed: choose Simulated device as the device's output (Settings →
 
 Connected, the editor offers to read the synth when this panel is open: the whole patch, then the system settings, so every control shows what the synth holds. Reading changes nothing on the synth. The pattern grid reads its own, with READ PATTERN.
 
-The library: Roland SH-201 components.json, beside this file. Import it (Library → Package & Library → Import) if the Source card says "Not in this library". A copy of this panel passed on with File → Share Panel carries the library with it.
+The library: Roland SH-201 components.json, beside this file. If a knob's Source card (its Properties tab) says "Not in this library", import it: select any knob, press Component Designer, and on the Publish tab under Package & Library press File, choose this file and press Import; then Back to Panel. A copy of this panel passed on with File → Share Panel carries the library with it.
 
 Left out on purpose: the twelve Patch Name characters one by one (the name box sends them), the hold pedal and the All Notes Off, All Sounds Off and Reset All Controllers messages, which are performed rather than set, and the dump requests, which the editor sends itself.`;
 
@@ -647,7 +648,7 @@ This is the answer to Tutorial 1 in Roland SH-201.cepanel's notepad: the same ${
 - Every knob is SH-201 Knob 1.1.0, the silver one: select any knob and its Source card says so. The faders and LED switches are still 1.0.0; they already look like the instrument's.
 - FILTER ENV and AMP ENV are sections of their own, and the filter envelope's DEPTH is a fader, as on the instrument.
 
-The library for this file is Roland SH-201 (hardware look) components.json, beside it.
+The library for this file is Roland SH-201 (hardware look) components.json, beside it. Import it as the draft's note says, from a knob's Component Designer: Publish › Package & Library › File, then Import.
 
 No hardware needed: choose Simulated device as the device's output (Settings → MIDI).`;
 
