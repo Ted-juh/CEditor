@@ -5,12 +5,12 @@
 // to the layout, these are the promises each panel makes to someone reading it.
 //
 // The draft, Roland SH-201.cepanel, in the GAIA panel's look:
-//   - every control sends one profile parameter: all 64 of each tone's, once each, and the tone
-//     pages the synth's Keyboard Part
-//   - a control sits in its tone, and in the section of the front panel its parameter belongs to
+//   - every control sends one profile parameter: all 64 of each tone's, once each, and Keyboard Part
+//   - a control sits in its tone, and in the section of the front panel its parameter belongs to;
+//     both tones are on the panel at once, Upper above Lower
 //   - every custom component is a clean linked copy of a package in the library file beside it,
 //     with its range, default and readout as per-copy settings, not design edits
-//   - the tones are pages named after Keyboard Part's choices, and the panel has no scripts
+//   - Keyboard Part is a choice of the synth's own two, in the header, and the panel has no scripts
 //
 // The hardware look, the answer to the tutorial in the draft's notepad, makes all the same promises
 // with the instrument's own sections, and is the draft repainted: the same parameters on the same
@@ -28,6 +28,12 @@ import {
   normalizeCustomComponentLibraryEnvelope, customComponentPackageId,
 } from '../src/CE_Application/utils/customComponentPackage.js';
 import { diffCustomComponentAgainstSource } from '../src/CE_Application/utils/customComponentSourceLink.js';
+import { render } from 'svelte/server';
+import { get } from 'svelte/store';
+import PanelPreviewSurface from '../src/CE_Application/editor/PanelPreviewSurface.svelte';
+import { panels, activePanelId, activeEditorTab } from '../src/CE_Application/stores/panels.js';
+import { panelPreviewSessions, createInteractionPreviewSession, setPreviewModeEnabled } from '../src/CE_Application/stores/interactionPreview.js';
+import { syncDeviceParameterToPanelPreview } from '../src/CE_Application/utils/deviceBindingSync.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
@@ -82,19 +88,22 @@ for (const look of [draft, hardware]) {
     assert.deepEqual(panel.requiredProfiles, [{ role: 'Roland SH-201', profileId: 'roland-sh-201', version: '*' }]);
   });
 
-  test(`${file}: the component tree reads like the front panel: Tone, its two tones, their sections`, () => {
-    const tonePages = panel.controls.find((c) => c._children.Core.name === 'Tone');
-    assert.equal(tonePages?._children.Core.controlType, 'TabContainer', 'a top-level Tone tab container');
-    const tones = getChildControls(tonePages);
-    assert.deepEqual(tones.map((c) => [c._children.Core.name, c._children.Core.tabPageId]), [['Upper', 'upper'], ['Lower', 'lower']]);
+  test(`${file}: the component tree reads like the front panel: its two tones, their sections`, () => {
+    const tones = panel.controls.filter((c) => getChildControls(c).length);
+    assert.deepEqual(tones.map((c) => [c._children.Core.name, c._children.Core.controlType]), [['Upper', 'Group'], ['Lower', 'Group']],
+      'two top-level groups, Upper first');
+    assert.ok(!all.some((c) => c._children.Core.controlType === 'TabContainer'), 'both tones at once, not pages of one');
+    const [upper, lower] = tones.map((c) => c._children.Transform);
+    assert.ok(upper.y + upper.height <= lower.y, 'Upper above Lower');
     for (const tone of tones) {
+      const toneId = tone._children.Core.name.toLowerCase();
       const groups = getChildControls(tone).filter((c) => getChildControls(c).length);
       assert.deepEqual(groups.map((c) => c._children.Core.name).sort(), [...new Set(Object.values(sections))].sort(), tone._children.Core.name);
       for (const section of groups) {
         for (const control of getChildControls(section)) {
           const id = parameterOf(control);
           if (!id) continue;
-          assert.equal(toneOf(id), tone._children.Core.tabPageId, `${id} is in the ${tone._children.Core.name} tone`);
+          assert.equal(toneOf(id), toneId, `${id} is in the ${tone._children.Core.name} tone`);
           assert.equal(sections[sectionGroup(parameters.get(id))], section._children.Core.name,
             `${id} (${parameters.get(id).group}) sits in ${section._children.Core.name}`);
         }
@@ -135,24 +144,43 @@ for (const look of [draft, hardware]) {
     }
   });
 
-  test(`${file}: the tones are pages named after the synth's Keyboard Part, and there are no scripts`, () => {
-    const tonePages = panel.controls.find((c) => c._children.Core.name === 'Tone');
+  test(`${file}: Keyboard Part is the synth's own choice of tone, and there are no scripts`, () => {
     const keyboardPart = parameters.get('patch.keyboardPart');
-    const config = tonePages._children.TabContainer;
-    // Named after the choices, in their order: a value heard from the synth ("lower") finds its page
-    // by name, and the page's number is the value the strip sends.
-    assert.deepEqual(config.pages.map((page) => page.id), keyboardPart.choices.map((choice) => choice.id));
-    assert.deepEqual(keyboardPart.choices.map((choice) => choice.value), [0, 1]);
-    assert.equal(config.pages[config.pageIndex].id, keyboardPart.default, 'opens on the part a new patch has');
-    assert.notEqual(config.showStrip, false, 'the strip is the tone buttons');
-    const [binding] = tonePages._children.DeviceBindings.bindings;
-    assert.deepEqual([binding.parameterId, binding.port, binding.feedback.receiveUpdates], ['patch.keyboardPart', 'pageIndex', true]);
-    assert.ok(!all.some((c) => c._children.Core.controlType === 'ToggleButton'), 'no tone button beside the pages');
+    const selector = bound.find((c) => parameterOf(c) === 'patch.keyboardPart');
+    assert.equal(selector._children.Core.controlType, 'RadioButtonGroup');
+    assert.ok(panel.controls.includes(selector), 'in the header, beside neither tone');
+    // Its rows are the profile's choices, so a value heard from the synth selects the row it names.
+    assert.deepEqual(selector._children.Value.rows.map((row) => [row.id, row.sendValue]),
+      keyboardPart.choices.map((choice) => [choice.id, choice.value]));
+    assert.equal(selector._children.Behavior.defaultValue, keyboardPart.default, 'opens on the part a new patch has');
+    const [binding] = selector._children.DeviceBindings.bindings;
+    assert.deepEqual([binding.port, binding.feedback.receiveUpdates], ['selectedChoice', true]);
+    assert.ok(!all.some((c) => c._children.Core.controlType === 'ToggleButton'), 'no tone button beside it');
     assert.deepEqual(panel.scripts ?? [], []);
     assert.ok(all.every((c) => !(c._children.Scripts?.scripts ?? []).length));
     assert.match(panel.notepad.notes[0].content, /Simulated device/);
   });
 }
+
+test('KEYBOARD follows the synth: Lower pressed on the instrument lights LOWER in the panel', () => {
+  const selector = draft.bound.find((c) => parameterOf(c) === 'patch.keyboardPart');
+  const id = selector._children.Core.id;
+  setPreviewModeEnabled(true);
+  const panel = { id: 'sh201', width: draft.panel.width, height: 60, controls: [selector], layers: [] };
+  panels.set([panel]);
+  activePanelId.set(panel.id);
+  activeEditorTab.set({ type: 'panel', id: panel.id });
+  panelPreviewSessions.set({ [id]: createInteractionPreviewSession(selector) });
+  const lit = () => [...render(PanelPreviewSurface, { props: { panel, scale: 1, bgLayers: {}, gridStyle: '' } }).body
+    .matchAll(/class="radio-group-item(?: [^"]*)?"/g)].map(([cls]) => /\bselected\b/.test(cls));
+  assert.deepEqual(lit(), [true, false], 'a new patch plays Upper');
+  // The device service reports a choice by its id; a raw number names the same row.
+  for (const [reported, expected] of [['lower', [false, true]], ['upper', [true, false]], [1, [false, true]], [0, [true, false]]]) {
+    syncDeviceParameterToPanelPreview('Roland SH-201', 'patch.keyboardPart', reported);
+    assert.deepEqual(lit(), expected, `the synth reports ${JSON.stringify(reported)}`);
+  }
+  assert.equal(get(panelPreviewSessions)[id].valueOverride, 'upper');
+});
 
 test('the draft\'s tutorial counts what the draft holds, and its answer is beside it', () => {
   const tutorial = draft.panel.notepad.notes.find((note) => /^Tutorial 1\b/.test(note.content));

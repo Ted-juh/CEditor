@@ -265,7 +265,7 @@ number, and when the synth reports the parameter the page turns. Label the pages
 the choices (on the **Pages** tab: UPPER, LOWER) and a page is found by name; otherwise by its
 number, which is the value a page sends. That is how a panel edits a
 synth with several parts. Each part gets a page of its own controls, each control bound once, and
-the strip is the part buttons. The Roland SH-201 panel does this for its Upper and Lower tones.
+the strip is the part buttons.
 
 ### Arranging
 
