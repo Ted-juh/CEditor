@@ -3,7 +3,7 @@
 // Before, File → Share Panel carried a panel's images, fonts and icons and not its library
 // packages: the copies arrived with their whole design but unlinked, their Source card saying "Not
 // in this library" until the author also sent the library file and the recipient imported it. The
-// SH-201 panels are the case in point — 49 linked copies of three packages — so they are what is
+// SH-201 panels are the case in point — 98 linked copies of three packages — so they are what is
 // shared here, from a library holding their packages to one that does not.
 
 import test from 'node:test';
@@ -66,7 +66,8 @@ test('opened on a computer whose library lacks them, the packages are added and 
   assert.deepEqual(library.map((entry) => `${entry.name} ${entry.version}`).sort(),
     ['SH-201 Fader 1.0.0', 'SH-201 Knob 1.0.0', 'SH-201 LED Switch 1.0.0']);
   const copies = copiesOf(get(activePanel));
-  assert.equal(copies.length, 49);
+  assert.equal(copies.length, copiesOf(sh201()).length);
+  assert.ok(copies.length > 90, 'both tones\' copies');
   for (const copy of copies) {
     const report = diffCustomComponentAgainstSource(copy, library);
     assert.equal(report.status, 'current', `${copy._children.Core.name}: ${report.status}`);

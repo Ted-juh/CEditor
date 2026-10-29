@@ -6,6 +6,7 @@ import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
 import { shouldAcceptFeedback } from './displayMode.js';
 import { flatControls } from './containment.js';
 import { hasPatternEditing } from './arpPatternLayouts.js';
+import { pageIndexForValue } from './tabContainerLayout.js';
 
 function getControlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -25,13 +26,22 @@ function activeDeviceBindings(control) {
     : [];
 }
 
-function patchForBinding(control, binding, value) {
+function patchForBinding(control, binding, value, session = null) {
   const port = String(binding?.port ?? 'value');
   // Staged pattern editing is atomic: individual hardware replies must not replace its loop length.
   if (port === 'arpEndStep' && hasPatternEditing(control)) return null;
   // Named custom channels are independent ports, not the component's main value.
   if (control?._children?.ValueChannels?._children?.[port]) {
     return { customValues: { [port]: value } };
+  }
+
+  // A Tabbed Container's page, which the click on its strip writes and sends. Heard back, it turns
+  // the page: the synth's own part button, a footswitch. Beside the container's other live sections.
+  if (port === 'pageIndex') {
+    const index = pageIndexForValue(control, value);
+    if (index === null) return null;
+    const sections = session?.sectionValues ?? {};
+    return { sectionValues: { ...sections, TabContainer: { ...(sections.TabContainer ?? {}), pageIndex: index } } };
   }
 
   if (port === 'state') {
@@ -155,7 +165,7 @@ function collectParameterPatches(context, deviceRole, parameterId, value, option
     // all. One question, asked with the flow in hand.
     if (!shouldAcceptFeedback(getBehavior(control), sessions?.[controlId])) continue;
 
-    const patch = patchForBinding(control, binding, value);
+    const patch = patchForBinding(control, binding, value, sessions?.[controlId]);
     if (!patch) continue;
 
     context.patches.push({ controlId, patch });

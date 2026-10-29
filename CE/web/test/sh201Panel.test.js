@@ -5,15 +5,16 @@
 // to the layout, these are the promises each panel makes to someone reading it.
 //
 // The draft, Roland SH-201.cepanel, in the GAIA panel's look:
-//   - every control sends one profile parameter, and all 64 of the Upper tone's are on it, once each
-//   - a control sits in the section of the front panel its parameter belongs to
+//   - every control sends one profile parameter: all 64 of each tone's, once each, and the tone
+//     pages the synth's Keyboard Part
+//   - a control sits in its tone, and in the section of the front panel its parameter belongs to
 //   - every custom component is a clean linked copy of a package in the library file beside it,
 //     with its range, default and readout as per-copy settings, not design edits
-//   - the tone-select button has its State, and the panel has no scripts
+//   - the tones are pages named after Keyboard Part's choices, and the panel has no scripts
 //
 // The hardware look, the answer to the tutorial in the draft's notepad, makes all the same promises
 // with the instrument's own sections, and is the draft repainted: the same parameters on the same
-// packages, the knob at its next version, and only the filter envelope's depth a different kind.
+// packages, the knob at its next version, and only the filter envelopes' depth a different kind.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -33,15 +34,18 @@ const read = (rel) => readFileSync(path.join(REPO, rel), 'utf8');
 const profile = JSON.parse(read('CE/profiles/test/roland-sh-201.ceditor-device.json'));
 const parameters = new Map(profile.parameters.map((p) => [p.id, p]));
 
-/** Which section of the front panel each of the profile's Upper groups belongs in. */
+/** Which section of the front panel each of the profile's tone groups belongs in ("Upper OSC1" is "OSC1"). */
 const DRAFT_SECTIONS = {
-  'Upper OSC1': 'OSC 1', 'Upper OSC2': 'OSC 2', 'Upper Mix Mod': 'MIX/MOD',
-  'Upper LFO1': 'LFO 1', 'Upper LFO2': 'LFO 2', 'Upper Pitch Env': 'PITCH ENV',
-  'Upper Filter': 'FILTER', 'Upper Filter Env': 'FILTER', 'Upper AMP': 'AMP', 'Upper AMP Env': 'AMP',
-  'Upper Performance': 'PERFORMANCE', 'Upper Effects Send': 'EFFECTS',
+  'OSC1': 'OSC 1', 'OSC2': 'OSC 2', 'Mix Mod': 'MIX/MOD',
+  'LFO1': 'LFO 1', 'LFO2': 'LFO 2', 'Pitch Env': 'PITCH ENV',
+  'Filter': 'FILTER', 'Filter Env': 'FILTER', 'AMP': 'AMP', 'AMP Env': 'AMP',
+  'Performance': 'PERFORMANCE', 'Effects Send': 'EFFECTS',
 };
 /** On the instrument the two envelopes are sections of their own. */
-const HARDWARE_SECTIONS = { ...DRAFT_SECTIONS, 'Upper Filter Env': 'FILTER ENV', 'Upper AMP Env': 'AMP ENV' };
+const HARDWARE_SECTIONS = { ...DRAFT_SECTIONS, 'Filter Env': 'FILTER ENV', 'AMP Env': 'AMP ENV' };
+const TONES = ['upper', 'lower'];
+const toneOf = (parameterId) => parameterId.split('.')[0];
+const sectionGroup = (parameter) => parameter.group.replace(/^(Upper|Lower) /, '');
 
 function load(file, libraryFile, sections) {
   const panel = deserializePanel(read(`CE/panels/${file}`), file, null);
@@ -61,7 +65,7 @@ const isCopy = (control) => control._children.Core.controlType === 'CustomCompon
 for (const look of [draft, hardware]) {
   const { file, panel, library, all, bound, sections } = look;
 
-  test(`${file}: every control sends one SH-201 parameter, and the whole Upper tone is there once`, () => {
+  test(`${file}: every control sends one SH-201 parameter, both tones whole and once, and Keyboard Part`, () => {
     const sent = [];
     for (const control of bound) {
       const bindings = control._children.DeviceBindings.bindings;
@@ -72,23 +76,28 @@ for (const look of [draft, hardware]) {
       assert.equal(binding.dryRun, false);
       sent.push(binding.parameterId);
     }
-    const upper = profile.parameters.filter((p) => p.id.startsWith('upper.')).map((p) => p.id);
-    assert.equal(upper.length, 64);
-    assert.deepEqual([...sent].sort(), [...upper].sort(), 'each Upper parameter once, and nothing else');
+    const tones = profile.parameters.filter((p) => TONES.includes(toneOf(p.id))).map((p) => p.id);
+    assert.equal(tones.length, 128);
+    assert.deepEqual([...sent].sort(), [...tones, 'patch.keyboardPart'].sort(), 'each tone parameter once, Keyboard Part, and nothing else');
     assert.deepEqual(panel.requiredProfiles, [{ role: 'Roland SH-201', profileId: 'roland-sh-201', version: '*' }]);
   });
 
-  test(`${file}: the component tree reads like the front panel: Upper, then its sections`, () => {
-    const upper = panel.controls.find((c) => c._children.Core.name === 'Upper');
-    assert.ok(upper, 'a top-level Upper container');
-    const groups = getChildControls(upper).filter((c) => getChildControls(c).length);
-    assert.deepEqual(groups.map((c) => c._children.Core.name).sort(), [...new Set(Object.values(sections))].sort());
-    for (const section of groups) {
-      for (const control of getChildControls(section)) {
-        const id = parameterOf(control);
-        if (!id) continue;
-        assert.equal(sections[parameters.get(id).group], section._children.Core.name,
-          `${id} (${parameters.get(id).group}) sits in ${section._children.Core.name}`);
+  test(`${file}: the component tree reads like the front panel: Tone, its two tones, their sections`, () => {
+    const tonePages = panel.controls.find((c) => c._children.Core.name === 'Tone');
+    assert.equal(tonePages?._children.Core.controlType, 'TabContainer', 'a top-level Tone tab container');
+    const tones = getChildControls(tonePages);
+    assert.deepEqual(tones.map((c) => [c._children.Core.name, c._children.Core.tabPageId]), [['Upper', 'upper'], ['Lower', 'lower']]);
+    for (const tone of tones) {
+      const groups = getChildControls(tone).filter((c) => getChildControls(c).length);
+      assert.deepEqual(groups.map((c) => c._children.Core.name).sort(), [...new Set(Object.values(sections))].sort(), tone._children.Core.name);
+      for (const section of groups) {
+        for (const control of getChildControls(section)) {
+          const id = parameterOf(control);
+          if (!id) continue;
+          assert.equal(toneOf(id), tone._children.Core.tabPageId, `${id} is in the ${tone._children.Core.name} tone`);
+          assert.equal(sections[sectionGroup(parameters.get(id))], section._children.Core.name,
+            `${id} (${parameters.get(id).group}) sits in ${section._children.Core.name}`);
+        }
       }
     }
   });
@@ -100,8 +109,8 @@ for (const look of [draft, hardware]) {
     }));
     assert.deepEqual(library.packages.map((p) => p.metadata.name).sort(), ['SH-201 Fader', 'SH-201 Knob', 'SH-201 LED Switch']);
     const copies = all.filter(isCopy);
-    // Every Upper parameter that is not a named list: those are stock Comboboxes, their rows the profile's.
-    const notLists = profile.parameters.filter((p) => p.id.startsWith('upper.') && p.type !== 'choice').length;
+    // Every tone parameter that is not a named list: those are stock Comboboxes, their rows the profile's.
+    const notLists = profile.parameters.filter((p) => TONES.includes(toneOf(p.id)) && p.type !== 'choice').length;
     assert.equal(copies.length, notLists);
     for (const copy of copies) {
       const report = diffCustomComponentAgainstSource(copy, entries);
@@ -126,13 +135,19 @@ for (const look of [draft, hardware]) {
     }
   });
 
-  test(`${file}: the tone-select button lights the tone being edited, and there are no scripts`, () => {
-    const button = all.find((c) => c._children.Core.name === 'Tone Upper');
-    const state = button?._children.States?._children?.Editing;
-    assert.ok(state, 'the Editing state');
-    assert.deepEqual(state.when, { checked: true });
-    assert.ok(state.patches.component['Background.Fill.colour']);
-    assert.equal(button._children.Behavior.defaultValue, true, 'Upper is the tone being edited');
+  test(`${file}: the tones are pages named after the synth's Keyboard Part, and there are no scripts`, () => {
+    const tonePages = panel.controls.find((c) => c._children.Core.name === 'Tone');
+    const keyboardPart = parameters.get('patch.keyboardPart');
+    const config = tonePages._children.TabContainer;
+    // Named after the choices, in their order: a value heard from the synth ("lower") finds its page
+    // by name, and the page's number is the value the strip sends.
+    assert.deepEqual(config.pages.map((page) => page.id), keyboardPart.choices.map((choice) => choice.id));
+    assert.deepEqual(keyboardPart.choices.map((choice) => choice.value), [0, 1]);
+    assert.equal(config.pages[config.pageIndex].id, keyboardPart.default, 'opens on the part a new patch has');
+    assert.notEqual(config.showStrip, false, 'the strip is the tone buttons');
+    const [binding] = tonePages._children.DeviceBindings.bindings;
+    assert.deepEqual([binding.parameterId, binding.port, binding.feedback.receiveUpdates], ['patch.keyboardPart', 'pageIndex', true]);
+    assert.ok(!all.some((c) => c._children.Core.controlType === 'ToggleButton'), 'no tone button beside the pages');
     assert.deepEqual(panel.scripts ?? [], []);
     assert.ok(all.every((c) => !(c._children.Scripts?.scripts ?? []).length));
     assert.match(panel.notepad.notes[0].content, /Simulated device/);
@@ -167,7 +182,8 @@ test('the hardware look is the draft repainted: the same parameter on the same p
     assert.equal(sourceOf(was).version, '1.0.0', `${id} in the draft`);
     assert.equal(sourceOf(control).version, expected, `${id} in the hardware look`);
   }
-  assert.deepEqual(changed, ['upper.filterEnv.depth: SH-201 Knob → SH-201 Fader'], 'the filter envelope depth is a slider, as on the instrument');
+  assert.deepEqual(changed.sort(), ['lower.filterEnv.depth: SH-201 Knob → SH-201 Fader', 'upper.filterEnv.depth: SH-201 Knob → SH-201 Fader'],
+    'the filter envelope depth is a slider, as on the instrument');
 
   const packages = (look) => Object.fromEntries(look.library.packages.map((p) => [p.metadata.name, p]));
   const [old, next] = [packages(draft), packages(hardware)];

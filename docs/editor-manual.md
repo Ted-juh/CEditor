@@ -259,6 +259,14 @@ title), **Tabbed Container** (pages with tabs; set them up on its **Pages** tab 
 the page that was showing when you put it in) and **Scroll Area** (contents larger than the box,
 scrolled into view).
 
+A Tabbed Container's page can be bound like a value, on the **Device** tab with the port **Page**.
+Bound to a synth's part or mode parameter, the pages follow it both ways: choosing a page sends its
+number, and when the synth reports the parameter the page turns. Label the pages as the synth names
+the choices (on the **Pages** tab: UPPER, LOWER) and a page is found by name; otherwise by its
+number, which is the value a page sends. That is how a panel edits a
+synth with several parts. Each part gets a page of its own controls, each control bound once, and
+the strip is the part buttons. The Roland SH-201 panel does this for its Upper and Lower tones.
+
 ### Arranging
 
 The dock's **Align** tool lines up the selected controls by their edges or centres, spaces them out

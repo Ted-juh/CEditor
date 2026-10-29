@@ -1,4 +1,7 @@
-// layout.mjs — where the SH-201 draft puts each Upper-tone parameter.
+// layout.mjs — where the SH-201 draft puts each parameter of a tone.
+//
+// Written for the Upper tone; the Lower tone is the same layout with `upper.` read as `lower.`,
+// because the profile's two tones are the same 64 parameters.
 //
 // Two rows, in the order a sound is built: the sources and their modulators on top (OSC 1, OSC 2,
 // Mix/Mod, LFO 1, LFO 2), then what shapes them (Pitch Env, Filter with its envelope, Amp with its

@@ -18,15 +18,16 @@
 //     component with different settings, not two edited copies.
 //   - One binding per control, the same one the Device tab makes: select a control and its Device
 //     Bindings section shows exactly which profile parameter it sends.
-//   - Containers named after the hardware's sections (Upper › OSC 1, Filter, Amp …), so the
+//   - Containers named after the hardware's sections (Tone › Upper › OSC 1, Filter, Amp …), so the
 //     component tree reads like the front panel.
-//   - A State on the tone-select button, the way the hardware lights the tone it is editing.
+//   - The two tones as the pages of a Tabbed Container, its strip the UPPER and LOWER buttons and
+//     its page bound to the synth's Keyboard Part: see tonePages for why not a State.
 //   - No scripts.
 //
 // THE FIRST VERSION ONLY. After it, the .cepanel file is the source and is edited in CEditor; this
 // generator is kept as the record of how the draft was made and to rebuild it while the draft is
-// still being shaped. It covers the Upper tone; the Lower tone, the effects and the arpeggiator
-// come after the owner has judged this one in the editor.
+// still being shaped. It covers the two tones; the effects and the arpeggiator come after the owner
+// has judged this one in the editor.
 //
 // The library file goes beside the panel. The library lives inside CEditor rather than in the
 // panel: a copy keeps its whole design and works anywhere, but on a machine without the package its
@@ -323,12 +324,16 @@ const LOOKS = {
     libraryOut: 'CE/panels/Roland SH-201 components.json',
     panelGuid: '6d1f3a52-0b7e-4c9a-a8f1-2e5b7c4d9a10',
     scriptId: 'roland_sh201',
-    description: 'Roland SH-201 — Upper tone, first draft: library components, one binding per control, sections as containers',
+    description: 'Roland SH-201 — Upper and Lower tones, first draft: library components, one binding per control, sections as containers',
     sectionStyle: (spec) => ({
       fill: SKIN.sectionFill, border: { enabled: true, thickness: 1.5, colour: spec.tint }, radius: 6,
       title: { colour: SKIN.tabText, fill: spec.tint, size: 10 }, caption: SKIN.caption, captionBold: false,
     }),
     plate: { fill: '00000000', border: { enabled: false, thickness: 0 } },
+    toneStrip: {
+      stripColour: '00000000', tabColour: SKIN.buttonOff, activeTabColour: SKIN.toneLit,
+      labelColour: SKIN.caption, activeLabelColour: SKIN.tabText,
+    },
   },
   hardware: {
     sections: HARDWARE_SECTIONS,
@@ -339,13 +344,18 @@ const LOOKS = {
     libraryOut: 'CE/panels/Roland SH-201 (hardware look) components.json',
     panelGuid: '9b4e7c21-5d3a-4f88-b0c6-1a2f6e8d3c55',
     scriptId: 'roland_sh201_hardware',
-    description: 'Roland SH-201 — Upper tone in the instrument\'s own look: the answer to the draft\'s tutorial',
+    description: 'Roland SH-201 — Upper and Lower tones in the instrument\'s own look: the answer to the draft\'s tutorial',
     sectionStyle: (spec) => (spec.surface === 'silver'
       ? { fill: HARDWARE_SKIN.silver, border: { enabled: false, thickness: 0, colour: '00000000' }, radius: 3,
         title: { colour: HARDWARE_SKIN.onSilver, fill: '00000000', size: 12 }, caption: HARDWARE_SKIN.onSilver, captionBold: true }
       : { fill: HARDWARE_SKIN.black, border: { enabled: true, thickness: 1, colour: HARDWARE_SKIN.blackEdge }, radius: 3,
         title: { colour: HARDWARE_SKIN.onBlack, fill: '00000000', size: 12 }, caption: HARDWARE_SKIN.onBlack, captionBold: true }),
     plate: { fill: HARDWARE_SKIN.plate, border: { enabled: true, thickness: 1, colour: HARDWARE_SKIN.plateEdge } },
+    // The instrument's tone buttons: dark keys with a red lamp on the lit one.
+    toneStrip: {
+      appearance: 'instrument', stripColour: HARDWARE_SKIN.plate, tabColour: 'FF26282B', activeTabColour: 'FF34373B',
+      labelColour: 'FFA9ADB2', activeLabelColour: HARDWARE_SKIN.onBlack, accentColour: HARDWARE_SKIN.toneLit,
+    },
   },
 };
 
@@ -376,8 +386,10 @@ function section(spec, at, ctx) {
   add(tab);
 
   for (const item of spec.items) {
-    const parameter = ctx.byId.get(item.p);
-    if (!parameter) { ctx.missing.push(item.p); continue; }
+    // layout.mjs names the Upper tone's parameters; the Lower tone's are the same, renamed.
+    const id = item.p.replace(/^upper\./, `${ctx.tone}.`);
+    const parameter = ctx.byId.get(id);
+    if (!parameter) { ctx.missing.push(id); continue; }
     const built = KINDS[item.kind](ctx.packages, parameter, item);
     add(built.control);
     add(label(item.label, built.caption, {
@@ -389,34 +401,44 @@ function section(spec, at, ctx) {
   return group;
 }
 
-/** The tone-select button and its State: lit for the tone the panel's controls edit. */
-function toneSelect(at, skin) {
-  const button = createControl('ToggleButton', {
-    Core: { id: 'sh201_tone_upper', name: 'Tone Upper', tooltip: 'The tone these controls edit. The SH-201 edits one tone at a time.' },
-    Transform: { x: at.x, y: at.y, width: 74, height: 24 },
-    Text: { content: 'UPPER', _children: { Font: { size: 10, bold: true, weight: 'Bold', weightValue: 700, letterSpacing: 1 } } },
-    Behavior: { defaultValue: true },
-    Background: { _children: { Fill: { colour: skin.buttonOff }, Corners: { radius: 4 } } },
-  });
-  button._children.States._children.Editing = {
-    _type: 'State',
-    name: 'Editing',
-    group: 'logical',
-    description: 'Lit like the hardware\'s tone lamp while this is the tone being edited.',
-    enabled: true,
-    when: { checked: true },
-    patches: {
-      component: {
-        'Background.Fill.colour': skin.toneLit,
-        'Text.Fill.colour': skin.tabText,
-      },
-      parts: {},
+/** The two tones of a patch, one page each, in the order the SH-201's own buttons are pressed for. */
+const TONES = [
+  { id: 'upper', label: 'UPPER', name: 'Upper' },
+  { id: 'lower', label: 'LOWER', name: 'Lower' },
+];
+const STRIP = 28;
+
+/**
+ * The tone pages: a Tabbed Container whose pages are the Upper and Lower tones, with the strip as
+ * the tone buttons. Its one binding is the synth's Keyboard Part, on the page: pressing LOWER shows
+ * the Lower tone's controls and tells the SH-201, as the LOWER button on the instrument does, and
+ * the synth reporting its part turns the page. The pages are named after Keyboard Part's choices,
+ * which is how a value heard from the synth ("lower") finds its page.
+ *
+ * Not a State: a State changes how a control looks, and the MIDI path never reads it, so a button
+ * whose State "switched" the tone would light up and leave every control sending the Upper tone.
+ * Two sets of controls, each bound once, and a page to choose between them is what switching is.
+ */
+function tonePages(tones, keyboardPart, look, at) {
+  const control = createControl('TabContainer', {
+    Core: { id: 'sh201_tone', name: 'Tone', tooltip: 'The tone the controls edit: Keyboard Part, as the instrument\'s UPPER and LOWER buttons set it.' },
+    Transform: { x: at.x, y: at.y, width: at.w, height: STRIP + tones[0]._children.Transform.height },
+    TabContainer: {
+      pages: TONES.map(({ id, label: text }) => ({ id, label: text })), pageIndex: 0,
+      stripSize: STRIP, edge: 'top', tabWidth: 96, labelSize: 10, ...look.toneStrip,
     },
-  };
-  return button;
+    Children: { padding: 0, clipChildren: true },
+    Background: { _children: { Fill: { colour: look.plate.fill }, Border: look.plate.border, Corners: { radius: 4 } } },
+  });
+  const binding = bindingFor(keyboardPart, 'pageIndex');
+  // A page is not a value with a range or a list to adopt: the pages are the choices already.
+  binding.adoptMetadata = false;
+  control._children.DeviceBindings = { _type: 'DeviceBindings', enabled: true, debug: false, bindings: [binding] };
+  control._children.Children._children = Object.fromEntries(tones.map((tone) => [tone._children.Core.id, tone]));
+  return control;
 }
 
-/** The header: the maker and the model, the tone select. The hardware look prints them as the instrument does. */
+/** The header: the maker and the model. The hardware look prints them as the instrument does. */
 function header(look) {
   const skin = look.skin;
   if (look === LOOKS.hardware) {
@@ -428,17 +450,11 @@ function header(look) {
       label('Roland', { x: PANEL.inset, y: 12, w: 92, h: 24 }, { size: 20, colour: skin.brand, align: 'left', name: 'brand' }),
       model,
       kind,
-      label('TONE', { x: 330, y: 19, w: 44, h: 14 }, { size: 9, bold: true, colour: skin.onBlack, align: 'right', name: 'tone caption' }),
-      toneSelect({ x: 380, y: 14 }, skin),
-      label('LOWER — not in this draft', { x: 462, y: 19, w: 170, h: 14 }, { size: 9, colour: skin.dim, align: 'left', name: 'lower note' }),
     ];
   }
   return [
     label('ROLAND', { x: PANEL.inset, y: 14, w: 90, h: 22 }, { size: 15, bold: true, colour: skin.brand, align: 'left', name: 'brand' }),
     label('SH-201', { x: PANEL.inset + 92, y: 10, w: 120, h: 28 }, { size: 22, bold: true, colour: skin.model, align: 'left', name: 'model' }),
-    label('TONE', { x: 330, y: 19, w: 44, h: 14 }, { size: 9, colour: skin.caption, align: 'right', name: 'tone caption' }),
-    toneSelect({ x: 380, y: 14 }, skin),
-    label('LOWER — not in this draft', { x: 462, y: 19, w: 170, h: 14 }, { size: 9, colour: skin.dim, align: 'left', name: 'lower note' }),
   ];
 }
 
@@ -464,20 +480,22 @@ function signalFlow(rowsAt, look) {
 
 /* ------------------------------------------------------------------ notes */
 
-const ABOUT = `Roland SH-201 — first draft, Upper tone only.
+const ABOUT = `Roland SH-201 — first draft, the Upper and Lower tones.
 
 How to read it in the editor:
-- Component tree: Upper › OSC 1, OSC 2, Mix/Mod, LFO 1, LFO 2, Pitch Env, Filter, Amp, Performance, Effects. The containers are the hardware's sections.
-- Select a knob: Device Bindings shows the one profile parameter it sends; its tooltip names it and its address. The Source card names the library package (SH-201 Knob, Fader or LED Switch), and "Update N copies on panel" finds every copy.
+- Component tree: Tone › Upper and Lower › OSC 1, OSC 2, Mix/Mod, LFO 1, LFO 2, Pitch Env, Filter, Amp, Performance, Effects. The containers are the hardware's sections, and each tone has all of them.
+- Select a knob: Device Bindings shows the one profile parameter it sends; its tooltip names it and its address. The Source card names the library package (SH-201 Knob, Fader or LED Switch), and "Update N other copies" finds every copy, on both pages.
 - A copy's range, default and readout are published settings of the component (Public API), so Coarse Tune (sent 28..100, read -36..+36) and Cutoff (0..127) are the same knob.
-- The UPPER button has a State, Editing, on its States tab: it lights the tone being edited, as the hardware does.
+- Tone is a Tabbed Container whose two pages are the tones; its strip is the UPPER and LOWER buttons. Its one binding is the synth's Keyboard Part, on the page: in Preview, pressing LOWER shows the Lower tone and tells the SH-201, as its own LOWER button does, and when the synth reports its part the page follows. Its Pages tab names the pages upper and lower, after Keyboard Part's choices, which is how a value from the synth finds its page.
+- Why pages and not a State: a State changes how a control looks, and nothing on the MIDI path reads it. Switching what a knob sends is two knobs, each bound once, and a page to choose between them.
+- In the editor, the component tree lists the two pages under Tone; click one to show it.
 - No scripts.
 
 No hardware needed: choose Simulated device as the device's output (Settings → MIDI). It answers from the profile.
 
-The library: Roland SH-201 components.json, beside this file. Import it (Library → Package & Library → Import) if the Source card says "Not in this library".
+The library: Roland SH-201 components.json, beside this file. Import it (Library → Package & Library → Import) if the Source card says "Not in this library". A copy of this panel passed on with File → Share Panel carries the library with it.
 
-Not built yet: the Lower tone (and how Upper/Lower switch), the effects, the arpeggiator, the system settings.`;
+Not built yet: the effects, the arpeggiator, the system settings.`;
 
 const tutorial = (knobs) => `Tutorial 1 — from this look to the SH-201's own
 
@@ -487,7 +505,7 @@ You need a photo of the instrument. Use your own: a photo from Roland or from th
 
 1. The reference. Show the dock (Ctrl+J), open Viewer and add your photo. Its eyedropper saves a colour to your swatches: take the silver of the OSC panel, the black of the envelope panels, the body, and the red of a lamp. Or type them: silver CBCCC7, panel black 1E1F21, body 121314, red D9402B.
 
-2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Upper in the component tree and give it a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate.
+2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Tone in the component tree and give it a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate. Under its Colours, set Style to Instrument and Accent to the red: the tone buttons get the instrument's lamps.
 
 3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, then on the Background tab set the fill to silver and switch the border off: with several controls selected, the Background tab changes all of them. Then select the others and make them black, with a thin grey border.
 
@@ -495,19 +513,22 @@ You need a photo of the instrument. Use your own: a photo from Roland or from th
 
 5. The knob, once for all ${knobs} of them. Select any knob and press Component Designer on the canvas. Select the part called face and give it a silver radial gradient, light at the top left (the Gradient tool); make rim almost black, and pointer and the ticks dark. Press Back to Panel. The knob's Source card now says it has edits of its own: press Save to library as 1.1.0… and then Save. Then press Update ${knobs - 1} other copies — every knob on the panel is the new one, each keeping its own range, default and readout, because those are the copy's settings, not the component's.
 
-6. The sections the instrument has. The SH-201 has FILTER ENV and AMP ENV as sections of their own. In FILTER, select the four envelope faders and their captions, press Ctrl+G to put them in a new container, and name it FILTER ENV on its Core tab; the same for AMP ENV. On the instrument the filter envelope's DEPTH is a slider too: delete the ENV DEPTH knob, place an SH-201 Fader from the dock's Library into FILTER ENV, and with it selected click Upper Filter Env Depth in the dock's Device tab. Then drag the sections into the instrument's order: the silver five and EFFECTS on top; PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV and PERFORMANCE below. A control dragged onto a container goes inside it; hold Space while dragging to stop that.
+6. The sections the instrument has. The SH-201 has FILTER ENV and AMP ENV as sections of their own. In FILTER, select the four envelope faders and their captions, press Ctrl+G to put them in a new container, and name it FILTER ENV on its Core tab; the same for AMP ENV. On the instrument the filter envelope's DEPTH is a slider too: delete the ENV DEPTH knob, place an SH-201 Fader from the dock's Library into FILTER ENV, and with it selected click Upper Filter Env Env Depth (the profile's name for it) in the dock's Device tab. Then drag the sections into the instrument's order: the silver five and EFFECTS on top; PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV and PERFORMANCE below. A control dragged onto a container goes inside it; hold Space while dragging to stop that.
 
 7. The name. Roland in white, not bold. SH-201 larger, bold and italic (the Text tool's Italic button), and a small italic SYNTHESIZER under it (Insert → Layout & Display → Label).
 
 8. The signal path. The instrument draws it in red: Insert → Layout & Display → Background, 2 pixels high, red, under the black row; and a ▶ label in each gap between the silver sections.
 
+Steps 3, 4 and 6 are for one tone. Do them on the Upper page; then click LOWER under Tone in the component tree to show the Lower page and do them again there. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Step 5 needs no second round: the Lower tone's knobs are copies of the same package, and Update takes them too.
+
 What stays: the LED switches are already the instrument's red lamps, the faders its black slots, and the named lists stay lists — on the SH-201 they are rows of lamps, which is a tutorial of its own.`;
 
-const HARDWARE_ABOUT = `Roland SH-201 — Upper tone, in the instrument's own look.
+const HARDWARE_ABOUT = `Roland SH-201 — the Upper and Lower tones, in the instrument's own look.
 
-This is the answer to Tutorial 1 in Roland SH-201.cepanel's notepad: the same 64 parameters, bindings and library components, repainted and arranged as the SH-201 is.
+This is the answer to Tutorial 1 in Roland SH-201.cepanel's notepad: the same 129 parameters, bindings and library components, repainted and arranged as the SH-201 is.
 
-- The silver signal path — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and the black modulation row: PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV, with EFFECTS and PERFORMANCE on the black body.
+- The silver signal path — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and the black modulation row: PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV, with EFFECTS and PERFORMANCE on the black body. Both tones, one page each.
+- The tone buttons are the Tone container's strip, drawn as the instrument's keys with a red lamp; they turn with the synth's Keyboard Part.
 - Every knob is SH-201 Knob 1.1.0, the silver one: select any knob and its Source card says so. The faders and LED switches are still 1.0.0; they already look like the instrument's.
 - FILTER ENV and AMP ENV are sections of their own, and the filter envelope's DEPTH is a fader, as on the instrument.
 
@@ -516,6 +537,39 @@ The library for this file is Roland SH-201 (hardware look) components.json, besi
 No hardware needed: choose Simulated device as the device's output (Settings → MIDI).`;
 
 /* ------------------------------------------------------------------ the panel */
+
+/** One tone: the look's rows of sections, in a container named after the tone, on its page. */
+function buildTone(tone, width, ctx) {
+  const children = {};
+  const rowsAt = [];
+  let y = PANEL.sectionTop - PANEL.upperTop;
+  for (const row of ctx.look.rows) {
+    let x = PANEL.inset;
+    const gaps = [];
+    row.sections.forEach((key, index) => {
+      const spec = ctx.look.sections[key];
+      const group = section(spec, { x, y }, ctx);
+      children[group._children.Core.id] = group;
+      x += spec.w + PANEL.gap;
+      if (index < row.sections.length - 1) gaps.push(x - PANEL.gap);
+    });
+    rowsAt.push({ row, y, gaps });
+    y += row.h + PANEL.gap;
+  }
+  if (ctx.look === LOOKS.hardware) {
+    for (const control of signalFlow(rowsAt, ctx.look)) children[control._children.Core.id] = control;
+    y += 6;
+  }
+
+  const group = createControl('Group', {
+    Core: { id: `sh201_${tone.id}`, name: tone.name, tooltip: `The ${tone.name} tone. The other tone has the same sections.`, tabPageId: tone.id },
+    Transform: { x: 0, y: 0, width, height: y + PANEL.inset },
+    Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 }, Corners: { radius: 4 } } },
+    Text: { content: '' },
+  });
+  group._children.Children = { ...group._children.Children, _children: children };
+  return group;
+}
 
 export function buildSh201Panel(lookName = 'draft') {
   const look = LOOKS[lookName];
@@ -527,43 +581,18 @@ export function buildSh201Panel(lookName = 'draft') {
   const packages = buildPackages(look.versions);
   const ctx = { byId, packages, missing: [], look };
 
-  const upperChildren = {};
-  const rowsAt = [];
-  let y = PANEL.sectionTop - PANEL.upperTop;
-  for (const row of look.rows) {
-    let x = PANEL.inset;
-    const gaps = [];
-    row.sections.forEach((key, index) => {
-      const spec = look.sections[key];
-      const group = section(spec, { x, y }, ctx);
-      upperChildren[group._children.Core.id] = group;
-      x += spec.w + PANEL.gap;
-      if (index < row.sections.length - 1) gaps.push(x - PANEL.gap);
-    });
-    rowsAt.push({ row, y, gaps });
-    y += row.h + PANEL.gap;
-  }
+  const width = PANEL.width - (lookName === 'hardware' ? 12 : 0);
+  const tones = TONES.map((tone) => buildTone(tone, width, { ...ctx, tone: tone.id }));
   if (ctx.missing.length) throw new Error(`layout.mjs places parameters the SH-201 profile does not have:\n  ${ctx.missing.join('\n  ')}`);
-  if (lookName === 'hardware') {
-    for (const control of signalFlow(rowsAt, look)) upperChildren[control._children.Core.id] = control;
-    y += 6;
-  }
+  const pages = tonePages(tones, byId.get('patch.keyboardPart'), look, { x: lookName === 'hardware' ? 6 : 0, y: PANEL.upperTop, w: width });
 
-  const upper = createControl('Group', {
-    Core: { id: 'sh201_upper', name: 'Upper', tooltip: 'The Upper tone. The Lower tone has the same sections.' },
-    Transform: { x: lookName === 'hardware' ? 6 : 0, y: PANEL.upperTop, width: PANEL.width - (lookName === 'hardware' ? 12 : 0), height: y + PANEL.inset },
-    Background: { _children: { Fill: { colour: look.plate.fill }, Border: look.plate.border, Corners: { radius: 4 } } },
-    Text: { content: '' },
-  });
-  upper._children.Children = { ...upper._children.Children, _children: upperChildren };
-
-  const controls = [...header(look), upper];
+  const controls = [...header(look), pages];
 
   const panel = createPanel('Roland SH-201');
   panel.controlSet = { id: DEFAULT_CONTROL_SET_ID };
   panel.controls = controls;
   panel.width = PANEL.width;
-  panel.height = PANEL.upperTop + upper._children.Transform.height + (lookName === 'hardware' ? 8 : 0);
+  panel.height = PANEL.upperTop + pages._children.Transform.height + (lookName === 'hardware' ? 8 : 0);
   panel.bgColour = look.skin.panelBg;
   panel.gridEnabled = false;
   panel.snapToGrid = false;

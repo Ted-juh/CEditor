@@ -156,6 +156,11 @@ The blocks are now that collection, and a request for one of them is still answe
 block. A second whole-patch request waits for its own answer instead of being resolved by the first
 block of it.
 
+**A Tabbed Container bound to a parameter follows the synth.** Its page was a bindable port in one
+direction: choosing a page sent it, and the synth reporting the same parameter changed nothing, in
+the editor or the exported plug-in. The page now turns, by its number or by a label that names the
+choice, so a panel whose pages are the synth's parts shows the part the synth is on.
+
 **A shared panel brings its library components.** File → Share Panel carried images, fonts and
 icons, not the library packages its custom components were placed from, so on another computer every
 copy said "Not in this library" until the library file was sent and imported too. The package now
@@ -175,9 +180,10 @@ you already have under the same name and version, with another design, is kept.
   28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents. Every block of an SH-201
   patch has a request of its own, so a script's `requestDump("upperToneDump")` is sent and
   answered; for 21 of the 23 blocks there was no request to send.
-- **An SH-201 panel to learn the editor from.** `Roland SH-201.cepanel` is the Upper tone, built the
-  way the editor builds by hand: three library components placed as linked copies, one binding per
-  control, sections named after the front panel, a State on the tone button, no scripts. Its
+- **An SH-201 panel to learn the editor from.** `Roland SH-201.cepanel` is both tones, built the way
+  the editor builds by hand: three library components placed as linked copies, one binding per
+  control, sections named after the front panel, the Upper and Lower tones as pages that follow the
+  synth's Keyboard Part, no scripts. Its
   notepad has a tutorial that takes it from the GAIA panel's look to the instrument's own — a
   reference photo in Viewer, colours on many controls at once, the knob redesigned once and
   updated on all its copies, new sections with Ctrl+G — and `Roland SH-201 (hardware look).cepanel`
