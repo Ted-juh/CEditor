@@ -1,9 +1,11 @@
-import { gaiaPatternReadGroups, decodeGaiaPattern, patternValuesForSend } from './gaiaPatternEditing.js';
+import { patternReadGroups, decodeGaiaPattern, patternValuesForSend } from './gaiaPatternEditing.js';
+import { layoutFor } from './arpPatternLayouts.js';
 
 /** Transport-independent coordinator. Only fresh incoming evidence can complete a read. */
 export function createGaiaPatternTransfer({ control, values, revision, route, feedback, read, write, apply, status, finishRead = () => {},
   pause = ms => new Promise(resolve => setTimeout(resolve, ms)), timeoutMs = 3500, sendGapMs = 20 }) {
   let busy = false, cancelled = false, serial = 0;
+  const layout = layoutFor(control), groups = patternReadGroups(layout);
   return {
     get busy() { return busy; },
     cancel() { cancelled = true; },
@@ -15,7 +17,7 @@ export function createGaiaPatternTransfer({ control, values, revision, route, fe
       const initialRevision = revision(), initialRoute = route(), generation = feedback().generation;
       const check = () => {
         if (cancelled) throw new Error('Cancelled. Already queued writes cannot be recalled.');
-        if (!initialRoute.ready || !route().ready) throw new Error('Connect the GAIA MIDI input and output first.');
+        if (!initialRoute.ready || !route().ready) throw new Error(`Connect the ${layout.synth} MIDI input and output first.`);
         if (initialRoute.key !== route().key || generation !== feedback().generation) throw new Error('Device route or patch changed; retry on the current patch.');
         if (feedback().identityError) throw new Error('Device identity mismatch; check the selected profile.');
         if (initialRevision !== revision()) throw new Error('Pattern changed during transfer. Edits kept; retry when ready.');
@@ -25,13 +27,13 @@ export function createGaiaPatternTransfer({ control, values, revision, route, fe
         check();
         if (action === 'read') {
           const raw = {};
-          for (let index = 0; index < gaiaPatternReadGroups.length; index++) {
+          for (let index = 0; index < groups.length; index++) {
             check();
-            const group = gaiaPatternReadGroups[index];
+            const group = groups[index];
             const baseline = Object.fromEntries(group.ids.map(id => [id, feedback().received?.[id]?.sequence ?? -1]));
-            const correlationId = `gaia_pattern_read_${Date.now()}_${++serial}`;
+            const correlationId = `${layout.kind}_pattern_read_${Date.now()}_${++serial}`;
             activeRead = correlationId;
-            status(`READING ${index + 1}/17 — editor unchanged`, true);
+            status(`READING ${index + 1}/${groups.length} — editor unchanged`, true);
             read({ request: group.request, correlationId });
             const deadline = Date.now() + timeoutMs;
             while (true) {
@@ -50,7 +52,7 @@ export function createGaiaPatternTransfer({ control, values, revision, route, fe
             }
           }
           check();
-          apply(decodeGaiaPattern(raw));
+          apply(decodeGaiaPattern(raw, layout));
           status('READ COMPLETE · Undo restores the previous editor pattern', false);
         } else {
           const entries = Object.entries(patternValuesForSend(control, values()));

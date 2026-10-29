@@ -45,6 +45,8 @@ const IGNORED_DESIGNER_KEYS = new Set([
   'selectedPart', 'preview', 'focusSection', 'focusApiMode',
 ]);
 
+const INSTANCE_DESIGNER_KEYS = new Set(['activeVariant', 'patternEditing']);
+
 const INSTANCE_CORE_KEYS = new Set([
   'name', 'layer', 'zIndex', 'visible', 'enabled', 'locked', 'alwaysOnTop', 'tooltip', 'screenReaderText',
   // The host parameter ids this copy's channels keep from the panel knobs they were made from
@@ -178,7 +180,9 @@ export function classifySourcePath(path, { overridePaths = [], routeNames = new 
   }
   if (section === 'Designer') {
     if (IGNORED_DESIGNER_KEYS.has(key)) return 'ignored';
-    if (key === 'activeVariant') return 'instance';
+    // Which synth's arpeggio pattern this copy's grid edits (arpPatternLayouts.js): a GAIA panel's
+    // grid and an SH-201 panel's are copies of one package, set apart by this.
+    if (INSTANCE_DESIGNER_KEYS.has(key)) return 'instance';
   }
   if (section === 'Transform' && INSTANCE_TRANSFORM_KEYS.has(key)) return 'instance';
   // Filled in at placement when the author left it blank (instantiateCustomComponentPackageControl),
@@ -522,7 +526,9 @@ export function rebaseCustomComponentOnSource(control, entry, options = {}) {
   for (const key of IGNORED_DESIGNER_KEYS) {
     if (mine.Designer && key in mine.Designer) designer[key] = deepClone(mine.Designer[key]);
   }
-  if (mine.Designer && 'activeVariant' in mine.Designer) designer.activeVariant = mine.Designer.activeVariant;
+  for (const key of INSTANCE_DESIGNER_KEYS) {
+    if (mine.Designer && key in mine.Designer) designer[key] = deepClone(mine.Designer[key]);
+  }
   designer.designWidth = Number(sourceTransform.width) || designer.designWidth;
   designer.designHeight = Number(sourceTransform.height) || designer.designHeight;
   children.Designer = stampProvenance(designer, entry, importedAt);
@@ -648,11 +654,15 @@ export function pushCustomComponentToSource(control, report) {
     if (channel && baseFlat.has(leaf)) channel.currentValue = deepClone(baseFlat.get(leaf));
   }
 
-  // Designer: no provenance of its own — the export stamps the package's.
+  // Designer: no provenance of its own — the export stamps the package's. And not this copy's
+  // synth: the next version keeps whatever mark the package had, so another copy's stays its own.
   if (children.Designer) {
     for (const key of ['packageName', 'packageVersion', 'packageId', 'packageFingerprint', 'packageImportedAt', 'sourcePackage']) {
       delete children.Designer[key];
     }
+    const theirs = report.base?.component?._children?.Designer;
+    if (theirs && 'patternEditing' in theirs) children.Designer.patternEditing = deepClone(theirs.patternEditing);
+    else delete children.Designer.patternEditing;
   }
 
   const version = nextPackageVersion(report.versions ?? []);

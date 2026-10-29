@@ -634,6 +634,8 @@ juce::var DeviceProfileService::getDiagnostics() const
 
         if (mapping.destination.type == "previewOnly")
             addIssue ("info", role, "MIDI destination is preview-only");
+        else if (mapping.destination.type == "simulatedDevice")
+            addIssue ("info", role, "MIDI destination is the simulated device: replies come from the profile, not an instrument");
         else if (mapping.destination.type == "none")
             addIssue ("warning", role, "MIDI destination is disabled");
         else if (mapping.destination.type == "hardwareOutput")
@@ -647,7 +649,7 @@ juce::var DeviceProfileService::getDiagnostics() const
                 addIssue ("warning", role, "Mapped hardware MIDI output is not currently available: " + mapping.destination.name);
         }
 
-        if (mapping.input.type == "none")
+        if (mapping.input.type == "none" && mapping.destination.type != "simulatedDevice")
             addIssue ("info", role, "MIDI input is disabled; startup pull and live device sync cannot receive replies");
         else if (mapping.input.type == "hardwareInput")
         {

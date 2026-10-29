@@ -1,11 +1,25 @@
 import { mount } from 'svelte';
 import PanelShotHarness from './PanelShotHarness.svelte';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { getChildControls } from '../src/CE_Application/utils/containment.js';
+import { isChildOnActivePage } from '../src/CE_Application/utils/tabContainerLayout.js';
 import { scrubKeyframes, clearKeyframeScrub } from '../src/CE_Application/utils/keyframePlayer.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 import { get } from 'svelte/store';
 
 window.__JUCE__ = undefined;
+
+/**
+ * Every control that is drawn: a container's children render too, and are counted by the DOM — but
+ * a Tabbed Container draws only the page that is showing, as CanvasControl does.
+ */
+function drawnControls(controls) {
+  return (controls ?? []).flatMap((control) => {
+    const tabs = control?._children?.Core?.controlType === 'TabContainer';
+    const children = getChildControls(control).filter((child) => !tabs || isChildOnActivePage(child, control));
+    return [control, ...drawnControls(children)];
+  });
+}
 window.__panelShot = {
   /** Pose a control at one time of one of its keyframes animations, as the Animation tab's playhead does. */
   scrub(controlId, name, time) {
@@ -27,6 +41,6 @@ window.__panelShot = {
     const panel = deserializePanel(await (await fetch(url)).text(), 'shot.cepanel', 'shot');
     window.__panel = panel;
     mount(PanelShotHarness, { target: document.getElementById('host'), props: { panel } });
-    return { width: panel.width, height: panel.height, controls: panel.controls.length };
+    return { width: panel.width, height: panel.height, controls: drawnControls(panel.controls).length };
   },
 };

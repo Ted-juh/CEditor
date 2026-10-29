@@ -54,7 +54,7 @@ juce::var DeviceProfileService::midiDestinationToVar (const MidiDestination& des
     object->setProperty ("type", destination.type);
     object->setProperty ("id", destination.id);
     object->setProperty ("name", destination.name);
-    object->setProperty ("canSend", destination.type == "hardwareOutput");
+    object->setProperty ("canSend", destination.type == "hardwareOutput" || isWithinProcess (destination.type));
     return juce::var (object);
 }
 
@@ -64,7 +64,7 @@ juce::var DeviceProfileService::midiInputToVar (const MidiInputEndpoint& input)
     object->setProperty ("type", input.type);
     object->setProperty ("id", input.id);
     object->setProperty ("name", input.name);
-    object->setProperty ("canReceive", input.type == "hardwareInput");
+    object->setProperty ("canReceive", input.type == "hardwareInput" || input.type == "internalCable");
     return juce::var (object);
 }
 
@@ -250,10 +250,10 @@ juce::String DeviceProfileService::sessionStateForMapping (const RoleMapping& ma
     if (mapping.sessionState.isNotEmpty())
         return mapping.sessionState;
 
-    if (mapping.input.type == "hardwareInput")
+    if (mapping.input.type == "hardwareInput" || mapping.input.type == "internalCable")
         return "linked";
 
-    if (mapping.destination.type == "hardwareOutput")
+    if (mapping.destination.type == "hardwareOutput" || isWithinProcess (mapping.destination.type))
         return "linked";
 
     return "preview";

@@ -1,4 +1,5 @@
 import { numberOr, clamp } from './primitives.js';
+import { hasPatternEditing } from './arpPatternLayouts.js';
 export const CUSTOM_ARP_NOTE_MIN = 0;
 export const CUSTOM_ARP_NOTE_MAX = 127;
 export const CUSTOM_ARP_DEFAULT_STEP_COUNT = 32;
@@ -161,7 +162,7 @@ export function resolveRuntimeArpeggiatorEdit(control, values = {}, hitZone = nu
   const rulerHeight = 24;
   const gridLeft = labelWidth;
   const gridTop = rulerHeight;
-  const inspector = arpeggiatorInspectorLayout(width, control?._children?.Designer?.patternEditing?.kind === 'gaia');
+  const inspector = arpeggiatorInspectorLayout(width, hasPatternEditing(control));
   const gridWidth = Math.max(1, inspector.contentWidth - labelWidth - 8);
   const gridHeight = Math.max(1, height - rulerHeight - 8 - (control?._children?.Designer?.arpeggiator?.numericFields ? inspector.height : 0));
   const rowHeight = gridHeight / 12;

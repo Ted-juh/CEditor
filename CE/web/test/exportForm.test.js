@@ -22,7 +22,8 @@ import { ENTRY_BASELINES, restoreEntries } from '../src/CE_Application/stores/do
 import { deepClone } from '../src/CE_Application/utils/deepClone.js';
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
-const PANELS = ['CE/panels/Roland GAIA SH-01.cepanel', 'CE/panels/Yamaha AN1x.cepanel',
+const PANELS = ['CE/panels/Roland GAIA SH-01.cepanel', 'CE/panels/Yamaha AN1x.cepanel', 'CE/panels/Roland SH-201.cepanel',
+  'CE/panels/Roland SH-201 (hardware look).cepanel',
   ...['01-components', '03-states', '07-packages', '08-export', '09-custom-stress'].map((n) => `CE/qa/QA-${n}.cepanel`)];
 
 const open = (rel) => deserializePanel(readText(path.join(REPO, rel)), rel, null);

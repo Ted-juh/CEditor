@@ -17,6 +17,8 @@
  * when the answer is that they picked the wrong profile.
  */
 
+import { outputSends, repliesCanArrive } from './midiEndpoints.js';
+
 const text = (value) => (typeof value === 'string' ? value.trim() : '');
 
 /** Hex bytes, as a synth would print them in its manual. */
@@ -123,13 +125,16 @@ export function identityTestBlocker(mapping) {
   // every port as absent and refuses every Test, which is exactly what the first draft did — and it
   // still passed the preview-only case, because "no destination" and "preview-only destination"
   // produce the same sentence. A test that passes for the wrong reason is how this survives.
-  const destinationType = text(mapping?.midiDestination?.type) || 'previewOnly';
-  if (destinationType !== 'hardwareOutput') {
+  // An internal cable and the simulated device send as a port does, and the simulated device
+  // answers on the role itself, so it needs nothing to listen to (utils/midiEndpoints.js).
+  if (!outputSends({ type: text(mapping?.midiDestination?.type) || 'previewOnly' })) {
     return 'Send To is Preview Only, so the inquiry never leaves the app. Choose the port your instrument is connected to.';
   }
 
-  const inputType = text(mapping?.midiInput?.type) || 'none';
-  if (inputType !== 'hardwareInput') {
+  if (!repliesCanArrive({
+    midiDestination: { type: text(mapping?.midiDestination?.type) },
+    midiInput: { type: text(mapping?.midiInput?.type) || 'none' },
+  })) {
     return 'Listen To is not set, so there is nothing to hear the answer on. Choose the port the instrument sends back to.';
   }
 

@@ -31,7 +31,9 @@
   import { gaiaSyncStatus } from '../utils/gaiaSyncStatus.js';
   import { customLcdInfo, formatLcdInfo } from '../utils/customLcdInfo.js';
   import { linkedEnvelopeConfig, linkedEnvelopeStages, linkedEnvelopePoints, linkedEnvelopeDragValue, linkedEnvelopeValue, linkedEnvelopeHold } from '../utils/linkedEnvelope.js';
-  import { hasGaiaPatternEditing, GaiaPatternHistory, editSelectedPatternNote, patternEditingShortcut } from '../utils/gaiaPatternEditing.js';
+  import { hasPatternEditing, GaiaPatternHistory, editSelectedPatternNote, patternEditingShortcut } from '../utils/gaiaPatternEditing.js';
+  import { layoutFor } from '../utils/arpPatternLayouts.js';
+  import { SIMULATED_DEVICE } from '../utils/midiEndpoints.js';
   import { getCustomArpeggiator, syncCustomArpeggiatorValues, revealArpeggiatorNote } from '../utils/customComponentArpeggiator.js';
   import { createGaiaPatternTransfer } from '../utils/gaiaPatternTransfer.js';
   import { startDeviceSync } from '../stores/deviceMidiOps.js';
@@ -695,7 +697,7 @@
   }
 
   function applyDeviceSyncStatus(control) {
-    if (hasGaiaPatternEditing(control)) {
+    if (hasPatternEditing(control)) {
       const next = deepClone(control);
       next._children.Designer.patternEditingState = customSessionValues(control).__arpEditState ?? {};
       return next;
@@ -704,7 +706,7 @@
     if (config?.kind !== 'gaiaArpeggio') return control;
     const grid = allControls.find(c => c._children?.Core?.name === config.gridName);
     if (!grid) return control;
-    const role = grid._children?.DeviceBindings?.bindings?.find(b => b.parameterId === 'arp.endStep')?.deviceRole;
+    const role = grid._children?.DeviceBindings?.bindings?.find(b => b.parameterId === layoutFor(grid).endStep)?.deviceRole;
     const status = gaiaSyncStatus({ grid, values: customSessionValues(grid), feedback: $deviceSyncFeedback?.[role],
       mapping: $deviceRoleMappings?.[role], destinations: $midiDestinations, inputs: $midiInputs, capabilities: $deviceTransportCapabilities });
     const next = deepClone(control);
@@ -7182,7 +7184,7 @@
     } } });
   }
   function handlePatternCommand(control, command) {
-    if (!hasGaiaPatternEditing(control)) return;
+    if (!hasPatternEditing(control)) return;
     if (command === 'help') {
       openDialog({ title: 'Arpeggio pattern — help', buttons: ['Close'], message:
         'Ruler: click or drag to set END STEP.\n\n' +
@@ -7204,14 +7206,16 @@
     } else if (['read', 'send'].includes(command)) {
       let transfer = patternTransfers.get(id);
       if (transfer?.busy) { if (command === 'read') transfer.cancel(); return; }
-      const role = control._children.DeviceBindings?.bindings?.find(b => b.parameterId === 'arp.endStep')?.deviceRole;
+      const role = control._children.DeviceBindings?.bindings?.find(b => b.parameterId === layoutFor(control).endStep)?.deviceRole;
       const mapping = () => get(deviceRoleMappings)?.[role];
       transfer = createGaiaPatternTransfer({ control, values: () => customSessionValues(control), revision: () => history.revision,
         feedback: () => get(deviceSyncFeedback)?.[role] ?? {},
         route: () => {
           const m = mapping(), cap = get(deviceTransportCapabilities);
+          // The simulated device answers on the role itself, so it needs no input of its own.
           return { key: JSON.stringify(m), ready: !!m?.profileId && cap?.canSendSysex === true && cap?.canReceiveSysex === true
-            && feedbackEndpointAvailable(m.midiDestination, get(midiDestinations)) && feedbackEndpointAvailable(m.midiInput, get(midiInputs)) };
+            && feedbackEndpointAvailable(m.midiDestination, get(midiDestinations))
+            && (m.midiDestination?.type === SIMULATED_DEVICE || feedbackEndpointAvailable(m.midiInput, get(midiInputs))) };
         },
         read: args => startDeviceSync({ ...args, deviceRole: role, profileId: mapping()?.profileId, syncDirection: 'pull', dryRun: false }),
         finishRead: (correlationId, error) => noteDeviceFeedbackRead({ correlationId, deviceRole: role, ok: !error, error }, 'resolved'),
@@ -7236,7 +7240,7 @@
     const control = controlById(controlId);
     const previous = control ? sessionFor(control) : null;
     const behavior = getBehavior(control);
-    if (hasGaiaPatternEditing(control)) {
+    if (hasPatternEditing(control)) {
       const values = customSessionValues(control), history = patternHistory(control);
       if (recordPatternHistory) history.record(control, values, { ...values, ...patch.customValues }, patch.dragging ?? previous?.dragging ?? false);
       patch = { ...patch, customValues: { ...patch.customValues, __arpEditState: {
@@ -7262,7 +7266,7 @@
     if (control) {
       // Blurring an idle control and cancelling outside its bounds are not trigger releases.
       const output = { ...patch };
-      if (hasGaiaPatternEditing(control) && output.customValues) {
+      if (hasPatternEditing(control) && output.customValues) {
         output.customValues = { ...output.customValues };
         delete output.customValues.arpEndStep; // Staged with the notes; only Send Pattern writes it.
       }
@@ -8329,8 +8333,12 @@
     if (isReadOnly(control)) return;
 
     // Double-click: two presses on the same control within 350ms (CanvasControl has no native dblclick).
+    // Timed by when each press HAPPENED (the event's own timestamp), not when it was handled: with a
+    // panel's scripts busy on the main thread, two quick presses on a stepper were handled more than
+    // 350ms apart and counted as two steps instead of a reset.
     const downId = getControlId(control);
-    const downAt = (typeof performance !== 'undefined' ? performance.now() : Date.now());
+    const downAt = Number.isFinite(event?.timeStamp) && event.timeStamp > 0 ? event.timeStamp
+      : (typeof performance !== 'undefined' ? performance.now() : Date.now());
     const isDoubleTap = downId === lastPointerDownId && (downAt - lastPointerDownAt) < 350;
     if (isDoubleTap) {
       dispatchInteraction(downId, 'onDoubleClick', controlLocalPoint(event));
@@ -9007,7 +9015,7 @@
       event.preventDefault(); event.stopPropagation();
       return;
     }
-    const patternCommand = hasGaiaPatternEditing(control) ? patternEditingShortcut(event) : '';
+    const patternCommand = hasPatternEditing(control) ? patternEditingShortcut(event) : '';
     if (patternCommand) {
       event.preventDefault(); event.stopPropagation();
       handlePatternCommand(control, patternCommand);

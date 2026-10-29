@@ -75,6 +75,19 @@ struct DeviceProfileServiceTestAccess
             out.add (event.getProperty ("status", "").toString());
         return out;
     }
+    /** Everything the cables and the simulated device have queued, delivered now — and what that
+        delivery queues in turn — as the timer would deliver it over the next moments. */
+    static int deliverWithinProcess (DeviceProfileService& service)
+    {
+        auto rounds = 0;
+        while (! service.loopbackDeliveries.empty() && rounds < 64)
+        {
+            service.processLoopbackDeliveries (true);
+            ++rounds;
+        }
+        return rounds;
+    }
+    static size_t queuedWithinProcess (const DeviceProfileService& service)  { return service.loopbackDeliveries.size(); }
 };
 } // namespace ceditor::device
 
@@ -1925,6 +1938,367 @@ int runRealtimeMonitorTests()
     return 0;
 }
 
+/*
+ * The simulated device: what the "Simulated device" output answers, from the profile alone.
+ *
+ * Against the SH-201, the profile it was built for — a tutorial panel has to work without the synth
+ * — and the GAIA, because nothing in it is the SH-201's: a second Roland profile, with a different
+ * model id and a different block layout, has to get a working simulator for free. The answers are
+ * checked with the engine's own parser, so the simulator is held to the reading the panel will do.
+ */
+int runSimulatedDeviceTests (const juce::File& sh201File, const juce::File& gaiaFile)
+{
+    using ceditor::device::DeviceProfileEngine;
+    using ceditor::device::SimulatedDevice;
+
+    auto failures = 0;
+    const auto fail = [&failures] (const juce::String& what)
+    {
+        std::cerr << "[FAIL] simulated device :: " << what << "\n";
+        ++failures;
+    };
+    const auto bytesOf = [] (const juce::String& hex)
+    {
+        juce::Array<int> bytes;
+        juce::StringArray tokens;
+        tokens.addTokens (hex, " ", "");
+        for (const auto& token : tokens)
+            bytes.add (token.getHexValue32());
+        return bytes;
+    };
+
+    DeviceProfileEngine sh201;
+    juce::String error;
+    if (! sh201.loadFromFile (sh201File, error))
+    {
+        fail ("SH-201 profile did not load: " + error);
+        return failures;
+    }
+
+    SimulatedDevice device (sh201);
+    if (! device.holdsMemory() || device.blockCount() != 23 || ! device.answersIdentity() || device.deviceId() != 0x10)
+        fail ("SH-201: expected 23 blocks, an identity and device id 10, got " + juce::String (device.blockCount())
+              + " blocks, identity " + (device.answersIdentity() ? "yes" : "no") + ", id " + juce::String (device.deviceId()));
+
+    // Identity: its own id and the broadcast id are answered, and the answer is one the profile
+    // accepts as the SH-201. Another id is not this device.
+    for (const auto* request : { "F0 7E 10 06 01 F7", "F0 7E 7F 06 01 F7" })
+    {
+        const auto replies = device.receive (bytesOf (request));
+        if (replies.size() != 1)
+        {
+            fail (juce::String ("identity request ") + request + " was not answered once");
+            continue;
+        }
+        const auto hex = DeviceProfileEngine::bytesToHex (replies[0]);
+        if (hex != "F0 7E 10 06 02 41 16 02 00 00 00 00 00 00 F7" || ! sh201.matchIdentityReply (hex).matched)
+            fail ("identity reply was " + hex);
+    }
+    if (! device.receive (bytesOf ("F0 7E 11 06 01 F7")).empty())
+        fail ("an identity request for device 11 was answered by device 10");
+
+    // A write is stored where it says and answers nothing: the profile's own test message.
+    const auto cutoffAddress = SimulatedDevice::addressFromBytes (bytesOf ("10 00 01 13"), 0, 4);
+    if (device.byteAt (cutoffAddress) < 0)
+        fail ("the Upper Filter cutoff address was not seeded from the profile");
+    if (! device.receive (bytesOf ("F0 41 10 00 00 16 12 10 00 01 13 40 1C F7")).empty() || device.byteAt (cutoffAddress) != 0x40)
+        fail ("DT1 cutoff = 64 was not stored (holds " + juce::String (device.byteAt (cutoffAddress)) + ")");
+
+    // A wrong checksum, and a write to another device id, change nothing — as on the hardware.
+    device.receive (bytesOf ("F0 41 10 00 00 16 12 10 00 01 13 22 1D F7"));
+    device.receive (bytesOf ("F0 41 11 00 00 16 12 10 00 01 13 22 3A F7"));
+    if (device.byteAt (cutoffAddress) != 0x40)
+        fail ("a write with a bad checksum or another device id was stored");
+
+    // One block asked for: one answer, which parses as that block's dump.
+    const auto commonRequest = sh201.compileDeviceRequest ("sh201", "requestPatchCommonDump");
+    const auto commonReplies = device.receive (commonRequest.transaction.messages[0].bytes);
+    if (commonReplies.size() != 1 || sh201.parseDumpMessage (DeviceProfileEngine::bytesToHex (commonReplies[0])).dumpId != "patchCommonDump")
+        fail ("RQ1 Patch Common was not answered with one parseable Patch Common dump");
+
+    // The whole temporary patch: one write per block in the range, in address order, which the
+    // profile collects into a complete patch that still holds the cutoff written above.
+    const auto patchRequest = sh201.compileDeviceRequest ("sh201", "requestTemporaryPatchBulk");
+    const auto patchReplies = device.receive (patchRequest.transaction.messages[0].bytes);
+    juce::StringArray patchHex;
+    for (const auto& reply : patchReplies)
+        patchHex.add (DeviceProfileEngine::bytesToHex (reply));
+    const auto collected = sh201.collectDumpMessages (patchHex);
+    if (patchReplies.size() != 22 || ! collected.complete
+        || collected.collectionId != "temporaryPatch" || collected.expectedMessageCount != 22
+        || (int) collected.values.getProperty ("upper.filter.cutoff", -1) != 64)
+        fail ("RQ1 temporary patch: " + juce::String ((int) patchReplies.size()) + " replies, collection "
+              + collected.status + ", cutoff " + collected.values.getProperty ("upper.filter.cutoff", "missing").toString());
+
+    // LFO Tempo Sync is ON at raw 0 (the MIDI Implementation's "ON, OFF"): switching it on sends
+    // the message the handoff gives for the hardware test, and another switch is still 0 off, 1 on.
+    const auto tempoSyncOn = sh201.compileSetParameter ("sh201", "upper.lfo1.tempoSync", true, true);
+    const auto wideOn = sh201.compileSetParameter ("sh201", "upper.osc1.pitchWide", true, true);
+    if (DeviceProfileEngine::transactionToHex (tempoSyncOn.transaction) != "F0 41 10 00 00 16 12 10 00 01 29 00 46 F7"
+        || DeviceProfileEngine::transactionToHex (wideOn.transaction) != "F0 41 10 00 00 16 12 10 00 01 01 01 6D F7")
+        fail ("Tempo Sync ON / OSC1 Wide ON sent " + DeviceProfileEngine::transactionToHex (tempoSyncOn.transaction)
+              + " / " + DeviceProfileEngine::transactionToHex (wideOn.transaction));
+
+    // A Roland profile that is not the SH-201 gets a simulator too.
+    DeviceProfileEngine gaia;
+    if (! gaia.loadFromFile (gaiaFile, error))
+    {
+        fail ("GAIA profile did not load: " + error);
+        return failures;
+    }
+    SimulatedDevice gaiaDevice (gaia);
+    const auto gaiaRequest = gaia.compileDeviceRequest ("gaia", "requestCommon");
+    const auto gaiaReplies = gaiaDevice.receive (gaiaRequest.transaction.messages[0].bytes);
+    if (! gaiaDevice.holdsMemory() || ! gaiaDevice.answersIdentity() || gaiaReplies.size() != 1
+        || ! gaia.parseDumpMessage (DeviceProfileEngine::bytesToHex (gaiaReplies[0])).ok)
+        fail ("GAIA: no memory, no identity, or Patch Common was not answered with a parseable dump");
+
+    if (failures == 0)
+        std::cout << "[PASS] simulated device :: identity, DT1 stored, RQ1 answered as dumps the profile parses (SH-201, GAIA)\n";
+    return failures;
+}
+
+/*
+ * The simulated device and the internal cables, through the service: sends, not calls. A request
+ * sent to the simulated device must be answered after the send returns, so the request is waiting
+ * when the answer comes — and is then resolved by it exactly as a reply from the synth would be.
+ */
+int runWithinProcessMidiTests (const juce::File& sh201File)
+{
+    using ceditor::device::DeviceProfileEngine;
+    using ceditor::device::DeviceProfileService;
+    using ceditor::device::DeviceProfileServiceTestAccess;
+    using ceditor::device::SimulatedDevice;
+
+    auto failures = 0;
+    const auto fail = [&failures] (const juce::String& what)
+    {
+        std::cerr << "[FAIL] within-process MIDI :: " << what << "\n";
+        ++failures;
+    };
+    const auto endpoint = [] (const juce::String& type, const juce::String& id)
+    {
+        auto* object = new juce::DynamicObject();
+        object->setProperty ("type", type);
+        object->setProperty ("id", id);
+        object->setProperty ("name", id);
+        return juce::var (object);
+    };
+    const auto map = [&endpoint] (DeviceProfileService& service, const juce::String& role, const juce::String& profileId,
+                                  const juce::String& outType, const juce::String& outId,
+                                  const juce::String& inType, const juce::String& inId)
+    {
+        auto* mapping = new juce::DynamicObject();
+        mapping->setProperty ("role", role);
+        mapping->setProperty ("profileId", profileId);
+        mapping->setProperty ("midiDestination", endpoint (outType, outId));
+        mapping->setProperty ("midiInput", endpoint (inType, inId));
+        return (bool) service.setDeviceRoleMapping (juce::var (mapping)).getProperty ("ok", false);
+    };
+    const auto listsId = [] (const juce::var& list, const juce::String& type, const juce::String& id)
+    {
+        if (auto* entries = list.getArray())
+            for (const auto& entry : *entries)
+                if (entry.getProperty ("type", {}).toString() == type && entry.getProperty ("id", {}).toString() == id)
+                    return true;
+        return false;
+    };
+
+    DeviceProfileService service;
+    if (! listsId (service.listMidiDestinations(), "simulatedDevice", "simulatedDevice")
+        || ! listsId (service.listMidiDestinations(), "internalCable", "cable4")
+        || ! listsId (service.listMidiInputs(), "internalCable", "cable1"))
+        fail ("the port lists do not offer the simulated device and the four cables");
+
+    std::vector<std::pair<juce::String, juce::var>> events;
+    service.setEventCallback ([&events] (const juce::String& name, const juce::var& payload) { events.push_back ({ name, payload }); });
+    const auto count = [&events] (const juce::String& name, const juce::String& role)
+    {
+        auto n = 0;
+        for (const auto& [eventName, payload] : events)
+            if (eventName == name && (role.isEmpty() || payload.getProperty ("deviceRole", {}).toString() == role))
+                ++n;
+        return n;
+    };
+
+    if (! map (service, "sh201", "roland-sh-201", "simulatedDevice", "simulatedDevice", "none", "none"))
+        fail ("the SH-201 role could not be mapped to the simulated device");
+    if (service.getSessionState().getProperty ("sh201", {}).getProperty ("state", {}).toString() != "linked")
+        fail ("a role sending to the simulated device is not linked, though it needs no input");
+
+    // Identity: sent, waiting, then answered — and only answered once delivered.
+    auto* identity = new juce::DynamicObject();
+    identity->setProperty ("deviceRole", "sh201");
+    identity->setProperty ("request", "identity");
+    const auto identitySent = service.startDeviceSync (juce::var (identity));
+    if (! (bool) identitySent.getProperty ("pending", false) || count ("deviceRequestResolved", "sh201") != 0)
+        fail ("the identity request was not left waiting (status " + identitySent.getProperty ("status", {}).toString() + ")");
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    if (count ("deviceRequestResolved", "sh201") != 1
+        || service.getSessionState().getProperty ("sh201", {}).getProperty ("identityStatus", {}).toString() != "matched")
+        fail ("the simulated SH-201's identity reply did not resolve the request as a match");
+
+    // A value written through a binding comes back in the patch the panel asks for.
+    auto* write = new juce::DynamicObject();
+    write->setProperty ("deviceRole", "sh201");
+    write->setProperty ("parameterId", "upper.filter.cutoff");
+    write->setProperty ("value", 100);
+    write->setProperty ("dryRun", false);
+    service.compileParameterMessage (juce::var (write), true);
+    if (DeviceProfileServiceTestAccess::queuedWithinProcess (service) != 0)
+        fail ("a DT1 write was answered");
+
+    // A request the profile names, waited for and resolved by the simulator's answer.
+    auto* read = new juce::DynamicObject();
+    read->setProperty ("deviceRole", "sh201");
+    read->setProperty ("request", "requestPatchCommonDump");
+    const auto readSent = service.startDeviceSync (juce::var (read));
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    if (! (bool) readSent.getProperty ("pending", false) || count ("deviceRequestResolved", "sh201") != 2)
+        fail ("the Patch Common read was not resolved by the simulated device (status "
+              + readSent.getProperty ("status", {}).toString() + ")");
+
+    // And the block a panel's "Request Upper Tone" button asks for comes back with the cutoff the
+    // knob wrote — read from the parsed dump, not the runtime state, which the write already set.
+    const auto parsedValue = [&events] (const juce::String& dumpId, const juce::String& parameterId)
+    {
+        juce::var value;
+        for (const auto& [eventName, payload] : events)
+            if (eventName == "dumpMessageParsed" && payload.getProperty ("dumpId", {}).toString() == dumpId)
+                value = payload.getProperty ("values", {}).getProperty (parameterId, {});
+        return value;
+    };
+    auto* button = new juce::DynamicObject();
+    button->setProperty ("deviceRole", "sh201");
+    button->setProperty ("parameterId", "actions.requestUpperTone");
+    button->setProperty ("value", 0);
+    button->setProperty ("dryRun", false);
+    service.compileParameterMessage (juce::var (button), true);
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    if ((int) parsedValue ("upperToneDump", "upper.filter.cutoff") != 100)
+        fail ("Request Upper Tone did not bring back the written cutoff (got "
+              + parsedValue ("upperToneDump", "upper.filter.cutoff").toString() + ")");
+
+    // Every block has a request of its own now, waited for and resolved like Patch Common: the
+    // seventeen a Read Pattern makes, and the tones a panel reads.
+    for (const auto* request : { "requestUpperTone", "requestArpeggioCommon", "requestArpeggioPattern01", "requestArpeggioPattern16" })
+    {
+        const auto before = count ("deviceRequestResolved", "sh201");
+        auto* block = new juce::DynamicObject();
+        block->setProperty ("deviceRole", "sh201");
+        block->setProperty ("request", request);
+        const auto sent = service.startDeviceSync (juce::var (block));
+        DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+        if (! (bool) sent.getProperty ("pending", false) || count ("deviceRequestResolved", "sh201") != before + 1)
+            fail (juce::String (request) + " was not resolved by the simulated device (status "
+                  + sent.getProperty ("status", {}).toString() + ")");
+    }
+
+    // The whole temporary patch is answered block by block, every one a dump the profile parses,
+    // and the request is resolved when the last of the 22 is in: it is the first step of the SH-201's
+    // startup chain, so it is the startup pull, a sync that names no request. It used to wait for a
+    // collection no dump belonged to, and time out. The chain then reads System Common, so a panel
+    // shows the synth's system settings too.
+    const auto lastResolved = [&events] (const juce::String& role, const juce::String& requestId = {})
+    {
+        juce::var resolved;
+        for (const auto& [eventName, payload] : events)
+            if (eventName == "deviceRequestResolved" && payload.getProperty ("deviceRole", {}).toString() == role
+                && (requestId.isEmpty() || payload.getProperty ("requestId", {}).toString() == requestId))
+                resolved = payload;
+        return resolved;
+    };
+    const auto parsedBefore = count ("dumpMessageParsed", "sh201");
+    const auto resolvedBefore = count ("deviceRequestResolved", "sh201");
+    auto* pull = new juce::DynamicObject();
+    pull->setProperty ("deviceRole", "sh201");
+    const auto pullSent = service.startDeviceSync (juce::var (pull));
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    const auto pulled = lastResolved ("sh201", "requestTemporaryPatchBulk");
+    const auto pulledCollection = pulled.getProperty ("dumpCollection", {});
+    if (count ("dumpMessageParsed", "sh201") - parsedBefore != 23)
+        fail ("the startup pull was answered with " + juce::String (count ("dumpMessageParsed", "sh201") - parsedBefore)
+              + " dumps, not the patch's 22 blocks and System Common");
+    if (! (bool) pullSent.getProperty ("pending", false)
+        || count ("deviceRequestResolved", "sh201") != resolvedBefore + 2
+        || pulled.getProperty ("dumpId", {}).toString() != "temporaryPatch"
+        || ! (bool) pulledCollection.getProperty ("complete", false)
+        || (int) pulledCollection.getProperty ("receivedMessageCount", 0) != 22
+        || (int) pulled.getProperty ("values", {}).getProperty ("upper.filter.cutoff", -1) != 100)
+        fail ("the startup pull of the temporary patch was not resolved by its 22 blocks (request "
+              + pulled.getProperty ("requestId", {}).toString() + ", collection "
+              + pulledCollection.getProperty ("status", "none").toString() + ", "
+              + pulledCollection.getProperty ("receivedMessageCount", 0).toString() + " messages)");
+    const auto system = lastResolved ("sh201");
+    if (system.getProperty ("dumpId", {}).toString() != "systemDump"
+        || (int) system.getProperty ("values", {}).getProperty ("system.masterTune", -1) != 1024)
+        fail ("the startup chain did not go on to read System Common after the patch (last resolved "
+              + system.getProperty ("dumpId", {}).toString() + ")");
+
+    // Asked again, it is answered by the new answer, not by the patch the first one completed: one
+    // block arriving first does not resolve it. And a block read on its own still resolves its own
+    // request, though it is one of the 22 — it is what Request Upper Tone sends for.
+    DeviceProfileEngine sh201;
+    juce::String loadError;
+    if (! sh201.loadFromFile (sh201File, loadError))
+        fail ("SH-201 profile did not load: " + loadError);
+    SimulatedDevice upperOnly (sh201);
+    const auto upperReplies = upperOnly.receive (sh201.compileDeviceRequest ("sh201", "requestUpperTone").transaction.messages[0].bytes);
+    auto* again = new juce::DynamicObject();
+    again->setProperty ("deviceRole", "sh201");
+    again->setProperty ("request", "requestTemporaryPatchBulk");
+    again->setProperty ("chainStartup", false);
+    service.startDeviceSync (juce::var (again));
+    const auto resolvedBeforeAgain = count ("deviceRequestResolved", "sh201");
+    auto* early = new juce::DynamicObject();
+    early->setProperty ("deviceRole", "sh201");
+    early->setProperty ("hex", upperReplies.empty() ? juce::String {} : DeviceProfileEngine::bytesToHex (upperReplies[0]));
+    service.ingestIncomingMidiMessage (juce::var (early));
+    if (upperReplies.size() != 1 || count ("deviceRequestResolved", "sh201") != resolvedBeforeAgain)
+        fail ("a second whole-patch request was resolved by the first block of its answer");
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    if (count ("deviceRequestResolved", "sh201") != resolvedBeforeAgain + 1)
+        fail ("the second whole-patch request was not resolved by its own answer");
+
+    auto* upperAgain = new juce::DynamicObject();
+    upperAgain->setProperty ("deviceRole", "sh201");
+    upperAgain->setProperty ("request", "requestUpperTone");
+    service.startDeviceSync (juce::var (upperAgain));
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    juce::var latestCollection;
+    for (const auto& [eventName, payload] : events)
+        if (eventName == "dumpCollectionUpdated" && payload.getProperty ("deviceRole", {}).toString() == "sh201")
+            latestCollection = payload;
+    if (lastResolved ("sh201").getProperty ("dumpId", {}).toString() != "upperToneDump"
+        || (int) latestCollection.getProperty ("receivedMessageCount", 0) != 22)
+        fail ("Upper Tone read after the patch: resolved by " + lastResolved ("sh201").getProperty ("dumpId", {}).toString()
+              + ", the patch now holds " + latestCollection.getProperty ("receivedMessageCount", 0).toString()
+              + " messages (a block read again replaces its place, it is not added)");
+
+    // Cables: what one role sends arrives on every role listening to that cable, and nowhere else.
+    map (service, "sender", "test-cc-synth", "internalCable", "cable2", "none", "none");
+    map (service, "listener", "test-cc-synth", "previewOnly", "previewOnly", "internalCable", "cable2");
+    map (service, "elsewhere", "test-cc-synth", "previewOnly", "previewOnly", "internalCable", "cable3");
+    auto* raw = new juce::DynamicObject();
+    raw->setProperty ("deviceRole", "sender");
+    raw->setProperty ("message", "B0 07 64");
+    raw->setProperty ("dryRun", false);
+    const auto rawSent = service.compileRawMidiAction (juce::var (raw), true);
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    juce::String heard;
+    for (const auto& [eventName, payload] : events)
+        if (eventName == "midiInputMessage" && payload.getProperty ("deviceRole", {}).toString() == "listener")
+            heard = payload.getProperty ("hex", {}).toString() + " via " + payload.getProperty ("origin", {}).toString();
+    if (! rawSent.getProperty ("status", {}).toString().startsWith ("Sent") || heard != "B0 07 64 via internalCable"
+        || count ("midiInputMessage", "elsewhere") != 0 || count ("midiInputMessage", "sender") != 0)
+        fail ("cable 2 delivered \"" + heard + "\" to its listener (send status "
+              + rawSent.getProperty ("status", {}).toString() + ")");
+
+    if (failures == 0)
+        std::cout << "[PASS] within-process MIDI :: simulated SH-201 answers identity, block reads and the startup pull of the whole patch after the send; cables reach their listeners only\n";
+    return failures;
+}
+
 int runServiceRequestTests()
 {
     ceditor::device::DeviceProfileService service;
@@ -3634,6 +4008,9 @@ int main (int argc, char** argv)
     failures += runRealtimeMonitorTests();
     failures += runRequestRetryTests();
     failures += runServiceRequestTests();
+    failures += runSimulatedDeviceTests (root.getChildFile ("roland-sh-201.ceditor-device.json"),
+                                         root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
+    failures += runWithinProcessMidiTests (root.getChildFile ("roland-sh-201.ceditor-device.json"));
     failures += runSharedInputReplyTests();
     failures += runSharedProfileEngineTests();
     failures += runSharedInputAcrossProcessesTests();

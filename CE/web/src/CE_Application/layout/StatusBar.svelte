@@ -25,6 +25,7 @@
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { countRolesInControls } from '../utils/deviceRoles.js';
   import { displayTabRequest } from '../stores/displayTab.js';
+  import { outputSends } from '../utils/midiEndpoints.js';
 
   let deviceRoles = $derived([...countRolesInControls($activePanel?.controls).keys()]);
   let deviceRole = $derived(deviceRoles.length === 1 ? deviceRoles[0] : deviceRoles.length ? '' : DEFAULT_DEVICE_ROLE);
@@ -84,7 +85,7 @@
 <div class="status-bar">
   <span class={['status-item', `status-${$scriptStatus.kind}`]}>{$scriptStatus.message || 'Ready'}</span>
   {#if canvasActive}
-    <button class="status-item midi-status" class:status-warn={!midiOutput || midiOutput.type !== 'hardwareOutput'}
+    <button class="status-item midi-status" class:status-warn={!outputSends(midiOutput)}
       title={deviceRole ? `${deviceRole} MIDI output: ${midiOutput?.name ?? 'Unavailable'}. Input: ${midiInput?.name ?? 'None'}. Click to configure ports.` : `Panel devices: ${deviceRoles.join(', ')}. Click to configure ports.`}
       onclick={() => displayTabRequest.set({ tab: 'ports' })}>
       MIDI out: {deviceRole ? midiOutput?.name ?? 'Unavailable' : `${deviceRoles.length} devices`}

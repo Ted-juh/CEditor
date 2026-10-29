@@ -158,6 +158,9 @@ export function fingerprintParameter(profile, parameterId) {
     // ASCII code of a patch name's first letter as the parameter's value — a plausible number from
     // a message that matched, which is exactly the failure the value WIDTH was added to prevent.
     valueType: String(parameter?.type ?? ''),
+    // A switch's own wire values, which the decoder needs to read it (Tempo Sync is ON at 0).
+    ...(parameter?.trueValue != null ? { trueValue: parameter.trueValue } : {}),
+    ...(parameter?.falseValue != null ? { falseValue: parameter.falseValue } : {}),
     source: 'compiled',
   };
 }
@@ -219,6 +222,8 @@ export function buildInboundIndex(profile) {
         valueLength: print.valueLength,
         encoding: print.encoding,
         valueType: print.valueType ?? '',
+        ...(print.trueValue != null ? { trueValue: print.trueValue } : {}),
+        ...(print.falseValue != null ? { falseValue: print.falseValue } : {}),
         source: print.source,
         valueMap: print.valueMap,
         alternate: print.alternate,
@@ -309,7 +314,7 @@ export function decodeInbound(index, hex, values = {}) {
     return Number.isFinite(value) ? { parameterId, value } : null;
   }
   const value = decodeParameterValue(
-    { id: parameterId, type: entry.valueType, encoding: entry.encoding }, raw);
+    { id: parameterId, type: entry.valueType, encoding: entry.encoding, trueValue: entry.trueValue, falseValue: entry.falseValue }, raw);
   return value === null ? null : { parameterId, value };
 }
 

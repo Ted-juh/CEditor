@@ -1,4 +1,6 @@
 import { blocksToLanes } from './gaiaArpPattern.js';
+import { layoutFor } from './arpPatternLayouts.js';
+import { SIMULATED_DEVICE } from './midiEndpoints.js';
 import { getCustomArpeggiator } from './customComponentArpeggiator.js';
 import { deviceFeedbackCounts, feedbackEndpointAvailable } from '../stores/deviceSyncFeedback.js';
 
@@ -8,17 +10,16 @@ export function gaiaPatternFingerprint(blocks) {
     .sort((a, b) => a[1] - b[1] || a[0] - b[0] || a[2] - b[2] || a[3] - b[3]));
 }
 export function gaiaExpectedArpValues(control, values = {}) {
-  const arp = getCustomArpeggiator(control, values);
+  const arp = getCustomArpeggiator(control, values), layout = layoutFor(control);
   const source = values.__arpPatternSource;
   if (source?.raw && source.fingerprint === gaiaPatternFingerprint(arp.blocks)) {
-    return { expected: { ...source.raw, 'arp.endStep': values.arpEndStep ?? 32 }, dropped: [] };
+    return { expected: { ...source.raw, [layout.endStep]: values.arpEndStep ?? layout.steps }, dropped: [] };
   }
-  const built = blocksToLanes(arp.blocks, { lanes: 16, steps: 32 });
-  const expected = { 'arp.endStep': values.arpEndStep ?? control?._children?.ValueChannels?._children?.arpEndStep?.defaultValue ?? 32 };
+  const built = blocksToLanes(arp.blocks, { lanes: layout.lanes, steps: layout.steps });
+  const expected = { [layout.endStep]: values.arpEndStep ?? control?._children?.ValueChannels?._children?.arpEndStep?.defaultValue ?? layout.steps };
   built.lanes.forEach((lane, index) => {
-    const prefix = `arpPattern.note${index + 1}`;
-    expected[`${prefix}.originalNote`] = lane.originalNote;
-    lane.steps.forEach((value, step) => { expected[`${prefix}.step${step + 1}Data`] = value; });
+    expected[layout.originalNote(index + 1)] = lane.originalNote;
+    lane.steps.forEach((value, step) => { expected[layout.step(index + 1, step + 1)] = value; });
   });
   return { expected, dropped: built.dropped };
 }
@@ -42,7 +43,10 @@ function statusPattern(grid, values) {
 
 export function gaiaSyncStatus({ grid, values = {}, feedback = {}, mapping, destinations = [], inputs = [], capabilities = {} }) {
   const output = capabilities.canSendSysex === true && feedbackEndpointAvailable(mapping?.midiDestination, destinations);
-  const input = capabilities.canReceiveSysex === true && feedbackEndpointAvailable(mapping?.midiInput, inputs);
+  // The simulated device answers on the role itself: its output is its input.
+  const input = capabilities.canReceiveSysex === true && (mapping?.midiDestination?.type === SIMULATED_DEVICE
+    ? output : feedbackEndpointAvailable(mapping?.midiInput, inputs));
+  const synth = layoutFor(grid).synth;
   const connection = !mapping?.profileId ? 'NO DEVICE MAPPING' : !output ? 'MIDI OFFLINE' : !input ? 'NO MIDI INPUT' : 'MIDI PORTS READY';
   const counts = deviceFeedbackCounts(feedback);
   const reads = Object.values(feedback.reads ?? {});
@@ -60,10 +64,10 @@ export function gaiaSyncStatus({ grid, values = {}, feedback = {}, mapping, dest
   // Receiving unrelated parameter data or matching the starter pattern does not attach it.
   const source = values.__arpPatternSource;
   const origin = source?.kind === 'hardware'
-    ? source.fingerprint === fingerprint ? 'GAIA-READ PATTERN' : 'EDITED GAIA PATTERN'
+    ? source.fingerprint === fingerprint ? `${synth}-READ PATTERN` : `EDITED ${synth} PATTERN`
     : edited ? 'EDITED IN EDITOR' : 'EDITOR PATTERN';
   const pattern = dropped.length ? `EXCEEDS 16 NOTE LANES (${dropped.length} NOT SENT)`
-    : verified && output && input && !reading && !readError && !feedback.identityError ? 'SYNCED (READBACK)' : received ? `NOT VERIFIED (${received}/529 RECEIVED)` : 'NOT READ FROM GAIA';
+    : verified && output && input && !reading && !readError && !feedback.identityError ? 'SYNCED (READBACK)' : received ? `NOT VERIFIED (${received}/${entries.length} RECEIVED)` : `NOT READ FROM ${synth}`;
   const transfer = feedback.identityError ? 'DEVICE IDENTITY MISMATCH' : counts.failed ? `${counts.failed} SEND ERROR${counts.failed === 1 ? '' : 'S'}`
     : readError ? 'READ FAILED / TIMED OUT'
     : reading ? 'READING…'

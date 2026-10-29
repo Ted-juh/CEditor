@@ -214,6 +214,7 @@ import {
   flatControls, findControlById, findParentOfControl, isContainerControl,
   insertControlIntoTree, mapControlsTree, removeControlFromTree, remintControlIds, controlPanelOffset,
 } from '../utils/containment.js';
+import { isHardwareEndpoint } from '../utils/midiEndpoints.js';
 
 /* --------------------------------------------------------------- path resolution */
 
@@ -8748,10 +8749,11 @@ function devicePortsRead(opts = {}) {
       name: String(port?.name ?? port?.id ?? ''),
       direction: dir,
       type,
-      // The two placeholder rows the app always lists are choices, not hardware. Both are reported
-      // — they are what a mapping can be set to — but a script asking "did a device show up" wants
-      // this flag, not a list of magic type strings to compare against.
-      hardware: type !== 'none' && type !== 'previewOnly',
+      // The placeholder rows the app always lists are choices, not hardware, and so are the
+      // internal cables and the simulated device. All are reported — they are what a mapping can be
+      // set to — but a script asking "did a device show up" wants this flag, not a list of magic
+      // type strings to compare against.
+      hardware: isHardwareEndpoint(port),
       role: roleUsing(port?.id, which),
     });
   };
@@ -11278,13 +11280,59 @@ function activeScripts() {
 }
 
 let pendingApprovalScript = null;
+
+/**
+ * The request for the active set, reused within one task.
+ *
+ * Every script's handlers check approval before they load and again before they run, and a
+ * dispatch visits every script, so building the request — every script's source in one string,
+ * and a walk of every control for the ones they carry — once per check made each event cost one
+ * fingerprint per script. On the GAIA panel (232 scripts) that was about half a second of main
+ * thread per click in Preview: two quick presses arrived as two clicks, and a double-click on a
+ * stepper stepped twice instead of resetting.
+ *
+ * Reused only while nothing it was built from has been replaced — the panel document, the live
+ * edit override, the panel's script document and the installed extensions, compared by identity —
+ * and only until the current task ends, so an edit, which arrives as a task of its own, is always
+ * checked against a freshly built request.
+ */
+let requestMemo = null;
+function requestInputs(panel) {
+  const doc = host ? null : get(scriptDocuments).find((d) => String(d.panelId) === String(panel?.id)) ?? null;
+  return [host, panel, live.editOverride, doc, ...registeredExtensions()];
+}
+function sameInputs(a, b) {
+  return a.length === b.length && a.every((value, index) => value === b[index]);
+}
+
 function executionRequest(extraScript = null) {
   const panel = livePanel();
   const scripts = activeScripts();
+  // A script of the active set, as the set holds it, adds nothing: the request is the set's own.
+  const member = !extraScript || scripts.find((s) => s.id === extraScript.id) === extraScript;
+  if (member) {
+    const inputs = requestInputs(panel);
+    if (requestMemo && sameInputs(requestMemo.inputs, inputs)) return requestMemo.request;
+    const request = buildExecutionRequest(panel, scripts, null);
+    requestMemo = { inputs, request };
+    setTimeout(() => { if (requestMemo?.request === request) requestMemo = null; }, 0);
+    return request;
+  }
+  return buildExecutionRequest(panel, scripts, extraScript);
+}
+
+function buildExecutionRequest(panel, scripts, extraScript) {
   const effective = extraScript
     ? [...scripts.filter(s => s.id !== extraScript.id), extraScript] : [...scripts];
-  // Canonical order makes explicit Run and event dispatch use the same approval.
-  effective.sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  // Canonical order makes explicit Run and event dispatch use the same approval. By code unit, not
+  // localeCompare: the script sandbox's lockdown (SES) replaces localeCompare with a plain
+  // comparison when it starts, so a panel approved before its first script loaded fingerprinted in
+  // the locale's order ("gaia_tone_copy" before "gaia_tone1_copy_click") and checked in the other,
+  // lost its approval the moment its scripts began, and had to be approved twice.
+  effective.sort((a, b) => {
+    const x = String(a.id), y = String(b.id);
+    return x < y ? -1 : x > y ? 1 : 0;
+  });
   const embedded = flatControls(panel?.controls ?? []).flatMap(c => c?._children?.Scripts?.scripts ?? []);
   const all = [...effective, ...embedded];
   const extensions = [...registeredExtensions(), ...(panel?.scripting?.extensions ?? [])];

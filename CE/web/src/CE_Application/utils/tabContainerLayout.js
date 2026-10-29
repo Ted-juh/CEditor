@@ -139,6 +139,29 @@ export function selectPage(control, index) {
   return clampInt(index, 0, tabPages(control).length - 1);
 }
 
+/** A name as a page is matched by it: case and punctuation aside, so "SOLO+LEGATO" is "solo-legato". */
+const nameKey = (value) => String(value ?? '').toLowerCase().replace(/[^a-z0-9]+/g, '');
+
+/**
+ * The page a value arriving on the bindable port names, or null when it names none.
+ *
+ * A page whose label (or id) is the value comes first: the editor hears a choice parameter as the
+ * choice's id ("lower"), so pages labelled as the synth names its choices (UPPER, LOWER) follow it
+ * whatever the wire values are. Otherwise the value is the page's number, which is what the port
+ * sends and what a player that decodes the wire value hears.
+ */
+export function pageIndexForValue(control, value) {
+  const pages = tabPages(control);
+  const named = nameKey(value);
+  if (named) {
+    const index = pages.findIndex((page) => nameKey(page?.label) === named || nameKey(page?.id) === named);
+    if (index >= 0) return index;
+  }
+  if (typeof value === 'boolean') return selectPage(control, value ? 1 : 0);
+  const number = Number(value);
+  return value !== '' && value != null && Number.isFinite(number) ? selectPage(control, number) : null;
+}
+
 export function tabPorts(control, parameterTypes = null) {
   const types = parameterTypes ?? {};
   return [{

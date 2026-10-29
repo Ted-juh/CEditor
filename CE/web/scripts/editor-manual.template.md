@@ -263,6 +263,14 @@ title), **Tabbed Container** (pages with tabs; set them up on its **Pages** tab 
 the page that was showing when you put it in) and **Scroll Area** (contents larger than the box,
 scrolled into view).
 
+A Tabbed Container's page can be bound like a value, on the **Device** tab with the port **Page**.
+Bound to a synth's part or mode parameter, the pages follow it both ways: choosing a page sends its
+number, and when the synth reports the parameter the page turns. Label the pages as the synth names
+the choices (on the **Pages** tab: UPPER, LOWER) and a page is found by name; otherwise by its
+number, which is the value a page sends. That is how a panel edits a
+synth with several parts. Each part gets a page of its own controls, each control bound once, and
+the strip is the part buttons.
+
 ### Arranging
 
 The dock's **Align** tool lines up the selected controls by their edges or centres, spaces them out
@@ -470,6 +478,20 @@ Set up the ports in either of two places:
 is received. The port choices are saved with the panel and with CEditor's settings. MIDI only works in
 the desktop app.
 
+Two kinds of output never leave CEditor, and they are listed after your computer's ports:
+
+- **Simulated device** stands in for the synth when it is not connected. It answers from the device's
+  profile: it keeps what your controls send, sends a patch back when the panel asks for one, and
+  answers **Test**. It needs no input; its answers arrive on the device itself. It makes no sound,
+  sends nothing unless asked, and knows only what the profile says. That makes it good for building
+  and trying a panel, and no proof that the profile matches the real instrument. It does this for
+  profiles that use Roland-style addresses, such as the GAIA SH-01 and SH-201. For other profiles it
+  only answers **Test**, and only if the profile describes the synth's identity.
+- **Internal cable 1** to **4** connect devices inside CEditor. What one device sends to a cable arrives
+  on every device whose **Listen To** is that cable. Other programs cannot see these cables. To
+  connect CEditor to another program on Windows, use a virtual MIDI port program such as loopMIDI;
+  its ports then appear in the lists like any other.
+
 ### Binding a control
 
 A control does nothing to the synth until it is bound. Select it and open the **Device** tab of the
@@ -520,6 +542,15 @@ role, say **drums**, add that device in **Settings → MIDI** and give it its ow
 The dock's **Routes** tool links one control to another: moving the source moves the target, by a
 chosen amount and curve. A route that ends at a parameter of the synth does not send anything yet —
 bind the target control instead.
+
+### A synth's arpeggio pattern
+
+A custom component with an arpeggiator grid can edit a synth's own user arpeggio pattern. The GAIA
+panel's grid does this: its READ PATTERN and SEND PATTERN zones bring the pattern from the synth and
+write it back. Choose whose pattern on the grid's **Device** tab, under **Arpeggio Pattern**:
+**Roland GAIA SH-01** or **Roland SH-201**. Then bind the grid's **Loop End Step** port to that
+synth's End Step parameter. The pattern is read from and sent to that binding's device. The choice
+belongs to this copy of the grid, not to its library component.
 
 ## 6. Describing a synth: device profiles
 
@@ -769,6 +800,12 @@ the fonts and icons it brought stay in that copy, so it can be shared on again. 
 read for themselves are not included. See [Fonts and icons](#fonts-and-icons) for which fonts and
 icons go along.
 
+Custom components placed from your library go along with their library package, the version each
+copy was placed from. Opening the shared panel adds the packages your library does not have and says
+which, so the copies are linked there as they were on the author's computer: their Source card can
+update them, and the Library dock can place more. A package your library already has under the same
+name and version, but with a different design, is kept as it is, and you are told.
+
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
 
@@ -1006,7 +1043,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Open Script Workspace** | | Opens a saved script workspace file. |
 | **Save** | Ctrl+S | Saves the panel (or the script workspace in front). |
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
-| **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts and icons inside, for another computer. |
+| **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts, icons and library components inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |
 | **Close Tab** | Ctrl+W | Closes the tab in front, asking first if it has unsaved changes. |
 | **Hostage...** | | Opens HoSTage, the instrument host. |

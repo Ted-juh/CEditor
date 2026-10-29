@@ -121,8 +121,11 @@ function applyRef(panel, ref, value) {
  * reference left alone and the file named in `missing`. Refusing outright would mean one stale path
  * blocks sharing an otherwise complete panel — and the author is the one person who can still find
  * that file.
+ *
+ * `components` are the library packages the panel's copies were placed from
+ * (utils/panelComponentPackages.js), carried as they are so the recipient's library can take them.
  */
-export async function createPanelPackage(panel, { readAsset, metadata = {}, now = null } = {}) {
+export async function createPanelPackage(panel, { readAsset, metadata = {}, now = null, components = [] } = {}) {
   if (typeof readAsset !== 'function') throw new TypeError('createPanelPackage needs a readAsset(path) function');
 
   // deepClone, not structuredClone: a panel handed in from the editor is a Svelte $state proxy, and
@@ -166,6 +169,7 @@ export async function createPanelPackage(panel, { readAsset, metadata = {}, now 
     panel: doc,
     assets,
     missing,
+    components: deepClone(Array.isArray(components) ? components : []),
   };
 }
 
@@ -198,6 +202,11 @@ export function validatePanelPackage(envelope) {
   }
   if (envelope.missing != null && (!Array.isArray(envelope.missing) || envelope.missing.some((path) => typeof path !== 'string'))) {
     issues.push('Package missing files must be a list of paths.');
+  }
+  // Optional: a package from before components travelled has none, and opens as it always did.
+  if (envelope.components != null && (!Array.isArray(envelope.components)
+      || envelope.components.some((entry) => !entry || typeof entry !== 'object' || Array.isArray(entry)))) {
+    issues.push('Package components must be a list of component packages.');
   }
   // Stop before walking references: malformed documents must return a refusal, not throw while
   // trying to iterate the very field whose shape we have just rejected.
@@ -260,5 +269,6 @@ export async function openPanelPackage(envelope, { writeAsset } = {}) {
     if (target) applyRef(panel, ref, target);
   }
 
-  return { ok: true, panel, issues: [], warnings: validation.warnings, unresolved };
+  const components = deepClone(envelope.components ?? []);
+  return { ok: true, panel, issues: [], warnings: validation.warnings, unresolved, components };
 }

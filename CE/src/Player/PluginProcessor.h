@@ -2942,11 +2942,11 @@ private:
                         o->setProperty ("name", src->getProperty ("name").toString());
                         o->setProperty ("direction", dir);
                         o->setProperty ("type", type);
-                        // The placeholder rows the service always lists are choices, not hardware.
-                        // Both are reported — they are what a mapping can be set to — but a script
-                        // asking "did a device show up" wants this flag, not a list of magic
-                        // type strings to compare against.
-                        o->setProperty ("hardware", type != "none" && type != "previewOnly");
+                        // The placeholder rows the service always lists are choices, not hardware,
+                        // and so are the internal cables and the simulated device. All are reported —
+                        // they are what a mapping can be set to — but a script asking "did a device
+                        // show up" wants this flag, not a list of magic type strings to compare against.
+                        o->setProperty ("hardware", type == "hardwareOutput" || type == "hardwareInput");
                         o->setProperty ("role", usedBy);
                         out.add (juce::var (o));
                     }

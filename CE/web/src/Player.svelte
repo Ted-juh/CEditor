@@ -37,7 +37,7 @@
   import deviceRuntime from './CE_Application/generated/roland.gaia.runtime.json';
   import { DEFAULT_DEVICE_ROLE } from './CE_Application/stores/deviceConstants.js';
   import { flatControls } from './CE_Application/utils/containment.js';
-  import { queueIncomingFeedback, incomingFeedbackEntries } from './CE_Application/utils/incomingFeedback.js';
+  import { queueIncomingFeedback, incomingFeedbackEntries, incomingFeedbackPatch } from './CE_Application/utils/incomingFeedback.js';
 
   // $state.raw keeps the document cloneable by PanelPreviewSurface. Loads replace it wholesale;
   // script-driven visual writes replace its shallow shell after mutating the addressed field.
@@ -260,17 +260,14 @@
     pendingIncoming = null;
     if (!pend) return;
     const patches = [];
+    const sessions = get(panelPreviewSessions) ?? {};
+    const controls = new Map(flatControls(panel?.controls ?? []).map((c) => [c?._children?.Core?.id, c]));
     for (const { controlId, port, value } of incomingFeedbackEntries(pend)) {
       // Move the on-screen control WITHOUT re-emitting a send (updatePanelPreviewSession
       // directly, not patchControlSession) so we don't fight the synth / create a loop.
-      // Display ports drive the panel's lighting/text, not a value override, so a
-      // display bound directly to a device parameter responds live in the player.
-      let patch;
-      if (port === 'brightness') patch = { brightnessOverride: Math.max(0, Math.min(100, Math.round((Number(value) / 127) * 100))) };
-      else if (port === 'backlight') patch = { backlightOverride: Number(value) >= 64 };
-      else if (port === 'text') patch = { textOverride: String(value) };
-      else patch = { valueOverrideEnabled: true, valueOverride: value };
-      patches.push({ controlId, patch });
+      // incomingFeedbackPatch says what each port moves: a value, a display, a page.
+      const patch = incomingFeedbackPatch(port, value, { control: controls.get(controlId), session: sessions[controlId] });
+      if (patch) patches.push({ controlId, patch });
     }
     updatePanelPreviewSessions(patches);
   }

@@ -800,6 +800,43 @@ int main()
                "ce.anim: a control the panel does not have is named missing, one it has and the panel itself are not");
     }
 
+    {
+        // The plug-in loads the scripts of every control in the tree. A container's children live in
+        // its Children._children map, not in `controls`, and a script on a control inside a group —
+        // a section of a front panel, say — used to be left out while the editor ran it.
+        const auto doc = juce::JSON::parse (R"JSON({
+          "scripts": [ { "id": "p", "language": "lua", "source": "-- panel" } ],
+          "controls": [
+            { "_children": { "Core": { "id": "top" },
+                             "Scripts": { "scripts": [ { "id": "t", "language": "lua", "source": "-- top" } ] } } },
+            { "_children": { "Core": { "id": "section" },
+                             "Children": { "_children": {
+                               "arp": { "_children": { "Core": { "id": "arp" },
+                                 "Scripts": { "scripts": [ { "id": "a", "language": "lua", "source": "-- arp" } ] },
+                                 "Children": { "_children": {
+                                   "deep": { "_children": { "Core": { "id": "deep" },
+                                     "Scripts": { "scripts": [ { "id": "d", "language": "lua", "source": "-- deep" } ] } } } } } } },
+                               "off": { "_children": { "Core": { "id": "off" },
+                                 "Scripts": { "enabled": false, "scripts": [ { "id": "o", "language": "lua", "source": "-- off" } ] } } } } } } }
+          ]
+        })JSON");
+
+        const auto gathered = ceditor::gatherPanelScripts (doc);
+        juce::StringArray ids, targets;
+        if (auto* arr = gathered.getArray())
+            for (const auto& s : *arr)
+            {
+                ids.add (s.getProperty ("id", {}).toString());
+                targets.add (s.getProperty ("target", {}).toString());
+            }
+
+        check (ids.joinIntoString (",") == "p,t,a,d",
+               "gatherPanelScripts: every control's scripts, a container's children included, container first (got "
+                   + ids.joinIntoString (",") + ")");
+        check (targets.joinIntoString (",") == ",top,arp,deep",
+               "gatherPanelScripts: a nested control's script targets that control (got " + targets.joinIntoString (",") + ")");
+    }
+
     std::cout << "--------------------\n" << (failures == 0 ? "ALL PASS" : (juce::String (failures) + " FAILED").toRawUTF8()) << std::endl;
     return failures == 0 ? 0 : 1;
 }

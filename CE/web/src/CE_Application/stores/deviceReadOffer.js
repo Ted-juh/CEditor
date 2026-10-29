@@ -18,15 +18,18 @@ import { requestProfileSource } from './deviceProfileSession.js';
 import { startDeviceSync } from './deviceMidiOps.js';
 import { openDialog } from './scriptUi.js';
 import { hasStartupRead } from '../utils/playerStartup.js';
+import { isHardwareEndpoint, SIMULATED_DEVICE } from '../utils/midiEndpoints.js';
 import { countRolesInPanels } from '../utils/deviceRoles.js';
 
 export const READ_NOW = 'Read now';
 export const NOT_NOW = 'Not now';
 
-/** "role\0port" for a mapping on real hardware, or null. */
+/** "role\0port" for a mapping on real hardware or on the simulated device, which answers a read
+ *  as the synth would, or null. Not an internal cable: what is at its far end is another role in
+ *  this editor, which no profile's read is answered by. */
 export function readOfferKey(role, mapping) {
   const dest = mapping?.midiDestination;
-  if (!role || dest?.type !== 'hardwareOutput' || !dest.id) return null;
+  if (!role || !(isHardwareEndpoint(dest) || dest?.type === SIMULATED_DEVICE) || !dest.id) return null;
   return `${role}\u0000${dest.id}`;
 }
 

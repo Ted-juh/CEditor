@@ -689,6 +689,143 @@ IdentityMatchResult DeviceProfileEngine::matchIdentityReply (const juce::String&
     return result;
 }
 
+juce::Array<int> DeviceProfileEngine::buildIdentityReply (int deviceId) const
+{
+    auto* root = profileObject();
+    auto* identity = root != nullptr ? asObject (root->getProperty ("identity")) : nullptr;
+    if (identity == nullptr || ! isMidiDataByte (deviceId))
+        return {};
+
+    const auto resolver = [this] (const juce::String& name) { return resolveVariable (name); };
+    auto manufacturer = parsePatternBytes (identity->getProperty ("manufacturerId"), resolver);
+    auto family = parsePatternBytes (identity->getProperty ("familyCode"), resolver);
+    auto model = parsePatternBytes (identity->getProperty ("modelNumber"), resolver);
+    auto revision = parsePatternBytes (identity->getProperty ("revision"), resolver);
+
+    // The reply's layout is fixed: the parser reads two family bytes and two model bytes whatever
+    // the block declares, so a field the block leaves out is zeros, not missing.
+    if ((manufacturer.size() != 1 && manufacturer.size() != 3) || ! allMidiDataBytes (manufacturer))
+        return {};
+    while (family.size() < 2) family.add (0);
+    while (model.size() < 2) model.add (0);
+    if (revision.isEmpty())
+        for (int index = 0; index < 4; ++index)
+            revision.add (0);
+
+    juce::Array<int> bytes { 0xf0, 0x7e, deviceId, 0x06, 0x02 };
+    for (const auto* part : { &manufacturer, &family, &model, &revision })
+        for (int index = 0; index < part->size(); ++index)
+            bytes.add ((*part)[index] & 0x7f);
+    bytes.add (0xf7);
+    return bytes;
+}
+
+DeviceProfileEngine::AddressedProtocol DeviceProfileEngine::addressedProtocol() const
+{
+    AddressedProtocol protocol;
+    auto* root = profileObject();
+    auto* recipes = root != nullptr ? asArray (root->getProperty ("messageRecipes")) : nullptr;
+    if (recipes == nullptr)
+        return protocol;
+
+    // One recipe's shape: the header before $address, then which value follows it. Anything that is
+    // not header, $address, the value, $checksum, F7 — in that order — is not this protocol.
+    struct Shape { juce::Array<int> header, variablePositions; juce::String value, checksumType; int checksumOffset = 0xa5; };
+    const auto shapeOf = [this] (const juce::DynamicObject& recipe, Shape& shape)
+    {
+        auto* items = asArray (recipe.getProperty ("template"));
+        auto* checksum = asObject (recipe.getProperty ("checksum"));
+        if (propString (recipe, "kind") != "sysex" || items == nullptr || checksum == nullptr)
+            return false;
+
+        juce::StringArray tokens;
+        for (const auto& item : *items)
+            tokens.add (item.toString().trim());
+
+        const auto at = tokens.indexOf ("$address");
+        if (at < 1 || tokens.size() != at + 4 || tokens[at + 2] != "$checksum" || tokens[at + 3].toUpperCase() != "F7")
+            return false;
+
+        shape.value = tokens[at + 1];
+        if ((shape.value != "$encodedValue" && shape.value != "$size")
+            || propString (*checksum, "from") != "$address" || propString (*checksum, "to") != shape.value)
+            return false;
+
+        for (int index = 0; index < at; ++index)
+        {
+            if (tokens[index].startsWithChar ('$'))
+            {
+                const auto value = resolveVariable (tokens[index].substring (1));
+                if (value.isVoid() || ! isMidiDataByte ((int) value))
+                    return false;
+                shape.variablePositions.add (index);
+                shape.header.add ((int) value);
+            }
+            else
+            {
+                shape.header.add (parseHexByte (tokens[index]));
+            }
+        }
+
+        shape.checksumType = propString (*checksum, "type");
+        shape.checksumOffset = propInt (*checksum, "offset", 0xa5);
+        return shape.header.size() > 1 && shape.header[0] == 0xf0;
+    };
+
+    Shape write, request;
+    juce::String writeRecipeId;
+    for (const auto& recipeValue : *recipes)
+    {
+        auto* recipe = asObject (recipeValue);
+        Shape shape;
+        if (recipe == nullptr || ! shapeOf (*recipe, shape))
+            continue;
+        if (shape.value == "$encodedValue" && write.header.isEmpty())
+        {
+            write = shape;
+            writeRecipeId = propString (*recipe, "id");
+        }
+        else if (shape.value == "$size" && request.header.isEmpty())
+        {
+            request = shape;
+        }
+    }
+
+    if (write.header.isEmpty() || request.header.isEmpty() || write.checksumType != request.checksumType)
+        return protocol;
+
+    const auto checksumWidth = ce::checksums::toBytes (write.checksumType, juce::Array<int> { 0 }, write.checksumOffset).size();
+    if (checksumWidth < 1)
+        return protocol;
+
+    // How wide an address is: what the parameters that write through this recipe give. A size is as
+    // wide as an address in every protocol of this shape.
+    auto addressBytes = 0;
+    if (auto* parameters = asArray (root->getProperty ("parameters")))
+        for (const auto& parameterValue : *parameters)
+            if (auto* parameter = asObject (parameterValue))
+                if (propString (*parameter, "messageRecipe") == writeRecipeId)
+                    if (const auto address = parseHexBytes (propString (*parameter, "address")); ! address.isEmpty())
+                    {
+                        addressBytes = address.size();
+                        break;
+                    }
+    if (addressBytes < 1)
+        return protocol;
+
+    protocol.ok = true;
+    protocol.writeHeader = write.header;
+    protocol.requestHeader = request.header;
+    protocol.writeVariablePositions = write.variablePositions;
+    protocol.requestVariablePositions = request.variablePositions;
+    protocol.addressBytes = addressBytes;
+    protocol.sizeBytes = addressBytes;
+    protocol.checksumType = write.checksumType;
+    protocol.checksumOffset = write.checksumOffset;
+    protocol.checksumBytes = checksumWidth;
+    return protocol;
+}
+
 juce::var DeviceProfileEngine::listParameterDescriptors() const
 {
     juce::Array<juce::var> descriptors;

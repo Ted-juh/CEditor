@@ -23,6 +23,9 @@ try {
     topLevel, { timeout: 30000 });
   assert.ok(await page.evaluate(() => document.querySelectorAll('[data-control-id]').length) > 300,
     'the sections did not bring their controls with them');
+  // The scripts load after the sandbox starts, which is asynchronous: wait for them, then say so if
+  // they never came.
+  await page.waitForFunction(() => window.__gaia.actions().includes('gaiaNamesScan'), null, { timeout: 30000 }).catch(() => {});
   assert.ok((await page.evaluate(()=>window.__gaia.actions())).includes('gaiaNamesScan'),
     'ordinary preview must initialize embedded panel scripts without a script editor or manual Run');
   async function control(name) {

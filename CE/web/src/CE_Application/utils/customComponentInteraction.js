@@ -9,6 +9,7 @@ import { numberOr, clamp } from './primitives.js';
 import { DragScrub, presets } from '../scrub/dragScrub';
 import { appScrubOverrides } from './scrubRuntime.js';
 import { SLIDER_CONTROL_KIND, sliderControlValueFromPoint } from './sliderControlPart.js';
+import { hasPatternEditing } from './arpPatternLayouts.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -902,7 +903,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
     const width = Math.max(320, numberOr(control?._children?.Transform?.width, point.rect.width));
     const steps = Math.max(1, numberOr(hitZone?.payload?.steps, 32));
     const x = (point.clientX - point.rect.left) * width / point.rect.width;
-    const { contentWidth } = arpeggiatorInspectorLayout(width, control?._children?.Designer?.patternEditing?.kind === 'gaia');
+    const { contentWidth } = arpeggiatorInspectorLayout(width, hasPatternEditing(control));
     const end = clamp(Math.floor((x - 44) / ((contentWidth - 52) / steps)) + 1, 1, steps);
     // This is a loop boundary, not a note edit or a playhead change.
     return { customValues: { arpEndStep: snapCustomChannelValue(channel, end) },

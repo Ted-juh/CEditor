@@ -27,6 +27,8 @@ const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../.
 const PANELS = [
   'CE/panels/Roland GAIA SH-01.cepanel',
   'CE/panels/Yamaha AN1x.cepanel',
+  'CE/panels/Roland SH-201.cepanel',
+  'CE/panels/Roland SH-201 (hardware look).cepanel',
   'CE/qa/QA-06-roland-gaia.cepanel',
   'CE/qa/QA-08-export.cepanel',
   'CE/qa/QA-09-custom-stress.cepanel',

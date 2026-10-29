@@ -367,8 +367,89 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - A Number or Range set to Display ignores the arrow, Home, End and Page keys in its value field, as
   it already ignored typing. ArrowUp moved the number and sent it.
 
+**A script on a control inside a container now runs in the exported plug-in.** It ran in the
+editor and was left out of the plug-in: not loaded, its modules not built in, its TypeScript not
+compiled. Scripts on top-level controls and panel scripts were never affected.
+
+**SH-201 LFO Tempo Sync is ON at 0.** The MIDI Implementation lists its switch as ON, OFF, unlike
+every other switch, and the profile had it the other way round. To be confirmed on the synth.
+Switches also go out as the values their profile names from the editor's own engine and are read
+back that way in the exported player: it sent 127 for every ON (the SH-201 takes 1) and read any
+non-zero value as ON. An SH-201 tone parameter's name now leaves out Upper or Lower ("Filter Env
+Depth"); its group still says which tone.
+
+**A panel with many scripts answers a click at once, and a double-click on a stepper resets.**
+Every script re-checked its approval before running, and each check rebuilt a fingerprint of all of
+the panel's scripts, so an event cost one fingerprint per script. On the GAIA panel (232 scripts)
+that was about half a second of main thread per click in Preview, and two quick presses on a
+stepper's − or + arrived as two steps instead of a reset. The check is reused within one task, and
+rebuilt whenever the panel, a script document or the installed extensions change. A double-click is
+also timed by when the presses happened, not when they were handled.
+
+**A panel's scripts are approved once.** On a panel whose script names sort differently in the
+locale than letter by letter (the GAIA panel's do: `gaia_tone_copy`, `gaia_tone1_copy_click`), the
+approval lapsed the moment the first script started. The script sandbox changes how text is
+compared when it starts, and the approval was a fingerprint of the scripts in that order. The
+scripts were reset and the panel asked to be approved again. The order no longer depends on the
+locale.
+
+**The SH-201's startup read completes.** It asks for the whole temporary patch, which the synth
+answers as 22 blocks, and it waited for a collection no block belonged to, so it always timed out.
+The blocks are now that collection, and a request for one of them is still answered by its own
+block. A second whole-patch request waits for its own answer instead of being resolved by the first
+block of it.
+
+**The SH-201 is read whole when it connects.** Its profile now has a startup read — the whole
+temporary patch, then System Common — so the editor offers to read the synth when an SH-201 panel
+is open, and the exported player reads it on its own. Before, the startup pull was the profile's
+first request alone, the editor never offered a read, and the system settings were never read.
+
+**A Tabbed Container bound to a parameter follows the synth.** Its page was a bindable port in one
+direction: choosing a page sent it, and the synth reporting the same parameter changed nothing, in
+the editor or the exported plug-in. The page now turns, by its number or by a label that names the
+choice, so a panel whose pages are the synth's parts shows the part the synth is on.
+
+**An arpeggio grid can be set to edit a synth's pattern.** Which synth's user pattern a grid reads
+and sends (GAIA SH-01 or SH-201) could only be set by a panel generator. It is on the grid's Device
+tab now, under Arpeggio Pattern, with the End Step binding the transfer needs. It is the copy's own
+setting: it does not make the copy an edited one, an update from the library keeps it, and Save to
+library does not pass it on.
+
+**A shared panel brings its library components.** File → Share Panel carried images, fonts and
+icons, not the library packages its custom components were placed from, so on another computer every
+copy said "Not in this library" until the library file was sent and imported too. The package now
+carries each version a copy was placed from, and opening it adds the ones your library lacks. One
+you already have under the same name and version, with another design, is kept.
+
 ## What you get
 
+- **A simulated device, for a panel without its synth.** Choose **Simulated device** as a device's
+  output (Settings → MIDI, or Ports) and it answers from the profile: it keeps what the controls
+  send, sends the patch back when the panel asks for it, and answers **Test**. For profiles with
+  Roland-style addresses (GAIA SH-01, SH-201); other profiles get identity only. It makes no sound
+  and is not a check of the profile against the instrument. **Internal cables 1–4** connect
+  devices inside CEditor; other programs cannot see them (on Windows, loopMIDI still does that).
+  The SH-201 profile now describes the synth's identity, so **Test** can recognise it, and its
+  42 offset parameters read what the synth's display reads: Coarse Tune −36…+36 rather than
+  28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents. Every block of an SH-201
+  patch has a request of its own, so a script's `requestDump("upperToneDump")` is sent and
+  answered; for 21 of the 23 blocks there was no request to send.
+- **An SH-201 panel to learn the editor from.** `Roland SH-201.cepanel` is the whole synth — both
+  tones, the patch's settings, the arpeggiator, the effects and the system settings — built the way
+  the editor builds by hand: four library components placed as linked copies, one binding per
+  control, sections named after the front panel, both tones on the panel at once (Upper above
+  Lower) with the synth's Keyboard Part in the header, no scripts. Under the tones, Patch holds what
+  they share: its name, level, balance, keyboard mode and split, the controllers' assignments,
+  ARPEGGIO, DELAY, REVERB, and the user arpeggio pattern on the GAIA's grid, set to the SH-201,
+  whose READ PATTERN and SEND PATTERN move its 528 parameters to and from the synth. System, last,
+  is every System Common setting, MIDI's TX EDIT among them. Its
+  notepad has a tutorial that takes it from the GAIA panel's look to the instrument's own — a
+  reference photo in Viewer, colours on many controls at once, the knob redesigned once and
+  updated on all its copies, new sections with Ctrl+G — and `Roland SH-201 (hardware look).cepanel`
+  is where it ends up. Bring your own photo of the instrument; none is included. The silver
+  sections there wear a transparent metallic overlay, a brushed-metal texture tiled over the fill
+  with the Overlay blend; `Roland SH-201 brushed metal.png` beside the panels is that texture, made
+  for the panel and free to use, and the tutorial shows how to add it.
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
   Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
   and reports the actual send result. Changing ports preserves its profile and parameter values.

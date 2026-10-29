@@ -24,9 +24,11 @@ import { get } from 'svelte/store';
 import { isJuceAvailable } from '../bridge/bridge.js';
 import { fileCache, loadFile } from './fileCache.js';
 import { appSettings } from './appSettings.js';
+import { customComponentLibrary } from './customComponentLibrary.js';
 import { readFontData } from './fontFileData.js';
 import { withEmbeddedFonts } from '../utils/documentFonts.js';
 import { withEmbeddedIcons } from '../utils/documentIcons.js';
+import { panelComponentPackages } from '../utils/panelComponentPackages.js';
 import {
   createPanelPackage,
   openPanelPackage,
@@ -111,9 +113,15 @@ export async function packagePanelForSharing(panel, metadata = {}) {
   // showing nothing in the editor either.
   const carried = { ...carriedFonts, panel: withEmbeddedIcons(carriedFonts.panel, get(appSettings)?.icons ?? []) };
 
+  // And the library packages its copies were placed from (utils/panelComponentPackages.js), so the
+  // copies arrive linked: their Source card can update them, and the Library dock can place more.
+  await customComponentLibrary.ready();
+  const components = panelComponentPackages(panel, customComponentLibrary.snapshot());
+
   const envelope = await createPanelPackage(carried.panel, {
     readAsset: readAssetViaCache,
     metadata,
+    components: components.envelopes,
   });
 
   const validation = validatePanelPackage(envelope);
@@ -127,6 +135,8 @@ export async function packagePanelForSharing(panel, metadata = {}) {
     fontCount: carried.panel.fonts?.length ?? 0,
     iconCount: carried.panel.icons?.length ?? 0,
     assetCount: Object.keys(envelope.assets).length,
+    componentCount: components.envelopes.length,
+    componentsNotInLibrary: components.notInLibrary,
   };
 }
 

@@ -303,13 +303,21 @@ juce::var DeviceProfileService::updateDumpCollectionForParsedDump (const juce::S
     state.collectionId = collectionId;
     state.updatedAtMs = nowMs();
 
-    auto alreadySeen = false;
-    for (const auto& existing : state.hexMessages)
-        if (existing == hex)
-            alreadySeen = true;
-
-    if (! alreadySeen)
+    // A dump with its own place in the collection (an addressRange: one block of a Roland patch)
+    // is the newest copy of that place, so it replaces the one before. Appended, a block read again
+    // with new values would sit beside the old one for as long as the session ran, and every later
+    // message would parse both. Dumps without a place are counted, so each distinct one is kept.
+    const auto hasPlace = completion != nullptr && completion->getProperty ("addressRange").getDynamicObject() != nullptr;
+    const auto replaced = hasPlace ? state.dumpIds.indexOf (result.dumpId) : -1;
+    if (replaced >= 0)
+    {
+        state.hexMessages.set (replaced, hex);
+    }
+    else if (! state.hexMessages.contains (hex))
+    {
         state.hexMessages.add (hex);
+        state.dumpIds.add (result.dumpId);
+    }
 
     auto collection = engine->collectDumpMessages (state.hexMessages);
     state.latestResult = dumpCollectionResultToVar ("collection_" + collectionId,
@@ -327,13 +335,7 @@ juce::var DeviceProfileService::updateDumpCollectionForParsedDump (const juce::S
     for (auto& [correlationId, pending] : pendingDeviceRequests)
     {
         juce::ignoreUnused (correlationId);
-        auto expectedMatchesCollection = pending.expectedDumpId == collection.collectionId;
-        if (! expectedMatchesCollection)
-            if (auto* messages = collection.messages.getArray())
-                for (const auto& message : *messages)
-                    if (auto* messageObject = message.getDynamicObject())
-                        if (messageObject->getProperty ("dumpId").toString() == pending.expectedDumpId)
-                            expectedMatchesCollection = true;
+        const auto expectedMatchesCollection = waitsForCollection (pending, collection.collectionId, collection.messages);
 
         if (pending.deviceRole == deviceRole
             && (pending.profileId.isEmpty() || pending.profileId == profileId)
@@ -539,8 +541,9 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
 
     // A reply to another instance's request, on an input this one shares with it: that instance's
     // to apply. Stopped before anything is emitted, because the page applies incoming SysEx from
-    // the raw event too (replyBelongsToAnotherInstance says more).
-    if (messageType == "sysex" && replyBelongsToAnotherInstance (role, hex))
+    // the raw event too (replyBelongsToAnotherInstance says more). What came from inside this
+    // process — a cable, or this role's own simulated device — was on no shared input.
+    if (messageType == "sysex" && ! isWithinProcess (origin) && replyBelongsToAnotherInstance (role, hex))
     {
         appendMonitorEvent ("in", role, "sysex", "reply to another instance's request", hex,
                             "Left to the instance that asked for it");

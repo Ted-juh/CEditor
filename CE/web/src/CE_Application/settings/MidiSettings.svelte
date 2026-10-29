@@ -364,7 +364,8 @@
             <strong>Send To</strong>
             <span>
               The MIDI output this device's controls play. <em>Preview Only</em> keeps everything
-              inside the editor and touches no hardware.
+              inside the editor and touches no hardware. <em>Simulated device</em> answers from the
+              profile when the synth is not connected.
             </span>
           </div>
           <select

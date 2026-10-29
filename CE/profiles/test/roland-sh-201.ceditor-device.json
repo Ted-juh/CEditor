@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": "0.4.0",
+  "profileVersion": "0.8.0",
   "minCEditorVersion": "0.9.0",
   "id": "roland-sh-201",
   "name": "Roland SH-201",
@@ -12,10 +12,26 @@
     "deviceId": 16,
     "channel": 1
   },
+  "identity": {
+    "requestDeviceId": "$deviceId",
+    "manufacturerId": [
+      "41"
+    ],
+    "familyCode": [
+      "16",
+      "02"
+    ],
+    "modelNumber": [
+      "00",
+      "00"
+    ],
+    "timeoutMs": 1000,
+    "retries": 0
+  },
   "coverage": {
     "singleParameterWrite": "broad-with-packed-text-and-requests",
-    "editBufferDumpRequest": "partial-block-requests",
-    "editBufferDumpParse": "partial",
+    "editBufferDumpRequest": "whole-patch-rq1-and-rq1-per-block",
+    "editBufferDumpParse": "complete-for-every-block-and-the-whole-patch",
     "bankDump": "notImplemented",
     "patchNameEdit": "complete-single-dt1-write",
     "realtimeEditing": "partial"
@@ -158,7 +174,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Channel"
+        "shortLabel": "Channel",
+        "min": 1,
+        "max": 16
       },
       "normalization": {
         "mode": "linear"
@@ -231,7 +249,11 @@
       "address": "01 00 00 05",
       "display": {
         "mode": "number",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -100,
+        "max": 100,
+        "unit": "cent",
+        "precision": 1
       },
       "normalization": {
         "mode": "linear"
@@ -272,7 +294,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -24,
+        "max": 24
       },
       "normalization": {
         "mode": "linear"
@@ -721,7 +745,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -761,7 +787,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Value"
+        "shortLabel": "Value",
+        "min": -5,
+        "max": 6
       },
       "normalization": {
         "mode": "linear"
@@ -1718,7 +1746,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Balance"
+        "shortLabel": "Balance",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -2688,7 +2718,7 @@
     },
     {
       "id": "upper.osc1.waveform",
-      "name": "Upper OSC1 Waveform",
+      "name": "OSC1 Waveform",
       "group": "Upper OSC1",
       "type": "choice",
       "address": "10 00 01 00",
@@ -2769,7 +2799,7 @@
     },
     {
       "id": "upper.osc1.pitchWide",
-      "name": "Upper OSC1 Pitch Wide",
+      "name": "OSC1 Pitch Wide",
       "group": "Upper OSC1",
       "type": "boolean",
       "address": "10 00 01 01",
@@ -2802,7 +2832,7 @@
     },
     {
       "id": "upper.osc1.coarseTune",
-      "name": "Upper OSC1 Coarse Tune",
+      "name": "OSC1 Coarse Tune",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 02",
@@ -2814,7 +2844,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -2841,7 +2873,7 @@
     },
     {
       "id": "upper.osc1.fineTune",
-      "name": "Upper OSC1 Fine Tune",
+      "name": "OSC1 Fine Tune",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 03",
@@ -2853,7 +2885,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -2880,7 +2914,7 @@
     },
     {
       "id": "upper.osc1.pulseWidth",
-      "name": "Upper OSC1 Pulse Width",
+      "name": "OSC1 Pulse Width",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 04",
@@ -2919,7 +2953,7 @@
     },
     {
       "id": "upper.osc1.pitchEnvDepth",
-      "name": "Upper OSC1 Pitch Env Depth",
+      "name": "OSC1 Pitch Env Depth",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 05",
@@ -2931,7 +2965,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -2958,7 +2994,7 @@
     },
     {
       "id": "upper.osc2.waveform",
-      "name": "Upper OSC2 Waveform",
+      "name": "OSC2 Waveform",
       "group": "Upper OSC2",
       "type": "choice",
       "address": "10 00 01 06",
@@ -3039,7 +3075,7 @@
     },
     {
       "id": "upper.osc2.pitchWide",
-      "name": "Upper OSC2 Pitch Wide",
+      "name": "OSC2 Pitch Wide",
       "group": "Upper OSC2",
       "type": "boolean",
       "address": "10 00 01 07",
@@ -3072,7 +3108,7 @@
     },
     {
       "id": "upper.osc2.coarseTune",
-      "name": "Upper OSC2 Coarse Tune",
+      "name": "OSC2 Coarse Tune",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 08",
@@ -3084,7 +3120,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -3111,7 +3149,7 @@
     },
     {
       "id": "upper.osc2.fineTune",
-      "name": "Upper OSC2 Fine Tune",
+      "name": "OSC2 Fine Tune",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 09",
@@ -3123,7 +3161,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -3150,7 +3190,7 @@
     },
     {
       "id": "upper.osc2.pulseWidth",
-      "name": "Upper OSC2 Pulse Width",
+      "name": "OSC2 Pulse Width",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 0A",
@@ -3189,7 +3229,7 @@
     },
     {
       "id": "upper.osc2.pitchEnvDepth",
-      "name": "Upper OSC2 Pitch Env Depth",
+      "name": "OSC2 Pitch Env Depth",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 0B",
@@ -3201,7 +3241,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3228,7 +3270,7 @@
     },
     {
       "id": "upper.pitchEnv.attack",
-      "name": "Upper Pitch Env Attack Time",
+      "name": "Pitch Env Attack Time",
       "group": "Upper Pitch Env",
       "type": "integer",
       "address": "10 00 01 0C",
@@ -3267,7 +3309,7 @@
     },
     {
       "id": "upper.pitchEnv.decay",
-      "name": "Upper Pitch Env Decay",
+      "name": "Pitch Env Decay",
       "group": "Upper Pitch Env",
       "type": "integer",
       "address": "10 00 01 0D",
@@ -3306,7 +3348,7 @@
     },
     {
       "id": "upper.mixMod.type",
-      "name": "Upper MIX/MOD Type",
+      "name": "MIX/MOD Type",
       "group": "Upper Mix Mod",
       "type": "choice",
       "address": "10 00 01 0E",
@@ -3357,7 +3399,7 @@
     },
     {
       "id": "upper.mixMod.balance",
-      "name": "Upper MIX/MOD Balance",
+      "name": "MIX/MOD Balance",
       "group": "Upper Mix Mod",
       "type": "integer",
       "address": "10 00 01 0F",
@@ -3369,7 +3411,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Balance"
+        "shortLabel": "Balance",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3396,7 +3440,7 @@
     },
     {
       "id": "upper.mixMod.lowFreq",
-      "name": "Upper MIX/MOD Low Freq",
+      "name": "MIX/MOD Low Freq",
       "group": "Upper Mix Mod",
       "type": "choice",
       "address": "10 00 01 10",
@@ -3447,7 +3491,7 @@
     },
     {
       "id": "upper.filter.type",
-      "name": "Upper Filter Type",
+      "name": "Filter Type",
       "group": "Upper Filter",
       "type": "choice",
       "address": "10 00 01 11",
@@ -3503,7 +3547,7 @@
     },
     {
       "id": "upper.filter.slope",
-      "name": "Upper Filter Slope",
+      "name": "Filter Slope",
       "group": "Upper Filter",
       "type": "choice",
       "address": "10 00 01 12",
@@ -3549,7 +3593,7 @@
     },
     {
       "id": "upper.filter.cutoff",
-      "name": "Upper Filter Cutoff Frequency",
+      "name": "Filter Cutoff Frequency",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 13",
@@ -3588,7 +3632,7 @@
     },
     {
       "id": "upper.filter.cutoffKeyfollow",
-      "name": "Upper Filter Cutoff Keyfollow",
+      "name": "Filter Cutoff Keyfollow",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 14",
@@ -3600,7 +3644,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Keyfollow"
+        "shortLabel": "Keyfollow",
+        "min": -200,
+        "max": 200
       },
       "normalization": {
         "mode": "linear"
@@ -3627,7 +3673,7 @@
     },
     {
       "id": "upper.filter.cutoffVelocity",
-      "name": "Upper Filter Cutoff Velocity Sens",
+      "name": "Filter Cutoff Velocity Sens",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 15",
@@ -3639,7 +3685,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3666,7 +3714,7 @@
     },
     {
       "id": "upper.filter.resonance",
-      "name": "Upper Filter Resonance",
+      "name": "Filter Resonance",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 16",
@@ -3705,7 +3753,7 @@
     },
     {
       "id": "upper.filterEnv.attack",
-      "name": "Upper Filter Env Attack Time",
+      "name": "Filter Env Attack Time",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 17",
@@ -3744,7 +3792,7 @@
     },
     {
       "id": "upper.filterEnv.decay",
-      "name": "Upper Filter Env Decay Time",
+      "name": "Filter Env Decay Time",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 18",
@@ -3783,7 +3831,7 @@
     },
     {
       "id": "upper.filterEnv.sustain",
-      "name": "Upper Filter Env Sustain Level",
+      "name": "Filter Env Sustain Level",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 19",
@@ -3822,7 +3870,7 @@
     },
     {
       "id": "upper.filterEnv.release",
-      "name": "Upper Filter Env Release Time",
+      "name": "Filter Env Release Time",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 1A",
@@ -3861,7 +3909,7 @@
     },
     {
       "id": "upper.filterEnv.depth",
-      "name": "Upper Filter Env Env Depth",
+      "name": "Filter Env Depth",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 1B",
@@ -3873,7 +3921,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3900,7 +3950,7 @@
     },
     {
       "id": "upper.amp.overdriveSwitch",
-      "name": "Upper AMP Overdrive Switch",
+      "name": "AMP Overdrive Switch",
       "group": "Upper AMP",
       "type": "boolean",
       "address": "10 00 01 1C",
@@ -3933,7 +3983,7 @@
     },
     {
       "id": "upper.amp.overdriveDrive",
-      "name": "Upper AMP Overdrive Drive",
+      "name": "AMP Overdrive Drive",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1D",
@@ -3972,7 +4022,7 @@
     },
     {
       "id": "upper.amp.level",
-      "name": "Upper AMP Level",
+      "name": "AMP Level",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1E",
@@ -4011,7 +4061,7 @@
     },
     {
       "id": "upper.amp.velocitySens",
-      "name": "Upper AMP Level Velocity Sens",
+      "name": "AMP Level Velocity Sens",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1F",
@@ -4023,7 +4073,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4050,7 +4102,7 @@
     },
     {
       "id": "upper.amp.pan",
-      "name": "Upper AMP Pan",
+      "name": "AMP Pan",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 20",
@@ -4062,7 +4114,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Pan"
+        "shortLabel": "Pan",
+        "min": -64,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4089,7 +4143,7 @@
     },
     {
       "id": "upper.ampEnv.attack",
-      "name": "Upper AMP Env Attack Time",
+      "name": "AMP Env Attack Time",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 21",
@@ -4128,7 +4182,7 @@
     },
     {
       "id": "upper.ampEnv.decay",
-      "name": "Upper AMP Env Decay Time",
+      "name": "AMP Env Decay Time",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 22",
@@ -4167,7 +4221,7 @@
     },
     {
       "id": "upper.ampEnv.sustain",
-      "name": "Upper AMP Env Sustain Level",
+      "name": "AMP Env Sustain Level",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 23",
@@ -4206,7 +4260,7 @@
     },
     {
       "id": "upper.ampEnv.release",
-      "name": "Upper AMP Env Release Time",
+      "name": "AMP Env Release Time",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 24",
@@ -4245,7 +4299,7 @@
     },
     {
       "id": "upper.delay.depth",
-      "name": "Upper Delay Depth",
+      "name": "Delay Depth",
       "group": "Upper Effects Send",
       "type": "integer",
       "address": "10 00 01 25",
@@ -4284,7 +4338,7 @@
     },
     {
       "id": "upper.reverb.depth",
-      "name": "Upper Reverb Depth",
+      "name": "Reverb Depth",
       "group": "Upper Effects Send",
       "type": "integer",
       "address": "10 00 01 26",
@@ -4323,7 +4377,7 @@
     },
     {
       "id": "upper.lfo1.shape",
-      "name": "Upper LFO1 Shape",
+      "name": "LFO1 Shape",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 27",
@@ -4394,7 +4448,7 @@
     },
     {
       "id": "upper.lfo1.rate",
-      "name": "Upper LFO1 Rate",
+      "name": "LFO1 Rate",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 28",
@@ -4433,13 +4487,13 @@
     },
     {
       "id": "upper.lfo1.tempoSync",
-      "name": "Upper LFO1 Tempo Sync Switch",
+      "name": "LFO1 Tempo Sync Switch",
       "group": "Upper LFO1",
       "type": "boolean",
       "address": "10 00 01 29",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -4466,7 +4520,7 @@
     },
     {
       "id": "upper.lfo1.tempoSyncNote",
-      "name": "Upper LFO1 Tempo Sync Note",
+      "name": "LFO1 Tempo Sync Note",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2A",
@@ -4602,7 +4656,7 @@
     },
     {
       "id": "upper.lfo1.fadeTime",
-      "name": "Upper LFO1 Fade Time",
+      "name": "LFO1 Fade Time",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 2B",
@@ -4641,7 +4695,7 @@
     },
     {
       "id": "upper.lfo1.keyTrigger",
-      "name": "Upper LFO1 Key Trigger",
+      "name": "LFO1 Key Trigger",
       "group": "Upper LFO1",
       "type": "boolean",
       "address": "10 00 01 2C",
@@ -4674,7 +4728,7 @@
     },
     {
       "id": "upper.lfo1.destination1",
-      "name": "Upper LFO1 Destination 1",
+      "name": "LFO1 Destination 1",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2D",
@@ -4730,7 +4784,7 @@
     },
     {
       "id": "upper.lfo1.depth1",
-      "name": "Upper LFO1 Depth 1",
+      "name": "LFO1 Depth 1",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 2E",
@@ -4742,7 +4796,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4769,7 +4825,7 @@
     },
     {
       "id": "upper.lfo1.destination2",
-      "name": "Upper LFO1 Destination 2",
+      "name": "LFO1 Destination 2",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2F",
@@ -4820,7 +4876,7 @@
     },
     {
       "id": "upper.lfo1.depth2",
-      "name": "Upper LFO1 Depth 2",
+      "name": "LFO1 Depth 2",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 30",
@@ -4832,7 +4888,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4859,7 +4917,7 @@
     },
     {
       "id": "upper.lfo2.shape",
-      "name": "Upper LFO2 Shape",
+      "name": "LFO2 Shape",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 31",
@@ -4930,7 +4988,7 @@
     },
     {
       "id": "upper.lfo2.rate",
-      "name": "Upper LFO2 Rate",
+      "name": "LFO2 Rate",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 32",
@@ -4969,13 +5027,13 @@
     },
     {
       "id": "upper.lfo2.tempoSync",
-      "name": "Upper LFO2 Tempo Sync Switch",
+      "name": "LFO2 Tempo Sync Switch",
       "group": "Upper LFO2",
       "type": "boolean",
       "address": "10 00 01 33",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -5002,7 +5060,7 @@
     },
     {
       "id": "upper.lfo2.tempoSyncNote",
-      "name": "Upper LFO2 Tempo Sync Note",
+      "name": "LFO2 Tempo Sync Note",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 34",
@@ -5138,7 +5196,7 @@
     },
     {
       "id": "upper.lfo2.fadeTime",
-      "name": "Upper LFO2 Fade Time",
+      "name": "LFO2 Fade Time",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 35",
@@ -5177,7 +5235,7 @@
     },
     {
       "id": "upper.lfo2.keyTrigger",
-      "name": "Upper LFO2 Key Trigger",
+      "name": "LFO2 Key Trigger",
       "group": "Upper LFO2",
       "type": "boolean",
       "address": "10 00 01 36",
@@ -5210,7 +5268,7 @@
     },
     {
       "id": "upper.lfo2.destination1",
-      "name": "Upper LFO2 Destination 1",
+      "name": "LFO2 Destination 1",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 37",
@@ -5266,7 +5324,7 @@
     },
     {
       "id": "upper.lfo2.depth1",
-      "name": "Upper LFO2 Depth 1",
+      "name": "LFO2 Depth 1",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 38",
@@ -5278,7 +5336,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -5305,7 +5365,7 @@
     },
     {
       "id": "upper.lfo2.destination2",
-      "name": "Upper LFO2 Destination 2",
+      "name": "LFO2 Destination 2",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 39",
@@ -5356,7 +5416,7 @@
     },
     {
       "id": "upper.lfo2.depth2",
-      "name": "Upper LFO2 Depth 2",
+      "name": "LFO2 Depth 2",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 3A",
@@ -5368,7 +5428,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -5395,7 +5457,7 @@
     },
     {
       "id": "upper.pitchBend.range",
-      "name": "Upper Pitch Bend Range",
+      "name": "Pitch Bend Range",
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3B",
@@ -5434,7 +5496,7 @@
     },
     {
       "id": "upper.octaveShift",
-      "name": "Upper Octave Shift",
+      "name": "Octave Shift",
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3C",
@@ -5446,7 +5508,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -5473,7 +5537,7 @@
     },
     {
       "id": "upper.portamento.switch",
-      "name": "Upper Portamento Switch",
+      "name": "Portamento Switch",
       "group": "Upper Performance",
       "type": "boolean",
       "address": "10 00 01 3D",
@@ -5506,7 +5570,7 @@
     },
     {
       "id": "upper.portamento.time",
-      "name": "Upper Portamento Time",
+      "name": "Portamento Time",
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3E",
@@ -5545,7 +5609,7 @@
     },
     {
       "id": "upper.monoSolo",
-      "name": "Upper Mono/Solo Select",
+      "name": "Mono/Solo Select",
       "group": "Upper Performance",
       "type": "choice",
       "address": "10 00 01 3F",
@@ -5596,7 +5660,7 @@
     },
     {
       "id": "lower.osc1.waveform",
-      "name": "Lower OSC1 Waveform",
+      "name": "OSC1 Waveform",
       "group": "Lower OSC1",
       "type": "choice",
       "address": "10 00 02 00",
@@ -5677,7 +5741,7 @@
     },
     {
       "id": "lower.osc1.pitchWide",
-      "name": "Lower OSC1 Pitch Wide",
+      "name": "OSC1 Pitch Wide",
       "group": "Lower OSC1",
       "type": "boolean",
       "address": "10 00 02 01",
@@ -5710,7 +5774,7 @@
     },
     {
       "id": "lower.osc1.coarseTune",
-      "name": "Lower OSC1 Coarse Tune",
+      "name": "OSC1 Coarse Tune",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 02",
@@ -5722,7 +5786,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -5749,7 +5815,7 @@
     },
     {
       "id": "lower.osc1.fineTune",
-      "name": "Lower OSC1 Fine Tune",
+      "name": "OSC1 Fine Tune",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 03",
@@ -5761,7 +5827,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -5788,7 +5856,7 @@
     },
     {
       "id": "lower.osc1.pulseWidth",
-      "name": "Lower OSC1 Pulse Width",
+      "name": "OSC1 Pulse Width",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 04",
@@ -5827,7 +5895,7 @@
     },
     {
       "id": "lower.osc1.pitchEnvDepth",
-      "name": "Lower OSC1 Pitch Env Depth",
+      "name": "OSC1 Pitch Env Depth",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 05",
@@ -5839,7 +5907,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -5866,7 +5936,7 @@
     },
     {
       "id": "lower.osc2.waveform",
-      "name": "Lower OSC2 Waveform",
+      "name": "OSC2 Waveform",
       "group": "Lower OSC2",
       "type": "choice",
       "address": "10 00 02 06",
@@ -5947,7 +6017,7 @@
     },
     {
       "id": "lower.osc2.pitchWide",
-      "name": "Lower OSC2 Pitch Wide",
+      "name": "OSC2 Pitch Wide",
       "group": "Lower OSC2",
       "type": "boolean",
       "address": "10 00 02 07",
@@ -5980,7 +6050,7 @@
     },
     {
       "id": "lower.osc2.coarseTune",
-      "name": "Lower OSC2 Coarse Tune",
+      "name": "OSC2 Coarse Tune",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 08",
@@ -5992,7 +6062,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -6019,7 +6091,7 @@
     },
     {
       "id": "lower.osc2.fineTune",
-      "name": "Lower OSC2 Fine Tune",
+      "name": "OSC2 Fine Tune",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 09",
@@ -6031,7 +6103,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -6058,7 +6132,7 @@
     },
     {
       "id": "lower.osc2.pulseWidth",
-      "name": "Lower OSC2 Pulse Width",
+      "name": "OSC2 Pulse Width",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 0A",
@@ -6097,7 +6171,7 @@
     },
     {
       "id": "lower.osc2.pitchEnvDepth",
-      "name": "Lower OSC2 Pitch Env Depth",
+      "name": "OSC2 Pitch Env Depth",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 0B",
@@ -6109,7 +6183,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6136,7 +6212,7 @@
     },
     {
       "id": "lower.pitchEnv.attack",
-      "name": "Lower Pitch Env Attack Time",
+      "name": "Pitch Env Attack Time",
       "group": "Lower Pitch Env",
       "type": "integer",
       "address": "10 00 02 0C",
@@ -6175,7 +6251,7 @@
     },
     {
       "id": "lower.pitchEnv.decay",
-      "name": "Lower Pitch Env Decay",
+      "name": "Pitch Env Decay",
       "group": "Lower Pitch Env",
       "type": "integer",
       "address": "10 00 02 0D",
@@ -6214,7 +6290,7 @@
     },
     {
       "id": "lower.mixMod.type",
-      "name": "Lower MIX/MOD Type",
+      "name": "MIX/MOD Type",
       "group": "Lower Mix Mod",
       "type": "choice",
       "address": "10 00 02 0E",
@@ -6265,7 +6341,7 @@
     },
     {
       "id": "lower.mixMod.balance",
-      "name": "Lower MIX/MOD Balance",
+      "name": "MIX/MOD Balance",
       "group": "Lower Mix Mod",
       "type": "integer",
       "address": "10 00 02 0F",
@@ -6277,7 +6353,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Balance"
+        "shortLabel": "Balance",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6304,7 +6382,7 @@
     },
     {
       "id": "lower.mixMod.lowFreq",
-      "name": "Lower MIX/MOD Low Freq",
+      "name": "MIX/MOD Low Freq",
       "group": "Lower Mix Mod",
       "type": "choice",
       "address": "10 00 02 10",
@@ -6355,7 +6433,7 @@
     },
     {
       "id": "lower.filter.type",
-      "name": "Lower Filter Type",
+      "name": "Filter Type",
       "group": "Lower Filter",
       "type": "choice",
       "address": "10 00 02 11",
@@ -6411,7 +6489,7 @@
     },
     {
       "id": "lower.filter.slope",
-      "name": "Lower Filter Slope",
+      "name": "Filter Slope",
       "group": "Lower Filter",
       "type": "choice",
       "address": "10 00 02 12",
@@ -6457,7 +6535,7 @@
     },
     {
       "id": "lower.filter.cutoff",
-      "name": "Lower Filter Cutoff Frequency",
+      "name": "Filter Cutoff Frequency",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 13",
@@ -6496,7 +6574,7 @@
     },
     {
       "id": "lower.filter.cutoffKeyfollow",
-      "name": "Lower Filter Cutoff Keyfollow",
+      "name": "Filter Cutoff Keyfollow",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 14",
@@ -6508,7 +6586,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Keyfollow"
+        "shortLabel": "Keyfollow",
+        "min": -200,
+        "max": 200
       },
       "normalization": {
         "mode": "linear"
@@ -6535,7 +6615,7 @@
     },
     {
       "id": "lower.filter.cutoffVelocity",
-      "name": "Lower Filter Cutoff Velocity Sens",
+      "name": "Filter Cutoff Velocity Sens",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 15",
@@ -6547,7 +6627,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6574,7 +6656,7 @@
     },
     {
       "id": "lower.filter.resonance",
-      "name": "Lower Filter Resonance",
+      "name": "Filter Resonance",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 16",
@@ -6613,7 +6695,7 @@
     },
     {
       "id": "lower.filterEnv.attack",
-      "name": "Lower Filter Env Attack Time",
+      "name": "Filter Env Attack Time",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 17",
@@ -6652,7 +6734,7 @@
     },
     {
       "id": "lower.filterEnv.decay",
-      "name": "Lower Filter Env Decay Time",
+      "name": "Filter Env Decay Time",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 18",
@@ -6691,7 +6773,7 @@
     },
     {
       "id": "lower.filterEnv.sustain",
-      "name": "Lower Filter Env Sustain Level",
+      "name": "Filter Env Sustain Level",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 19",
@@ -6730,7 +6812,7 @@
     },
     {
       "id": "lower.filterEnv.release",
-      "name": "Lower Filter Env Release Time",
+      "name": "Filter Env Release Time",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 1A",
@@ -6769,7 +6851,7 @@
     },
     {
       "id": "lower.filterEnv.depth",
-      "name": "Lower Filter Env Env Depth",
+      "name": "Filter Env Depth",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 1B",
@@ -6781,7 +6863,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6808,7 +6892,7 @@
     },
     {
       "id": "lower.amp.overdriveSwitch",
-      "name": "Lower AMP Overdrive Switch",
+      "name": "AMP Overdrive Switch",
       "group": "Lower AMP",
       "type": "boolean",
       "address": "10 00 02 1C",
@@ -6841,7 +6925,7 @@
     },
     {
       "id": "lower.amp.overdriveDrive",
-      "name": "Lower AMP Overdrive Drive",
+      "name": "AMP Overdrive Drive",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1D",
@@ -6880,7 +6964,7 @@
     },
     {
       "id": "lower.amp.level",
-      "name": "Lower AMP Level",
+      "name": "AMP Level",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1E",
@@ -6919,7 +7003,7 @@
     },
     {
       "id": "lower.amp.velocitySens",
-      "name": "Lower AMP Level Velocity Sens",
+      "name": "AMP Level Velocity Sens",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1F",
@@ -6931,7 +7015,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6958,7 +7044,7 @@
     },
     {
       "id": "lower.amp.pan",
-      "name": "Lower AMP Pan",
+      "name": "AMP Pan",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 20",
@@ -6970,7 +7056,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Pan"
+        "shortLabel": "Pan",
+        "min": -64,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6997,7 +7085,7 @@
     },
     {
       "id": "lower.ampEnv.attack",
-      "name": "Lower AMP Env Attack Time",
+      "name": "AMP Env Attack Time",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 21",
@@ -7036,7 +7124,7 @@
     },
     {
       "id": "lower.ampEnv.decay",
-      "name": "Lower AMP Env Decay Time",
+      "name": "AMP Env Decay Time",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 22",
@@ -7075,7 +7163,7 @@
     },
     {
       "id": "lower.ampEnv.sustain",
-      "name": "Lower AMP Env Sustain Level",
+      "name": "AMP Env Sustain Level",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 23",
@@ -7114,7 +7202,7 @@
     },
     {
       "id": "lower.ampEnv.release",
-      "name": "Lower AMP Env Release Time",
+      "name": "AMP Env Release Time",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 24",
@@ -7153,7 +7241,7 @@
     },
     {
       "id": "lower.delay.depth",
-      "name": "Lower Delay Depth",
+      "name": "Delay Depth",
       "group": "Lower Effects Send",
       "type": "integer",
       "address": "10 00 02 25",
@@ -7192,7 +7280,7 @@
     },
     {
       "id": "lower.reverb.depth",
-      "name": "Lower Reverb Depth",
+      "name": "Reverb Depth",
       "group": "Lower Effects Send",
       "type": "integer",
       "address": "10 00 02 26",
@@ -7231,7 +7319,7 @@
     },
     {
       "id": "lower.lfo1.shape",
-      "name": "Lower LFO1 Shape",
+      "name": "LFO1 Shape",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 27",
@@ -7302,7 +7390,7 @@
     },
     {
       "id": "lower.lfo1.rate",
-      "name": "Lower LFO1 Rate",
+      "name": "LFO1 Rate",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 28",
@@ -7341,13 +7429,13 @@
     },
     {
       "id": "lower.lfo1.tempoSync",
-      "name": "Lower LFO1 Tempo Sync Switch",
+      "name": "LFO1 Tempo Sync Switch",
       "group": "Lower LFO1",
       "type": "boolean",
       "address": "10 00 02 29",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -7374,7 +7462,7 @@
     },
     {
       "id": "lower.lfo1.tempoSyncNote",
-      "name": "Lower LFO1 Tempo Sync Note",
+      "name": "LFO1 Tempo Sync Note",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2A",
@@ -7510,7 +7598,7 @@
     },
     {
       "id": "lower.lfo1.fadeTime",
-      "name": "Lower LFO1 Fade Time",
+      "name": "LFO1 Fade Time",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 2B",
@@ -7549,7 +7637,7 @@
     },
     {
       "id": "lower.lfo1.keyTrigger",
-      "name": "Lower LFO1 Key Trigger",
+      "name": "LFO1 Key Trigger",
       "group": "Lower LFO1",
       "type": "boolean",
       "address": "10 00 02 2C",
@@ -7582,7 +7670,7 @@
     },
     {
       "id": "lower.lfo1.destination1",
-      "name": "Lower LFO1 Destination 1",
+      "name": "LFO1 Destination 1",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2D",
@@ -7638,7 +7726,7 @@
     },
     {
       "id": "lower.lfo1.depth1",
-      "name": "Lower LFO1 Depth 1",
+      "name": "LFO1 Depth 1",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 2E",
@@ -7650,7 +7738,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -7677,7 +7767,7 @@
     },
     {
       "id": "lower.lfo1.destination2",
-      "name": "Lower LFO1 Destination 2",
+      "name": "LFO1 Destination 2",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2F",
@@ -7728,7 +7818,7 @@
     },
     {
       "id": "lower.lfo1.depth2",
-      "name": "Lower LFO1 Depth 2",
+      "name": "LFO1 Depth 2",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 30",
@@ -7740,7 +7830,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -7767,7 +7859,7 @@
     },
     {
       "id": "lower.lfo2.shape",
-      "name": "Lower LFO2 Shape",
+      "name": "LFO2 Shape",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 31",
@@ -7838,7 +7930,7 @@
     },
     {
       "id": "lower.lfo2.rate",
-      "name": "Lower LFO2 Rate",
+      "name": "LFO2 Rate",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 32",
@@ -7877,13 +7969,13 @@
     },
     {
       "id": "lower.lfo2.tempoSync",
-      "name": "Lower LFO2 Tempo Sync Switch",
+      "name": "LFO2 Tempo Sync Switch",
       "group": "Lower LFO2",
       "type": "boolean",
       "address": "10 00 02 33",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -7910,7 +8002,7 @@
     },
     {
       "id": "lower.lfo2.tempoSyncNote",
-      "name": "Lower LFO2 Tempo Sync Note",
+      "name": "LFO2 Tempo Sync Note",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 34",
@@ -8046,7 +8138,7 @@
     },
     {
       "id": "lower.lfo2.fadeTime",
-      "name": "Lower LFO2 Fade Time",
+      "name": "LFO2 Fade Time",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 35",
@@ -8085,7 +8177,7 @@
     },
     {
       "id": "lower.lfo2.keyTrigger",
-      "name": "Lower LFO2 Key Trigger",
+      "name": "LFO2 Key Trigger",
       "group": "Lower LFO2",
       "type": "boolean",
       "address": "10 00 02 36",
@@ -8118,7 +8210,7 @@
     },
     {
       "id": "lower.lfo2.destination1",
-      "name": "Lower LFO2 Destination 1",
+      "name": "LFO2 Destination 1",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 37",
@@ -8174,7 +8266,7 @@
     },
     {
       "id": "lower.lfo2.depth1",
-      "name": "Lower LFO2 Depth 1",
+      "name": "LFO2 Depth 1",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 38",
@@ -8186,7 +8278,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -8213,7 +8307,7 @@
     },
     {
       "id": "lower.lfo2.destination2",
-      "name": "Lower LFO2 Destination 2",
+      "name": "LFO2 Destination 2",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 39",
@@ -8264,7 +8358,7 @@
     },
     {
       "id": "lower.lfo2.depth2",
-      "name": "Lower LFO2 Depth 2",
+      "name": "LFO2 Depth 2",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 3A",
@@ -8276,7 +8370,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -8303,7 +8399,7 @@
     },
     {
       "id": "lower.pitchBend.range",
-      "name": "Lower Pitch Bend Range",
+      "name": "Pitch Bend Range",
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3B",
@@ -8342,7 +8438,7 @@
     },
     {
       "id": "lower.octaveShift",
-      "name": "Lower Octave Shift",
+      "name": "Octave Shift",
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3C",
@@ -8354,7 +8450,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -8381,7 +8479,7 @@
     },
     {
       "id": "lower.portamento.switch",
-      "name": "Lower Portamento Switch",
+      "name": "Portamento Switch",
       "group": "Lower Performance",
       "type": "boolean",
       "address": "10 00 02 3D",
@@ -8414,7 +8512,7 @@
     },
     {
       "id": "lower.portamento.time",
-      "name": "Lower Portamento Time",
+      "name": "Portamento Time",
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3E",
@@ -8453,7 +8551,7 @@
     },
     {
       "id": "lower.monoSolo",
-      "name": "Lower Mono/Solo Select",
+      "name": "Mono/Solo Select",
       "group": "Lower Performance",
       "type": "choice",
       "address": "10 00 02 3F",
@@ -8555,8 +8653,10 @@
       "default": 49,
       "display": {
         "mode": "number",
-        "unit": "",
-        "shortLabel": "Feedback"
+        "unit": "%",
+        "shortLabel": "Feedback",
+        "min": -98,
+        "max": 98
       },
       "normalization": {
         "mode": "linear"
@@ -9732,7 +9832,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Range"
+        "shortLabel": "Range",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -31991,6 +32093,18 @@
       "value": "$encodedValue"
     }
   ],
+  "startup": {
+    "policy": "pull",
+    "syncDirection": "pull",
+    "sync": [
+      {
+        "request": "requestTemporaryPatchBulk"
+      },
+      {
+        "request": "requestSystemDump"
+      }
+    ]
+  },
   "requests": [
     {
       "id": "requestTemporaryPatchBulk",
@@ -32076,6 +32190,657 @@
       ],
       "response": {
         "dump": "patchCommonDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestUpperTone",
+      "name": "Request Upper Tone",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "01",
+        "00",
+        "00",
+        "00",
+        "00",
+        "40",
+        "2F",
+        "F7"
+      ],
+      "address": "10 00 01 00",
+      "size": "00 00 00 40",
+      "response": {
+        "dump": "upperToneDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestLowerTone",
+      "name": "Request Lower Tone",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "02",
+        "00",
+        "00",
+        "00",
+        "00",
+        "40",
+        "2E",
+        "F7"
+      ],
+      "address": "10 00 02 00",
+      "size": "00 00 00 40",
+      "response": {
+        "dump": "lowerToneDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestDelay",
+      "name": "Request Delay",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "03",
+        "00",
+        "00",
+        "00",
+        "00",
+        "05",
+        "68",
+        "F7"
+      ],
+      "address": "10 00 03 00",
+      "size": "00 00 00 05",
+      "response": {
+        "dump": "delayDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestReverb",
+      "name": "Request Reverb",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "04",
+        "00",
+        "00",
+        "00",
+        "00",
+        "0A",
+        "62",
+        "F7"
+      ],
+      "address": "10 00 04 00",
+      "size": "00 00 00 0A",
+      "response": {
+        "dump": "reverbDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioCommon",
+      "name": "Request Arpeggio Common",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "05",
+        "00",
+        "00",
+        "00",
+        "00",
+        "08",
+        "63",
+        "F7"
+      ],
+      "address": "10 00 05 00",
+      "size": "00 00 00 08",
+      "response": {
+        "dump": "arpeggioCommonDump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern01",
+      "name": "Request Arpeggio Pattern 01",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "06",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "28",
+        "F7"
+      ],
+      "address": "10 00 06 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern01Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern02",
+      "name": "Request Arpeggio Pattern 02",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "07",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "27",
+        "F7"
+      ],
+      "address": "10 00 07 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern02Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern03",
+      "name": "Request Arpeggio Pattern 03",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "08",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "26",
+        "F7"
+      ],
+      "address": "10 00 08 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern03Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern04",
+      "name": "Request Arpeggio Pattern 04",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "09",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "25",
+        "F7"
+      ],
+      "address": "10 00 09 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern04Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern05",
+      "name": "Request Arpeggio Pattern 05",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0A",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "24",
+        "F7"
+      ],
+      "address": "10 00 0A 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern05Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern06",
+      "name": "Request Arpeggio Pattern 06",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0B",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "23",
+        "F7"
+      ],
+      "address": "10 00 0B 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern06Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern07",
+      "name": "Request Arpeggio Pattern 07",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0C",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "22",
+        "F7"
+      ],
+      "address": "10 00 0C 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern07Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern08",
+      "name": "Request Arpeggio Pattern 08",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0D",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "21",
+        "F7"
+      ],
+      "address": "10 00 0D 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern08Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern09",
+      "name": "Request Arpeggio Pattern 09",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0E",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "20",
+        "F7"
+      ],
+      "address": "10 00 0E 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern09Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern10",
+      "name": "Request Arpeggio Pattern 10",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "0F",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1F",
+        "F7"
+      ],
+      "address": "10 00 0F 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern10Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern11",
+      "name": "Request Arpeggio Pattern 11",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "10",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1E",
+        "F7"
+      ],
+      "address": "10 00 10 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern11Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern12",
+      "name": "Request Arpeggio Pattern 12",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "11",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1D",
+        "F7"
+      ],
+      "address": "10 00 11 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern12Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern13",
+      "name": "Request Arpeggio Pattern 13",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "12",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1C",
+        "F7"
+      ],
+      "address": "10 00 12 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern13Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern14",
+      "name": "Request Arpeggio Pattern 14",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "13",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1B",
+        "F7"
+      ],
+      "address": "10 00 13 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern14Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern15",
+      "name": "Request Arpeggio Pattern 15",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "14",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "1A",
+        "F7"
+      ],
+      "address": "10 00 14 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern15Dump"
+      },
+      "timeoutMs": 3000,
+      "retries": 1
+    },
+    {
+      "id": "requestArpeggioPattern16",
+      "name": "Request Arpeggio Pattern 16",
+      "kind": "sysex",
+      "template": [
+        "F0",
+        "41",
+        "$deviceId",
+        "00",
+        "00",
+        "16",
+        "11",
+        "10",
+        "00",
+        "15",
+        "00",
+        "00",
+        "00",
+        "00",
+        "42",
+        "19",
+        "F7"
+      ],
+      "address": "10 00 15 00",
+      "size": "00 00 00 42",
+      "response": {
+        "dump": "arpeggioPattern16Dump"
       },
       "timeoutMs": 3000,
       "retries": 1
@@ -32254,7 +33019,11 @@
   "authoringNotes": [
     "Large profile: DPD should use paged parameter loading and backend filtering.",
     "Arpeggio Pattern parameters are intentionally grouped by pattern block; they are advanced editing targets.",
-    "DT1 dump parsing definitions are generated from documented address ranges; captured hardware dumps should be added as parse tests."
+    "DT1 dump parsing definitions are generated from documented address ranges; captured hardware dumps should be added as parse tests.",
+    "Arpeggio pattern values: Original Note 0..127, or 128 for OFF; a step 0 for a rest, 1..127 for a note's velocity, 128 for a tie, each sent as two nibbles, high first. The owner reports the SH-201's step bytes as 08 00 a tie, 00 00 a rest and 07 0F the loudest velocity, which is this encoding of 128, 0 and 127 (sh201ArpPattern.test.js holds it); the Owner's Manual (Arpeggio) describes a step as a Note On with its velocity, a Tie or a Rest. A captured pattern dump would make it a test against the instrument.",
+    "LFO Tempo Sync Switch is listed in the MIDI Implementation as ON, OFF, where every other switch is OFF, ON: raw 0 is ON. The four Tempo Sync parameters say so (falseValue 1, trueValue 0). The PDF has misprints elsewhere, so this is to be confirmed on the synth: F0 41 10 00 00 16 12 10 00 01 29 00 46 F7 (Upper LFO1 Tempo Sync, raw 0) should switch sync on.",
+    "A tone parameter's name leaves out Upper or Lower: its group says which tone, as do its id, its address and, on a panel, the section it sits in.",
+    "Startup read: the whole temporary patch (22 blocks, one request), then System Common. The panel shows the synth's system settings as well as its patch once read; before, the startup pull was the profile's first request alone and the system settings were never read."
   ],
   "dumpDefinitions": [
     {
@@ -32567,7 +33336,16 @@
           "parameter": "patch.dBeamPolarity",
           "offset": 32
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 0,
+          "length": 33
+        }
+      }
     },
     {
       "id": "upperToneDump",
@@ -32859,7 +33637,16 @@
           "parameter": "upper.monoSolo",
           "offset": 63
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 33,
+          "length": 64
+        }
+      }
     },
     {
       "id": "lowerToneDump",
@@ -33151,7 +33938,16 @@
           "parameter": "lower.monoSolo",
           "offset": 63
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 97,
+          "length": 64
+        }
+      }
     },
     {
       "id": "delayDump",
@@ -33207,7 +34003,16 @@
           "parameter": "delay.modDepth",
           "offset": 4
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 161,
+          "length": 5
+        }
+      }
     },
     {
       "id": "reverbDump",
@@ -33283,7 +34088,16 @@
           "parameter": "reverb.hfDampGain",
           "offset": 9
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 166,
+          "length": 10
+        }
+      }
     },
     {
       "id": "arpeggioCommonDump",
@@ -33347,7 +34161,16 @@
           "parameter": "arpeggio.endStep",
           "offset": 6
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 176,
+          "length": 8
+        }
+      }
     },
     {
       "id": "arpeggioPattern01Dump",
@@ -33515,7 +34338,16 @@
           "parameter": "arpeggio.pattern01.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 184,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern02Dump",
@@ -33683,7 +34515,16 @@
           "parameter": "arpeggio.pattern02.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 250,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern03Dump",
@@ -33851,7 +34692,16 @@
           "parameter": "arpeggio.pattern03.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 316,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern04Dump",
@@ -34019,7 +34869,16 @@
           "parameter": "arpeggio.pattern04.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 382,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern05Dump",
@@ -34187,7 +35046,16 @@
           "parameter": "arpeggio.pattern05.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 448,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern06Dump",
@@ -34355,7 +35223,16 @@
           "parameter": "arpeggio.pattern06.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 514,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern07Dump",
@@ -34523,7 +35400,16 @@
           "parameter": "arpeggio.pattern07.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 580,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern08Dump",
@@ -34691,7 +35577,16 @@
           "parameter": "arpeggio.pattern08.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 646,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern09Dump",
@@ -34859,7 +35754,16 @@
           "parameter": "arpeggio.pattern09.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 712,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern10Dump",
@@ -35027,7 +35931,16 @@
           "parameter": "arpeggio.pattern10.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 778,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern11Dump",
@@ -35195,7 +36108,16 @@
           "parameter": "arpeggio.pattern11.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 844,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern12Dump",
@@ -35363,7 +36285,16 @@
           "parameter": "arpeggio.pattern12.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 910,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern13Dump",
@@ -35531,7 +36462,16 @@
           "parameter": "arpeggio.pattern13.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 976,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern14Dump",
@@ -35699,7 +36639,16 @@
           "parameter": "arpeggio.pattern14.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 1042,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern15Dump",
@@ -35867,7 +36816,16 @@
           "parameter": "arpeggio.pattern15.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 1108,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern16Dump",
@@ -36035,7 +36993,16 @@
           "parameter": "arpeggio.pattern16.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 1174,
+          "length": 66
+        }
+      }
     }
   ]
 }

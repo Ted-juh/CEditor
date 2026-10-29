@@ -4,6 +4,7 @@ import { extensionsToBundle } from '../scripting/extensionModules.js';
 import { ensureTs, transpileTs } from '../scripting/tsService.js';
 import { packagePanelForSharing, openSharedPanel } from './panelSharing.js';
 import { exportFormDocument } from './panelModel.js';
+import { controlsInTree } from '../scripting/scriptPanelExport.js';
 
 /**
  * Prepare the same document for either native exporter: assets carried, TypeScript compiled,
@@ -22,7 +23,9 @@ export async function preparePanelForExport(serialized) {
   // Unlike a shared document, plugin export deliberately carries Total Recall.
   if (original.deviceSession) panel.deviceSession = original.deviceSession;
 
-  const scripts = [...(panel.scripts ?? []), ...(panel.controls ?? [])
+  // Every control's, a container's children included: the player loads the scripts of the whole
+  // tree (collectPanelExportScripts), so a nested control's TypeScript needs its compiledJs too.
+  const scripts = [...(panel.scripts ?? []), ...controlsInTree(panel.controls)
     .flatMap((control) => control?._children?.Scripts?.scripts ?? [])];
   const typescript = scripts.filter((script) => script.language === 'typescript' && script.source?.trim());
   if (typescript.length) {
