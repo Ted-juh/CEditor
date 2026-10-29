@@ -6,9 +6,10 @@
 //
 // The draft, Roland SH-201.cepanel, in the GAIA panel's look:
 //   - every control sends one profile parameter: all 64 of each tone's, once each, Keyboard Part,
-//     and what the tones share: the arpeggiator, the delay and the reverb
+//     what the tones share (the patch's settings, the arpeggiator, the effects) and the system
+//     settings; of Patch Common and System Common, nothing is left out but the name's characters
 //   - a control sits in its tone, and in the section of the front panel its parameter belongs to;
-//     both tones are on the panel at once, Upper above Lower, and the patch's sections under them
+//     both tones are on the panel at once, Upper above Lower, then Patch, then System
 //   - every custom component is a clean linked copy of a package in the library file beside it,
 //     with its range, default and readout as per-copy settings, not design edits
 //   - the pattern grid is the SH-201's: SEND PATTERN sends the 528 pattern parameters and End Step
@@ -59,18 +60,37 @@ const toneOf = (parameterId) => parameterId.split('.')[0];
 const sectionGroup = (parameter) => parameter.group.replace(/^(Upper|Lower) /, '');
 
 /**
- * What the tones share, by the section it sits in: the Arpeggio Common, Delay and Reverb blocks, End
- * Step on the pattern grid, and the Patch Common settings that belong with them — the three
- * switches, Hold, which tone arpeggiates in a split, and the tempo the arpeggio runs at.
+ * What the tones share, by the section it sits in: the patch's own settings and controllers, the
+ * Arpeggio Common, Delay and Reverb blocks with the Patch Common switches and the tempo that belong
+ * with them, and End Step on the pattern grid.
  */
-const PATCH_COMMON = {
-  'patch.arpeggioSwitch': 'ARPEGGIO', 'patch.arpeggioHold': 'ARPEGGIO', 'patch.splitArpeggio': 'ARPEGGIO', 'patch.tempo': 'ARPEGGIO',
-  'patch.delaySwitch': 'DELAY', 'patch.reverbSwitch': 'REVERB',
+const PATCH_PLATE = {
+  'PATCH': ['patch.name', 'patch.keyboardMode', 'patch.level', 'patch.toneBalance', 'patch.splitPoint'],
+  'CONTROLLERS': ['patch.modulationAssign', 'patch.modulationDestination', 'patch.dBeamAssign', 'patch.dBeamDestination',
+    'patch.dBeamPolarity', 'patch.pitchBendDestination', 'patch.expressionDestination', 'patch.activeExpression'],
+  'ARPEGGIO': ['patch.arpeggioSwitch', 'patch.arpeggioHold', 'patch.splitArpeggio', 'patch.tempo',
+    ...profile.parameters.filter((p) => p.group === 'Arpeggio Common' && p.id !== 'arpeggio.endStep').map((p) => p.id)],
+  'DELAY': ['patch.delaySwitch', ...profile.parameters.filter((p) => p.group === 'Delay').map((p) => p.id)],
+  'REVERB': ['patch.reverbSwitch', ...profile.parameters.filter((p) => p.group === 'Reverb').map((p) => p.id)],
+  'PATTERN': ['arpeggio.endStep'],
 };
-const patchSection = (parameter) => (parameter.id === 'arpeggio.endStep' ? 'PATTERN'
-  : PATCH_COMMON[parameter.id] ?? { 'Arpeggio Common': 'ARPEGGIO', Delay: 'DELAY', Reverb: 'REVERB' }[parameter.group] ?? null);
-const PATCH = profile.parameters.filter(patchSection).map((p) => p.id);
-const PATCH_SECTION_NAMES = ['ARPEGGIO', 'DELAY', 'REVERB', 'PATTERN'];
+/** The instrument's own settings, by section: every System Common parameter. */
+const SYSTEM_PLATE = {
+  'MASTER': ['system.localSwitch', 'system.remoteKeyboardSwitch', 'system.masterTune', 'system.masterKeyShift',
+    'system.masterLevel', 'system.octaveShift', 'system.transposeValue'],
+  'TEMPO': ['system.clockSource', 'system.tempo'],
+  'PATCH SELECT': ['system.patchBankMsb', 'system.patchBankLsb', 'system.patchProgram', 'system.patchRxTxChannel', 'system.patchRemain'],
+  'MIDI': ['system.receiveProgramChange', 'system.receiveBankSelect', 'system.transmitProgramChange', 'system.transmitBankSelect',
+    'system.transmitEditData', 'system.transmitActiveSensing', 'system.softThrough', 'system.midiUsbThru'],
+  'PEDAL & D BEAM': ['system.pedalAssign', 'system.pedalPolarity', 'system.dBeamSens'],
+  'RECORDER': ['system.recorderSyncOutput', 'system.recorderMetronomeMode', 'system.recorderMetronomeLevel'],
+};
+const sectionIn = (plate) => new Map(Object.entries(plate).flatMap(([section, ids]) => ids.map((id) => [id, section])));
+const PATCH = Object.values(PATCH_PLATE).flat();
+const SYSTEM = Object.values(SYSTEM_PLATE).flat();
+const SHARED_SECTION_NAMES = [...Object.keys(PATCH_PLATE), ...Object.keys(SYSTEM_PLATE)];
+/** Typed, not turned: a stock number box each. */
+const NUMBER_BOXES = ['system.patchBankMsb', 'system.patchBankLsb', 'system.patchProgram', 'system.patchRxTxChannel'];
 
 function load(file, libraryFile, sections) {
   const panel = deserializePanel(read(`CE/panels/${file}`), file, null);
@@ -103,20 +123,25 @@ for (const look of [draft, hardware]) {
     }
     const tones = profile.parameters.filter((p) => TONES.includes(toneOf(p.id))).map((p) => p.id);
     assert.equal(tones.length, 128);
-    assert.equal(PATCH.length, 28, 'Arpeggio Common 7, Delay 5, Reverb 10, and six of Patch Common');
-    assert.deepEqual([...sent].sort(), [...tones, 'patch.keyboardPart', ...PATCH].sort(),
-      'each tone parameter once, Keyboard Part, what the tones share, and nothing else');
+    assert.deepEqual([...sent].sort(), [...tones, 'patch.keyboardPart', ...PATCH, ...SYSTEM].sort(),
+      'each tone parameter once, Keyboard Part, what the tones share, the system settings, and nothing else');
+    // Nothing of Patch Common or System Common is missing but the name's twelve characters, which
+    // the name box sends; the pedal, the all-off actions and the dump requests are not settings.
+    const ofGroup = (group) => profile.parameters.filter((p) => p.group === group).map((p) => p.id);
+    assert.deepEqual(ofGroup('Patch Common').filter((id) => !sent.includes(id)), Array.from({ length: 12 }, (_, i) => `patch.nameChar${String(i + 1).padStart(2, '0')}`));
+    assert.deepEqual(ofGroup('System Common').filter((id) => !sent.includes(id)), []);
+    for (const group of ['Arpeggio Common', 'Delay', 'Reverb']) assert.deepEqual(ofGroup(group).filter((id) => !sent.includes(id)), [], group);
     assert.deepEqual(panel.requiredProfiles, [{ role: 'Roland SH-201', profileId: 'roland-sh-201', version: '*' }]);
   });
 
-  test(`${file}: the component tree reads like the front panel: two tones, then what they share`, () => {
+  test(`${file}: the component tree reads like the front panel: two tones, what they share, the system`, () => {
     const plates = panel.controls.filter((c) => getChildControls(c).length);
-    assert.deepEqual(plates.map((c) => [c._children.Core.name, c._children.Core.controlType]), [['Upper', 'Group'], ['Lower', 'Group'], ['Patch', 'Group']],
-      'three top-level groups: Upper, Lower, Patch');
+    assert.deepEqual(plates.map((c) => [c._children.Core.name, c._children.Core.controlType]),
+      [['Upper', 'Group'], ['Lower', 'Group'], ['Patch', 'Group'], ['System', 'Group']], 'four top-level groups');
     assert.ok(!all.some((c) => c._children.Core.controlType === 'TabContainer'), 'both tones at once, not pages of one');
     const boxes = plates.map((c) => c._children.Transform);
     for (let i = 1; i < boxes.length; i++) assert.ok(boxes[i - 1].y + boxes[i - 1].height <= boxes[i].y, `${plates[i - 1]._children.Core.name} above ${plates[i]._children.Core.name}`);
-    const [upper, lower, patch] = plates;
+    const [upper, lower, patch, system] = plates;
     for (const tone of [upper, lower]) {
       const toneId = tone._children.Core.name.toLowerCase();
       const groups = getChildControls(tone).filter((c) => getChildControls(c).length);
@@ -131,12 +156,15 @@ for (const look of [draft, hardware]) {
         }
       }
     }
-    const shared = getChildControls(patch).filter((c) => getChildControls(c).length);
-    assert.deepEqual(shared.map((c) => c._children.Core.name), PATCH_SECTION_NAMES);
-    for (const section of shared) {
-      for (const control of getChildControls(section)) {
-        const id = parameterOf(control);
-        if (id) assert.equal(patchSection(parameters.get(id)), section._children.Core.name, `${id} sits in ${section._children.Core.name}`);
+    for (const [plate, layout] of [[patch, PATCH_PLATE], [system, SYSTEM_PLATE]]) {
+      const where = sectionIn(layout);
+      const groups = getChildControls(plate).filter((c) => getChildControls(c).length);
+      assert.deepEqual(groups.map((c) => c._children.Core.name), Object.keys(layout), plate._children.Core.name);
+      for (const section of groups) {
+        for (const control of getChildControls(section)) {
+          const id = parameterOf(control);
+          if (id) assert.equal(where.get(id), section._children.Core.name, `${id} sits in ${section._children.Core.name}`);
+        }
       }
     }
   });
@@ -148,9 +176,15 @@ for (const look of [draft, hardware]) {
     }));
     assert.deepEqual(library.packages.map((p) => p.metadata.name).sort(), ['SH-201 Arpeggio Grid', 'SH-201 Fader', 'SH-201 Knob', 'SH-201 LED Switch']);
     const copies = all.filter(isCopy);
-    // Every parameter that is not a named list: those are stock lists, their rows the profile's.
-    const notLists = bound.filter((c) => parameters.get(parameterOf(c)).type !== 'choice');
-    assert.deepEqual(copies.map(parameterOf).sort(), notLists.map(parameterOf).sort());
+    // Every value is a library copy but a named list (a stock list, its rows the profile's), the name
+    // (a stock text box) and the numbers that are typed (stock number boxes).
+    const stock = (c) => { const p = parameters.get(parameterOf(c)); return p.type === 'choice' || p.type === 'text' || NUMBER_BOXES.includes(p.id); };
+    assert.deepEqual(copies.map(parameterOf).sort(), bound.filter((c) => !stock(c)).map(parameterOf).sort());
+    for (const control of bound.filter(stock)) {
+      const parameter = parameters.get(parameterOf(control));
+      const expected = parameter.type === 'text' ? ['TextInput'] : parameter.type === 'choice' ? ['Combobox', 'RadioButtonGroup'] : ['Number'];
+      assert.ok(expected.includes(control._children.Core.controlType), `${parameter.id} is a ${control._children.Core.controlType}`);
+    }
     for (const copy of copies) {
       const report = diffCustomComponentAgainstSource(copy, entries);
       assert.equal(report.status, 'current',
@@ -172,6 +206,19 @@ for (const look of [draft, hardware]) {
         assert.deepEqual([channel.format.displayMin, channel.format.displayMax], [parameter.display.min, parameter.display.max], parameter.id);
       }
     }
+  });
+
+  test(`${file}: the name and the typed numbers send what the profile says, and open at a new patch's`, () => {
+    const name = bound.find((c) => parameterOf(c) === 'patch.name');
+    assert.deepEqual([name._children.DeviceBindings.bindings[0].port, name._children.Behavior.defaultValue], ['text', 'SH-201 INIT']);
+    for (const id of NUMBER_BOXES) {
+      const box = bound.find((c) => parameterOf(c) === id);
+      const parameter = parameters.get(id);
+      const behavior = box._children.Behavior;
+      assert.deepEqual([behavior.min, behavior.max, behavior.defaultValue], [parameter.range.min, parameter.range.max, parameter.default], id);
+    }
+    const channel = bound.find((c) => parameterOf(c) === 'system.patchRxTxChannel')._children.Behavior;
+    assert.deepEqual([channel.displayMin, channel.displayMax], [1, 16], 'the channel reads as the synth shows it');
   });
 
   test(`${file}: PATTERN is the SH-201's user arpeggio, sent as one, its End Step bound`, () => {
@@ -276,7 +323,7 @@ test('the hardware look\'s silver sections carry the brushed-metal overlay that 
   const dataUrl = `data:image/png;base64,${texture.toString('base64')}`;
   const SILVER = ['OSC 1', 'OSC 2', 'MIX/MOD', 'FILTER', 'AMP'];
   const sections = (look) => look.all.filter((c) => c._children.Core.controlType === 'Group' && getChildControls(c).length
-    && [...Object.values(look.sections), ...PATCH_SECTION_NAMES].includes(c._children.Core.name));
+    && [...Object.values(look.sections), ...SHARED_SECTION_NAMES].includes(c._children.Core.name));
   const silver = sections(hardware).filter((c) => SILVER.includes(c._children.Core.name));
   assert.equal(silver.length, SILVER.length * 2, 'both tones');
   for (const section of silver) {

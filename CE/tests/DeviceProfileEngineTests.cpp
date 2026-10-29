@@ -2118,14 +2118,16 @@ int runWithinProcessMidiTests (const juce::File& sh201File)
     }
 
     // The whole temporary patch is answered block by block, every one a dump the profile parses,
-    // and the request is resolved when the last of the 22 is in: it is the SH-201's first request,
-    // so it is the startup pull, a sync that names no request. It used to wait for a collection no
-    // dump belonged to, and time out.
-    const auto lastResolved = [&events] (const juce::String& role)
+    // and the request is resolved when the last of the 22 is in: it is the first step of the SH-201's
+    // startup chain, so it is the startup pull, a sync that names no request. It used to wait for a
+    // collection no dump belonged to, and time out. The chain then reads System Common, so a panel
+    // shows the synth's system settings too.
+    const auto lastResolved = [&events] (const juce::String& role, const juce::String& requestId = {})
     {
         juce::var resolved;
         for (const auto& [eventName, payload] : events)
-            if (eventName == "deviceRequestResolved" && payload.getProperty ("deviceRole", {}).toString() == role)
+            if (eventName == "deviceRequestResolved" && payload.getProperty ("deviceRole", {}).toString() == role
+                && (requestId.isEmpty() || payload.getProperty ("requestId", {}).toString() == requestId))
                 resolved = payload;
         return resolved;
     };
@@ -2135,14 +2137,13 @@ int runWithinProcessMidiTests (const juce::File& sh201File)
     pull->setProperty ("deviceRole", "sh201");
     const auto pullSent = service.startDeviceSync (juce::var (pull));
     DeviceProfileServiceTestAccess::deliverWithinProcess (service);
-    const auto pulled = lastResolved ("sh201");
+    const auto pulled = lastResolved ("sh201", "requestTemporaryPatchBulk");
     const auto pulledCollection = pulled.getProperty ("dumpCollection", {});
-    if (count ("dumpMessageParsed", "sh201") - parsedBefore != 22)
-        fail ("the temporary patch was answered with " + juce::String (count ("dumpMessageParsed", "sh201") - parsedBefore)
-              + " dumps, not the patch's 22 blocks");
+    if (count ("dumpMessageParsed", "sh201") - parsedBefore != 23)
+        fail ("the startup pull was answered with " + juce::String (count ("dumpMessageParsed", "sh201") - parsedBefore)
+              + " dumps, not the patch's 22 blocks and System Common");
     if (! (bool) pullSent.getProperty ("pending", false)
-        || count ("deviceRequestResolved", "sh201") != resolvedBefore + 1
-        || pulled.getProperty ("requestId", {}).toString() != "requestTemporaryPatchBulk"
+        || count ("deviceRequestResolved", "sh201") != resolvedBefore + 2
         || pulled.getProperty ("dumpId", {}).toString() != "temporaryPatch"
         || ! (bool) pulledCollection.getProperty ("complete", false)
         || (int) pulledCollection.getProperty ("receivedMessageCount", 0) != 22
@@ -2151,6 +2152,11 @@ int runWithinProcessMidiTests (const juce::File& sh201File)
               + pulled.getProperty ("requestId", {}).toString() + ", collection "
               + pulledCollection.getProperty ("status", "none").toString() + ", "
               + pulledCollection.getProperty ("receivedMessageCount", 0).toString() + " messages)");
+    const auto system = lastResolved ("sh201");
+    if (system.getProperty ("dumpId", {}).toString() != "systemDump"
+        || (int) system.getProperty ("values", {}).getProperty ("system.masterTune", -1) != 1024)
+        fail ("the startup chain did not go on to read System Common after the patch (last resolved "
+              + system.getProperty ("dumpId", {}).toString() + ")");
 
     // Asked again, it is answered by the new answer, not by the patch the first one completed: one
     // block arriving first does not resolve it. And a block read on its own still resolves its own
@@ -2164,6 +2170,7 @@ int runWithinProcessMidiTests (const juce::File& sh201File)
     auto* again = new juce::DynamicObject();
     again->setProperty ("deviceRole", "sh201");
     again->setProperty ("request", "requestTemporaryPatchBulk");
+    again->setProperty ("chainStartup", false);
     service.startDeviceSync (juce::var (again));
     const auto resolvedBeforeAgain = count ("deviceRequestResolved", "sh201");
     auto* early = new juce::DynamicObject();

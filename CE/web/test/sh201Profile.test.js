@@ -17,6 +17,7 @@ import {
   encodeParameterValue, decodeParameterValue, localCompileParameter,
 } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 import { buildInboundIndex, decodeInbound } from '../src/CE_Application/utils/inboundParameterIndex.js';
+import { hasStartupRead, startupReadPlan } from '../src/CE_Application/utils/playerStartup.js';
 
 const profile = JSON.parse(readFileSync(new URL('../../profiles/test/roland-sh-201.ceditor-device.json', import.meta.url), 'utf8'));
 const byId = new Map(profile.parameters.map((p) => [p.id, p]));
@@ -68,4 +69,19 @@ test('a tone parameter is named without its tone, and is told apart by its group
     const names = tones.filter((p) => p.id.startsWith(tone)).map((p) => p.name);
     assert.equal(new Set(names).size, names.length, `${tone} names are unique`);
   }
+});
+
+test('the startup read is the whole patch, then the system settings', () => {
+  // The panel has the system settings on it, so a read that left them out would show defaults
+  // for an instrument set otherwise. Before the chain the startup pull was the first request alone.
+  assert.deepEqual(profile.startup.sync.map((step) => step.request), ['requestTemporaryPatchBulk', 'requestSystemDump']);
+  const requests = new Map(profile.requests.map((r) => [r.id, r]));
+  assert.equal(requests.get('requestTemporaryPatchBulk').response.collectionId, 'temporaryPatch');
+  assert.equal(requests.get('requestSystemDump').response.dump, 'systemDump');
+  const system = profile.dumpDefinitions.find((d) => d.id === 'systemDump');
+  const read = new Set(system.mappings.map((m) => m.parameter));
+  for (const parameter of profile.parameters.filter((p) => p.group === 'System Common')) assert.ok(read.has(parameter.id), `${parameter.id} is read`);
+  // So the editor offers to read the synth when the panel connects, and the exported player pulls.
+  assert.equal(hasStartupRead(profile), true);
+  assert.equal(startupReadPlan({ restored: false, profile }), 'pull');
 });

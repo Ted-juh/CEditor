@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": "0.7.0",
+  "profileVersion": "0.8.0",
   "minCEditorVersion": "0.9.0",
   "id": "roland-sh-201",
   "name": "Roland SH-201",
@@ -32093,6 +32093,18 @@
       "value": "$encodedValue"
     }
   ],
+  "startup": {
+    "policy": "pull",
+    "syncDirection": "pull",
+    "sync": [
+      {
+        "request": "requestTemporaryPatchBulk"
+      },
+      {
+        "request": "requestSystemDump"
+      }
+    ]
+  },
   "requests": [
     {
       "id": "requestTemporaryPatchBulk",
@@ -33010,7 +33022,8 @@
     "DT1 dump parsing definitions are generated from documented address ranges; captured hardware dumps should be added as parse tests.",
     "Arpeggio pattern values: Original Note 0..127, or 128 for OFF; a step 0 for a rest, 1..127 for a note's velocity, 128 for a tie, each sent as two nibbles, high first. The owner reports the SH-201's step bytes as 08 00 a tie, 00 00 a rest and 07 0F the loudest velocity, which is this encoding of 128, 0 and 127 (sh201ArpPattern.test.js holds it); the Owner's Manual (Arpeggio) describes a step as a Note On with its velocity, a Tie or a Rest. A captured pattern dump would make it a test against the instrument.",
     "LFO Tempo Sync Switch is listed in the MIDI Implementation as ON, OFF, where every other switch is OFF, ON: raw 0 is ON. The four Tempo Sync parameters say so (falseValue 1, trueValue 0). The PDF has misprints elsewhere, so this is to be confirmed on the synth: F0 41 10 00 00 16 12 10 00 01 29 00 46 F7 (Upper LFO1 Tempo Sync, raw 0) should switch sync on.",
-    "A tone parameter's name leaves out Upper or Lower: its group says which tone, as do its id, its address and, on a panel, the section it sits in."
+    "A tone parameter's name leaves out Upper or Lower: its group says which tone, as do its id, its address and, on a panel, the section it sits in.",
+    "Startup read: the whole temporary patch (22 blocks, one request), then System Common. The panel shows the synth's system settings as well as its patch once read; before, the startup pull was the profile's first request alone and the system settings were never read."
   ],
   "dumpDefinitions": [
     {

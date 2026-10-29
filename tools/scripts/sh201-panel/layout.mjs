@@ -182,11 +182,44 @@ export const SECTION_ROWS = [
 // runs at; the rest are the Arpeggio Common, Delay and Reverb blocks.
 //
 //   grid    the SH-201 Arpeggio Grid package: the user pattern, its End Step bound, caption over it
+//   text    a stock text box, for the patch name, caption over it
+//   number  a stock number box, for a value that is typed rather than turned, caption over it
 
 /** The pattern grid's size: the GAIA's, as wide as the panel. Its toolbar lays out by width. */
 export const ARP_GRID = { w: 1604, h: 240 };
 
 export const PATCH_SECTIONS = {
+  patch: {
+    title: 'PATCH',
+    tint: TINT.play,
+    about: 'The patch as a whole: its name, its level, the balance of its two tones, and how the keyboard plays them — SINGLE, DUAL (both at once) or SPLIT at SPLIT POINT, a MIDI note number (60 is middle C).',
+    w: 390,
+    h: 196,
+    items: [
+      { p: 'patch.name', kind: 'text', x: 12, y: 42, w: 176, label: 'NAME' },
+      { p: 'patch.keyboardMode', kind: 'combo', x: 200, y: 42, w: 100, label: 'KEYBOARD' },
+      { p: 'patch.level', kind: 'knob', x: 20, y: 100, label: 'LEVEL' },
+      { p: 'patch.toneBalance', kind: 'knob', x: 92, y: 100, label: 'BALANCE' },
+      { p: 'patch.splitPoint', kind: 'knob', x: 225, y: 100, label: 'SPLIT POINT' },
+    ],
+  },
+  controllers: {
+    title: 'CONTROLLERS',
+    tint: TINT.play,
+    about: 'What the performance controllers do, and which tone they reach: the modulation lever, the D Beam, the pitch bend and an expression pedal.',
+    w: 828,
+    h: 196,
+    items: [
+      { p: 'patch.modulationAssign', kind: 'combo', x: 16, y: 42, w: 150, label: 'MOD ASSIGN' },
+      { p: 'patch.modulationDestination', kind: 'combo', x: 16, y: 100, w: 100, label: 'MOD TONE' },
+      { p: 'patch.dBeamAssign', kind: 'combo', x: 236, y: 42, w: 180, label: 'D BEAM ASSIGN' },
+      { p: 'patch.dBeamDestination', kind: 'combo', x: 236, y: 100, w: 100, label: 'D BEAM TONE' },
+      { p: 'patch.dBeamPolarity', kind: 'switch', x: 352, y: 96, label: 'REVERSE' },
+      { p: 'patch.pitchBendDestination', kind: 'combo', x: 476, y: 42, w: 110, label: 'BEND TONE' },
+      { p: 'patch.expressionDestination', kind: 'combo', x: 666, y: 42, w: 110, label: 'EXPRESSION TONE' },
+      { p: 'patch.activeExpression', kind: 'switch', x: 666, y: 96, label: 'ACTIVE EXP' },
+    ],
+  },
   arpeggio: {
     title: 'ARPEGGIO',
     tint: TINT.arp,
@@ -255,8 +288,103 @@ export const PATCH_SECTIONS = {
 };
 
 export const PATCH_ROWS = [
+  { h: 196, sections: ['patch', 'controllers'] },
   { h: 196, sections: ['arpeggio', 'delay', 'reverb'] },
   { h: 292, sections: ['pattern'] },
+];
+
+/* ------------------------------------------------------------------ the instrument's own settings */
+
+// System Common: kept in the synth, not in the patch, so they apply whichever patch is playing. The
+// patch-select numbers are typed, not turned: each value names another patch.
+
+export const SYSTEM_SECTIONS = {
+  master: {
+    title: 'MASTER',
+    tint: TINT.effects,
+    about: 'The whole instrument\'s tuning, transposition and level, and whether its keys play its own sound (LOCAL) and take notes from a keyboard on MIDI (REMOTE KBD).',
+    w: 380,
+    h: 196,
+    items: [
+      { p: 'system.localSwitch', kind: 'switch', x: 12, y: 38, label: 'LOCAL' },
+      { p: 'system.remoteKeyboardSwitch', kind: 'switch', x: 88, y: 38, label: 'REMOTE KBD' },
+      { p: 'system.masterTune', kind: 'knob', x: 20, y: 100, label: 'TUNE' },
+      { p: 'system.masterKeyShift', kind: 'knob', x: 92, y: 100, label: 'KEY SHIFT' },
+      { p: 'system.masterLevel', kind: 'knob', x: 164, y: 100, label: 'LEVEL' },
+      { p: 'system.octaveShift', kind: 'knob', x: 236, y: 100, label: 'OCTAVE' },
+      { p: 'system.transposeValue', kind: 'knob', x: 308, y: 100, label: 'TRANSPOSE' },
+    ],
+  },
+  tempo: {
+    title: 'TEMPO',
+    tint: TINT.effects,
+    about: 'Where the tempo comes from — the patch\'s own, this system tempo, MIDI clock or USB — and the system tempo itself.',
+    w: 130,
+    h: 196,
+    items: [
+      { p: 'system.clockSource', kind: 'combo', x: 12, y: 42, w: 104, label: 'CLOCK' },
+      { p: 'system.tempo', kind: 'knob', x: 40, y: 100, label: 'TEMPO' },
+    ],
+  },
+  patchSelect: {
+    title: 'PATCH SELECT',
+    tint: TINT.effects,
+    about: 'Which patch is selected, and the MIDI channel the synth plays and sends on. A new bank or program number can select another patch on the synth, and with it the edits not yet written are gone. REMAIN keeps a held sound while the patch changes.',
+    w: 244,
+    h: 196,
+    items: [
+      { p: 'system.patchBankMsb', kind: 'number', x: 12, y: 42, w: 64, label: 'BANK MSB' },
+      { p: 'system.patchBankLsb', kind: 'number', x: 88, y: 42, w: 64, label: 'BANK LSB' },
+      { p: 'system.patchProgram', kind: 'number', x: 164, y: 42, w: 64, label: 'PROGRAM' },
+      { p: 'system.patchRxTxChannel', kind: 'number', x: 12, y: 100, w: 64, label: 'CHANNEL' },
+      { p: 'system.patchRemain', kind: 'switch', x: 88, y: 96, label: 'REMAIN' },
+    ],
+  },
+  midi: {
+    title: 'MIDI',
+    tint: TINT.effects,
+    about: 'What the synth takes in and sends out. TX EDIT on makes the synth send each edit made on it, so the panel can follow the synth\'s own knobs.',
+    w: 316,
+    h: 196,
+    items: [
+      { p: 'system.receiveProgramChange', kind: 'switch', x: 12, y: 38, label: 'RX PROGRAM' },
+      { p: 'system.receiveBankSelect', kind: 'switch', x: 88, y: 38, label: 'RX BANK' },
+      { p: 'system.transmitProgramChange', kind: 'switch', x: 164, y: 38, label: 'TX PROGRAM' },
+      { p: 'system.transmitBankSelect', kind: 'switch', x: 240, y: 38, label: 'TX BANK' },
+      { p: 'system.transmitEditData', kind: 'switch', x: 12, y: 96, label: 'TX EDIT' },
+      { p: 'system.transmitActiveSensing', kind: 'switch', x: 88, y: 96, label: 'SENSING' },
+      { p: 'system.softThrough', kind: 'switch', x: 164, y: 96, label: 'SOFT THRU' },
+      { p: 'system.midiUsbThru', kind: 'switch', x: 240, y: 96, label: 'USB THRU' },
+    ],
+  },
+  pedal: {
+    title: 'PEDAL & D BEAM',
+    tint: TINT.effects,
+    about: 'What a pedal plugged into the synth does and which way it works, and how sensitive the D Beam is.',
+    w: 270,
+    h: 196,
+    items: [
+      { p: 'system.pedalAssign', kind: 'combo', x: 12, y: 42, w: 112, label: 'PEDAL ASSIGN' },
+      { p: 'system.pedalPolarity', kind: 'combo', x: 136, y: 42, w: 120, label: 'POLARITY' },
+      { p: 'system.dBeamSens', kind: 'knob', x: 40, y: 100, label: 'D BEAM SENS' },
+    ],
+  },
+  recorder: {
+    title: 'RECORDER',
+    tint: TINT.effects,
+    about: 'The recorder\'s metronome — when it sounds and how loud — and whether the recorder sends sync out.',
+    w: 210,
+    h: 196,
+    items: [
+      { p: 'system.recorderSyncOutput', kind: 'switch', x: 12, y: 38, label: 'SYNC OUT' },
+      { p: 'system.recorderMetronomeMode', kind: 'combo', x: 96, y: 42, w: 100, label: 'METRONOME' },
+      { p: 'system.recorderMetronomeLevel', kind: 'knob', x: 120, y: 100, label: 'METRO LEVEL' },
+    ],
+  },
+};
+
+export const SYSTEM_ROWS = [
+  { h: 196, sections: ['master', 'tempo', 'patchSelect', 'midi', 'pedal', 'recorder'] },
 ];
 
 /* ------------------------------------------------------------------ the hardware look */
@@ -342,9 +470,10 @@ export const HARDWARE_SECTIONS = {
   performance: pick('performance', { surface: 'black', h: 214 }),
 };
 
-/** The patch's sections on the black body, as the modulation row is. */
-export const HARDWARE_PATCH_SECTIONS = Object.fromEntries(Object.entries(PATCH_SECTIONS)
-  .map(([key, spec]) => [key, { ...spec, surface: 'black' }]));
+/** The patch's and the system's sections on the black body, as the modulation row is. */
+const onBlack = (sections) => Object.fromEntries(Object.entries(sections).map(([key, spec]) => [key, { ...spec, surface: 'black' }]));
+export const HARDWARE_PATCH_SECTIONS = onBlack(PATCH_SECTIONS);
+export const HARDWARE_SYSTEM_SECTIONS = onBlack(SYSTEM_SECTIONS);
 
 export const HARDWARE_ROWS = [
   { h: 196, sections: ['osc1', 'osc2', 'mixMod', 'filter', 'amp', 'effects'], flow: true },
