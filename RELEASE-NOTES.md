@@ -158,7 +158,9 @@ compiled. Scripts on top-level controls and panel scripts were never affected.
   Roland-style addresses (GAIA SH-01, SH-201); other profiles get identity only. It makes no sound
   and is not a check of the profile against the instrument. **Internal cables 1–4** connect
   devices inside CEditor; other programs cannot see them (on Windows, loopMIDI still does that).
-  The SH-201 profile now describes the synth's identity, so **Test** can recognise it.
+  The SH-201 profile now describes the synth's identity, so **Test** can recognise it, and its
+  42 offset parameters read what the synth's display reads: Coarse Tune −36…+36 rather than
+  28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents.
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
   Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
   and reports the actual send result. Changing ports preserves its profile and parameter values.

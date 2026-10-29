@@ -166,7 +166,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Channel"
+        "shortLabel": "Channel",
+        "min": 1,
+        "max": 16
       },
       "normalization": {
         "mode": "linear"
@@ -239,7 +241,11 @@
       "address": "01 00 00 05",
       "display": {
         "mode": "number",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -100,
+        "max": 100,
+        "unit": "cent",
+        "precision": 1
       },
       "normalization": {
         "mode": "linear"
@@ -280,7 +286,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -24,
+        "max": 24
       },
       "normalization": {
         "mode": "linear"
@@ -729,7 +737,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -769,7 +779,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Value"
+        "shortLabel": "Value",
+        "min": -5,
+        "max": 6
       },
       "normalization": {
         "mode": "linear"
@@ -1726,7 +1738,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Balance"
+        "shortLabel": "Balance",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -2822,7 +2836,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -2861,7 +2877,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -2939,7 +2957,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3092,7 +3112,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -3131,7 +3153,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -3209,7 +3233,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3377,7 +3403,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Balance"
+        "shortLabel": "Balance",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3608,7 +3636,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Keyfollow"
+        "shortLabel": "Keyfollow",
+        "min": -200,
+        "max": 200
       },
       "normalization": {
         "mode": "linear"
@@ -3647,7 +3677,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -3881,7 +3913,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4031,7 +4065,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4070,7 +4106,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Pan"
+        "shortLabel": "Pan",
+        "min": -64,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4750,7 +4788,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -4840,7 +4880,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -5286,7 +5328,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -5376,7 +5420,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -5454,7 +5500,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -5730,7 +5778,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -5769,7 +5819,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -5847,7 +5899,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6000,7 +6054,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -36,
+        "max": 36
       },
       "normalization": {
         "mode": "linear"
@@ -6039,7 +6095,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Tune"
+        "shortLabel": "Tune",
+        "min": -50,
+        "max": 50
       },
       "normalization": {
         "mode": "linear"
@@ -6117,7 +6175,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6285,7 +6345,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Balance"
+        "shortLabel": "Balance",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6516,7 +6578,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Keyfollow"
+        "shortLabel": "Keyfollow",
+        "min": -200,
+        "max": 200
       },
       "normalization": {
         "mode": "linear"
@@ -6555,7 +6619,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6789,7 +6855,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Depth"
+        "shortLabel": "Depth",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6939,7 +7007,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Sens"
+        "shortLabel": "Sens",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -6978,7 +7048,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Pan"
+        "shortLabel": "Pan",
+        "min": -64,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -7658,7 +7730,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -7748,7 +7822,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -8194,7 +8270,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "1"
+        "shortLabel": "1",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -8284,7 +8362,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "2"
+        "shortLabel": "2",
+        "min": -63,
+        "max": 63
       },
       "normalization": {
         "mode": "linear"
@@ -8362,7 +8442,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Shift"
+        "shortLabel": "Shift",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
@@ -8563,8 +8645,10 @@
       "default": 49,
       "display": {
         "mode": "number",
-        "unit": "",
-        "shortLabel": "Feedback"
+        "unit": "%",
+        "shortLabel": "Feedback",
+        "min": -98,
+        "max": 98
       },
       "normalization": {
         "mode": "linear"
@@ -9740,7 +9824,9 @@
       "display": {
         "mode": "number",
         "unit": "",
-        "shortLabel": "Range"
+        "shortLabel": "Range",
+        "min": -3,
+        "max": 3
       },
       "normalization": {
         "mode": "linear"
