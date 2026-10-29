@@ -137,6 +137,17 @@ export function setPaletteColors(lib, id, colors) {
 }
 
 /** Do these two slot arrays say the same thing? Used to skip no-op writes. */
+/**
+ * A colour put in the first empty cell of a palette's colours: `{ colors, index }`, a new array of
+ * PALETTE_SIZE, or index -1 and the colours as they were when every cell is taken.
+ */
+export function placeInFirstEmpty(colors, hex) {
+  const next = Array.from({ length: PALETTE_SIZE }, (_, i) => colors?.[i] ?? null);
+  const index = next.findIndex((colour) => colour === null);
+  if (index !== -1) next[index] = hex;
+  return { colors: next, index };
+}
+
 export function sameColors(a, b) {
   const left = normalizeColors(a);
   const right = normalizeColors(b);

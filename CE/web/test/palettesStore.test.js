@@ -110,3 +110,20 @@ test('switching palettes does not leak one palette\'s colours into another', asy
   selectPalette(firstId);
   assert.equal(getActivePalette().colors[0], 'FF0000');
 });
+
+// The Viewer's eyedropper said "saved to swatch 1" and the Colors tab showed nothing: it wrote only
+// the working copy, which the swatch grid replaces with the active palette whenever it appears. A
+// pick now goes into the active palette, so the grid loads it back.
+test('a colour picked in the Viewer is in the active palette the Colors tab loads', async () => {
+  const store = await freshStore({ [STORAGE_KEY]: { activeId: 'p1', palettes: [{ id: 'p1', name: 'Mine', colors: ['112233', null, 'AABBCC'] }] } });
+  const { placeInFirstEmpty } = await import('../src/CE_Application/utils/paletteLibrary.js');
+  const { colors, index } = placeInFirstEmpty(store.getActivePalette().colors, 'D9402B');
+  assert.equal(index, 1, 'the first empty cell, not the end');
+  store.saveActiveColors(colors);
+  assert.deepEqual(store.getActivePalette().colors.slice(0, 3), ['112233', 'D9402B', 'AABBCC']);
+  assert.deepEqual(store.stored().palettes[0].colors.slice(0, 3), ['112233', 'D9402B', 'AABBCC'], 'and it is saved');
+
+  const full = placeInFirstEmpty(Array(24).fill('000000'), 'D9402B');
+  assert.equal(full.index, -1);
+  assert.ok(full.colors.every((colour) => colour === '000000'), 'a full palette is left as it was');
+});

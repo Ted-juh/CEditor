@@ -47,6 +47,8 @@
   import { editorTarget, tabForEditorTarget } from '../stores/editorTarget.js';
   import { deepClone } from '../utils/deepClone.js';
   import { readStoredJson, readStoredNumber, writeStoredJson } from '../utils/localStorageState.js';
+  import { getActivePalette, saveActiveColors } from '../stores/palettes.js';
+  import { PALETTE_SIZE, placeInFirstEmpty } from '../utils/paletteLibrary.js';
   import { syncExternalTarget } from '../utils/targetSync.js';
   import { splitColourAlpha, alphaToHex } from '../utils/colorMath.js';
   import { impliedDockTab } from '../utils/displayDock.js';
@@ -581,13 +583,15 @@
   // --- Viewer eyedropper: save picked color to first empty swatch ---
   // Called from ViewerTab's eyedropper. Returns a status message for the
   // child to display, since the swatch array lives here.
+  // Into the active palette, not only the working copy. The swatch grid loads the palette over
+  // `swatches` each time it appears, and it is not on screen while the Viewer is in front, so a pick
+  // kept only in `swatches` said "saved to swatch 1" and was gone by the time Colors was opened.
   function handleViewerColorPicked(hex) {
-    const emptyIdx = swatches.findIndex(s => s === null);
-    if (emptyIdx !== -1) {
-      swatches[emptyIdx] = hex;
-      return `#${hex} saved to swatch ${emptyIdx + 1}`;
-    }
-    return `#${hex} — no empty swatch (double-click one to clear)`;
+    const { colors, index } = placeInFirstEmpty(getActivePalette()?.colors ?? swatches, hex);
+    if (index === -1) return `#${hex}: no empty swatch. In Colors, right-click one and choose Clear.`;
+    saveActiveColors(colors);
+    for (let i = 0; i < PALETTE_SIZE; i++) swatches[i] = colors[i];
+    return `#${hex} saved to swatch ${index + 1}`;
   }
 
   // --- Gradient change handler ---
