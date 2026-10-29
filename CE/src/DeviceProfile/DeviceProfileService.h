@@ -237,6 +237,7 @@ private:
         juce::String profileId;
         juce::String collectionId;
         juce::StringArray hexMessages;
+        juce::StringArray dumpIds;   // beside hexMessages: which dump each one parsed as
         juce::var latestResult;
         double updatedAtMs = 0.0;
     };
@@ -353,6 +354,9 @@ private:
     void resolvePendingRequestsForDumpCollection (const juce::String& deviceRole,
                                                   const juce::String& profileId,
                                                   const DumpCollectionResult& result);
+    static bool waitsForCollection (const PendingDeviceRequest& request,
+                                    const juce::String& collectionId,
+                                    const juce::var& collectedMessages);
     void startNextStartupRequest (const PendingDeviceRequest& request);
     void updatePresetScanForResolvedDump (const PendingDeviceRequest& request,
                                           const DumpParseResult& result);

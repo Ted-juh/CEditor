@@ -303,13 +303,21 @@ juce::var DeviceProfileService::updateDumpCollectionForParsedDump (const juce::S
     state.collectionId = collectionId;
     state.updatedAtMs = nowMs();
 
-    auto alreadySeen = false;
-    for (const auto& existing : state.hexMessages)
-        if (existing == hex)
-            alreadySeen = true;
-
-    if (! alreadySeen)
+    // A dump with its own place in the collection (an addressRange: one block of a Roland patch)
+    // is the newest copy of that place, so it replaces the one before. Appended, a block read again
+    // with new values would sit beside the old one for as long as the session ran, and every later
+    // message would parse both. Dumps without a place are counted, so each distinct one is kept.
+    const auto hasPlace = completion != nullptr && completion->getProperty ("addressRange").getDynamicObject() != nullptr;
+    const auto replaced = hasPlace ? state.dumpIds.indexOf (result.dumpId) : -1;
+    if (replaced >= 0)
+    {
+        state.hexMessages.set (replaced, hex);
+    }
+    else if (! state.hexMessages.contains (hex))
+    {
         state.hexMessages.add (hex);
+        state.dumpIds.add (result.dumpId);
+    }
 
     auto collection = engine->collectDumpMessages (state.hexMessages);
     state.latestResult = dumpCollectionResultToVar ("collection_" + collectionId,
@@ -327,13 +335,7 @@ juce::var DeviceProfileService::updateDumpCollectionForParsedDump (const juce::S
     for (auto& [correlationId, pending] : pendingDeviceRequests)
     {
         juce::ignoreUnused (correlationId);
-        auto expectedMatchesCollection = pending.expectedDumpId == collection.collectionId;
-        if (! expectedMatchesCollection)
-            if (auto* messages = collection.messages.getArray())
-                for (const auto& message : *messages)
-                    if (auto* messageObject = message.getDynamicObject())
-                        if (messageObject->getProperty ("dumpId").toString() == pending.expectedDumpId)
-                            expectedMatchesCollection = true;
+        const auto expectedMatchesCollection = waitsForCollection (pending, collection.collectionId, collection.messages);
 
         if (pending.deviceRole == deviceRole
             && (pending.profileId.isEmpty() || pending.profileId == profileId)

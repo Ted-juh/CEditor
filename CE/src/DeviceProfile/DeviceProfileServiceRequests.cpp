@@ -231,6 +231,20 @@ juce::var DeviceProfileService::pushRuntimeStateToDevice (const juce::String& co
 
 void DeviceProfileService::addPendingDeviceRequest (const PendingDeviceRequest& request)
 {
+    // A request for a whole collection is answered by what arrives for it, not by what an earlier
+    // answer left: a collection completed once stays complete, and would resolve the second request
+    // on the first message of its answer, with the rest of the values still the old ones.
+    for (auto it = dumpCollections.begin(); it != dumpCollections.end();)
+    {
+        const auto& state = it->second;
+        if (state.deviceRole == request.deviceRole
+            && state.collectionId == request.expectedDumpId
+            && (request.profileId.isEmpty() || state.profileId == request.profileId))
+            it = dumpCollections.erase (it);
+        else
+            ++it;
+    }
+
     pendingDeviceRequests[request.correlationId] = request;
     publishPendingRequests();
     startTimerHz (60);
@@ -297,8 +311,11 @@ void DeviceProfileService::resolvePendingRequestsForDump (const juce::String& de
     if (! result.ok || result.dumpId.isEmpty())
         return;
 
-    if (result.expectedMessageCount > 1)
-        return;
+    // A request that names this dump is answered by it, even when the dump is one of a collection:
+    // RQ1 for the SH-201's Upper Tone is answered by the Upper Tone block, which is also one of the
+    // 22 a whole-patch request collects. What waits for the collection is a request that names the
+    // collection, and one with a continue request, which asks for the rest after the first part.
+    const auto partOfMore = result.expectedMessageCount > 1;
 
     for (auto it = pendingDeviceRequests.begin(); it != pendingDeviceRequests.end();)
     {
@@ -306,7 +323,8 @@ void DeviceProfileService::resolvePendingRequestsForDump (const juce::String& de
         if (request.deviceRole != deviceRole
             || request.expectedResponseKind == "identity"
             || (request.profileId.isNotEmpty() && profileId.isNotEmpty() && request.profileId != profileId)
-            || request.expectedDumpId != result.dumpId)
+            || request.expectedDumpId != result.dumpId
+            || (partOfMore && request.continueRequestId.isNotEmpty()))
         {
             ++it;
             continue;
@@ -345,18 +363,10 @@ void DeviceProfileService::resolvePendingRequestsForDumpCollection (const juce::
     for (auto it = pendingDeviceRequests.begin(); it != pendingDeviceRequests.end();)
     {
         const auto request = it->second;
-        auto expectedMatchesCollection = request.expectedDumpId == result.collectionId;
-        if (! expectedMatchesCollection)
-            if (auto* messages = result.messages.getArray())
-                for (const auto& message : *messages)
-                    if (auto* messageObject = message.getDynamicObject())
-                        if (messageObject->getProperty ("dumpId").toString() == request.expectedDumpId)
-                            expectedMatchesCollection = true;
-
         if (request.deviceRole != deviceRole
             || request.expectedResponseKind == "identity"
             || (request.profileId.isNotEmpty() && profileId.isNotEmpty() && request.profileId != profileId)
-            || ! expectedMatchesCollection)
+            || ! waitsForCollection (request, result.collectionId, result.messages))
         {
             ++it;
             continue;
@@ -387,6 +397,25 @@ void DeviceProfileService::resolvePendingRequestsForDumpCollection (const juce::
         if (request.nextRequestId.isNotEmpty() && request.purpose != "presetScan")
             startNextStartupRequest (request);
     }
+}
+
+bool DeviceProfileService::waitsForCollection (const PendingDeviceRequest& request,
+                                               const juce::String& collectionId,
+                                               const juce::var& collectedMessages)
+{
+    if (collectionId.isNotEmpty() && request.expectedDumpId == collectionId)
+        return true;
+
+    // A request for one dump of the collection waits for the rest only when it continues: one
+    // without a continue request is answered by its own dump (resolvePendingRequestsForDump).
+    if (request.continueRequestId.isEmpty())
+        return false;
+
+    if (auto* messages = collectedMessages.getArray())
+        for (const auto& message : *messages)
+            if (message.getProperty ("dumpId", {}).toString() == request.expectedDumpId)
+                return true;
+    return false;
 }
 
 void DeviceProfileService::startNextStartupRequest (const PendingDeviceRequest& request)

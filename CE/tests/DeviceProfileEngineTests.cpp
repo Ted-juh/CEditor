@@ -1948,6 +1948,7 @@ int runSimulatedDeviceTests (const juce::File& sh201File, const juce::File& gaia
         patchHex.add (DeviceProfileEngine::bytesToHex (reply));
     const auto collected = sh201.collectDumpMessages (patchHex);
     if (patchReplies.size() != 22 || ! collected.complete
+        || collected.collectionId != "temporaryPatch" || collected.expectedMessageCount != 22
         || (int) collected.values.getProperty ("upper.filter.cutoff", -1) != 64)
         fail ("RQ1 temporary patch: " + juce::String ((int) patchReplies.size()) + " replies, collection "
               + collected.status + ", cutoff " + collected.values.getProperty ("upper.filter.cutoff", "missing").toString());
@@ -1976,10 +1977,12 @@ int runSimulatedDeviceTests (const juce::File& sh201File, const juce::File& gaia
  * sent to the simulated device must be answered after the send returns, so the request is waiting
  * when the answer comes — and is then resolved by it exactly as a reply from the synth would be.
  */
-int runWithinProcessMidiTests()
+int runWithinProcessMidiTests (const juce::File& sh201File)
 {
+    using ceditor::device::DeviceProfileEngine;
     using ceditor::device::DeviceProfileService;
     using ceditor::device::DeviceProfileServiceTestAccess;
+    using ceditor::device::SimulatedDevice;
 
     auto failures = 0;
     const auto fail = [&failures] (const juce::String& what)
@@ -2105,16 +2108,79 @@ int runWithinProcessMidiTests()
                   + sent.getProperty ("status", {}).toString() + ")");
     }
 
-    // The whole temporary patch is answered block by block, every one a dump the profile parses.
+    // The whole temporary patch is answered block by block, every one a dump the profile parses,
+    // and the request is resolved when the last of the 22 is in: it is the SH-201's first request,
+    // so it is the startup pull, a sync that names no request. It used to wait for a collection no
+    // dump belonged to, and time out.
+    const auto lastResolved = [&events] (const juce::String& role)
+    {
+        juce::var resolved;
+        for (const auto& [eventName, payload] : events)
+            if (eventName == "deviceRequestResolved" && payload.getProperty ("deviceRole", {}).toString() == role)
+                resolved = payload;
+        return resolved;
+    };
     const auto parsedBefore = count ("dumpMessageParsed", "sh201");
-    auto* bulk = new juce::DynamicObject();
-    bulk->setProperty ("deviceRole", "sh201");
-    bulk->setProperty ("request", "requestTemporaryPatchBulk");
-    service.startDeviceSync (juce::var (bulk));
+    const auto resolvedBefore = count ("deviceRequestResolved", "sh201");
+    auto* pull = new juce::DynamicObject();
+    pull->setProperty ("deviceRole", "sh201");
+    const auto pullSent = service.startDeviceSync (juce::var (pull));
     DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    const auto pulled = lastResolved ("sh201");
+    const auto pulledCollection = pulled.getProperty ("dumpCollection", {});
     if (count ("dumpMessageParsed", "sh201") - parsedBefore != 22)
         fail ("the temporary patch was answered with " + juce::String (count ("dumpMessageParsed", "sh201") - parsedBefore)
               + " dumps, not the patch's 22 blocks");
+    if (! (bool) pullSent.getProperty ("pending", false)
+        || count ("deviceRequestResolved", "sh201") != resolvedBefore + 1
+        || pulled.getProperty ("requestId", {}).toString() != "requestTemporaryPatchBulk"
+        || pulled.getProperty ("dumpId", {}).toString() != "temporaryPatch"
+        || ! (bool) pulledCollection.getProperty ("complete", false)
+        || (int) pulledCollection.getProperty ("receivedMessageCount", 0) != 22
+        || (int) pulled.getProperty ("values", {}).getProperty ("upper.filter.cutoff", -1) != 100)
+        fail ("the startup pull of the temporary patch was not resolved by its 22 blocks (request "
+              + pulled.getProperty ("requestId", {}).toString() + ", collection "
+              + pulledCollection.getProperty ("status", "none").toString() + ", "
+              + pulledCollection.getProperty ("receivedMessageCount", 0).toString() + " messages)");
+
+    // Asked again, it is answered by the new answer, not by the patch the first one completed: one
+    // block arriving first does not resolve it. And a block read on its own still resolves its own
+    // request, though it is one of the 22 — it is what Request Upper Tone sends for.
+    DeviceProfileEngine sh201;
+    juce::String loadError;
+    if (! sh201.loadFromFile (sh201File, loadError))
+        fail ("SH-201 profile did not load: " + loadError);
+    SimulatedDevice upperOnly (sh201);
+    const auto upperReplies = upperOnly.receive (sh201.compileDeviceRequest ("sh201", "requestUpperTone").transaction.messages[0].bytes);
+    auto* again = new juce::DynamicObject();
+    again->setProperty ("deviceRole", "sh201");
+    again->setProperty ("request", "requestTemporaryPatchBulk");
+    service.startDeviceSync (juce::var (again));
+    const auto resolvedBeforeAgain = count ("deviceRequestResolved", "sh201");
+    auto* early = new juce::DynamicObject();
+    early->setProperty ("deviceRole", "sh201");
+    early->setProperty ("hex", upperReplies.empty() ? juce::String {} : DeviceProfileEngine::bytesToHex (upperReplies[0]));
+    service.ingestIncomingMidiMessage (juce::var (early));
+    if (upperReplies.size() != 1 || count ("deviceRequestResolved", "sh201") != resolvedBeforeAgain)
+        fail ("a second whole-patch request was resolved by the first block of its answer");
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    if (count ("deviceRequestResolved", "sh201") != resolvedBeforeAgain + 1)
+        fail ("the second whole-patch request was not resolved by its own answer");
+
+    auto* upperAgain = new juce::DynamicObject();
+    upperAgain->setProperty ("deviceRole", "sh201");
+    upperAgain->setProperty ("request", "requestUpperTone");
+    service.startDeviceSync (juce::var (upperAgain));
+    DeviceProfileServiceTestAccess::deliverWithinProcess (service);
+    juce::var latestCollection;
+    for (const auto& [eventName, payload] : events)
+        if (eventName == "dumpCollectionUpdated" && payload.getProperty ("deviceRole", {}).toString() == "sh201")
+            latestCollection = payload;
+    if (lastResolved ("sh201").getProperty ("dumpId", {}).toString() != "upperToneDump"
+        || (int) latestCollection.getProperty ("receivedMessageCount", 0) != 22)
+        fail ("Upper Tone read after the patch: resolved by " + lastResolved ("sh201").getProperty ("dumpId", {}).toString()
+              + ", the patch now holds " + latestCollection.getProperty ("receivedMessageCount", 0).toString()
+              + " messages (a block read again replaces its place, it is not added)");
 
     // Cables: what one role sends arrives on every role listening to that cable, and nowhere else.
     map (service, "sender", "test-cc-synth", "internalCable", "cable2", "none", "none");
@@ -2136,7 +2202,7 @@ int runWithinProcessMidiTests()
               + rawSent.getProperty ("status", {}).toString() + ")");
 
     if (failures == 0)
-        std::cout << "[PASS] within-process MIDI :: simulated SH-201 answers identity and patch reads after the send; cables reach their listeners only\n";
+        std::cout << "[PASS] within-process MIDI :: simulated SH-201 answers identity, block reads and the startup pull of the whole patch after the send; cables reach their listeners only\n";
     return failures;
 }
 
@@ -3444,7 +3510,7 @@ int main (int argc, char** argv)
     failures += runServiceRequestTests();
     failures += runSimulatedDeviceTests (root.getChildFile ("roland-sh-201.ceditor-device.json"),
                                          root.getChildFile ("roland-gaia-sh01.ceditor-device.json"));
-    failures += runWithinProcessMidiTests();
+    failures += runWithinProcessMidiTests (root.getChildFile ("roland-sh-201.ceditor-device.json"));
     failures += runSharedInputReplyTests();
     failures += runSharedProfileEngineTests();
     failures += runSharedInputAcrossProcessesTests();

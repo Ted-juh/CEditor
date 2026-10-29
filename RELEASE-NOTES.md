@@ -150,6 +150,12 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 editor and was left out of the plug-in: not loaded, its modules not built in, its TypeScript not
 compiled. Scripts on top-level controls and panel scripts were never affected.
 
+**The SH-201's startup read completes.** It asks for the whole temporary patch, which the synth
+answers as 22 blocks, and it waited for a collection no block belonged to, so it always timed out.
+The blocks are now that collection, and a request for one of them is still answered by its own
+block. A second whole-patch request waits for its own answer instead of being resolved by the first
+block of it.
+
 ## What you get
 
 - **A simulated device, for a panel without its synth.** Choose **Simulated device** as a device's

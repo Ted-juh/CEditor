@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": "0.5.0",
+  "profileVersion": "0.6.0",
   "minCEditorVersion": "0.9.0",
   "id": "roland-sh-201",
   "name": "Roland SH-201",
@@ -30,8 +30,8 @@
   },
   "coverage": {
     "singleParameterWrite": "broad-with-packed-text-and-requests",
-    "editBufferDumpRequest": "partial-block-requests",
-    "editBufferDumpParse": "partial",
+    "editBufferDumpRequest": "whole-patch-rq1-and-rq1-per-block",
+    "editBufferDumpParse": "complete-for-every-block-and-the-whole-patch",
     "bankDump": "notImplemented",
     "patchNameEdit": "complete-single-dt1-write",
     "realtimeEditing": "partial"
@@ -33320,7 +33320,16 @@
           "parameter": "patch.dBeamPolarity",
           "offset": 32
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 0,
+          "length": 33
+        }
+      }
     },
     {
       "id": "upperToneDump",
@@ -33612,7 +33621,16 @@
           "parameter": "upper.monoSolo",
           "offset": 63
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 33,
+          "length": 64
+        }
+      }
     },
     {
       "id": "lowerToneDump",
@@ -33904,7 +33922,16 @@
           "parameter": "lower.monoSolo",
           "offset": 63
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 97,
+          "length": 64
+        }
+      }
     },
     {
       "id": "delayDump",
@@ -33960,7 +33987,16 @@
           "parameter": "delay.modDepth",
           "offset": 4
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 161,
+          "length": 5
+        }
+      }
     },
     {
       "id": "reverbDump",
@@ -34036,7 +34072,16 @@
           "parameter": "reverb.hfDampGain",
           "offset": 9
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 166,
+          "length": 10
+        }
+      }
     },
     {
       "id": "arpeggioCommonDump",
@@ -34100,7 +34145,16 @@
           "parameter": "arpeggio.endStep",
           "offset": 6
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 176,
+          "length": 8
+        }
+      }
     },
     {
       "id": "arpeggioPattern01Dump",
@@ -34268,7 +34322,16 @@
           "parameter": "arpeggio.pattern01.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 184,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern02Dump",
@@ -34436,7 +34499,16 @@
           "parameter": "arpeggio.pattern02.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 250,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern03Dump",
@@ -34604,7 +34676,16 @@
           "parameter": "arpeggio.pattern03.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 316,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern04Dump",
@@ -34772,7 +34853,16 @@
           "parameter": "arpeggio.pattern04.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 382,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern05Dump",
@@ -34940,7 +35030,16 @@
           "parameter": "arpeggio.pattern05.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 448,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern06Dump",
@@ -35108,7 +35207,16 @@
           "parameter": "arpeggio.pattern06.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 514,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern07Dump",
@@ -35276,7 +35384,16 @@
           "parameter": "arpeggio.pattern07.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 580,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern08Dump",
@@ -35444,7 +35561,16 @@
           "parameter": "arpeggio.pattern08.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 646,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern09Dump",
@@ -35612,7 +35738,16 @@
           "parameter": "arpeggio.pattern09.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 712,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern10Dump",
@@ -35780,7 +35915,16 @@
           "parameter": "arpeggio.pattern10.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 778,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern11Dump",
@@ -35948,7 +36092,16 @@
           "parameter": "arpeggio.pattern11.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 844,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern12Dump",
@@ -36116,7 +36269,16 @@
           "parameter": "arpeggio.pattern12.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 910,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern13Dump",
@@ -36284,7 +36446,16 @@
           "parameter": "arpeggio.pattern13.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 976,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern14Dump",
@@ -36452,7 +36623,16 @@
           "parameter": "arpeggio.pattern14.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 1042,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern15Dump",
@@ -36620,7 +36800,16 @@
           "parameter": "arpeggio.pattern15.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 1108,
+          "length": 66
+        }
+      }
     },
     {
       "id": "arpeggioPattern16Dump",
@@ -36788,7 +36977,16 @@
           "parameter": "arpeggio.pattern16.step32",
           "offset": 64
         }
-      ]
+      ],
+      "completion": {
+        "collectionId": "temporaryPatch",
+        "expectedMessages": 22,
+        "collectionBytes": 1240,
+        "addressRange": {
+          "start": 1174,
+          "length": 66
+        }
+      }
     }
   ]
 }
