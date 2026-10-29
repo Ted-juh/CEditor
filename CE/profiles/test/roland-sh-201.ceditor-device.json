@@ -33008,7 +33008,7 @@
     "Large profile: DPD should use paged parameter loading and backend filtering.",
     "Arpeggio Pattern parameters are intentionally grouped by pattern block; they are advanced editing targets.",
     "DT1 dump parsing definitions are generated from documented address ranges; captured hardware dumps should be added as parse tests.",
-    "Arpeggio pattern values are read as the GAIA SH-01's, whose ranges they share: Original Note 0..127, or 128 for OFF; a step 0 for a rest, 1..127 for a note's velocity, 128 for a tie. The Owner's Manual (Arpeggio) describes a style as up to 32 steps by 16 pitches, each step a Note On with its velocity, a Tie or a Rest, which agrees; it does not give the byte values, which are still to be checked against the MIDI Implementation or a captured pattern dump."
+    "Arpeggio pattern values: Original Note 0..127, or 128 for OFF; a step 0 for a rest, 1..127 for a note's velocity, 128 for a tie, each sent as two nibbles, high first. The owner reports the SH-201's step bytes as 08 00 a tie, 00 00 a rest and 07 0F the loudest velocity, which is this encoding of 128, 0 and 127 (sh201ArpPattern.test.js holds it); the Owner's Manual (Arpeggio) describes a step as a Note On with its velocity, a Tie or a Rest. A captured pattern dump would make it a test against the instrument."
   ],
   "dumpDefinitions": [
     {

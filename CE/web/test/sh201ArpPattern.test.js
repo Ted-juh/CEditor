@@ -131,3 +131,35 @@ test('the status names the SH-201, and the simulated device needs no input to be
   });
   assert.match(hardware.text, /NO MIDI INPUT/, 'a real synth still needs its input');
 });
+
+// What a step is on the wire, as the owner knows the SH-201 to send it: two bytes, high nibble
+// first — 08 00 a tie (128), 00 00 a rest (0), 07 0F the loudest velocity (127). The profile's
+// nibbled encoding of 0..128 is exactly that, and a lane read back in those bytes is a note tied
+// over two steps and then silence. Original Note's OFF is 128, so 08 00 as well.
+test('a step is two bytes, high nibble first: 08 00 a tie, 00 00 a rest, 07 0F the loudest', async () => {
+  const { encodeParameterValue, localBuildDumpMessage, localParseDumpMessage, localCompileParameter } =
+    await import('../src/CE_Application/stores/deviceProfileLocalEngine.js');
+  const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+  const param = (id) => SH201.parameters.find((p) => p.id === id);
+  const step = param(layout.step(1, 1));
+  const wire = (value) => hex(encodeParameterValue(step, value).bytes ?? encodeParameterValue(step, value));
+  assert.deepEqual([wire(128), wire(0), wire(127)], ['08 00', '00 00', '07 0F']);
+  assert.equal(hex(encodeParameterValue(param(layout.originalNote(1)), 128).bytes ?? []), '08 00', 'Original Note OFF');
+  assert.equal(localCompileParameter(SH201, { parameterId: layout.step(1, 1), value: 128, deviceRole: 'sh201' }).transaction.hex,
+    'F0 41 10 00 00 16 12 10 00 06 02 08 00 60 F7', 'a tie on step 1 of lane 1, as the synth takes it');
+
+  // Lane 1 read back: note C4, the loudest, tied into step 2, silent from step 3.
+  const lane = localBuildDumpMessage(SH201, 'arpeggioPattern01Dump', {
+    [layout.originalNote(1)]: 60, [layout.step(1, 1)]: 127, [layout.step(1, 2)]: 128, [layout.step(1, 3)]: 0,
+  });
+  assert.match(lane.hex, /^F0 41 10 00 00 16 12 10 00 06 00 03 0C 07 0F 08 00 00 00 /, 'note 60 is 03 0C, then 07 0F, 08 00, 00 00');
+  const raw = { [layout.endStep]: 16 };
+  for (let n = 1; n <= layout.lanes; n++) {
+    raw[layout.originalNote(n)] = 128;
+    for (let s = 1; s <= layout.steps; s++) raw[layout.step(n, s)] = 0;
+  }
+  Object.assign(raw, localParseDumpMessage(SH201, lane.hex).values);
+  const { blocks } = decodeGaiaPattern(raw, layout);
+  assert.deepEqual(blocks.map(({ note, step: at, length, velocity }) => ({ note, at, length, velocity })),
+    [{ note: 60, at: 0, length: 2, velocity: 127 }]);
+});
