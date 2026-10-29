@@ -153,6 +153,7 @@ export function deviceRoleRows(roleMappings, panels, alwaysInclude = []) {
       mapping: roleMappings?.[role] ?? null,
       configured: !!roleMappings?.[role],
       usedBy: used.get(role) ?? 0,
+      requiredProfileId: requiredProfileFor(panels, role),
     });
   };
 
@@ -161,6 +162,34 @@ export function deviceRoleRows(roleMappings, panels, alwaysInclude = []) {
   for (const role of [...used.keys()].sort()) add(role);
 
   return rows;
+}
+
+/** The profile the open panels were made for on this device (their requiredProfiles), or ''. */
+export function requiredProfileFor(panels, role) {
+  for (const panel of panels ?? []) {
+    for (const entry of Array.isArray(panel?.requiredProfiles) ? panel.requiredProfiles : []) {
+      if (entry?.role === role && entry?.profileId) return String(entry.profileId);
+    }
+  }
+  return '';
+}
+
+/**
+ * The profile a device is set up with when someone first picks its port: what it already has,
+ * else the one its panel was made for, else the fallback.
+ *
+ * The fallback alone was the bug. The settings page mapped a new device to whichever profile was
+ * selected last, so the SH-201 panel's device came up as the Yamaha AN1x: every binding resolved
+ * against the wrong synth, and the read the SH-201 offers never came. A panel's requiredProfiles
+ * already says which profile it means; it is only skipped when that profile is not loaded, since
+ * a device mapped to a profile nobody has fails every send.
+ */
+export function profileForDevice(row, loadedProfileIds, fallback = '') {
+  if (row?.mapping?.profileId) return row.mapping.profileId;
+  const required = row?.requiredProfileId ?? '';
+  const loaded = loadedProfileIds instanceof Set ? loadedProfileIds : new Set(loadedProfileIds ?? []);
+  if (required && loaded.has(required)) return required;
+  return fallback;
 }
 
 /**

@@ -17,7 +17,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { fileURLToPath } from 'node:url';
 
-import { countRolesInControls, countRolesInPanels, deviceRoleRows, renameRoleInControls, renameRoleInPanel } from '../src/CE_Application/utils/deviceRoles.js';
+import {
+  countRolesInControls, countRolesInPanels, deviceRoleRows, profileForDevice, renameRoleInControls, renameRoleInPanel, requiredProfileFor,
+} from '../src/CE_Application/utils/deviceRoles.js';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { expandControl } from '../src/CE_Application/stores/documentShape.js';
 import { readText } from './support/readText.mjs';
@@ -172,4 +174,26 @@ test('the GAIA panel names its device after the instrument', () => {
       .map((channel) => `arp_pattern_grid.${channel}`),
   ]);
   assert.deepEqual(panel.requiredProfiles.map((e) => e.role), ['Roland GAIA SH-01']);
+});
+
+// A device nothing has set up yet, chosen a port for in Settings → MIDI, was mapped to whichever
+// profile was selected last. Opening the SH-201 panel after the AN1x's put its device on the AN1x
+// profile: every binding resolved against the wrong synth, and the SH-201's read was never offered.
+test('a new device starts on the profile its panel was made for', () => {
+  const sh201 = {
+    controls: [bound('k1', 'Roland SH-201', 'upper.filter.cutoff')],
+    requiredProfiles: [{ role: 'Roland SH-201', profileId: 'roland-sh-201', version: '*' }],
+  };
+  const [row] = deviceRoleRows({}, [sh201]);
+  assert.equal(row.requiredProfileId, 'roland-sh-201');
+  assert.equal(requiredProfileFor([sh201], 'somewhere else'), '');
+
+  const loaded = ['yamaha-an1x-dpd', 'roland-sh-201'];
+  assert.equal(profileForDevice(row, loaded, 'yamaha-an1x-dpd'), 'roland-sh-201', 'not the one selected last');
+  // A profile the device already has is kept: choosing a port changes the port, not the profile.
+  const mapped = deviceRoleRows({ 'Roland SH-201': { profileId: 'roland-sh-201-custom' } }, [sh201])[0];
+  assert.equal(profileForDevice(mapped, loaded, 'yamaha-an1x-dpd'), 'roland-sh-201-custom');
+  // A panel made for a profile this machine does not have gets the fallback, not a dead mapping.
+  assert.equal(profileForDevice(row, ['yamaha-an1x-dpd'], 'yamaha-an1x-dpd'), 'yamaha-an1x-dpd');
+  assert.equal(profileForDevice({ requiredProfileId: '' }, loaded, 'generic-cc-dpd'), 'generic-cc-dpd');
 });

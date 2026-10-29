@@ -19,10 +19,10 @@
    */
   import { get } from 'svelte/store';
   import { onMount, untrack } from 'svelte';
-  import { initDeviceProfileBridge, mapDeviceRole } from '../stores/deviceProfiles.js';
+  import { deviceProfiles, initDeviceProfileBridge, mapDeviceRole } from '../stores/deviceProfiles.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { activePanel } from '../stores/panels.js';
-  import { countRolesInControls, deviceRoleRows } from '../utils/deviceRoles.js';
+  import { countRolesInControls, deviceRoleRows, profileForDevice } from '../utils/deviceRoles.js';
 
   import {
     midiDestinations,
@@ -78,7 +78,11 @@
 
   function changePort(kind, id) {
     const port = (kind === 'midiDestination' ? destinations : inputs).find((item) => item.id === id);
-    if (port && role) mapDeviceRole(role, mapping?.profileId || 'generic-cc-dpd', { [kind]: port });
+    if (!port || !role) return;
+    // A device nothing has set up yet starts on the profile its panel was made for.
+    const row = roles.find((entry) => entry.role === role);
+    const profileId = profileForDevice(row ?? { mapping }, ($deviceProfiles ?? []).map((p) => p.id), 'generic-cc-dpd');
+    mapDeviceRole(role, profileId, { [kind]: port });
   }
 
   const destinations = $derived($midiDestinations ?? []);

@@ -48,7 +48,7 @@
   } from '../stores/deviceProfiles.js';
   import { listMidiDestinations, listMidiInputs, listDeviceProfiles, isJuceAvailable } from '../bridge/bridge.js';
   import { panels, updatePanel } from '../stores/panels.js';
-  import { deviceRoleRows, renameRoleInPanel } from '../utils/deviceRoles.js';
+  import { deviceRoleRows, profileForDevice, renameRoleInPanel } from '../utils/deviceRoles.js';
   import { identityEventMatches, identityOutcome, identityTestBlocker } from '../utils/deviceIdentity.js';
 
   let hasBackend = $state(false);
@@ -89,8 +89,11 @@
   const PREVIEW_ONLY = { type: 'previewOnly', id: 'previewOnly', name: 'Preview Only' };
   const NO_INPUT = { type: 'none', id: 'none', name: 'No MIDI Input' };
 
+  // A device nothing has set up yet starts on the profile its panel was made for.
+  const profileOf = (row) => profileForDevice(row, ($deviceProfiles ?? []).map((p) => p.id), $selectedDeviceProfileId);
+
   function apply(row, { destination, input, profile } = {}) {
-    mapDeviceRole(row.role, profile ?? row.mapping?.profileId ?? $selectedDeviceProfileId, {
+    mapDeviceRole(row.role, profile ?? profileOf(row), {
       midiDestination: portOf(outputs, destination ?? row.mapping?.midiDestination?.id, PREVIEW_ONLY),
       midiInput: portOf(inputs, input ?? row.mapping?.midiInput?.id, NO_INPUT),
       syncDirection: row.mapping?.syncDirection ?? 'pull',
@@ -178,7 +181,7 @@
     startDeviceSync({
       correlationId,
       deviceRole: row.role,
-      profileId: row.mapping?.profileId ?? $selectedDeviceProfileId,
+      profileId: profileOf(row),
       request: 'identityRequest',
       dryRun: false,
     });
@@ -408,7 +411,7 @@
           <select
             class="port-select"
             aria-label="Device profile"
-            value={row.mapping?.profileId ?? $selectedDeviceProfileId}
+            value={profileOf(row)}
             onchange={(event) => apply(row, { profile: event.currentTarget.value })}
           >
             {#each $deviceProfiles as profile (profile.id)}
