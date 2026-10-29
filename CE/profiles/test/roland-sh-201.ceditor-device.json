@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "profileVersion": "0.6.0",
+  "profileVersion": "0.7.0",
   "minCEditorVersion": "0.9.0",
   "id": "roland-sh-201",
   "name": "Roland SH-201",
@@ -2718,7 +2718,7 @@
     },
     {
       "id": "upper.osc1.waveform",
-      "name": "Upper OSC1 Waveform",
+      "name": "OSC1 Waveform",
       "group": "Upper OSC1",
       "type": "choice",
       "address": "10 00 01 00",
@@ -2799,7 +2799,7 @@
     },
     {
       "id": "upper.osc1.pitchWide",
-      "name": "Upper OSC1 Pitch Wide",
+      "name": "OSC1 Pitch Wide",
       "group": "Upper OSC1",
       "type": "boolean",
       "address": "10 00 01 01",
@@ -2832,7 +2832,7 @@
     },
     {
       "id": "upper.osc1.coarseTune",
-      "name": "Upper OSC1 Coarse Tune",
+      "name": "OSC1 Coarse Tune",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 02",
@@ -2873,7 +2873,7 @@
     },
     {
       "id": "upper.osc1.fineTune",
-      "name": "Upper OSC1 Fine Tune",
+      "name": "OSC1 Fine Tune",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 03",
@@ -2914,7 +2914,7 @@
     },
     {
       "id": "upper.osc1.pulseWidth",
-      "name": "Upper OSC1 Pulse Width",
+      "name": "OSC1 Pulse Width",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 04",
@@ -2953,7 +2953,7 @@
     },
     {
       "id": "upper.osc1.pitchEnvDepth",
-      "name": "Upper OSC1 Pitch Env Depth",
+      "name": "OSC1 Pitch Env Depth",
       "group": "Upper OSC1",
       "type": "integer",
       "address": "10 00 01 05",
@@ -2994,7 +2994,7 @@
     },
     {
       "id": "upper.osc2.waveform",
-      "name": "Upper OSC2 Waveform",
+      "name": "OSC2 Waveform",
       "group": "Upper OSC2",
       "type": "choice",
       "address": "10 00 01 06",
@@ -3075,7 +3075,7 @@
     },
     {
       "id": "upper.osc2.pitchWide",
-      "name": "Upper OSC2 Pitch Wide",
+      "name": "OSC2 Pitch Wide",
       "group": "Upper OSC2",
       "type": "boolean",
       "address": "10 00 01 07",
@@ -3108,7 +3108,7 @@
     },
     {
       "id": "upper.osc2.coarseTune",
-      "name": "Upper OSC2 Coarse Tune",
+      "name": "OSC2 Coarse Tune",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 08",
@@ -3149,7 +3149,7 @@
     },
     {
       "id": "upper.osc2.fineTune",
-      "name": "Upper OSC2 Fine Tune",
+      "name": "OSC2 Fine Tune",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 09",
@@ -3190,7 +3190,7 @@
     },
     {
       "id": "upper.osc2.pulseWidth",
-      "name": "Upper OSC2 Pulse Width",
+      "name": "OSC2 Pulse Width",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 0A",
@@ -3229,7 +3229,7 @@
     },
     {
       "id": "upper.osc2.pitchEnvDepth",
-      "name": "Upper OSC2 Pitch Env Depth",
+      "name": "OSC2 Pitch Env Depth",
       "group": "Upper OSC2",
       "type": "integer",
       "address": "10 00 01 0B",
@@ -3270,7 +3270,7 @@
     },
     {
       "id": "upper.pitchEnv.attack",
-      "name": "Upper Pitch Env Attack Time",
+      "name": "Pitch Env Attack Time",
       "group": "Upper Pitch Env",
       "type": "integer",
       "address": "10 00 01 0C",
@@ -3309,7 +3309,7 @@
     },
     {
       "id": "upper.pitchEnv.decay",
-      "name": "Upper Pitch Env Decay",
+      "name": "Pitch Env Decay",
       "group": "Upper Pitch Env",
       "type": "integer",
       "address": "10 00 01 0D",
@@ -3348,7 +3348,7 @@
     },
     {
       "id": "upper.mixMod.type",
-      "name": "Upper MIX/MOD Type",
+      "name": "MIX/MOD Type",
       "group": "Upper Mix Mod",
       "type": "choice",
       "address": "10 00 01 0E",
@@ -3399,7 +3399,7 @@
     },
     {
       "id": "upper.mixMod.balance",
-      "name": "Upper MIX/MOD Balance",
+      "name": "MIX/MOD Balance",
       "group": "Upper Mix Mod",
       "type": "integer",
       "address": "10 00 01 0F",
@@ -3440,7 +3440,7 @@
     },
     {
       "id": "upper.mixMod.lowFreq",
-      "name": "Upper MIX/MOD Low Freq",
+      "name": "MIX/MOD Low Freq",
       "group": "Upper Mix Mod",
       "type": "choice",
       "address": "10 00 01 10",
@@ -3491,7 +3491,7 @@
     },
     {
       "id": "upper.filter.type",
-      "name": "Upper Filter Type",
+      "name": "Filter Type",
       "group": "Upper Filter",
       "type": "choice",
       "address": "10 00 01 11",
@@ -3547,7 +3547,7 @@
     },
     {
       "id": "upper.filter.slope",
-      "name": "Upper Filter Slope",
+      "name": "Filter Slope",
       "group": "Upper Filter",
       "type": "choice",
       "address": "10 00 01 12",
@@ -3593,7 +3593,7 @@
     },
     {
       "id": "upper.filter.cutoff",
-      "name": "Upper Filter Cutoff Frequency",
+      "name": "Filter Cutoff Frequency",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 13",
@@ -3632,7 +3632,7 @@
     },
     {
       "id": "upper.filter.cutoffKeyfollow",
-      "name": "Upper Filter Cutoff Keyfollow",
+      "name": "Filter Cutoff Keyfollow",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 14",
@@ -3673,7 +3673,7 @@
     },
     {
       "id": "upper.filter.cutoffVelocity",
-      "name": "Upper Filter Cutoff Velocity Sens",
+      "name": "Filter Cutoff Velocity Sens",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 15",
@@ -3714,7 +3714,7 @@
     },
     {
       "id": "upper.filter.resonance",
-      "name": "Upper Filter Resonance",
+      "name": "Filter Resonance",
       "group": "Upper Filter",
       "type": "integer",
       "address": "10 00 01 16",
@@ -3753,7 +3753,7 @@
     },
     {
       "id": "upper.filterEnv.attack",
-      "name": "Upper Filter Env Attack Time",
+      "name": "Filter Env Attack Time",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 17",
@@ -3792,7 +3792,7 @@
     },
     {
       "id": "upper.filterEnv.decay",
-      "name": "Upper Filter Env Decay Time",
+      "name": "Filter Env Decay Time",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 18",
@@ -3831,7 +3831,7 @@
     },
     {
       "id": "upper.filterEnv.sustain",
-      "name": "Upper Filter Env Sustain Level",
+      "name": "Filter Env Sustain Level",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 19",
@@ -3870,7 +3870,7 @@
     },
     {
       "id": "upper.filterEnv.release",
-      "name": "Upper Filter Env Release Time",
+      "name": "Filter Env Release Time",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 1A",
@@ -3909,7 +3909,7 @@
     },
     {
       "id": "upper.filterEnv.depth",
-      "name": "Upper Filter Env Env Depth",
+      "name": "Filter Env Depth",
       "group": "Upper Filter Env",
       "type": "integer",
       "address": "10 00 01 1B",
@@ -3950,7 +3950,7 @@
     },
     {
       "id": "upper.amp.overdriveSwitch",
-      "name": "Upper AMP Overdrive Switch",
+      "name": "AMP Overdrive Switch",
       "group": "Upper AMP",
       "type": "boolean",
       "address": "10 00 01 1C",
@@ -3983,7 +3983,7 @@
     },
     {
       "id": "upper.amp.overdriveDrive",
-      "name": "Upper AMP Overdrive Drive",
+      "name": "AMP Overdrive Drive",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1D",
@@ -4022,7 +4022,7 @@
     },
     {
       "id": "upper.amp.level",
-      "name": "Upper AMP Level",
+      "name": "AMP Level",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1E",
@@ -4061,7 +4061,7 @@
     },
     {
       "id": "upper.amp.velocitySens",
-      "name": "Upper AMP Level Velocity Sens",
+      "name": "AMP Level Velocity Sens",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 1F",
@@ -4102,7 +4102,7 @@
     },
     {
       "id": "upper.amp.pan",
-      "name": "Upper AMP Pan",
+      "name": "AMP Pan",
       "group": "Upper AMP",
       "type": "integer",
       "address": "10 00 01 20",
@@ -4143,7 +4143,7 @@
     },
     {
       "id": "upper.ampEnv.attack",
-      "name": "Upper AMP Env Attack Time",
+      "name": "AMP Env Attack Time",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 21",
@@ -4182,7 +4182,7 @@
     },
     {
       "id": "upper.ampEnv.decay",
-      "name": "Upper AMP Env Decay Time",
+      "name": "AMP Env Decay Time",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 22",
@@ -4221,7 +4221,7 @@
     },
     {
       "id": "upper.ampEnv.sustain",
-      "name": "Upper AMP Env Sustain Level",
+      "name": "AMP Env Sustain Level",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 23",
@@ -4260,7 +4260,7 @@
     },
     {
       "id": "upper.ampEnv.release",
-      "name": "Upper AMP Env Release Time",
+      "name": "AMP Env Release Time",
       "group": "Upper AMP Env",
       "type": "integer",
       "address": "10 00 01 24",
@@ -4299,7 +4299,7 @@
     },
     {
       "id": "upper.delay.depth",
-      "name": "Upper Delay Depth",
+      "name": "Delay Depth",
       "group": "Upper Effects Send",
       "type": "integer",
       "address": "10 00 01 25",
@@ -4338,7 +4338,7 @@
     },
     {
       "id": "upper.reverb.depth",
-      "name": "Upper Reverb Depth",
+      "name": "Reverb Depth",
       "group": "Upper Effects Send",
       "type": "integer",
       "address": "10 00 01 26",
@@ -4377,7 +4377,7 @@
     },
     {
       "id": "upper.lfo1.shape",
-      "name": "Upper LFO1 Shape",
+      "name": "LFO1 Shape",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 27",
@@ -4448,7 +4448,7 @@
     },
     {
       "id": "upper.lfo1.rate",
-      "name": "Upper LFO1 Rate",
+      "name": "LFO1 Rate",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 28",
@@ -4487,13 +4487,13 @@
     },
     {
       "id": "upper.lfo1.tempoSync",
-      "name": "Upper LFO1 Tempo Sync Switch",
+      "name": "LFO1 Tempo Sync Switch",
       "group": "Upper LFO1",
       "type": "boolean",
       "address": "10 00 01 29",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -4520,7 +4520,7 @@
     },
     {
       "id": "upper.lfo1.tempoSyncNote",
-      "name": "Upper LFO1 Tempo Sync Note",
+      "name": "LFO1 Tempo Sync Note",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2A",
@@ -4656,7 +4656,7 @@
     },
     {
       "id": "upper.lfo1.fadeTime",
-      "name": "Upper LFO1 Fade Time",
+      "name": "LFO1 Fade Time",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 2B",
@@ -4695,7 +4695,7 @@
     },
     {
       "id": "upper.lfo1.keyTrigger",
-      "name": "Upper LFO1 Key Trigger",
+      "name": "LFO1 Key Trigger",
       "group": "Upper LFO1",
       "type": "boolean",
       "address": "10 00 01 2C",
@@ -4728,7 +4728,7 @@
     },
     {
       "id": "upper.lfo1.destination1",
-      "name": "Upper LFO1 Destination 1",
+      "name": "LFO1 Destination 1",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2D",
@@ -4784,7 +4784,7 @@
     },
     {
       "id": "upper.lfo1.depth1",
-      "name": "Upper LFO1 Depth 1",
+      "name": "LFO1 Depth 1",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 2E",
@@ -4825,7 +4825,7 @@
     },
     {
       "id": "upper.lfo1.destination2",
-      "name": "Upper LFO1 Destination 2",
+      "name": "LFO1 Destination 2",
       "group": "Upper LFO1",
       "type": "choice",
       "address": "10 00 01 2F",
@@ -4876,7 +4876,7 @@
     },
     {
       "id": "upper.lfo1.depth2",
-      "name": "Upper LFO1 Depth 2",
+      "name": "LFO1 Depth 2",
       "group": "Upper LFO1",
       "type": "integer",
       "address": "10 00 01 30",
@@ -4917,7 +4917,7 @@
     },
     {
       "id": "upper.lfo2.shape",
-      "name": "Upper LFO2 Shape",
+      "name": "LFO2 Shape",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 31",
@@ -4988,7 +4988,7 @@
     },
     {
       "id": "upper.lfo2.rate",
-      "name": "Upper LFO2 Rate",
+      "name": "LFO2 Rate",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 32",
@@ -5027,13 +5027,13 @@
     },
     {
       "id": "upper.lfo2.tempoSync",
-      "name": "Upper LFO2 Tempo Sync Switch",
+      "name": "LFO2 Tempo Sync Switch",
       "group": "Upper LFO2",
       "type": "boolean",
       "address": "10 00 01 33",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -5060,7 +5060,7 @@
     },
     {
       "id": "upper.lfo2.tempoSyncNote",
-      "name": "Upper LFO2 Tempo Sync Note",
+      "name": "LFO2 Tempo Sync Note",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 34",
@@ -5196,7 +5196,7 @@
     },
     {
       "id": "upper.lfo2.fadeTime",
-      "name": "Upper LFO2 Fade Time",
+      "name": "LFO2 Fade Time",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 35",
@@ -5235,7 +5235,7 @@
     },
     {
       "id": "upper.lfo2.keyTrigger",
-      "name": "Upper LFO2 Key Trigger",
+      "name": "LFO2 Key Trigger",
       "group": "Upper LFO2",
       "type": "boolean",
       "address": "10 00 01 36",
@@ -5268,7 +5268,7 @@
     },
     {
       "id": "upper.lfo2.destination1",
-      "name": "Upper LFO2 Destination 1",
+      "name": "LFO2 Destination 1",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 37",
@@ -5324,7 +5324,7 @@
     },
     {
       "id": "upper.lfo2.depth1",
-      "name": "Upper LFO2 Depth 1",
+      "name": "LFO2 Depth 1",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 38",
@@ -5365,7 +5365,7 @@
     },
     {
       "id": "upper.lfo2.destination2",
-      "name": "Upper LFO2 Destination 2",
+      "name": "LFO2 Destination 2",
       "group": "Upper LFO2",
       "type": "choice",
       "address": "10 00 01 39",
@@ -5416,7 +5416,7 @@
     },
     {
       "id": "upper.lfo2.depth2",
-      "name": "Upper LFO2 Depth 2",
+      "name": "LFO2 Depth 2",
       "group": "Upper LFO2",
       "type": "integer",
       "address": "10 00 01 3A",
@@ -5457,7 +5457,7 @@
     },
     {
       "id": "upper.pitchBend.range",
-      "name": "Upper Pitch Bend Range",
+      "name": "Pitch Bend Range",
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3B",
@@ -5496,7 +5496,7 @@
     },
     {
       "id": "upper.octaveShift",
-      "name": "Upper Octave Shift",
+      "name": "Octave Shift",
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3C",
@@ -5537,7 +5537,7 @@
     },
     {
       "id": "upper.portamento.switch",
-      "name": "Upper Portamento Switch",
+      "name": "Portamento Switch",
       "group": "Upper Performance",
       "type": "boolean",
       "address": "10 00 01 3D",
@@ -5570,7 +5570,7 @@
     },
     {
       "id": "upper.portamento.time",
-      "name": "Upper Portamento Time",
+      "name": "Portamento Time",
       "group": "Upper Performance",
       "type": "integer",
       "address": "10 00 01 3E",
@@ -5609,7 +5609,7 @@
     },
     {
       "id": "upper.monoSolo",
-      "name": "Upper Mono/Solo Select",
+      "name": "Mono/Solo Select",
       "group": "Upper Performance",
       "type": "choice",
       "address": "10 00 01 3F",
@@ -5660,7 +5660,7 @@
     },
     {
       "id": "lower.osc1.waveform",
-      "name": "Lower OSC1 Waveform",
+      "name": "OSC1 Waveform",
       "group": "Lower OSC1",
       "type": "choice",
       "address": "10 00 02 00",
@@ -5741,7 +5741,7 @@
     },
     {
       "id": "lower.osc1.pitchWide",
-      "name": "Lower OSC1 Pitch Wide",
+      "name": "OSC1 Pitch Wide",
       "group": "Lower OSC1",
       "type": "boolean",
       "address": "10 00 02 01",
@@ -5774,7 +5774,7 @@
     },
     {
       "id": "lower.osc1.coarseTune",
-      "name": "Lower OSC1 Coarse Tune",
+      "name": "OSC1 Coarse Tune",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 02",
@@ -5815,7 +5815,7 @@
     },
     {
       "id": "lower.osc1.fineTune",
-      "name": "Lower OSC1 Fine Tune",
+      "name": "OSC1 Fine Tune",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 03",
@@ -5856,7 +5856,7 @@
     },
     {
       "id": "lower.osc1.pulseWidth",
-      "name": "Lower OSC1 Pulse Width",
+      "name": "OSC1 Pulse Width",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 04",
@@ -5895,7 +5895,7 @@
     },
     {
       "id": "lower.osc1.pitchEnvDepth",
-      "name": "Lower OSC1 Pitch Env Depth",
+      "name": "OSC1 Pitch Env Depth",
       "group": "Lower OSC1",
       "type": "integer",
       "address": "10 00 02 05",
@@ -5936,7 +5936,7 @@
     },
     {
       "id": "lower.osc2.waveform",
-      "name": "Lower OSC2 Waveform",
+      "name": "OSC2 Waveform",
       "group": "Lower OSC2",
       "type": "choice",
       "address": "10 00 02 06",
@@ -6017,7 +6017,7 @@
     },
     {
       "id": "lower.osc2.pitchWide",
-      "name": "Lower OSC2 Pitch Wide",
+      "name": "OSC2 Pitch Wide",
       "group": "Lower OSC2",
       "type": "boolean",
       "address": "10 00 02 07",
@@ -6050,7 +6050,7 @@
     },
     {
       "id": "lower.osc2.coarseTune",
-      "name": "Lower OSC2 Coarse Tune",
+      "name": "OSC2 Coarse Tune",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 08",
@@ -6091,7 +6091,7 @@
     },
     {
       "id": "lower.osc2.fineTune",
-      "name": "Lower OSC2 Fine Tune",
+      "name": "OSC2 Fine Tune",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 09",
@@ -6132,7 +6132,7 @@
     },
     {
       "id": "lower.osc2.pulseWidth",
-      "name": "Lower OSC2 Pulse Width",
+      "name": "OSC2 Pulse Width",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 0A",
@@ -6171,7 +6171,7 @@
     },
     {
       "id": "lower.osc2.pitchEnvDepth",
-      "name": "Lower OSC2 Pitch Env Depth",
+      "name": "OSC2 Pitch Env Depth",
       "group": "Lower OSC2",
       "type": "integer",
       "address": "10 00 02 0B",
@@ -6212,7 +6212,7 @@
     },
     {
       "id": "lower.pitchEnv.attack",
-      "name": "Lower Pitch Env Attack Time",
+      "name": "Pitch Env Attack Time",
       "group": "Lower Pitch Env",
       "type": "integer",
       "address": "10 00 02 0C",
@@ -6251,7 +6251,7 @@
     },
     {
       "id": "lower.pitchEnv.decay",
-      "name": "Lower Pitch Env Decay",
+      "name": "Pitch Env Decay",
       "group": "Lower Pitch Env",
       "type": "integer",
       "address": "10 00 02 0D",
@@ -6290,7 +6290,7 @@
     },
     {
       "id": "lower.mixMod.type",
-      "name": "Lower MIX/MOD Type",
+      "name": "MIX/MOD Type",
       "group": "Lower Mix Mod",
       "type": "choice",
       "address": "10 00 02 0E",
@@ -6341,7 +6341,7 @@
     },
     {
       "id": "lower.mixMod.balance",
-      "name": "Lower MIX/MOD Balance",
+      "name": "MIX/MOD Balance",
       "group": "Lower Mix Mod",
       "type": "integer",
       "address": "10 00 02 0F",
@@ -6382,7 +6382,7 @@
     },
     {
       "id": "lower.mixMod.lowFreq",
-      "name": "Lower MIX/MOD Low Freq",
+      "name": "MIX/MOD Low Freq",
       "group": "Lower Mix Mod",
       "type": "choice",
       "address": "10 00 02 10",
@@ -6433,7 +6433,7 @@
     },
     {
       "id": "lower.filter.type",
-      "name": "Lower Filter Type",
+      "name": "Filter Type",
       "group": "Lower Filter",
       "type": "choice",
       "address": "10 00 02 11",
@@ -6489,7 +6489,7 @@
     },
     {
       "id": "lower.filter.slope",
-      "name": "Lower Filter Slope",
+      "name": "Filter Slope",
       "group": "Lower Filter",
       "type": "choice",
       "address": "10 00 02 12",
@@ -6535,7 +6535,7 @@
     },
     {
       "id": "lower.filter.cutoff",
-      "name": "Lower Filter Cutoff Frequency",
+      "name": "Filter Cutoff Frequency",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 13",
@@ -6574,7 +6574,7 @@
     },
     {
       "id": "lower.filter.cutoffKeyfollow",
-      "name": "Lower Filter Cutoff Keyfollow",
+      "name": "Filter Cutoff Keyfollow",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 14",
@@ -6615,7 +6615,7 @@
     },
     {
       "id": "lower.filter.cutoffVelocity",
-      "name": "Lower Filter Cutoff Velocity Sens",
+      "name": "Filter Cutoff Velocity Sens",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 15",
@@ -6656,7 +6656,7 @@
     },
     {
       "id": "lower.filter.resonance",
-      "name": "Lower Filter Resonance",
+      "name": "Filter Resonance",
       "group": "Lower Filter",
       "type": "integer",
       "address": "10 00 02 16",
@@ -6695,7 +6695,7 @@
     },
     {
       "id": "lower.filterEnv.attack",
-      "name": "Lower Filter Env Attack Time",
+      "name": "Filter Env Attack Time",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 17",
@@ -6734,7 +6734,7 @@
     },
     {
       "id": "lower.filterEnv.decay",
-      "name": "Lower Filter Env Decay Time",
+      "name": "Filter Env Decay Time",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 18",
@@ -6773,7 +6773,7 @@
     },
     {
       "id": "lower.filterEnv.sustain",
-      "name": "Lower Filter Env Sustain Level",
+      "name": "Filter Env Sustain Level",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 19",
@@ -6812,7 +6812,7 @@
     },
     {
       "id": "lower.filterEnv.release",
-      "name": "Lower Filter Env Release Time",
+      "name": "Filter Env Release Time",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 1A",
@@ -6851,7 +6851,7 @@
     },
     {
       "id": "lower.filterEnv.depth",
-      "name": "Lower Filter Env Env Depth",
+      "name": "Filter Env Depth",
       "group": "Lower Filter Env",
       "type": "integer",
       "address": "10 00 02 1B",
@@ -6892,7 +6892,7 @@
     },
     {
       "id": "lower.amp.overdriveSwitch",
-      "name": "Lower AMP Overdrive Switch",
+      "name": "AMP Overdrive Switch",
       "group": "Lower AMP",
       "type": "boolean",
       "address": "10 00 02 1C",
@@ -6925,7 +6925,7 @@
     },
     {
       "id": "lower.amp.overdriveDrive",
-      "name": "Lower AMP Overdrive Drive",
+      "name": "AMP Overdrive Drive",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1D",
@@ -6964,7 +6964,7 @@
     },
     {
       "id": "lower.amp.level",
-      "name": "Lower AMP Level",
+      "name": "AMP Level",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1E",
@@ -7003,7 +7003,7 @@
     },
     {
       "id": "lower.amp.velocitySens",
-      "name": "Lower AMP Level Velocity Sens",
+      "name": "AMP Level Velocity Sens",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 1F",
@@ -7044,7 +7044,7 @@
     },
     {
       "id": "lower.amp.pan",
-      "name": "Lower AMP Pan",
+      "name": "AMP Pan",
       "group": "Lower AMP",
       "type": "integer",
       "address": "10 00 02 20",
@@ -7085,7 +7085,7 @@
     },
     {
       "id": "lower.ampEnv.attack",
-      "name": "Lower AMP Env Attack Time",
+      "name": "AMP Env Attack Time",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 21",
@@ -7124,7 +7124,7 @@
     },
     {
       "id": "lower.ampEnv.decay",
-      "name": "Lower AMP Env Decay Time",
+      "name": "AMP Env Decay Time",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 22",
@@ -7163,7 +7163,7 @@
     },
     {
       "id": "lower.ampEnv.sustain",
-      "name": "Lower AMP Env Sustain Level",
+      "name": "AMP Env Sustain Level",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 23",
@@ -7202,7 +7202,7 @@
     },
     {
       "id": "lower.ampEnv.release",
-      "name": "Lower AMP Env Release Time",
+      "name": "AMP Env Release Time",
       "group": "Lower AMP Env",
       "type": "integer",
       "address": "10 00 02 24",
@@ -7241,7 +7241,7 @@
     },
     {
       "id": "lower.delay.depth",
-      "name": "Lower Delay Depth",
+      "name": "Delay Depth",
       "group": "Lower Effects Send",
       "type": "integer",
       "address": "10 00 02 25",
@@ -7280,7 +7280,7 @@
     },
     {
       "id": "lower.reverb.depth",
-      "name": "Lower Reverb Depth",
+      "name": "Reverb Depth",
       "group": "Lower Effects Send",
       "type": "integer",
       "address": "10 00 02 26",
@@ -7319,7 +7319,7 @@
     },
     {
       "id": "lower.lfo1.shape",
-      "name": "Lower LFO1 Shape",
+      "name": "LFO1 Shape",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 27",
@@ -7390,7 +7390,7 @@
     },
     {
       "id": "lower.lfo1.rate",
-      "name": "Lower LFO1 Rate",
+      "name": "LFO1 Rate",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 28",
@@ -7429,13 +7429,13 @@
     },
     {
       "id": "lower.lfo1.tempoSync",
-      "name": "Lower LFO1 Tempo Sync Switch",
+      "name": "LFO1 Tempo Sync Switch",
       "group": "Lower LFO1",
       "type": "boolean",
       "address": "10 00 02 29",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -7462,7 +7462,7 @@
     },
     {
       "id": "lower.lfo1.tempoSyncNote",
-      "name": "Lower LFO1 Tempo Sync Note",
+      "name": "LFO1 Tempo Sync Note",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2A",
@@ -7598,7 +7598,7 @@
     },
     {
       "id": "lower.lfo1.fadeTime",
-      "name": "Lower LFO1 Fade Time",
+      "name": "LFO1 Fade Time",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 2B",
@@ -7637,7 +7637,7 @@
     },
     {
       "id": "lower.lfo1.keyTrigger",
-      "name": "Lower LFO1 Key Trigger",
+      "name": "LFO1 Key Trigger",
       "group": "Lower LFO1",
       "type": "boolean",
       "address": "10 00 02 2C",
@@ -7670,7 +7670,7 @@
     },
     {
       "id": "lower.lfo1.destination1",
-      "name": "Lower LFO1 Destination 1",
+      "name": "LFO1 Destination 1",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2D",
@@ -7726,7 +7726,7 @@
     },
     {
       "id": "lower.lfo1.depth1",
-      "name": "Lower LFO1 Depth 1",
+      "name": "LFO1 Depth 1",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 2E",
@@ -7767,7 +7767,7 @@
     },
     {
       "id": "lower.lfo1.destination2",
-      "name": "Lower LFO1 Destination 2",
+      "name": "LFO1 Destination 2",
       "group": "Lower LFO1",
       "type": "choice",
       "address": "10 00 02 2F",
@@ -7818,7 +7818,7 @@
     },
     {
       "id": "lower.lfo1.depth2",
-      "name": "Lower LFO1 Depth 2",
+      "name": "LFO1 Depth 2",
       "group": "Lower LFO1",
       "type": "integer",
       "address": "10 00 02 30",
@@ -7859,7 +7859,7 @@
     },
     {
       "id": "lower.lfo2.shape",
-      "name": "Lower LFO2 Shape",
+      "name": "LFO2 Shape",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 31",
@@ -7930,7 +7930,7 @@
     },
     {
       "id": "lower.lfo2.rate",
-      "name": "Lower LFO2 Rate",
+      "name": "LFO2 Rate",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 32",
@@ -7969,13 +7969,13 @@
     },
     {
       "id": "lower.lfo2.tempoSync",
-      "name": "Lower LFO2 Tempo Sync Switch",
+      "name": "LFO2 Tempo Sync Switch",
       "group": "Lower LFO2",
       "type": "boolean",
       "address": "10 00 02 33",
       "default": false,
-      "falseValue": 0,
-      "trueValue": 1,
+      "falseValue": 1,
+      "trueValue": 0,
       "display": {
         "mode": "boolean",
         "shortLabel": "Switch"
@@ -8002,7 +8002,7 @@
     },
     {
       "id": "lower.lfo2.tempoSyncNote",
-      "name": "Lower LFO2 Tempo Sync Note",
+      "name": "LFO2 Tempo Sync Note",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 34",
@@ -8138,7 +8138,7 @@
     },
     {
       "id": "lower.lfo2.fadeTime",
-      "name": "Lower LFO2 Fade Time",
+      "name": "LFO2 Fade Time",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 35",
@@ -8177,7 +8177,7 @@
     },
     {
       "id": "lower.lfo2.keyTrigger",
-      "name": "Lower LFO2 Key Trigger",
+      "name": "LFO2 Key Trigger",
       "group": "Lower LFO2",
       "type": "boolean",
       "address": "10 00 02 36",
@@ -8210,7 +8210,7 @@
     },
     {
       "id": "lower.lfo2.destination1",
-      "name": "Lower LFO2 Destination 1",
+      "name": "LFO2 Destination 1",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 37",
@@ -8266,7 +8266,7 @@
     },
     {
       "id": "lower.lfo2.depth1",
-      "name": "Lower LFO2 Depth 1",
+      "name": "LFO2 Depth 1",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 38",
@@ -8307,7 +8307,7 @@
     },
     {
       "id": "lower.lfo2.destination2",
-      "name": "Lower LFO2 Destination 2",
+      "name": "LFO2 Destination 2",
       "group": "Lower LFO2",
       "type": "choice",
       "address": "10 00 02 39",
@@ -8358,7 +8358,7 @@
     },
     {
       "id": "lower.lfo2.depth2",
-      "name": "Lower LFO2 Depth 2",
+      "name": "LFO2 Depth 2",
       "group": "Lower LFO2",
       "type": "integer",
       "address": "10 00 02 3A",
@@ -8399,7 +8399,7 @@
     },
     {
       "id": "lower.pitchBend.range",
-      "name": "Lower Pitch Bend Range",
+      "name": "Pitch Bend Range",
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3B",
@@ -8438,7 +8438,7 @@
     },
     {
       "id": "lower.octaveShift",
-      "name": "Lower Octave Shift",
+      "name": "Octave Shift",
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3C",
@@ -8479,7 +8479,7 @@
     },
     {
       "id": "lower.portamento.switch",
-      "name": "Lower Portamento Switch",
+      "name": "Portamento Switch",
       "group": "Lower Performance",
       "type": "boolean",
       "address": "10 00 02 3D",
@@ -8512,7 +8512,7 @@
     },
     {
       "id": "lower.portamento.time",
-      "name": "Lower Portamento Time",
+      "name": "Portamento Time",
       "group": "Lower Performance",
       "type": "integer",
       "address": "10 00 02 3E",
@@ -8551,7 +8551,7 @@
     },
     {
       "id": "lower.monoSolo",
-      "name": "Lower Mono/Solo Select",
+      "name": "Mono/Solo Select",
       "group": "Lower Performance",
       "type": "choice",
       "address": "10 00 02 3F",
@@ -33008,7 +33008,9 @@
     "Large profile: DPD should use paged parameter loading and backend filtering.",
     "Arpeggio Pattern parameters are intentionally grouped by pattern block; they are advanced editing targets.",
     "DT1 dump parsing definitions are generated from documented address ranges; captured hardware dumps should be added as parse tests.",
-    "Arpeggio pattern values: Original Note 0..127, or 128 for OFF; a step 0 for a rest, 1..127 for a note's velocity, 128 for a tie, each sent as two nibbles, high first. The owner reports the SH-201's step bytes as 08 00 a tie, 00 00 a rest and 07 0F the loudest velocity, which is this encoding of 128, 0 and 127 (sh201ArpPattern.test.js holds it); the Owner's Manual (Arpeggio) describes a step as a Note On with its velocity, a Tie or a Rest. A captured pattern dump would make it a test against the instrument."
+    "Arpeggio pattern values: Original Note 0..127, or 128 for OFF; a step 0 for a rest, 1..127 for a note's velocity, 128 for a tie, each sent as two nibbles, high first. The owner reports the SH-201's step bytes as 08 00 a tie, 00 00 a rest and 07 0F the loudest velocity, which is this encoding of 128, 0 and 127 (sh201ArpPattern.test.js holds it); the Owner's Manual (Arpeggio) describes a step as a Note On with its velocity, a Tie or a Rest. A captured pattern dump would make it a test against the instrument.",
+    "LFO Tempo Sync Switch is listed in the MIDI Implementation as ON, OFF, where every other switch is OFF, ON: raw 0 is ON. The four Tempo Sync parameters say so (falseValue 1, trueValue 0). The PDF has misprints elsewhere, so this is to be confirmed on the synth: F0 41 10 00 00 16 12 10 00 01 29 00 46 F7 (Upper LFO1 Tempo Sync, raw 0) should switch sync on.",
+    "A tone parameter's name leaves out Upper or Lower: its group says which tone, as do its id, its address and, on a panel, the section it sits in."
   ],
   "dumpDefinitions": [
     {

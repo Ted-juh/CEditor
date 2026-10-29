@@ -208,7 +208,14 @@ export function decodeParameterValue(parameter, bytes) {
     return decoded.ok ? decoded.value : null;
   }
 
-  if (encoding === 'boolean-u7') return (list[0] & 0x7f) === 0 ? 0 : 1;
+  if (encoding === 'boolean-u7') {
+    // The parameter's own wire values first, as the native engine reads them: the SH-201's Tempo
+    // Sync is ON at 0 and OFF at 1. Any other byte is read as it always was, non-zero for on.
+    const raw = list[0] & 0x7f;
+    if (parameter?.trueValue != null && raw === Number(parameter.trueValue)) return 1;
+    if (parameter?.falseValue != null && raw === Number(parameter.falseValue)) return 0;
+    return raw === 0 ? 0 : 1;
+  }
   if (encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb') {
     return ((list[0] & 0x7f) << 7) | (list[1] & 0x7f);
   }
@@ -249,7 +256,12 @@ export function encodeParameterValue(parameter, value) {
   }
   if (encoding === 'boolean-u7') {
     const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
-    return { bytes: [on ? 127 : 0], number: on ? 127 : 0, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };
+    // The values the parameter names, as the native engine sends them (falseValue / trueValue):
+    // the SH-201's switches are 0 and 1, its Tempo Sync 1 and 0. This sent 127 for every ON, which
+    // the SH-201 does not take for a switch. Without them, 0 and 127 as before.
+    const number = on ? Number(parameter?.trueValue ?? 127) : Number(parameter?.falseValue ?? 0);
+    if (!Number.isInteger(number) || number < 0 || number > 127) return { error: `Boolean wire value outside MIDI data byte range for ${parameter?.id ?? ''}` };
+    return { bytes: [number], number, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };
   }
   if (encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb') {
     const number = clampInt(value, 0, 16383);

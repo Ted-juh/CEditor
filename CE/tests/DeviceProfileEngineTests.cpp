@@ -1953,6 +1953,15 @@ int runSimulatedDeviceTests (const juce::File& sh201File, const juce::File& gaia
         fail ("RQ1 temporary patch: " + juce::String ((int) patchReplies.size()) + " replies, collection "
               + collected.status + ", cutoff " + collected.values.getProperty ("upper.filter.cutoff", "missing").toString());
 
+    // LFO Tempo Sync is ON at raw 0 (the MIDI Implementation's "ON, OFF"): switching it on sends
+    // the message the handoff gives for the hardware test, and another switch is still 0 off, 1 on.
+    const auto tempoSyncOn = sh201.compileSetParameter ("sh201", "upper.lfo1.tempoSync", true, true);
+    const auto wideOn = sh201.compileSetParameter ("sh201", "upper.osc1.pitchWide", true, true);
+    if (DeviceProfileEngine::transactionToHex (tempoSyncOn.transaction) != "F0 41 10 00 00 16 12 10 00 01 29 00 46 F7"
+        || DeviceProfileEngine::transactionToHex (wideOn.transaction) != "F0 41 10 00 00 16 12 10 00 01 01 01 6D F7")
+        fail ("Tempo Sync ON / OSC1 Wide ON sent " + DeviceProfileEngine::transactionToHex (tempoSyncOn.transaction)
+              + " / " + DeviceProfileEngine::transactionToHex (wideOn.transaction));
+
     // A Roland profile that is not the SH-201 gets a simulator too.
     DeviceProfileEngine gaia;
     if (! gaia.loadFromFile (gaiaFile, error))

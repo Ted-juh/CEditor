@@ -150,6 +150,13 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 editor and was left out of the plug-in: not loaded, its modules not built in, its TypeScript not
 compiled. Scripts on top-level controls and panel scripts were never affected.
 
+**SH-201 LFO Tempo Sync is ON at 0.** The MIDI Implementation lists its switch as ON, OFF, unlike
+every other switch, and the profile had it the other way round. To be confirmed on the synth.
+Switches also go out as the values their profile names from the editor's own engine and are read
+back that way in the exported player: it sent 127 for every ON (the SH-201 takes 1) and read any
+non-zero value as ON. An SH-201 tone parameter's name now leaves out Upper or Lower ("Filter Env
+Depth"); its group still says which tone.
+
 **A panel with many scripts answers a click at once, and a double-click on a stepper resets.**
 Every script re-checked its approval before running, and each check rebuilt a fingerprint of all of
 the panel's scripts, so an event cost one fingerprint per script. On the GAIA panel (232 scripts)
