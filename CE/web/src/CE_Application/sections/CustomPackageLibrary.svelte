@@ -450,19 +450,22 @@
       libraryStatus = importPreview.error || 'Import rejected';
       return;
     }
-    let entry = null;
-    for (const envelope of envelopes) {
-      entry = customComponentLibrary.importEnvelope(envelope) ?? entry;
-    }
+    // What the library kept, not what the file held: the two differed once, silently.
+    const { imported, failures } = customComponentLibrary.importEnvelopes(envelopes);
+    const entry = imported[imported.length - 1] ?? null;
     if (entry?.id) selectedLibraryId = entry.id;
-    if (load && envelopes.length === 1 && applyLibraryEntryToCurrent(entry)) {
+    if (failures.length) {
+      const [first] = failures;
+      libraryStatus = `Imported ${imported.length} of ${envelopes.length}. ${first.name}: ${first.reason}`
+        + (failures.length > 1 ? ` (and ${failures.length - 1} more)` : '');
+    } else if (load && envelopes.length === 1 && applyLibraryEntryToCurrent(entry)) {
       libraryStatus = entry?.validation?.ok === false ? 'Imported and loaded with issues' : 'Imported and loaded';
     } else {
-      const issueCount = envelopes.filter((envelope) => envelope.validation?.ok === false).length;
+      const issueCount = imported.filter((item) => item.validation?.ok === false).length;
       const suffix = importPreview.rejected ? `, ${importPreview.rejected} rejected` : '';
       libraryStatus = issueCount
-        ? `Imported ${envelopes.length} with ${issueCount} issue${issueCount === 1 ? '' : 's'}${suffix}`
-        : `Imported ${envelopes.length}${suffix}`;
+        ? `Imported ${imported.length} with ${issueCount} issue${issueCount === 1 ? '' : 's'}${suffix}`
+        : `Imported ${imported.length}${suffix}`;
     }
     importText = '';
   }

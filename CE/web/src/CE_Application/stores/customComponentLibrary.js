@@ -121,6 +121,14 @@ function createLibraryStore() {
     });
   })();
 
+  function importOne(value) {
+    const envelope = normalizeCustomComponentEnvelope(value);
+    if (!envelope) return null;
+    const entry = createEntry(envelope);
+    store.update((entries) => persist([entry, ...entries.filter((item) => item.id !== entry.id)]));
+    return entry;
+  }
+
   return {
     subscribe: store.subscribe,
     /** Resolves once the library has been read from the database (immediately where there is none). */
@@ -135,11 +143,37 @@ function createLibraryStore() {
       return entry;
     },
     importEnvelope(value) {
-      const envelope = normalizeCustomComponentEnvelope(value);
-      if (!envelope) return null;
-      const entry = createEntry(envelope);
-      store.update((entries) => persist([entry, ...entries.filter((item) => item.id !== entry.id)]));
-      return entry;
+      return importOne(value);
+    },
+    /**
+     * Import several packages and say what the library actually kept.
+     *
+     * The import screen used to count the packages it had read from the file and call that
+     * "Imported 4", whatever the library did with them. On the owner's Windows install it said
+     * "Imported 4" while the library stayed empty, and nothing anywhere said why. This counts what
+     * the library holds afterwards, and gives each package it did not keep a reason, also written
+     * to the console, so a failure names itself.
+     */
+    importEnvelopes(values) {
+      const imported = [];
+      const failures = [];
+      for (const value of Array.isArray(values) ? values : []) {
+        const name = String(value?.metadata?.name ?? value?.envelope?.metadata?.name ?? 'A package');
+        try {
+          const entry = importOne(value);
+          if (entry) imported.push(entry);
+          else failures.push({ name, reason: 'it is not a component package' });
+        } catch (error) {
+          failures.push({ name, reason: String(error?.message ?? error) });
+          console.error(`[componentLibrary] could not import ${name}`, error);
+        }
+      }
+      const held = new Set(get(store).map((entry) => entry.id));
+      for (const entry of imported.filter((item) => !held.has(item.id))) {
+        failures.push({ name: entry.name, reason: 'the library did not keep it' });
+        console.error(`[componentLibrary] ${entry.name} was imported and is not in the library`);
+      }
+      return { imported: imported.filter((entry) => held.has(entry.id)), failures };
     },
     updateMetadata(id, metadata = {}) {
       let updated = null;

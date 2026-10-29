@@ -75,3 +75,29 @@ test('without IndexedDB the library stays in localStorage, as before', async () 
   library.importEnvelope(envelopeFor('Only'));
   assert.ok(values.get('ce.customComponentLibrary.v1').includes('Only'));
 });
+
+// The import screen said "Imported 4" for a file of four packages whatever the library then held;
+// on a Windows install the library stayed empty under that message. importEnvelopes counts what the
+// library holds afterwards and names each package it did not keep, and why.
+test('importing several says what the library kept, and why it refused the rest', async () => {
+  storage();
+  await withIndexedDb();
+  const library = await freshLibrary();
+  const broken = { format: envelopeFor('X').format, metadata: { name: 'Broken Knob' }, component: { _children: {} } };
+  Object.defineProperty(broken.component._children, 'Core', { enumerable: true, get() { throw new Error('unreadable core'); } });
+  const notAPackage = { metadata: { name: 'Not A Package' } };
+
+  const { imported, failures } = library.importEnvelopes([envelopeFor('Good One'), broken, notAPackage, envelopeFor('Good Two')]);
+  assert.deepEqual(imported.map((entry) => entry.name), ['Good One', 'Good Two']);
+  assert.deepEqual(get(library).map((entry) => entry.name).sort(), ['Good One', 'Good Two']);
+  assert.deepEqual(failures.map((failure) => failure.name), ['Broken Knob', 'Not A Package']);
+  assert.match(failures[0].reason, /unreadable core/);
+  assert.match(failures[1].reason, /not a component package/);
+
+  // The SH-201 library file, as the import screen reads it: all four kept.
+  const { readFileSync } = await import('node:fs');
+  const { normalizeCustomComponentLibraryEnvelope } = await import('../src/CE_Application/utils/customComponentPackage.js');
+  const file = normalizeCustomComponentLibraryEnvelope(JSON.parse(readFileSync(new URL('../../panels/Roland SH-201 components.json', import.meta.url), 'utf8')));
+  const sh201 = library.importEnvelopes(file.packages);
+  assert.deepEqual([sh201.imported.length, sh201.failures], [4, []]);
+});
