@@ -208,7 +208,10 @@ you already have under the same name and version, with another design, is kept.
   notepad has a tutorial that takes it from the GAIA panel's look to the instrument's own — a
   reference photo in Viewer, colours on many controls at once, the knob redesigned once and
   updated on all its copies, new sections with Ctrl+G — and `Roland SH-201 (hardware look).cepanel`
-  is where it ends up. Bring your own photo of the instrument; none is included.
+  is where it ends up. Bring your own photo of the instrument; none is included. The silver
+  sections there wear a transparent metallic overlay, a brushed-metal texture tiled over the fill
+  with the Overlay blend; `Roland SH-201 brushed metal.png` beside the panels is that texture, made
+  for the panel and free to use, and the tutorial shows how to add it.
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,
   Dry Run and Preview. The status bar opens Ports; Ports configures the panel's named devices
   and reports the actual send result. Changing ports preserves its profile and parameter values.

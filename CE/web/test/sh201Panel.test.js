@@ -195,3 +195,27 @@ test('the hardware look is the draft repainted: the same parameter on the same p
     assert.equal(next[name].fingerprint, old[name].fingerprint, `${name} is the draft's`);
   }
 });
+
+test('the hardware look\'s silver sections carry the brushed-metal overlay that ships beside it', () => {
+  const texture = readFileSync(path.join(REPO, 'CE/panels/Roland SH-201 brushed metal.png'));
+  assert.deepEqual([...texture.subarray(1, 4)].map((b) => String.fromCharCode(b)).join(''), 'PNG');
+  const dataUrl = `data:image/png;base64,${texture.toString('base64')}`;
+  const SILVER = ['OSC 1', 'OSC 2', 'MIX/MOD', 'FILTER', 'AMP'];
+  const sections = (look) => look.all.filter((c) => c._children.Core.controlType === 'Group' && getChildControls(c).length
+    && Object.values(look.sections).includes(c._children.Core.name));
+  const silver = sections(hardware).filter((c) => SILVER.includes(c._children.Core.name));
+  assert.equal(silver.length, SILVER.length * 2, 'both tones');
+  for (const section of silver) {
+    const fill = section._children.Background._children.Fill;
+    assert.deepEqual([fill.overlayEnabled, fill.overlayBlend, fill.overlayFit, fill.overlaySrc === dataUrl],
+      [true, 'overlay', 'tile', true], `${section._children.Core.name}: a transparent metallic overlay, the file beside the panel`);
+    assert.ok(fill.overlayOpacity > 0 && fill.overlayOpacity < 100, 'transparent');
+  }
+  for (const section of [...sections(hardware).filter((c) => !SILVER.includes(c._children.Core.name)), ...sections(draft)]) {
+    assert.notEqual(section._children.Background._children.Fill.overlayEnabled, true, `${section._children.Core.name} has no overlay`);
+  }
+  const tutorial = draft.panel.notepad.notes.find((note) => /^Tutorial 1\b/.test(note.content)).content;
+  assert.match(tutorial, /transparent metallic overlay/);
+  assert.match(tutorial, /Roland SH-201 brushed metal\.png/);
+  assert.match(tutorial, /Blend to Overlay/);
+});

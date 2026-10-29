@@ -50,6 +50,7 @@ import {
 import { diffCustomComponentAgainstSource } from '../../../CE/web/src/CE_Application/utils/customComponentSourceLink.js';
 import { gaiaFader, gaiaKnob, gaiaLeds } from '../gaia-panel/components.mjs';
 import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
+import { brushedMetalDataUrl, brushedMetalPng } from './brushedMetal.mjs';
 import {
   SECTIONS, SECTION_ROWS, PANEL, SKIN, HARDWARE_SECTIONS, HARDWARE_ROWS, HARDWARE_SKIN,
 } from './layout.mjs';
@@ -60,6 +61,13 @@ const PROFILE = path.join(REPO, 'CE/profiles/test/roland-sh-201.ceditor-device.j
 
 /** The device name every binding carries — a name a person would give the instrument. */
 export const DEVICE_NAME = 'Roland SH-201';
+
+/** The brushed-metal texture the hardware look's silver sections carry, and readers of the tutorial use. */
+export const METAL_TEXTURE_OUT = 'CE/panels/Roland SH-201 brushed metal.png';
+const METAL = brushedMetalDataUrl();
+// A transparent metallic overlay: tiled over the silver, blended with Overlay, so the streaks
+// lighten and darken the fill without changing its colour (brushedMetal.mjs says why).
+const METAL_OVERLAY = { overlayEnabled: true, overlaySrc: METAL, overlayFit: 'tile', overlayBlend: 'overlay', overlayOpacity: 60, overlayTileScale: 1 };
 
 /** A fixed date for the packages, so the files only change when the design does. */
 const STAMP = '2026-10-29T00:00:00.000Z';
@@ -346,7 +354,7 @@ const LOOKS = {
     scriptId: 'roland_sh201_hardware',
     description: 'Roland SH-201 — Upper and Lower tones in the instrument\'s own look: the answer to the draft\'s tutorial',
     sectionStyle: (spec) => (spec.surface === 'silver'
-      ? { fill: HARDWARE_SKIN.silver, border: { enabled: false, thickness: 0, colour: '00000000' }, radius: 3,
+      ? { fill: HARDWARE_SKIN.silver, overlay: METAL_OVERLAY, border: { enabled: false, thickness: 0, colour: '00000000' }, radius: 3,
         title: { colour: HARDWARE_SKIN.onSilver, fill: '00000000', size: 12 }, caption: HARDWARE_SKIN.onSilver, captionBold: true }
       : { fill: HARDWARE_SKIN.black, border: { enabled: true, thickness: 1, colour: HARDWARE_SKIN.blackEdge }, radius: 3,
         title: { colour: HARDWARE_SKIN.onBlack, fill: '00000000', size: 12 }, caption: HARDWARE_SKIN.onBlack, captionBold: true }),
@@ -369,7 +377,7 @@ function section(spec, at, ctx) {
     Transform: { x: at.x, y: at.y, width: spec.w, height: spec.h },
     Background: {
       _children: {
-        Fill: { colour: style.fill },
+        Fill: { colour: style.fill, ...(style.overlay ?? {}) },
         Border: style.border,
         Corners: { radius: style.radius },
       },
@@ -509,6 +517,8 @@ You need a photo of the instrument. Use your own: a photo from Roland or from th
 
 3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, then on the Background tab set the fill to silver and switch the border off: with several controls selected, the Background tab changes all of them. Then select the others and make them black, with a thin grey border.
 
+A flat silver reads as grey plastic; the instrument's is brushed aluminium. Give the silver sections a transparent metallic overlay: select OSC 1, and on the Background tab turn on the Overlay layer and press its ... button to choose a brushed-metal texture (Roland SH-201 brushed metal.png, beside this file, or your own). Set its Blend to Overlay and its Opacity to about 60: Overlay lightens and darkens the silver without changing its colour. Press C on the layer to copy it, select the other silver sections, turn on their Overlay layer and press P: the layer is pasted on all of them.
+
 4. Lettering. The instrument prints black on silver and white on black, and puts no tabs behind its section names. Double-click a section to reach its title (Esc goes back up), clear the title's fill, and set its text black and bold in the dock's Text tool. Select a section's captions in the component tree (Ctrl+click, or Shift+click for a range) and make them black and bold too. On the black sections, white.
 
 5. The knob, once for all ${knobs} of them. Select any knob and press Component Designer on the canvas. Select the part called face and give it a silver radial gradient, light at the top left (the Gradient tool); make rim almost black, and pointer and the ticks dark. Press Back to Panel. The knob's Source card now says it has edits of its own: press Save to library as 1.1.0… and then Save. Then press Update ${knobs - 1} other copies — every knob on the panel is the new one, each keeping its own range, default and readout, because those are the copy's settings, not the component's.
@@ -529,6 +539,7 @@ This is the answer to Tutorial 1 in Roland SH-201.cepanel's notepad: the same 12
 
 - The silver signal path — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and the black modulation row: PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV, with EFFECTS and PERFORMANCE on the black body. Both tones, one page each.
 - The tone buttons are the Tone container's strip, drawn as the instrument's keys with a red lamp; they turn with the synth's Keyboard Part.
+- The silver sections carry a transparent metallic overlay: Roland SH-201 brushed metal.png, tiled over the fill with the Overlay blend at 60%. It is in the file, so the panel needs nothing beside it.
 - Every knob is SH-201 Knob 1.1.0, the silver one: select any knob and its Source card says so. The faders and LED switches are still 1.0.0; they already look like the instrument's.
 - FILTER ENV and AMP ENV are sections of their own, and the filter envelope's DEPTH is a fader, as on the instrument.
 
@@ -649,6 +660,15 @@ function main() {
       const doc = JSON.parse(panel);
       console.log(`Wrote ${path.relative(REPO, out.panel)} (${doc.width}x${doc.height}, ${(panel.length / 1024).toFixed(0)} KB) and its library`);
     }
+  }
+  const texture = path.join(REPO, METAL_TEXTURE_OUT);
+  if (check) {
+    let current = null;
+    try { current = readFileSync(texture); } catch { /* missing counts as stale */ }
+    if (!current || !current.equals(brushedMetalPng())) stale.push(texture);
+  } else {
+    writeFileSync(texture, brushedMetalPng());
+    console.log(`Wrote ${METAL_TEXTURE_OUT}`);
   }
   if (!check) return;
   if (!stale.length) { console.log('SH-201 panels and libraries are up to date.'); return; }
