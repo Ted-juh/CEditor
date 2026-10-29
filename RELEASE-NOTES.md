@@ -208,10 +208,13 @@ you already have under the same name and version, with another design, is kept.
   28…100, depths −63…+63, Keyfollow −200…+200, Master Tune in cents. Every block of an SH-201
   patch has a request of its own, so a script's `requestDump("upperToneDump")` is sent and
   answered; for 21 of the 23 blocks there was no request to send.
-- **An SH-201 panel to learn the editor from.** `Roland SH-201.cepanel` is both tones, built the way
-  the editor builds by hand: three library components placed as linked copies, one binding per
-  control, sections named after the front panel, both tones on the panel at once (Upper above
-  Lower) with the synth's Keyboard Part in the header, no scripts. Its
+- **An SH-201 panel to learn the editor from.** `Roland SH-201.cepanel` is both tones, the
+  arpeggiator and the effects, built the way the editor builds by hand: four library components
+  placed as linked copies, one binding per control, sections named after the front panel, both
+  tones on the panel at once (Upper above Lower) with the synth's Keyboard Part in the header, no
+  scripts. Under the tones, Patch holds what they share: ARPEGGIO, DELAY, REVERB, and the user
+  arpeggio pattern on the GAIA's grid, set to the SH-201, whose READ PATTERN and SEND PATTERN move
+  its 528 parameters to and from the synth. Its
   notepad has a tutorial that takes it from the GAIA panel's look to the instrument's own — a
   reference photo in Viewer, colours on many controls at once, the knob redesigned once and
   updated on all its copies, new sections with Ctrl+G — and `Roland SH-201 (hardware look).cepanel`

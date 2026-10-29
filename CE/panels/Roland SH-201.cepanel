@@ -16,12 +16,12 @@
   "scriptId": "roland_sh201",
   "author": "",
   "version": "1.0.0",
-  "description": "Roland SH-201 — Upper and Lower tones, first draft: library components, one binding per control, sections as containers",
+  "description": "Roland SH-201 — Upper and Lower tones, arpeggiator and effects, first draft: library components, one binding per control, sections as containers",
   "enabled": true,
   "locked": false,
   "filePath": null,
   "width": 1660,
-  "height": 1006,
+  "height": 1566,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -115,11 +115,11 @@
     "notes": [
       {
         "name": "About this panel",
-        "content": "Roland SH-201 — first draft, the Upper and Lower tones.\n\nHow to read it in the editor:\n- Component tree: Upper and Lower › OSC 1, OSC 2, Mix/Mod, LFO 1, LFO 2, Pitch Env, Filter, Amp, Performance, Effects. The containers are the hardware's sections, and each tone has all of them.\n- Both tones are on the panel at once, Upper above Lower, each control bound to its own tone's parameter.\n- Select a knob: Device Bindings shows the one profile parameter it sends; its tooltip names it and its address. The Source card names the library package (SH-201 Knob, Fader or LED Switch), and \"Update N other copies\" finds every copy, in both tones.\n- A copy's range, default and readout are published settings of the component (Public API), so Coarse Tune (sent 28..100, read -36..+36) and Cutoff (0..127) are the same knob.\n- KEYBOARD, in the header, is the synth's Keyboard Part: which tone its keys play, what its UPPER and LOWER buttons set. It changes what you hear, not what the knobs edit; when the synth's own buttons are pressed it follows.\n- Why two sets of controls and not a State: a State changes how a control looks, and nothing on the MIDI path reads it. Editing two tones is two knobs, each bound once.\n- No scripts.\n\nNo hardware needed: choose Simulated device as the device's output (Settings → MIDI). It answers from the profile.\n\nThe library: Roland SH-201 components.json, beside this file. Import it (Library → Package & Library → Import) if the Source card says \"Not in this library\". A copy of this panel passed on with File → Share Panel carries the library with it.\n\nNot built yet: the effects, the arpeggiator, the system settings."
+        "content": "Roland SH-201 — first draft: the Upper and Lower tones, the arpeggiator and the effects.\n\nHow to read it in the editor:\n- Component tree: Upper and Lower › OSC 1, OSC 2, Mix/Mod, LFO 1, LFO 2, Pitch Env, Filter, Amp, Performance, Effects. The containers are the hardware's sections, and each tone has all of them. Then Patch › Arpeggio, Delay, Reverb, Pattern: what the two tones share, once.\n- Both tones are on the panel at once, Upper above Lower, each control bound to its own tone's parameter.\n- Select a knob: Device Bindings shows the one profile parameter it sends; its tooltip names it and its address. The Source card names the library package (SH-201 Knob, Fader, LED Switch or Arpeggio Grid), and \"Update N other copies\" finds every copy, in both tones and the patch.\n- A copy's range, default and readout are published settings of the component (Public API), so Coarse Tune (sent 28..100, read -36..+36) and Cutoff (0..127) are the same knob.\n- KEYBOARD, in the header, is the synth's Keyboard Part: which tone its keys play, what its UPPER and LOWER buttons set. It changes what you hear, not what the knobs edit; when the synth's own buttons are pressed it follows.\n- Why two sets of controls and not a State: a State changes how a control looks, and nothing on the MIDI path reads it. Editing two tones is two knobs, each bound once.\n- PATTERN is the synth's user arpeggio: sixteen notes over thirty-two steps, the 528 parameters of Arpeggio Pattern 01–16. In Preview, draw notes on it; SEND PATTERN writes them and the END STEP to the synth, and READ PATTERN reads the synth's back. It is a linked copy too, with one binding: its Loop End Step port to Arpeggio End Step, which is also the device READ and SEND talk to. Its Device tab's Synth says SH-201: that is what makes the grid use the SH-201's parameters and not the GAIA's. Everything else in Patch sends as you move it.\n- No scripts.\n\nNo hardware needed: choose Simulated device as the device's output (Settings → MIDI). It answers from the profile.\n\nThe library: Roland SH-201 components.json, beside this file. Import it (Library → Package & Library → Import) if the Source card says \"Not in this library\". A copy of this panel passed on with File → Share Panel carries the library with it.\n\nNot built yet: the patch's other settings (level, tone balance, keyboard mode and split point, the controllers' destinations) and the system settings."
       },
       {
         "name": "Tutorial 1 — the SH-201's own look",
-        "content": "Tutorial 1 — from this look to the SH-201's own\n\nThe answer is beside this file: Roland SH-201 (hardware look).cepanel, with its own library file. Open it in a second tab to compare as you go. Save this one under a new name first (File → Save As), so the draft stays as it is.\n\nYou need a photo of the instrument. Use your own: a photo from Roland or from the web is not ours to put in a panel.\n\n1. The reference. Show the dock (Ctrl+J), open Viewer and add your photo. Its eyedropper saves a colour to your swatches: take the silver of the OSC panel, the black of the envelope panels, the body, and the red of a lamp. Or type them: silver CBCCC7, panel black 1E1F21, body 121314, red D9402B.\n\n2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Upper and Lower in the component tree (Ctrl+click) and give them a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate.\n\n3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, then on the Background tab set the fill to silver and switch the border off: with several controls selected, the Background tab changes all of them. Then select the others and make them black, with a thin grey border.\n\nA flat silver reads as grey plastic; the instrument's is brushed aluminium. Give the silver sections a transparent metallic overlay: select OSC 1, and on the Background tab turn on the Overlay layer and press its ... button to choose a brushed-metal texture (Roland SH-201 brushed metal.png, beside this file, or your own). Set its Blend to Overlay and its Opacity to about 60: Overlay lightens and darkens the silver without changing its colour. Press C on the layer to copy it, select the other silver sections, turn on their Overlay layer and press P: the layer is pasted on all of them.\n\n4. Lettering. The instrument prints black on silver and white on black, and puts no tabs behind its section names. Double-click a section to reach its title (Esc goes back up), clear the title's fill, and set its text black and bold in the dock's Text tool. Select a section's captions in the component tree (Ctrl+click, or Shift+click for a range) and make them black and bold too. On the black sections, white.\n\n5. The knob, once for all 62 of them. Select any knob and press Component Designer on the canvas. Select the part called face and give it a silver radial gradient, light at the top left (the Gradient tool); make rim almost black, and pointer and the ticks dark. Press Back to Panel. The knob's Source card now says it has edits of its own: press Save to library as 1.1.0… and then Save. Then press Update 61 other copies — every knob on the panel is the new one, each keeping its own range, default and readout, because those are the copy's settings, not the component's.\n\n6. The sections the instrument has. The SH-201 has FILTER ENV and AMP ENV as sections of their own. In FILTER, select the four envelope faders and their captions, press Ctrl+G to put them in a new container, and name it FILTER ENV on its Core tab; the same for AMP ENV. On the instrument the filter envelope's DEPTH is a slider too: delete the ENV DEPTH knob, place an SH-201 Fader from the dock's Library into FILTER ENV, and with it selected click Filter Env Depth, in the Upper Filter Env group, in the dock's Device tab. Then drag the sections into the instrument's order: the silver five and EFFECTS on top; PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV and PERFORMANCE below. A control dragged onto a container goes inside it; hold Space while dragging to stop that.\n\n7. The name. Roland in white, not bold. SH-201 larger, bold and italic (the Text tool's Italic button), and a small italic SYNTHESIZER under it (Insert → Layout & Display → Label).\n\n8. The signal path. The instrument draws it in red: Insert → Layout & Display → Background, 2 pixels high, red, under the black row; and a ▶ label in each gap between the silver sections.\n\nSteps 3, 4, 6 and 8 are for one tone. Do them on Upper, then again on Lower, below it; in step 3 you can Ctrl+click the silver sections of both tones at once. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Step 5 needs no second round: the Lower tone's knobs are copies of the same package, and Update takes them too.\n\nWhat stays: the LED switches are already the instrument's red lamps, the faders its black slots, and the named lists stay lists — on the SH-201 they are rows of lamps, which is a tutorial of its own."
+        "content": "Tutorial 1 — from this look to the SH-201's own\n\nThe answer is beside this file: Roland SH-201 (hardware look).cepanel, with its own library file. Open it in a second tab to compare as you go. Save this one under a new name first (File → Save As), so the draft stays as it is.\n\nYou need a photo of the instrument. Use your own: a photo from Roland or from the web is not ours to put in a panel.\n\n1. The reference. Show the dock (Ctrl+J), open Viewer and add your photo. Its eyedropper saves a colour to your swatches: take the silver of the OSC panel, the black of the envelope panels, the body, and the red of a lamp. Or type them: silver CBCCC7, panel black 1E1F21, body 121314, red D9402B.\n\n2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Upper, Lower and Patch in the component tree (Ctrl+click) and give them a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate.\n\n3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, then on the Background tab set the fill to silver and switch the border off: with several controls selected, the Background tab changes all of them. Then select the others and make them black, with a thin grey border.\n\nA flat silver reads as grey plastic; the instrument's is brushed aluminium. Give the silver sections a transparent metallic overlay: select OSC 1, and on the Background tab turn on the Overlay layer and press its ... button to choose a brushed-metal texture (Roland SH-201 brushed metal.png, beside this file, or your own). Set its Blend to Overlay and its Opacity to about 60: Overlay lightens and darkens the silver without changing its colour. Press C on the layer to copy it, select the other silver sections, turn on their Overlay layer and press P: the layer is pasted on all of them.\n\n4. Lettering. The instrument prints black on silver and white on black, and puts no tabs behind its section names. Double-click a section to reach its title (Esc goes back up), clear the title's fill, and set its text black and bold in the dock's Text tool. Select a section's captions in the component tree (Ctrl+click, or Shift+click for a range) and make them black and bold too. On the black sections, white.\n\n5. The knob, once for all 76 of them. Select any knob and press Component Designer on the canvas. Select the part called face and give it a silver radial gradient, light at the top left (the Gradient tool); make rim almost black, and pointer and the ticks dark. Press Back to Panel. The knob's Source card now says it has edits of its own: press Save to library as 1.1.0… and then Save. Then press Update 75 other copies — every knob on the panel is the new one, each keeping its own range, default and readout, because those are the copy's settings, not the component's.\n\n6. The sections the instrument has. The SH-201 has FILTER ENV and AMP ENV as sections of their own. In FILTER, select the four envelope faders and their captions, press Ctrl+G to put them in a new container, and name it FILTER ENV on its Core tab; the same for AMP ENV. On the instrument the filter envelope's DEPTH is a slider too: delete the ENV DEPTH knob, place an SH-201 Fader from the dock's Library into FILTER ENV, and with it selected click Filter Env Depth, in the Upper Filter Env group, in the dock's Device tab. Then drag the sections into the instrument's order: the silver five and EFFECTS on top; PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV and PERFORMANCE below. A control dragged onto a container goes inside it; hold Space while dragging to stop that.\n\n7. The name. Roland in white, not bold. SH-201 larger, bold and italic (the Text tool's Italic button), and a small italic SYNTHESIZER under it (Insert → Layout & Display → Label).\n\n8. The signal path. The instrument draws it in red: Insert → Layout & Display → Background, 2 pixels high, red, under the black row; and a ▶ label in each gap between the silver sections.\n\nSteps 3, 4, 6 and 8 are for one tone. Do them on Upper, then again on Lower, below it; in step 3 you can Ctrl+click the silver sections of both tones at once. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Patch, under both, needs steps 3 and 4 once: its four sections are black. Step 5 needs no second round: the Lower tone's knobs and the patch's are copies of the same package, and Update takes them too.\n\nWhat stays: the LED switches are already the instrument's red lamps, the faders its black slots, and the named lists stay lists — on the SH-201 they are rows of lamps, which is a tutorial of its own."
       }
     ]
   },
@@ -2207,6 +2207,607 @@
       "valueKind": "float",
       "deviceRole": "Roland SH-201",
       "deviceParameterId": "lower.reverb.depth"
+    },
+    {
+      "id": "patch_arpeggioSwitch.value",
+      "label": "patch_arpeggioSwitch",
+      "controlName": "patch_arpeggioSwitch",
+      "path": "patch_arpeggioSwitch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "patch.arpeggioSwitch"
+    },
+    {
+      "id": "patch_arpeggioHold.value",
+      "label": "patch_arpeggioHold",
+      "controlName": "patch_arpeggioHold",
+      "path": "patch_arpeggioHold.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "patch.arpeggioHold"
+    },
+    {
+      "id": "arpeggio_motif.value",
+      "label": "arpeggio_motif",
+      "controlName": "arpeggio_motif",
+      "path": "arpeggio_motif.value",
+      "min": 0,
+      "max": 11,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "UP/L",
+        "UP/L&H",
+        "UP/_",
+        "DOWN/L",
+        "DOWN/L&H",
+        "DOWN/_",
+        "UP&DOWN/L",
+        "UP&DOWN/L&H",
+        "UP&DOWN/_",
+        "RANDOM/L",
+        "RANDOM/_",
+        "PHRASE"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.motif"
+    },
+    {
+      "id": "patch_splitArpeggio.value",
+      "label": "patch_splitArpeggio",
+      "controlName": "patch_splitArpeggio",
+      "path": "patch_splitArpeggio.value",
+      "min": 0,
+      "max": 2,
+      "defaultValue": 2,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "UPPER",
+        "LOWER",
+        "BOTH"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "patch.splitArpeggio"
+    },
+    {
+      "id": "patch_tempo.value",
+      "label": "patch_tempo",
+      "controlName": "patch_tempo",
+      "path": "patch_tempo.value",
+      "min": 5,
+      "max": 300,
+      "defaultValue": 120,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "patch.tempo"
+    },
+    {
+      "id": "arpeggio_octaveRange.value",
+      "label": "arpeggio_octaveRange",
+      "controlName": "arpeggio_octaveRange",
+      "path": "arpeggio_octaveRange.value",
+      "min": 61,
+      "max": 67,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.octaveRange"
+    },
+    {
+      "id": "arpeggio_accentRate.value",
+      "label": "arpeggio_accentRate",
+      "controlName": "arpeggio_accentRate",
+      "path": "arpeggio_accentRate.value",
+      "min": 0,
+      "max": 100,
+      "defaultValue": 50,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.accentRate"
+    },
+    {
+      "id": "arpeggio_velocity.value",
+      "label": "arpeggio_velocity",
+      "controlName": "arpeggio_velocity",
+      "path": "arpeggio_velocity.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 100,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.velocity"
+    },
+    {
+      "id": "arpeggio_grid.value",
+      "label": "arpeggio_grid",
+      "controlName": "arpeggio_grid",
+      "path": "arpeggio_grid.value",
+      "min": 0,
+      "max": 8,
+      "defaultValue": 5,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "04_",
+        "08_",
+        "08L",
+        "08H",
+        "08t",
+        "16_",
+        "16L",
+        "16H",
+        "16t"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.grid"
+    },
+    {
+      "id": "arpeggio_duration.value",
+      "label": "arpeggio_duration",
+      "controlName": "arpeggio_duration",
+      "path": "arpeggio_duration.value",
+      "min": 0,
+      "max": 9,
+      "defaultValue": 7,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "30",
+        "40",
+        "50",
+        "60",
+        "70",
+        "80",
+        "90",
+        "100",
+        "120",
+        "FUL"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.duration"
+    },
+    {
+      "id": "patch_delaySwitch.value",
+      "label": "patch_delaySwitch",
+      "controlName": "patch_delaySwitch",
+      "path": "patch_delaySwitch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "patch.delaySwitch"
+    },
+    {
+      "id": "delay_hfDamp.value",
+      "label": "delay_hfDamp",
+      "controlName": "delay_hfDamp",
+      "path": "delay_hfDamp.value",
+      "min": 0,
+      "max": 17,
+      "defaultValue": 17,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "200 Hz",
+        "250 Hz",
+        "315 Hz",
+        "400 Hz",
+        "500 Hz",
+        "630 Hz",
+        "800 Hz",
+        "1000 Hz",
+        "1250 Hz",
+        "1600 Hz",
+        "2000 Hz",
+        "2500 Hz",
+        "3150 Hz",
+        "4000 Hz",
+        "5000 Hz",
+        "6300 Hz",
+        "8000 Hz",
+        "BYPASS"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "delay.hfDamp"
+    },
+    {
+      "id": "delay_time.value",
+      "label": "delay_time",
+      "controlName": "delay_time",
+      "path": "delay_time.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "delay.time"
+    },
+    {
+      "id": "delay_feedback.value",
+      "label": "delay_feedback",
+      "controlName": "delay_feedback",
+      "path": "delay_feedback.value",
+      "min": 0,
+      "max": 98,
+      "defaultValue": 49,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "delay.feedback"
+    },
+    {
+      "id": "delay_modRate.value",
+      "label": "delay_modRate",
+      "controlName": "delay_modRate",
+      "path": "delay_modRate.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "delay.modRate"
+    },
+    {
+      "id": "delay_modDepth.value",
+      "label": "delay_modDepth",
+      "controlName": "delay_modDepth",
+      "path": "delay_modDepth.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "delay.modDepth"
+    },
+    {
+      "id": "patch_reverbSwitch.value",
+      "label": "patch_reverbSwitch",
+      "controlName": "patch_reverbSwitch",
+      "path": "patch_reverbSwitch.value",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "patch.reverbSwitch"
+    },
+    {
+      "id": "reverb_size.value",
+      "label": "reverb_size",
+      "controlName": "reverb_size",
+      "path": "reverb_size.value",
+      "min": 0,
+      "max": 7,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "1",
+        "2",
+        "3",
+        "4",
+        "5",
+        "6",
+        "7",
+        "8"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.size"
+    },
+    {
+      "id": "reverb_highCut.value",
+      "label": "reverb_highCut",
+      "controlName": "reverb_highCut",
+      "path": "reverb_highCut.value",
+      "min": 0,
+      "max": 20,
+      "defaultValue": 20,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "160 Hz",
+        "200 Hz",
+        "250 Hz",
+        "320 Hz",
+        "400 Hz",
+        "500 Hz",
+        "640 Hz",
+        "800 Hz",
+        "1000 Hz",
+        "1250 Hz",
+        "1600 Hz",
+        "2000 Hz",
+        "2500 Hz",
+        "3200 Hz",
+        "4000 Hz",
+        "5000 Hz",
+        "6400 Hz",
+        "8000 Hz",
+        "10000 Hz",
+        "12500 Hz",
+        "BYPASS"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.highCut"
+    },
+    {
+      "id": "reverb_lfDampFrequency.value",
+      "label": "reverb_lfDampFrequency",
+      "controlName": "reverb_lfDampFrequency",
+      "path": "reverb_lfDampFrequency.value",
+      "min": 0,
+      "max": 19,
+      "defaultValue": 9,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "50 Hz",
+        "64 Hz",
+        "80 Hz",
+        "100 Hz",
+        "125 Hz",
+        "160 Hz",
+        "200 Hz",
+        "250 Hz",
+        "320 Hz",
+        "400 Hz",
+        "500 Hz",
+        "640 Hz",
+        "800 Hz",
+        "1000 Hz",
+        "1250 Hz",
+        "1600 Hz",
+        "2000 Hz",
+        "2500 Hz",
+        "3200 Hz",
+        "4000 Hz"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.lfDampFrequency"
+    },
+    {
+      "id": "reverb_hfDampFrequency.value",
+      "label": "reverb_hfDampFrequency",
+      "controlName": "reverb_hfDampFrequency",
+      "path": "reverb_hfDampFrequency.value",
+      "min": 0,
+      "max": 5,
+      "defaultValue": 3,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "choice",
+      "choiceLabels": [
+        "4000 Hz",
+        "5000 Hz",
+        "6400 Hz",
+        "8000 Hz",
+        "10000 Hz",
+        "12500 Hz"
+      ],
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.hfDampFrequency"
+    },
+    {
+      "id": "reverb_time.value",
+      "label": "reverb_time",
+      "controlName": "reverb_time",
+      "path": "reverb_time.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.time"
+    },
+    {
+      "id": "reverb_preDelay.value",
+      "label": "reverb_preDelay",
+      "controlName": "reverb_preDelay",
+      "path": "reverb_preDelay.value",
+      "min": 0,
+      "max": 125,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.preDelay"
+    },
+    {
+      "id": "reverb_density.value",
+      "label": "reverb_density",
+      "controlName": "reverb_density",
+      "path": "reverb_density.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.density"
+    },
+    {
+      "id": "reverb_diffusion.value",
+      "label": "reverb_diffusion",
+      "controlName": "reverb_diffusion",
+      "path": "reverb_diffusion.value",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 64,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.diffusion"
+    },
+    {
+      "id": "reverb_lfDampGain.value",
+      "label": "reverb_lfDampGain",
+      "controlName": "reverb_lfDampGain",
+      "path": "reverb_lfDampGain.value",
+      "min": 0,
+      "max": 36,
+      "defaultValue": 36,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.lfDampGain"
+    },
+    {
+      "id": "reverb_hfDampGain.value",
+      "label": "reverb_hfDampGain",
+      "controlName": "reverb_hfDampGain",
+      "path": "reverb_hfDampGain.value",
+      "min": 0,
+      "max": 36,
+      "defaultValue": 36,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "reverb.hfDampGain"
+    },
+    {
+      "id": "arpeggio_pattern.arpCurrentStep",
+      "label": "arpeggio_pattern Current Step",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpCurrentStep",
+      "min": 0,
+      "max": 31,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "arpeggio_pattern.arpStepCount",
+      "label": "arpeggio_pattern Step Count",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpStepCount",
+      "min": 1,
+      "max": 256,
+      "defaultValue": 32,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "arpeggio_pattern.arpEndStep",
+      "label": "arpeggio_pattern Loop End Step",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpEndStep",
+      "min": 1,
+      "max": 32,
+      "defaultValue": 32,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "Roland SH-201",
+      "deviceParameterId": "arpeggio.endStep"
+    },
+    {
+      "id": "arpeggio_pattern.arpGate",
+      "label": "arpeggio_pattern Gate",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpGate",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "arpeggio_pattern.arpNote",
+      "label": "arpeggio_pattern Note",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpNote",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "arpeggio_pattern.arpVelocity",
+      "label": "arpeggio_pattern Velocity",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpVelocity",
+      "min": 0,
+      "max": 127,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
+    },
+    {
+      "id": "arpeggio_pattern.arpPattern",
+      "label": "arpeggio_pattern Arp Pattern",
+      "controlName": "arpeggio_pattern",
+      "path": "arpeggio_pattern.arpPattern",
+      "min": 0,
+      "max": 1,
+      "defaultValue": 0,
+      "unit": "",
+      "midiCC": null,
+      "valueKind": "float",
+      "deviceRole": "",
+      "deviceParameterId": ""
     }
   ],
   "scripts": [],
@@ -2218,7 +2819,7 @@
   "controls": [
     {
       "_children": {
-        "Core": {"name":"brand","id":"sh201_brand_299","controlType":"Label"},
+        "Core": {"name":"brand","id":"sh201_brand_364","controlType":"Label"},
         "Transform": {"x":16,"y":14,"width":90,"height":22},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"ROLAND","_children":{"Fill":{"colour":"FFE6E9EC"},"Font":{"weight":"Bold","weightValue":700,"size":15,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
@@ -2228,7 +2829,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"model","id":"sh201_model_300","controlType":"Label"},
+        "Core": {"name":"model","id":"sh201_model_365","controlType":"Label"},
         "Transform": {"x":108,"y":10,"height":28},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"SH-201","_children":{"Fill":{"colour":"FFE2513C"},"Font":{"weight":"Bold","weightValue":700,"size":22,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
@@ -2238,7 +2839,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"keyboard part caption","id":"sh201_keyboard_part_caption_302","controlType":"Label"},
+        "Core": {"name":"keyboard part caption","id":"sh201_keyboard_part_caption_367","controlType":"Label"},
         "Transform": {"x":336,"y":19,"width":78,"height":14},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"KEYBOARD","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"weight":"Bold","weightValue":700,"size":9,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
@@ -2248,7 +2849,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"patch_keyboardPart","tooltip":"Keyboard Part — 10 00 00 12: which tone the keyboard plays. Both tones are edited here at once.","id":"sh201_patch_keyboardPart_301","controlType":"RadioButtonGroup"},
+        "Core": {"name":"patch_keyboardPart","tooltip":"Keyboard Part — 10 00 00 12: which tone the keyboard plays. Both tones are edited here at once.","id":"sh201_patch_keyboardPart_366","controlType":"RadioButtonGroup"},
         "Transform": {"x":420,"y":9,"width":190,"height":34},
         "Background": {"_children":{"Fill":{"solidEnabled":false},"Border":{"enabled":false}}},
         "Text": {"content":"","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":10}}},
@@ -6155,6 +6756,852 @@
                         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
                         "Text": {"content":"REVERB","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
                         "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    }
+                  }
+                }
+              },
+              "_type": "Control"
+            }
+          }
+        }
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Patch","tooltip":"What the two tones share: the arpeggiator and its pattern, the delay and the reverb.","id":"sh201_patch","controlType":"Group"},
+        "Transform": {"y":1016,"width":1660,"height":550},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0},"Corners":{"radius":4}}},
+        "Text": {"content":""},
+        "Children": {
+          "_children": {
+            "sh201_Patch_title_299": {
+              "_children": {
+                "Core": {"name":"Patch title","id":"sh201_Patch_title_299","controlType":"Label"},
+                "Transform": {"x":16,"y":4,"height":16},
+                "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                "Text": {"content":"PATCH","_children":{"Fill":{"colour":"FFE2513C"},"Font":{"weight":"Bold","weightValue":700,"size":11,"letterSpacing":1.5,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+              },
+              "_type": "Control"
+            },
+            "sh201_section_ARPEGGIO_300": {
+              "_children": {
+                "Core": {"name":"ARPEGGIO","tooltip":"The arpeggiator: on, hold, how held keys are played (MOTIF, GRID, DURATION), at the patch's TEMPO. VELOCITY 0 is REAL, the keys' own velocity. In a split, SPLIT says which tone it plays.","id":"sh201_section_ARPEGGIO_300","controlType":"Group"},
+                "Transform": {"x":16,"y":26,"width":404,"height":196},
+                "Background": {"_children":{"Fill":{"colour":"FF22262B"},"Border":{"thickness":1.5,"colour":"FFC98BC0"}}},
+                "Text": {"content":""},
+                "Children": {
+                  "_children": {
+                    "sh201_ARPEGGIO_title_301": {
+                      "_children": {
+                        "Core": {"name":"ARPEGGIO title","id":"sh201_ARPEGGIO_title_301","controlType":"Label"},
+                        "Transform": {"x":2,"y":2,"width":84,"height":17},
+                        "Background": {"_children":{"Fill":{"colour":"FFC98BC0"},"Border":{"enabled":false,"thickness":0},"Corners":{"radius":4,"_removed":["_type","linked","borderEnabled","style","direction","borderStyle","thickness","dotRadius","doubleGap","doubleAnchor","doubleDirection","colour","fillSolid","fillGradient","fillImage","fillOverlay","imageSrc","overlaySrc","gradient","gradientFlow","cornerGradientMode","cornerGradientFlip","cornerGradientInheritSide","topLeft","topRight","bottomLeft","bottomRight"]}}},
+                        "Text": {"content":"ARPEGGIO","_children":{"Fill":{"colour":"FF121518"},"Font":{"weight":"Bold","weightValue":700,"size":10,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_arpeggioSwitch_302": {
+                      "_children": {
+                        "Core": {"name":"patch_arpeggioSwitch","tooltip":"Arpeggio Switch — 10 00 00 1A","id":"sh201_patch_arpeggioSwitch_302","controlType":"CustomComponent"},
+                        "Transform": {"x":12,"y":38,"width":64,"height":38},
+                        "Designer": {"packageName":"SH-201 LED Switch","packageVersion":"1.0.0","packageId":"sh-201-led-switch@1-0-0","packageFingerprint":"ea8b1d6c","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-led-switch@1-0-0","name":"SH-201 LED Switch","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ea8b1d6c","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"multi","labels":["multi"]},"readiness":{"ok":true,"score":75,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[],"counts":{"inputs":1,"outputs":1,"properties":0,"total":2}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":64,"designHeight":38},
+                        "Parts": {
+                          "_drawing": "c1f5474a"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","step":1,"format":{"precision":0}},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","type":"selector","role":"selector","valueChannel":"value","valueChannels":["value"],"geometry":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"pick0":{"_type":"HitZone","name":"pick0","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":10.526315789473683,"height":39.473684210526315},"payload":0},"pick1":{"_type":"HitZone","name":"pick1","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":50,"height":39.473684210526315},"payload":1}}},
+                        "Bindings": {"_children":{"led0":{"_type":"Binding","name":"led0","source":"channel.value.raw","mapMode":"enum","target":"Parts.led0.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFF3B30","1":"FF3A1E1C","false":"FFFF3B30","true":"FF3A1E1C"},"clamp":false},"name0":{"_type":"Binding","name":"name0","source":"channel.value.raw","mapMode":"enum","target":"Parts.name0.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFFFFFF","1":"FF8A959E","false":"FFFFFFFF","true":"FF8A959E"},"clamp":false},"led1":{"_type":"Binding","name":"led1","source":"channel.value.raw","mapMode":"enum","target":"Parts.led1.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF3A1E1C","1":"FFFF3B30","false":"FF3A1E1C","true":"FFFF3B30"},"clamp":false},"name1":{"_type":"Binding","name":"name1","source":"channel.value.raw","mapMode":"enum","target":"Parts.name1.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF8A959E","1":"FFFFFFFF","false":"FF8A959E","true":"FFFFFFFF"},"clamp":false}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"patch.arpeggioSwitch","parameterType":"boolean"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-led-switch"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_arpeggioSwitch_caption_303": {
+                      "_children": {
+                        "Core": {"name":"patch_arpeggioSwitch caption","id":"sh201_patch_arpeggioSwitch_caption_303","controlType":"Label"},
+                        "Transform": {"x":12,"y":24,"width":64,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"ARPEGGIO","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_arpeggioHold_304": {
+                      "_children": {
+                        "Core": {"name":"patch_arpeggioHold","tooltip":"Arpeggio Hold — 10 00 00 1B","id":"sh201_patch_arpeggioHold_304","controlType":"CustomComponent"},
+                        "Transform": {"x":88,"y":38,"width":64,"height":38},
+                        "Designer": {"packageName":"SH-201 LED Switch","packageVersion":"1.0.0","packageId":"sh-201-led-switch@1-0-0","packageFingerprint":"ea8b1d6c","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-led-switch@1-0-0","name":"SH-201 LED Switch","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ea8b1d6c","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"multi","labels":["multi"]},"readiness":{"ok":true,"score":75,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[],"counts":{"inputs":1,"outputs":1,"properties":0,"total":2}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":64,"designHeight":38},
+                        "Parts": {
+                          "_drawing": "c1f5474a"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","step":1,"format":{"precision":0}},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","type":"selector","role":"selector","valueChannel":"value","valueChannels":["value"],"geometry":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"pick0":{"_type":"HitZone","name":"pick0","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":10.526315789473683,"height":39.473684210526315},"payload":0},"pick1":{"_type":"HitZone","name":"pick1","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":50,"height":39.473684210526315},"payload":1}}},
+                        "Bindings": {"_children":{"led0":{"_type":"Binding","name":"led0","source":"channel.value.raw","mapMode":"enum","target":"Parts.led0.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFF3B30","1":"FF3A1E1C","false":"FFFF3B30","true":"FF3A1E1C"},"clamp":false},"name0":{"_type":"Binding","name":"name0","source":"channel.value.raw","mapMode":"enum","target":"Parts.name0.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFFFFFF","1":"FF8A959E","false":"FFFFFFFF","true":"FF8A959E"},"clamp":false},"led1":{"_type":"Binding","name":"led1","source":"channel.value.raw","mapMode":"enum","target":"Parts.led1.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF3A1E1C","1":"FFFF3B30","false":"FF3A1E1C","true":"FFFF3B30"},"clamp":false},"name1":{"_type":"Binding","name":"name1","source":"channel.value.raw","mapMode":"enum","target":"Parts.name1.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF8A959E","1":"FFFFFFFF","false":"FF8A959E","true":"FFFFFFFF"},"clamp":false}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"patch.arpeggioHold","parameterType":"boolean"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-led-switch"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_arpeggioHold_caption_305": {
+                      "_children": {
+                        "Core": {"name":"patch_arpeggioHold caption","id":"sh201_patch_arpeggioHold_caption_305","controlType":"Label"},
+                        "Transform": {"x":88,"y":24,"width":64,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_motif_306": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_motif","tooltip":"Arpeggio Motif — 10 00 05 02","id":"sh201_arpeggio_motif_306","controlType":"Combobox"},
+                        "Transform": {"x":164,"y":42,"width":128,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"up-l"},
+                        "Value": {"rows":[{"id":"up-l","displayText":"UP/L","internalValue":"up-l","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"up-lh","displayText":"UP/L&H","internalValue":"up-lh","sendValue":1,"receiveValue":1},{"id":"up","displayText":"UP/_","internalValue":"up","sendValue":2,"receiveValue":2},{"id":"down-l","displayText":"DOWN/L","internalValue":"down-l","sendValue":3,"receiveValue":3},{"id":"down-lh","displayText":"DOWN/L&H","internalValue":"down-lh","sendValue":4,"receiveValue":4},{"id":"down","displayText":"DOWN/_","internalValue":"down","sendValue":5,"receiveValue":5},{"id":"updown-l","displayText":"UP&DOWN/L","internalValue":"updown-l","sendValue":6,"receiveValue":6},{"id":"updown-lh","displayText":"UP&DOWN/L&H","internalValue":"updown-lh","sendValue":7,"receiveValue":7},{"id":"updown","displayText":"UP&DOWN/_","internalValue":"updown","sendValue":8,"receiveValue":8},{"id":"random-l","displayText":"RANDOM/L","internalValue":"random-l","sendValue":9,"receiveValue":9},{"id":"random","displayText":"RANDOM/_","internalValue":"random","sendValue":10,"receiveValue":10},{"id":"phrase","displayText":"PHRASE","internalValue":"phrase","sendValue":11,"receiveValue":11}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"arpeggio.motif","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_motif_caption_307": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_motif caption","id":"sh201_arpeggio_motif_caption_307","controlType":"Label"},
+                        "Transform": {"x":164,"y":28,"width":128,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"MOTIF","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_splitArpeggio_308": {
+                      "_children": {
+                        "Core": {"name":"patch_splitArpeggio","tooltip":"Split Arpeggio — 10 00 00 14","id":"sh201_patch_splitArpeggio_308","controlType":"Combobox"},
+                        "Transform": {"x":304,"y":42,"width":88,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"both"},
+                        "Value": {"rows":[{"id":"upper","displayText":"UPPER","internalValue":"upper","sendValue":0,"receiveValue":0},{"id":"lower","displayText":"LOWER","internalValue":"lower","sendValue":1,"receiveValue":1},{"id":"both","displayText":"BOTH","internalValue":"both","sendValue":2,"receiveValue":2,"selectedByDefault":true}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"patch.splitArpeggio","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_splitArpeggio_caption_309": {
+                      "_children": {
+                        "Core": {"name":"patch_splitArpeggio caption","id":"sh201_patch_splitArpeggio_caption_309","controlType":"Label"},
+                        "Transform": {"x":304,"y":28,"width":88,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"SPLIT","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_tempo_310": {
+                      "_children": {
+                        "Core": {"name":"patch_tempo","tooltip":"Patch Tempo — 10 00 00 0E","id":"sh201_patch_tempo_310","controlType":"CustomComponent"},
+                        "Transform": {"x":20,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","min":5,"max":300,"step":1,"defaultValue":120,"currentValue":120},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"patch.tempo","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_tempo_caption_311": {
+                      "_children": {
+                        "Core": {"name":"patch_tempo caption","id":"sh201_patch_tempo_caption_311","controlType":"Label"},
+                        "Transform": {"x":6,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"TEMPO","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_octaveRange_312": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_octaveRange","tooltip":"Arpeggio Octave Range — 10 00 05 03","id":"sh201_arpeggio_octaveRange_312","controlType":"CustomComponent"},
+                        "Transform": {"x":92,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","min":61,"max":67,"step":1,"defaultValue":64,"currentValue":64,"format":{"displayMin":-3,"displayMax":3}},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"arpeggio.octaveRange","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_octaveRange_caption_313": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_octaveRange caption","id":"sh201_arpeggio_octaveRange_caption_313","controlType":"Label"},
+                        "Transform": {"x":78,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"OCTAVE","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_accentRate_314": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_accentRate","tooltip":"Arpeggio Accent Rate — 10 00 05 04","id":"sh201_arpeggio_accentRate_314","controlType":"CustomComponent"},
+                        "Transform": {"x":164,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":100,"step":1,"defaultValue":50,"currentValue":50},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"arpeggio.accentRate","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_accentRate_caption_315": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_accentRate caption","id":"sh201_arpeggio_accentRate_caption_315","controlType":"Label"},
+                        "Transform": {"x":150,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"ACCENT","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_velocity_316": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_velocity","tooltip":"Arpeggio Velocity — 10 00 05 05","id":"sh201_arpeggio_velocity_316","controlType":"CustomComponent"},
+                        "Transform": {"x":236,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":100,"currentValue":100},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"arpeggio.velocity","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_velocity_caption_317": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_velocity caption","id":"sh201_arpeggio_velocity_caption_317","controlType":"Label"},
+                        "Transform": {"x":222,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"VELOCITY","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_grid_318": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_grid","tooltip":"Arpeggio Grid — 10 00 05 00","id":"sh201_arpeggio_grid_318","controlType":"Combobox"},
+                        "Transform": {"x":304,"y":100,"width":88,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"16"},
+                        "Value": {"rows":[{"id":"04","displayText":"04_","internalValue":"04","sendValue":0,"receiveValue":0},{"id":"08","displayText":"08_","internalValue":"08","sendValue":1,"receiveValue":1},{"id":"08l","displayText":"08L","internalValue":"08l","sendValue":2,"receiveValue":2},{"id":"08h","displayText":"08H","internalValue":"08h","sendValue":3,"receiveValue":3},{"id":"08t","displayText":"08t","internalValue":"08t","sendValue":4,"receiveValue":4},{"id":"16","displayText":"16_","internalValue":"16","sendValue":5,"receiveValue":5,"selectedByDefault":true},{"id":"16l","displayText":"16L","internalValue":"16l","sendValue":6,"receiveValue":6},{"id":"16h","displayText":"16H","internalValue":"16h","sendValue":7,"receiveValue":7},{"id":"16t","displayText":"16t","internalValue":"16t","sendValue":8,"receiveValue":8}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"arpeggio.grid","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_grid_caption_319": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_grid caption","id":"sh201_arpeggio_grid_caption_319","controlType":"Label"},
+                        "Transform": {"x":304,"y":86,"width":88,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"GRID","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_duration_320": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_duration","tooltip":"Arpeggio Duration — 10 00 05 01","id":"sh201_arpeggio_duration_320","controlType":"Combobox"},
+                        "Transform": {"x":304,"y":150,"width":88,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"100"},
+                        "Value": {"rows":[{"id":"30","displayText":"30","internalValue":"30","sendValue":0,"receiveValue":0},{"id":"40","displayText":"40","internalValue":"40","sendValue":1,"receiveValue":1},{"id":"50","displayText":"50","internalValue":"50","sendValue":2,"receiveValue":2},{"id":"60","displayText":"60","internalValue":"60","sendValue":3,"receiveValue":3},{"id":"70","displayText":"70","internalValue":"70","sendValue":4,"receiveValue":4},{"id":"80","displayText":"80","internalValue":"80","sendValue":5,"receiveValue":5},{"id":"90","displayText":"90","internalValue":"90","sendValue":6,"receiveValue":6},{"id":"100","displayText":"100","internalValue":"100","sendValue":7,"receiveValue":7,"selectedByDefault":true},{"id":"120","displayText":"120","internalValue":"120","sendValue":8,"receiveValue":8},{"id":"ful","displayText":"FUL","internalValue":"ful","sendValue":9,"receiveValue":9}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"arpeggio.duration","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_duration_caption_321": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_duration caption","id":"sh201_arpeggio_duration_caption_321","controlType":"Label"},
+                        "Transform": {"x":304,"y":136,"width":88,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"DURATION","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    }
+                  }
+                }
+              },
+              "_type": "Control"
+            },
+            "sh201_section_DELAY_322": {
+              "_children": {
+                "Core": {"name":"DELAY","tooltip":"The patch's delay. Each tone's EFFECTS section says how much of it goes here.","id":"sh201_section_DELAY_322","controlType":"Group"},
+                "Transform": {"x":430,"y":26,"width":316,"height":196},
+                "Background": {"_children":{"Fill":{"colour":"FF22262B"},"Border":{"thickness":1.5,"colour":"FFB2BAC2"}}},
+                "Text": {"content":""},
+                "Children": {
+                  "_children": {
+                    "sh201_DELAY_title_323": {
+                      "_children": {
+                        "Core": {"name":"DELAY title","id":"sh201_DELAY_title_323","controlType":"Label"},
+                        "Transform": {"x":2,"y":2,"width":60,"height":17},
+                        "Background": {"_children":{"Fill":{"colour":"FFB2BAC2"},"Border":{"enabled":false,"thickness":0},"Corners":{"radius":4,"_removed":["_type","linked","borderEnabled","style","direction","borderStyle","thickness","dotRadius","doubleGap","doubleAnchor","doubleDirection","colour","fillSolid","fillGradient","fillImage","fillOverlay","imageSrc","overlaySrc","gradient","gradientFlow","cornerGradientMode","cornerGradientFlip","cornerGradientInheritSide","topLeft","topRight","bottomLeft","bottomRight"]}}},
+                        "Text": {"content":"DELAY","_children":{"Fill":{"colour":"FF121518"},"Font":{"weight":"Bold","weightValue":700,"size":10,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_delaySwitch_324": {
+                      "_children": {
+                        "Core": {"name":"patch_delaySwitch","tooltip":"Delay Switch — 10 00 00 1C","id":"sh201_patch_delaySwitch_324","controlType":"CustomComponent"},
+                        "Transform": {"x":12,"y":38,"width":64,"height":38},
+                        "Designer": {"packageName":"SH-201 LED Switch","packageVersion":"1.0.0","packageId":"sh-201-led-switch@1-0-0","packageFingerprint":"ea8b1d6c","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-led-switch@1-0-0","name":"SH-201 LED Switch","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ea8b1d6c","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"multi","labels":["multi"]},"readiness":{"ok":true,"score":75,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[],"counts":{"inputs":1,"outputs":1,"properties":0,"total":2}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":64,"designHeight":38},
+                        "Parts": {
+                          "_drawing": "c1f5474a"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","step":1,"format":{"precision":0}},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","type":"selector","role":"selector","valueChannel":"value","valueChannels":["value"],"geometry":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"pick0":{"_type":"HitZone","name":"pick0","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":10.526315789473683,"height":39.473684210526315},"payload":0},"pick1":{"_type":"HitZone","name":"pick1","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":50,"height":39.473684210526315},"payload":1}}},
+                        "Bindings": {"_children":{"led0":{"_type":"Binding","name":"led0","source":"channel.value.raw","mapMode":"enum","target":"Parts.led0.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFF3B30","1":"FF3A1E1C","false":"FFFF3B30","true":"FF3A1E1C"},"clamp":false},"name0":{"_type":"Binding","name":"name0","source":"channel.value.raw","mapMode":"enum","target":"Parts.name0.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFFFFFF","1":"FF8A959E","false":"FFFFFFFF","true":"FF8A959E"},"clamp":false},"led1":{"_type":"Binding","name":"led1","source":"channel.value.raw","mapMode":"enum","target":"Parts.led1.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF3A1E1C","1":"FFFF3B30","false":"FF3A1E1C","true":"FFFF3B30"},"clamp":false},"name1":{"_type":"Binding","name":"name1","source":"channel.value.raw","mapMode":"enum","target":"Parts.name1.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF8A959E","1":"FFFFFFFF","false":"FF8A959E","true":"FFFFFFFF"},"clamp":false}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"patch.delaySwitch","parameterType":"boolean"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-led-switch"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_delaySwitch_caption_325": {
+                      "_children": {
+                        "Core": {"name":"patch_delaySwitch caption","id":"sh201_patch_delaySwitch_caption_325","controlType":"Label"},
+                        "Transform": {"x":12,"y":24,"width":64,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"DELAY","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_hfDamp_326": {
+                      "_children": {
+                        "Core": {"name":"delay_hfDamp","tooltip":"Delay HF Damp — 10 00 03 02","id":"sh201_delay_hfDamp_326","controlType":"Combobox"},
+                        "Transform": {"x":96,"y":42,"width":100,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"bypass"},
+                        "Value": {"rows":[{"id":"200","displayText":"200 Hz","internalValue":"200","sendValue":0,"receiveValue":0},{"id":"250","displayText":"250 Hz","internalValue":"250","sendValue":1,"receiveValue":1},{"id":"315","displayText":"315 Hz","internalValue":"315","sendValue":2,"receiveValue":2},{"id":"400","displayText":"400 Hz","internalValue":"400","sendValue":3,"receiveValue":3},{"id":"500","displayText":"500 Hz","internalValue":"500","sendValue":4,"receiveValue":4},{"id":"630","displayText":"630 Hz","internalValue":"630","sendValue":5,"receiveValue":5},{"id":"800","displayText":"800 Hz","internalValue":"800","sendValue":6,"receiveValue":6},{"id":"1000","displayText":"1000 Hz","internalValue":"1000","sendValue":7,"receiveValue":7},{"id":"1250","displayText":"1250 Hz","internalValue":"1250","sendValue":8,"receiveValue":8},{"id":"1600","displayText":"1600 Hz","internalValue":"1600","sendValue":9,"receiveValue":9},{"id":"2000","displayText":"2000 Hz","internalValue":"2000","sendValue":10,"receiveValue":10},{"id":"2500","displayText":"2500 Hz","internalValue":"2500","sendValue":11,"receiveValue":11},{"id":"3150","displayText":"3150 Hz","internalValue":"3150","sendValue":12,"receiveValue":12},{"id":"4000","displayText":"4000 Hz","internalValue":"4000","sendValue":13,"receiveValue":13},{"id":"5000","displayText":"5000 Hz","internalValue":"5000","sendValue":14,"receiveValue":14},{"id":"6300","displayText":"6300 Hz","internalValue":"6300","sendValue":15,"receiveValue":15},{"id":"8000","displayText":"8000 Hz","internalValue":"8000","sendValue":16,"receiveValue":16},{"id":"bypass","displayText":"BYPASS","internalValue":"bypass","sendValue":17,"receiveValue":17,"selectedByDefault":true}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"delay.hfDamp","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_hfDamp_caption_327": {
+                      "_children": {
+                        "Core": {"name":"delay_hfDamp caption","id":"sh201_delay_hfDamp_caption_327","controlType":"Label"},
+                        "Transform": {"x":96,"y":28,"width":100,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"HF DAMP","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_time_328": {
+                      "_children": {
+                        "Core": {"name":"delay_time","tooltip":"Delay Time — 10 00 03 00","id":"sh201_delay_time_328","controlType":"CustomComponent"},
+                        "Transform": {"x":20,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"delay.time","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_time_caption_329": {
+                      "_children": {
+                        "Core": {"name":"delay_time caption","id":"sh201_delay_time_caption_329","controlType":"Label"},
+                        "Transform": {"x":6,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"TIME","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_feedback_330": {
+                      "_children": {
+                        "Core": {"name":"delay_feedback","tooltip":"Delay Feedback — 10 00 03 01","id":"sh201_delay_feedback_330","controlType":"CustomComponent"},
+                        "Transform": {"x":92,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":98,"step":1,"defaultValue":49,"currentValue":49,"format":{"unit":"%","displayMin":-98,"displayMax":98}},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"delay.feedback","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_feedback_caption_331": {
+                      "_children": {
+                        "Core": {"name":"delay_feedback caption","id":"sh201_delay_feedback_caption_331","controlType":"Label"},
+                        "Transform": {"x":78,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"FEEDBACK","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_modRate_332": {
+                      "_children": {
+                        "Core": {"name":"delay_modRate","tooltip":"Delay Modulation Rate — 10 00 03 03","id":"sh201_delay_modRate_332","controlType":"CustomComponent"},
+                        "Transform": {"x":164,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"delay.modRate","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_modRate_caption_333": {
+                      "_children": {
+                        "Core": {"name":"delay_modRate caption","id":"sh201_delay_modRate_caption_333","controlType":"Label"},
+                        "Transform": {"x":150,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"MOD RATE","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_modDepth_334": {
+                      "_children": {
+                        "Core": {"name":"delay_modDepth","tooltip":"Delay Modulation Depth — 10 00 03 04","id":"sh201_delay_modDepth_334","controlType":"CustomComponent"},
+                        "Transform": {"x":236,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"delay.modDepth","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_delay_modDepth_caption_335": {
+                      "_children": {
+                        "Core": {"name":"delay_modDepth caption","id":"sh201_delay_modDepth_caption_335","controlType":"Label"},
+                        "Transform": {"x":222,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"MOD DEPTH","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    }
+                  }
+                }
+              },
+              "_type": "Control"
+            },
+            "sh201_section_REVERB_336": {
+              "_children": {
+                "Core": {"name":"REVERB","tooltip":"The patch's reverb. Each tone's EFFECTS section says how much of it goes here.","id":"sh201_section_REVERB_336","controlType":"Group"},
+                "Transform": {"x":756,"y":26,"width":488,"height":196},
+                "Background": {"_children":{"Fill":{"colour":"FF22262B"},"Border":{"thickness":1.5,"colour":"FFB2BAC2"}}},
+                "Text": {"content":""},
+                "Children": {
+                  "_children": {
+                    "sh201_REVERB_title_337": {
+                      "_children": {
+                        "Core": {"name":"REVERB title","id":"sh201_REVERB_title_337","controlType":"Label"},
+                        "Transform": {"x":2,"y":2,"width":68,"height":17},
+                        "Background": {"_children":{"Fill":{"colour":"FFB2BAC2"},"Border":{"enabled":false,"thickness":0},"Corners":{"radius":4,"_removed":["_type","linked","borderEnabled","style","direction","borderStyle","thickness","dotRadius","doubleGap","doubleAnchor","doubleDirection","colour","fillSolid","fillGradient","fillImage","fillOverlay","imageSrc","overlaySrc","gradient","gradientFlow","cornerGradientMode","cornerGradientFlip","cornerGradientInheritSide","topLeft","topRight","bottomLeft","bottomRight"]}}},
+                        "Text": {"content":"REVERB","_children":{"Fill":{"colour":"FF121518"},"Font":{"weight":"Bold","weightValue":700,"size":10,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_reverbSwitch_338": {
+                      "_children": {
+                        "Core": {"name":"patch_reverbSwitch","tooltip":"Reverb Switch — 10 00 00 1D","id":"sh201_patch_reverbSwitch_338","controlType":"CustomComponent"},
+                        "Transform": {"x":12,"y":38,"width":64,"height":38},
+                        "Designer": {"packageName":"SH-201 LED Switch","packageVersion":"1.0.0","packageId":"sh-201-led-switch@1-0-0","packageFingerprint":"ea8b1d6c","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-led-switch@1-0-0","name":"SH-201 LED Switch","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ea8b1d6c","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"multi","labels":["multi"]},"readiness":{"ok":true,"score":75,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[],"counts":{"inputs":1,"outputs":1,"properties":0,"total":2}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":64,"designHeight":38},
+                        "Parts": {
+                          "_drawing": "c1f5474a"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","step":1,"format":{"precision":0}},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","type":"selector","role":"selector","valueChannel":"value","valueChannels":["value"],"geometry":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"pick0":{"_type":"HitZone","name":"pick0","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":10.526315789473683,"height":39.473684210526315},"payload":0},"pick1":{"_type":"HitZone","name":"pick1","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue","bounds":{"y":50,"height":39.473684210526315},"payload":1}}},
+                        "Bindings": {"_children":{"led0":{"_type":"Binding","name":"led0","source":"channel.value.raw","mapMode":"enum","target":"Parts.led0.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFF3B30","1":"FF3A1E1C","false":"FFFF3B30","true":"FF3A1E1C"},"clamp":false},"name0":{"_type":"Binding","name":"name0","source":"channel.value.raw","mapMode":"enum","target":"Parts.name0.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FFFFFFFF","1":"FF8A959E","false":"FFFFFFFF","true":"FF8A959E"},"clamp":false},"led1":{"_type":"Binding","name":"led1","source":"channel.value.raw","mapMode":"enum","target":"Parts.led1.Background.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF3A1E1C","1":"FFFF3B30","false":"FF3A1E1C","true":"FFFF3B30"},"clamp":false},"name1":{"_type":"Binding","name":"name1","source":"channel.value.raw","mapMode":"enum","target":"Parts.name1.Text.Fill.colour","outputUnit":"","outputMax":1,"trueValue":1,"enumMap":{"0":"FF8A959E","1":"FFFFFFFF","false":"FF8A959E","true":"FFFFFFFF"},"clamp":false}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"patch.reverbSwitch","parameterType":"boolean"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-led-switch"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_patch_reverbSwitch_caption_339": {
+                      "_children": {
+                        "Core": {"name":"patch_reverbSwitch caption","id":"sh201_patch_reverbSwitch_caption_339","controlType":"Label"},
+                        "Transform": {"x":12,"y":24,"width":64,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"REVERB","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_size_340": {
+                      "_children": {
+                        "Core": {"name":"reverb_size","tooltip":"Reverb Size — 10 00 04 02","id":"sh201_reverb_size_340","controlType":"Combobox"},
+                        "Transform": {"x":96,"y":42,"width":64,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"1"},
+                        "Value": {"rows":[{"id":"1","displayText":"1","internalValue":"1","sendValue":0,"receiveValue":0,"selectedByDefault":true},{"id":"2","displayText":"2","internalValue":"2","sendValue":1,"receiveValue":1},{"id":"3","displayText":"3","internalValue":"3","sendValue":2,"receiveValue":2},{"id":"4","displayText":"4","internalValue":"4","sendValue":3,"receiveValue":3},{"id":"5","displayText":"5","internalValue":"5","sendValue":4,"receiveValue":4},{"id":"6","displayText":"6","internalValue":"6","sendValue":5,"receiveValue":5},{"id":"7","displayText":"7","internalValue":"7","sendValue":6,"receiveValue":6},{"id":"8","displayText":"8","internalValue":"8","sendValue":7,"receiveValue":7}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"reverb.size","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_size_caption_341": {
+                      "_children": {
+                        "Core": {"name":"reverb_size caption","id":"sh201_reverb_size_caption_341","controlType":"Label"},
+                        "Transform": {"x":96,"y":28,"width":64,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"SIZE","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_highCut_342": {
+                      "_children": {
+                        "Core": {"name":"reverb_highCut","tooltip":"Reverb High Cut — 10 00 04 03","id":"sh201_reverb_highCut_342","controlType":"Combobox"},
+                        "Transform": {"x":174,"y":42,"width":100,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"bypass"},
+                        "Value": {"rows":[{"id":"160","displayText":"160 Hz","internalValue":"160","sendValue":0,"receiveValue":0},{"id":"200","displayText":"200 Hz","internalValue":"200","sendValue":1,"receiveValue":1},{"id":"250","displayText":"250 Hz","internalValue":"250","sendValue":2,"receiveValue":2},{"id":"320","displayText":"320 Hz","internalValue":"320","sendValue":3,"receiveValue":3},{"id":"400","displayText":"400 Hz","internalValue":"400","sendValue":4,"receiveValue":4},{"id":"500","displayText":"500 Hz","internalValue":"500","sendValue":5,"receiveValue":5},{"id":"640","displayText":"640 Hz","internalValue":"640","sendValue":6,"receiveValue":6},{"id":"800","displayText":"800 Hz","internalValue":"800","sendValue":7,"receiveValue":7},{"id":"1000","displayText":"1000 Hz","internalValue":"1000","sendValue":8,"receiveValue":8},{"id":"1250","displayText":"1250 Hz","internalValue":"1250","sendValue":9,"receiveValue":9},{"id":"1600","displayText":"1600 Hz","internalValue":"1600","sendValue":10,"receiveValue":10},{"id":"2000","displayText":"2000 Hz","internalValue":"2000","sendValue":11,"receiveValue":11},{"id":"2500","displayText":"2500 Hz","internalValue":"2500","sendValue":12,"receiveValue":12},{"id":"3200","displayText":"3200 Hz","internalValue":"3200","sendValue":13,"receiveValue":13},{"id":"4000","displayText":"4000 Hz","internalValue":"4000","sendValue":14,"receiveValue":14},{"id":"5000","displayText":"5000 Hz","internalValue":"5000","sendValue":15,"receiveValue":15},{"id":"6400","displayText":"6400 Hz","internalValue":"6400","sendValue":16,"receiveValue":16},{"id":"8000","displayText":"8000 Hz","internalValue":"8000","sendValue":17,"receiveValue":17},{"id":"10000","displayText":"10000 Hz","internalValue":"10000","sendValue":18,"receiveValue":18},{"id":"12500","displayText":"12500 Hz","internalValue":"12500","sendValue":19,"receiveValue":19},{"id":"bypass","displayText":"BYPASS","internalValue":"bypass","sendValue":20,"receiveValue":20,"selectedByDefault":true}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"reverb.highCut","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_highCut_caption_343": {
+                      "_children": {
+                        "Core": {"name":"reverb_highCut caption","id":"sh201_reverb_highCut_caption_343","controlType":"Label"},
+                        "Transform": {"x":174,"y":28,"width":100,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"HIGH CUT","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_lfDampFrequency_344": {
+                      "_children": {
+                        "Core": {"name":"reverb_lfDampFrequency","tooltip":"Reverb LF Damp Frequency — 10 00 04 06","id":"sh201_reverb_lfDampFrequency_344","controlType":"Combobox"},
+                        "Transform": {"x":288,"y":42,"width":86,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"400"},
+                        "Value": {"rows":[{"id":"50","displayText":"50 Hz","internalValue":"50","sendValue":0,"receiveValue":0},{"id":"64","displayText":"64 Hz","internalValue":"64","sendValue":1,"receiveValue":1},{"id":"80","displayText":"80 Hz","internalValue":"80","sendValue":2,"receiveValue":2},{"id":"100","displayText":"100 Hz","internalValue":"100","sendValue":3,"receiveValue":3},{"id":"125","displayText":"125 Hz","internalValue":"125","sendValue":4,"receiveValue":4},{"id":"160","displayText":"160 Hz","internalValue":"160","sendValue":5,"receiveValue":5},{"id":"200","displayText":"200 Hz","internalValue":"200","sendValue":6,"receiveValue":6},{"id":"250","displayText":"250 Hz","internalValue":"250","sendValue":7,"receiveValue":7},{"id":"320","displayText":"320 Hz","internalValue":"320","sendValue":8,"receiveValue":8},{"id":"400","displayText":"400 Hz","internalValue":"400","sendValue":9,"receiveValue":9,"selectedByDefault":true},{"id":"500","displayText":"500 Hz","internalValue":"500","sendValue":10,"receiveValue":10},{"id":"640","displayText":"640 Hz","internalValue":"640","sendValue":11,"receiveValue":11},{"id":"800","displayText":"800 Hz","internalValue":"800","sendValue":12,"receiveValue":12},{"id":"1000","displayText":"1000 Hz","internalValue":"1000","sendValue":13,"receiveValue":13},{"id":"1250","displayText":"1250 Hz","internalValue":"1250","sendValue":14,"receiveValue":14},{"id":"1600","displayText":"1600 Hz","internalValue":"1600","sendValue":15,"receiveValue":15},{"id":"2000","displayText":"2000 Hz","internalValue":"2000","sendValue":16,"receiveValue":16},{"id":"2500","displayText":"2500 Hz","internalValue":"2500","sendValue":17,"receiveValue":17},{"id":"3200","displayText":"3200 Hz","internalValue":"3200","sendValue":18,"receiveValue":18},{"id":"4000","displayText":"4000 Hz","internalValue":"4000","sendValue":19,"receiveValue":19}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"reverb.lfDampFrequency","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_lfDampFrequency_caption_345": {
+                      "_children": {
+                        "Core": {"name":"reverb_lfDampFrequency caption","id":"sh201_reverb_lfDampFrequency_caption_345","controlType":"Label"},
+                        "Transform": {"x":288,"y":28,"width":86,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"LF DAMP","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_hfDampFrequency_346": {
+                      "_children": {
+                        "Core": {"name":"reverb_hfDampFrequency","tooltip":"Reverb HF Damp Frequency — 10 00 04 08","id":"sh201_reverb_hfDampFrequency_346","controlType":"Combobox"},
+                        "Transform": {"x":386,"y":42,"width":86,"height":22},
+                        "Background": {"_children":{"Corners":{"radius":3}}},
+                        "Text": {"content":"","_children":{"Font":{"size":10}}},
+                        "Behavior": {"defaultValue":"8000"},
+                        "Value": {"rows":[{"id":"4000","displayText":"4000 Hz","internalValue":"4000","sendValue":0,"receiveValue":0},{"id":"5000","displayText":"5000 Hz","internalValue":"5000","sendValue":1,"receiveValue":1},{"id":"6400","displayText":"6400 Hz","internalValue":"6400","sendValue":2,"receiveValue":2},{"id":"8000","displayText":"8000 Hz","internalValue":"8000","sendValue":3,"receiveValue":3,"selectedByDefault":true},{"id":"10000","displayText":"10000 Hz","internalValue":"10000","sendValue":4,"receiveValue":4},{"id":"12500","displayText":"12500 Hz","internalValue":"12500","sendValue":5,"receiveValue":5}]},
+                        "DeviceBindings": {"bindings":[{"port":"selectedChoice","deviceRole":"Roland SH-201","parameterId":"reverb.hfDampFrequency","parameterType":"choice"}]}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_hfDampFrequency_caption_347": {
+                      "_children": {
+                        "Core": {"name":"reverb_hfDampFrequency caption","id":"sh201_reverb_hfDampFrequency_caption_347","controlType":"Label"},
+                        "Transform": {"x":386,"y":28,"width":86,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"HF DAMP","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_time_348": {
+                      "_children": {
+                        "Core": {"name":"reverb_time","tooltip":"Reverb Time — 10 00 04 00","id":"sh201_reverb_time_348","controlType":"CustomComponent"},
+                        "Transform": {"x":20,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"reverb.time","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_time_caption_349": {
+                      "_children": {
+                        "Core": {"name":"reverb_time caption","id":"sh201_reverb_time_caption_349","controlType":"Label"},
+                        "Transform": {"x":6,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"TIME","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_preDelay_350": {
+                      "_children": {
+                        "Core": {"name":"reverb_preDelay","tooltip":"Reverb Pre Delay — 10 00 04 01","id":"sh201_reverb_preDelay_350","controlType":"CustomComponent"},
+                        "Transform": {"x":90,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":125,"step":1},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"reverb.preDelay","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_preDelay_caption_351": {
+                      "_children": {
+                        "Core": {"name":"reverb_preDelay caption","id":"sh201_reverb_preDelay_caption_351","controlType":"Label"},
+                        "Transform": {"x":76,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"PRE DELAY","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_density_352": {
+                      "_children": {
+                        "Core": {"name":"reverb_density","tooltip":"Reverb Density — 10 00 04 04","id":"sh201_reverb_density_352","controlType":"CustomComponent"},
+                        "Transform": {"x":160,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"reverb.density","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_density_caption_353": {
+                      "_children": {
+                        "Core": {"name":"reverb_density caption","id":"sh201_reverb_density_caption_353","controlType":"Label"},
+                        "Transform": {"x":146,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"DENSITY","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_diffusion_354": {
+                      "_children": {
+                        "Core": {"name":"reverb_diffusion","tooltip":"Reverb Diffusion — 10 00 04 05","id":"sh201_reverb_diffusion_354","controlType":"CustomComponent"},
+                        "Transform": {"x":230,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":127,"step":1,"defaultValue":64,"currentValue":64},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"reverb.diffusion","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_diffusion_caption_355": {
+                      "_children": {
+                        "Core": {"name":"reverb_diffusion caption","id":"sh201_reverb_diffusion_caption_355","controlType":"Label"},
+                        "Transform": {"x":216,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"DIFFUSION","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_lfDampGain_356": {
+                      "_children": {
+                        "Core": {"name":"reverb_lfDampGain","tooltip":"Reverb LF Damp Gain — 10 00 04 07","id":"sh201_reverb_lfDampGain_356","controlType":"CustomComponent"},
+                        "Transform": {"x":306,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":36,"step":1,"defaultValue":36,"currentValue":36},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"reverb.lfDampGain","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_lfDampGain_caption_357": {
+                      "_children": {
+                        "Core": {"name":"reverb_lfDampGain caption","id":"sh201_reverb_lfDampGain_caption_357","controlType":"Label"},
+                        "Transform": {"x":292,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"LF GAIN","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_hfDampGain_358": {
+                      "_children": {
+                        "Core": {"name":"reverb_hfDampGain","tooltip":"Reverb HF Damp Gain — 10 00 04 09","id":"sh201_reverb_hfDampGain_358","controlType":"CustomComponent"},
+                        "Transform": {"x":404,"y":100,"width":50,"height":50},
+                        "Designer": {"packageName":"SH-201 Knob","packageVersion":"1.0.0","packageId":"sh-201-knob@1-0-0","packageFingerprint":"ed23c6fa","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-knob@1-0-0","name":"SH-201 Knob","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"ed23c6fa","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"slider","labels":["slider"]},"readiness":{"ok":true,"score":88,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"outputs":[{"name":"value","label":"Value","type":"float","channel":"value"}],"properties":[{"name":"minimum","label":"Minimum","type":"number","path":"ValueChannels.value.min","part":""},{"name":"maximum","label":"Maximum","type":"number","path":"ValueChannels.value.max","part":""},{"name":"step","label":"Step","type":"number","path":"ValueChannels.value.step","part":""},{"name":"valueType","label":"Value type","type":"enum","path":"ValueChannels.value.type","part":""},{"name":"readout","label":"Readout (display range, unit)","type":"object","path":"ValueChannels.value.format","part":""}],"counts":{"inputs":1,"outputs":1,"properties":5,"total":7}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":50,"designHeight":50},
+                        "Parts": {
+                          "_drawing": "f7d61206"
+                        },
+                        "ValueChannels": {"_children":{"value":{"_type":"ValueChannel","name":"value","label":"Value","type":"int","max":36,"step":1,"defaultValue":36,"currentValue":36},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"drive":{"_type":"BehaviorModule","name":"drive","role":"knob","valueChannel":"value","valueChannels":["value"],"geometry":"circular","dragMode":"vertical"},"_removed":["mainSlider","modeButton"]}},
+                        "HitZones": {"_children":{"grab":{"_type":"HitZone","name":"grab","cursor":"default","targetBehavior":"drive","targetValueChannel":"value","action":"setValue"}}},
+                        "Bindings": {"_children":{"pointerAngle":{"_type":"Binding","name":"pointerAngle","source":"channel.value.normalized","target":"Parts.pointer.Layout.rotation","outputUnit":"px","outputMin":-135,"outputMax":135,"falseValue":-135,"trueValue":135,"round":true}},"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"deviceRole":"Roland SH-201","parameterId":"reverb.hfDampGain","parameterType":"integer"}]},
+                        "PublishedProperties": {"inputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode","accentColour"]},"outputs":{"value":{"channel":"value","label":"Value","type":"float","enabled":true},"_removed":["mainValue","mode"]},"editableProperties":{"minimum":{"path":"ValueChannels.value.min","label":"Minimum","type":"number","enabled":true},"maximum":{"path":"ValueChannels.value.max","label":"Maximum","type":"number","enabled":true},"step":{"path":"ValueChannels.value.step","label":"Step","type":"number","enabled":true},"valueType":{"path":"ValueChannels.value.type","label":"Value type","type":"enum","enabled":true},"readout":{"path":"ValueChannels.value.format","label":"Readout (display range, unit)","type":"object","enabled":true},"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-knob"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_reverb_hfDampGain_caption_359": {
+                      "_children": {
+                        "Core": {"name":"reverb_hfDampGain caption","id":"sh201_reverb_hfDampGain_caption_359","controlType":"Label"},
+                        "Transform": {"x":390,"y":152,"width":78,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"HF GAIN","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    }
+                  }
+                }
+              },
+              "_type": "Control"
+            },
+            "sh201_section_PATTERN_360": {
+              "_children": {
+                "Core": {"name":"PATTERN","tooltip":"The user arpeggio: sixteen notes over thirty-two steps. Notes and END STEP go to the synth on SEND PATTERN; READ PATTERN reads the synth's back.","id":"sh201_section_PATTERN_360","controlType":"Group"},
+                "Transform": {"x":16,"y":232,"width":1628,"height":292},
+                "Background": {"_children":{"Fill":{"colour":"FF22262B"},"Border":{"thickness":1.5,"colour":"FFC98BC0"}}},
+                "Text": {"content":""},
+                "Children": {
+                  "_children": {
+                    "sh201_PATTERN_title_361": {
+                      "_children": {
+                        "Core": {"name":"PATTERN title","id":"sh201_PATTERN_title_361","controlType":"Label"},
+                        "Transform": {"x":2,"y":2,"width":76,"height":17},
+                        "Background": {"_children":{"Fill":{"colour":"FFC98BC0"},"Border":{"enabled":false,"thickness":0},"Corners":{"radius":4,"_removed":["_type","linked","borderEnabled","style","direction","borderStyle","thickness","dotRadius","doubleGap","doubleAnchor","doubleDirection","colour","fillSolid","fillGradient","fillImage","fillOverlay","imageSrc","overlaySrc","gradient","gradientFlow","cornerGradientMode","cornerGradientFlip","cornerGradientInheritSide","topLeft","topRight","bottomLeft","bottomRight"]}}},
+                        "Text": {"content":"PATTERN","_children":{"Fill":{"colour":"FF121518"},"Font":{"weight":"Bold","weightValue":700,"size":10,"letterSpacing":0.4,"bold":true},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_arpeggio_pattern_362": {
+                      "_children": {
+                        "Core": {"name":"arpeggio_pattern","tooltip":"The user arpeggio: Arpeggio Pattern 01–16, sixteen notes of 32 steps, sent with SEND PATTERN. Its END STEP is Arpeggio End Step — 10 00 05 06.","id":"sh201_arpeggio_pattern_362","controlType":"CustomComponent"},
+                        "Transform": {"x":12,"y":42,"width":1604,"height":240},
+                        "Designer": {"arpeggiator":{"enabled":true,"numericFields":true,"blocks":[{"id":"arp_seed_0","note":60,"step":0,"length":1,"velocity":112},{"id":"arp_seed_1","note":63,"step":2,"length":1,"velocity":88},{"id":"arp_seed_2","note":67,"step":4,"length":1,"velocity":96},{"id":"arp_seed_3","note":70,"step":6,"length":1,"velocity":80},{"id":"arp_seed_4","note":72,"step":8,"length":2,"velocity":120},{"id":"arp_seed_5","note":67,"step":12,"length":1,"velocity":88},{"id":"arp_seed_6","note":63,"step":14,"length":2,"velocity":88}]},"packageName":"SH-201 Arpeggio Grid","packageVersion":"1.0.0","packageId":"sh-201-arpeggio-grid@1-0-0","packageFingerprint":"d1decd24","packageImportedAt":"2026-10-29T00:00:00.000Z","sourcePackage":{"id":"sh-201-arpeggio-grid@1-0-0","name":"SH-201 Arpeggio Grid","version":"1.0.0","author":"CEditor","category":"Roland SH-201","license":"AGPL-3.0","homepage":"","fingerprint":"d1decd24","importedAt":"2026-10-29T00:00:00.000Z","capabilities":{"primaryKind":"arpeggiator","labels":["arpeggiator","sequencer","multi"]},"readiness":{"ok":true,"score":75,"requiredOpenCount":0},"publicApiSummary":{"inputs":[{"name":"currentStep","label":"Current Step","type":"int","channel":"arpCurrentStep"},{"name":"endStep","label":"Loop End Step","type":"int","channel":"arpEndStep"}],"outputs":[{"name":"gate","label":"Gate","type":"bool","channel":"arpGate"},{"name":"note","label":"Note","type":"int","channel":"arpNote"},{"name":"velocity","label":"Velocity","type":"int","channel":"arpVelocity"},{"name":"pattern","label":"Pattern","type":"array","channel":"arpPattern"}],"properties":[],"counts":{"inputs":2,"outputs":4,"properties":0,"total":6}},"assetManifest":{"images":[],"filmstrips":[],"counts":{"images":0,"filmstrips":0,"total":0},"totalBytes":0}},"designWidth":1604,"designHeight":240,"patternEditing":{"kind":"sh201","mode":"manual"}},
+                        "Parts": {
+                          "_children": {
+                            "field": {"name":"field","_children":{"Layout":{"x":0,"y":0,"width":1604,"height":240,"xUnit":"px","yUnit":"px","anchorX":"left","anchorY":"top"},"Background":{"_children":{"Fill":{"colour":"FF0D1116"},"Border":{"thickness":1,"colour":"55000000"},"Corners":{"linked":true,"radius":4}},"_type":"Background"}},"_type":"Part"}
+                          }
+                        },
+                        "ValueChannels": {"_children":{"arpCurrentStep":{"_type":"ValueChannel","name":"arpCurrentStep","label":"Current Step","type":"int","max":31,"step":1,"format":{"precision":0}},"arpStepCount":{"_type":"ValueChannel","name":"arpStepCount","label":"Step Count","type":"int","min":1,"max":256,"step":1,"defaultValue":32,"currentValue":32,"format":{"precision":0}},"arpEndStep":{"_type":"ValueChannel","name":"arpEndStep","label":"Loop End Step","type":"int","min":1,"max":32,"step":1,"defaultValue":32,"currentValue":16,"format":{"precision":0}},"arpGate":{"_type":"ValueChannel","name":"arpGate","label":"Gate","type":"bool","step":1},"arpNote":{"_type":"ValueChannel","name":"arpNote","label":"Note","type":"int","max":127,"step":1,"format":{"precision":0}},"arpVelocity":{"_type":"ValueChannel","name":"arpVelocity","label":"Velocity","type":"int","max":127,"step":1,"format":{"precision":0}},"arpPattern":{"_type":"ValueChannel","name":"arpPattern","label":"Arp Pattern","type":"array","publicInput":false,"deviceBindable":false,"size":512,"items":[],"itemFields":{"note":{"min":0,"max":127,"step":1,"default":60},"step":{"min":0,"max":255,"step":1,"default":0},"length":{"min":1,"max":256,"step":1,"default":1},"velocity":{"min":1,"max":127,"step":1,"default":96}},"_removed":["currentValue","snap","curve","constraints"]},"_removed":["mainValue","mode"]}},
+                        "Behaviors": {"_children":{"_removed":["mainSlider","modeButton"]}},
+                        "Bindings": {"_removed":["_type"]},
+                        "DeviceBindings": {"bindings":[{"port":"arpEndStep","deviceRole":"Roland SH-201","parameterId":"arpeggio.endStep","parameterType":"integer","adoptMetadata":false}]},
+                        "PublishedProperties": {"inputs":{"currentStep":{"channel":"arpCurrentStep","label":"Current Step","type":"int"},"endStep":{"channel":"arpEndStep","label":"Loop End Step","type":"int"},"_removed":["mainValue","mode","accentColour"]},"outputs":{"gate":{"channel":"arpGate","label":"Gate","type":"bool"},"note":{"channel":"arpNote","label":"Note","type":"int"},"velocity":{"channel":"arpVelocity","label":"Velocity","type":"int"},"pattern":{"channel":"arpPattern","label":"Pattern","type":"array"},"_removed":["mainValue","mode"]},"editableProperties":{"_removed":["label","variant"]}},
+                        "ExternalAPI": {"addressableName":"sh-201-arpeggio-grid"}
+                      },
+                      "_type": "Control"
+                    },
+                    "sh201_pattern_gestures_363": {
+                      "_children": {
+                        "Core": {"name":"pattern gestures","id":"sh201_pattern_gestures_363","controlType":"Label"},
+                        "Transform": {"x":12,"y":25,"width":1604,"height":14},
+                        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
+                        "Text": {"content":"RULER: CLICK / DRAG = END STEP     |     NOTE: LEFT = MOVE   ·   MIDDLE = VELOCITY   ·   RIGHT = LENGTH   ·   SHIFT = FINE","_children":{"Fill":{"colour":"FFB9C2CA"},"Font":{"size":9,"letterSpacing":0.4,"bold":false},"Multiline":{"wrapMode":"none","overflowMode":"shrink","maxLines":1,"fitMode":"shrink","lineHeight":1.1}}},
+                        "ContentLayout": {"horizontalAlign":"left","paddingLeft":1,"paddingRight":1,"paddingTop":0,"paddingBottom":0}
                       },
                       "_type": "Control"
                     }

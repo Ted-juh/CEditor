@@ -11,7 +11,8 @@
 // makes sense in the generator. This one is meant to be read in the editor, so what a reader needs to
 // see is in the document, not in this file:
 //
-//   - Three library components — the SH-201 knob, fader and LED switch — placed as LINKED copies.
+//   - Four library components — the SH-201 knob, fader, LED switch and arpeggio grid — placed as
+//     LINKED copies.
 //     Select any knob and its Source card names the package; "Update N other copies" finds the
 //     others. A copy's range, default and readout are published as editable properties, so a knob
 //     bound to Coarse Tune (28..100, read -36..+36) and one bound to Cutoff (0..127) are the same
@@ -26,8 +27,8 @@
 //
 // THE FIRST VERSION ONLY. After it, the .cepanel file is the source and is edited in CEditor; this
 // generator is kept as the record of how the draft was made and to rebuild it while the draft is
-// still being shaped. It covers the two tones; the effects and the arpeggiator come after the owner
-// has judged this one in the editor.
+// still being shaped. It covers the two tones, and the arpeggiator and effects they share; the
+// patch's other settings and the system settings are still to come.
 //
 // The library file goes beside the panel. The library lives inside CEditor rather than in the
 // panel: a copy keeps its whole design and works anywhere, but on a machine without the package its
@@ -48,11 +49,12 @@ import {
   instantiateCustomComponentPackageControl, customComponentPackageId,
 } from '../../../CE/web/src/CE_Application/utils/customComponentPackage.js';
 import { diffCustomComponentAgainstSource } from '../../../CE/web/src/CE_Application/utils/customComponentSourceLink.js';
-import { gaiaFader, gaiaKnob, gaiaLeds } from '../gaia-panel/components.mjs';
+import { gaiaArpGrid, gaiaFader, gaiaKnob, gaiaLeds } from '../gaia-panel/components.mjs';
 import { flatControls } from '../../../CE/web/src/CE_Application/utils/containment.js';
 import { brushedMetalDataUrl, brushedMetalPng } from './brushedMetal.mjs';
 import {
   SECTIONS, SECTION_ROWS, PANEL, SKIN, HARDWARE_SECTIONS, HARDWARE_ROWS, HARDWARE_SKIN,
+  PATCH_SECTIONS, PATCH_ROWS, HARDWARE_PATCH_SECTIONS, ARP_GRID,
 } from './layout.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -180,6 +182,26 @@ function hardwareKnob() {
   return knob;
 }
 
+/**
+ * The SH-201's user arpeggio, as the GAIA panel's grid draws it: the two synths keep a pattern the
+ * same way, sixteen notes of thirty-two steps. It opens on a figure inside a new patch's sixteen
+ * steps, so nothing starts outside the loop; READ PATTERN replaces it with the synth's.
+ */
+function arpGrid() {
+  return gaiaArpGrid({
+    width: ARP_GRID.w, height: ARP_GRID.h, steps: 32,
+    blocks: [
+      { id: 'arp_seed_0', note: 60, step: 0, length: 1, velocity: 112 },
+      { id: 'arp_seed_1', note: 63, step: 2, length: 1, velocity: 88 },
+      { id: 'arp_seed_2', note: 67, step: 4, length: 1, velocity: 96 },
+      { id: 'arp_seed_3', note: 70, step: 6, length: 1, velocity: 80 },
+      { id: 'arp_seed_4', note: 72, step: 8, length: 2, velocity: 120 },
+      { id: 'arp_seed_5', note: 67, step: 12, length: 1, velocity: 88 },
+      { id: 'arp_seed_6', note: 63, step: 14, length: 2, velocity: 88 },
+    ],
+  });
+}
+
 const COMPONENTS = {
   knob: {
     name: 'SH-201 Knob',
@@ -198,6 +220,11 @@ const COMPONENTS = {
     name: 'SH-201 LED Switch',
     description: 'An on/off switch with a lamp for each setting, for one SH-201 switch parameter.',
     versions: { '1.0.0': () => publish(ledSwitch()) },
+  },
+  grid: {
+    name: 'SH-201 Arpeggio Grid',
+    description: 'The user arpeggio pattern: sixteen notes over thirty-two steps, read from and sent to the synth with READ PATTERN and SEND PATTERN.',
+    versions: { '1.0.0': () => arpGrid() },
   },
 };
 
@@ -282,6 +309,30 @@ function placeCopy(envelope, parameter, at) {
   return control;
 }
 
+/**
+ * The pattern: a linked copy of the grid, marked as the SH-201's (Designer.patternEditing, a per-copy
+ * setting), so READ PATTERN and SEND PATTERN use the SH-201's 528 pattern parameters and seventeen
+ * requests (utils/arpPatternLayouts.js). Its one binding is the Loop End Step port to Arpeggio End
+ * Step, which also names the device those two talk to. The notes are not bindings: 528 parameters
+ * behind one drawing go out together, when SEND PATTERN is pressed, not one per mouse move.
+ */
+function placeGrid(envelope, parameter, at) {
+  const control = instantiateCustomComponentPackageControl(envelope, {
+    id: nextId('arpeggio_pattern'),
+    name: 'arpeggio_pattern',
+    importedAt: STAMP,
+    Transform: { x: at.x, y: at.y },
+  });
+  control._children.Core.tooltip = `The user arpeggio: Arpeggio Pattern 01–16, sixteen notes of 32 steps, sent with SEND PATTERN. Its END STEP is ${whereItGoes(parameter)}.`;
+  control._children.Designer.patternEditing = { kind: 'sh201', mode: 'manual' };
+  const binding = bindingFor(parameter, 'arpEndStep');
+  // The port's range is the grid's steps already; End Step adopts nothing.
+  binding.adoptMetadata = false;
+  control._children.DeviceBindings = { _type: 'DeviceBindings', enabled: true, debug: false, bindings: [binding] };
+  control._children.ValueChannels._children.arpEndStep.currentValue = parameter.default;
+  return control;
+}
+
 /** A stock list for a named setting, its rows adopted from the profile's own choices. */
 function placeCombo(parameter, at, w) {
   const control = createControl('Combobox', {
@@ -313,6 +364,10 @@ const KINDS = {
     control: placeCombo(parameter, item, item.w ?? 104),
     caption: { x: item.x, y: item.y - 14, w: item.w ?? 104, align: 'left' },
   }),
+  grid: (packages, parameter, item) => ({
+    control: placeGrid(packages.grid, parameter, item),
+    caption: { x: item.x, y: item.y - 17, w: item.w, align: 'left' },
+  }),
 };
 
 /* ------------------------------------------------------------------ the two looks */
@@ -326,13 +381,15 @@ const LOOKS = {
   draft: {
     sections: SECTIONS,
     rows: SECTION_ROWS,
+    patchSections: PATCH_SECTIONS,
+    patchRows: PATCH_ROWS,
     skin: SKIN,
     versions: {},
     panelOut: 'CE/panels/Roland SH-201.cepanel',
     libraryOut: 'CE/panels/Roland SH-201 components.json',
     panelGuid: '6d1f3a52-0b7e-4c9a-a8f1-2e5b7c4d9a10',
     scriptId: 'roland_sh201',
-    description: 'Roland SH-201 — Upper and Lower tones, first draft: library components, one binding per control, sections as containers',
+    description: 'Roland SH-201 — Upper and Lower tones, arpeggiator and effects, first draft: library components, one binding per control, sections as containers',
     sectionStyle: (spec) => ({
       fill: SKIN.sectionFill, border: { enabled: true, thickness: 1.5, colour: spec.tint }, radius: 6,
       title: { colour: SKIN.tabText, fill: spec.tint, size: 10 }, caption: SKIN.caption, captionBold: false,
@@ -343,13 +400,15 @@ const LOOKS = {
   hardware: {
     sections: HARDWARE_SECTIONS,
     rows: HARDWARE_ROWS,
+    patchSections: HARDWARE_PATCH_SECTIONS,
+    patchRows: PATCH_ROWS,
     skin: HARDWARE_SKIN,
     versions: { knob: '1.1.0' },
     panelOut: 'CE/panels/Roland SH-201 (hardware look).cepanel',
     libraryOut: 'CE/panels/Roland SH-201 (hardware look) components.json',
     panelGuid: '9b4e7c21-5d3a-4f88-b0c6-1a2f6e8d3c55',
     scriptId: 'roland_sh201_hardware',
-    description: 'Roland SH-201 — Upper and Lower tones in the instrument\'s own look: the answer to the draft\'s tutorial',
+    description: 'Roland SH-201 — Upper and Lower tones, arpeggiator and effects in the instrument\'s own look: the answer to the draft\'s tutorial',
     sectionStyle: (spec) => (spec.surface === 'silver'
       ? { fill: HARDWARE_SKIN.silver, overlay: METAL_OVERLAY, border: { enabled: false, thickness: 0, colour: '00000000' }, radius: 3,
         title: { colour: HARDWARE_SKIN.onSilver, fill: '00000000', size: 12 }, caption: HARDWARE_SKIN.onSilver, captionBold: true }
@@ -388,13 +447,13 @@ function section(spec, at, ctx) {
 
   for (const item of spec.items) {
     // layout.mjs names the Upper tone's parameters; the Lower tone's are the same, renamed.
-    const id = item.p.replace(/^upper\./, `${ctx.tone}.`);
+    const id = ctx.tone ? item.p.replace(/^upper\./, `${ctx.tone}.`) : item.p;
     const parameter = ctx.byId.get(id);
     if (!parameter) { ctx.missing.push(id); continue; }
     const built = KINDS[item.kind](ctx.packages, parameter, item);
     add(built.control);
     add(label(item.label, built.caption, {
-      align: built.caption.align ?? 'center', colour: style.caption, bold: style.captionBold, name: `${handle(parameter)} caption`,
+      align: built.caption.align ?? 'center', colour: style.caption, bold: style.captionBold, name: item.captionName ?? `${handle(parameter)} caption`,
     }));
   }
 
@@ -484,22 +543,23 @@ function signalFlow(rowsAt, look) {
 
 /* ------------------------------------------------------------------ notes */
 
-const ABOUT = `Roland SH-201 — first draft, the Upper and Lower tones.
+const ABOUT = `Roland SH-201 — first draft: the Upper and Lower tones, the arpeggiator and the effects.
 
 How to read it in the editor:
-- Component tree: Upper and Lower › OSC 1, OSC 2, Mix/Mod, LFO 1, LFO 2, Pitch Env, Filter, Amp, Performance, Effects. The containers are the hardware's sections, and each tone has all of them.
+- Component tree: Upper and Lower › OSC 1, OSC 2, Mix/Mod, LFO 1, LFO 2, Pitch Env, Filter, Amp, Performance, Effects. The containers are the hardware's sections, and each tone has all of them. Then Patch › Arpeggio, Delay, Reverb, Pattern: what the two tones share, once.
 - Both tones are on the panel at once, Upper above Lower, each control bound to its own tone's parameter.
-- Select a knob: Device Bindings shows the one profile parameter it sends; its tooltip names it and its address. The Source card names the library package (SH-201 Knob, Fader or LED Switch), and "Update N other copies" finds every copy, in both tones.
+- Select a knob: Device Bindings shows the one profile parameter it sends; its tooltip names it and its address. The Source card names the library package (SH-201 Knob, Fader, LED Switch or Arpeggio Grid), and "Update N other copies" finds every copy, in both tones and the patch.
 - A copy's range, default and readout are published settings of the component (Public API), so Coarse Tune (sent 28..100, read -36..+36) and Cutoff (0..127) are the same knob.
 - KEYBOARD, in the header, is the synth's Keyboard Part: which tone its keys play, what its UPPER and LOWER buttons set. It changes what you hear, not what the knobs edit; when the synth's own buttons are pressed it follows.
 - Why two sets of controls and not a State: a State changes how a control looks, and nothing on the MIDI path reads it. Editing two tones is two knobs, each bound once.
+- PATTERN is the synth's user arpeggio: sixteen notes over thirty-two steps, the 528 parameters of Arpeggio Pattern 01–16. In Preview, draw notes on it; SEND PATTERN writes them and the END STEP to the synth, and READ PATTERN reads the synth's back. It is a linked copy too, with one binding: its Loop End Step port to Arpeggio End Step, which is also the device READ and SEND talk to. Its Device tab's Synth says SH-201: that is what makes the grid use the SH-201's parameters and not the GAIA's. Everything else in Patch sends as you move it.
 - No scripts.
 
 No hardware needed: choose Simulated device as the device's output (Settings → MIDI). It answers from the profile.
 
 The library: Roland SH-201 components.json, beside this file. Import it (Library → Package & Library → Import) if the Source card says "Not in this library". A copy of this panel passed on with File → Share Panel carries the library with it.
 
-Not built yet: the effects, the arpeggiator, the system settings.`;
+Not built yet: the patch's other settings (level, tone balance, keyboard mode and split point, the controllers' destinations) and the system settings.`;
 
 const tutorial = (knobs) => `Tutorial 1 — from this look to the SH-201's own
 
@@ -509,7 +569,7 @@ You need a photo of the instrument. Use your own: a photo from Roland or from th
 
 1. The reference. Show the dock (Ctrl+J), open Viewer and add your photo. Its eyedropper saves a colour to your swatches: take the silver of the OSC panel, the black of the envelope panels, the body, and the red of a lamp. Or type them: silver CBCCC7, panel black 1E1F21, body 121314, red D9402B.
 
-2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Upper and Lower in the component tree (Ctrl+click) and give them a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate.
+2. The body. Click an empty part of the canvas, so the panel itself is selected, and set its background to the body colour. Select Upper, Lower and Patch in the component tree (Ctrl+click) and give them a fill a shade lighter (1B1C1E) and a thin dark border: on the instrument the controls sit on a plate.
 
 3. The silver row and the black row. On the SH-201 the signal path is silver — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and everything else is black. Ctrl+click those five in the component tree, then on the Background tab set the fill to silver and switch the border off: with several controls selected, the Background tab changes all of them. Then select the others and make them black, with a thin grey border.
 
@@ -525,15 +585,16 @@ A flat silver reads as grey plastic; the instrument's is brushed aluminium. Give
 
 8. The signal path. The instrument draws it in red: Insert → Layout & Display → Background, 2 pixels high, red, under the black row; and a ▶ label in each gap between the silver sections.
 
-Steps 3, 4, 6 and 8 are for one tone. Do them on Upper, then again on Lower, below it; in step 3 you can Ctrl+click the silver sections of both tones at once. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Step 5 needs no second round: the Lower tone's knobs are copies of the same package, and Update takes them too.
+Steps 3, 4, 6 and 8 are for one tone. Do them on Upper, then again on Lower, below it; in step 3 you can Ctrl+click the silver sections of both tones at once. Copy Style (Ctrl+Alt+C) on an Upper section or caption and Paste Style (Ctrl+Alt+V) on its Lower twins saves most of the clicking. Patch, under both, needs steps 3 and 4 once: its four sections are black. Step 5 needs no second round: the Lower tone's knobs and the patch's are copies of the same package, and Update takes them too.
 
 What stays: the LED switches are already the instrument's red lamps, the faders its black slots, and the named lists stay lists — on the SH-201 they are rows of lamps, which is a tutorial of its own.`;
 
-const HARDWARE_ABOUT = `Roland SH-201 — the Upper and Lower tones, in the instrument's own look.
+const hardwareAbout = (bound) => `Roland SH-201 — the Upper and Lower tones, the arpeggiator and the effects, in the instrument's own look.
 
-This is the answer to Tutorial 1 in Roland SH-201.cepanel's notepad: the same 129 parameters, bindings and library components, repainted and arranged as the SH-201 is.
+This is the answer to Tutorial 1 in Roland SH-201.cepanel's notepad: the same ${bound} bound controls, bindings and library components, repainted and arranged as the SH-201 is.
 
 - The silver signal path — OSC 1, OSC 2, MIX/MOD, FILTER, AMP — and the black modulation row: PITCH ENV, LFO 1, LFO 2, FILTER ENV, AMP ENV, with EFFECTS and PERFORMANCE on the black body. Both tones, Upper above Lower, each on its plate.
+- PATCH, under both: ARPEGGIO, DELAY, REVERB and the PATTERN grid, on black. READ PATTERN and SEND PATTERN on the grid move the user arpeggio to and from the synth.
 - KEYBOARD, in the header, is the synth's Keyboard Part: which tone its keys play.
 - The silver sections carry a transparent metallic overlay: Roland SH-201 brushed metal.png, tiled over the fill with the Overlay blend at 60%. It is in the file, so the panel needs nothing beside it.
 - Every knob is SH-201 Knob 1.1.0, the silver one: select any knob and its Source card says so. The faders and LED switches are still 1.0.0; they already look like the instrument's.
@@ -545,19 +606,36 @@ No hardware needed: choose Simulated device as the device's output (Settings →
 
 /* ------------------------------------------------------------------ the panel */
 
-/** One tone: its name, then the look's rows of sections, in a container named after the tone. */
-function buildTone(tone, at, ctx) {
+/**
+ * The plates the panel is made of, top to bottom: the two tones, then what they share. A tone's
+ * sections are the look's; the patch's are its own, and carry no signal path.
+ */
+function platesOf(look) {
+  return [
+    ...TONES.map((tone) => ({
+      ...tone, tone: tone.id, rows: look.rows, sections: look.sections, flow: true,
+      tooltip: `The ${tone.name} tone. The other tone has the same sections.`,
+    })),
+    {
+      id: 'patch', name: 'Patch', title: 'PATCH', rows: look.patchRows, sections: look.patchSections, flow: false,
+      tooltip: 'What the two tones share: the arpeggiator and its pattern, the delay and the reverb.',
+    },
+  ];
+}
+
+/** One plate: its name, then its rows of sections, in a container named after it. */
+function buildPlate(plate, at, ctx) {
   const children = {};
   const rowsAt = [];
-  const title = label(tone.title, { x: PANEL.inset, y: 4, w: 120, h: 16 }, { size: 11, bold: true, colour: ctx.look.tone.title, align: 'left', name: `${tone.name} title` });
+  const title = label(plate.title, { x: PANEL.inset, y: 4, w: 120, h: 16 }, { size: 11, bold: true, colour: ctx.look.tone.title, align: 'left', name: `${plate.name} title` });
   title._children.Text._children.Font.letterSpacing = 1.5;
   children[title._children.Core.id] = title;
   let y = TONE_TITLE + 4;
-  for (const row of ctx.look.rows) {
+  for (const row of plate.rows) {
     let x = PANEL.inset;
     const gaps = [];
     row.sections.forEach((key, index) => {
-      const spec = ctx.look.sections[key];
+      const spec = plate.sections[key];
       const group = section(spec, { x, y }, ctx);
       children[group._children.Core.id] = group;
       x += spec.w + PANEL.gap;
@@ -566,13 +644,13 @@ function buildTone(tone, at, ctx) {
     rowsAt.push({ row, y, gaps });
     y += row.h + PANEL.gap;
   }
-  if (ctx.look === LOOKS.hardware) {
+  if (plate.flow && ctx.look === LOOKS.hardware) {
     for (const control of signalFlow(rowsAt, ctx.look)) children[control._children.Core.id] = control;
     y += 6;
   }
 
   const group = createControl('Group', {
-    Core: { id: `sh201_${tone.id}`, name: tone.name, tooltip: `The ${tone.name} tone. The other tone has the same sections.` },
+    Core: { id: `sh201_${plate.id}`, name: plate.name, tooltip: plate.tooltip },
     Transform: { x: at.x, y: at.y, width: at.w, height: y + PANEL.inset },
     Background: { _children: { Fill: { colour: ctx.look.plate.fill }, Border: ctx.look.plate.border, Corners: { radius: 4 } } },
     Text: { content: '' },
@@ -593,16 +671,16 @@ export function buildSh201Panel(lookName = 'draft') {
 
   const width = PANEL.width - (lookName === 'hardware' ? 12 : 0);
   const left = lookName === 'hardware' ? 6 : 0;
-  const tones = [];
+  const plates = [];
   let top = PANEL.upperTop;
-  for (const tone of TONES) {
-    const group = buildTone(tone, { x: left, y: top, w: width }, { ...ctx, tone: tone.id });
-    tones.push(group);
+  for (const plate of platesOf(look)) {
+    const group = buildPlate(plate, { x: left, y: top, w: width }, { ...ctx, tone: plate.tone ?? null });
+    plates.push(group);
     top += group._children.Transform.height + PANEL.gap;
   }
   if (ctx.missing.length) throw new Error(`layout.mjs places parameters the SH-201 profile does not have:\n  ${ctx.missing.join('\n  ')}`);
 
-  const controls = [...header(look), ...keyboardPart(byId.get('patch.keyboardPart'), look, { x: 420, y: 9, w: 190 }), ...tones];
+  const controls = [...header(look), ...keyboardPart(byId.get('patch.keyboardPart'), look, { x: 420, y: 9, w: 190 }), ...plates];
 
   const panel = createPanel('Roland SH-201');
   panel.controlSet = { id: DEFAULT_CONTROL_SET_ID };
@@ -615,8 +693,9 @@ export function buildSh201Panel(lookName = 'draft') {
   panel.description = look.description;
   panel.requiredProfiles = [{ role: DEVICE_NAME, profileId: profile.id, version: '*' }];
   const knobs = flatControls(controls).filter((c) => c._children?.Designer?.packageName === COMPONENTS.knob.name).length;
+  const bound = flatControls(controls).filter((c) => (c._children?.DeviceBindings?.bindings ?? []).length).length;
   panel.notepad = lookName === 'hardware'
-    ? { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: HARDWARE_ABOUT }] }
+    ? { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: hardwareAbout(bound) }] }
     : { activeNoteIndex: 0, notes: [{ name: 'About this panel', content: ABOUT }, { name: 'Tutorial 1 — the SH-201\'s own look', content: tutorial(knobs) }] };
   panel.panelGuid = look.panelGuid;
   panel.scriptId = look.scriptId;

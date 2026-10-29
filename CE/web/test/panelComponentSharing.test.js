@@ -3,7 +3,7 @@
 // Before, File → Share Panel carried a panel's images, fonts and icons and not its library
 // packages: the copies arrived with their whole design but unlinked, their Source card saying "Not
 // in this library" until the author also sent the library file and the recipient imported it. The
-// SH-201 panels are the case in point — 98 linked copies of three packages — so they are what is
+// SH-201 panels are the case in point — 117 linked copies of four packages — so they are what is
 // shared here, from a library holding their packages to one that does not.
 
 import test from 'node:test';
@@ -45,12 +45,12 @@ async function shareSh201() {
   return result;
 }
 
-test('sharing the SH-201 panel carries the three packages its copies were placed from, once each', async () => {
+test('sharing the SH-201 panel carries the four packages its copies were placed from, once each', async () => {
   const result = await shareSh201();
-  assert.equal(result.componentCount, 3);
+  assert.equal(result.componentCount, 4);
   assert.deepEqual(result.componentsNotInLibrary, []);
   const carried = result.envelope.components.map((envelope) => `${envelope.metadata.name} ${envelope.metadata.version}`).sort();
-  assert.deepEqual(carried, ['SH-201 Fader 1.0.0', 'SH-201 Knob 1.0.0', 'SH-201 LED Switch 1.0.0']);
+  assert.deepEqual(carried, ['SH-201 Arpeggio Grid 1.0.0', 'SH-201 Fader 1.0.0', 'SH-201 Knob 1.0.0', 'SH-201 LED Switch 1.0.0']);
   assert.ok(validatePanelPackage(result.envelope).ok);
 });
 
@@ -64,15 +64,15 @@ test('opened on a computer whose library lacks them, the packages are added and 
   assert.ok(opened, 'the shared panel opened');
   const library = customComponentLibrary.snapshot();
   assert.deepEqual(library.map((entry) => `${entry.name} ${entry.version}`).sort(),
-    ['SH-201 Fader 1.0.0', 'SH-201 Knob 1.0.0', 'SH-201 LED Switch 1.0.0']);
+    ['SH-201 Arpeggio Grid 1.0.0', 'SH-201 Fader 1.0.0', 'SH-201 Knob 1.0.0', 'SH-201 LED Switch 1.0.0']);
   const copies = copiesOf(get(activePanel));
   assert.equal(copies.length, copiesOf(sh201()).length);
-  assert.ok(copies.length > 90, 'both tones\' copies');
+  assert.ok(copies.length > 110, 'both tones\' copies and the patch\'s');
   for (const copy of copies) {
     const report = diffCustomComponentAgainstSource(copy, library);
     assert.equal(report.status, 'current', `${copy._children.Core.name}: ${report.status}`);
   }
-  assert.ok(get(scriptNotifications).some((n) => /Added 3 components to your library/.test(n.message ?? n.text ?? '')),
+  assert.ok(get(scriptNotifications).some((n) => /Added 4 components to your library/.test(n.message ?? n.text ?? '')),
     'the recipient is told what was added');
 });
 
@@ -96,16 +96,16 @@ test('a package of the same name and version with another design is the recipien
   await openPackageText(panelPackageFile(envelope).text);
   const knob = customComponentLibrary.snapshot().find((entry) => entry.name === 'SH-201 Knob');
   assert.equal(knob.fingerprint, kept.fingerprint, 'their knob is still theirs');
-  assert.equal(customComponentLibrary.snapshot().length, 3, 'the fader and the switch were added');
+  assert.equal(customComponentLibrary.snapshot().length, 4, 'the fader, the switch and the grid were added');
   assert.ok(get(scriptNotifications).some((n) => /already has SH-201 Knob 1\.0\.0 with a different design/.test(n.message ?? n.text ?? '')));
 });
 
 test('a copy whose package this library does not hold is named, and the panel still shares', async () => {
-  // Only the knob's package is in the library: the faders and switches cannot take theirs along.
+  // Only the knob's package is in the library: the faders, switches and grid cannot take theirs along.
   customComponentLibrary.importEnvelope(sh201Library().find((p) => p.metadata.name === 'SH-201 Knob'));
   const { envelopes, notInLibrary } = panelComponentPackages(sh201(), customComponentLibrary.snapshot());
   assert.deepEqual(envelopes.map((e) => e.metadata.name), ['SH-201 Knob']);
-  assert.deepEqual([...notInLibrary].sort(), ['SH-201 Fader 1.0.0', 'SH-201 LED Switch 1.0.0']);
+  assert.deepEqual([...notInLibrary].sort(), ['SH-201 Arpeggio Grid 1.0.0', 'SH-201 Fader 1.0.0', 'SH-201 LED Switch 1.0.0']);
 });
 
 test('a package from before components travelled opens as it did, and a malformed list is refused', async () => {

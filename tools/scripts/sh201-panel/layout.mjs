@@ -37,6 +37,7 @@ const TINT = {
   amp: 'FFD9705F',
   play: 'FF80BF90',
   effects: 'FFB2BAC2',
+  arp: 'FFC98BC0',
 };
 
 export const PANEL = { width: 1660, inset: 16, gap: 10, upperTop: 52, sectionTop: 60 };
@@ -173,6 +174,91 @@ export const SECTION_ROWS = [
   { h: 196, sections: ['pitchEnv', 'filter', 'amp', 'performance', 'effects'] },
 ];
 
+/* ------------------------------------------------------------------ what the two tones share */
+
+// The arpeggiator and the effects belong to the patch, not to a tone: one set, under both tones.
+// Their switches are Patch Common parameters (Arpeggio Switch, Hold, Delay Switch, Reverb Switch),
+// and so are Split Arpeggio, which tone arpeggiates in a split, and the Patch Tempo the arpeggio
+// runs at; the rest are the Arpeggio Common, Delay and Reverb blocks.
+//
+//   grid    the SH-201 Arpeggio Grid package: the user pattern, its End Step bound, caption over it
+
+/** The pattern grid's size: the GAIA's, as wide as the panel. Its toolbar lays out by width. */
+export const ARP_GRID = { w: 1604, h: 240 };
+
+export const PATCH_SECTIONS = {
+  arpeggio: {
+    title: 'ARPEGGIO',
+    tint: TINT.arp,
+    about: 'The arpeggiator: on, hold, how held keys are played (MOTIF, GRID, DURATION), at the patch\'s TEMPO. VELOCITY 0 is REAL, the keys\' own velocity. In a split, SPLIT says which tone it plays.',
+    w: 404,
+    h: 196,
+    items: [
+      { p: 'patch.arpeggioSwitch', kind: 'switch', x: 12, y: 38, label: 'ARPEGGIO' },
+      { p: 'patch.arpeggioHold', kind: 'switch', x: 88, y: 38, label: 'HOLD' },
+      { p: 'arpeggio.motif', kind: 'combo', x: 164, y: 42, w: 128, label: 'MOTIF' },
+      { p: 'patch.splitArpeggio', kind: 'combo', x: 304, y: 42, w: 88, label: 'SPLIT' },
+      { p: 'patch.tempo', kind: 'knob', x: 20, y: 100, label: 'TEMPO' },
+      { p: 'arpeggio.octaveRange', kind: 'knob', x: 92, y: 100, label: 'OCTAVE' },
+      { p: 'arpeggio.accentRate', kind: 'knob', x: 164, y: 100, label: 'ACCENT' },
+      { p: 'arpeggio.velocity', kind: 'knob', x: 236, y: 100, label: 'VELOCITY' },
+      { p: 'arpeggio.grid', kind: 'combo', x: 304, y: 100, w: 88, label: 'GRID' },
+      { p: 'arpeggio.duration', kind: 'combo', x: 304, y: 150, w: 88, label: 'DURATION' },
+    ],
+  },
+  delay: {
+    title: 'DELAY',
+    tint: TINT.effects,
+    about: 'The patch\'s delay. Each tone\'s EFFECTS section says how much of it goes here.',
+    w: 316,
+    h: 196,
+    items: [
+      { p: 'patch.delaySwitch', kind: 'switch', x: 12, y: 38, label: 'DELAY' },
+      { p: 'delay.hfDamp', kind: 'combo', x: 96, y: 42, w: 100, label: 'HF DAMP' },
+      { p: 'delay.time', kind: 'knob', x: 20, y: 100, label: 'TIME' },
+      { p: 'delay.feedback', kind: 'knob', x: 92, y: 100, label: 'FEEDBACK' },
+      { p: 'delay.modRate', kind: 'knob', x: 164, y: 100, label: 'MOD RATE' },
+      { p: 'delay.modDepth', kind: 'knob', x: 236, y: 100, label: 'MOD DEPTH' },
+    ],
+  },
+  reverb: {
+    title: 'REVERB',
+    tint: TINT.effects,
+    about: 'The patch\'s reverb. Each tone\'s EFFECTS section says how much of it goes here.',
+    w: 488,
+    h: 196,
+    items: [
+      { p: 'patch.reverbSwitch', kind: 'switch', x: 12, y: 38, label: 'REVERB' },
+      { p: 'reverb.size', kind: 'combo', x: 96, y: 42, w: 64, label: 'SIZE' },
+      { p: 'reverb.highCut', kind: 'combo', x: 174, y: 42, w: 100, label: 'HIGH CUT' },
+      { p: 'reverb.lfDampFrequency', kind: 'combo', x: 288, y: 42, w: 86, label: 'LF DAMP' },
+      { p: 'reverb.hfDampFrequency', kind: 'combo', x: 386, y: 42, w: 86, label: 'HF DAMP' },
+      { p: 'reverb.time', kind: 'knob', x: 20, y: 100, label: 'TIME' },
+      { p: 'reverb.preDelay', kind: 'knob', x: 90, y: 100, label: 'PRE DELAY' },
+      { p: 'reverb.density', kind: 'knob', x: 160, y: 100, label: 'DENSITY' },
+      { p: 'reverb.diffusion', kind: 'knob', x: 230, y: 100, label: 'DIFFUSION' },
+      { p: 'reverb.lfDampGain', kind: 'knob', x: 306, y: 100, label: 'LF GAIN' },
+      { p: 'reverb.hfDampGain', kind: 'knob', x: 404, y: 100, label: 'HF GAIN' },
+    ],
+  },
+  pattern: {
+    title: 'PATTERN',
+    tint: TINT.arp,
+    about: 'The user arpeggio: sixteen notes over thirty-two steps. Notes and END STEP go to the synth on SEND PATTERN; READ PATTERN reads the synth\'s back.',
+    w: 1628,
+    h: 292,
+    items: [
+      { p: 'arpeggio.endStep', kind: 'grid', x: 12, y: 42, ...ARP_GRID, captionName: 'pattern gestures',
+        label: 'RULER: CLICK / DRAG = END STEP     |     NOTE: LEFT = MOVE   ·   MIDDLE = VELOCITY   ·   RIGHT = LENGTH   ·   SHIFT = FINE' },
+    ],
+  },
+};
+
+export const PATCH_ROWS = [
+  { h: 196, sections: ['arpeggio', 'delay', 'reverb'] },
+  { h: 292, sections: ['pattern'] },
+];
+
 /* ------------------------------------------------------------------ the hardware look */
 
 // What the tutorial in the draft's notepad ends at: the same parameters on the same packages, in
@@ -255,6 +341,10 @@ export const HARDWARE_SECTIONS = {
   },
   performance: pick('performance', { surface: 'black', h: 214 }),
 };
+
+/** The patch's sections on the black body, as the modulation row is. */
+export const HARDWARE_PATCH_SECTIONS = Object.fromEntries(Object.entries(PATCH_SECTIONS)
+  .map(([key, spec]) => [key, { ...spec, surface: 'black' }]));
 
 export const HARDWARE_ROWS = [
   { h: 196, sections: ['osc1', 'osc2', 'mixMod', 'filter', 'amp', 'effects'], flow: true },

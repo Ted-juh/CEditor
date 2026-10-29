@@ -2,7 +2,7 @@
   "format": "ceditor-component-library",
   "formatVersion": 1,
   "exportedAt": "2026-10-29T00:00:00.000Z",
-  "packageCount": 3,
+  "packageCount": 4,
   "packages": [
     {
       "format": "ceditor-component",
@@ -18700,6 +18700,1718 @@
                 "label": "Value",
                 "type": "float",
                 "enabled": true
+              }
+            },
+            "editableProperties": {}
+          },
+          "ExternalAPI": {
+            "_type": "ExternalAPI",
+            "version": 1,
+            "addressableName": "",
+            "acceptsExternalLinks": true,
+            "emitsExternalLinks": true,
+            "linkPolicy": "publishedOnly",
+            "inputs": [],
+            "outputs": [],
+            "events": [
+              {
+                "id": "valueChange",
+                "label": "Value Change",
+                "enabled": true
+              },
+              {
+                "id": "modeChange",
+                "label": "Mode Change",
+                "enabled": true
+              }
+            ]
+          },
+          "Variants": {
+            "_type": "Variants",
+            "active": "default",
+            "_children": {
+              "default": {
+                "_type": "Variant",
+                "name": "default",
+                "label": "Default",
+                "enabled": true,
+                "description": "Base editable custom component layout.",
+                "patches": {}
+              }
+            }
+          },
+          "Scripts": {
+            "_type": "Scripts",
+            "enabled": true,
+            "runInPreview": true,
+            "scripts": []
+          }
+        }
+      },
+      "assets": {
+        "_type": "Assets",
+        "images": {},
+        "filmstrips": {},
+        "fonts": {},
+        "thumbnails": {},
+        "packagePolicy": {
+          "embedAssets": true,
+          "warnMissingFonts": true
+        }
+      },
+      "assetsEmbedded": true,
+      "migration": {
+        "fromVersion": 1,
+        "toVersion": 1,
+        "applied": [],
+        "warnings": []
+      }
+    },
+    {
+      "format": "ceditor-component",
+      "formatVersion": 1,
+      "compatibility": {
+        "customComponentVersion": 1,
+        "minimumFormatVersion": 1
+      },
+      "exportedAt": "2026-10-29T00:00:00.000Z",
+      "metadata": {
+        "name": "SH-201 Arpeggio Grid",
+        "id": "sh-201-arpeggio-grid",
+        "author": "CEditor",
+        "version": "1.0.0",
+        "description": "The user arpeggio pattern: sixteen notes over thirty-two steps, read from and sent to the synth with READ PATTERN and SEND PATTERN.",
+        "category": "Roland SH-201",
+        "tags": [
+          "sh-201",
+          "roland",
+          "grid"
+        ],
+        "license": "AGPL-3.0",
+        "homepage": ""
+      },
+      "fingerprint": "d1decd24",
+      "summary": {
+        "parts": 1,
+        "materializedParts": 133,
+        "generatedParts": 132,
+        "valueChannels": 7,
+        "behaviors": 0,
+        "hitZones": 0,
+        "materializedHitZones": 21,
+        "generatedHitZones": 21,
+        "generatedSources": 1,
+        "generators": 0,
+        "links": 0,
+        "bindings": 0,
+        "animations": 0,
+        "variants": 1,
+        "images": 0,
+        "filmstrips": 0,
+        "publicInputs": 2,
+        "publicOutputs": 4,
+        "editableProperties": 0,
+        "arpeggiator": true,
+        "arpeggiatorSteps": 32,
+        "arpeggiatorBlocks": 7,
+        "arpeggiatorNotes": 5,
+        "arpeggiatorMaxPolyphony": 1
+      },
+      "readiness": {
+        "ok": true,
+        "score": 75,
+        "doneCount": 6,
+        "totalCount": 8,
+        "requiredOpenCount": 0,
+        "recommendedOpenCount": 1,
+        "optionalOpenCount": 1,
+        "steps": [
+          {
+            "id": "visuals",
+            "label": "Visual Layers",
+            "done": true,
+            "detail": "133 authored/runtime layer(s)",
+            "target": "shapes",
+            "severity": "required"
+          },
+          {
+            "id": "values",
+            "label": "Value Model",
+            "done": true,
+            "detail": "7 value channel(s)",
+            "target": "overview",
+            "severity": "required"
+          },
+          {
+            "id": "interaction",
+            "label": "Interaction",
+            "done": true,
+            "detail": "0 behavior(s), 22 hit surface(s)",
+            "target": "movement",
+            "severity": "recommended"
+          },
+          {
+            "id": "motion",
+            "label": "Motion Rules",
+            "done": true,
+            "detail": "0 binding(s), 0 animation(s), 0 link(s)",
+            "target": "movement",
+            "severity": "optional"
+          },
+          {
+            "id": "publicApi",
+            "label": "Panel API",
+            "done": true,
+            "detail": "2 input(s), 4 output(s)",
+            "target": "links",
+            "severity": "recommended"
+          },
+          {
+            "id": "properties",
+            "label": "Editable Properties",
+            "done": false,
+            "detail": "0 published property control(s)",
+            "target": "states",
+            "severity": "recommended"
+          },
+          {
+            "id": "assets",
+            "label": "Packaged Assets",
+            "done": false,
+            "detail": "0 image(s), 0 filmstrip(s)",
+            "target": "assets",
+            "severity": "optional"
+          },
+          {
+            "id": "validPackage",
+            "label": "Package Validity",
+            "done": true,
+            "detail": "No blocking package issues",
+            "target": "overview",
+            "severity": "required"
+          }
+        ],
+        "validation": {
+          "ok": true,
+          "issues": [],
+          "warnings": [
+            "Published input \"currentStep\" has no package default value.",
+            "Published input \"endStep\" has no package default value.",
+            "Published output \"note\" has no package default value.",
+            "Published output \"velocity\" has no package default value."
+          ]
+        }
+      },
+      "thumbnail": {
+        "width": 1604,
+        "height": 240,
+        "aspectRatio": 6.683,
+        "parts": [
+          {
+            "name": "arp_block_arp_seed_5_zone_2_bottom",
+            "kind": "rectangle",
+            "x": 41,
+            "y": 39.2,
+            "width": 0.1,
+            "height": 1.3,
+            "rotation": 0,
+            "radius": 0,
+            "colour": "#081015",
+            "text": "",
+            "zIndex": 25
+          },
+          {
+            "name": "arp_block_arp_seed_6_zone_1_top",
+            "kind": "rectangle",
+            "x": 47.1,
+            "y": 60.8,
+            "width": 0.1,
+            "height": 1.3,
+            "rotation": 0,
+            "radius": 0,
+            "colour": "#081015",
+            "text": "",
+            "zIndex": 25
+          },
+          {
+            "name": "arp_block_arp_seed_6_zone_1_bottom",
+            "kind": "rectangle",
+            "x": 47.1,
+            "y": 64.2,
+            "width": 0.1,
+            "height": 1.3,
+            "rotation": 0,
+            "radius": 0,
+            "colour": "#081015",
+            "text": "",
+            "zIndex": 25
+          },
+          {
+            "name": "arp_block_arp_seed_6_zone_2_top",
+            "kind": "rectangle",
+            "x": 49.1,
+            "y": 60.8,
+            "width": 0.1,
+            "height": 1.3,
+            "rotation": 0,
+            "radius": 0,
+            "colour": "#081015",
+            "text": "",
+            "zIndex": 25
+          },
+          {
+            "name": "arp_block_arp_seed_6_zone_2_bottom",
+            "kind": "rectangle",
+            "x": 49.1,
+            "y": 64.2,
+            "width": 0.1,
+            "height": 1.3,
+            "rotation": 0,
+            "radius": 0,
+            "colour": "#081015",
+            "text": "",
+            "zIndex": 25
+          },
+          {
+            "name": "arp_numeric_selection",
+            "kind": "rectangle",
+            "x": 2.7,
+            "y": 89.2,
+            "width": 9.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "SELECT A N",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_previous",
+            "kind": "rectangle",
+            "x": 13,
+            "y": 89.2,
+            "width": 1.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#11181E",
+            "text": "‹",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_next",
+            "kind": "rectangle",
+            "x": 15.2,
+            "y": 89.2,
+            "width": 1.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#11181E",
+            "text": "›",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_PitchLabel",
+            "kind": "rectangle",
+            "x": 17.5,
+            "y": 89.2,
+            "width": 4.5,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "PITCH",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_pitch",
+            "kind": "rectangle",
+            "x": 21.9,
+            "y": 89.2,
+            "width": 3.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#11181E",
+            "text": "—",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_StartLabel",
+            "kind": "rectangle",
+            "x": 26.2,
+            "y": 89.2,
+            "width": 4.5,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "START",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_start",
+            "kind": "rectangle",
+            "x": 30.7,
+            "y": 89.2,
+            "width": 3.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#11181E",
+            "text": "—",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_LengthLabel",
+            "kind": "rectangle",
+            "x": 34.9,
+            "y": 89.2,
+            "width": 4.5,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "LENGTH",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_length",
+            "kind": "rectangle",
+            "x": 39.4,
+            "y": 89.2,
+            "width": 3.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#11181E",
+            "text": "—",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_VelocityLabel",
+            "kind": "rectangle",
+            "x": 43.6,
+            "y": 89.2,
+            "width": 4.5,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "VELOCITY",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_velocity",
+            "kind": "rectangle",
+            "x": 48.1,
+            "y": 89.2,
+            "width": 3.7,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#11181E",
+            "text": "—",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_status",
+            "kind": "rectangle",
+            "x": 52.9,
+            "y": 89.2,
+            "width": 9,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "",
+            "zIndex": 29
+          },
+          {
+            "name": "arp_numeric_keys",
+            "kind": "rectangle",
+            "x": 62.3,
+            "y": 89.2,
+            "width": 37.2,
+            "height": 9.2,
+            "rotation": 0,
+            "radius": 3,
+            "colour": "#000000",
+            "text": "[ / ] SELE",
+            "zIndex": 29
+          }
+        ]
+      },
+      "capabilities": {
+        "primaryKind": "arpeggiator",
+        "labels": [
+          "arpeggiator",
+          "sequencer",
+          "multi"
+        ]
+      },
+      "publicApiSummary": {
+        "inputs": [
+          {
+            "name": "currentStep",
+            "label": "Current Step",
+            "type": "int",
+            "channel": "arpCurrentStep"
+          },
+          {
+            "name": "endStep",
+            "label": "Loop End Step",
+            "type": "int",
+            "channel": "arpEndStep"
+          }
+        ],
+        "outputs": [
+          {
+            "name": "gate",
+            "label": "Gate",
+            "type": "bool",
+            "channel": "arpGate"
+          },
+          {
+            "name": "note",
+            "label": "Note",
+            "type": "int",
+            "channel": "arpNote"
+          },
+          {
+            "name": "velocity",
+            "label": "Velocity",
+            "type": "int",
+            "channel": "arpVelocity"
+          },
+          {
+            "name": "pattern",
+            "label": "Pattern",
+            "type": "array",
+            "channel": "arpPattern"
+          }
+        ],
+        "properties": [],
+        "counts": {
+          "inputs": 2,
+          "outputs": 4,
+          "properties": 0,
+          "total": 6
+        }
+      },
+      "assetManifest": {
+        "images": [],
+        "filmstrips": [],
+        "counts": {
+          "images": 0,
+          "filmstrips": 0,
+          "total": 0
+        },
+        "totalBytes": 0
+      },
+      "fontManifest": {
+        "families": [],
+        "warnMissing": true
+      },
+      "validation": {
+        "ok": true,
+        "issues": [],
+        "warnings": [
+          "Published input \"currentStep\" has no package default value.",
+          "Published input \"endStep\" has no package default value.",
+          "Published output \"note\" has no package default value.",
+          "Published output \"velocity\" has no package default value."
+        ]
+      },
+      "publicApi": {
+        "_type": "PublishedProperties",
+        "inputs": {
+          "currentStep": {
+            "channel": "arpCurrentStep",
+            "label": "Current Step",
+            "type": "int"
+          },
+          "endStep": {
+            "channel": "arpEndStep",
+            "label": "Loop End Step",
+            "type": "int"
+          }
+        },
+        "outputs": {
+          "gate": {
+            "channel": "arpGate",
+            "label": "Gate",
+            "type": "bool"
+          },
+          "note": {
+            "channel": "arpNote",
+            "label": "Note",
+            "type": "int"
+          },
+          "velocity": {
+            "channel": "arpVelocity",
+            "label": "Velocity",
+            "type": "int"
+          },
+          "pattern": {
+            "channel": "arpPattern",
+            "label": "Pattern",
+            "type": "array"
+          }
+        },
+        "editableProperties": {}
+      },
+      "externalApi": {
+        "_type": "ExternalAPI",
+        "version": 1,
+        "addressableName": "",
+        "acceptsExternalLinks": true,
+        "emitsExternalLinks": true,
+        "linkPolicy": "publishedOnly",
+        "inputs": [],
+        "outputs": [],
+        "events": [
+          {
+            "id": "valueChange",
+            "label": "Value Change",
+            "enabled": true
+          },
+          {
+            "id": "modeChange",
+            "label": "Mode Change",
+            "enabled": true
+          }
+        ]
+      },
+      "component": {
+        "_type": "Control",
+        "_children": {
+          "Core": {
+            "_type": "Core",
+            "name": "SH-201 Arpeggio Grid",
+            "controlType": "CustomComponent",
+            "tooltip": "",
+            "screenReaderText": "",
+            "stylePreset": "",
+            "controlSetId": "",
+            "controlForm": "",
+            "formSize": 100,
+            "formDepth": 60,
+            "formDivisions": 12,
+            "formShowValue": true,
+            "formFaceColour": "FFDEDBD2",
+            "formHousingColour": "FF171A20",
+            "formInkColour": "FF20282C",
+            "formLabelColour": "FF20282C",
+            "formAccentColour": "FF40BCCC",
+            "visible": true,
+            "enabled": true,
+            "locked": false,
+            "zIndex": 0,
+            "alwaysOnTop": false,
+            "layer": "Main",
+            "id": "sh201_component_grid"
+          },
+          "Transform": {
+            "_type": "Transform",
+            "x": 0,
+            "y": 0,
+            "anchor": "topLeft",
+            "affectsFit": true,
+            "width": 1604,
+            "height": 240,
+            "minWidth": 0,
+            "minHeight": 0,
+            "maxWidth": 0,
+            "maxHeight": 0,
+            "aspectLock": false,
+            "opacity": 1,
+            "rotation": 0,
+            "scale": 1
+          },
+          "Background": {
+            "_type": "Background",
+            "mode": "solid",
+            "_children": {
+              "Fill": {
+                "_type": "Fill",
+                "mode": "solid",
+                "layerOrder": [
+                  "solid",
+                  "gradient",
+                  "image",
+                  "overlay"
+                ],
+                "colour": "00000000",
+                "solidEnabled": false,
+                "solidBlend": "normal",
+                "solidClipMode": "shape",
+                "solidMuted": false,
+                "gradientEnabled": false,
+                "gradientOpacity": 100,
+                "gradientName": "",
+                "gradientBlend": "normal",
+                "gradientClipMode": "shape",
+                "gradientMuted": false,
+                "gradient": null,
+                "imageEnabled": false,
+                "imageMuted": false,
+                "imageSrc": "",
+                "imageOpacity": 100,
+                "imageFit": "fill",
+                "imageAlign": "center",
+                "imageOffsetX": 0,
+                "imageOffsetY": 0,
+                "imageBlend": "normal",
+                "imageBlur": 0,
+                "imageTint": "FFFFFF",
+                "imageFlipH": false,
+                "imageFlipV": false,
+                "imageRotation": 0,
+                "imageGrayscale": false,
+                "imageSaturation": 100,
+                "imageBrightness": 100,
+                "imageContrast": 100,
+                "imageTileScale": 1,
+                "imageClipMode": "shape",
+                "overlayEnabled": false,
+                "overlayMuted": false,
+                "overlaySrc": "",
+                "overlayOpacity": 100,
+                "overlayFit": "tile",
+                "overlayAlign": "center",
+                "overlayOffsetX": 0,
+                "overlayOffsetY": 0,
+                "overlayBlend": "normal",
+                "overlayBlur": 0,
+                "overlayTint": "FFFFFF",
+                "overlayFlipH": false,
+                "overlayFlipV": false,
+                "overlayRotation": 0,
+                "overlayGrayscale": false,
+                "overlaySaturation": 100,
+                "overlayBrightness": 100,
+                "overlayContrast": 100,
+                "overlayTileScale": 1,
+                "overlayClipMode": "shape",
+                "soloLayer": ""
+              },
+              "Border": {
+                "_type": "Border",
+                "enabled": false,
+                "linked": true,
+                "style": "solid",
+                "thickness": 2,
+                "dotRadius": 2,
+                "colour": "FFFFFFFF",
+                "fillSolid": true,
+                "fillGradient": false,
+                "fillImage": false,
+                "fillOverlay": false,
+                "imageSrc": "",
+                "overlaySrc": "",
+                "gradient": null,
+                "gradientFlow": "across",
+                "doubleGap": 2,
+                "top": {
+                  "style": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across"
+                },
+                "right": {
+                  "style": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across"
+                },
+                "bottom": {
+                  "style": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across"
+                },
+                "left": {
+                  "style": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across"
+                }
+              },
+              "Corners": {
+                "_type": "Corners",
+                "linked": true,
+                "borderEnabled": true,
+                "radius": 10,
+                "style": "rounded",
+                "direction": "outward",
+                "borderStyle": "solid",
+                "thickness": 2,
+                "dotRadius": 2,
+                "doubleGap": 2,
+                "doubleAnchor": "center",
+                "doubleDirection": "outward",
+                "colour": "FFFFFFFF",
+                "fillSolid": true,
+                "fillGradient": false,
+                "fillImage": false,
+                "fillOverlay": false,
+                "imageSrc": "",
+                "overlaySrc": "",
+                "gradient": null,
+                "gradientFlow": "across",
+                "cornerGradientMode": "radial",
+                "cornerGradientFlip": false,
+                "cornerGradientInheritSide": "A",
+                "topLeft": {
+                  "radius": 0,
+                  "borderEnabled": true,
+                  "style": "rounded",
+                  "direction": "outward",
+                  "borderStyle": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "doubleAnchor": "center",
+                  "doubleDirection": "outward",
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across",
+                  "cornerGradientMode": "radial",
+                  "cornerGradientFlip": false,
+                  "cornerGradientInheritSide": "A"
+                },
+                "topRight": {
+                  "radius": 0,
+                  "borderEnabled": true,
+                  "style": "rounded",
+                  "direction": "outward",
+                  "borderStyle": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "doubleAnchor": "center",
+                  "doubleDirection": "outward",
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across",
+                  "cornerGradientMode": "radial",
+                  "cornerGradientFlip": false,
+                  "cornerGradientInheritSide": "A"
+                },
+                "bottomLeft": {
+                  "radius": 0,
+                  "borderEnabled": true,
+                  "style": "rounded",
+                  "direction": "outward",
+                  "borderStyle": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "doubleAnchor": "center",
+                  "doubleDirection": "outward",
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across",
+                  "cornerGradientMode": "radial",
+                  "cornerGradientFlip": false,
+                  "cornerGradientInheritSide": "A"
+                },
+                "bottomRight": {
+                  "radius": 0,
+                  "borderEnabled": true,
+                  "style": "rounded",
+                  "direction": "outward",
+                  "borderStyle": "solid",
+                  "thickness": 2,
+                  "dotRadius": 2,
+                  "doubleGap": 2,
+                  "doubleAnchor": "center",
+                  "doubleDirection": "outward",
+                  "colour": "FFFFFFFF",
+                  "fillSolid": true,
+                  "fillGradient": false,
+                  "fillImage": false,
+                  "fillOverlay": false,
+                  "imageSrc": "",
+                  "overlaySrc": "",
+                  "gradient": null,
+                  "gradientFlow": "across",
+                  "cornerGradientMode": "radial",
+                  "cornerGradientFlip": false,
+                  "cornerGradientInheritSide": "A"
+                }
+              }
+            }
+          },
+          "Effects": {
+            "_type": "Effects",
+            "_children": {
+              "Shadows": {
+                "_type": "Shadows",
+                "items": [
+                  {
+                    "enabled": false,
+                    "type": "drop",
+                    "offsetX": 0,
+                    "offsetY": 2,
+                    "blur": 4,
+                    "spread": 0,
+                    "colour": "66000000"
+                  }
+                ]
+              },
+              "Bevel": {
+                "_type": "Bevel",
+                "enabled": false,
+                "style": "outer-bevel",
+                "depth": 100,
+                "size": 5,
+                "softness": 0,
+                "angle": 135,
+                "highlightColour": "FFFFFF",
+                "highlightOpacity": 75,
+                "shadowColour": "000000",
+                "shadowOpacity": 75
+              },
+              "Filters": {
+                "_type": "Filters",
+                "blur": 0,
+                "brightness": 100,
+                "contrast": 100,
+                "saturation": 100,
+                "hueRotate": 0,
+                "grayscale": 0,
+                "sepia": 0,
+                "invert": 0
+              },
+              "Blend": {
+                "_type": "Blend",
+                "mode": "normal"
+              },
+              "Material": {
+                "_type": "Material",
+                "enabled": false,
+                "kind": "blast",
+                "strength": 100,
+                "shine": 100,
+                "grain": 100,
+                "lampFollowsSet": true,
+                "lampAzimuth": 225,
+                "lampElevation": 48
+              }
+            }
+          },
+          "Mouse": {
+            "_type": "Mouse",
+            "cursor": "pointer",
+            "interceptClicks": true,
+            "interceptChildClicks": false,
+            "bringToFrontOnClick": false,
+            "draggable": false,
+            "hitTestShape": "rectangle",
+            "focusable": true,
+            "focusOutline": false,
+            "tabIndex": 0,
+            "dragMode": "auto",
+            "dragSensitivity": 1,
+            "invertX": false,
+            "invertY": false
+          },
+          "Designer": {
+            "_type": "Designer",
+            "version": 1,
+            "mode": "workshop",
+            "authoringStage": "foundation",
+            "selectedAssistantContext": "overview",
+            "selectedLayer": "background",
+            "selectedValueChannel": "mainValue",
+            "selectedBehavior": "mainSlider",
+            "selectedHitZone": "mainDragArea",
+            "selectedGenerator": "",
+            "selectedAsset": "",
+            "activeVariant": "default",
+            "preview": {
+              "state": "base",
+              "animationsEnabled": true,
+              "showHitZones": false,
+              "showBounds": true,
+              "showValues": true,
+              "testValue": 0.5
+            },
+            "arpeggiator": {
+              "enabled": true,
+              "numericFields": true,
+              "stepCount": 32,
+              "noteMin": 0,
+              "noteMax": 127,
+              "viewNote": 60,
+              "selectedBlock": "",
+              "blocks": [
+                {
+                  "id": "arp_seed_0",
+                  "note": 60,
+                  "step": 0,
+                  "length": 1,
+                  "velocity": 112
+                },
+                {
+                  "id": "arp_seed_1",
+                  "note": 63,
+                  "step": 2,
+                  "length": 1,
+                  "velocity": 88
+                },
+                {
+                  "id": "arp_seed_2",
+                  "note": 67,
+                  "step": 4,
+                  "length": 1,
+                  "velocity": 96
+                },
+                {
+                  "id": "arp_seed_3",
+                  "note": 70,
+                  "step": 6,
+                  "length": 1,
+                  "velocity": 80
+                },
+                {
+                  "id": "arp_seed_4",
+                  "note": 72,
+                  "step": 8,
+                  "length": 2,
+                  "velocity": 120
+                },
+                {
+                  "id": "arp_seed_5",
+                  "note": 67,
+                  "step": 12,
+                  "length": 1,
+                  "velocity": 88
+                },
+                {
+                  "id": "arp_seed_6",
+                  "note": 63,
+                  "step": 14,
+                  "length": 2,
+                  "velocity": 88
+                }
+              ]
+            },
+            "notes": "Custom components are reusable mini-instruments made from layers, values, behaviors, hit zones, generators, links, states, and animations."
+          },
+          "Parts": {
+            "_type": "Parts",
+            "_children": {
+              "field": {
+                "_type": "Part",
+                "name": "field",
+                "role": "custom",
+                "kind": "rectangle",
+                "visible": true,
+                "opacity": 1,
+                "zIndex": 0,
+                "acceptsStatePatches": true,
+                "clipChildren": false,
+                "meta": {},
+                "_children": {
+                  "Layout": {
+                    "_type": "PartLayout",
+                    "mode": "absolute",
+                    "x": 0,
+                    "y": 0,
+                    "width": 1604,
+                    "height": 240,
+                    "xUnit": "px",
+                    "yUnit": "px",
+                    "widthUnit": "px",
+                    "heightUnit": "px",
+                    "anchorX": "left",
+                    "anchorY": "top",
+                    "align": "center",
+                    "paddingLeft": 0,
+                    "paddingRight": 0,
+                    "paddingTop": 0,
+                    "paddingBottom": 0,
+                    "offsetX": 0,
+                    "offsetY": 0,
+                    "rotation": 0,
+                    "scale": 1,
+                    "pivotX": 50,
+                    "pivotY": 50
+                  },
+                  "Background": {
+                    "_type": "Background",
+                    "mode": "solid",
+                    "_children": {
+                      "Fill": {
+                        "_type": "Fill",
+                        "mode": "solid",
+                        "layerOrder": [
+                          "solid",
+                          "gradient",
+                          "image",
+                          "overlay"
+                        ],
+                        "colour": "FF0D1116",
+                        "solidEnabled": true,
+                        "solidBlend": "normal",
+                        "solidClipMode": "shape",
+                        "solidMuted": false,
+                        "gradientEnabled": false,
+                        "gradientOpacity": 100,
+                        "gradientName": "",
+                        "gradientBlend": "normal",
+                        "gradientClipMode": "shape",
+                        "gradientMuted": false,
+                        "gradient": null,
+                        "imageEnabled": false,
+                        "imageMuted": false,
+                        "imageSrc": "",
+                        "imageOpacity": 100,
+                        "imageFit": "fill",
+                        "imageAlign": "center",
+                        "imageOffsetX": 0,
+                        "imageOffsetY": 0,
+                        "imageBlend": "normal",
+                        "imageBlur": 0,
+                        "imageTint": "FFFFFF",
+                        "imageFlipH": false,
+                        "imageFlipV": false,
+                        "imageRotation": 0,
+                        "imageGrayscale": false,
+                        "imageSaturation": 100,
+                        "imageBrightness": 100,
+                        "imageContrast": 100,
+                        "imageTileScale": 1,
+                        "imageClipMode": "shape",
+                        "overlayEnabled": false,
+                        "overlayMuted": false,
+                        "overlaySrc": "",
+                        "overlayOpacity": 100,
+                        "overlayFit": "tile",
+                        "overlayAlign": "center",
+                        "overlayOffsetX": 0,
+                        "overlayOffsetY": 0,
+                        "overlayBlend": "normal",
+                        "overlayBlur": 0,
+                        "overlayTint": "FFFFFF",
+                        "overlayFlipH": false,
+                        "overlayFlipV": false,
+                        "overlayRotation": 0,
+                        "overlayGrayscale": false,
+                        "overlaySaturation": 100,
+                        "overlayBrightness": 100,
+                        "overlayContrast": 100,
+                        "overlayTileScale": 1,
+                        "overlayClipMode": "shape",
+                        "soloLayer": ""
+                      },
+                      "Border": {
+                        "_type": "Border",
+                        "enabled": true,
+                        "linked": true,
+                        "style": "solid",
+                        "thickness": 1,
+                        "dotRadius": 2,
+                        "colour": "55000000",
+                        "fillSolid": true,
+                        "fillGradient": false,
+                        "fillImage": false,
+                        "fillOverlay": false,
+                        "imageSrc": "",
+                        "overlaySrc": "",
+                        "gradient": null,
+                        "gradientFlow": "across",
+                        "doubleGap": 2,
+                        "top": {
+                          "style": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across"
+                        },
+                        "right": {
+                          "style": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across"
+                        },
+                        "bottom": {
+                          "style": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across"
+                        },
+                        "left": {
+                          "style": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across"
+                        }
+                      },
+                      "Corners": {
+                        "_type": "Corners",
+                        "linked": true,
+                        "borderEnabled": true,
+                        "radius": 4,
+                        "style": "rounded",
+                        "direction": "outward",
+                        "borderStyle": "solid",
+                        "thickness": 2,
+                        "dotRadius": 2,
+                        "doubleGap": 2,
+                        "doubleAnchor": "center",
+                        "doubleDirection": "outward",
+                        "colour": "FFFFFFFF",
+                        "fillSolid": true,
+                        "fillGradient": false,
+                        "fillImage": false,
+                        "fillOverlay": false,
+                        "imageSrc": "",
+                        "overlaySrc": "",
+                        "gradient": null,
+                        "gradientFlow": "across",
+                        "cornerGradientMode": "radial",
+                        "cornerGradientFlip": false,
+                        "cornerGradientInheritSide": "A",
+                        "topLeft": {
+                          "radius": 0,
+                          "borderEnabled": true,
+                          "style": "rounded",
+                          "direction": "outward",
+                          "borderStyle": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "doubleAnchor": "center",
+                          "doubleDirection": "outward",
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across",
+                          "cornerGradientMode": "radial",
+                          "cornerGradientFlip": false,
+                          "cornerGradientInheritSide": "A"
+                        },
+                        "topRight": {
+                          "radius": 0,
+                          "borderEnabled": true,
+                          "style": "rounded",
+                          "direction": "outward",
+                          "borderStyle": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "doubleAnchor": "center",
+                          "doubleDirection": "outward",
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across",
+                          "cornerGradientMode": "radial",
+                          "cornerGradientFlip": false,
+                          "cornerGradientInheritSide": "A"
+                        },
+                        "bottomLeft": {
+                          "radius": 0,
+                          "borderEnabled": true,
+                          "style": "rounded",
+                          "direction": "outward",
+                          "borderStyle": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "doubleAnchor": "center",
+                          "doubleDirection": "outward",
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across",
+                          "cornerGradientMode": "radial",
+                          "cornerGradientFlip": false,
+                          "cornerGradientInheritSide": "A"
+                        },
+                        "bottomRight": {
+                          "radius": 0,
+                          "borderEnabled": true,
+                          "style": "rounded",
+                          "direction": "outward",
+                          "borderStyle": "solid",
+                          "thickness": 2,
+                          "dotRadius": 2,
+                          "doubleGap": 2,
+                          "doubleAnchor": "center",
+                          "doubleDirection": "outward",
+                          "colour": "FFFFFFFF",
+                          "fillSolid": true,
+                          "fillGradient": false,
+                          "fillImage": false,
+                          "fillOverlay": false,
+                          "imageSrc": "",
+                          "overlaySrc": "",
+                          "gradient": null,
+                          "gradientFlow": "across",
+                          "cornerGradientMode": "radial",
+                          "cornerGradientFlip": false,
+                          "cornerGradientInheritSide": "A"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "Assets": {
+            "_type": "Assets",
+            "images": {},
+            "filmstrips": {},
+            "fonts": {},
+            "thumbnails": {},
+            "packagePolicy": {
+              "embedAssets": true,
+              "warnMissingFonts": true
+            }
+          },
+          "ValueChannels": {
+            "_type": "ValueChannels",
+            "_children": {
+              "arpCurrentStep": {
+                "_type": "ValueChannel",
+                "name": "arpCurrentStep",
+                "label": "Current Step",
+                "type": "int",
+                "min": 0,
+                "max": 31,
+                "step": 1,
+                "defaultValue": 0,
+                "currentValue": 0,
+                "publicInput": true,
+                "publicOutput": true,
+                "deviceBindable": true,
+                "format": {
+                  "precision": 0,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "snap": {
+                  "enabled": true,
+                  "mode": "step"
+                },
+                "curve": {
+                  "mode": "linear",
+                  "deadZone": 0,
+                  "hysteresis": 0
+                },
+                "constraints": {
+                  "enabled": true,
+                  "normalizedMin": 0,
+                  "normalizedMax": 1
+                }
+              },
+              "arpStepCount": {
+                "_type": "ValueChannel",
+                "name": "arpStepCount",
+                "label": "Step Count",
+                "type": "int",
+                "min": 1,
+                "max": 256,
+                "step": 1,
+                "defaultValue": 32,
+                "currentValue": 32,
+                "publicInput": true,
+                "publicOutput": true,
+                "deviceBindable": true,
+                "format": {
+                  "precision": 0,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "snap": {
+                  "enabled": true,
+                  "mode": "step"
+                },
+                "curve": {
+                  "mode": "linear",
+                  "deadZone": 0,
+                  "hysteresis": 0
+                },
+                "constraints": {
+                  "enabled": true,
+                  "normalizedMin": 0,
+                  "normalizedMax": 1
+                }
+              },
+              "arpEndStep": {
+                "_type": "ValueChannel",
+                "name": "arpEndStep",
+                "label": "Loop End Step",
+                "type": "int",
+                "min": 1,
+                "max": 32,
+                "step": 1,
+                "defaultValue": 32,
+                "currentValue": 32,
+                "publicInput": true,
+                "publicOutput": true,
+                "deviceBindable": true,
+                "format": {
+                  "precision": 0,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "snap": {
+                  "enabled": true,
+                  "mode": "step"
+                },
+                "curve": {
+                  "mode": "linear",
+                  "deadZone": 0,
+                  "hysteresis": 0
+                },
+                "constraints": {
+                  "enabled": true,
+                  "normalizedMin": 0,
+                  "normalizedMax": 1
+                }
+              },
+              "arpGate": {
+                "_type": "ValueChannel",
+                "name": "arpGate",
+                "label": "Gate",
+                "type": "bool",
+                "min": 0,
+                "max": 1,
+                "step": 1,
+                "defaultValue": 0,
+                "currentValue": 0,
+                "publicInput": true,
+                "publicOutput": true,
+                "deviceBindable": true,
+                "format": {
+                  "precision": 2,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "snap": {
+                  "enabled": true,
+                  "mode": "step"
+                },
+                "curve": {
+                  "mode": "linear",
+                  "deadZone": 0,
+                  "hysteresis": 0
+                },
+                "constraints": {
+                  "enabled": true,
+                  "normalizedMin": 0,
+                  "normalizedMax": 1
+                }
+              },
+              "arpNote": {
+                "_type": "ValueChannel",
+                "name": "arpNote",
+                "label": "Note",
+                "type": "int",
+                "min": 0,
+                "max": 127,
+                "step": 1,
+                "defaultValue": 0,
+                "currentValue": 0,
+                "publicInput": true,
+                "publicOutput": true,
+                "deviceBindable": true,
+                "format": {
+                  "precision": 0,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "snap": {
+                  "enabled": true,
+                  "mode": "step"
+                },
+                "curve": {
+                  "mode": "linear",
+                  "deadZone": 0,
+                  "hysteresis": 0
+                },
+                "constraints": {
+                  "enabled": true,
+                  "normalizedMin": 0,
+                  "normalizedMax": 1
+                }
+              },
+              "arpVelocity": {
+                "_type": "ValueChannel",
+                "name": "arpVelocity",
+                "label": "Velocity",
+                "type": "int",
+                "min": 0,
+                "max": 127,
+                "step": 1,
+                "defaultValue": 0,
+                "currentValue": 0,
+                "publicInput": true,
+                "publicOutput": true,
+                "deviceBindable": true,
+                "format": {
+                  "precision": 0,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "snap": {
+                  "enabled": true,
+                  "mode": "step"
+                },
+                "curve": {
+                  "mode": "linear",
+                  "deadZone": 0,
+                  "hysteresis": 0
+                },
+                "constraints": {
+                  "enabled": true,
+                  "normalizedMin": 0,
+                  "normalizedMax": 1
+                }
+              },
+              "arpPattern": {
+                "_type": "ValueChannel",
+                "name": "arpPattern",
+                "label": "Arp Pattern",
+                "type": "array",
+                "size": 512,
+                "items": [],
+                "min": 0,
+                "max": 1,
+                "step": 0.01,
+                "defaultValue": 0,
+                "publicInput": false,
+                "publicOutput": true,
+                "deviceBindable": false,
+                "format": {
+                  "precision": 2,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                },
+                "itemFields": {
+                  "note": {
+                    "min": 0,
+                    "max": 127,
+                    "step": 1,
+                    "default": 60
+                  },
+                  "step": {
+                    "min": 0,
+                    "max": 255,
+                    "step": 1,
+                    "default": 0
+                  },
+                  "length": {
+                    "min": 1,
+                    "max": 256,
+                    "step": 1,
+                    "default": 1
+                  },
+                  "velocity": {
+                    "min": 1,
+                    "max": 127,
+                    "step": 1,
+                    "default": 96
+                  }
+                }
+              }
+            }
+          },
+          "Behaviors": {
+            "_type": "Behaviors",
+            "_children": {}
+          },
+          "HitZones": {
+            "_type": "HitZones",
+            "_children": {}
+          },
+          "Generators": {
+            "_type": "Generators",
+            "_children": {}
+          },
+          "Bindings": {
+            "enabled": true,
+            "debug": false,
+            "_children": {}
+          },
+          "Links": {
+            "_type": "Links",
+            "enabled": true,
+            "debug": false,
+            "_children": {}
+          },
+          "States": {
+            "_type": "States",
+            "enabled": true,
+            "debug": false,
+            "priority": [],
+            "_children": {}
+          },
+          "Animations": {
+            "_type": "Animations",
+            "enabled": true,
+            "debug": false,
+            "_children": {}
+          },
+          "DeviceBindings": {
+            "_type": "DeviceBindings",
+            "enabled": true,
+            "debug": false,
+            "bindings": []
+          },
+          "PublishedProperties": {
+            "_type": "PublishedProperties",
+            "inputs": {
+              "currentStep": {
+                "channel": "arpCurrentStep",
+                "label": "Current Step",
+                "type": "int"
+              },
+              "endStep": {
+                "channel": "arpEndStep",
+                "label": "Loop End Step",
+                "type": "int"
+              }
+            },
+            "outputs": {
+              "gate": {
+                "channel": "arpGate",
+                "label": "Gate",
+                "type": "bool"
+              },
+              "note": {
+                "channel": "arpNote",
+                "label": "Note",
+                "type": "int"
+              },
+              "velocity": {
+                "channel": "arpVelocity",
+                "label": "Velocity",
+                "type": "int"
+              },
+              "pattern": {
+                "channel": "arpPattern",
+                "label": "Pattern",
+                "type": "array"
               }
             },
             "editableProperties": {}
