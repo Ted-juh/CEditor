@@ -10,7 +10,7 @@
  *   - a row of controls hanging out of the bottom of its own box
  *
  * so this asserts the three things a screenshot would have caught, and writes the screenshot too.
- * Set PANEL_SHOT_OUT to a path to keep the picture.
+ * Set PANEL_SHOT_OUT to a path to keep the picture, and PANEL_SHOT_PANEL to render another panel.
  * Not a pixel baseline: fonts differ between machines. What is checked is that every control has a
  * real size, that nothing sits outside the panel, and that the boxes contain what they are drawn
  * around.
@@ -24,7 +24,8 @@ import assert from 'node:assert/strict';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(HERE, '../dist-scenery');
-const PANEL = join(HERE, '../../panels/Yamaha AN1x.cepanel');
+// PANEL_SHOT_PANEL renders another panel the same way (the SH-201 draft, say); the AN1x is the default.
+const PANEL = process.env.PANEL_SHOT_PANEL || join(HERE, '../../panels/Yamaha AN1x.cepanel');
 const OUT = process.env.PANEL_SHOT_OUT ?? '';
 // The panel is 2802x2216 CSS pixels, which is a picture you cannot read a control legend off at
 // 1:1 on a normal display. PANEL_SHOT_SCALE is the device pixel ratio the shot is taken at, so a

@@ -1,6 +1,7 @@
 import { mount } from 'svelte';
 import PanelShotHarness from './PanelShotHarness.svelte';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { flatControls } from '../src/CE_Application/utils/containment.js';
 import { scrubKeyframes, clearKeyframeScrub } from '../src/CE_Application/utils/keyframePlayer.js';
 import { keyframeOverlays } from '../src/CE_Application/stores/keyframeOverlays.js';
 import { get } from 'svelte/store';
@@ -27,6 +28,7 @@ window.__panelShot = {
     const panel = deserializePanel(await (await fetch(url)).text(), 'shot.cepanel', 'shot');
     window.__panel = panel;
     mount(PanelShotHarness, { target: document.getElementById('host'), props: { panel } });
-    return { width: panel.width, height: panel.height, controls: panel.controls.length };
+    // Every control in the tree: a container's children render too, and are counted by the DOM.
+    return { width: panel.width, height: panel.height, controls: flatControls(panel.controls).length };
   },
 };
