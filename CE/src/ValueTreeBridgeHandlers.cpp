@@ -1,4 +1,5 @@
 #include "ValueTreeBridge.h"
+#include "Osc/OscQuestion.h"
 #include "AppSettings.h"
 #include "AtomicFileWrite.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
@@ -670,6 +671,18 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
 
                         browser->emitEventIfBrowserIsVisible ("panelPackageSaved", juce::var (obj));
                     });
+            });
+        })
+        // ce.file (ScriptFiles.h): a script's dialogs and the files the person chose with them. The
+        // answer goes back as "scriptFileResult", with the request's id.
+        .withEventListener ("scriptFile", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                scriptFiles.handle (payload, [this] (const juce::var& result)
+                {
+                    if (browser != nullptr) browser->emitEventIfBrowserIsVisible ("scriptFileResult", result);
+                });
             });
         })
         .withEventListener ("openPanelPackage", [this] (const juce::var&)
@@ -1647,6 +1660,8 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
             });
         });
 
+    // ce.osc asks the user before the network is used; the editor asks in a dialog of its own.
+    deviceProfileService.askAboutNetwork = ceditor::osc::askAboutNetworkWithDialog;
     options = ceditor::device::withDeviceRuntimeEvents (std::move (options), deviceProfileService,
         [this] (const juce::String& eventName, const juce::var& payload)
         {

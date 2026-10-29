@@ -101,12 +101,13 @@ test('a value the runtime reads as a choice, written another way, is listed as w
   assert.equal(accept(src, r, '1/8t'), src);
   assert.equal(labels(r).filter((l) => l.toLowerCase() === '1/8t').length, 1, 'once, in its own place');
 
-  // A curve's name is read only as it is spelled: "outback" is refused, so outBack is selected as
-  // the curve is spelled, and Enter corrects it.
+  // A curve's name is read in any case too (it was read only as spelled, and "outback" was refused
+  // and selected as outBack): it is listed as written, in outBack's place, and Enter keeps it.
   const curve = 'ce.anim.to("x", 1, { curve = "outback" })';
   const c = forced(curve, 'lua', curve.indexOf('back'));
-  assert.equal(selectedLabel(c), 'outBack');
-  assert.equal(accept(curve, c, 'outBack'), curve.replace('outback', 'outBack'));
+  assert.equal(c.selected, ANIM_CURVE_NAMES.indexOf('outBack'));
+  assert.equal(selectedLabel(c), 'outback');
+  assert.equal(accept(curve, c, 'outback'), curve);
 });
 
 test('a scale and a chord, in Lua, JavaScript and Python', () => {
@@ -141,7 +142,7 @@ test('an event, in Lua, JavaScript, Python and C++ handler code: the handler nam
     const r = forced(src, lang, src.indexOf('ValueChanged'));
     assert.deepEqual(labels(r), HANDLERS, lang);
     assert.equal(selectedLabel(r), 'onValueChanged', lang);
-    assert.match(r.options[r.selected].detail, /^now · Fires once, when the value has settled/, lang);
+    assert.match(r.options[r.selected].detail, /^now · Runs once, when the value settles/, lang);
     assert.equal(accept(src, r, 'onClick'), src.replace('"onValueChanged"', '"onClick"'), lang);
   }
   // An event written by its id ("valueChanged") is the same event: listed as written in its

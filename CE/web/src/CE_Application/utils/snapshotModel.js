@@ -234,6 +234,20 @@ export function morphSendPlan(previous, next, { budget = 32 } = {}) {
  * Three buckets rather than one list, because "changed" and "only in A" are different questions to
  * a user: the first is an edit, the second is a parameter one side never captured.
  */
+function isNumeric(value) {
+  if (typeof value === 'number') return Number.isFinite(value);
+  if (typeof value === 'boolean') return true;
+  return typeof value === 'string' && value.trim() !== '' && Number.isFinite(Number(value));
+}
+
+// Synths pad a name to its length with spaces, so "INIT PATCH  " and "INIT PATCH" are one name.
+function sameNonNumeric(a, b) {
+  if (a === b) return true;
+  if (a == null || b == null) return false;
+  if (typeof a === 'object' || typeof b === 'object') return JSON.stringify(a) === JSON.stringify(b);
+  return String(a).replace(/\s+$/, '') === String(b).replace(/\s+$/, '');
+}
+
 export function diffSnapshots(a, b, parameters = []) {
   const byId = new Map((parameters ?? []).map((p) => [p.id, p]));
   const left = a?.values ?? {};
@@ -252,6 +266,15 @@ export function diffSnapshots(a, b, parameters = []) {
 
     if (inA && !inB) { onlyInA.push({ id, parameter, value: left[id] }); continue; }
     if (!inA && inB) { onlyInB.push({ id, parameter, value: right[id] }); continue; }
+
+    // A choice id or a name is not a number. Number() made both NaN, and NaN !== NaN, so every
+    // choice and every patch name counted as changed, however alike the two snapshots were.
+    if (!isNumeric(left[id]) || !isNumeric(right[id])) {
+      if (sameNonNumeric(left[id], right[id])) { same += 1; continue; }
+      // A different choice or name is a whole change: there is no "how far" to measure.
+      changed.push({ id, parameter, from: left[id], to: right[id], delta: null, magnitude: 1 });
+      continue;
+    }
 
     const from = Number(left[id]);
     const to = Number(right[id]);

@@ -33,8 +33,8 @@ test('the summaries say which way the channel is counted', () => {
   // sendNote instead, and both summaries say so, because a silent disagreement about channel
   // numbering is a bug somebody debugs for an hour.
   const noteIn = ALL_EVENTS.find((e) => e.fn === 'onNoteIn');
-  assert.match(noteIn.summary, /1-16/);
-  assert.match(ALL_EVENTS.find((e) => e.fn === 'onCcIn').summary, /0-based/);
+  assert.match(noteIn.summary, /1 to 16 as in sendNote/);
+  assert.match(ALL_EVENTS.find((e) => e.fn === 'onCcIn').summary, /counts from 0 here, 0 to 15/);
 });
 
 /* ------------------------------------------------------------------------ classification */

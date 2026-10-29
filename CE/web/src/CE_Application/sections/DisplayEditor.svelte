@@ -158,8 +158,17 @@
     set('backlightColour', p.backlight);
   }
 
+  // The Text rows edit the display's lines, or, once it has layouts, the text of the layout being
+  // edited: a layout draws its own text where no zone paints, and that is what a script writes.
   function setLine(index, value) {
-    set(`lines.${index}`, String(value ?? ''));
+    if (!editLayout) {
+      set(`lines.${index}`, String(value ?? ''));
+      return;
+    }
+    withLayout(editLayout.id, (l) => {
+      const text = Array.isArray(l.lines) ? l.lines : [];
+      l.lines = Array.from({ length: Math.max(text.length, index + 1) }, (_, r) => (r === index ? String(value ?? '') : String(text[r] ?? '')));
+    });
   }
 
   function onPickImage(event) {
@@ -197,6 +206,13 @@
     layouts.find((l) => String(l?.id) === String(editLayoutId))
     ?? layouts[0] ?? null
   );
+  // What the Text rows show: the layout's own text while there are layouts, the lines otherwise.
+  let textRows = $derived(editLayout ? (Array.isArray(editLayout.lines) ? editLayout.lines : []) : lines);
+  let editLayoutNumber = $derived(editLayout ? layouts.indexOf(editLayout) + 1 : 0);
+  // A layout as the lists show it: its number, which is how a script addresses it, and its name.
+  function layoutLabel(layout, index) {
+    return `${index + 1} · ${layout?.name || layout?.id || ''}`;
+  }
   let pages = $derived(display?.pages ?? {});
   // Known values of the Pages selector control, so the "When" field can be a
   // pick-list instead of a guessing game. null = free numeric/text entry.
@@ -235,7 +251,10 @@
   function addLayout() {
     const next = cloneLayouts();
     const id = genId('lay_');
-    next.push({ id, name: `Layout ${next.length + 1}`, zones: [] });
+    // The first layout takes the lines as its text, so what the display shows does not vanish on
+    // Enable (the Pixel Display's first layout adopts its elements the same way).
+    const text = next.length === 0 ? lines.map((line) => String(line ?? '')) : [];
+    next.push({ id, name: `Layout ${next.length + 1}`, lines: text, zones: [] });
     commitLayouts(next);
     setLcdDesignLayout(core?.id, id);
     if (next.length === 1) {
@@ -258,6 +277,13 @@
     next.splice(next.indexOf(src) + 1, 0, copy);
     commitLayouts(next);
     setLcdDesignLayout(core?.id, copy.id);
+  }
+  function withLayout(id, mutate) {
+    const next = cloneLayouts();
+    const l = next.find((x) => String(x.id) === String(id));
+    if (!l) return;
+    mutate(l);
+    commitLayouts(next);
   }
   function renameLayout(id, name) {
     const next = cloneLayouts();
@@ -433,8 +459,10 @@
   <div class="screen-section" class:wide={false} data-screen-section="Text">
   <PropertySection title="Text" icon={Type}>
     {#each Array.from({ length: rows }) as _, index}
-      <PropertyCell label={`Line ${index + 1}`} span={4} hint="Text for this row, padded or truncated to the column count. Value tokens in braces: value, pct, bar, bar:N.">
-        <input class="val" type="text" value={lines[index] ?? ''} oninput={(event) => setLine(index, event.target.value)} />
+      <PropertyCell label={`Row ${index + 1}`} span={4} hint={editLayout
+        ? `Text for this row of layout ${editLayoutNumber}, shown where no zone paints. Value tokens in braces: value, pct, bar, bar:N.`
+        : 'Text for this row, padded or truncated to the column count. Value tokens in braces: value, pct, bar, bar:N.'}>
+        <input class="val" type="text" value={textRows[index] ?? ''} oninput={(event) => setLine(index, event.target.value)} />
       </PropertyCell>
     {/each}
   </PropertySection>
@@ -592,7 +620,7 @@
   <PropertySection title="Layouts" icon={LayoutGrid}>
     {#snippet tools()}
       {#if layouts.length === 0}
-        <button class="hdr-add" type="button" title="Compose the display from bound regions instead of the lines above. Add a layout to switch modes." onclick={() => addLayout()}>+ Enable</button>
+        <button class="hdr-add" type="button" title="Compose the display from layouts of bound regions. The rows above become layout 1's text, shown where no zone paints." onclick={() => addLayout()}>+ Enable</button>
       {:else}
         <button class="hdr-add" type="button" title="Add a region to this layout." onclick={() => addZone()}>+ Zone</button>
       {/if}
@@ -601,8 +629,8 @@
       <PropertyCell label="Edit / Preview Layout" span={4} hint="Which layout the Zones table edits and previews. Runtime switching is set by the Pages rules.">
         <div class="field-row">
           <select class="val" value={String(editLayout?.id ?? '')} onchange={(event) => selectEditLayout(event.target.value)}>
-            {#each layouts as l}
-              <option value={String(l.id)}>{l.name ?? l.id}</option>
+            {#each layouts as l, li}
+              <option value={String(l.id)}>{layoutLabel(l, li)}</option>
             {/each}
           </select>
           <button class="val rm" type="button" onclick={() => addLayout()} title="Add layout">＋</button>
@@ -610,13 +638,14 @@
           <button class="val rm" type="button" onclick={() => removeLayout(editLayout?.id)} title="Remove layout">✕</button>
         </div>
       </PropertyCell>
-      <PropertyCell label="Name" span={4} hint="Layout name (used by the Pages rules).">
+      <PropertyCell label="Name" span={4} hint="Layout name, used by the Pages rules and by scripts. Scripts also reach it by its number, as listed above.">
         <input class="val" type="text" value={editLayout?.name ?? ''} oninput={(event) => renameLayout(editLayout?.id, event.target.value)} />
       </PropertyCell>
 
       {#if editLayout && (editLayout.zones ?? []).length > 0}
         <div class="zone-head">
           <span class="zone-num">#</span>
+          <span class="zname">Name</span>
           <span class="zn">Row</span>
           <span class="zn">Start</span>
           <span class="zn">End</span>
@@ -634,6 +663,7 @@
         {#each (editLayout.zones ?? []) as z, i (z.id ?? i)}
           <div class="zone-cell">
             <span class="zone-num" title="Zone">#{i + 1}</span>
+            <input class="val zname" type="text" title="Script name — how ce.components.lcd.zoneText, zoneShow, zoneAt… address this zone, on every layout that has one by this name. Never drawn." placeholder="name" value={z.name ?? ''} onchange={(event) => setZone(i, 'name', event.target.value.trim())} />
             <span class="zn nc-wrap" title="Row"><NumberCell value={z.row ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'row', Math.round(value))} /></span>
             <span class="zn nc-wrap" title="Col start"><NumberCell value={z.colStart ?? 1} defaultValue={1} step={1} min={1} onchange={(value) => setZone(i, 'colStart', Math.round(value))} /></span>
             <span class="zn nc-wrap" title="Col end"><NumberCell value={z.colEnd ?? cols} defaultValue={cols} step={1} min={1} onchange={(value) => setZone(i, 'colEnd', Math.round(value))} /></span>
@@ -758,8 +788,8 @@
       </PropertyCell>
       <PropertyCell label="Default" span={4} hint="Resting layout when no selector value matches.">
         <select class="val" value={pages.defaultLayoutId ?? ''} onchange={(event) => setPageProp('defaultLayoutId', event.target.value)}>
-          {#each layouts as l}
-            <option value={String(l.id)}>{l.name ?? l.id}</option>
+          {#each layouts as l, li}
+            <option value={String(l.id)}>{layoutLabel(l, li)}</option>
           {/each}
         </select>
       </PropertyCell>
@@ -792,8 +822,8 @@
               {/if}
             {/if}
             <select class="val" title="Layout" value={String(m.layoutId ?? '')} onchange={(event) => setSelectorRow(i, 'layoutId', event.target.value)}>
-              {#each layouts as l}
-                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {#each layouts as l, li}
+                <option value={String(l.id)}>{layoutLabel(l, li)}</option>
               {/each}
             </select>
             <button class="val rule-move" type="button" title="Move rule up" disabled={i === 0} onclick={() => moveSelectorRow(i, -1)}>▲</button>
@@ -807,8 +837,8 @@
         <PropertyCell label={`Overlay ${i + 1}`} span={4} hint="Transiently show a layout when a control changes.">
           <div class="field-row">
             <select class="val" title="Layout" value={String(ov.layoutId ?? '')} onchange={(event) => setOverlay(i, 'layoutId', event.target.value)}>
-              {#each layouts as l}
-                <option value={String(l.id)}>{l.name ?? l.id}</option>
+              {#each layouts as l, li}
+                <option value={String(l.id)}>{layoutLabel(l, li)}</option>
               {/each}
             </select>
             <select class="val" title="On change of" value={ov.sourceId ?? ''} onchange={(event) => setOverlay(i, 'sourceId', event.target.value)}>
@@ -939,7 +969,7 @@
         {/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Backlt Src" span={2} hint="Drive the backlight on/off live from a toggle/button in preview.">
+    <PropertyCell label="Backlt Src" span={2} hint="A control that switches the backlight live: on while it is on, or past halfway along its range.">
       <select class="val" value={display.backlightSourceId ?? ''} onchange={(event) => set('backlightSourceId', event.target.value)}>
         <option value="">None</option>
         {#each allSources as src}
@@ -1021,8 +1051,8 @@
     <PropertyCell label="Blink" span={1} hint="Blink the lit text on and off.">
       <PropertyToggle value={display.blink === true} onchange={() => toggle('blink', false)} />
     </PropertyCell>
-    <PropertyCell label="Blink Rate" span={1} compact hint="Milliseconds per blink half-cycle.">
-      <NumberCell label="Rate" value={display.blinkRate ?? 500} defaultValue={500} step={50} min={60} onchange={(value) => set('blinkRate', value)} />
+    <PropertyCell label="Blink Rate" span={1} compact hint="Time on, then off, in milliseconds.">
+      <NumberCell label="Rate" value={display.blinkRate ?? 500} defaultValue={500} step={50} min={60} max={5000} onchange={(value) => set('blinkRate', value)} />
     </PropertyCell>
     <PropertyCell label="Cursor" span={2} hint="Show a cursor cell.">
       <select class="val" value={display.cursor ?? 'off'} onchange={(event) => set('cursor', event.target.value)}>
@@ -1034,11 +1064,13 @@
     <PropertyCell label="Cursor Blink" span={1} hint="Blink the cursor.">
       <PropertyToggle value={display.cursorBlink !== false} onchange={() => toggle('cursorBlink', true)} />
     </PropertyCell>
-    <PropertyCell label="Cursor Row" span={1} compact hint="Cursor row (0-based).">
-      <NumberCell label="Row" value={display.cursorRow ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorRow', Math.round(value))} />
+    <!-- Counted from 1, as ce.components.lcd.cursorAt counts them; stored from 0, as the renderer
+         reads them. They said 0-based here, so the inspector's column 0 was a script's column 1. -->
+    <PropertyCell label="Cursor Row" span={1} compact hint="Cursor row, counted from 1.">
+      <NumberCell label="Row" value={(display.cursorRow ?? 0) + 1} defaultValue={1} step={1} min={1} max={display.rows ?? 2} onchange={(value) => set('cursorRow', Math.round(value) - 1)} />
     </PropertyCell>
-    <PropertyCell label="Cursor Col" span={1} compact hint="Cursor column (0-based).">
-      <NumberCell label="Col" value={display.cursorCol ?? 0} defaultValue={0} step={1} min={0} onchange={(value) => set('cursorCol', Math.round(value))} />
+    <PropertyCell label="Cursor Col" span={1} compact hint="Cursor column, counted from 1.">
+      <NumberCell label="Col" value={(display.cursorCol ?? 0) + 1} defaultValue={1} step={1} min={1} max={display.cols ?? 16} onchange={(value) => set('cursorCol', Math.round(value) - 1)} />
     </PropertyCell>
   </PropertySection>
   </div>
@@ -1351,6 +1383,15 @@
     flex: 0 0 auto;
     text-align: center;
   }
+
+  /* The name a script reaches the zone by. */
+  .zone-head .zname,
+  .zone-cell .zname {
+    width: 64px;
+    flex: 0 0 auto;
+  }
+
+  .zone-head .zname { text-align: left; }
 
   .zone-head .zn2,
   .zone-cell .zn2 {

@@ -9,13 +9,15 @@ export function classifyWorkspace({ activeTab = null, componentWorkspaceMode = '
   if (activeTab?.type === 'component') return 'component';
   if (activeTab?.type === 'settings') return 'settings';
   if (activeTab?.type === 'instrumentHost') return 'instrumentHost';
+  if (activeTab?.type === 'documentation') return 'documentation';
   return 'panel';
 }
 
 export function workspaceOwnsChrome(workspaceKind) {
   // The instrument host owns its layout the way the other full workspaces do: the tree,
-  // display and properties panels are panel-editor chrome and mean nothing over a rack.
-  return ['component', 'device', 'script', 'screen', 'instrumentHost'].includes(workspaceKind);
+  // display and properties panels are panel-editor chrome and mean nothing over a rack. The
+  // documentation tab is a reading page: the manual gets the width, not three empty docks.
+  return ['component', 'device', 'script', 'screen', 'instrumentHost', 'documentation'].includes(workspaceKind);
 }
 
 export function resolveWorkspaceChrome({

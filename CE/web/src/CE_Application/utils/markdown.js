@@ -28,15 +28,48 @@ export function escapeHtml(text) {
 /**
  * An href we are willing to emit.
  *
- * Relative links between documents are dropped to plain text rather than rendered as links: inside
- * the viewer there is no file to navigate to, and a link that does nothing when clicked is worse
- * than no link. In-page anchors work, because the outline uses the same slugs.
+ * In-page anchors and http(s). A relative link to another document is not an href at all: the
+ * caller's `resolveLink` may turn it into a jump to a document the viewer has (see `linkTag`), and
+ * when it cannot, the label is left as plain text — a link that does nothing when clicked is worse
+ * than no link.
  */
 export function safeHref(href) {
   const value = String(href ?? '').trim();
   if (value.startsWith('#')) return value;
   return /^https?:\/\//i.test(value) ? value : null;
 }
+
+/**
+ * The tag for one link, or its label as text.
+ *
+ * THE BUG THIS SHAPE FIXES. Every link used to get `target="_blank"`. The documents' links are
+ * almost all in-page anchors (`[Hooks](#3-when-a-script-runs)`), and in the app a `_blank` anchor
+ * is a new-window request for `https://juce.backend/#3-when-a-script-runs` — which the native side
+ * hands to the user's default browser, where that origin does not exist. Every link in the manual
+ * opened a "not found" page.
+ *
+ * So only an outside page opens elsewhere. An anchor, and a link to another document the viewer
+ * holds, are marked with `data-help-anchor` / `data-help-doc` for the viewer to handle itself
+ * (DocumentationView.svelte); their `href` stays an in-page `#…` so nothing can turn them into a
+ * request for the app's own origin.
+ *
+ * `href` and `label` arrive escaped. `resolveLink(href)` answers `{ doc, anchor }` or null.
+ */
+function linkTag(label, href, resolveLink) {
+  const safe = safeHref(href);
+  if (safe?.startsWith('#')) {
+    return `<a href="${safe}" data-help-anchor="${escapeAttribute(safe.slice(1))}">${label}</a>`;
+  }
+  if (safe) return `<a href="${safe}" target="_blank" rel="noreferrer">${label}</a>`;
+  const target = typeof resolveLink === 'function' ? resolveLink(href) : null;
+  if (!target?.doc) return label;
+  const anchor = target.anchor ? escapeAttribute(target.anchor) : '';
+  return `<a href="#${anchor}" data-help-doc="${escapeAttribute(target.doc)}" data-help-anchor="${anchor}">${label}</a>`;
+}
+
+/** Text already escaped once is not escaped twice; anything else is. For attribute values. */
+const escapeAttribute = (value) => escapeHtml(String(value ?? '').replace(/&(amp|lt|gt|quot|#39);/g,
+  (_, e) => ({ amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" })[e]));
 
 /** The id an in-page anchor points at. GitHub's rule, so `#section-name` links carry over. */
 export function headingSlug(text) {
@@ -59,17 +92,14 @@ const CODE_MARK = '\uE000';
  * span containing `**stars**` stays literal. Not a nicety here — the scripting manual is full of
  * code spans containing exactly this punctuation.
  */
-export function renderInline(escaped) {
+export function renderInline(escaped, { resolveLink = null } = {}) {
   const codeSpans = [];
   let text = String(escaped ?? '').replace(/`([^`]+)`/g, (_, code) => {
     codeSpans.push(code);
     return `${CODE_MARK}${codeSpans.length - 1}${CODE_MARK}`;
   });
 
-  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (whole, label, href) => {
-    const safe = safeHref(href);
-    return safe ? `<a href="${safe}" target="_blank" rel="noreferrer">${label}</a>` : label;
-  });
+  text = text.replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (whole, label, href) => linkTag(label, href, resolveLink));
 
   text = text
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
@@ -85,8 +115,6 @@ export function renderInline(escaped) {
     (_, i) => `<code>${codeSpans[Number(i)]}</code>`);
 }
 
-const inline = (raw) => renderInline(escapeHtml(raw));
-
 /** A pipe-table row split into cells, with the leading and trailing pipes discarded. */
 function tableCells(line) {
   return line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map((c) => c.trim());
@@ -100,10 +128,14 @@ const isTableDivider = (line) => /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(line) && line
  * Line-oriented and single pass. Block state is explicit rather than recursive because the subset
  * has no nesting worth the machinery — a list inside a blockquote does not appear in these docs,
  * and pretending to support it would be a claim the renderer could not keep.
+ *
+ * `resolveLink(href)` turns a relative link into `{ doc, anchor }` when it names a document the
+ * caller can show (utils/helpLinks.js); without it, or when it answers null, the label is text.
  */
-export function renderMarkdown(text) {
+export function renderMarkdown(text, { resolveLink = null } = {}) {
   const lines = String(text ?? '').replace(/\r\n?/g, '\n').split('\n');
   const out = [];
+  const inline = (raw) => renderInline(escapeHtml(raw), { resolveLink });
 
   let paragraph = [];
   let list = null;          // { ordered: boolean, items: string[] }

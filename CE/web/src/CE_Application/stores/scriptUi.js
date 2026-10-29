@@ -20,6 +20,11 @@ export const scriptNotifications = writable([]);
 export const scriptStatus = writable({ message: '', kind: 'info' });
 
 const KINDS = new Set(['info', 'warn', 'error']);
+/** A kind as a script wrote it, in any case: "Warn" is "warn". null when it is none of the three. */
+const kindOf = (kind) => {
+  const word = typeof kind === 'string' ? kind.trim().toLowerCase() : '';
+  return KINDS.has(word) ? word : null;
+};
 let nextId = 1;
 
 /** Add a notification. `duration` is how long it lives; 0 or less means until dismissed. */
@@ -31,7 +36,7 @@ export function notify(message, { kind = 'info', duration = 3000 } = {}) {
   const entry = {
     id,
     message: text,
-    kind: KINDS.has(kind) ? kind : 'info',
+    kind: kindOf(kind) ?? 'info',
     expiresAt: Number.isFinite(ms) && ms > 0 ? Date.now() + ms : null,
     // When it was last (re)set, so update() can give a timed message the rest of its life back
     // rather than guessing how long it originally had.
@@ -75,7 +80,7 @@ export function updateNotification(id, message, { kind, duration } = {}) {
     return {
       ...n,
       message: text,
-      kind: kind !== undefined && KINDS.has(kind) ? kind : n.kind,
+      kind: kindOf(kind) ?? n.kind,
       expiresAt: ms === null
         // No duration given: keep a sticky message sticky, and give a timed one its full life back.
         ? (n.expiresAt == null ? null : Date.now() + Math.max(0, n.expiresAt - (n.setAt ?? Date.now())))
@@ -93,7 +98,7 @@ export function expireNotifications(now = Date.now()) {
 
 export function setStatus(message, { kind = 'info' } = {}) {
   const text = String(message ?? '').trim();
-  scriptStatus.set({ message: text, kind: text && KINDS.has(kind) ? kind : 'info' });
+  scriptStatus.set({ message: text, kind: text ? (kindOf(kind) ?? 'info') : 'info' });
 }
 
 /* ------------------------------------------------------------------------------ dialogs */
@@ -156,7 +161,7 @@ export function openDialog(opts, onChoice) {
     title: title || message,
     message: title ? message : '',
     buttons: settle,
-    kind: KINDS.has(o.kind) ? o.kind : 'info',
+    kind: kindOf(o.kind) ?? 'info',
     default: settle.includes(o.default) ? o.default : settle[0],
     value: String(o.value ?? ''),
     placeholder: String(o.placeholder ?? ''),

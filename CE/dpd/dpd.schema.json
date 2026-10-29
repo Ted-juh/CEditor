@@ -89,6 +89,20 @@
 
     "presets": { "$ref": "#/$defs/presets" },
 
+    "patch": { "$ref": "#/$defs/patchSection" },
+
+    "display": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How the synth's own display writes values, for the whole profile. Optional.",
+      "properties": {
+        "middleC": {
+          "type": "integer", "minimum": -2, "maximum": 9,
+          "description": "The octave number middle C (MIDI note 60) has on this synth: 4 by default, 3 on a Yamaha. Every note parameter is written with it unless the parameter's own display says otherwise."
+        }
+      }
+    },
+
     "overrides": {
       "type": "array",
       "items": { "$ref": "#/$defs/overrideOp" },
@@ -234,6 +248,7 @@
           "additionalProperties": true,
           "properties": { "preferredComponent": { "type": "string" } }
         },
+        "display": { "$ref": "#/$defs/parameterDisplay" },
         "provenance": { "$ref": "#/$defs/provenance" }
       },
       "allOf": [
@@ -310,6 +325,73 @@
       }
     },
 
+    "patchSection": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "What a patch of this synth is, for ce.patch: which parts of the synth a patch can hold, which dumps read and send each, how apply sends one by default, and how a slot is written. Optional; without it ce.patch works out a voice from the parameters (every one but actions and the System, Global, Utility and Performance groups).",
+      "properties": {
+        "scopes": {
+          "type": "array",
+          "description": "Each part of the synth a patch can hold. Without one named \"voice\", ce.patch adds its own.",
+          "items": {
+            "type": "object",
+            "required": ["id"],
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string", "minLength": 1, "description": "The scope's id, as scripts name it: \"voice\", \"multi\", \"system\"." },
+              "name": { "type": "string", "description": "The scope's name as a person reads it." },
+              "groups": { "type": "array", "items": { "type": "string" }, "description": "Its parameters, by the groups they are in." },
+              "only": { "type": "array", "items": { "type": "string" }, "description": "Its parameters, by id (with groups: those in either)." },
+              "except": { "type": "array", "items": { "type": "string" }, "description": "Never these parameters, by id or group." },
+              "dumps": { "type": "array", "items": { "type": "string" }, "description": "The dumps that together read and send the scope, in the order they are sent (dumpDefinitions ids)." }
+            }
+          }
+        },
+        "deliver": { "enum": ["parameters", "dump"], "description": "How ce.patch.apply sends a patch when the script does not say: one message per changed parameter, or the scope's dumps." },
+        "write": {
+          "type": "object",
+          "description": "How ce.patch.write stores a patch in a slot. \"dump\": the \"slot\" variable is set and the named dump is sent.",
+          "required": ["via"],
+          "properties": {
+            "via": { "enum": ["dump", "command"] },
+            "dump": { "type": "string", "description": "For via \"dump\": the dump addressed to the slot." },
+            "recipe": { "type": "string", "description": "For via \"command\": the write message (not sent by ce.patch yet)." }
+          }
+        }
+      }
+    },
+    "parameterDisplay": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "How the synth's own display writes this parameter's value: read by ce.format.parameter and by the value readout of a control bound to it. Optional; a parameter without it is shown as its number.",
+      "properties": {
+        "format": {
+          "enum": ["number", "hz", "time", "db", "percent", "pan", "ratio", "note", "division", "table"],
+          "description": "Which kind of value it is. hz, time (milliseconds), db, ratio, note and division write the shown value (after min/max); percent is how far along the stored range the value is; pan is the distance from the middle of the shown range, or from 0 when it runs through 0."
+        },
+        "table": {
+          "type": "array",
+          "minItems": 1,
+          "description": "The text for each stored value, for a display that follows no formula: a list whose first entry is for the lowest stored value, or a list of { upTo, text } ranges read in order.",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "number" },
+              {
+                "type": "object",
+                "required": ["upTo", "text"],
+                "properties": { "upTo": { "type": "number" }, "text": { "type": ["string", "number"] } }
+              }
+            ]
+          }
+        },
+        "min": { "type": "number", "description": "The shown value of the lowest stored value, when it differs (the GAIA stores Octave Shift 61..67 and shows -3..+3)." },
+        "max": { "type": "number", "description": "The shown value of the highest stored value." },
+        "unit": { "type": "string", "description": "The unit after a plain number, such as \"cent\"." },
+        "precision": { "type": "integer", "minimum": 0, "maximum": 6, "description": "Decimals shown." },
+        "middleC": { "type": "integer", "minimum": -2, "maximum": 9, "description": "For a note: the octave number of middle C, when it differs from the profile's." }
+      }
+    },
     "presets": {
       "type": "object",
       "additionalProperties": false,

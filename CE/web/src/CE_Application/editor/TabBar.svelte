@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDeviceProfileTab, closeScreenTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
+  import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDocumentationTab, closeDeviceProfileTab, closeScreenTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
@@ -49,6 +49,7 @@
     settings: 'Settings',
     screen: 'Screen',
     instrumentHost: 'Hostage',
+    documentation: 'Documentation',
   };
 
   function tabTooltip(tab) {
@@ -290,6 +291,8 @@
       closeSettingsTab();
     } else if (tab.tabType === 'instrumentHost') {
       closeInstrumentHostTab();
+    } else if (tab.tabType === 'documentation') {
+      closeDocumentationTab();
     } else if (tab.tabType === 'deviceProfile') {
       closeDeviceProfileTab(tab.id);
     } else if (tab.tabType === 'component') {

@@ -20,13 +20,14 @@
 
 import { SCALE_NAMES } from './musicTheory.js';
 import { DIVISION_IDS } from '../utils/transportLayout.js';
-import { ARP_PATTERNS, ARP_SOURCES } from '../utils/arpLayout.js';
+import { ARP_PATTERNS, ARP_SOURCES, SWING_SOURCES as ARP_SWING_SOURCES } from '../utils/arpLayout.js';
 import { CHORDPAD_MODES, CHORD_TYPES, CHORDPAD_VOICINGS } from '../utils/chordPadLayout.js';
 import { RIBBON_MODES } from '../utils/noteRibbonLayout.js';
 import {
   PAD_MAPS, PAD_MODES, PAD_ORIGINS, PAD_VELOCITY_SOURCES, PAD_ZONE_ACTIONS,
 } from '../utils/drumPadLayout.js';
 import { CONSTELLATION_MODES } from '../utils/constellationLayout.js';
+import { ORBIT_OUTPUTS } from '../utils/orbitLayout.js';
 import { ROUTER_INPUT_SOURCES } from '../utils/routerLayout.js';
 import { POLY_PRESSURE_MODES } from '../utils/midiNoteInput.js';
 import { MACRO_CURVES } from '../utils/macroLayout.js';
@@ -42,6 +43,8 @@ import { VOICINGS, HARMONY_MODES, OUT_OF_KEY, VOICE_LEADING, MEMORY_PRESETS } fr
 import { SPLIT_PRESETS } from '../utils/splitZoneLayout.js';
 import { PHRASE_SEEDS, PHRASE_DIRECTIONS } from '../utils/phraseLayout.js';
 import { RECORDER_SOURCES } from '../utils/noteRecorderLayout.js';
+import { ZONE_SHOW_KINDS } from '../utils/lcdZones.js';
+import { PIXEL_ELEMENT_KINDS } from '../utils/pixelElements.js';
 
 /* The LCD and the Pixel display have no layout module of their own — their behaviour lives in the
  * renderer and the editor. Declared here rather than invented into a new module, and held to the
@@ -50,6 +53,8 @@ import { RECORDER_SOURCES } from '../utils/noteRecorderLayout.js';
 export const LCD_SCROLLS = ['off', 'left', 'right'];
 export const LCD_CURSORS = ['off', 'block', 'underline'];
 export const PIXEL_ANIM_MODES = ['off', 'file', 'preset'];
+// The effects LcdGraphicCanvas's presetInto draws; a name it does not know drew nothing.
+export const ANIM_PRESETS = ['wave', 'scanner', 'rain', 'starfield', 'spinner', 'plasma'];
 /* …and the coverage audit's crop. Same rule: each is held to the editor's own `<select>` by
  * componentEnums.test.js, because the value is consumed by a renderer conditional rather than by a
  * table any module exports. `orientation` is spelled by four components and they do NOT agree —
@@ -62,6 +67,8 @@ export const NOTERIBBON_VELOCITY_SOURCES = ['fixed', 'position'];
 export const NOTERIBBON_MOD_AXES = ['none', 'cc'];
 export const CROSSFADER_ORIENTATIONS = ['horizontal', 'vertical'];
 export const METER_ORIENTATIONS = ['horizontal', 'vertical', 'arc'];
+// Where a meter's caption sits: MeterRenderer draws it above or below, and not at all for "none".
+export const METER_LABEL_POSITIONS = ['none', 'above', 'below'];
 export const MATRIX_CELL_STYLES = ['bar', 'fill', 'dot'];
 export const LCD_SCROLL_MODES = ['loop', 'bounce'];
 export const PIXEL_LAYOUT_TRANSITIONS = ['none', 'fade', 'slide'];
@@ -74,6 +81,7 @@ export const VERB_VALUES = {
   'arp.scale': SCALE_NAMES,
   'arp.chordType': CHORD_TYPES,
   'arp.source': ARP_SOURCES,
+  'arp.swingSource': ARP_SWING_SOURCES,
   'chordpad.mode': CHORDPAD_MODES,
   'chordpad.scale': SCALE_NAMES,
   'chordpad.chordType': CHORD_TYPES,
@@ -93,16 +101,24 @@ export const VERB_VALUES = {
   'ribbon.style': RIBBON_STYLES,
   'crossfader.orientation': CROSSFADER_ORIENTATIONS,
   'meter.orientation': METER_ORIENTATIONS,
+  'meter.labelPosition': METER_LABEL_POSITIONS,
   'matrix.cellStyle': MATRIX_CELL_STYLES,
   'lcd.anim': PIXEL_ANIM_MODES,
+  'lcd.animPreset': ANIM_PRESETS,
   'lcd.scrollMode': LCD_SCROLL_MODES,
+  // What a zone shows: the zone table's own picker reads the same list.
+  'lcd.zoneKind': ZONE_SHOW_KINDS,
   'pixel.layoutTransition': PIXEL_LAYOUT_TRANSITIONS,
+  // What an element is: the inspector's kind list reads the same one.
+  'pixel.kind': PIXEL_ELEMENT_KINDS,
   // One table for all four corners: they offer the same vocabulary, and a corner that offered a
   // different set from its neighbour would be a surprise rather than a feature.
   ...Object.fromEntries(['TopLeft', 'TopRight', 'BottomLeft', 'BottomRight']
     .map((c) => [`drumpads.corner${c}`, PAD_ZONE_ACTIONS])),
   'turing.division': DIVISION_IDS,
   'constellation.mode': CONSTELLATION_MODES,
+  // What a satellite sends: the engine's own list, which the inspector's select offers too.
+  'orbit.nodeOutput': ORBIT_OUTPUTS,
   'router.source': ROUTER_INPUT_SOURCES.map((s) => String(s?.id ?? s)),
   'router.poly': POLY_PRESSURE_MODES,
   'macro.slotCurve': MACRO_CURVES,
@@ -127,6 +143,7 @@ export const VERB_VALUES = {
   'lcd.scroll': LCD_SCROLLS,
   'lcd.cursor': LCD_CURSORS,
   'pixel.anim': PIXEL_ANIM_MODES,
+  'pixel.animPreset': ANIM_PRESETS,
 };
 
 /** …and the same for the five hand-written families, whose reducers already validate against these

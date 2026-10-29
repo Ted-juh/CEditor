@@ -185,7 +185,25 @@ export const ARRANGE_VERBS = Object.freeze({
  */
 export function arrangementPlan(memberId, transforms, which, opts) {
   const list = Array.isArray(transforms) ? transforms : [];
-  const none = { patches: new Map(), refused: null };
+  const none = { patches: new Map(), refused: null, said: [] };
+  const verb = ARRANGE_VERBS[memberId] ?? memberId;
+  // No control to work on, or one where the verb needs two, is refused with why: it answered 0
+  // without a word, as though there were nothing to move (the owner's word, "ce.panel" in
+  // docs/design/api-descriptions-handoff.md).
+  if (!list.length) return { ...none, refused: `ce.panel.${verb}: no control was named, so nothing was moved.` };
+  if (memberId !== 'panelAlign' && ARRANGE_VERBS[memberId] && list.length < 2) {
+    return { ...none, refused: `ce.panel.${verb} needs at least two controls, and only "${list[0].name}" is one, so nothing was moved.` };
+  }
+  // An option that is not a number is used as its default and said; the runtime says each once.
+  const said = [];
+  const numberOr = (key, fallback, fallbackWords) => {
+    const given = opts?.[key];
+    if (given === undefined || given === null) return fallback;
+    const n = Number(given);
+    if (typeof given !== 'boolean' && Number.isFinite(n)) return n;
+    said.push(`ce.panel.${verb}: the ${key} ${JSON.stringify(given)} is not a number, so ${fallbackWords ?? fallback} was used.`);
+    return fallback;
+  };
   // The reference is the group's own bounds, or one named control — "align these to that one",
   // which is what the canvas calls a key object. A name that is not in the list is refused rather
   // than lined up on something else: a layout the script did not ask for, which it would have to
@@ -193,7 +211,6 @@ export function arrangementPlan(memberId, transforms, which, opts) {
   const keyName = opts?.to != null ? String(opts.to) : null;
   const named = keyName ? list.find((t) => t.name === keyName || t.id === keyName) ?? null : null;
   if (memberId === 'panelAlign') {
-    if (!list.length) return none;
     if (keyName && !named) {
       return { ...none, refused: `ce.panel.align: "${keyName}" is not one of the names given, so nothing was moved.` };
     }
@@ -203,13 +220,13 @@ export function arrangementPlan(memberId, transforms, which, opts) {
       const patch = alignPatch(t, which, ref);
       if (patch) patches.set(t.id, patch);
     }
-    return { patches, refused: null, ref, key: named?.id ?? null };
+    return { patches, refused: null, ref, key: named?.id ?? null, said };
   }
-  if (!ARRANGE_VERBS[memberId] || list.length < 2) return none;
+  if (!ARRANGE_VERBS[memberId]) return none;
   switch (memberId) {
     case 'panelDistribute': {
-      const gap = Number(opts?.gap);
-      return { patches: distributePatches(list, which, Number.isFinite(gap) ? gap : null, opts?.align === true), refused: null };
+      const gap = numberOr('gap', null, 'a gap worked out from the space');
+      return { patches: distributePatches(list, which, gap, opts?.align === true), refused: null, said };
     }
     case 'panelMatch': {
       // A name that is not in the list used to fall back to the first, silently, and every other
@@ -223,21 +240,24 @@ export function arrangementPlan(memberId, transforms, which, opts) {
         if (t.id === key.id) continue;                     // the reference does not resize itself
         patches.set(t.id, matchPatch(key, which));
       }
-      return { patches, refused: null, key: key.id };
+      return { patches, refused: null, key: key.id, said };
     }
-    case 'panelGrid':
-      return { patches: gridPatches(
-        list,
-        Number.isFinite(Number(opts?.columns)) ? Number(opts.columns) : 3,
-        Number.isFinite(Number(opts?.gapX)) ? Number(opts.gapX) : 10,
-        Number.isFinite(Number(opts?.gapY)) ? Number(opts.gapY) : 10), refused: null };
-    case 'panelCircle':
-      return { patches: circlePatches(
-        list,
-        Number.isFinite(Number(opts?.radius)) ? Number(opts.radius) : 100,
-        Number.isFinite(Number(opts?.startAngle)) ? Number(opts.startAngle) : 0), refused: null };
+    case 'panelGrid': {
+      let columns = Math.round(numberOr('columns', 3));
+      if (columns < 1) {
+        said.push(`ce.panel.grid: the columns ${JSON.stringify(opts.columns)} is below 1, so 1 was used.`);
+        columns = 1;
+      }
+      return { patches: gridPatches(list, columns, numberOr('gapX', 10), numberOr('gapY', 10)), refused: null, said };
+    }
+    case 'panelCircle': {
+      const radius = numberOr('radius', 100);
+      // A radius below 0 put each control on the far side of the circle from where it was asked.
+      if (radius < 0) return { ...none, refused: `ce.panel.circle: the radius ${radius} is below 0, so nothing was moved.` };
+      return { patches: circlePatches(list, radius, numberOr('startAngle', 0)), refused: null, said };
+    }
     case 'panelFlip':
-      return { patches: flipPatches(list, which), refused: null };
+      return { patches: flipPatches(list, which), refused: null, said };
     default:
       return none;
   }

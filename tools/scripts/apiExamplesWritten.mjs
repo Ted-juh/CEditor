@@ -202,6 +202,301 @@ export const WRITTEN = {
     lua: `local p = ce.device.parameter("filter.cutoff")\nif p then set("Cutoff.Behavior.max", p.max) end`,
     js: `const p = ce.device.parameter("filter.cutoff");\nif (p) set("Cutoff.Behavior.max", p.max);`,
   },
+  patchCurrent: {
+    lua: `local before = ce.patch.current()\nlog(before.name .. ": " .. #before.missing .. " values not known")`,
+    js: `const before = ce.patch.current();\nlog(\`\${before.name}: \${before.missing.length} values not known\`);`,
+  },
+  patchRead: {
+    lua: `ce.patch.read("voice", function(p, info)\n  if info.ok then state.original = p end\nend)`,
+    js: `ce.patch.read("voice", (p, info) => {\n  if (info.ok) state.original = p;\n});`,
+  },
+  patchLoad: { code: 'ce.patch.apply(ce.patch.load("Warm pad"))' },
+  patchMorph: {
+    lua: `function onValueChange(value)\n  ce.patch.apply(ce.patch.morph(state.a, state.b, value / 127), { live = true })\nend`,
+    js: `function onValueChange(value) {\n  ce.patch.apply(ce.patch.morph(state.a, state.b, value / 127), { live: true });\n}`,
+  },
+  patchBlend: {
+    lua: `ce.patch.apply(ce.patch.blend({ state.a, state.b, state.c }, { 0.5, 0.3, 0.2 }), { live = true })`,
+    js: `ce.patch.apply(ce.patch.blend([state.a, state.b, state.c], [0.5, 0.3, 0.2]), { live: true });`,
+  },
+  patchRandom: {
+    lua: `ce.patch.apply(ce.patch.random({ groups = { "Filter" }, seed = 7 }))`,
+    js: `ce.patch.apply(ce.patch.random({ groups: ["Filter"], seed: 7 }));`,
+  },
+  patchMutate: {
+    lua: `state.p = ce.patch.mutate(state.p, 0.1, { lock = { "Amp Env" } })\nce.patch.apply(state.p)`,
+    js: `state.p = ce.patch.mutate(state.p, 0.1, { lock: ["Amp Env"] });\nce.patch.apply(state.p);`,
+  },
+  patchMerge: {
+    lua: `ce.patch.apply(ce.patch.merge(state.mine, state.theirs, { groups = { "Filter" } }))`,
+    js: `ce.patch.apply(ce.patch.merge(state.mine, state.theirs, { groups: ["Filter"] }));`,
+  },
+  patchDiff: {
+    lua: `for _, d in ipairs(ce.patch.diff(state.saved, ce.patch.current())) do\n  log(d.name .. ": " .. tostring(d.from) .. " to " .. tostring(d.to))\nend`,
+    js: `for (const d of ce.patch.diff(state.saved, ce.patch.current())) {\n  log(\`\${d.name}: \${d.from} to \${d.to}\`);\n}`,
+  },
+  patchEqual: {
+    lua: `if not ce.patch.equal(state.saved, ce.patch.current()) then logWarn("the patch has changed") end`,
+    js: `if (!ce.patch.equal(state.saved, ce.patch.current())) logWarn("the patch has changed");`,
+  },
+  patchApply: {
+    lua: `local result = ce.patch.apply(p)\nif #result.skipped > 0 then logWarn(#result.skipped .. " parameters not sent") end`,
+    js: `const result = ce.patch.apply(p);\nif (result.skipped.length) logWarn(\`\${result.skipped.length} parameters not sent\`);`,
+  },
+  patchSave: { code: 'ce.patch.save("Warm pad", ce.patch.current())' },
+  patchList: {
+    lua: `for row, p in ipairs(ce.patch.list()) do\n  ce.components.lcd.text("Patches", row, p.name)\nend`,
+    js: `ce.patch.list().forEach((p, i) => ce.components.lcd.text("Patches", i + 1, p.name));`,
+  },
+  patchForget: { code: 'ce.patch.forget("Warm pad")' },
+  patchWrite: {
+    lua: `local result = ce.patch.write(ce.patch.current(), 130)\nif not result.ok then logError(result.error) end`,
+    js: `const result = ce.patch.write(ce.patch.current(), 130);\nif (!result.ok) logError(result.error);`,
+  },
+  patchScopes: {
+    lua: `for _, s in ipairs(ce.patch.scopes()) do log(s.id .. ": " .. s.parameters .. " parameters") end`,
+    js: `for (const s of ce.patch.scopes()) log(\`\${s.id}: \${s.parameters} parameters\`);`,
+  },
+  patchDefine: {
+    lua: `function onPanelLoad()\n  ce.patch.define("voice", { groups = { "Osc", "Filter", "Amp" }, dumps = { "voice" } })\nend`,
+    js: `function onPanelLoad() {\n  ce.patch.define("voice", { groups: ["Osc", "Filter", "Amp"], dumps: ["voice"] });\n}`,
+  },
+  oscListen: {
+    lua: `function onPanelReady()\n  ce.osc.listen({ port = 8000, network = true })\nend`,
+    js: `function onPanelReady() {\n  ce.osc.listen({ port: 8000, network: true });\n}`,
+  },
+  oscStop: { code: 'ce.osc.stop()' },
+  oscOn: {
+    lua: `state.faders = ce.osc.on("/fader/[1-8]", function(msg)\n  local n = tonumber(msg.address:match("(%d)$"))\n  set("Slider" .. n .. ".value", msg.args[1] * 127)\nend)`,
+    js: `state.faders = ce.osc.on("/fader/[1-8]", (msg) => {\n  const n = Number(msg.address.slice(-1));\n  set(\`Slider\${n}.value\`, msg.args[0] * 127);\n});`,
+  },
+  oscOff: { code: 'ce.osc.off(state.faders)' },
+  oscTarget: { code: 'ce.osc.target("tablet", "192.168.1.20:9000")' },
+  oscSend: {
+    lua: `function onValueChanged(value)\n  if origin() ~= "osc" then ce.osc.send("tablet", "/fader/1", value / 127) end\nend`,
+    js: `function onValueChanged(value) {\n  if (origin() !== "osc") ce.osc.send("tablet", "/fader/1", value / 127);\n}`,
+  },
+  oscBundle: {
+    lua: `ce.osc.bundle("tablet", {\n  { address = "/fader/1", args = { 0.5 } },\n  { address = "/label/1", args = { "64" } },\n})`,
+    js: `ce.osc.bundle("tablet", [\n  { address: "/fader/1", args: [0.5] },\n  { address: "/label/1", args: ["64"] },\n]);`,
+  },
+  oscStatus: {
+    lua: `ce.components.lcd.text("Display", 1, "OSC port " .. tostring(ce.osc.status().port))`,
+    js: `ce.components.lcd.text("Display", 1, \`OSC port \${ce.osc.status().port}\`);`,
+  },
+  origin: {
+    lua: `function onValueChanged(value)\n  if origin() ~= "device" then sendCC(1, 74, value) end\nend`,
+    js: `function onValueChanged(value) {\n  if (origin() !== "device") sendCC(1, 74, value);\n}`,
+  },
+  dawHost: {
+    lua: `local host = ce.daw.host()\nif host then ce.components.lcd.text("Display", 1, host.name) end`,
+    js: `const host = ce.daw.host();\nif (host) ce.components.lcd.text("Display", 1, host.name);`,
+  },
+  dawParameters: {
+    lua: `for _, p in ipairs(ce.daw.parameters()) do log(p.id .. ": " .. p.name) end`,
+    js: `for (const p of ce.daw.parameters()) log(\`\${p.id}: \${p.name}\`);`,
+  },
+  dawParameter: {
+    lua: `local p = ce.daw.parameter("Cutoff.value")\nif p then log("the DAW calls it " .. p.name) end`,
+    js: `const p = ce.daw.parameter("Cutoff.value");\nif (p) log(\`the DAW calls it \${p.name}\`);`,
+  },
+  dawProgram: {
+    lua: `local program = ce.daw.program()\nif program then ce.components.lcd.text("Display", 2, program.number .. " " .. program.name) end`,
+    js: `const program = ce.daw.program();\nif (program) ce.components.lcd.text("Display", 2, \`\${program.number} \${program.name}\`);`,
+  },
+  dawPrograms: {
+    lua: `for _, p in ipairs(ce.daw.programs()) do log(p.number .. " " .. p.name) end`,
+    js: `for (const p of ce.daw.programs()) log(\`\${p.number} \${p.name}\`);`,
+  },
+  dawBeginGesture: {
+    lua: `function onClick()\n  state.step = 0\n  ce.daw.beginGesture("Cutoff.value")\n  startTimer("sweep", 20)\nend`,
+    js: `function onClick() {\n  state.step = 0;\n  ce.daw.beginGesture("Cutoff.value");\n  startTimer("sweep", 20);\n}`,
+  },
+  dawEndGesture: { code: 'ce.daw.endGesture("Cutoff.value")' },
+  dawRename: {
+    lua: `function onValueChanged(mode)\n  ce.daw.rename("Osc2Param.value", mode == 1 and "Sync amount" or "Pulse width")\nend`,
+    js: `function onValueChanged(mode) {\n  ce.daw.rename("Osc2Param.value", mode === 1 ? "Sync amount" : "Pulse width");\n}`,
+  },
+  dawAssign: {
+    lua: `ce.daw.assign(1, "LfoRate.value", { name = "LFO rate" })`,
+    js: `ce.daw.assign(1, "LfoRate.value", { name: "LFO rate" });`,
+  },
+  dawMarkChanged: {
+    lua: `state.notes = "verse 2"\nce.daw.markChanged()`,
+    js: `state.notes = "verse 2";\nce.daw.markChanged();`,
+  },
+  mpeZone: {
+    lua: `function onPanelLoad()\n  ce.mpe.zone({ members = 7, bendRange = 24 })\nend`,
+    js: `function onPanelLoad() {\n  ce.mpe.zone({ members: 7, bendRange: 24 });\n}`,
+  },
+  mpeNoteOn: {
+    lua: `function onPointerDown()\n  state.id = ce.mpe.noteOn("C4", 100, { timbre = 0.3 })\nend`,
+    js: `function onPointerDown() {\n  state.id = ce.mpe.noteOn("C4", 100, { timbre: 0.3 });\n}`,
+  },
+  mpeExpress: {
+    lua: `function onValueChange(value)\n  if state.id then ce.mpe.express(state.id, { pressure = value / 127 }) end\nend`,
+    js: `function onValueChange(value) {\n  if (state.id) ce.mpe.express(state.id, { pressure: value / 127 });\n}`,
+  },
+  mpeNoteOff: {
+    lua: `function onPointerUp()\n  if state.id then ce.mpe.noteOff(state.id); state.id = nil end\nend`,
+    js: `function onPointerUp() {\n  if (state.id) { ce.mpe.noteOff(state.id); state.id = null; }\n}`,
+  },
+  mpeAllOff: {
+    lua: `function onPanelClose()\n  ce.mpe.allOff()\nend`,
+    js: `function onPanelClose() {\n  ce.mpe.allOff();\n}`,
+  },
+  mpeNotes: {
+    lua: `for _, n in ipairs(ce.mpe.notes()) do log(n.note .. " on channel " .. n.channel) end`,
+    js: `for (const n of ce.mpe.notes()) log(\`\${n.note} on channel \${n.channel}\`);`,
+  },
+  mpeListen: {
+    lua: `function onPanelLoad()\n  ce.mpe.listen({ from = "controller" })\nend\n\nfunction onExpressionIn(e)\n  set("Bend.value", e.bend)\nend`,
+    js: `function onPanelLoad() {\n  ce.mpe.listen({ from: "controller" });\n}\n\nfunction onExpressionIn(e) {\n  set("Bend.value", e.bend);\n}`,
+  },
+  ciDiscover: {
+    lua: `function onPanelReady()\n  ce.ci.discover(function(found)\n    for _, d in ipairs(found) do\n      if d.matchesProfile then state.synth = d.muid return end\n    end\n    ce.components.lcd.text("Display", 1, "No MIDI-CI")\n  end)\nend`,
+    js: `function onPanelReady() {\n  ce.ci.discover((found) => {\n    const d = found.find((x) => x.matchesProfile);\n    if (d) state.synth = d.muid;\n    else ce.components.lcd.text("Display", 1, "No MIDI-CI");\n  });\n}`,
+  },
+  ciDevices: {
+    lua: `for _, d in ipairs(ce.ci.devices()) do log(d.muid .. ": " .. (d.names and d.names.model or d.model)) end`,
+    js: `for (const d of ce.ci.devices()) log(\`\${d.muid}: \${d.names?.model ?? d.model}\`);`,
+  },
+  ciGet: {
+    lua: `ce.ci.get(state.synth, "ProgramList", function(result)\n  if not result.ok then log("ProgramList: " .. result.status .. " " .. (result.message or "")) return end\n  for row, p in ipairs(result.body) do ce.components.lcd.text("Programs", row, p.title) end\nend)`,
+    js: `ce.ci.get(state.synth, "ProgramList", (result) => {\n  if (!result.ok) return log(\`ProgramList: \${result.status} \${result.message ?? ""}\`);\n  result.body.forEach((p, i) => ce.components.lcd.text("Programs", i + 1, p.title));\n});`,
+  },
+  ciSet: {
+    lua: `ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, function(result)\n  if not result.ok then logWarn("not renamed: " .. result.status) end\nend)`,
+    js: `ce.ci.set(state.synth, "X-PatchName", { name: "Warm Pad" }, (result) => {\n  if (!result.ok) logWarn(\`not renamed: \${result.status}\`);\n});`,
+  },
+  ciSubscribe: {
+    lua: `state.programs = ce.ci.subscribe(state.synth, "ProgramList", function(update)\n  if update.command ~= "end" then ce.ci.get(state.synth, "ProgramList", showPrograms) end\nend)`,
+    js: `state.programs = ce.ci.subscribe(state.synth, "ProgramList", (update) => {\n  if (update.command !== "end") ce.ci.get(state.synth, "ProgramList", showPrograms);\n});`,
+  },
+  ciUnsubscribe: {
+    lua: `function onPanelClose()\n  if state.programs then ce.ci.unsubscribe(state.programs) end\nend`,
+    js: `function onPanelClose() {\n  if (state.programs) ce.ci.unsubscribe(state.programs);\n}`,
+  },
+  ciProfiles: {
+    lua: `for _, p in ipairs(ce.ci.profiles(state.synth)) do log(p.id .. (p.enabled and " on" or " off")) end`,
+    js: `for (const p of ce.ci.profiles(state.synth)) log(p.id + (p.enabled ? " on" : " off"));`,
+  },
+  ciSetProfile: { code: 'ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)' },
+  ciDraftProfile: {
+    lua: `ce.ci.draftProfile(state.synth, function(draft)\n  if draft then ce.file.save("draft.json", draft.profile, { indent = 2 }) end\nend)`,
+    js: `ce.ci.draftProfile(state.synth, (draft) => {\n  if (draft) ce.file.save("draft.json", draft.profile, { indent: 2 });\n});`,
+  },
+  fileOpen: {
+    lua: `ce.file.open({ types = { "syx" }, title = "Import a bank" }, function(file, bytes)\n  if not file then return end\n  for _, message in ipairs(ce.file.syxSplit(bytes)) do ce.midi.sendSysex(message) end\nend)`,
+    js: `ce.file.open({ types: ["syx"], title: "Import a bank" }, (file, bytes) => {\n  if (!file) return;\n  for (const message of ce.file.syxSplit(bytes)) ce.midi.sendSysex(message);\n});`,
+  },
+  fileSave: {
+    lua: `ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages), {}, function(file)\n  if file then state.bankFile = file end\nend)`,
+    js: `ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages), {}, (file) => {\n  if (file) state.bankFile = file;\n});`,
+  },
+  fileRead: {
+    lua: `ce.file.read(state.bankFile, function(bytes)\n  if bytes then state.messages = ce.file.syxSplit(bytes) end\nend)`,
+    js: `ce.file.read(state.bankFile, (bytes) => {\n  if (bytes) state.messages = ce.file.syxSplit(bytes);\n});`,
+  },
+  fileWrite: { code: 'ce.file.write(state.bankFile, ce.file.syxJoin(state.messages))' },
+  fileFolder: {
+    lua: `ce.file.folder({ title = "Export the bank to", writable = true }, function(dir)\n  if not dir then return end\n  for slot, bytes in ipairs(state.patches) do\n    ce.file.saveIn(dir, string.format("%03d.syx", slot), bytes)\n  end\nend)`,
+    js: `ce.file.folder({ title: "Export the bank to", writable: true }, (dir) => {\n  if (!dir) return;\n  state.patches.forEach((bytes, i) => ce.file.saveIn(dir, \`\${String(i + 1).padStart(3, "0")}.syx\`, bytes));\n});`,
+  },
+  fileList: {
+    lua: `for row, f in ipairs(ce.file.list(state.dir, { types = { "syx" } })) do\n  ce.components.lcd.text("Files", row, f.name)\nend`,
+    js: `ce.file.list(state.dir, { types: ["syx"] }).forEach((f, i) => ce.components.lcd.text("Files", i + 1, f.name));`,
+  },
+  fileSaveIn: { code: 'ce.file.saveIn(state.dir, "001 Brass.syx", bytes, { replace = true })' },
+  fileSyxSplit: {
+    lua: `local messages = ce.file.syxSplit(bytes, { prefix = { 0xF0, 0x41 } })\nlog(#messages .. " Roland messages")`,
+    js: `const messages = ce.file.syxSplit(bytes, { prefix: [0xF0, 0x41] });\nlog(messages.length + " Roland messages");`,
+  },
+  fileSyxJoin: { code: 'ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))' },
+  fileMidiRead: {
+    lua: `local song = ce.file.midiRead(data)\nfor _, n in ipairs(song.tracks[1].notes) do log(n.note .. " at beat " .. n.beat) end`,
+    js: `const song = ce.file.midiRead(data);\nfor (const n of song.tracks[0].notes) log(\`\${n.note} at beat \${n.beat}\`);`,
+  },
+  fileMidiWrite: {
+    lua: `local bytes = ce.file.midiWrite(ce.components.recorder.read("Recorder"), { name = "Take 1" })\nce.file.save("Take 1.mid", bytes)`,
+    js: `const bytes = ce.file.midiWrite(ce.components.recorder.read("Recorder"), { name: "Take 1" });\nce.file.save("Take 1.mid", bytes);`,
+  },
+  verifyCoverage: {
+    lua: `local c = ce.verify.coverage()\nlog(c.checkable .. " of " .. c.total .. " parameters can be checked")\nfor _, d in ipairs(c.dumps) do\n  if d.expectedBytes ~= d.layoutBytes then logWarn(d.kind .. ": the length does not add up") end\nend`,
+    js: `const c = ce.verify.coverage();\nlog(\`\${c.checkable} of \${c.total} parameters can be checked\`);\nfor (const d of c.dumps) {\n  if (d.expectedBytes !== d.layoutBytes) logWarn(\`\${d.kind}: the length does not add up\`);\n}`,
+  },
+  verifyCheck: {
+    lua: `function onClick()\n  local started = ce.verify.check(function(report)\n    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width = 16 }))\n  end)\n  if not started then ce.components.lcd.text("Display", 1, "Busy or offline") end\nend`,
+    js: `function onClick() {\n  const started = ce.verify.check((report) => {\n    ce.components.lcd.text("Display", 1, ce.verify.summary(report, { width: 16 }));\n  });\n  if (!started) ce.components.lcd.text("Display", 1, "Busy or offline");\n}`,
+  },
+  verifyDump: {
+    lua: `ce.verify.dump("common", { times = 3 }, function(report)\n  for _, d in ipairs(report.differed) do log(d.name .. " changes by itself") end\nend)`,
+    js: `ce.verify.dump("common", { times: 3 }, (report) => {\n  for (const d of report.differed) log(\`\${d.name} changes by itself\`);\n});`,
+  },
+  verifyWrite: {
+    lua: `ce.verify.write("tone1.filter.cutoff", 64, function(report)\n  if not report.ok then logWarn(ce.verify.summary(report)) end\nend)`,
+    js: `ce.verify.write("tone1.filter.cutoff", 64, (report) => {\n  if (!report.ok) logWarn(ce.verify.summary(report));\n});`,
+  },
+  verifyProbe: {
+    lua: `ce.verify.probe("tone1.lfo.rate", function(report)\n  for _, p in ipairs(report.probes) do\n    if not p.same then log(p.id .. ": sent " .. tostring(p.value) .. ", got " .. tostring(p.got)) end\n  end\nend)`,
+    js: `ce.verify.probe("tone1.lfo.rate", (report) => {\n  for (const p of report.probes) {\n    if (!p.same) log(\`\${p.id}: sent \${p.value}, got \${p.got}\`);\n  }\n});`,
+  },
+  verifyPatch: {
+    lua: `ce.verify.patch({ group = "Filter" }, function(report)\n  log(ce.verify.summary(report))\nend)`,
+    js: `ce.verify.patch({ group: "Filter" }, (report) => {\n  log(ce.verify.summary(report));\n});`,
+  },
+  verifySummary: {
+    lua: `function onVerifyDone(report)\n  ce.components.lcd.text("Display", 2, ce.verify.summary(report, { width = 16 }))\nend`,
+    js: `function onVerifyDone(report) {\n  ce.components.lcd.text("Display", 2, ce.verify.summary(report, { width: 16 }));\n}`,
+  },
+  verifyRunning: {
+    lua: `local now = ce.verify.running()\nif now then ce.components.lcd.text("Display", 1, now.kind .. " " .. now.done .. "/" .. now.total) end`,
+    js: `const now = ce.verify.running();\nif (now) ce.components.lcd.text("Display", 1, \`\${now.kind} \${now.done}/\${now.total}\`);`,
+  },
+  verifyCancel: {
+    lua: `function onClick()\n  if not ce.verify.cancel() then log("no check was running") end\nend`,
+    js: `function onClick() {\n  if (!ce.verify.cancel()) log("no check was running");\n}`,
+  },
+  keysShortcut: {
+    lua: `function onPanelReady()\n  ce.keys.shortcut("Ctrl+G", function() run("Random.action") end, { description = "Random voice" })\nend`,
+    js: `function onPanelReady() {\n  ce.keys.shortcut("Ctrl+G", () => run("Random.action"), { description: "Random voice" });\n}`,
+  },
+  keysRemove: {
+    lua: `state.randomKey = ce.keys.shortcut("Ctrl+G", randomVoice)\n-- later, when that page is hidden:\nce.keys.remove(state.randomKey)`,
+    js: `state.randomKey = ce.keys.shortcut("Ctrl+G", randomVoice);\n// later, when that page is hidden:\nce.keys.remove(state.randomKey);`,
+  },
+  keysList: {
+    lua: `for row, s in ipairs(ce.keys.list()) do\n  ce.components.lcd.text("Help", row, s.keys .. "  " .. (s.description or ""))\nend`,
+    js: `ce.keys.list().forEach((s, i) => {\n  ce.components.lcd.text("Help", i + 1, \`\${s.keys}  \${s.description ?? ""}\`);\n});`,
+  },
+  keysIsDown: {
+    lua: `function onValueChange(value)\n  if ce.keys.isDown("Shift") then log("fine steps") end\nend`,
+    js: `function onValueChange(value) {\n  if (ce.keys.isDown("Shift")) log("fine steps");\n}`,
+  },
+  keysHeld: {
+    lua: `log(#ce.keys.held() .. " keys held")`,
+    js: `log(ce.keys.held().length + " keys held");`,
+  },
+  keysPiano: {
+    lua: `function onValueChanged(value)\n  ce.keys.piano({ on = value > 0, target = "Keys" })\nend`,
+    js: `function onValueChanged(value) {\n  ce.keys.piano({ on: value > 0, target: "Keys" });\n}`,
+  },
+  keysPianoInfo: {
+    lua: `ce.components.lcd.text("Display", 2, "Octave " .. ce.keys.pianoInfo().octave)`,
+    js: `ce.components.lcd.text("Display", 2, "Octave " + ce.keys.pianoInfo().octave);`,
+  },
+  keysFocus: {
+    lua: `ce.keys.shortcut("Ctrl+Shift+F", function() ce.keys.focus("Cutoff") end, { description = "Go to the filter" })`,
+    js: `ce.keys.shortcut("Ctrl+Shift+F", () => ce.keys.focus("Cutoff"), { description: "Go to the filter" });`,
+  },
+  keysFocused: {
+    lua: `function onKeyDown(key)\n  if ce.keys.focused() == "Cutoff" then log("the cutoff knob has the arrows") end\nend`,
+    js: `function onKeyDown(key) {\n  if (ce.keys.focused() === "Cutoff") log("the cutoff knob has the arrows");\n}`,
+  },
+  formatParameter: {
+    lua: `local v = ce.device.read("octaveShift")\nce.components.lcd.text("Display", 1, ce.format.line("Octave", ce.format.parameter("octaveShift", v), 16))`,
+    js: `const v = ce.device.read("octaveShift");\nce.components.lcd.text("Display", 1, ce.format.line("Octave", ce.format.parameter("octaveShift", v), 16));`,
+  },
   deviceConnected: {
     lua: `if ce.device.connected() then ce.device.requestDump("patch") end`,
     js: `if (ce.device.connected()) ce.device.requestDump("patch");`,

@@ -114,9 +114,10 @@ test('the scripting API reads its ranges from the field sets, so the two cannot 
 
 test('a script may reach further than the inspector, never less far', () => {
   for (const [section, fields] of SETS) assert.deepEqual(scriptRangesNarrowerThanInspector(fields), [], section);
-  // The ones that reach further, on purpose, and nothing else.
+  // The ones that reach further, on purpose, and nothing else. The Kinetic's gravity and bounce did
+  // too, past what the ball plays (kineticParams), and take the inspector's ranges since its review.
   const wider = SETS.flatMap(([section, fields]) => fields.filter((field) => field.script).map((field) => `${section}.${field.key}`));
-  assert.deepEqual(wider, ['Kinetic.gravity', 'Kinetic.restitution', 'Crossfader.detent', 'ChordPad.gridCols', 'ChordPad.strumMs']);
+  assert.deepEqual(wider, ['Crossfader.detent', 'ChordPad.gridCols', 'ChordPad.strumMs']);
   // ...and the check catches a script range that falls short of the inspector's.
   const short = [{ key: 'mix', kind: 'number', min: 0, max: 1, clamp: true, script: { min: 0, max: 0.5 } }];
   assert.deepEqual(scriptRangesNarrowerThanInspector(short), ['mix: the inspector writes 0..1, a script accepts 0..0.5']);

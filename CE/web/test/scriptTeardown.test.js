@@ -61,7 +61,8 @@ test('onPanelClose and onPanelDestroy are separate hooks with separate summaries
   const close = LIFECYCLE_HOOKS.find((h) => h.id === 'onPanelClose');
   const destroy = LIFECYCLE_HOOKS.find((h) => h.id === 'onPanelDestroy');
   assert.notEqual(close.summary, destroy.summary);
-  assert.match(close.summary, /onPanelDestroy/, 'onPanelClose should point at the other one');
+  // Its one sentence says what it is; its notes point at the other (the hooks' review).
+  assert.match([close.summary, ...(close.notes ?? [])].join(' '), /onPanelDestroy/, 'onPanelClose should point at the other one');
 });
 
 /* ----------------------------------------------------------------------------- dispatch */

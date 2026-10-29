@@ -135,7 +135,11 @@ The dock also opens by itself when it is needed: clicking a colour swatch anywhe
 
 ### Help
 
-**Help → Documentation** opens the manuals inside CEditor, with a search box. **F1** shows every
+**Help → Documentation** opens the manuals inside CEditor as a tab beside your panels, with a
+search box (**Ctrl+F**). A link in a manual jumps to the section it names; **Back** (or
+**Alt+Left**) returns to where you clicked it. **Own window** moves the manual into a window of its
+own, which you can move, resize or put on a second screen; **Back to the editor** in that window
+puts it in a tab again. CEditor remembers which of the two you used last. **F1** shows every
 keyboard shortcut. When you hover over a setting in the properties panel, the **Info** bar at its
 bottom explains what the setting does.
 

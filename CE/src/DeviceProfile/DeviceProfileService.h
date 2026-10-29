@@ -2,6 +2,7 @@
 
 #include "DeviceProfileEngine.h"
 #include "MidiCiSession.h"
+#include "Osc/OscService.h"
 
 #include <juce_audio_devices/juce_audio_devices.h>
 
@@ -69,6 +70,23 @@ public:
     juce::var ingestIncomingMidiMessage (const juce::var& payload);
     juce::var startMidiCiDiscovery (const juce::var& payload);
     juce::var setMidiCiProfile (const juce::var& payload);
+    /** ce.ci (docs/design/ce-ci-module.md): one script command. Answers at once with { ok, token },
+        or { ok = false, error }, or, for the commands that need no device, the answer itself
+        (devices, profiles without a token, unsubscribe, setProfile). What a device says comes later
+        as a "ciReply" device event, { token, final, result }; a device that answers, leaves or turns
+        a profile on or off is raised as "ciDiscovered", "ciDeviceRemoved" or "ciProfileChanged".
+        payload: { op, role, muid, resource, body, opts, token, id, on, channel, timeoutMs }; a
+        caller that names `token` gets its replies under it (the panel view's own ids). */
+    juce::var ciCommand (const juce::var& payload);
+    /** ce.osc (docs/design/ce-osc-module.md): one command for the panel's OSC transport
+        (Osc/OscService.h), made on first use, since nothing opens until asked. A message that arrives
+        is raised as an "oscMessage" device event. */
+    juce::var oscCommand (const juce::var& payload);
+    /** How to ask the user a yes-or-no question about the network, set by whoever has a window to
+        ask in (the editor, the player, the plug-in). Unset: nobody to ask, and the answer is no. */
+    std::function<void (const juce::String& question, std::function<void (bool yes)> answer)> askAboutNetwork;
+    /** Tests stand in for the MIDI output: a role's raw MIDI (MIDI-CI) goes here instead of a port. */
+    std::function<void (const juce::String& role, const juce::MidiMessage&)> rawMidiTapForTesting;
     juce::var parseDumpMessage (const juce::var& payload, bool updateState);
     juce::var runProfileTests (const juce::var& payload);
     juce::var getRuntimeState() const;
@@ -149,6 +167,10 @@ private:
         juce::String scanId;
         double createdAtMs = 0.0;
         double timeoutAtMs = 0.0;
+        // What was sent and how long each try waits, so a request whose reply did not come can be
+        // sent again (processPendingRequestTimeouts) rather than only counting its retries.
+        MidiTransaction transaction;
+        int timeoutMs = 0;
         int retriesRemaining = 0;
         int continuationCount = 0;
         bool continueSent = false;
@@ -266,11 +288,24 @@ private:
 
     // MIDI-CI live discovery (MIDI 2.0 plan, phase M1). The session is driven entirely on the message
     // thread: pumped from timerCallback, fed incoming SysEx from processIncomingMidiMessage.
-    std::unique_ptr<MidiCiSession> midiCiSession;
     juce::String midiCiRole;
     double midiCiDeadlineMs = 0.0;
     bool midiCiActive = false;
     std::set<uint32_t> midiCiReported; // muids already emitted as midiCiDiscovered
+
+    // ce.ci: one session per role, kept while the service lives, so replies, later reads and
+    // subscriptions are heard at any time, and the app keeps one MUID (ciSessionFor).
+    std::map<juce::String, std::unique_ptr<MidiCiSession>> ciSessions;
+    std::unique_ptr<ceditor::osc::OscService> oscTransport;   // made on the first ce.osc command
+    struct CiDiscovery { juce::var token; juce::String role; double deadline = 0.0; };
+    std::vector<CiDiscovery> ciDiscoveries;
+    std::map<juce::String, std::pair<juce::String, int>> ciSubscriptions;   // token -> (role, session id)
+    int ciNextToken = 1;
+    MidiCiSession* ciSessionFor (const juce::String& role, bool create);
+    juce::var ciDescribe (const juce::String& role, uint32_t muid);
+    juce::String ciRoleOf (uint32_t muid) const;
+    void ciReply (const juce::var& token, bool final, const juce::var& result);
+    void pollCiSessions();
 
     // `force` skips the rescan throttle, for the cold paths that must see a profile written a moment
     // ago (the profile list behind the settings dropdown, and validating a newly chosen profile id).

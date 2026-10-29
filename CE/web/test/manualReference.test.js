@@ -160,7 +160,7 @@ test('the animation verbs agree about the timing options they share', () => {
 const CAPITALISED = new Set([
   'MIDI', 'CC', 'NRPN', 'RPN', 'DAW', 'JSON', 'SYSEX', 'ASCII', 'LCD', 'GM', 'CRC', 'DPD', 'GUI',
   'VST3', 'API', 'UI', 'RGB', 'AARRGGBB', 'RRGGBB', 'RRGGBBAA', 'LFO', 'GCD', 'XY', 'ADSR', 'OK', 'ID', 'IDS',
-  'CPU', 'HSL', 'MSB', 'LSB', 'URL', 'URLS', 'A', 'I',
+  'CPU', 'HSL', 'MSB', 'LSB', 'URL', 'URLS', 'A', 'I', 'CI', 'MPE', 'OSC',
 ]);
 
 /** A summary with its quoted values and code spans removed — the parts prose rules apply to. */
@@ -211,7 +211,7 @@ const TYPE_WORDS = new Set([
   'number', 'text', 'true or false', 'function', 'list', 'options', 'table', 'path', 'colour', 'note',
   'bytes', 'control name', 'event name', 'any value', 'number or text', 'text or list',
   'list of numbers', 'list of bytes', 'list of notes', 'list of text', 'text or object',
-  'list of objects',
+  'list of objects', 'number or table', 'number or name',
 ]);
 
 test('every parameter\'s type is shown in a word from one short list', () => {
@@ -243,7 +243,7 @@ test('the contract\'s own type names are not shown', () => {
 test('the manual names each parameter with its type and whether it is required', () => {
   const manual = generateManual();
   assert.match(manual, /`v` \(number, required\): The value to move\./);
-  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make\./);
+  assert.match(manual, /`count` \(number, optional\): How many bytes of 7 bits to make, from 1 to 4\./);
 });
 
 /* -------------------------------------------------------------------- the tree */

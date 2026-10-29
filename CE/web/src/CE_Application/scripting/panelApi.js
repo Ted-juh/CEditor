@@ -276,14 +276,42 @@ function optionFields(entries) {
 
 /** The option fields more than one member declares, defined once. */
 const SHARED_OPTION_FIELDS = {
+  /* --- ce.patch: choosing parameters, the options every patch command shares - */
+  patchGroups: { name: 'groups', type: 'list of text', default: 'every group', sample: '{"Filter", "Amp Env"}', summary: 'Only parameters in these groups, as the profile names them, in any case.' },
+  patchOnly: { name: 'only', type: 'list of text', default: 'every parameter', sample: '{"cutoff"}', summary: 'Only these parameters, by id. With groups: those in either.' },
+  patchExcept: { name: 'except', type: 'list of text', default: 'none', summary: 'Never these parameters, by id or group name. Wins over groups and only.' },
+  patchLock: { name: 'lock', type: 'list of text', default: 'none', summary: 'These keep their value from the first patch, by id or group name. Unlike except, they stay in the result.' },
+  patchInclude: { name: 'include', type: 'list of text', default: 'none', summary: 'Take in what is left out by default: "name" for the patch name, "readOnly" for parameters the synth cannot be sent, or ids and groups.' },
+  patchRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device, by its role as the panel names it.' },
+  patchScope: { name: 'scope', type: 'text', default: '"voice"', summary: 'The part of the synth, when the command takes no patch to read it from.' },
+  patchSeed: { name: 'seed', type: 'number', default: 'the script\'s random stream', summary: 'Where the random numbers start: the same seed gives the same patch, in every language.' },
+
+  /* --- ce.ci: the options its commands share -------------------------------- */
+  ciRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device whose MIDI ports to ask on.' },
+  ciResId: { name: 'resId', type: 'text', default: 'none', summary: 'For a resource that holds several items: which one, such as one program.' },
+  ciTimeout: { name: 'timeoutMs', type: 'number', default: '3000', unit: 'milliseconds', summary: 'How long to wait for the device\'s answer.' },
+
+  /* --- ce.verify: the options its checks share ----------------------------- */
+  verifyRole: { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device. Every check but coverage asks the main synth only.' },
+  verifyIds: { name: 'ids', type: 'list of text', default: 'every parameter', sample: '{"cutoff", "resonance"}', summary: 'Only these parameters, by id.' },
+  verifyGroup: { name: 'group', type: 'text', default: 'every group', summary: 'Only the parameters of this group, as the profile names it, in any case.' },
+  verifySettle: { name: 'settleMs', type: 'number', default: '100', unit: 'milliseconds', summary: 'The wait between sending and asking the synth for the value back.' },
+
+  /* --- ce.format: the options every formatting command shares ------------- */
+  formatDecimals: { name: 'decimals', type: 'number', default: 'as the command decides', summary: 'Exactly this many decimal places, 0 to 6.' },
+  formatDigits: { name: 'digits', type: 'number', default: '3', summary: 'Significant digits, 1 to 6, when `decimals` is left out.' },
+  formatSign: { name: 'sign', type: 'text', default: '"auto"', values: ['auto', 'always'], summary: '"always" writes a plus too, as in "+12".' },
+  formatUnit: { name: 'unit', type: 'true or false, or text', default: 'true', summary: 'Off for no unit, or text for a unit of its own, such as "st".' },
+  formatSpace: { name: 'space', type: 'true or false', default: 'true', summary: 'The space between the number and its unit. None before % either way.' },
+  formatWidth: { name: 'width', type: 'number', summary: 'Pad to this many characters, the text on the right. Longer text is not cut (that is ce.format.fit).' },
+  formatPlaceholder: { name: 'placeholder', type: 'text', default: '"--"', summary: 'The text for a missing value.' },
+  formatUnicode: { name: 'unicode', type: 'true or false', default: 'false', summary: 'The typographic characters (−, ∞, ♯, ♭), for a label in a normal font. LCD fonts have none of them.' },
+  formatAbbreviations: { name: 'abbreviations', type: 'table', summary: 'More words to shorten, or the built-in ones changed: { Cutoff = "Cut" }.' },
+
   /* --- persistence ------------------------------------------------------- */
   scope: {
     name: 'scope', type: 'text', default: '"panel"', values: ['panel', 'script', 'local'],
-    summary: 'Which store to use. "panel" is shared by every script on the panel and travels with '
-      + 'it; "script" is private to this one; "local" stays on this machine and is never written '
-      + 'into the panel document. A scope that is not one of these is refused, and so is an options '
-      + 'table with any other key, such as a misspelled `scop`: nothing is saved or read, and a '
-      + 'message says why, because falling back to "panel" would share a private setting.',
+    summary: '"panel": every script on the panel; kept with the panel.\n"script": this script only.\n"local": this computer only, never written into the panel; in an exported plug-in, this instance only.\nCase-insensitive.\nLeft out: "panel".\nAny other: nothing is saved or read, with a console error; it does not fall back to "panel", which would share a private value.',
   },
 
   /* --- animation timing (ce.anim.to / .spring / .envelope) ---------------- */
@@ -336,34 +364,35 @@ const SHARED_OPTION_FIELDS = {
   // read the same keys through applyControlProps.
   controlName: {
     name: 'name', type: 'text', default: 'one derived from the type', sample: '"cutoff"',
-    summary: 'The control\'s name. Every other command addresses the control by this name.',
+    summary: 'The name every other command reaches it by.\nTaken already: a number is added; use the name given back.',
   },
   controlX: {
     name: 'x', type: 'number', default: '0', unit: 'pixels',
-    summary: 'Distance from the left edge of whatever contains it.',
+    summary: 'Pixels from the left edge of its container.\nNot a number: as it was, with a console warning the first time.',
   },
-  controlY: { name: 'y', type: 'number', default: '0', unit: 'pixels', summary: 'Distance from the top edge.' },
+  controlY: {
+    name: 'y', type: 'number', default: '0', unit: 'pixels',
+    summary: 'Pixels from the top edge of its container.\nNot a number: as it was, with a console warning the first time.',
+  },
   controlWidth: {
     name: 'width', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-    summary: 'How wide to make it.',
+    summary: 'Pixels.\n0 or below, or not a number: as it was, with a console warning the first time.',
   },
   controlHeight: {
     name: 'height', type: 'number', default: 'the type\'s own', unit: 'pixels', sample: '64',
-    summary: 'How tall to make it.',
+    summary: 'Pixels.\n0 or below, or not a number: as it was, with a console warning the first time.',
   },
   controlParent: {
     name: 'parent', type: 'text', default: 'the panel itself', sample: '"row1"', kind: 'control',
-    summary: 'The name of a container to put it inside.',
+    summary: 'The name of a container to put it in: a control with a Children section, such as a Container or a Group.\nNot a control, or not a container: rejected with a console error.',
   },
   controlSection: {
     name: '<section>', type: 'object', group: 'any section',
-    summary: 'Any section of the control, to set up as you make it — for example '
-      + '{ Behavior = { min = 0, max = 127 } }. The section names are the ones set() uses, capitals '
-      + 'and all (Behavior, not behavior), and one the control does not have refuses the call. Inside '
-      + 'one, names are read in any capitals, as a path is: '
-      + '{ Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest of it. A '
-      + 'colour is stored as set() stores it, and a setting the section does not have is written with '
-      + 'a warning, as set() writes one.',
+    summary: ['Any section of the control, by the name set() uses, such as { Behavior = { min = 0, max = 127 } }.',
+      'The section\'s name as written: Behavior, not behavior.', 'A section the control does not have: rejected with a console error.',
+      'Inside one, names in any case, as in a path; a child given is merged into the one there: { Background = { Fill = { colour = "red" } } } changes the Fill and keeps the rest.',
+      'A colour: stored as set() stores it; one it would refuse: rejected with a console error.',
+      'A setting the section does not have: written, with a console warning, as set() writes one.'].join('\n'),
   },
 
   /* --- dialogs and messages (ce.ui) -------------------------------------- */
@@ -399,7 +428,7 @@ const SHARED_OPTION_FIELDS = {
   },
   bytesOrder: {
     name: 'order', type: 'text', default: '"msb"', values: ['msb', 'lsb'],
-    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb").',
+    summary: 'Which byte comes first: the most significant ("msb") or the least ("lsb"). Case-insensitive.',
   },
 
   /* --- image layers (ce.image) -------------------------------------------- */
@@ -450,14 +479,22 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelLoad', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelLoad()',
-    summary: 'Runs first, as soon as the panel is opened and before any controls exist. Use it to set up MIDI or send the synth a start-up message. Do not read or change controls here — they have not been created yet.',
+    summary: 'Runs first, when the panel opens, before any control exists.',
+    notes: [
+      'Set up MIDI here, or send the synth a start-up message.',
+      'Controls cannot be read or changed yet.',
+    ],
     params: [],
     snippet: { lua: 'function onPanelLoad()\n  $0\nend', javascript: 'function onPanelLoad() {\n  $0\n}' },
   },
   {
     id: 'onPanelBuild', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onPanelBuild()',
-    summary: 'Runs after onPanelLoad and before onPanelReady. This is the place to create, copy and arrange controls from a script. Controls made by a script are removed before each run, so this always starts from the panel as you built it.',
+    summary: 'Runs after `onPanelLoad`, to create, copy and arrange controls from a script.',
+    notes: [
+      'Controls a script made are removed before each run, so it starts from the panel as it was built.',
+      'Panel view only.',
+    ],
     params: [],
     snippet: {
       lua: 'function onPanelBuild()\n  for i = 1, 4 do\n    ce.panel.create("Knob", { name = "osc" .. i, x = 20 + i * 90, y = 40 })\n  end\n  $0\nend',
@@ -467,7 +504,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onError', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onError(info)',
-    summary: 'Runs when any script on the panel fails. `info` says which script failed, what it was doing and what the error was. The error is always written to the log as well. If onError itself fails, that error is logged and onError is not called again, so it cannot get stuck in a loop.',
+    summary: 'Runs when any script on the panel fails.',
+    notes: [
+      'The error is written to the console as well.',
+      'An error in `onError` itself is written to the console, and `onError` is not called for it, so it cannot loop.',
+    ],
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'script', type: 'text', summary: 'The name of the script that failed.' },
       { name: 'scriptId', type: 'text', summary: 'Its id, which stays the same when it is renamed.' },
@@ -484,7 +525,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDraw', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_WEBVIEW,
     signature: 'onDraw(info)',
-    summary: 'Paints on top of the control this script is attached to; `info` gives the control\'s name and its current size. It runs when the control needs repainting, not on every frame: to animate, call `ce.draw.redraw()` from a timer.',
+    summary: 'Paints on top of the control this script is attached to.',
+    notes: [
+      'Runs when the control needs painting, not every frame: to animate, call `ce.draw.redraw()` from a timer.',
+      'Panel view only.',
+    ],
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'target', type: 'text', summary: 'The name of the control being painted.' },
       { name: 'width', type: 'number', unit: 'pixels', summary: 'How wide the control is right now.' },
@@ -498,7 +543,11 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelReady', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelReady(info)',
-    summary: 'Runs once the controls exist. This is the moment to ask the synth for its current settings and fill the controls. In a plugin it runs again each time the window is reopened, so put one-time work inside `if info.firstTime`.',
+    summary: 'Runs once the controls exist.',
+    notes: [
+      'Ask the synth for its settings here, and fill the controls.',
+      'In a plug-in it runs again each time the window opens: put one-time work inside `if info.firstTime`.',
+    ],
     params: [{ name: 'info', type: 'object', fields: optionFields([
       { name: 'firstTime', type: 'true or false',
         summary: 'True the first time the panel opens, false when a plugin window is reopened. '
@@ -512,14 +561,23 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onPanelClose', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelClose()',
-    summary: 'Runs when the panel window closes: you stopped the preview, or the plugin window was closed in the DAW. Your scripts keep running after this — timers still tick and MIDI still arrives. To clean up when the scripts themselves are stopped, use onPanelDestroy.',
+    summary: 'Runs when the panel window closes.',
+    notes: [
+      'The preview stopped, or the plug-in\'s window was closed in the DAW.',
+      'The scripts go on running: timers tick and MIDI arrives. `onPanelDestroy` runs when they stop.',
+    ],
     params: [],
     snippet: { lua: 'function onPanelClose()\n  $0\nend', javascript: 'function onPanelClose() {\n  $0\n}' },
   },
   {
     id: 'onPanelDestroy', kind: 'lifecycle', category: 'Lifecycle',
     signature: 'onPanelDestroy()',
-    summary: 'Runs when the scripts are about to be stopped: another panel was opened, the scripts were replaced, or the plugin was removed. It is the last hook to run, and timers, saved state and MIDI still work, so this is the place to restore the synth or send a final dump. It runs exactly once, even if onPanelClose never did.',
+    summary: 'Runs when the scripts are about to stop.',
+    notes: [
+      'Another panel was opened, the scripts were replaced, or the plug-in was removed.',
+      'The last hook: timers, saved values and MIDI still work, so restore the synth or send a last dump here.',
+      'Once, even when `onPanelClose` never ran.',
+    ],
     params: [],
     snippet: { lua: 'function onPanelDestroy()\n  $0\nend', javascript: 'function onPanelDestroy() {\n  $0\n}' },
   },
@@ -530,11 +588,19 @@ export const LIFECYCLE_HOOKS = [
   // ScriptRuntime::onDawSaveState merges the returned keys into the shared store.
   //
   // Player-only. The editor has no DAW to save a project, so these never fire in preview — test
-  // them in the exported plugin.
+  // them in the exported plugin. With the plug-in's window open the page's scripts run them
+  // (panelRuntime.js, setDawStateSink), and the state passes between page and window-shut engines
+  // as the window opens and closes (PluginProcessor.h, applyDawStateFromPage).
   {
     id: 'onDawSaveState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawSaveState(store) -> object',
-    summary: 'Runs when the DAW saves the project. Return a table (Lua) or object (JavaScript) holding what you want saved. `store` shows what other scripts have saved so far; it is for reading only, and changing it saves nothing.',
+    summary: 'Runs so the DAW can save your values with the project: return what to keep.',
+    notes: [
+      'Return a table holding what you want saved.',
+      'Runs shortly after your scripts have run, whether the plug-in\'s window is open or shut.',
+      '`store` shows what other scripts saved so far; it is to read only, and changing it saves nothing.',
+      'In an exported plug-in only.',
+    ],
     params: [{ name: 'store', type: 'object' }],
     snippet: {
       lua: 'function onDawSaveState(store)\n  return { ${1:key} = ${2:value} }$0\nend',
@@ -544,7 +610,12 @@ export const LIFECYCLE_HOOKS = [
   {
     id: 'onDawRestoreState', kind: 'lifecycle', category: 'Lifecycle', runtime: RUNTIME_PLAYER,
     signature: 'onDawRestoreState(store)',
-    summary: 'Runs when the DAW reopens the project. Read your values back out of `store`, which holds what your onDawSaveState returned together with what every other script saved.',
+    summary: 'Runs when the DAW opens the project again, and when the plug-in\'s window opens or closes: read your values back.',
+    notes: [
+      '`store` holds what your `onDawSaveState` returned, with every other script\'s.',
+      'The window opening or closing runs it so that the scripts that run next carry on from the same values.',
+      'In an exported plug-in only.',
+    ],
     params: [{ name: 'store', type: 'object' }],
     snippet: { lua: 'function onDawRestoreState(store)\n  $0\nend', javascript: 'function onDawRestoreState(store) {\n  $0\n}' },
   },
@@ -556,18 +627,18 @@ export const LIFECYCLE_HOOKS = [
 // names passed directly (Q4): one obvious datum directly, several fields as one object.
 
 export const CONTROL_EVENTS = [
-  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Fires again and again while the value is moving, for example while a knob is being dragged. Use it for things on screen that should follow the control.' },
-  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Fires once, when the value has settled — for example when the knob is let go. This is the moment to tell the synth.' },
-  { id: 'activeHandleChanged', fn: 'onActiveHandleChanged', payload: 'info', summary: 'A slider with more than one handle switched to a different handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end".' },
+  { id: 'valueChange', fn: 'onValueChange', payload: 'value', summary: 'Runs again and again while the value moves, as a knob is dragged: for what on screen follows the control.' },
+  { id: 'valueChanged', fn: 'onValueChanged', payload: 'value', summary: 'Runs once, when the value settles, as a knob is let go: the moment to tell the synth.' },
+  { id: 'activeHandleChanged', fn: 'onActiveHandleChanged', payload: 'info', summary: 'A slider with more than one handle moved to another handle. `info.activeHandle` and `info.previousActiveHandle` are each "start", "current" or "end".' },
   { id: 'click', fn: 'onClick', payload: 'mouse', summary: 'The control was clicked. `mouse.x` and `mouse.y` say where, inside the control.' },
   { id: 'doubleClick', fn: 'onDoubleClick', payload: 'mouse', summary: 'The control was double-clicked. `mouse.x` and `mouse.y` say where.' },
-  { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` which modifier keys were held.' },
+  { id: 'pointerDown', fn: 'onPointerDown', payload: 'mouse', summary: 'A mouse button was pressed on the control. `mouse.x` and `mouse.y` say where, `mouse.button` which button, and `mouse.modifiers` the keys held.' },
   { id: 'pointerMove', fn: 'onPointerMove', payload: 'mouse', summary: 'The mouse moved while a button was held down on the control. `mouse.x` and `mouse.y` give the new position.' },
   { id: 'pointerUp', fn: 'onPointerUp', payload: 'mouse', summary: 'The mouse button was released.' },
   { id: 'hoverStart', fn: 'onHoverStart', payload: null, summary: 'The mouse pointer moved onto the control.' },
   { id: 'hoverEnd', fn: 'onHoverEnd', payload: null, summary: 'The mouse pointer left the control.' },
   { id: 'wheel', fn: 'onWheel', payload: 'wheel', summary: 'The mouse wheel was turned over the control. `wheel.delta` says how far, and in which direction.' },
-  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The control\'s look-state changed. `state` is one word: "normal", "hover", "pressed" or "disabled".' },
+  { id: 'stateChanged', fn: 'onStateChanged', payload: 'state', summary: 'The control\'s look changed. `state` is "normal", "hover", "pressed" or "disabled".' },
 ];
 
 // `panelStateChanged` used to be declared here. There is no panel-state feature in the model —
@@ -575,8 +646,13 @@ export const CONTROL_EVENTS = [
 // not fire in any runtime. Declaring an event no runtime raises is the same defect as declaring
 // a command no runtime implements; it comes back when panel states do.
 export const PANEL_EVENTS = [
-  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'Any control on the panel changed. `info.target` is the control\'s name and `info.value` its new value. Use it to react to many controls in one place.' },
+  { id: 'controlChanged', fn: 'onControlChanged', payload: 'info', summary: 'A control on the panel changed. `info.target` is its name and `info.value` its new value: one handler for many controls.' },
   { id: 'timer', fn: 'onTimer', payload: 'info', summary: 'A timer you started is due. `info.id` is the name you gave it in `ce.time.startTimer()` or `ce.time.syncTimer()`.' },
+  // ce.keys. Panel view only: with the window shut there is no keyboard.
+  { id: 'keyDown', fn: 'onKeyDown', payload: 'key', runtime: RUNTIME_WEBVIEW,
+    summary: 'A key went down that nothing else on the panel kept: not while typing, and not the panic key, a shortcut, a piano key or a key the focused control used. `key.key` is its name as printed ("R", "7", "Space", "Up", "F2"), `key.code` its place, the same on every layout ("KeyR"), `key.ctrl`, `key.shift`, `key.alt` and `key.meta` the modifiers, `key.repeat` true while the system repeats a held key, and `key.control` the control that has the keyboard. Return true to keep the key: it then goes no further, not to the DAW and not to the editor.' },
+  { id: 'keyUp', fn: 'onKeyUp', payload: 'key', runtime: RUNTIME_WEBVIEW,
+    summary: 'A key whose keyDown was raised went up, with the same fields except `repeat`. Also raised for every such key when the panel loses the keyboard while it is held. Its return value is not used.' },
 ];
 
 // Musical time. Raised by whichever runtime is following the clock — the editor's master clock, or
@@ -586,33 +662,66 @@ export const PANEL_EVENTS = [
 // is 500ms, so the event lands within a frame of it, which is right for lighting an LED, advancing
 // a setlist or stepping a sequencer. It is NOT sample-accurate and must never be used to time audio.
 export const TIME_EVENTS = [
-  { id: 'beat', fn: 'onBeat', payload: 'time', summary: 'A beat went by while the transport is playing. `time.bar` and `time.beat` give the position, `time.beats` the total count of beats, and `time.bpm` the tempo. It arrives within a thirtieth of a second of the beat: right for lighting an LED or stepping a display, not for timing sound.' },
-  { id: 'bar', fn: 'onBar', payload: 'time', summary: 'A new bar started. `time.bar` is the bar number, `time.beats` the total count of beats, and `time.beatsPerBar` the time signature\'s beats per bar. It fires on the downbeat, together with onBeat.' },
-  { id: 'transport', fn: 'onTransport', payload: 'time', summary: 'The transport started, stopped or changed tempo. `time.playing` says whether it is running, `time.bpm` gives the tempo and `time.source` what is driving it.' },
+  { id: 'beat', fn: 'onBeat', payload: 'time', summary: 'A beat went by while the transport plays. `time.bar` and `time.beat` give where, `time.beats` the beats so far, and `time.bpm` the tempo. Within a thirtieth of a second: right for a light or a display, not for timing sound.' },
+  { id: 'bar', fn: 'onBar', payload: 'time', summary: 'A bar began, on the downbeat, with onBeat. `time.bar` is its number, `time.beats` the beats so far, and `time.beatsPerBar` the beats in a bar.' },
+  { id: 'transport', fn: 'onTransport', payload: 'time', summary: 'The transport started, stopped or changed tempo. `time.playing` says whether it runs, `time.bpm` gives the tempo and `time.source` what drives it.' },
 ];
 
 export const DEVICE_EVENTS = [
   // decoded (the DPD payoff — 90% of use)
-  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'The synth reported a parameter value and the device profile has decoded it. `info.parameter` is the parameter\'s id and `info.value` its value, in the parameter\'s own units.' },
-  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A bulk dump from the synth arrived and has been decoded. The controls bound to its parameters are already filled in by the time this runs. `dump.values` holds every decoded value (parameter id to value), `dump.kind` names the dump, such as "patch", and `dump.role` the device it came from.' },
+  { id: 'parameterReceived', fn: 'onParameterReceived', payload: 'info', decoded: true, summary: 'The synth sent a parameter\'s value, read through its profile. `info.parameter` is the parameter\'s id and `info.value` its value, in the parameter\'s own units.' },
+  { id: 'dumpReceived', fn: 'onDumpReceived', payload: 'dump', decoded: true, summary: 'A dump from the synth arrived and was read; the controls bound to it are filled in already. `dump.values` holds each value by parameter id, `dump.kind` names the dump, such as "patch", and `dump.role` the synth it came from.' },
   // A preset changed on the instrument OR from this panel, which is one event on purpose: a script
   // that repaints a name display does not care which end pressed the button, and giving it two
   // events would mean every such script wiring both and getting it wrong once.
-  { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The current preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe the new one. `preset.source` says which end changed it: "device" when the instrument sent a Program Change, "panel" when the panel called recallPreset.' },
+  // ce.osc: every OSC message that arrives, whether or not a pattern matched it.
+  { id: 'oscIn', fn: 'onOscIn', payload: 'message', decoded: false,
+    summary: 'An OSC message arrived on the port ce.osc.listen() opened. `message.address` is where it was sent, `message.args` its values, `message.types` their OSC types, `message.from` who sent it ({ host, port }), and `message.time` a bundle\'s time. origin() gives "osc".' },
+  // ce.daw: the DAW moved a parameter, or chose a program (docs/design/ce-daw-module.md). Raised by an
+  // exported plug-in, with its window open or shut; never in the editor, which has no DAW.
+  { id: 'automationIn', fn: 'onAutomationIn', payload: 'move', decoded: false,
+    summary: 'The DAW moved a parameter. `move.control` is the control\'s name, `move.path` its path, `move.value` the new value in the control\'s own range and `move.id` the DAW parameter\'s id. The control\'s own value events fire too, with origin() giving "host". Never for a change a script or a hand made.' },
+  { id: 'dawProgramIn', fn: 'onDawProgramIn', payload: 'program', decoded: false,
+    summary: 'The DAW chose a program from the plug-in\'s bank, and the plug-in has sent it to the synth. `program.index` counts from 0, `program.number` from 1, and `program.name` is its name.' },
+  // ce.ci: a MIDI-CI device answered, left, or had a profile turned on or off (docs/design/ce-ci-module.md).
+  { id: 'ciDiscovered', fn: 'onCiDiscovered', payload: 'device', decoded: true, summary: 'A MIDI-CI device answered: to ce.ci.discover(), or by announcing itself. `device` is as ce.ci.discover() describes it: `device.muid`, `device.model`, `device.names` and `device.matchesProfile` among them.' },
+  { id: 'ciDeviceRemoved', fn: 'onCiDeviceRemoved', payload: 'device', decoded: true, summary: 'A MIDI-CI device is gone. `device.muid` is its number and `device.role` the panel\'s device it was found on. Its subscriptions have ended.' },
+  { id: 'ciProfileChanged', fn: 'onCiProfileChanged', payload: 'profile', decoded: true, summary: 'A MIDI-CI profile was turned on or off, by a script or on the device itself. `profile.muid` is the device, `profile.id` the profile, `profile.address` "device" or a channel, and `profile.enabled` its new state.' },
+  // ce.verify: raised after a check's own function has run, so one script can show what any script checked.
+  { id: 'verifyDone', fn: 'onVerifyDone', payload: 'report', decoded: true, summary: 'A ce.verify check finished. `report` is the report its function was given: `report.kind` says which check, `report.ok` whether all was well, and `report.matched`, `report.differed` and `report.unchecked` say what was found. Raised for cancelled checks too.' },
+  { id: 'presetChange', fn: 'onPresetChange', payload: 'preset', decoded: true, summary: 'The preset changed. `preset.slot`, `preset.program`, `preset.name`, `preset.category` and `preset.bankId` describe it; `preset.source` is "device" when the synth sent a Program Change, "panel" when the panel called recallPreset.' },
   // raw (escape hatch)
-  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'Any MIDI message arrived, exactly as received. `midi.bytes` holds the message, `midi.status` its first byte and `midi.channel` its channel, counted from 0.' },
-  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A Control Change message arrived. `cc.cc` is the controller number and `cc.value` its value. Note that `cc.channel` is 0-based here (0 to 15), unlike sendCC and onNoteIn, which count channels 1 to 16.' },
+  { id: 'midiIn', fn: 'onMidiIn', payload: 'midi', decoded: false, summary: 'A MIDI message arrived. `midi.bytes` holds it as received, `midi.status` its first byte and `midi.channel` its channel, counted from 0. `midi.from` is the device it came from.' },
+  { id: 'ccIn', fn: 'onCcIn', payload: 'cc', decoded: false, summary: 'A controller message arrived. `cc.cc` is the controller number and `cc.value` its value; `cc.channel` counts from 0 here, 0 to 15, where sendCC and onNoteIn count 1 to 16. `cc.from` is the device it came from.' },
   // The most common message on the wire had no event of its own: a panel reacting to played notes
   // had to take onMidiIn and decode status nibbles by hand, in every language, including the
   // note-on-with-velocity-0 case that actually means note-off. Both are derived from the STATUS
   // BYTE rather than from the host's messageType, so the two runtimes cannot classify differently.
   { id: 'noteIn', fn: 'onNoteIn', payload: 'note', decoded: false,
-    summary: 'A note was played. `note.channel` (1-16, the same as sendNote), `note.note` and `note.velocity` describe it. A note-on with velocity 0 means "note off" in MIDI, so it arrives as onNoteOffIn instead.' },
+    summary: 'A note was played. `note.channel`, 1 to 16 as in sendNote, `note.note` and `note.velocity` describe it. A note-on at velocity 0 is a note-off in MIDI, and arrives as onNoteOffIn. `note.from` is the device it came from, and `note.id` the note\'s id while ce.mpe.listen() reads that device.' },
   { id: 'noteOffIn', fn: 'onNoteOffIn', payload: 'note', decoded: false,
-    summary: 'A note was released. `note.channel` (1-16), `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 when the device sent a note-on with velocity 0 instead of a note-off.' },
-  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'A System Exclusive (SysEx) message arrived. `bytes` is the message as a list of numbers.' },
-  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A device became connected and ready. `device.role` names which device it is, `device.profileId` its device profile.' },
-  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A device is no longer connected and ready. `device.role` names which device it was, and `device.message` may say why.' },
+    summary: 'A note was let go. `note.channel`, 1 to 16, `note.note` and `note.velocity` describe it; the velocity is the release velocity, or 0 for a note-on at velocity 0. `note.from` and `note.id` are as onNoteIn gives them.' },
+  // The rest of a device's MIDI, decoded once before any script (midiInDecoder.js, MidiInDecoder.h).
+  // Bends, pressure and expression are thinned to one every 10 ms per channel, never reordered.
+  { id: 'bendIn', fn: 'onBendIn', payload: 'bend', decoded: false,
+    summary: 'A pitch bend arrived. `bend.value` is -8192 to 8191, 0 in the middle; `bend.amount` the same from -1 to 1; `bend.raw` 0 to 16383, as the two bytes carry it. `bend.channel` is 1 to 16 and `bend.from` the device. Raised at most once every 10 ms per channel, with the latest value.' },
+  { id: 'pressureIn', fn: 'onPressureIn', payload: 'pressure', decoded: false,
+    summary: 'Channel pressure arrived. `pressure.value` is 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per channel.' },
+  { id: 'polyPressureIn', fn: 'onPolyPressureIn', payload: 'pressure', decoded: false,
+    summary: 'Pressure on one note arrived. `pressure.note` is the note, `pressure.value` 0 to 127, `pressure.amount` 0 to 1, `pressure.channel` 1 to 16 and `pressure.from` the device. Raised at most once every 10 ms per note.' },
+  { id: 'programIn', fn: 'onProgramIn', payload: 'program', decoded: false,
+    summary: 'A program change arrived. `program.program` is 0 to 127, as the message carries it, and `program.number` 1 to 128, as most synths show it. `program.bankMsb` and `program.bankLsb` are the bank select that came just before it on this channel, when one did. `program.channel` is 1 to 16 and `program.from` the device.' },
+  { id: 'nrpnIn', fn: 'onNrpnIn', payload: 'nrpn', decoded: false,
+    summary: 'An NRPN arrived, put together from its controllers (99, 98, then 6 and 38). `nrpn.msb` and `nrpn.lsb` are the parameter number\'s halves, as sendNRPN takes them, and `nrpn.parameter` the two as one number. `nrpn.value` is 0 to 16383 when the fine half came (`nrpn.fine` true), else 0 to 127. For an increment or decrement, `nrpn.step` is 1 or -1 instead. The controllers still raise ccIn too.' },
+  { id: 'rpnIn', fn: 'onRpnIn', payload: 'rpn', decoded: false,
+    summary: 'An RPN arrived, put together from controllers 101 and 100, then 6 and 38. The fields are those of nrpnIn, and `rpn.name` is "bendRange", "fineTuning", "coarseTuning" or "mpeConfiguration" for the numbers that have one.' },
+  { id: 'transportIn', fn: 'onTransportIn', payload: 'transport', decoded: false,
+    summary: 'A device sent start, stop, continue or a song position. `transport.action` is "start", "stop", "continue" or "position"; for "position", `transport.beat` is where it points, in beats from the start. `transport.from` is the device. Clock ticks are not raised one by one.' },
+  { id: 'expressionIn', fn: 'onExpressionIn', payload: 'expression', decoded: false,
+    summary: 'A note read with ce.mpe.listen() moved. `expression.id` is the note\'s id, as noteIn gave it, `expression.note` the note and `expression.channel` its member channel. `expression.bend` is in semitones, `expression.pressure` and `expression.timbre` 0 to 1, and `expression.changed` says which moved: "bend", "pressure" or "timbre". Raised at most once every 10 ms per note.' },
+  { id: 'sysexIn', fn: 'onSysexIn', payload: 'bytes', decoded: false, summary: 'A SysEx message arrived. `bytes` holds it as a list of numbers.' },
+  { id: 'deviceConnected', fn: 'onDeviceConnected', payload: 'device', decoded: false, summary: 'A synth was connected and is ready. `device.role` names it and `device.profileId` its profile.' },
+  { id: 'deviceDisconnected', fn: 'onDeviceDisconnected', payload: 'device', decoded: false, summary: 'A synth is no longer connected and ready. `device.role` names it, and `device.message` may say why.' },
 ];
 
 /* Components (design doc §45).
@@ -633,27 +742,27 @@ export const DEVICE_EVENTS = [
  */
 export const COMPONENT_EVENTS = [
   { id: 'step', fn: 'onStep', payload: 'step', runtime: RUNTIME_WEBVIEW,
-    summary: 'A sequencer moved to its next step. `step.target` is the component\'s name, `step.index` the step number (counting from 1), `step.of` how many steps there are, and `step.notes` the notes it plays. Raised by the Arpeggiator, Turing Machine, Phrase Sequencer and Looper.' },
+    summary: 'A sequencer moved to its next step: an Arpeggiator, Turing Machine, Phrase Sequencer or Looper. `step.target` is its name, `step.index` the step, counted from 1, `step.of` how many there are, and `step.notes` the notes it plays.' },
   { id: 'cycle', fn: 'onCycle', payload: 'cycle', runtime: RUNTIME_WEBVIEW,
-    summary: 'A sequence or loop came back round to its start. `cycle.target` is the component\'s name and `cycle.count` how many times it has come round since the panel opened. Raised by the Arpeggiator, Turing Machine, Looper and Orbit.' },
+    summary: 'A sequence or loop came round to its start: an Arpeggiator, Turing Machine, Looper or Orbit. `cycle.target` is its name and `cycle.count` how many times it has come round since the panel opened.' },
   { id: 'hit', fn: 'onHit', payload: 'hit', runtime: RUNTIME_WEBVIEW,
-    summary: 'A pad, key or ribbon was struck. `hit.target` is the component\'s name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard. Raised by the Chord Pad, Drum Pads and Note Ribbon.' },
+    summary: 'A pad, key or strip was struck: a Chord Pad, Drum Pads or Note Ribbon. `hit.target` is its name, `hit.id` which pad or key, `hit.note` the note and `hit.velocity` how hard.' },
   { id: 'release', fn: 'onRelease', payload: 'release', runtime: RUNTIME_WEBVIEW,
-    summary: 'A pad, key or ribbon was let go. `release.target` is the component\'s name, `release.id` which pad or key, and `release.note` the note.' },
+    summary: 'A pad, key or strip was let go. `release.target` is its name, `release.id` which pad or key, and `release.note` the note.' },
   { id: 'scene', fn: 'onScene', payload: 'scene', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Setlist switched to a scene. `scene.target` is the component\'s name, `scene.index` the scene number (counting from 1) and `scene.name` its name. It fires however the scene was chosen, by a script or by a footswitch.' },
+    summary: 'The Setlist moved to a scene, however it was chosen. `scene.target` is its name, `scene.index` the scene, counted from 1, and `scene.name` its name.' },
   { id: 'stage', fn: 'onStage', payload: 'stage', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component moved into a new stage. `stage.target` is the component\'s name, `stage.stage` the new stage and `stage.previous` the old one. The Recorder reports "idle", "armed", "recording" and "overdub"; the Envelope reports "sustain", "release" and "end". This is not the same as onStateChanged, which is about hover and press.' },
+    summary: 'A Recorder or an Envelope moved to a new stage. `stage.target` is its name, `stage.stage` the new stage and `stage.previous` the old one: the Recorder\'s "idle", "armed", "recording" and "overdub", the Envelope\'s "sustain", "release" and "end". Not onStateChanged, which is hover and press.' },
   { id: 'settled', fn: 'onSettled', payload: 'settled', runtime: RUNTIME_WEBVIEW,
-    summary: 'A spring-loaded control finished gliding back to its rest position. `settled.target` is the component\'s name and `settled.value` where it came to rest. Raised by the Ribbon, Crossfader and Vector Joystick.' },
+    summary: 'A Ribbon, Crossfader or Vector Joystick finished going back to its rest. `settled.target` is its name and `settled.value` where it came to rest.' },
   { id: 'bounce', fn: 'onBounce', payload: 'bounce', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Kinetic ball hit a wall. `bounce.target` is the component\'s name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.' },
+    summary: 'The Kinetic ball hit a wall. `bounce.target` is its name, `bounce.x` and `bounce.y` where it hit, and `bounce.vx` and `bounce.vy` its speed across and down.' },
   { id: 'recall', fn: 'onRecall', payload: 'recall', runtime: RUNTIME_WEBVIEW,
-    summary: 'The Constellation snapped to one of its presets. `recall.target` is the component\'s name, `recall.id` the preset and `recall.label` its label. It fires in snap mode only, not in blend mode.' },
+    summary: 'The Constellation, in snap mode, moved to another preset. `recall.target` is its name, `recall.id` the preset and `recall.label` its label.' },
   { id: 'zone', fn: 'onZone', payload: 'zone', runtime: RUNTIME_WEBVIEW,
-    summary: 'A Meter\'s reading crossed into a different zone, such as from green into red. `zone.target` is the component\'s name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.' },
+    summary: 'A Meter\'s reading crossed into another zone, such as from green into red. `zone.target` is its name, `zone.zone` the new zone, `zone.previous` the old one and `zone.value` the reading.' },
   { id: 'voiced', fn: 'onVoiced', payload: 'voiced', runtime: RUNTIME_WEBVIEW,
-    summary: 'A component turned one played note into other notes. `voiced.target` is the component\'s name, `voiced.note` and `voiced.velocity` the note that was played, and `voiced.out` the notes it produced. Raised by the Zone Splitter and the Harmoniser.' },
+    summary: 'A Zone Splitter or Harmoniser turned a played note into other notes. `voiced.target` is its name, `voiced.note` and `voiced.velocity` the note played, and `voiced.out` the notes it made.' },
 ];
 
 export const EVENTS = { control: CONTROL_EVENTS, panel: PANEL_EVENTS, time: TIME_EVENTS, device: DEVICE_EVENTS, component: COMPONENT_EVENTS };
@@ -674,15 +783,20 @@ export const COMMANDS = [
   /* --- Values (Q1) --- */
   {
     id: 'set', category: 'Values', signature: 'set(path, value [, opts])',
-    summary: 'Change a value on the panel — usually a control\'s value, but any property a path can reach. Add .normalizedValue to the path to give a position from 0 to 1 instead of the real value. A colour property takes 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#". "#000", a name such as "red", rgb() and hsl() are stored written out ("#000000", "#FF0000"), as `get()` returns them; a number, "#" with four digits and anything else are refused with a message and nothing is written, window open or shut. A gradient stop is stored as RRGGBB and takes no alpha. The change is sent to the synth, except while your script reacts to MIDI from the synth, so it does not hear its own value echoed back.',
+    summary: 'Change a value on the panel: a control\'s value, or any property a path reaches.',
+    notes: [
+      'Sent to the synth, except while a handler answers MIDI from the synth, so a value is not echoed back; `opts.transmit` decides otherwise.',
+      'A new property on a section with a fixed shape: written, with a console warning that nothing reads it.',
+      'Returns nothing.',
+    ],
+    example: '`set("Cutoff", 64)` turns the control called Cutoff to 64.',
+
     params: [
-      { name: 'path', type: 'path', required: true },
-      { name: 'value', type: 'value', required: true, at: 'path' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'path', type: 'path', required: true, summary: 'A control\'s name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.\n"panel." and a property: the panel\'s own, such as "panel.width".\n".normalizedValue" at the end: its position, 0 to 1, in place of the value.\nNot a control on the panel, or a property it does not have: nothing is written, with a console error.' },
+      { name: 'value', type: 'value', required: true, summary: 'The new value.\nA Knob\'s, a Slider\'s, a Number\'s or a Range\'s value, and a position: a number. Text that is a number: read as one.\nA colour property: 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#"; "#000", a name such as "red", rgb() and hsl() are stored written out, as "#000000" and "#FF0000".\nA gradient stop: RRGGBB, without alpha.\nLeft out, a number in any other form, or a colour in any other form: nothing is written, with a console error.', at: 'path' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'transmit', type: 'true or false', default: 'decided by where the write came from',
-          summary: 'Whether to send the change to the synth. Left out, a write made while handling '
-            + 'something the synth sent stays silent and any other write is sent. Set it only when '
-            + 'you need to override that.' },
+          summary: 'Whether the change is sent to the synth: true sent, false not.\nLeft out: sent, except while a handler answers MIDI from the synth.' },
       ]) },
     ],
     scopes: 'any',
@@ -690,10 +804,15 @@ export const COMMANDS = [
   },
   {
     id: 'get', category: 'Values', signature: 'get(path [, form])',
-    summary: 'Read a value from the panel. A control\'s value comes in three forms: add .value (the default), .normalizedValue or .midiValue to the end of the path, or pass the form\'s name as `form`. A `form` that is not one of the three is refused with a message that names them, and the one you meant when it is one written another way ("normalisedValue" is answered with "Write normalizedValue."), and nothing comes back. Returns nothing if the control or property does not exist, and writes a message saying which, in the words set() uses: a control that is not on the panel, or a path that leads nowhere on it. A property that exists but has no value yet returns nothing without a message.',
+    summary: 'Read a value from the panel.',
+    notes: [
+      'Returns the value; a colour written out, as `set()` stores it.',
+    ],
+    example: '`get("Cutoff")` gives the value of the control called Cutoff.',
+
     params: [
-      { name: 'path', type: 'path', required: true },
-      { name: 'form', type: 'string', required: false, values: VALUE_ACCESSOR_IDS },
+      { name: 'path', type: 'path', required: true, summary: 'A control\'s name, then a dot and the property: "Cutoff.value", "Cutoff.Transform.x". The name alone: its value. Names in any case.\n"panel." and a property: the panel\'s own, such as "panel.width".\nNot a control on the panel, or a property it does not have: no result, with a console error.\nA property with no value yet: no result, without a word.' },
+      { name: 'form', type: 'string', required: false, summary: '"value": the control\'s value.\n"normalizedValue": its position, 0 to 1.\n"midiValue": the number the synth is sent; only where the synth\'s profile is attached.\nCase-insensitive.\nLeft out: "value", or the form the path ends with.\nAny other: no result, with a console error naming the forms.', values: VALUE_ACCESSOR_IDS },
     ],
     scopes: 'any',
     snippet: { lua: 'get("${1:path}")$0', javascript: 'get("${1:path}")$0' },
@@ -702,15 +821,28 @@ export const COMMANDS = [
   /* --- Transmit control (Q2, Family A) --- */
   {
     id: 'noTransmit', category: 'Transmit', signature: 'noTransmit(fn)',
-    summary: 'Run a block of code that changes controls without sending anything to the synth — for example an Init Patch button that resets twenty controls at once. Sending switches back on by itself when the block ends.',
-    params: [{ name: 'fn', type: 'function', required: true }],
+    summary: 'Change controls without sending anything to the synth.',
+    notes: [
+      'For an Init Patch button that resets many controls at once.',
+      'Sending is back on when the function ends; an error in it is printed in the console.',
+      'Returns nothing.',
+    ],
+    example: '`noTransmit(function() set("Cutoff", 0) set("Reso", 0) end)` resets both, silently.',
+
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The changes to make.\nNot a function: a console error.' }],
     scopes: 'any',
     snippet: { lua: 'noTransmit(function()\n  $0\nend)', javascript: 'noTransmit(() => {\n  $0\n})' },
   },
   {
     id: 'transmit', category: 'Transmit', signature: 'transmit(fn)',
-    summary: 'Run a block of code whose changes are sent to the synth even while your script is reacting to MIDI from the synth, when they would normally stay silent.',
-    params: [{ name: 'fn', type: 'function', required: true }],
+    summary: 'Send changes to the synth even while a handler answers MIDI from it.',
+    notes: [
+      'Outside such a handler changes are sent anyway.',
+      'Returns nothing.',
+    ],
+    example: '`transmit(function() set("Cutoff", 64) end)` sends 64 from inside a MIDI handler.',
+
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The changes to send.' }],
     scopes: 'any',
     snippet: { lua: 'transmit(function()\n  $0\nend)', javascript: 'transmit(() => {\n  $0\n})' },
   },
@@ -718,11 +850,18 @@ export const COMMANDS = [
   /* --- Events & Flow (Q3, Q6) --- */
   {
     id: 'on', category: 'Events & Flow', signature: 'on(target, event, fn)',
-    summary: 'Listen for an event from any script: on another control, on the panel, on the device, or a custom event announced with emit. `target` is the name of what to listen to ("*" means anything), `event` the handler name, such as "onValueChanged", and `fn` the function to call. Put it at the top of a script, outside any function, so it is set up once when the script loads. A script also answers the one event in its Runs on setting without this.',
+    summary: 'Call a function whenever an event happens.',
+    notes: [
+      'Put it at the top of a script, outside any function: it is set up once, when the script loads; running the script again replaces it.',
+      'A script answers the event its Runs on setting names without it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`on("*", "patchLoaded", fn)` calls fn each time any script emits patchLoaded.',
+
     params: [
-      { name: 'target', type: 'targetRef', required: true },
-      { name: 'event', type: 'eventName', required: true },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'target', type: 'targetRef', required: true, summary: 'What the event comes from: a control\'s name, in any case, or "*" for anything.\nLeft out: "*".' },
+      { name: 'event', type: 'eventName', required: true, summary: 'The event: a handler\'s name, such as "onValueChanged", or a name `emit()` announces.\nLeft out: nothing is set up, with a console error.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the event\'s information.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -732,10 +871,16 @@ export const COMMANDS = [
   },
   {
     id: 'off', category: 'Events & Flow', signature: 'off(target, event)',
-    summary: 'Stop listening to an event you started listening to with on. It removes this script\'s listeners for that target and event; other scripts\' listeners are left alone. Naming something you were not listening to does nothing.',
+    summary: 'Stop calling the functions `on()` set up for an event.',
+    notes: [
+      'This script\'s only; other scripts\' go on.',
+      'Returns nothing. One that was not set up: nothing, without a word.',
+    ],
+    example: '`off("Cutoff", "onValueChanged")` stops this script\'s calls for Cutoff\'s value changes.',
+
     params: [
-      { name: 'target', type: 'targetRef', required: true },
-      { name: 'event', type: 'eventName', required: true },
+      { name: 'target', type: 'targetRef', required: true, summary: 'As `on()` was given it.\nLeft out: "*".' },
+      { name: 'event', type: 'eventName', required: true, summary: 'As `on()` was given it.' },
     ],
     scopes: 'any',
     snippet: { lua: 'off("${1:target}", "${2:event}")$0', javascript: 'off("${1:target}", "${2:event}")$0' },
@@ -750,10 +895,17 @@ export const COMMANDS = [
    * named action the panel can be built out of. */
   {
     id: 'watch', category: 'Events & Flow', signature: 'watch(path, fn)',
-    summary: 'Call `fn(value, previous)` whenever a path on the panel changes — a control\'s value, a colour, a setting deep inside a section. It fires whatever made the change: a script, the user, or MIDI from the synth.',
+    summary: 'Call a function whenever a value on the panel changes.',
+    notes: [
+      'Whatever made the change: a script, a drag, MIDI from the synth.',
+      'Running the script again replaces it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`watch("Cutoff", function(value, previous) log(value) end)` logs Cutoff\'s value each time it changes.',
+
     params: [
-      { name: 'path', type: 'string', required: true, kind: 'path' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'path', type: 'string', required: true, summary: 'What to watch: a path, as `set()` takes it.\nLeft out: nothing is set up, with a console error.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the new value and the one before.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -763,10 +915,17 @@ export const COMMANDS = [
   },
   {
     id: 'compute', category: 'Events & Flow', signature: 'compute(path, fn)',
-    summary: 'Turn a property into a formula. `fn` is worked out again whenever anything on the panel changes, and its result is written to `path` — for example a label that always shows the cutoff frequency.',
+    summary: 'Make a property follow a formula.',
+    notes: [
+      'Worked out again whenever anything on the panel changes, and written to the path.',
+      'Running the script again replaces it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`compute("Readout.Text.content", function() return get("Cutoff") .. " Hz" end)` keeps Readout showing Cutoff\'s value.',
+
     params: [
-      { name: 'path', type: 'string', required: true, kind: 'path' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'path', type: 'string', required: true, summary: 'The property to write: a path, as `set()` takes it.\nLeft out: nothing is set up, with a console error.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Returns the value to write.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -776,10 +935,16 @@ export const COMMANDS = [
   },
   {
     id: 'intercept', category: 'Events & Flow', signature: 'intercept(path, fn)',
-    summary: 'Check or change every value written to `path` before it lands. `fn(value, previous)` can return a different value to use instead (to clamp, round or snap it), return false to refuse the change, or return nothing to let it through unchanged.',
+    summary: 'Check or change every value written to a property before it lands.',
+    notes: [
+      'Running the script again replaces it.',
+      'Returns nothing. A function left out: nothing is set up, without a word.',
+    ],
+    example: '`intercept("Cutoff", function(value) return math.floor(value) end)` keeps Cutoff whole.',
+
     params: [
-      { name: 'path', type: 'string', required: true, kind: 'path' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'path', type: 'string', required: true, summary: 'The property: a path, as `set()` takes it.\nLeft out: nothing is set up, with a console error.', kind: 'path' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the value and the one before.\nA value returned: written in its place.\nfalse: the change is refused.\nNothing: written as it is.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -789,10 +954,17 @@ export const COMMANDS = [
   },
   {
     id: 'defineAction', category: 'Events & Flow', signature: 'defineAction(name, fn)',
-    summary: 'Give a function a name so other scripts can call it. Any script, in any language, can then run it with run("name"), and the panel offers it wherever controls can be set to trigger an action.',
+    summary: 'Name a function, so other scripts and the panel can call it.',
+    notes: [
+      'The panel offers it wherever a control can trigger an action.',
+      'A name this script defined: replaced. One another script defined: this one is ignored, with a console error.',
+      'Returns nothing. A name or a function left out: nothing is defined, without a word.',
+    ],
+    example: '`defineAction("randomize", fn)` lets any script call fn with `run("randomize")`.',
+
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'fn', type: 'function', required: true },
+      { name: 'name', type: 'string', required: true, summary: 'The action\'s name, in any case.\nLeft out: nothing is set up, with a console error.', kind: 'sharedName' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with what `run()` passes; what it returns goes back.\nNot a function, or left out: nothing is set up, with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -802,20 +974,33 @@ export const COMMANDS = [
   },
   {
     id: 'emit', category: 'Events & Flow', signature: 'emit(name [, data])',
-    summary: 'Announce a custom event by name, optionally with some data. Every script listening for it with on("*", name, fn) is called. The announcing script does not wait for an answer; use run when you need one.',
+    summary: 'Announce an event of your own, with data.',
+    notes: [
+      'It does not wait for an answer: `run()` gives one.',
+      'An emit inside an emit, 16 deep: dropped, with a console error.',
+      'Returns nothing.',
+    ],
+    example: '`emit("patchLoaded", { name = "Init" })` calls every function `on("*", "patchLoaded", fn)` set up.',
+
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'data', type: 'value', required: false },
+      { name: 'name', type: 'string', required: true, summary: 'The event\'s name, as `on()` listens for it.', kind: 'sharedName' },
+      { name: 'data', type: 'value', required: false, summary: 'Passed to each function.\nLeft out: nothing.' },
     ],
     scopes: 'any',
     snippet: { lua: 'emit("${1:name}", ${2:data})$0', javascript: 'emit("${1:name}", ${2:data})$0' },
   },
   {
     id: 'run', category: 'Events & Flow', signature: 'run(target.action [, args])',
-    summary: 'Call an action that another script has defined, and get its result back. Name it as "action", or as "control.action" to call the function of that name in a particular control\'s script. It works across languages, so only plain data — numbers, text, true/false, lists and tables — can be passed in and returned.',
+    summary: 'Call an action another script defined, and give back what it returns.',
+    notes: [
+      'Works across languages: only numbers, text, true or false, lists and tables pass in and out.',
+      'Returns what the action returns. No script defines it: no result, with a console error.',
+    ],
+    example: '`run("randomize")` calls the action randomize and gives its result.',
+
     params: [
-      { name: 'action', type: 'scriptRef', required: true, kind: 'sharedName' },
-      { name: 'args', type: 'value', required: false },
+      { name: 'action', type: 'scriptRef', required: true, summary: 'The action\'s name, as `defineAction()` gave it; or "Control.action" for the function of that name in a control\'s script.', kind: 'sharedName' },
+      { name: 'args', type: 'value', required: false, summary: 'Passed to the action.\nLeft out: nothing.' },
     ],
     scopes: 'any',
     snippet: { lua: 'run("${1:target.action}")$0', javascript: 'run("${1:target.action}")$0' },
@@ -877,12 +1062,17 @@ export const COMMANDS = [
   {
     id: 'requestDump', category: 'Device / MIDI', signature: 'requestDump(kind [, fn [, opts]])',
     refusal: 'false',
-    summary: 'Ask the synth to send a dump — all of a patch\'s settings in one message. `kind` is a dump the device profile defines, such as "system", or one declared with defineDump; a request\'s own id, such as "requestSystem", works too. Any other kind is refused. When the dump arrives, the bound controls are filled and onDumpReceived runs. Give `fn` and it is also called with `(values, info)`, once the dump a request answers with arrives; `info.ok` is false when nothing arrived in time (3 seconds, unless `opts.timeout` says otherwise). A request answered by several dumps at once is waited for under none of them, so give `fn` the dump you want.',
+    summary: 'Ask the synth to send a dump: every setting of a patch in one message.',
+    example: '`requestDump("patch")` asks the synth for its patch dump.',
+    notes: [
+      'When it arrives, the bound controls are filled and `onDumpReceived` runs.',
+      'Returns true when the request went out. Rejected: false, with a console error.',
+    ],
     params: [
-      { name: 'kind', type: 'dumpKind', required: true },
-      { name: 'fn', type: 'function', required: false },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
-        { name: 'timeout', type: 'number', default: '3000', unit: 'milliseconds',
+      { name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, such as "system", or one declared with `deviceDefineDump()`; or a request\'s own id, such as "requestSystem".\nAny other: rejected with a console error.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(values, info) when the reply arrives, or when it does not.\n`info.ok` false: nothing arrived in time; see `opts.timeout`.\nA request answered by several dumps at once: none is waited for; name the dump wanted.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The option below.', fields: optionFields([
+        { name: 'timeout', type: 'number', default: 'the request\'s own timeout for every try, at least 3000', unit: 'milliseconds',
           summary: 'How long to wait for the reply before giving up and calling `fn` with '
             + 'info.ok = false.' },
       ]) },
@@ -896,10 +1086,15 @@ export const COMMANDS = [
   {
     id: 'recallPreset', category: 'Device / MIDI', signature: 'recallPreset(slot [, opts])',
     refusal: 'result',
-    summary: 'Switch the synth to a stored preset, using whatever message the device profile says that synth needs: a Program Change, a Bank Select plus a Program Change, or a SysEx message. Returns { ok, error, slot, name, category, messages }. `slot` counts presets across all banks, as the device profile numbers them — it is not the MIDI program number. On a synth whose second bank starts at 64, slot 64 is that bank\'s first preset, whatever program number it uses.',
+    summary: 'Switch the synth to a stored preset.',
+    example: '`recallPreset(64)` switches to preset 64, the first of the second bank on a synth whose banks hold 64.',
+    notes: [
+      'Sent as the device profile says the synth needs: a Program Change, a Bank Select and a Program Change, or a SysEx message.',
+      'Returns { ok, error, slot, name, category, messages }; refused: `ok` false, `error` saying why, and a console error.',
+    ],
     params: [
-      { name: 'slot', type: 'number', required: true, kind: 'presetSlot' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'slot', type: 'number', required: true, summary: 'Preset number across all banks, counted from 0, as the device profile numbers them: not the MIDI program number.\nNot a whole number from 0: rejected with a console error.', kind: 'presetSlot' },
+      { name: 'opts', type: 'object', required: false, summary: 'The option below.', fields: optionFields([
         { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
           summary: 'Which device to recall on, when the panel names more than one.' },
       ]) },
@@ -909,30 +1104,48 @@ export const COMMANDS = [
   },
   {
     id: 'preset', category: 'Device / MIDI', signature: 'preset([role])',
-    summary: 'Describe the preset that is loaded now: { slot, program, name, category, bankId, bankLabel, writable, source }. Most synths do not announce their preset when they connect and cannot be asked, so this reports what the panel has seen — a Program Change arriving or a recallPreset going out. Until then `slot` is -1.',
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    summary: 'Describe the preset loaded now.',
+    example: '`preset().name` gives the loaded preset\'s name.',
+    notes: [
+      'Returns { slot, program, name, category, bankId, bankLabel, writable, source }.',
+      'What the panel has seen: a Program Change arriving or a `recallPreset()` going out. Until then `slot` is -1: most synths do not say, and cannot be asked.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: { lua: 'local p = preset()$0', javascript: 'const p = preset();$0' },
   },
   {
     id: 'applyDump', category: 'Device / MIDI', signature: 'applyDump(bytes)',
-    summary: 'Fill the panel from a dump. Give the raw bytes and the device profile decodes them and sets every bound control; give a table of parameter values (parameter id to value) and they are applied directly. Nothing is sent back to the synth. Raw bytes can be a list of numbers or hex text, read a byte at a time as `sendSysex` reads it.',
-    params: [{ name: 'bytes', type: 'bytes', required: true }],
+    summary: 'Fill the panel from a dump, without sending anything to the synth.',
+    example: '`applyDump({ cutoff = 64 })` sets the controls bound to cutoff to 64.',
+    notes: [
+      'Returns how many values were applied.',
+    ],
+    params: [{ name: 'bytes', type: 'bytes', required: true, summary: 'A table of parameter ids and values: applied as they are.\nOr the dump\'s bytes, a list of numbers or hex text read a byte at a time as `sendSysex()` reads it: decoded by the device profile.\nBytes in the panel view: not decoded, with a console line; the exported plug-in decodes them.' }],
     scopes: 'any',
     snippet: { lua: 'applyDump(${1:bytes})$0', javascript: 'applyDump(${1:bytes})$0' },
   },
   {
     id: 'sendDump', category: 'Device / MIDI', signature: 'sendDump(kind)',
-    summary: 'Build a dump from the panel\'s current values and send it to the synth. `kind` is a dump the device profile defines, by its id, as requestDump takes it; a kind the profile has no dump by is refused and nothing is sent.',
-    params: [{ name: 'kind', type: 'dumpKind', required: true }],
+    summary: 'Build a dump from the panel\'s values and send it to the synth.',
+    example: '`sendDump("patch")` sends the panel\'s values to the synth as its patch dump.',
+    notes: [
+      'Rejected: with a console error; nothing is sent.',
+    ],
+    params: [{ name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, by its id, as `requestDump()` takes it.\nAny other: rejected with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'sendDump("${1:patch}")$0', javascript: 'sendDump("${1:patch}")$0' },
   },
   {
     id: 'buildDump', category: 'Device / MIDI', signature: 'buildDump(kind)',
-    summary: 'Build a dump from the panel\'s current values and return its bytes without sending them — for example to store it or change it first. `kind` is a dump the device profile defines, by its id, or one declared with defineDump; a kind it has no dump by is refused and nothing comes back.',
+    summary: 'Build a dump from the panel\'s values, and give back its bytes without sending them.',
+    example: '`local bytes = buildDump("patch")` keeps the panel\'s values as a patch dump.',
+    notes: [
+      'A profile\'s dump is built by the device host: in the panel view, only a dump declared with `deviceDefineDump()` is.',
+      'Returns a list of bytes. Rejected: no result, with a console error.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'kind', type: 'dumpKind', required: true }],
+    params: [{ name: 'kind', type: 'dumpKind', required: true, summary: 'A dump the device profile defines, by its id, or one declared with `deviceDefineDump()`.\nAny other: rejected with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'local bytes = buildDump("${1:patch}")$0', javascript: 'const bytes = buildDump("${1:patch}")$0' },
   },
@@ -1290,11 +1503,17 @@ export const COMMANDS = [
      than a return value, because an answer necessarily arrives later than the call. */
   {
     id: 'uiNotify', category: 'User feedback', signature: 'uiNotify(message [, opts])',
-    summary: 'Show a short pop-up message to the person using the panel, and return its ID. It disappears after 3 seconds unless you set `opts.duration` (in milliseconds); 0 or less keeps it up until it is dismissed. Use it for things the user should know about, not for debugging — that is what `log()` is for. Pass the ID to `ce.ui.update()` to change the message in place, or to `ce.ui.dismiss()` to remove it.',
+    summary: 'Show a short message to the person using the panel.',
+    example: '`uiNotify("Patch saved")` shows Patch saved for three seconds.',
+    notes: [
+      'Returns its id, for `ce.ui.update()` and `ce.ui.dismiss()`.',
+      'For what the player should know; `log()` is for you.',
+      'A click on it removes it.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number: written as text.\nLeft out, or "": nothing is shown, with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: '3000', unit: 'milliseconds', min: null,
           summary: 'How long the message stays up. 0 or less keeps it visible until something '
@@ -1307,11 +1526,17 @@ export const COMMANDS = [
   {
     id: 'uiStatus', category: 'User feedback', signature: 'uiStatus([message] [, opts])',
     refusal: 'false',
-    summary: 'Show a line of text in the status bar. It stays until you replace it; call this with no message to clear it. Use it for an ongoing state, such as "Recording" or "Synced" — for a one-off event, use `ce.ui.notify()`. Read the current status back with `ce.ui.state()`.',
+    summary: 'Show a line of text in the status bar, until it is replaced.',
+    example: '`uiStatus("Recording", { kind = "warn" })` shows Recording in the status bar.',
+    notes: [
+      'For a state that lasts, such as "Synced"; `ce.ui.notify()` is for an event.',
+      '`ce.ui.state()` reads it back.',
+      'Returns true.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'message', type: 'string', required: false },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['uiKind']) },
+      { name: 'message', type: 'string', required: false, summary: 'The text.\nLeft out, or "": the status bar is cleared.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['uiKind']) },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.ui.status("${1:Recording}")$0', javascript: 'ce.ui.status("${1:Recording}");$0' },
@@ -1319,10 +1544,16 @@ export const COMMANDS = [
   {
     id: 'uiDialog', category: 'User feedback', signature: 'uiDialog(opts [, onChoice]) -> boolean',
     refusal: 'unanswered',
-    summary: 'Ask a question with buttons. The answer arrives later through `onChoice`, which receives the label of the button that was clicked, or nothing if the dialog was closed without a choice. Only one dialog can be open at a time. The call itself returns true if the dialog appeared; if it returns false, nothing was shown — for example because another dialog is already open — and `onChoice` has already been called with nothing.',
+    summary: 'Ask a question with buttons.',
+    example: '`uiDialog({ title = "Overwrite the patch?", buttons = { "Cancel", "Overwrite" } }, fn)` asks, and calls fn with the button clicked.',
+    notes: [
+      'One dialog at a time.',
+      'Returns true if it appeared. Another dialog open: false, and `onChoice` called with nothing; `ce.ui.state()` says so.',
+      'No title and no message: false, with a console error, and `onChoice` called with nothing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true, fields: optionFields([
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         'uiTitle', 'uiMessage',
         { name: 'buttons', type: 'list of text', default: 'one button labelled "OK"',
           summary: 'The button labels, left to right. Whichever is clicked is what `onChoice` is '
@@ -1331,7 +1562,7 @@ export const COMMANDS = [
         { name: 'default', type: 'text', default: 'the first button', sample: '"Cancel"',
           summary: 'The label of the button focused when the dialog opens.' },
       ]) },
-      { name: 'onChoice', type: 'function', required: false },
+      { name: 'onChoice', type: 'function', required: false, summary: 'Called later with the label of the button clicked; nothing when it was closed without one.' },
     ],
     scopes: 'any',
     snippet: {
@@ -1352,10 +1583,16 @@ export const COMMANDS = [
   {
     id: 'uiPrompt', category: 'User feedback', signature: 'uiPrompt(opts [, onAnswer]) -> boolean',
     refusal: 'unanswered',
-    summary: 'Ask the user to type some text. The answer arrives through `onAnswer`: the text they typed, or nothing if they cancelled. An empty answer (they accepted an empty field) is not the same as no answer. Pressing Enter accepts. Returns true if the dialog appeared; if it returns false, `onAnswer` has already been called with nothing.',
+    summary: 'Ask for a line of text.',
+    example: '`uiPrompt({ title = "Name this patch", value = "Init" }, fn)` asks, and calls fn with what was typed.',
+    notes: [
+      'Enter accepts.',
+      'Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.',
+      'No title and no message: false, with a console error, and `onAnswer` called with nothing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true,
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           'uiTitle', 'uiMessage',
           { name: 'value', type: 'text', default: 'empty', sample: 'get("patchName")',
@@ -1369,7 +1606,7 @@ export const COMMANDS = [
             summary: 'Which of the two buttons is drawn as the default one: the accept label or the '
               + 'cancel label. Pressing Enter in the field accepts either way.' },
         ]) },
-      { name: 'onAnswer', type: 'function', required: false },
+      { name: 'onAnswer', type: 'function', required: false, summary: 'Called later with the text typed; "" when an empty field was accepted; nothing when it was cancelled.' },
     ],
     scopes: 'any',
     snippet: {
@@ -1380,10 +1617,16 @@ export const COMMANDS = [
   {
     id: 'uiChoose', category: 'User feedback', signature: 'uiChoose(opts [, onAnswer]) -> boolean',
     refusal: 'unanswered',
-    summary: 'Ask the user to pick from a list. The answer arrives through `onAnswer`: the chosen item, a list of items if `opts.multiple` is set, or nothing if they cancelled. A long list scrolls rather than making the dialog taller. Returns true if the dialog appeared; if it returns false — for example because `opts.items` is empty — `onAnswer` has already been called with nothing.',
+    summary: 'Ask for a choice from a list.',
+    example: '`uiChoose({ title = "Load which bank?", items = { "A", "B", "C" } }, fn)` asks, and calls fn with the bank chosen.',
+    notes: [
+      'A long list scrolls.',
+      'Returns true if it appeared. Another dialog open: false, and `onAnswer` called with nothing.',
+      'No title and no message, or no items: false, with a console error, and `onAnswer` called with nothing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'opts', type: 'object', required: true,
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           'uiTitle', 'uiMessage',
           { name: 'items', type: 'list of text', required: true,
@@ -1394,7 +1637,7 @@ export const COMMANDS = [
             summary: 'Allow more than one to be picked, in which case the answer is a list.' },
           'uiAccept', 'uiCancel', 'uiKind',
         ]) },
-      { name: 'onAnswer', type: 'function', required: false },
+      { name: 'onAnswer', type: 'function', required: false, summary: 'Called later with the item chosen; a list of them with `multiple`; nothing when it was cancelled.' },
     ],
     scopes: 'any',
     snippet: {
@@ -1404,20 +1647,30 @@ export const COMMANDS = [
   },
   {
     id: 'uiDismiss', category: 'User feedback', signature: 'uiDismiss([id]) -> number',
-    summary: 'Remove a message shown with `ce.ui.notify()`; the user can also remove one by clicking it. With no `id`, every message is removed. Returns how many were removed.',
+    summary: 'Remove a message `ce.ui.notify()` showed, or every one.',
+    example: '`uiDismiss(id)` removes that message.',
+    notes: [
+      'Returns how many were removed.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'id', type: 'number', required: false }],
+    params: [{ name: 'id', type: 'number', required: false, summary: 'The id `ce.ui.notify()` gave.\nLeft out: every message.\nNot a number: nothing is removed, with a console error.' }],
     scopes: 'any',
     snippet: { lua: 'ce.ui.dismiss(${1:id})$0', javascript: 'ce.ui.dismiss(${1:id});$0' },
   },
   {
     id: 'uiUpdate', category: 'User feedback', signature: 'uiUpdate(id, message [, opts]) -> boolean',
-    summary: 'Change the text of a message that is already showing, in place. To show progress, show the first message with an `opts.duration` of 0 so it stays up, then update it as you go. Returns false once the message has gone — for example because the user dismissed it — so you know to stop updating.',
+    summary: 'Change the text of a message that is showing.',
+    example: '`uiUpdate(id, "Sending 3 of 8")` changes the message in place.',
+    notes: [
+      'For progress: show the first with `duration = 0`, so it stays, then change it as you go.',
+      'Returns true; false once the message has gone, such as when it was clicked away, so you know to stop.',
+      'No id, or no message: false, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'id', type: 'number', required: true },
-      { name: 'message', type: 'string', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'id', type: 'number', required: true, summary: 'The id `ce.ui.notify()` gave.' },
+      { name: 'message', type: 'string', required: true, summary: 'The new text.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         'uiKind',
         { name: 'duration', type: 'number', default: 'unchanged', sample: '5000',
           summary: 'A new lifetime for the message. If omitted, a sticky message stays sticky '
@@ -1432,16 +1685,27 @@ export const COMMANDS = [
   },
   {
     id: 'uiState', category: 'User feedback', signature: 'uiState() -> table',
-    summary: 'Return what is on screen: `status`, `statusKind`, `notifications` (a list, each with `id`, `message`, `kind` and `sticky`) and `dialog`. `dialog` is true while a dialog is open, which tells you why `ce.ui.dialog()` returned false: another dialog was already showing, rather than there being no panel window to show it in.',
+    summary: 'Give what is on screen: the status bar, the messages and whether a dialog is open.',
+    example: '`uiState().dialog` gives true while a dialog is open.',
+    notes: [
+      'Returns { status, statusKind, notifications, dialog }; each notification { id, message, kind, sticky }.',
+      '`dialog` true: why `ce.ui.dialog()` gave false, rather than there being no panel window.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     scopes: 'any',
     snippet: { lua: 'if not ce.ui.state().dialog then $0 end', javascript: 'if (!ce.ui.state().dialog) { $0 }' },
   },
   {
     id: 'uiCopy', category: 'User feedback', signature: 'uiCopy(text) -> boolean',
-    summary: 'Copy text to the clipboard. The copy happens in the background, and the system may refuse it unless it follows a click by the user, so true means the copy was attempted, not that it worked; a refusal is written to the script console. Scripts cannot read the clipboard.',
+    summary: 'Copy text to the clipboard.',
+    example: '`uiCopy(encodeJson(allSettings()))` copies the panel\'s settings as JSON.',
+    notes: [
+      'Returns true when it was tried, not that it worked: the system may refuse a copy that does not follow a click, which the console says.',
+      'Scripts cannot read the clipboard.',
+      'No text: false, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'text', type: 'string', required: true }],
+    params: [{ name: 'text', type: 'string', required: true, summary: 'The text.\nA number: written as text.' }],
     scopes: 'any',
     snippet: { lua: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")))$0', javascript: 'ce.ui.copy(ce.storage.encode(buildDump("${1:patch}")));$0' },
   },
@@ -1503,9 +1767,9 @@ export const COMMANDS = [
         { name: 'dashOffset', type: 'number', default: '0', unit: 'pixels',
           summary: 'Where the dash pattern starts.\nAdvanced on a timer: the dashes move.\nInvalid: 0.' },
         { name: 'cap', type: 'text', default: '"butt"', values: ['butt', 'round', 'square'],
-          summary: 'Line ends: "butt", "round" or "square". Case-sensitive.\nInvalid: default.' },
+          summary: 'Line ends: "butt", "round" or "square". Case-insensitive.\nInvalid: default.' },
         { name: 'join', type: 'text', default: '"miter"', values: ['miter', 'round', 'bevel'],
-          summary: 'Corners: "miter", "round" or "bevel". Case-sensitive.\nInvalid: default.' },
+          summary: 'Corners: "miter", "round" or "bevel". Case-insensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',
@@ -1857,7 +2121,7 @@ export const COMMANDS = [
       { name: 'h', type: 'number', required: true, kind: 'number', summary: 'Height in pixels.\nRange: ≥ 0.\n< 0, or invalid: 0.' },
       { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: fit "fill".', fields: optionFields([
         { name: 'fit', type: 'text', default: '"fill"', values: ['fill', 'contain', 'cover'],
-          summary: 'How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-sensitive.\nInvalid: default.' },
+          summary: 'How the image fills the box: "fill" (stretched), "contain" (its shape kept, with gaps) or "cover" (its shape kept, cropped). Case-insensitive.\nInvalid: default.' },
       ]) },
     ],
     scopes: 'any',
@@ -1893,7 +2157,7 @@ export const COMMANDS = [
     params: [{ name: 'mode', type: 'string', required: true,
       values: ['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge',
         'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion'],
-      summary: 'One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-sensitive.\nInvalid: rejected with a console error.' }],
+      summary: 'One of "normal", "multiply", "screen", "overlay", "darken", "lighten", "color-dodge", "color-burn", "hard-light", "soft-light", "difference" or "exclusion". Case-insensitive.\nInvalid: rejected with a console error.' }],
     scopes: 'any',
   },
   {
@@ -1922,9 +2186,16 @@ export const COMMANDS = [
   },
   {
     id: 'imageAssets', category: 'Images', signature: 'imageAssets([opts]) -> list',
-    summary: 'List the images in your icon library, then any icons the panel carries with it. Each entry is { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }. `source` is "panel" for a carried icon, and `portable` says whether the picture is already in the panel: true for those, false for your library\'s. Sharing or exporting copies a library icon into the panel if a control shows it or a script names it in quotes, but not one whose name a script builds while it runs. `embeddable` says whether the entry has image data that can be copied into the panel.',
+    summary: 'List the images a control can show: the icon library\'s, then the panel\'s own.',
+    example: '`imageAssets({ vector = true })` gives the vector icons.',
+    notes: [
+      'Returns a list of { id, name, source, mime, vector, width, height, filePath, dataUrl, portable, embeddable }.',
+      '`source` "panel": carried with the panel. `portable`: in the panel already; true for those, false for the library\'s.',
+      'A library icon is copied into the panel on sharing or export when a control shows it or a script names it in quotes; not one whose name a script builds as it runs.',
+      '`embeddable`: it has image data that `ce.image.embed()` can copy into the panel.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
       { name: 'vector', type: 'true or false',
         summary: 'Set true to list only vector icons, which stay sharp at any size.' },
       { name: 'embeddable', type: 'true or false',
@@ -1935,19 +2206,30 @@ export const COMMANDS = [
   },
   {
     id: 'imageAsset', category: 'Images', signature: 'imageAsset(idOrName) -> table|nil',
-    summary: 'Look up one image in the icon library or among the icons the panel carries, by id first and then by name (capitals do not matter), the same way the panel finds an icon when it draws one. Returns the entry, in the same form as `ce.image.assets()`, or nothing if there is no such image, so check with it before pointing a control at an asset. Be aware that a name which happens to match is returned just as an id match would be.',
+    summary: 'Find one image by its id or name.',
+    example: '`imageAsset("Logo")` gives the image called Logo.',
+    notes: [
+      'Returns the entry, as `ce.image.assets()` gives each.',
+      'By id first, then by name, as the panel finds an icon to draw.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'idOrName', type: 'string', required: true, kind: 'image' }],
+    params: [{ name: 'idOrName', type: 'string', required: true, summary: 'The image\'s id or name; a name in any case.\nNot an image: no result, without a word.\nLeft out: no result, with a console error.', kind: 'image' }],
     scopes: 'any',
   },
   {
     id: 'imageSet', category: 'Images', signature: 'imageSet(target, src [, opts]) -> boolean',
-    summary: 'Put a picture on one of a control\'s four image layers and switch that layer on. The picture and the on-switch are always set together, so a layer is never left on with nothing in it. `opts.layer` picks the layer: "image" (the default) and "overlay" are background layers that stack; "textImage" and "textTexture" fill the text itself, and choosing one replaces whatever fill the text had. An option it does not take at all refuses the whole call; one the chosen layer does not have is refused with a message. Either way the command returns false.',
+    summary: 'Put a picture on one of a control\'s image layers, and switch the layer on.',
+    example: '`imageSet("Pad", "textures/metal.png", { opacity = 60 })` shows the picture behind Pad at 60%.',
+    notes: [
+      'The picture and the switch are set together: a layer is never on with nothing in it.',
+      'A text layer replaces the text\'s fill.',
+      'Returns true. An option the layer does not have: refused, with a console error, and false.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'src', type: 'string', required: true, kind: 'image' },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'src', type: 'string', required: true, summary: 'The picture: a file\'s path or address, or a data URL ("data:image/png;base64,…").\nOnly a data URL survives an export; `ce.image.embed()` copies a file in.\nLeft out: the picture is kept; only the options are set.\n"": the layer is emptied and switched off.\nLeft out, with no option: nothing is set, with a console error.', kind: 'image' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           { name: 'layer', type: 'text', default: '"image"', values: IMAGE_LAYER_IDS,
             summary: 'Which of the control\'s four image layers to write. The first two are '
@@ -2002,34 +2284,53 @@ export const COMMANDS = [
   },
   {
     id: 'imageClear', category: 'Images', signature: 'imageClear(target [, layer]) -> boolean',
-    summary: 'Switch an image layer off and empty it in one step. `layer` is "image" unless you name another. Clearing "textImage" or "textTexture" also sets the text fill back to "solid", because a text fill with no picture would show nothing.',
+    summary: 'Switch an image layer off and empty it.',
+    example: '`imageClear("Pad", "overlay")` takes the overlay away.',
+    notes: [
+      'A text layer sets the text\'s fill back to "solid": a text fill with no picture shows nothing.',
+      'Returns true; false with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'layer', type: 'string', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'layer', type: 'string', required: false, summary: '"image" or "overlay": the background layers, which stack.\n"textImage" or "textTexture": the text\'s fill.\nCase-insensitive.\nLeft out: "image".\nAny other: rejected with a console error.',
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
     scopes: 'any',
   },
   {
     id: 'imageRead', category: 'Images', signature: 'imageRead(target [, layer]) -> table',
-    summary: 'Read all the settings of one image layer (`layer` is "image" unless you name another), plus three extra fields. `active` says whether the layer will actually be drawn; for a text layer that depends on the text\'s fill mode, not on its Enabled switch. `source` is "data", "file" or "none". `portable` says whether the image survives an export, which only embedded image data does.',
+    summary: 'Read every setting of one image layer.',
+    example: '`imageRead("Pad").source` gives "data", "file" or "none".',
+    notes: [
+      'Returns the layer\'s settings, with three more:',
+      '`active`: whether it is drawn; a text layer\'s by the text\'s fill, not its switch.',
+      '`source`: "data", "file" or "none".',
+      '`portable`: whether it survives an export; only embedded data does.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'layer', type: 'string', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'layer', type: 'string', required: false, summary: '"image" or "overlay": the background layers, which stack.\n"textImage" or "textTexture": the text\'s fill.\nCase-insensitive.\nLeft out: "image".\nAny other: rejected with a console error.',
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
     scopes: 'any',
   },
   {
     id: 'imageIcon', category: 'Images', signature: 'imageIcon(target, idOrName [, opts]) -> boolean',
-    summary: 'Show an image from the icon library (or one the panel carries) in a control\'s Icon section, chosen by id or name. `opts` can also set its size, fit, tint, opacity and rotation. An image that is not there is refused with a message rather than stored. A control that shows only its text is switched to show the icon beside it (or alone, when there is no text). Write the id or name in quotes, as a plain string: that is how sharing and exporting find the icon and pack it into the panel. Use this rather than `set()`: it records the asset\'s id and name together, so the control finds exactly that image.',
+    summary: 'Show an image in a control\'s Icon section, by its id or name.',
+    example: '`imageIcon("Play", "play-circle", { size = 24 })` shows the play-circle icon on Play.',
+    notes: [
+      'A control showing only its text is switched to show the icon beside it, or alone with no text.',
+      'Write the id or name in quotes: sharing and exporting find the icon that way, and copy it into the panel.',
+      'Use it rather than `set()`: it writes the asset\'s id and name together.',
+      'Returns true; false with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'idOrName', type: 'string', required: true, kind: 'image' },
-      { name: 'opts', type: 'object', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'idOrName', type: 'string', required: true, summary: 'The image\'s id or name; a name in any case.\nNot an image: rejected with a console error.', kind: 'image' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         fields: optionFields([
           { name: 'size', type: 'number', default: '16', unit: 'pixels',
             summary: 'How big the icon is drawn.' },
@@ -2042,27 +2343,44 @@ export const COMMANDS = [
   },
   {
     id: 'imageEmbed', category: 'Images', signature: 'imageEmbed(target [, layer]) -> boolean',
-    summary: 'Copy a layer\'s image into the panel itself, in place of a file path that only exists on this computer, so the image survives export. If the layer already holds embedded image data, it returns true and changes nothing. If the file has not been read yet, it returns false and starts reading it; call it again once the file has loaded and it will succeed.',
+    summary: 'Copy a layer\'s picture into the panel, so it survives an export.',
+    example: '`imageEmbed("Pad")` copies Pad\'s background picture into the panel.',
+    notes: [
+      'Returns true; the picture already in the panel: true, changing nothing.',
+      'A file not read yet: false, and its reading starts; call it again once it has loaded.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'layer', type: 'string', required: false,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'layer', type: 'string', required: false, summary: '"image" or "overlay": the background layers, which stack.\n"textImage" or "textTexture": the text\'s fill.\nCase-insensitive.\nLeft out: "image".\nAny other: rejected with a console error.',
         values: ['image', 'overlay', 'textImage', 'textTexture'] },
     ],
     scopes: 'any',
   },
   {
     id: 'imageLoad', category: 'Images', signature: 'imageLoad(path) -> boolean',
-    summary: 'Start reading an image file and report whether it is ready. A layer that points at a file shows nothing until the file has been read, and reading happens in the background, so this returns false the first time and true once the image has arrived. A data URL needs no reading and returns true straight away.',
+    summary: 'Start reading an image file, and say whether it is ready.',
+    example: '`imageLoad("textures/metal.png")` gives false at first, then true once the file is read.',
+    notes: [
+      'A layer that points at a file shows nothing until it is read, which happens in the background.',
+      'Returns true when it is ready; a data URL at once.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'path', type: 'string', required: true }],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The file\'s path, or a data URL.\nLeft out, or "": false, with a console error.' }],
     scopes: 'any',
   },
   {
     id: 'textFonts', category: 'Typography', signature: 'textFonts([opts]) -> list',
-    summary: 'List every font the panel can use, with what each one supports: the built-in fonts, your font library, and any font the panel carries with it (`source` "panel"). `portable` says whether a font is already there wherever the panel goes: true for the built-in fonts and the carried ones, false for your library\'s. Sharing or exporting packs a library font into the panel if a control uses it or a script names it in quotes. `featuresKnown` says whether the font\'s typographic features have actually been checked; when it is false, an empty `features` list means they are unknown, not that there are none.',
+    summary: 'List every font the panel can use, and what each supports.',
+    example: '`textFonts({ variable = true })` gives the variable fonts.',
+    notes: [
+      'Returns a list: the built-in fonts, the font library\'s, and the panel\'s own, `source` "panel".',
+      '`portable`: there wherever the panel goes; true for the built-in fonts and the panel\'s own, false for the library\'s.',
+      'A library font is copied into the panel on sharing or export when a control uses it or a script names it in quotes.',
+      '`featuresKnown` false: an empty `features` list means they are not known, not that there are none.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
       { name: 'portable', type: 'true or false',
         summary: 'Set true to list only fonts that are already there wherever the panel goes: the '
           + 'built-in fonts and the ones the panel carries. A font from your font library is packed '
@@ -2075,18 +2393,29 @@ export const COMMANDS = [
   },
   {
     id: 'textFont', category: 'Typography', signature: 'textFont(family) -> table|nil',
-    summary: 'Look up one font by family name. Returns its description, with the same fields as `ce.text.fonts()`, or nothing if no such font is available. Capitals do not matter, and the font\'s display name works too, just as in the Properties panel. Use it to check that a font exists before you set it, or to see which variable axes it has.',
+    summary: 'Find one font by its family name.',
+    example: '`textFont("Inter").variable` gives true for a variable Inter.',
+    notes: [
+      'Returns its description, as `ce.text.fonts()` gives each.',
+      'Use it to see that a font is there before setting it, or which axes it has.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'family', type: 'string', required: true, kind: 'font' }],
+    params: [{ name: 'family', type: 'string', required: true, summary: 'The family, or its display name, as the Properties panel shows it, in any case.\nNot a font the panel has: no result, without a word.\nLeft out: no result, with a console error.', kind: 'font' }],
     scopes: 'any',
   },
   {
     id: 'textStyle', category: 'Typography', signature: 'textStyle(target, opts) -> boolean',
-    summary: 'Set a control\'s typography in one call: font, size, weight, spacing, alignment and the rest. Use it rather than `set()` for the weight, because boldness is stored in two fields that must agree and this always writes both. An option it does not take refuses the whole call. A font that is not available, or a typographic feature the font does not have, is refused with a message while the other options still apply. Returns false if any part did not apply. Name the font in quotes, as a plain string: that is how sharing and exporting find a font from your library and pack it into the panel.',
+    summary: 'Set a control\'s typography in one call: font, size, weight, spacing, alignment and the rest.',
+    example: '`textStyle("Title", { family = "Inter", size = 18, weight = "Bold" })` sets Title in 18-point Inter Bold.',
+    notes: [
+      'Use it rather than `set()` for the weight: it is two fields that must agree, and this writes both.',
+      'Name the font in quotes: sharing and exporting find a library font that way, and copy it into the panel.',
+      'Returns true. A font the panel has not, or a feature the font has not: refused, with a console error, the other options set, and false.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'opts', type: 'object', required: true,
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'opts', type: 'object', required: true, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.',
         // The declared list used to name 17 fields while the implementation accepted 27: the four
         // paddings and five of the six OpenType switches were missing, so the only way to learn
         // that `tabularFigures` was allowed was to read textStyle.js. The feature switches come
@@ -2143,42 +2472,64 @@ export const COMMANDS = [
   },
   {
     id: 'textAxis', category: 'Typography', signature: 'textAxis(target, tag, value) -> boolean',
-    summary: 'Set one axis of a variable font by its four-letter tag, such as "wght" for weight. The value is kept within the range the font allows, and an axis the font does not have is refused rather than stored. Setting "wght" also updates the control\'s weight, as the Properties panel\'s own axis slider does; otherwise the text would still be drawn at its old weight.',
+    summary: 'Set one axis of a variable font, by its four-letter tag.',
+    example: '`textAxis("Title", "wght", 650)` sets Title\'s weight axis to 650.',
+    notes: [
+      '"wght" sets the control\'s weight too, as the Properties panel\'s slider does.',
+      'Returns true; false with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'tag', type: 'string', required: true, kind: 'fontAxis' },
-      { name: 'value', type: 'number', required: true, kind: 'fontAxis' },
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'tag', type: 'string', required: true, summary: 'The axis\'s tag, such as "wght" or "wdth".\nNot one the font has: rejected with a console error.', kind: 'fontAxis' },
+      { name: 'value', type: 'number', required: true, summary: 'The axis\'s value.\nOutside the font\'s range: the nearest end.', kind: 'fontAxis' },
     ],
     scopes: 'any',
   },
   {
     id: 'textRead', category: 'Typography', signature: 'textRead(target [, name]) -> value|table',
-    summary: 'Read one text setting by name, such as "size" or "lineHeight", without having to know which part of the Text section (Font, Multiline or Position) holds it. With no name, returns everything as { content, resolvedWeight, font, multiline, position }. `resolvedWeight` is the weight the text is actually drawn at, worked out from the two stored weight fields.',
+    summary: 'Read one text setting by name, or every one.',
+    example: '`textRead("Title", "size")` gives Title\'s text size.',
+    notes: [
+      'Returns the value; left out, { content, resolvedWeight, font, multiline, position }.',
+      '`resolvedWeight`: the weight the text is drawn at, from its two weight fields.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'name', type: 'string', required: false },
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'name', type: 'string', required: false, summary: 'A setting\'s name, such as "size" or "lineHeight", wherever in the Text section it is.\nLeft out: every setting, as a table.\nNot a setting: no result, with a console error.' },
     ],
     scopes: 'any',
   },
   {
     id: 'textMeasure', category: 'Typography', signature: 'textMeasure(target [, text]) -> table',
-    summary: 'Measure how much room a control\'s text takes up in its own font. Returns { width, height, lines, truncated, exact }, where `truncated` says whether some of the text is cut off. It lays the text out exactly as the panel does, so spacing, wrapping and line limits all count. Pass `text` to measure something the control does not hold yet. `exact` is false when the text could not actually be measured and the answer is an estimate.',
+    summary: 'Measure how much room a control\'s text takes, in its own font.',
+    example: '`textMeasure("Title").truncated` gives true when some of the text is cut off.',
+    notes: [
+      'Returns { width, height, lines, truncated, exact }.',
+      'Laid out as the panel lays it out: spacing, wrapping and the line limit count.',
+      '`exact` false: it could not be measured, and the answer is an estimate.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'text', type: 'string', required: false },
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'text', type: 'string', required: false, summary: 'Text to measure in the control\'s font.\nLeft out: the control\'s own.' },
     ],
     scopes: 'any',
   },
   {
     id: 'textFit', category: 'Typography', signature: 'textFit(target [, opts]) -> table',
-    summary: 'Find the largest text size at which a control\'s text fits inside its box, write that size to the control, and return { size, fits, changed, exact }. It tries whole-number sizes from `opts.max` (the current size) down to `opts.min` (6). Setting Text.Multiline.fitMode to "shrink" only shrinks the text as it is drawn and never changes the stored size; this writes the size, so other code can read it and line things up with it. If even `opts.min` overflows, `fits` is false and the size is set to `opts.min`; the call still succeeds.',
+    summary: 'Find the largest text size at which a control\'s text fits, and set it.',
+    example: '`textFit("Title", { min = 8 })` makes Title\'s text as large as fits, and 8 at least.',
+    notes: [
+      'Returns { size, fits, changed, exact }.',
+      'Tries whole sizes from `max` down to `min`. Even `min` too large: set to `min`, `fits` false.',
+      'Unlike Text.Multiline.fitMode "shrink", which only draws the text smaller, this writes the size.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'target', type: 'string', required: true, kind: 'control' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'target', type: 'string', required: true, summary: 'The control\'s name.\nNot a control on the panel: rejected with a console error.', kind: 'control' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'min', type: 'number', default: '6', unit: 'pixels',
           summary: 'The smallest size to shrink to. If the text still overflows at this size, the '
             + 'result has fits = false; the call still succeeds.' },
@@ -2189,6 +2540,1190 @@ export const COMMANDS = [
             + 'yet.' },
       ]) },
     ],
+    scopes: 'any',
+  },
+  // patch
+  // A synth's sound as a value (docs/design/ce-patch-module.md). Everything that is the same in
+  // every runtime is patchCore.js; the runtimes read and send around it.
+  {
+    id: 'patchCurrent', category: 'Patches', signature: 'patchCurrent([scope [, opts]]) -> patch', refusal: 'nothing',
+    summary: 'Capture the patch as the panel knows it now: the values the synth last reported, or the controls hold.',
+    example: '`local before = ce.patch.current()` keeps the voice as it is now.',
+    notes: [
+      'A patch is a table: { device, role, scope, name, values, missing, source }. `values` is parameter id to value, in the parameter\'s own units; a choice is its id, such as "saw".',
+      'Asks the synth nothing. A parameter the synth never reported is listed in `missing`.',
+      'A panel without a device profile still works: `values` is then keyed by control name.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: false, summary: 'The part of the synth: "voice" when left out, or a scope ce.patch.scopes() lists.\nNot one: no result, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchScope']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchRead', category: 'Patches', signature: 'patchRead(scope, fn [, opts]) -> boolean', refusal: 'false',
+    summary: 'Ask the synth for a patch, and get it when the reply arrives: fn(patch, info).',
+    example: '`ce.patch.read("voice", function(p, info) if info.ok then state.original = p end end)` asks the synth for the voice it is playing.',
+    notes: [
+      'Asks for the scope\'s dumps, one after another, with ce.device.requestDump(); the panel\'s controls are filled from each reply, as a dump always fills them.',
+      '`info.ok` is false when a reply did not arrive in time; the patch is then what the panel knows. `info.missing` lists the ids no reply held.',
+      'A scope with no dumps to ask for (the profile\'s patch section, or define(), names them): false, with a console error.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: true, summary: 'The part of the synth.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(patch, info) when the reply arrives, or when it does not.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'timeout', type: 'number', unit: 'milliseconds', default: 'as long as the profile asks', summary: 'How long to wait for each dump.' },
+        'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchLoad', category: 'Patches', signature: 'patchLoad(name [, opts]) -> patch', refusal: 'nothing',
+    summary: 'Get a patch kept with ce.patch.save(), by its name.',
+    example: '`ce.patch.apply(ce.patch.load("Warm pad"))` plays the patch kept as "Warm pad".',
+    notes: [
+      'Loading sends nothing: pass the result to apply() to hear it.',
+      'No patch by that name, or one kept for another synth: no result, with a console error naming it.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'The name it was kept under, in any case.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMorph', category: 'Patches', signature: 'patchMorph(a, b, t [, opts]) -> patch', refusal: 'nothing',
+    summary: 'A patch part of the way from one patch to another.',
+    example: '`ce.patch.morph(warm, bright, 0.25)` gives a patch a quarter of the way from warm to bright.',
+    notes: [
+      'A number moves in a straight line from a to b, then is rounded to its step and held inside its range. A choice or an on/off is a\'s below `switchAt` and b\'s from it. The patch name stays a\'s.',
+      'A parameter only one of the two patches holds keeps that patch\'s value.',
+      'To morph from a knob, call it in the knob\'s onValueChange and pass the result to apply(p, { live = true }).',
+      'b of another synth or scope: no result, with a console error.',
+    ],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The patch at 0.' },
+      { name: 'b', type: 'table', required: true, summary: 'The patch at 1.' },
+      { name: 't', type: 'number', required: true, summary: 'Range: 0 to 1 (a to b).\nOutside the range: held at 0 or 1.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole',
+        { name: 'switchAt', type: 'number', default: '0.5', summary: 'Where a choice or an on/off changes from a\'s value to b\'s, 0 to 1.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchBlend', category: 'Patches', signature: 'patchBlend(patches, weights [, opts]) -> patch', refusal: 'nothing',
+    summary: 'One patch made of several, each counting as much as its weight.',
+    example: '`ce.patch.blend({ a, b, c }, { 0.5, 0.3, 0.2 })` leans mostly towards a.',
+    notes: [
+      'The weights need not add up to 1; a patch without a weight counts 0. Adding up to 0 or less: no result, with a console error.',
+      'A choice or an on/off takes the value of the patch with the largest weight.',
+      'The weights from ce.math.weightsFor() go straight in, for a morph pad.',
+    ],
+    params: [
+      { name: 'patches', type: 'list', required: true, summary: 'Two or more patches of the same synth and scope.' },
+      { name: 'weights', type: 'list of numbers', required: true, summary: 'How much each counts.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchRandom', category: 'Patches', signature: 'patchRandom([opts]) -> patch', refusal: 'nothing',
+    summary: 'A new patch with random values, within each parameter\'s range.',
+    example: '`ce.patch.random({ groups = {"Filter"}, seed = 7 })` gives the current patch with a new filter section.',
+    notes: [
+      'What is not chosen keeps its value from `from`. The patch name never changes.',
+      'The same `seed` gives the same patch, in every language.',
+      'A panel without a device profile does not say each control\'s range: no result, with a console error.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchScope', 'patchSeed',
+        { name: 'from', type: 'table', default: 'ce.patch.current()', summary: 'The patch whose unchosen values are kept.' },
+        { name: 'within', type: 'table', default: 'each parameter\'s whole range', sample: '{ cutoff = { 40, 100 } }', summary: 'Narrower ranges by id; outside the parameter\'s range they are held inside it.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMutate', category: 'Patches', signature: 'patchMutate(patch, amount [, opts]) -> patch', refusal: 'nothing',
+    summary: 'A variation of a patch: every chosen value moved a little, at random.',
+    example: '`ce.patch.mutate(p, 0.1)` moves each number by up to a tenth of its range.',
+    notes: [
+      'Numbers move by up to `amount` of their range, more often a little than a lot.',
+      'A choice or an on/off changes with a chance of `amount`, to another of its values. Text never changes.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch to vary.' },
+      { name: 'amount', type: 'number', required: true, summary: 'Range: 0 to 1 (no change to any value).\nOutside the range: held at 0 or 1.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole', 'patchSeed']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchMerge', category: 'Patches', signature: 'patchMerge(base, other, opts) -> patch', refusal: 'nothing',
+    summary: 'A patch with the chosen parameters taken from another patch.',
+    example: '`ce.patch.merge(mine, theirs, { groups = {"Filter"} })` keeps mine with the filter from theirs.',
+    notes: ['One of `groups` or `only` is needed: taking every value is `other` itself. Neither: no result, with a console error.'],
+    params: [
+      { name: 'base', type: 'table', required: true, summary: 'The patch that gives everything not chosen.' },
+      { name: 'other', type: 'table', required: true, summary: 'The patch that gives the chosen parameters.' },
+      { name: 'opts', type: 'object', required: true, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchDiff', category: 'Patches', signature: 'patchDiff(a, b [, opts]) -> list', refusal: 'nothing',
+    summary: 'List the parameters whose values differ between two patches: { id, name, group, from, to }.',
+    example: '`ce.patch.diff(saved, ce.patch.current())` lists what has changed since the patch was saved.',
+    notes: [
+      'In the profile\'s parameter order; the same patches give an empty list.',
+      'A parameter only one patch holds is listed, with no value on the other side.',
+      'Two numbers closer than the parameter\'s step count as the same, and so do two names that differ only in trailing spaces.',
+    ],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The first patch.' },
+      { name: 'b', type: 'table', required: true, summary: 'The second patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchEqual', category: 'Patches', signature: 'patchEqual(a, b [, opts]) -> boolean', refusal: 'nothing',
+    summary: 'Tell whether two patches hold the same values.',
+    example: '`if not ce.patch.equal(state.saved, ce.patch.current()) then ... end` runs when the patch has been changed.',
+    notes: ['The same as an empty ce.patch.diff(a, b, opts).'],
+    params: [
+      { name: 'a', type: 'table', required: true, summary: 'The first patch.' },
+      { name: 'b', type: 'table', required: true, summary: 'The second patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchApply', category: 'Patches', signature: 'patchApply(patch [, opts]) -> table', refusal: 'result',
+    summary: 'Put a patch on the panel and send it to the synth, the way this synth takes a patch.',
+    example: '`ce.patch.apply(p)` makes the panel and the synth play p.',
+    notes: [
+      'The panel\'s controls always take the values, whatever `send` says.',
+      'Returns { ok, via, applied, sent, skipped }: `via` is "parameters", "dump" or "none"; `skipped` lists { id, why }. Refused: ok false, with a console error.',
+      '"auto" sends the scope\'s dumps when the profile\'s patch section says `deliver = "dump"`, and one message per changed parameter otherwise.',
+      'A patch of another synth: refused, naming it.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch to apply.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchGroups', 'patchOnly', 'patchExcept', 'patchLock', 'patchInclude', 'patchRole',
+        { name: 'send', type: 'text', default: '"auto"', values: ['auto', 'parameters', 'dump', 'none'], summary: 'How it goes to the synth: "none" sets the panel only.' },
+        { name: 'changedOnly', type: 'true or false', default: 'true', summary: 'Send only values that differ from what the synth last had.' },
+        { name: 'live', type: 'true or false', default: 'false', summary: 'For a value moving under a hand: the 32 parameters that moved most now, the rest with the next apply without live.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchSave', category: 'Patches', signature: 'patchSave(name, patch [, opts]) -> boolean', refusal: 'false',
+    summary: 'Keep a patch by name, for this synth.',
+    example: '`ce.patch.save("Warm pad", p)` keeps p as "Warm pad".',
+    notes: [
+      'Kept with the panel, as ce.storage.saveSetting() keeps a value: in the editor with the panel document, in an exported plug-in in the DAW project.',
+      'A name of 1 to 64 characters; anything else: false, with a console error.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'Up to 64 characters.' },
+      { name: 'patch', type: 'table', required: true, summary: 'The patch.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'replace', type: 'true or false', default: 'true', summary: 'Off: a name already in use is refused, with a console error.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchList', category: 'Patches', signature: 'patchList([opts]) -> list', refusal: 'empty list',
+    summary: 'List the patches kept for this synth: { name, scope, savedAt }, newest first.',
+    example: '`ce.patch.list()` gives every kept patch\'s name.',
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole',
+        { name: 'scope', type: 'text', default: 'every scope', summary: 'Only the patches of this scope.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchForget', category: 'Patches', signature: 'patchForget(name [, opts]) -> boolean', refusal: 'false',
+    summary: 'Remove a kept patch.',
+    example: '`ce.patch.forget("Warm pad")` removes it.',
+    notes: ['Returns true when one was removed; no patch by that name: false, without a word.'],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'Its name, in any case.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchWrite', category: 'Patches', signature: 'patchWrite(patch, slot [, opts]) -> table', refusal: 'result',
+    summary: 'Store a patch in the synth\'s own memory, in a writable slot.',
+    example: '`ce.patch.write(p, 130)` stores p in preset 130.',
+    notes: [
+      'Overwrites what the slot held. The synth does not ask, so ask first with ce.ui.choose().',
+      'How it is stored is the profile\'s patch section: `write = { via = "dump", dump = "..." }` sets the "slot" variable and sends that dump. A profile that does not say: refused, with a console error.',
+      'Returns { ok, slot, error }.',
+    ],
+    params: [
+      { name: 'patch', type: 'table', required: true, summary: 'The patch.' },
+      { name: 'slot', type: 'number', required: true, summary: 'The preset number across all banks, counted from 0, as ce.device.recallPreset() takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['patchRole']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'patchScopes', category: 'Patches', signature: 'patchScopes([role]) -> list', refusal: 'empty list',
+    summary: 'Describe the parts of the synth a patch can hold: { id, name, parameters, canRead, canSend, via }.',
+    example: '`ce.patch.scopes()` might give a voice and a system scope.',
+    notes: [
+      'Without a patch section in the profile: "voice" is every parameter but actions and the System, Global, Utility and Performance groups, and "system" those groups.',
+      'A panel without a device profile: one scope, "voice", holding the panel\'s controls.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  {
+    id: 'patchDefine', category: 'Patches', signature: 'patchDefine(scope, spec [, role]) -> boolean', refusal: 'false',
+    summary: 'Describe a scope from the script, for a synth whose profile has no patch section, or to change one.',
+    example: '`ce.patch.define("voice", { groups = {"Osc", "Filter", "Amp"}, dumps = {"voice"} })` makes the voice those three groups, read and sent as the voice dump.',
+    notes: [
+      'spec takes the fields the profile\'s patch section takes for one scope: name, groups, only, except, dumps, read, transform. Anything else: false, with a console error.',
+      'Lasts while the panel is open; call it in onPanelLoad.',
+    ],
+    params: [
+      { name: 'scope', type: 'text', required: true, summary: 'The scope\'s id. An existing one is replaced for this panel.' },
+      { name: 'spec', type: 'table', required: true, summary: 'The scope: groups, only, except and dumps, as lists of names.' },
+      { name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device.' },
+    ],
+    scopes: 'any',
+  },
+  // ci
+  // MIDI-CI for scripts (docs/design/ce-ci-module.md). The session lives once, in the device layer in
+  // C++ (DeviceProfileService::ciCommand); ciCore.js checks a call and hands back the answers, the same
+  // in every runtime. Not yet tried against a real MIDI-CI device: only against JUCE's own, in a loopback.
+  {
+    id: 'ciDiscover', category: 'MIDI-CI', signature: 'ciDiscover([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Ask which MIDI-CI devices are there, and get the ones that answer.',
+    example: '`ce.ci.discover(function(found) log(#found .. " MIDI-CI devices") end)`.',
+    notes: [
+      'fn is called once, when the time is up, with a list of devices; none: an empty list. A synth that does not speak MIDI-CI says nothing, so an empty list is the usual answer.',
+      'A device is { muid, role, manufacturer, family, model, version, names, propertyExchange, profiles, matchesProfile }: `muid` its MIDI-CI number for this session; the codes as hex text, as device profiles write them ("41", "01 00"); `names` the words from its DeviceInfo; `matchesProfile` true when it is the synth the role\'s device profile describes.',
+      'A muid changes each time the device is switched on: to find a device again, keep its manufacturer, family and model.',
+      'Each device is also raised as ciDiscovered as soon as it answers. Returns true when asked; false when the role has no MIDI output.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciRole',
+        { name: 'timeoutMs', type: 'number', default: '3000', unit: 'milliseconds', summary: 'How long to listen for answers.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the list of devices.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciDevices', category: 'MIDI-CI', signature: 'ciDevices([role]) -> list', refusal: 'empty list',
+    summary: 'The MIDI-CI devices found so far, without asking again.',
+    example: '`#ce.ci.devices() > 0` is true once a MIDI-CI device has answered.',
+    notes: ['A device stays in the list until it says it is leaving or its ports close.'],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'Only the devices on this role\'s ports. Left out: all.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'ciGet', category: 'MIDI-CI', signature: 'ciGet(muid, resource [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Read a resource from a device: its DeviceInfo, a controller or program list, or one of its own.',
+    example: '`ce.ci.get(state.synth, "ResourceList", fn)` gives the list of resources the device has.',
+    notes: [
+      'fn is called with { ok, status, message, body, mediaType }: `status` is the device\'s own (200 is fine, 404 a resource it does not have); `body` is a table for JSON, text for text, and bytes otherwise. No answer in time: ok false, status 0, "no reply in time".',
+      'ResourceList first: it says which resources exist, and whether each can be set or followed.',
+      'Returns true when sent; false, with a console error, for a device without property exchange or one nobody found.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device, from discover or devices.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name, as the device names it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId', 'ciTimeout',
+        { name: 'offset', type: 'number', default: '0', summary: 'For a long list the device gives in pages: where to start.' },
+        { name: 'limit', type: 'number', default: 'the whole list', summary: 'For a long list: how many to give.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the result.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSet', category: 'MIDI-CI', signature: 'ciSet(muid, resource, body [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Change a resource on a device.',
+    example: '`ce.ci.set(state.synth, "X-PatchName", { name = "Warm Pad" }, fn)` renames the patch on a device that has that resource.',
+    notes: [
+      'A table is sent as JSON, text as text. To send bytes, give `mediaType`, such as "application/octet-stream".',
+      'fn is called with { ok, status, message }: 405 is a resource the device will not change.',
+      'Changes the device, as sendSysex can.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name.' },
+      { name: 'body', type: 'value', required: true, summary: 'What to set it to.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId', 'ciTimeout',
+        { name: 'partial', type: 'true or false', default: 'false', summary: 'Send only the fields that change, for a device that allows it.' },
+        { name: 'mediaType', type: 'text', default: 'as body says', summary: 'What body is, such as "text/plain"; needed for bytes.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the result.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSubscribe', category: 'MIDI-CI', signature: 'ciSubscribe(muid, resource [, opts], fn) -> id', refusal: 'nothing',
+    summary: 'Be told when a resource changes on the device.',
+    example: '`ce.ci.subscribe(state.synth, "ProgramList", fn)` calls fn when the user renames or stores a program on the synth.',
+    notes: [
+      'fn is called with { command, body } for each change: "full" (the whole resource), "partial" (only what changed) or "notify" (it changed: get it again); and once with "end" when the device, the panel or ce.ci.unsubscribe() ends it, or the device is gone. A device that refuses: "end" with ok false.',
+      'Returns an id for ce.ci.unsubscribe(); a device without property exchange: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'resource', type: 'text', required: true, summary: 'The resource\'s name.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['ciResId']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with each update.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciUnsubscribe', category: 'MIDI-CI', signature: 'ciUnsubscribe(id) -> boolean', refusal: 'false',
+    summary: 'Stop following a resource; the device is told.',
+    example: '`ce.ci.unsubscribe(state.programs)` in onPanelClose.',
+    notes: ['Returns true when there was one.'],
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id ce.ci.subscribe() gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'ciProfiles', category: 'MIDI-CI', signature: 'ciProfiles(muid [, fn]) -> list', refusal: 'empty list',
+    summary: 'A device\'s MIDI-CI profiles, and which are on.',
+    example: '`ce.ci.profiles(state.synth)` gives what the last inquiry found.',
+    notes: [
+      'Each is { id, address, enabled }: `id` the profile\'s five bytes as hex text ("7E 21 09 01 00"), `address` "device" or a channel, 1 to 16.',
+      'Without fn: the list as last heard, at once. With fn: the device is asked again, and fn is called with the fresh list.',
+      'A MIDI-CI profile is an agreed way for a device to behave, such as a drawbar organ. It is not one of CEditor\'s device profiles.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called with the fresh list.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciSetProfile', category: 'MIDI-CI', signature: 'ciSetProfile(muid, id, on [, opts]) -> boolean', refusal: 'false',
+    summary: 'Turn a MIDI-CI profile on or off.',
+    example: '`ce.ci.setProfile(state.synth, "7E 21 09 01 00", true)`.',
+    notes: ['The device answers with its new state, raised as ciProfileChanged. A device that refuses raises nothing, and profiles keeps the old state.'],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'id', type: 'text', required: true, summary: 'The profile, as profiles gives it.' },
+      { name: 'on', type: 'boolean', required: true, summary: 'On or off.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'channel', type: 'number', default: 'the whole device', summary: 'One channel, 1 to 16, for a profile turned on per channel.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'ciDraftProfile', category: 'MIDI-CI', signature: 'ciDraftProfile(muid, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Make a draft device profile from what a device reports.',
+    example: '`ce.ci.draftProfile(state.synth, function(draft) log(draft.summary.parameters .. " parameters") end)`.',
+    notes: [
+      'Asks for DeviceInfo, AllCtrlList, ChCtrlList and ProgramList, then builds the draft as the Discovery screen does, marked as partial.',
+      'fn is called with { profile, summary }: `profile` a table ready to save as JSON with ce.file.save(); `summary` counts what it holds, and `missing` lists what the device did not say.',
+      'A starting point, not a finished profile: MIDI-CI says which controllers a device has, not its SysEx dumps.',
+    ],
+    params: [
+      { name: 'muid', type: 'number', required: true, summary: 'The device.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the draft.' },
+    ],
+    scopes: 'any',
+  },
+  // osc
+  // Open Sound Control (docs/design/ce-osc-module.md). The port, OSC's reading and writing and the
+  // user's yes for the network live once, in C++ (Osc/OscService.h); oscCore.js checks a call and runs
+  // each pattern's function, the same in every runtime.
+  {
+    id: 'oscListen', category: 'OSC', signature: 'oscListen([opts]) -> boolean', refusal: 'false',
+    summary: 'Start receiving OSC on a port.',
+    example: '`ce.osc.listen({ port = 8000, network = true })` receives from a tablet on the same network, after the user says yes.',
+    notes: [
+      'This computer only, unless `network` is on; then the user is asked the first time, and listening starts when they say yes. The answer is kept on this computer for the panel, never in the panel file.',
+      'The port in use is in status().port: show it where the user types it into the tablet. Calling it again moves to the new port.',
+      'Returns true when listening, or waiting for the user. In an exported plug-in with its window shut, false when the port is in use or the user said no; in the panel view that comes a moment later, as a console line and status().error.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'port', type: 'number', default: '8000', summary: 'The port, 1024 to 65535.' },
+        { name: 'network', type: 'boolean', default: 'false', summary: 'Receive from other computers too, after the user says yes.' },
+        { name: 'nextFree', type: 'boolean', default: 'false', summary: 'Take the next free port when this one is in use, as a second copy of the panel must.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscStop', category: 'OSC', signature: 'oscStop() -> boolean', refusal: 'false',
+    summary: 'Stop receiving OSC, and close the port.',
+    example: '`ce.osc.stop()` from an "OSC off" switch.',
+    notes: ['Closed by itself when the panel closes. Returns true when a port was open.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'oscOn', category: 'OSC', signature: 'oscOn(pattern, fn) -> number', refusal: 'nothing',
+    summary: 'Run a function for every OSC message to an address; wildcards allowed.',
+    example: '`ce.osc.on("/fader/*", fn)` runs `fn` for `/fader/1`, `/fader/2` and so on.',
+    notes: [
+      'OSC\'s wildcards, inside one part of the address: `*` any text, `?` one character, `[1-4]` one of a range, `[!0]` anything but, `{cutoff,reso}` one of a list.',
+      'fn is called with the message: { address, args, types, from, time }. `args` are its values; `types` the OSC type of each, such as "if"; `from` { host, port }, which ce.osc.send() takes to answer; `time` a bundle\'s time.',
+      'Several patterns can match one message; each function runs, in the order they were made. A script\'s patterns go when it reloads.',
+      'Returns an id for ce.osc.off().',
+    ],
+    params: [
+      { name: 'pattern', type: 'string', required: true, summary: 'An address, starting with /.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with each message.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscOff', category: 'OSC', signature: 'oscOff(id) -> boolean', refusal: 'false',
+    summary: 'Remove a pattern ce.osc.on() made.',
+    example: '`ce.osc.off(state.faders)`.',
+    notes: ['Returns true when there was one.'],
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id ce.osc.on() gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'oscTarget', category: 'OSC', signature: 'oscTarget(name [, address]) -> boolean', refusal: 'false',
+    summary: 'Give a destination a name, so ce.osc.send() can use it.',
+    example: '`ce.osc.target("tablet", "192.168.1.20:9000")`.',
+    notes: [
+      'Another computer asks the user once, as listening on the network does; this computer ("127.0.0.1" or "localhost") does not.',
+      'Names belong to the panel and are shared by its scripts, until the panel closes.',
+      'Returns true when set, or waiting for the user\'s answer.',
+    ],
+    params: [
+      { name: 'name', type: 'string', required: true, summary: 'The name scripts will use.' },
+      { name: 'address', type: 'value', required: false, default: 'forget the name', summary: '"host:port", { host, port }, or a message\'s from.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscSend', category: 'OSC', signature: 'oscSend(to, address [, args] [, types]) -> boolean', refusal: 'false',
+    summary: 'Send one OSC message.',
+    example: '`ce.osc.send("tablet", "/label/1", "Cutoff")` sets a label in TouchOSC.',
+    notes: [
+      'Every number goes as `f`, the type most receivers expect; text as `s`, true and false as `T` and `F`, nothing as `N`, a list of bytes as `b`. A whole number needs `types` "i", because some languages cannot tell 1 from 1.0.',
+      '`types` gives one OSC type for each value instead: i h f d s S T F N I b r m t c.',
+      'Sending never waits; messages go out in the order sent. A destination on another computer asks the user first, and the message waits for the answer.',
+      'Returns true when sent; false for an address without a leading /, types that do not fit the values, or a destination the user refused.',
+    ],
+    params: [
+      { name: 'to', type: 'value', required: true, summary: 'A name from ce.osc.target(), "host:port", or a message\'s from.' },
+      { name: 'address', type: 'string', required: true, summary: 'Where to send it, starting with /.' },
+      { name: 'args', type: 'value', required: false, default: 'no values', summary: 'One value, or a list of them.' },
+      { name: 'types', type: 'string', required: false, default: 'worked out from the values', summary: 'The OSC types, one per value, such as "if".' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscBundle', category: 'OSC', signature: 'oscBundle(to, messages [, opts]) -> boolean', refusal: 'false',
+    summary: 'Send several OSC messages as one packet, so they arrive together.',
+    example: '`ce.osc.bundle("tablet", { { address = "/fader/1", args = { 0.5 } }, { address = "/label/1", args = { "64" } } })`.',
+    notes: [
+      'For a tablet showing many values: one bundle for a page of faders is one packet, not twenty. A bundle larger than 64 KB is refused; split it.',
+      'Returns true when sent.',
+    ],
+    params: [
+      { name: 'to', type: 'value', required: true, summary: 'As ce.osc.send() takes it.' },
+      { name: 'messages', type: 'list', required: true, summary: 'A list of { address, args, types }.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'time', type: 'number', default: 'at once', unit: 'seconds since 1900', summary: 'When the receiver should act on it, for a receiver that schedules bundles.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'oscStatus', category: 'OSC', signature: 'oscStatus() -> table', refusal: 'nothing',
+    summary: 'What OSC is doing: listening or not, on which port, what was received, sent and dropped.',
+    example: '`ce.osc.status().port` is the port to type into the tablet.',
+    notes: [
+      'Returns { listening, waiting, port, network, received, sent, dropped, error }: `waiting` while the user has not answered; the counts since the panel opened; `error` the last reason something was refused: "portInUse", "refusedByUser", "badPort", "badAddress", "badMessage", "tooLarge" or "badPacket".',
+      'In the panel view it answers from what the transport last said, a moment behind.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  // daw
+  // The exported plug-in and its DAW (docs/design/ce-daw-module.md). dawCore.js checks a call and asks
+  // the plug-in, the same in every runtime; in the editor there is no DAW.
+  {
+    id: 'dawHost', category: 'DAW', signature: 'dawHost() -> table', refusal: 'nothing',
+    summary: 'What the exported plug-in is running in: the DAW\'s name, the plug-in format, the sample rate and block size, and whether its window is open.',
+    example: '`ce.daw.host().name` is "Bitwig Studio" in Bitwig.',
+    notes: [
+      'Returns { name, format, sampleRate, blockSize, editorOpen }. `name` is the DAW as JUCE knows it, else "Unknown"; `format` is "vst3", "clap", "lv2", "au" or "standalone".',
+      '`sampleRate` and `blockSize` are nothing until the DAW has started the plug-in. Tempo, position and play state are in ce.time.',
+      'In the editor: nothing.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawParameters', category: 'DAW', signature: 'dawParameters() -> list', refusal: 'empty list',
+    summary: 'The plug-in\'s DAW parameters, in the order the DAW lists them.',
+    example: '`#ce.daw.parameters()` is how many the DAW can automate.',
+    notes: [
+      'Each is { id, name, path, control, min, max, default, unit, kind, choices, group, value }: `kind` is "float", "choice" or "bool"; `choices` the texts of a list; `group` the folder the DAW shows it in; `name` the name the DAW shows now; `value` as get() gives it.',
+      'The spare parameters are at the end, with `path` nothing while empty.',
+      'In the editor: the list the next export would bake.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawParameter', category: 'DAW', signature: 'dawParameter(path) -> table', refusal: 'nothing',
+    summary: 'One DAW parameter, by its control\'s path.',
+    example: '`ce.daw.parameter("Cutoff.value").name` is the name the DAW shows for the cutoff knob.',
+    notes: ['Returns one entry as ce.daw.parameters() gives it; a control that is not a DAW parameter: nothing.'],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path, as set takes it.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawProgram', category: 'DAW', signature: 'dawProgram() -> table', refusal: 'nothing',
+    summary: 'The program the DAW has chosen from the plug-in\'s bank.',
+    example: '`ce.daw.program().name` is what the DAW\'s program menu shows.',
+    notes: [
+      'Returns { index, number, name, count }: `index` from 0, `number` from 1, `count` the size of the bank.',
+      'The bank is the one baked at export from the device profile\'s presets. A panel without one, and the editor: nothing.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawPrograms', category: 'DAW', signature: 'dawPrograms() -> list', refusal: 'empty list',
+    summary: 'The whole bank the DAW chooses from.',
+    example: '`ce.daw.programs()[1].name` is the first program\'s name.',
+    notes: ['Returns a list of { index, number, name }; no bank: an empty list.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'dawBeginGesture', category: 'DAW', signature: 'dawBeginGesture(path) -> boolean', refusal: 'false',
+    summary: 'Start one DAW gesture on a parameter: every set on it until endGesture is one move to the DAW.',
+    example: '`ce.daw.beginGesture("Cutoff.value")` before a sweep the script plays.',
+    notes: [
+      'Without it, each set is a gesture of its own, and a DAW writing automation in touch or latch mode lets go of the parameter after every value.',
+      'Only for changes the script makes over time: a morph, a sweep. A drag by a hand is one gesture already.',
+      'A gesture left open is ended, with a console line, when the window or the plug-in closes.',
+      'Returns true when started; false when one is already open on it, or the path is not a DAW parameter, and in the editor.',
+    ],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawEndGesture', category: 'DAW', signature: 'dawEndGesture(path) -> boolean', refusal: 'false',
+    summary: 'End the gesture ce.daw.beginGesture() started.',
+    example: '`ce.daw.endGesture("Cutoff.value")` when the sweep is done.',
+    notes: ['Returns true when a gesture was open.'],
+    params: [{ name: 'path', type: 'string', required: true, summary: 'The control\'s path.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'dawRename', category: 'DAW', signature: 'dawRename(path [, name]) -> boolean', refusal: 'false',
+    summary: 'Give a parameter a new name in the DAW.',
+    example: '`ce.daw.rename("Osc2Param.value", "Sync amount")` when the oscillator\'s mode changes what its knob does.',
+    notes: [
+      'The parameter\'s id and place stay the same, so automation already written stays on it. The name is saved with the project.',
+      'Not every DAW shows a new name at once; some only after the project is opened again, and LV2 has no way to say it.',
+      'Returns true when the name was changed; in the editor, false.',
+    ],
+    params: [
+      { name: 'path', type: 'string', required: true, summary: 'The control\'s path.' },
+      { name: 'name', type: 'string', required: false, default: 'the name it was exported with', summary: 'The new name.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'dawAssign', category: 'DAW', signature: 'dawAssign(slot [, path] [, opts]) -> boolean', refusal: 'false',
+    summary: 'Put a control on one of the panel\'s spare parameters, so the DAW can automate it.',
+    example: '`ce.daw.assign(1, "LfoRate.value")` puts the LFO rate on spare parameter 1.',
+    notes: [
+      'The author reserves spare parameters in the panel\'s export settings; the script decides what is on them.',
+      'The spare shows the control\'s range and text: "440 Hz", not "0.53". Moving one moves the other, both ways.',
+      'A control is on one slot at a time: assigning it again moves it. The assignment is saved with the project and comes back before its automation plays.',
+      'Returns true when assigned; false for a slot the panel does not have, a control with no range, and in the editor.',
+    ],
+    params: [
+      { name: 'slot', type: 'number', required: true, summary: '1 to the number of spare parameters the panel has.' },
+      { name: 'path', type: 'string', required: false, default: 'empty the slot', summary: 'The control\'s path.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'name', type: 'string', default: 'the control\'s name', summary: 'The name the DAW shows for the slot.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'dawMarkChanged', category: 'DAW', signature: 'dawMarkChanged() -> boolean', refusal: 'false',
+    summary: 'Tell the DAW the project has unsaved changes.',
+    example: '`ce.daw.markChanged()` after a script changed something only onDawSaveState saves.',
+    notes: [
+      'Without it a DAW may close the project without asking, and lose what only the script holds. A change to a DAW parameter needs no call.',
+      'Also runs onDawSaveState on the next tick, so the state is ready when the DAW asks.',
+      'Returns true when the DAW was told; in the editor, false.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  // mpe
+  // MPE out (docs/design/midi-input-and-mpe.md): mpeCore.js picks each note's member channel and sends
+  // its expression there, the same in every runtime. One zone per panel; Python's is per script.
+  {
+    id: 'mpeZone', category: 'MPE', signature: 'mpeZone([opts]) -> boolean', refusal: 'false',
+    summary: 'Set up the MPE zone the panel plays into, and tell the synth.',
+    example: '`ce.mpe.zone({ members = 7 })` plays into a lower zone of seven channels, 2 to 8.',
+    notes: [
+      'MPE gives each sounding note a MIDI channel of its own, so each note can bend, swell and change tone by itself. A zone is one manager channel and the member channels its notes use: the lower zone has channel 1 as manager and members from 2 upwards; the upper zone has 16 and members from 15 down.',
+      'With `send` on, the synth gets the MPE Configuration Message (RPN 6) on the manager channel and the bend range (RPN 0) on every channel of the zone, so both ends agree.',
+      'Changing the zone ends every sounding note first. Returns true when the zone is set.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'zone', type: 'string', default: '"lower"', summary: '"lower" (manager channel 1) or "upper" (manager channel 16).' },
+        { name: 'members', type: 'number', default: '15', summary: 'How many member channels, 1 to 15, and so how many notes can sound at once.' },
+        { name: 'bendRange', type: 'number', default: '48', unit: 'semitones', summary: 'How far a full bend goes on a member channel. MPE\'s own default.' },
+        { name: 'managerBendRange', type: 'number', default: '2', unit: 'semitones', summary: 'The same, for the manager channel.' },
+        { name: 'send', type: 'boolean', default: 'true', summary: 'Send the setup to the synth. Off for a synth set up by hand.' },
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device to play.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNoteOn', category: 'MPE', signature: 'mpeNoteOn(note, velocity [, opts]) -> number', refusal: 'nothing',
+    summary: 'Play a note on a member channel of its own, and get its id.',
+    example: '`local id = ce.mpe.noteOn("C4", 100)` plays middle C and keeps its id.',
+    notes: [
+      'The channel is the free member channel released longest ago, so a release tail on the synth is not cut off. Every channel busy: the oldest note is ended first, with a console line the first time.',
+      'The starting bend, timbre and pressure are sent before the note, as MPE asks, so a note never starts at the last note\'s bend.',
+      'Before ce.mpe.zone(): a lower zone of 15 is set up first, and sent.',
+      'Returns the note\'s id, a number.',
+    ],
+    params: [
+      { name: 'note', type: 'number or text', required: true, summary: 'The note, 0 to 127, or a name such as "C4".' },
+      { name: 'velocity', type: 'number', required: true, summary: '1 to 127.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'bend', type: 'number', default: '0', unit: 'semitones', summary: 'The bend the note starts with, held to the zone\'s bend range.' },
+        { name: 'pressure', type: 'number', default: '0', summary: 'The pressure it starts with, 0 to 1.' },
+        { name: 'timbre', type: 'number', default: '0.5', summary: 'The timbre it starts with, 0 to 1 (controller 74).' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeExpress', category: 'MPE', signature: 'mpeExpress(id, values) -> boolean', refusal: 'false',
+    summary: 'Change one sounding note\'s bend, pressure or timbre.',
+    example: '`ce.mpe.express(id, { bend = 0.5, pressure = 0.8 })` bends the note up a quarter tone and presses it.',
+    notes: [
+      'What is left out is not sent.',
+      'A note that has ended: false, and nothing sent, so a late gesture does not land on the next note to use that channel. Returns true when sent.',
+    ],
+    params: [
+      { name: 'id', type: 'number', required: true, summary: 'A note\'s id, from ce.mpe.noteOn().' },
+      { name: 'values', type: 'object', required: true, fields: optionFields([
+        { name: 'bend', type: 'number', default: 'not sent', unit: 'semitones', summary: 'The note\'s bend, held to the zone\'s bend range.' },
+        { name: 'pressure', type: 'number', default: 'not sent', summary: 'Its pressure, 0 to 1.' },
+        { name: 'timbre', type: 'number', default: 'not sent', summary: 'Its timbre, 0 to 1 (controller 74).' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNoteOff', category: 'MPE', signature: 'mpeNoteOff(id [, velocity]) -> boolean', refusal: 'false',
+    summary: 'End a note played with ce.mpe.noteOn().',
+    example: '`ce.mpe.noteOff(id)` releases the note.',
+    notes: ['Returns true when the note was sounding; false when it had already ended.'],
+    params: [
+      { name: 'id', type: 'number', required: true, summary: 'The note\'s id.' },
+      { name: 'velocity', type: 'number', required: false, default: '64', summary: 'The release velocity, 0 to 127.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeAllOff', category: 'MPE', signature: 'mpeAllOff() -> number', refusal: 'zero',
+    summary: 'End every note the panel plays through MPE, and set each member channel\'s bend back to the middle.',
+    example: '`ce.mpe.allOff()` in onPanelClose leaves the synth silent.',
+    notes: [
+      'Returns how many notes were ended.',
+      'ce.midi.panic() silences these too, as it does every note; call this as well, so ce.mpe.notes() is empty again.',
+    ],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeNotes', category: 'MPE', signature: 'mpeNotes() -> list', refusal: 'empty list',
+    summary: 'The notes sounding now through ce.mpe.',
+    example: '`#ce.mpe.notes()` is how many are held.',
+    notes: ['Each is { id, note, channel, velocity, bend, pressure, timbre }, oldest first; none: an empty list.'],
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'mpeListen', category: 'MPE', signature: 'mpeListen([opts]) -> boolean', refusal: 'false',
+    summary: 'Read MPE from a device: give each note an id, and raise expressionIn as it moves.',
+    example: '`ce.mpe.listen({ from = "controller" })` reads MPE from the device the panel calls "controller".',
+    notes: [
+      'An MPE controller sends each note on its own channel, with its bend, pressure and timbre on that channel. This turns them back into notes.',
+      'While listening, noteIn and noteOffIn from that device carry `note.id`, the same id expressionIn gives, and bendIn, pressureIn and controller 74 on its member channels are raised as expressionIn instead.',
+      'The zone comes from the MPE Configuration Message the device sends, when it sends one; else from `zone` and `members` here.',
+      'Returns true when listening. `listen({ off = true })` stops.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'from', type: 'string', kind: 'deviceRole', default: 'every input', summary: 'The device to read, by its role.' },
+        { name: 'zone', type: 'string', default: '"lower"', summary: '"lower" or "upper", until the device says which.' },
+        { name: 'members', type: 'number', default: '15', summary: 'How many member channels, 1 to 15, until the device says.' },
+        { name: 'bendRange', type: 'number', default: '48', unit: 'semitones', summary: 'For turning a member channel\'s bend into semitones.' },
+        { name: 'off', type: 'boolean', default: 'false', summary: 'True stops reading the device.' }]) },
+    ],
+    scopes: 'any',
+  },
+  // file
+  // Librarian files through the person's own dialogs (docs/design/ce-file-module.md). A script never
+  // names a path: every file comes from a dialog the person answered. The dialogs are the panel
+  // view's (scriptFileHost.js, over CE/src/ScriptFiles.h); the four that take files apart work on
+  // bytes and run everywhere (fileCore.js).
+  {
+    id: 'fileOpen', category: 'Files', signature: 'fileOpen(opts, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person for a file, and get its contents.',
+    example: '`ce.file.open({ types = {"syx"} }, function(file, data) … end)` asks for a .syx file and gives its bytes.',
+    notes: [
+      'fn is called as fn(file, data) once the person has chosen, or fn(nil) when they cancel. `data` is bytes for syx and mid, text for txt and csv, and a value for json.',
+      '`file` is a table to keep and pass back: { id, name, type, size, canWrite, isFolder }. It holds no folder: the script never sees where the file is.',
+      'A json file that is not valid JSON: fn(file, nil), with a console error naming the line where it goes wrong.',
+      'Returns true when the dialog opened. Another ce.file dialog already open: the console says so. With the plug-in\'s window shut there is nobody to answer, so nothing is done.',
+      'Files of up to 8 MB.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        { name: 'types', type: 'list of text', default: 'none, needed', sample: '{"syx"}', summary: 'The types the dialog accepts, from syx, mid, json, txt and csv.' },
+        { name: 'title', type: 'text', default: '"Open"', summary: 'The dialog\'s title: say what the file is for, such as "Import a bank".' },
+        { name: 'multiple', type: 'true or false', default: 'false', summary: 'Let the person pick several files: fn is then called once for each.' },
+        { name: 'writable', type: 'true or false', default: 'false', summary: 'Let ce.file.write() write this file again later, as a librarian keeps a bank file open.' },
+        { name: 'read', type: 'true or false', default: 'true', summary: 'Off: give the file value only, and read it later with ce.file.read().' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(file, data), or fn(nil) when the person cancels.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSave', category: 'Files', signature: 'fileSave(name, data [, opts [, fn]]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person where to save, then write the file there.',
+    example: '`ce.file.save("Bank A.syx", bytes)` offers to save the bytes as "Bank A.syx".',
+    notes: [
+      'The extension of `name` sets the type: .syx, .mid, .json, .txt or .csv. Anything else: false, with a console error.',
+      '`data` is bytes for syx and mid, text for txt and csv, and any value for json. The wrong kind for the type: false, with a console error, and nothing written.',
+      'fn is called as fn(file) when it is written, or fn(nil, why) when the person cancels or the write fails. The file value has `canWrite` on, so ce.file.write() can save to it again without asking.',
+      'The dialog asks before writing over a file that is there. The person can change the name; the file keeps the type asked for.',
+    ],
+    params: [
+      { name: 'name', type: 'text', required: true, summary: 'The name the dialog suggests, with its extension.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'title', type: 'text', default: '"Save"', summary: 'The dialog\'s title.' },
+        { name: 'indent', type: 'number', default: 'none', summary: 'For json: spaces to indent each level, so a person can read the file.' }]) },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(file), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileRead', category: 'Files', signature: 'fileRead(file, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Read a chosen file again, as it is now.',
+    example: '`ce.file.read(state.bank, function(data) … end)` reads the bank file the person opened earlier.',
+    notes: [
+      'fn is called as fn(data), the contents as open gives them, or fn(nil, why) when the file has gone or cannot be read.',
+      'Not a file value from ce.file.open, save or list: false, with a console error.',
+    ],
+    params: [
+      { name: 'file', type: 'table', required: true, summary: 'A file value from open, save or list.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(data), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileWrite', category: 'Files', signature: 'fileWrite(file, data [, fn]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Write a chosen file again, without asking.',
+    example: '`ce.file.write(state.bank, ce.file.syxJoin(state.messages))` saves the edited bank back to its file.',
+    notes: [
+      'Only a file whose `canWrite` is on: one from save, saveIn, or open with `writable`. Anything else: false, with a console error saying the person must save to it first.',
+      'Written whole, through a temporary file, so a write cut short leaves the old file as it was.',
+      'fn is called as fn(true) when written, or fn(false, why) when not.',
+    ],
+    params: [
+      { name: 'file', type: 'table', required: true, summary: 'A file value whose canWrite is on.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write, as save takes it.' },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(true), or fn(false, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileFolder', category: 'Files', signature: 'fileFolder(opts, fn) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Ask the person for a folder.',
+    example: '`ce.file.folder({ title = "Export the bank to", writable = true }, function(dir) … end)` asks where to put a bank\'s files.',
+    notes: [
+      'fn is called as fn(folder) once chosen, or fn(nil) when the person cancels.',
+      'Only this folder: not the folders inside it, and nothing above it.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: true, fields: optionFields([
+        { name: 'title', type: 'text', default: '"Choose a folder"', summary: 'The dialog\'s title.' },
+        { name: 'writable', type: 'true or false', default: 'false', summary: 'Let ce.file.saveIn() write into it.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called as fn(folder), or fn(nil).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileList', category: 'Files', signature: 'fileList(folder [, opts]) -> list', refusal: 'empty list', runtime: RUNTIME_WEBVIEW,
+    summary: 'The files in a chosen folder, sorted as a person sorts them ("2" before "10").',
+    example: '`ce.file.list(dir, { types = {"syx"} })` gives every .syx file in it.',
+    notes: [
+      'Each is a file value, for ce.file.read(). They can be written only when the folder was chosen writable.',
+      'The files there when the folder was chosen, as saveIn last left them, or when list was last called: a file another program adds shows the next time.',
+    ],
+    params: [
+      { name: 'folder', type: 'table', required: true, summary: 'A folder value from ce.file.folder().' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'types', type: 'list of text', default: 'every type on the list', summary: 'Only these types.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSaveIn', category: 'Files', signature: 'fileSaveIn(folder, name, data [, opts [, fn]]) -> boolean', refusal: 'false', runtime: RUNTIME_WEBVIEW,
+    summary: 'Write one file into a chosen folder.',
+    example: '`ce.file.saveIn(dir, "001 Brass.syx", bytes)` writes one patch of a bank.',
+    notes: [
+      'Only a folder chosen `writable`. A name with a /, \\ or .. in it, or without a listed extension: false, with a console error.',
+      'A file of that name already there is not written over, and fn gets the reason, unless `replace` is on. The person agreed to a folder, not to losing what was in it.',
+      'fn is called as fn(file) when written, or fn(nil, why) when not.',
+    ],
+    params: [
+      { name: 'folder', type: 'table', required: true, summary: 'A folder value from ce.file.folder(), chosen writable.' },
+      { name: 'name', type: 'text', required: true, summary: 'The file\'s name, with its extension.' },
+      { name: 'data', type: 'value', required: true, summary: 'What to write, as save takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'replace', type: 'true or false', default: 'false', summary: 'Write over a file of that name.' },
+        { name: 'indent', type: 'number', default: 'none', summary: 'For json: spaces to indent each level.' }]) },
+      { name: 'fn', type: 'function', required: false, summary: 'Called as fn(file), or fn(nil, why).' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSyxSplit', category: 'Files', signature: 'fileSyxSplit(bytes [, opts]) -> list', refusal: 'empty list',
+    summary: 'The SysEx messages in a .syx file, one by one, each from F0 to F7.',
+    example: '`ce.file.syxSplit(bytes)` gives a list of messages.',
+    notes: [
+      'Bytes outside any message are left out, with a console warning saying how many and where. So is a message cut off by the next F0, or with no F7 at the end of the file, unless `partial` is on.',
+      'Works on bytes the script holds, so it runs everywhere, window shut too.',
+    ],
+    params: [
+      { name: 'bytes', type: 'array', required: true, kind: 'bytes', summary: 'The file\'s bytes, a list or hex text.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'partial', type: 'true or false', default: 'false', summary: 'Keep a last message with no F7, so a cut-off file can still be looked at.' },
+        { name: 'prefix', type: 'list', default: 'none', summary: 'Only messages that start with these bytes, such as {0xF0, 0x41} for Roland.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileSyxJoin', category: 'Files', signature: 'fileSyxJoin(messages) -> list', refusal: 'nothing',
+    summary: 'Messages as one .syx file\'s bytes, in the order given, nothing added between.',
+    example: '`ce.file.save("Bank A.syx", ce.file.syxJoin(state.messages))` saves a bank.',
+    notes: ['A message that does not start with F0 and end with F7: nothing, with a console error naming which.'],
+    params: [{ name: 'messages', type: 'list', required: true, summary: 'Messages, each bytes or hex text.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'fileMidiRead', category: 'Files', signature: 'fileMidiRead(bytes [, opts]) -> table', refusal: 'nothing',
+    summary: 'A MIDI file as tracks of notes: { ticksPerBeat, tempo, tempos, timeSignature, tracks }.',
+    example: '`ce.file.midiRead(data).tracks[1].notes` gives the first track\'s notes.',
+    notes: [
+      'Each track is { name, notes, events }. A note is { beat, note, velocity, length, channel }: `beat` from 0, `length` in beats, `channel` from 1. `events` holds everything else as { beat, bytes }: controllers, program changes, bend, SysEx.',
+      '`tempo` is the tempo at the start, 120 when the file gives none; `tempos` lists every change as { beat, bpm }.',
+      'A note-on with velocity 0 ends the note. A note that never ends lasts to the end of its track, with a console warning naming it.',
+      'Types 0 and 1. A type 2 file, a file timed in SMPTE frames, or one cut short: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'bytes', type: 'array', required: true, kind: 'bytes', summary: 'The file\'s bytes.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'track', type: 'number', default: 'every track', summary: 'Read only this track, counted from 1.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'fileMidiWrite', category: 'Files', signature: 'fileMidiWrite(song [, opts]) -> list', refusal: 'nothing',
+    summary: 'A MIDI file\'s bytes from a song, a list of notes, or a Phrase Recorder\'s take.',
+    example: '`ce.file.midiWrite(ce.components.recorder.read("Recorder"))` gives the recorder\'s take as a MIDI file.',
+    notes: [
+      '`song` is a song as midiRead gives it, a list of notes { beat, note, velocity, length, channel } written as one track, or a Phrase Recorder\'s section, whose take is written over its bars at the transport\'s beats per bar.',
+      'One track is written as type 0, several as type 1, at 480 ticks per beat unless the song says otherwise.',
+      'Returns the bytes, for ce.file.save(). Anything else as `song`: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'song', type: 'table', required: true, summary: 'A song, a list of notes, or a recorder\'s section.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'tempo', type: 'number', default: 'the song\'s, else the transport\'s, else 120', summary: 'The tempo written at the start, in beats per minute.' },
+        { name: 'name', type: 'text', default: 'none', summary: 'The name written into the first track.' },
+        { name: 'channel', type: 'number', default: '1', summary: 'The channel, 1 to 16, for notes that carry none.' }]) },
+    ],
+    scopes: 'any',
+  },
+  // verify
+  // Asking the synth whether it holds what was sent (docs/design/ce-verify-module.md). The deciding is
+  // verifyCore.js, the same in every runtime; each check ends in one report, handed to its function
+  // and raised as onVerifyDone.
+  {
+    id: 'verifyCoverage', category: 'Verify', signature: 'verifyCoverage([opts]) -> table', refusal: 'nothing',
+    summary: 'Which parameters a check can read back from the synth, which it cannot and why, and whether each dump\'s length adds up. Sends nothing.',
+    example: '`ce.verify.coverage().checkable` is how many of the synth\'s parameters can be checked.',
+    notes: [
+      'Returns { role, total, checkable, unchecked, dumps }: `unchecked` lists { id, name, why }, `why` "notInDump" (no dump holds it) or "noRequest" (the profile cannot ask for that dump).',
+      '`dumps` lists { kind, expectedBytes, layoutBytes, unread } for every dump these parameters are in. `expectedBytes` is the length the profile gives, `layoutBytes` what its layout adds up to; when the two differ, the profile is wrong in one of them. `unread` lists the payload bytes no parameter reads, as { from, to }.',
+      'Reads only the profile, so it works without a synth connected.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup']) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyCheck', category: 'Verify', signature: 'verifyCheck([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Ask the synth for its values and compare them with what the panel shows. Writes nothing.',
+    example: '`ce.verify.check(function(report) log(ce.verify.summary(report)) end)` checks every parameter and logs one line.',
+    notes: [
+      'Asks only for the dumps that hold the parameters asked about, one after another, with the profile\'s gap between them. Each reply fills the panel, as a dump always does.',
+      'The report: { kind, role, ok, total, matched, differed, unchecked, dumps, probes, ms, cancelled }. `matched` lists ids; `differed` lists { id, name, expected, got, raw }, `expected` what the panel held and `got` what the synth sent, `raw` the number the synth sent for a choice the profile does not name; `unchecked` lists { id, name, why }; `dumps` lists { kind, status, expectedBytes }, `status` "ok" or "noReply".',
+      '`why` is "notInDump", "noRequest", "noReply" (asked, asked again, no answer in time), "moved" (the value changed while it was checked), "notWritable" or "cancelled".',
+      '`ok` is true when nothing differed and nothing was left unchecked by no reply, a move or a cancel.',
+      'Returns true when started; false while a check runs on that device, when the synth is not connected, or for any device but the main synth.',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyDump', category: 'Verify', signature: 'verifyDump(kind [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Ask for the same dump several times and compare the first reply with the last. Writes nothing.',
+    example: '`ce.verify.dump("common", function(report) log(#report.differed) end)` logs how many values changed between two asks.',
+    notes: [
+      'A value that changes when nothing was sent is one the synth changes by itself, such as a counter or a clock. Every check that compares it will find it different.',
+      '`differed` holds the parameters that changed, `expected` the first reply\'s value and `got` the last.',
+      'A dump the profile has no request for: false, with a console error.',
+    ],
+    params: [
+      { name: 'kind', type: 'dumpKind', required: true, summary: 'The dump, by the id the profile gives it, or the id of its request.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole',
+        { name: 'times', type: 'number', default: '2', summary: 'How many times to ask, 2 to 10.' },
+        { name: 'gapMs', type: 'number', default: '500', unit: 'milliseconds', summary: 'The wait between the asks.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyWrite', category: 'Verify', signature: 'verifyWrite(id, value [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Send one value, ask the synth for it back, and compare.',
+    example: '`ce.verify.write("tone1.filter.cutoff", 64, fn)` sends 64 and reports whether the synth holds 64.',
+    notes: [
+      'Sent as ce.device.write() sends it, so the panel\'s control follows. ce.device.write() says the message left; this says whether it landed.',
+      'A parameter no dump holds is still sent, and is reported unchecked with the reason.',
+    ],
+    params: [
+      { name: 'id', type: 'text', required: true, summary: 'The parameter id, as the profile names it.' },
+      { name: 'value', type: 'number or text', required: true, summary: 'The value, in the parameter\'s own units, as ce.device.write() takes it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifySettle']) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyProbe', category: 'Verify', signature: 'verifyProbe(id [, opts], fn) -> boolean', refusal: 'false',
+    summary: 'Try a parameter at several values, read each one back, then put the old value back.',
+    example: '`ce.verify.probe("tone1.lfo.rate", fn)` tries the lowest, middle and highest rate and the two next to each end.',
+    notes: [
+      'Left out, `values` is: for a number, the lowest, the one above it, the middle, the one below the highest, and the highest; for a choice, every choice up to 16, else the first, middle and last; for on/off, both; for text, a name of full length and an empty one.',
+      'The report\'s `probes` lists { id, value, got, same } for each value tried, and `differed` the values that did not land. `restored` is true when the old value was read back too.',
+      'The old value is sent back when the probe ends, fails or is cancelled. A parameter that cannot be read back is not sent at all.',
+    ],
+    params: [
+      { name: 'id', type: 'text', required: true, summary: 'The parameter id.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifySettle',
+        { name: 'values', type: 'list', default: 'as the notes say', summary: 'The values to try, in the parameter\'s own units.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyPatch', category: 'Verify', signature: 'verifyPatch([opts,] fn) -> boolean', refusal: 'false',
+    summary: 'Send the panel\'s whole sound, ask for every dump that holds it, and compare every value.',
+    example: '`ce.verify.patch(fn)` after building a sound in the panel, before saving it on the synth.',
+    notes: [
+      '`via` left out: whole dumps when the profile\'s patch section says `deliver = "dump"`, else one message per parameter.',
+      'Parameters the profile says cannot be written are reported unchecked as "notWritable".',
+    ],
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['verifyRole', 'verifyIds', 'verifyGroup', 'verifySettle',
+        { name: 'via', type: 'text', default: 'as the profile delivers a patch', values: ['dump', 'parameters'], summary: 'How the sound is sent: whole dumps, or one value at a time.' },
+        { name: 'send', type: 'true or false', default: 'true', summary: 'Off: compare without sending first, as check does.' }]) },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the report.' },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifySummary', category: 'Verify', signature: 'verifySummary(report [, opts]) -> text', refusal: 'nothing',
+    summary: 'A report as one line of text.',
+    example: '`ce.verify.summary(report)` gives "1180 of 1222 match, 3 differ, 39 unchecked (no reply: tone3)".',
+    notes: [
+      'Counts, then in brackets the dump that did not answer, or the most common reason a parameter was left unchecked. A cancelled check says so first.',
+      'Not a report: nothing, with a console error.',
+    ],
+    params: [
+      { name: 'report', type: 'table', required: true, summary: 'A report from any check.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'width', type: 'number', default: 'no limit', summary: 'The most characters to give, for an LCD line. Too long: the part in brackets goes first, then the words are shortened ("5/9 ok 1 diff 3 unchk"), then the line is cut.' }]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyRunning', category: 'Verify', signature: 'verifyRunning([role]) -> table', refusal: 'nothing',
+    summary: 'The check running now on a device: { kind, role, done, total, ms }, or nothing.',
+    example: '`ce.verify.running()` while a patch check runs gives { kind = "patch", done = 3, total = 5, ms = 1840 }.',
+    notes: [
+      '`done` and `total` count dumps asked for (for a probe, values tried), so a script can show progress.',
+      'In Lua and JavaScript every script sees every check on the panel. In Python a script sees the checks it started.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  {
+    id: 'verifyCancel', category: 'Verify', signature: 'verifyCancel([role]) -> boolean', refusal: 'false',
+    summary: 'Stop the check running on a device.',
+    example: '`ce.verify.cancel()` from a "Stop" button.',
+    notes: [
+      'The check\'s function is still called, with what was read so far and `cancelled` true; what was not read is unchecked as "cancelled". A probe sends the old value back first.',
+      'Returns true when a check was running.',
+    ],
+    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole', summary: 'The device; left out: "mainSynth".' }],
+    scopes: 'any',
+  },
+  // keys
+  // The computer keyboard on a panel (docs/design/ce-keys-module.md). Panel view only: with the
+  // window shut there is no keyboard. Who gets a key, in order, is scriptKeys.js's header.
+  {
+    id: 'keysShortcut', category: 'Keyboard', signature: 'keysShortcut(keys, fn [, opts]) -> id', refusal: 'nothing',
+    summary: 'Run a function when a key, or a key with modifiers, is pressed anywhere on the panel.',
+    example: '`ce.keys.shortcut("Ctrl+G", randomizeVoice, { description = "Random voice" })` runs randomizeVoice on Ctrl+G.',
+    notes: [
+      'Refused, with a console line saying why: the editor\'s own keys, the keys DAWs and the system take (Ctrl+R, Ctrl+S and the like), the panic key, and a key another shortcut already has. Space is allowed, with a console line: in a DAW it then no longer starts the transport while the plug-in has the keyboard.',
+      'A shortcut without a modifier waits for a focused control that uses that key: with a knob focused, a shortcut on "Up" does not run, and the knob moves. With a modifier it always runs.',
+      'Shortcuts name the key printed on it: "Ctrl+G" is G wherever it sits on a German or French keyboard.',
+      'Nothing runs while the user is typing into a text box or editing an LCD.',
+      'Returns an id for `remove`; refused: nothing. A script\'s shortcuts are removed when it reloads.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'keys', type: 'text', required: true, summary: 'The key and its modifiers joined by +: "Ctrl+G", "Shift+Up", "F2", "Space". Modifiers are Ctrl, Shift, Alt and Meta (the Windows key, or Cmd on a Mac), in any order and any case.' },
+      { name: 'fn', type: 'function', required: true, summary: 'Called with the same fields keyDown gives.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'description', type: 'text', sample: '"Random voice"', summary: 'The words `list` shows for it.' },
+        { name: 'repeat', type: 'true or false', default: 'false', summary: 'On: run again while the key is held and the system repeats it.' },
+      ]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'keysRemove', category: 'Keyboard', signature: 'keysRemove(id) -> boolean',
+    summary: 'Take a shortcut away.',
+    example: '`ce.keys.remove(state.randomKey)` when the page that used it is hidden.',
+    notes: ['Returns true when there was one.'],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'id', type: 'number', required: true, summary: 'The id `shortcut` gave.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysList', category: 'Keyboard', signature: 'keysList() -> list',
+    summary: 'Every key the panel uses, for a help page: a list of { id, keys, description }.',
+    example: '`#ce.keys.list()` is how many keys the panel uses.',
+    notes: [
+      'The panic key comes first (id "panic"), then the shortcuts in the order they were made.',
+      'The piano is one entry while it is on, keys "Piano".',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysIsDown', category: 'Keyboard', signature: 'keysIsDown(key) -> boolean',
+    summary: 'Whether a key is held now.',
+    example: '`ce.keys.isDown("Shift")` in onValueChange, to move a knob in fine steps while Shift is held.',
+    notes: [
+      'Counts keys the panel saw go down, except while typing. False after the panel loses the keyboard.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'key', type: 'text', required: true, summary: 'A name as keyDown gives it ("Shift", "R", "Up"), or a place as its `code` gives it ("KeyR").' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysHeld', category: 'Keyboard', signature: 'keysHeld() -> list',
+    summary: 'The keys held now, by name, in the order they went down.',
+    example: '`ce.keys.held()` while Ctrl and G are held gives { "Ctrl", "G" }.',
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysPiano', category: 'Keyboard', signature: 'keysPiano([opts]) -> boolean', refusal: 'false',
+    summary: 'Play notes from the letter keys of the computer keyboard.',
+    example: '`ce.keys.piano({ target = "Keys" })` plays through the Keyboard component named "Keys", which lights up as notes play.',
+    notes: [
+      'The layout is the one Ableton Live and Hostage use, by the keys\' place: the middle letter row plays the white keys from C (A, S, D, F, G, H, J, K, L, ;, \'), the row above it the black ones (W, E, T, Y, U, O, P). On a German or French keyboard the same places play the same notes.',
+      'A key held plays one note until it is let go; the system\'s key repeat is ignored. Keys pressed with Ctrl, Alt or Meta are left for shortcuts.',
+      'With a `target`, the notes go through that Keyboard component: its channel, velocity, transpose, octave and scale lock apply, its keys show what is held, and it raises hit and release as for the mouse. Without one, the options below apply and the notes go to the device as sendNote sends them.',
+      'Every note is let go when the panel loses the keyboard, when the piano is turned off, and on the panic key.',
+      'Returns true when on; false when off, or when the panel has nothing to play to.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'on', type: 'true or false', default: 'true', summary: 'Off stops the piano and lets every note go.' },
+        { name: 'target', type: 'text', kind: 'control', sample: '"Keys"', summary: 'A Keyboard component to play through.' },
+        { name: 'octave', type: 'number', default: '4', summary: 'The octave the A key starts: 4 makes it C4, note 60.' },
+        { name: 'velocity', type: 'number', default: '100', summary: 'How hard every note is played, 1 to 127.' },
+        { name: 'channel', type: 'number', default: '1', summary: 'The MIDI channel, 1 to 16, without a `target`.' },
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"', summary: 'The device, without a `target`.' },
+        { name: 'octaveKeys', type: 'true or false', default: 'true', summary: 'Z and X move the octave down and up.' },
+        { name: 'velocityKeys', type: 'true or false', default: 'true', summary: 'C and V lower and raise the velocity by 20.' },
+      ]) },
+    ],
+    scopes: 'any',
+  },
+  {
+    id: 'keysPianoInfo', category: 'Keyboard', signature: 'keysPianoInfo() -> table',
+    summary: 'What the piano is doing: { on, octave, velocity, channel, target, notes }.',
+    example: '`ce.keys.pianoInfo().octave` is the octave Z and X have moved it to.',
+    notes: [
+      '`notes` is a list of { note, key } for the notes held now.',
+      'To react to each note as it is played, give the piano a `target` and listen to that component\'s hit and release.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
+    scopes: 'any',
+  },
+  {
+    id: 'keysFocus', category: 'Keyboard', signature: 'keysFocus([control]) -> boolean',
+    summary: 'Give a control the keyboard, so the arrows and digits move it.',
+    example: '`ce.keys.focus("Cutoff")` after a shortcut that jumps to the filter.',
+    notes: [
+      'The control shows its focus ring, as after Tab.',
+      'Left out: no control has the keyboard, and keys go to shortcuts and keyDown.',
+      'Refused (false) for a control with "Focusable" off or its keys turned off, a hidden control, and outside the preview.',
+    ],
+    runtime: RUNTIME_WEBVIEW,
+    params: [{ name: 'control', type: 'string', required: false, kind: 'control', summary: 'The control\'s name.' }],
+    scopes: 'any',
+  },
+  {
+    id: 'keysFocused', category: 'Keyboard', signature: 'keysFocused() -> text',
+    summary: 'The control that has the keyboard, or nothing.',
+    example: '`ce.keys.focused() == "Cutoff"` while the cutoff knob takes the arrows.',
+    notes: ['The same name as keyDown\'s `control`.'],
+    runtime: RUNTIME_WEBVIEW,
+    params: [],
     scopes: 'any',
   },
   {
@@ -2209,7 +3744,7 @@ export const COMMANDS = [
       { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: size 12, left-aligned, the control\'s font.', fields: optionFields([
         { name: 'size', type: 'number', default: '12', unit: 'pixels', sample: '12', summary: 'Text size in pixels.\nRange: > 0.\n≤ 0, or invalid: default.' },
         { name: 'align', type: 'text', default: '"left"', values: ['left', 'middle', 'right'],
-          summary: 'Which part of the text sits at x: "left", "middle" or "right". Case does not matter; "center", "centre" and "centred" are "middle".\nInvalid: rejected with a console error.' },
+          summary: 'Which part of the text sits at x: "left", "middle" or "right". Case-insensitive.\n"center", "centre" and "centred": "middle".\nInvalid: rejected with a console error.' },
         { name: 'family', type: 'text', sample: '"Inter Tight"', kind: 'font', summary: 'Font family.\nLeft out: the control\'s font.' },
       ]) },
     ],
@@ -2246,11 +3781,16 @@ export const COMMANDS = [
      from a script. */
   {
     id: 'panelCreate', category: 'Panel structure', signature: 'panelCreate(type, props)',
-    summary: 'Create a new control of the given `type`, such as "Knob", and return its name, or nothing if there is no such type (`ce.panel.types()` lists them). `props` sets its name, position, size and container, and any section settings, such as { Behavior = { min = 0, max = 127 } }. Colours in them are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is created. If the name is taken, a number is added to make it unique, so use the name this returns. Controls a script creates are not saved with the panel and are cleared before each onPanelBuild, which is the place to create them.',
+    summary: 'Create a control of a type, and give back its name.',
+    example: '`ce.panel.create("Knob", { name = "Cutoff", x = 20, y = 40 })` makes a knob called Cutoff at 20, 40.',
+    notes: [
+      'Returns its name. Rejected: no result, with a console error; nothing is created.',
+      'A control a script creates is not saved with the panel, and is cleared before each `onPanelBuild`, which is where to create it.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'type', type: 'string', required: true, kind: 'componentType' },
-      { name: 'props', type: 'object', required: false, fields: optionFields([
+      { name: 'type', type: 'string', required: true, summary: 'The control\'s type, such as "Knob": one of `ce.panel.types()`. Case-insensitive.\nNot a type, or left out: rejected with a console error.', kind: 'componentType' },
+      { name: 'props', type: 'object', required: false, summary: 'Its name, place, size and container, and any of its sections\' settings: the options below.\nLeft out: the type\'s own, at the top level.', fields: optionFields([
         'controlName', 'controlX', 'controlY', 'controlWidth', 'controlHeight', 'controlParent',
         'controlSection',
       ]) },
@@ -2263,11 +3803,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelClone', category: 'Panel structure', signature: 'panelClone(name, props)',
-    summary: 'Copy an existing control, with all its settings, and return the copy\'s name, or nothing if there is no control of that name. The copy goes into the same container as the original and is called `<name>_copy` unless `props` names it; a number is added if that name is taken. `props` works as in `ce.panel.create()`, so you can move the copy or change its settings as you make it, and a colour in them that `set()` would refuse means no copy is made.',
+    summary: 'Copy a control, with all its settings, and give back the copy\'s name.',
+    example: '`ce.panel.clone("Cutoff", { name = "Cutoff2", y = 120 })` makes a copy of Cutoff called Cutoff2, at y 120.',
+    notes: [
+      'Returns the copy\'s name. Rejected: no result, with a console error; nothing is copied.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'control' },
-      { name: 'props', type: 'object', required: false, at: 'name', fields: optionFields([
+      { name: 'name', type: 'string', required: true, summary: 'The control to copy.\nNot a control, or left out: rejected with a console error.', kind: 'control' },
+      { name: 'props', type: 'object', required: false, summary: 'As `ce.panel.create()`\'s: the options below.\nLeft out: a copy called its name with "_copy" added, in the same container.', at: 'name', fields: optionFields([
         { like: 'controlName', default: 'the original\'s name with _copy added' },
         'controlX', 'controlY', 'controlWidth', 'controlHeight',
         { like: 'controlParent', default: 'the original\'s container' },
@@ -2282,36 +3826,48 @@ export const COMMANDS = [
   },
   {
     id: 'panelDestroy', category: 'Panel structure', signature: 'panelDestroy(name)',
-    summary: 'Remove a control, together with everything inside it. Returns true if the control was there and has been removed, false if there was no such control. It works on any control: the ones you placed in the editor as well as the ones a script created.',
+    summary: 'Remove a control, and everything inside it.',
+    example: '`ce.panel.destroy("Cutoff")` removes the control called Cutoff.',
+    notes: [
+      'Any control: placed in the editor or made by a script.',
+      'Returns true when it was removed; false when there was no control of that name.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'string', required: true, kind: 'control' }],
+    params: [{ name: 'name', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: false, without a word.\nLeft out: rejected with a console error.', kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'ce.panel.destroy("${1:name}")$0', javascript: 'ce.panel.destroy("${1:name}");$0' },
   },
   {
     id: 'panelParent', category: 'Panel structure', signature: 'panelParent(name [, containerName])',
-    summary: 'Move a control into a container, or back to the top level of the panel when `containerName` is left out. Returns true on success. A container is any control with a Children section, such as a Container or a Group. A control cannot be moved into itself or into one of the controls it contains.',
+    summary: 'Move a control into a container, or out to the top level of the panel.',
+    example: '`ce.panel.parent("Cutoff", "Row")` moves Cutoff into the container called Row.',
+    notes: [
+      'Returns true when it moved. Rejected: false, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'name', type: 'string', required: true, kind: 'control' },
-      { name: 'containerName', type: 'string', required: false, kind: 'control' },
+      { name: 'name', type: 'string', required: true, summary: 'The control to move.\nNot a control, or left out: rejected with a console error.', kind: 'control' },
+      { name: 'containerName', type: 'string', required: false, summary: 'A control with a Children section, such as a Container or a Group.\nLeft out, or "": the top level of the panel.\nNot a control, not a container, or the control itself or one inside it: rejected with a console error.', kind: 'control' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.panel.parent("${1:knob}", "${2:row}")$0', javascript: 'ce.panel.parent("${1:knob}", "${2:row}");$0' },
   },
   {
     id: 'panelFind', category: 'Panel structure', signature: 'panelFind([query])',
-    summary: 'List the names of the controls that match `query`, including controls inside containers. `query` can be part of a name (capitals do not matter) or a table such as { type = "Knob", generated = true, parent = "row1" }, where `generated` picks out the controls a script created. With no query, it lists every control. A key that is not one of the four filters, such as `Type` or `kind`, or a value of the wrong kind, such as generated = "true", is refused with a message saying which, and the list comes back empty.',
+    summary: 'List the names of the controls that match a query.',
+    example: '`ce.panel.find({ type = "Knob" })` gives the name of every knob.',
+    notes: [
+      'Containers and the controls inside them are both listed.',
+      'Returns a list of names, in panel order. Rejected: an empty list, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'query', type: 'object', required: false, fields: optionFields([
-      { name: 'name', type: 'text', sample: '"osc"', summary: 'Match controls whose name contains this.' },
-      { name: 'type', type: 'text', sample: '"Knob"', summary: 'Match one kind of control, such as "Knob". '
-        + 'ce.panel.types() lists the spellings.' },
+    params: [{ name: 'query', type: 'object', required: false, summary: 'Part of a name, in any case; or a table of the filters below, every one of which must match.\nLeft out: every control.\nAnything else, or a filter it does not have: rejected with a console error.', fields: optionFields([
+      { name: 'name', type: 'text', sample: '"osc"', summary: 'Part of a name, in any case.' },
+      { name: 'type', type: 'text', sample: '"Knob"', summary: 'A control type, such as "Knob": one of ce.panel.types(). Case-insensitive.\nNot a type: rejected with a console error.' },
       { name: 'generated', type: 'true or false',
-        summary: '`true` matches only controls a script created, `false` only the ones you placed '
-          + 'by hand. The text "true" is refused.' },
+        summary: 'Whether a script made the control.\ntrue: only the controls a script made.\nfalse: only the ones placed in the editor.\nNot true or false, such as the text "true": rejected with a console error.' },
       { name: 'parent', type: 'text', sample: '"row1"',
-        summary: 'Match only what is inside the container of this name.' },
+        summary: 'A container\'s name, in any case: only the controls directly inside it.' },
     ]) }],
     scopes: 'any',
     snippet: {
@@ -2321,15 +3877,23 @@ export const COMMANDS = [
   },
   {
     id: 'panelInfo', category: 'Panel structure', signature: 'panelInfo(name)',
-    summary: 'Describe a control: { name, id, type, x, y, width, height, parent, generated }, or nothing if there is no such control. `x` and `y` are measured from the control\'s container; use `ce.panel.rect()` for its position on the panel. `generated` is true for a control a script created.',
+    summary: 'Describe a control: its name, id, type, place, size and container, and whether a script made it.',
+    example: '`ce.panel.info("Cutoff").type` gives "Knob".',
+    notes: [
+      'Returns { name, id, type, x, y, width, height, parent, generated }. `x` and `y` are from its container\'s corner; `ce.panel.rect()` gives its place on the panel.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'string', required: true, kind: 'control' }],
+    params: [{ name: 'name', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: no result, without a word.\nLeft out: rejected with a console error.', kind: 'control' }],
     scopes: 'any',
     snippet: { lua: 'local c = ce.panel.info("${1:name}")$0', javascript: 'const c = ce.panel.info("${1:name}");$0' },
   },
   {
     id: 'panelTypes', category: 'Panel structure', signature: 'panelTypes()',
-    summary: 'List the names of every control type `ce.panel.create()` accepts.',
+    summary: 'List every control type `ce.panel.create()` takes.',
+    example: '`ce.panel.types()` gives { "Background", "Label", "Button", … }.',
+    notes: [
+      'Returns a list of type names.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [],
     scopes: 'any',
@@ -2360,15 +3924,18 @@ export const COMMANDS = [
   {
     id: 'panelAlign', category: 'Panel structure', signature: 'panelAlign(names, edge [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Line controls up on one edge or centre line: "left", "hCenter", "right", "top", "vCenter" or "bottom". By default they line up with the box around the whole group; `opts.to` names one of the listed controls to line up with instead, and a name that is not in the list is refused and nothing moves. Returns how many controls it moved. Names that are not controls are reported and skipped.',
+    summary: 'Line controls up on one edge or centre line.',
+    example: '`ce.panel.align({ "Cutoff", "Res" }, "top")` lines up the tops of Cutoff and Res.',
+    notes: [
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'edge', type: 'string', required: true, values: LAYOUT_WORDS.panelAlign.values },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list, or one name.\nA name that is not a control: said in the console, and skipped.\nNo control: rejected with a console error.' },
+      { name: 'edge', type: 'string', required: true, summary: '"left", "right", "top" or "bottom": that edge.\n"hCenter": the centre line across; "vCenter": the centre line down.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelAlign.values },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'to', type: 'text', default: 'the box the whole group occupies', sample: '"cutoff"',
-          summary: 'Name one of the controls to line the others up on, instead of on the group as '
-            + 'a whole. This is what the canvas calls the key object.' },
+          summary: 'One of the names given: the others line up on it, the canvas\'s key object.\nNot one of the names: rejected with a console error.' },
       ]) },
     ],
     scopes: 'any',
@@ -2380,23 +3947,24 @@ export const COMMANDS = [
   {
     id: 'panelDistribute', category: 'Panel structure', signature: 'panelDistribute(names, what [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Space controls out evenly. "leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" and "bottomEdges" even out their positions; "hSpacing" and "vSpacing" even out the gaps between them, which suits controls of different sizes. The first and last controls stay where they are. With "hSpacing" or "vSpacing", `opts.gap` sets a fixed gap instead (the last control then moves too), and `opts.align = true` also puts every top edge level with the leftmost control\'s ("hSpacing") or every left edge in line with the topmost control\'s ("vSpacing"). Needs at least two controls; returns how many it moved.',
+    summary: 'Space controls out evenly between the first and the last.',
+    example: '`ce.panel.distribute({ "A", "B", "C" }, "hSpacing")` makes the gaps between A, B and C equal.',
+    notes: [
+      'The first and the last stay where they are, unless `opts.gap` is given.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'what', type: 'string', required: true, values: LAYOUT_WORDS.panelDistribute.values },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'what', type: 'string', required: true, summary: '"leftEdges", "hCenters", "rightEdges", "topEdges", "vCenters" or "bottomEdges": those positions evened out.\n"hSpacing" or "vSpacing": the gaps between them evened out, for controls of different sizes.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelDistribute.values },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'gap', type: 'number', default: 'worked out from the space available', sample: '12',
           unit: 'pixels',
-          summary: 'Force a fixed gap between the controls rather than spreading them to fill '
-            + 'what is there.' },
+          summary: 'Pixels between one control and the next, with "hSpacing" or "vSpacing": the last control moves too.\nNot a number: as left out, with a console warning the first time.' },
         // true is all distributePatches acts on (alignOpposite). This was typed as text, sampled
         // "top" and said it took ce.panel.align's words, every one of which did nothing.
         { name: 'align', type: 'true or false', default: 'false',
-          summary: 'With "hSpacing" or "vSpacing" only. true also lines them up across the other '
-            + 'axis, so a row ends up level as well as evenly spaced: "hSpacing" puts every top edge '
-            + 'level with the leftmost control\'s, and "vSpacing" puts every left edge in line with '
-            + 'the topmost control\'s. It is not an edge name: "top" or "left" does nothing.' },
+          summary: 'With "hSpacing" or "vSpacing" only.\ntrue: also lined up across: every top edge level with the leftmost control\'s, or every left edge with the topmost\'s.\nAnything but true, such as "top": not.' },
       ]) },
     ],
     scopes: 'any',
@@ -2404,14 +3972,18 @@ export const COMMANDS = [
   {
     id: 'panelMatch', category: 'Panel structure', signature: 'panelMatch(names, what [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Make controls the same size: "width", "height" or "both". The first name in the list sets the size, unless `opts.to` names another control from the list; that control keeps its own size and the others copy it. A `to` that is not in the list is refused and nothing changes. Needs at least two controls. Returns how many controls changed.',
+    summary: 'Make controls the same width, height, or both.',
+    example: '`ce.panel.match({ "A", "B" }, "both")` gives B the size of A.',
+    notes: [
+      'Returns how many controls it sized, whether or not they changed. Rejected: 0, with a console error; nothing changes.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'what', type: 'string', required: true, values: LAYOUT_WORDS.panelMatch.values },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'what', type: 'string', required: true, summary: '"width", "height" or "both".\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelMatch.values },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'to', type: 'text', default: 'the first name you gave', sample: '"cutoff"',
-          summary: 'Name the control whose size the others should copy. It is not resized itself.' },
+          summary: 'One of the names given: the others take its size, and it keeps its own.\nNot one of the names: rejected with a console error.' },
       ]) },
     ],
     scopes: 'any',
@@ -2419,17 +3991,23 @@ export const COMMANDS = [
   {
     id: 'panelGrid', category: 'Panel structure', signature: 'panelGrid(names [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Arrange controls in a grid of equal cells, each as big as the largest control. They are placed in reading order (top to bottom, then left to right, with controls at about the same height, within roughly 20 pixels, counted as one row), not in the order you list them. The first control in that order stays where it is and the grid grows from there. Needs at least two controls; returns how many it moved.',
+    summary: 'Arrange controls in a grid of equal cells, each as big as the largest.',
+    example: '`ce.panel.grid(pads, { columns = 4 })` lays the pads out four to a row.',
+    notes: [
+      'In reading order, not the order listed: top to bottom, then left to right; controls within about 20 pixels of the same height are one row.',
+      'The first in that order stays where it is, and the grid grows from there.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'columns', type: 'number', default: '3',
-          summary: 'How many controls per row.' },
+          summary: 'Controls to a row.\nA fraction: rounded.\nBelow 1: 1, with a console warning the first time.\nNot a number: 3, with a console warning the first time.' },
         { name: 'gapX', type: 'number', default: '10', unit: 'pixels',
-          summary: 'The gap between columns.' },
+          summary: 'Pixels between columns.\nNot a number: 10, with a console warning the first time.' },
         { name: 'gapY', type: 'number', default: '10', unit: 'pixels',
-          summary: 'The gap between rows.' },
+          summary: 'Pixels between rows.\nNot a number: 10, with a console warning the first time.' },
       ]) },
     ],
     scopes: 'any',
@@ -2441,56 +4019,79 @@ export const COMMANDS = [
   {
     id: 'panelCircle', category: 'Panel structure', signature: 'panelCircle(names [, opts]) -> number',
     refusal: 'zero',
-    summary: 'Arrange controls evenly around a circle, centred on the middle of the box they currently fill, in the order you list them. Each control\'s centre sits on the circle. `opts.startAngle` is in degrees, with 0 at three o\'clock and angles running clockwise, which differs from `ce.draw.arc()`, where 0 is twelve o\'clock. Needs at least two controls; returns how many it moved.',
+    summary: 'Arrange controls evenly round a circle, in the order listed.',
+    example: '`ce.panel.circle(knobs, { radius = 80 })` sets the knobs round a circle of radius 80.',
+    notes: [
+      'Centred on the middle of the box they fill now; each control\'s centre on the circle.',
+      '0 degrees is three o\'clock here, where `ce.draw.arc()` has twelve.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.\nLeft out: each its default.', fields: optionFields([
         { name: 'radius', type: 'number', default: '100', unit: 'pixels',
-          summary: 'How far from the centre to place each control.' },
+          summary: 'Pixels from the centre to each control\'s centre.\nBelow 0: rejected with a console error.\nNot a number: 100, with a console warning the first time.' },
         { name: 'startAngle', type: 'number', default: '0', unit: 'degrees', hint: '0 is three o\'clock, increasing clockwise',
-          summary: 'Where the first control goes, clockwise from three o\'clock.' },
+          summary: 'Degrees, clockwise from three o\'clock: where the first control goes.\nNot a number: 0, with a console warning the first time.' },
       ]) },
     ],
     scopes: 'any',
   },
   {
     id: 'panelFlip', category: 'Panel structure', signature: 'panelFlip(names, axis) -> number',
-    summary: 'Mirror the positions of controls across the middle of the box they fill: "horizontal" swaps left and right, "vertical" swaps top and bottom. Only their positions change; the controls themselves are not turned or mirrored. Needs at least two controls; returns how many it moved.',
+    summary: 'Mirror the positions of controls across the middle of the box they fill.',
+    example: '`ce.panel.flip({ "A", "B" }, "horizontal")` swaps A and B left for right.',
+    notes: [
+      'Only their places change: the controls are not turned.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'axis', type: 'string', required: true, values: LAYOUT_WORDS.panelFlip.values },
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list of two or more.\nA name that is not a control: said in the console, and skipped.\nFewer than two controls: rejected with a console error.' },
+      { name: 'axis', type: 'string', required: true, summary: '"horizontal": left and right swap.\n"vertical": top and bottom swap.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelFlip.values },
     ],
     scopes: 'any',
   },
   {
     id: 'panelRect', category: 'Panel structure', signature: 'panelRect(name) -> table',
-    summary: 'Get a control\'s position on the panel: { x, y, width, height, right, bottom }. Unlike Transform.x and Transform.y, this includes the offset of any container the control sits in. Give a list of names to get the box around the whole group. Returns nothing if none of the names is a control.',
+    summary: 'Get a control\'s box on the panel, or the box around several.',
+    example: '`ce.panel.rect("Cutoff").right` gives Cutoff\'s right edge, in panel pixels.',
+    notes: [
+      'Returns { x, y, width, height, right, bottom }, from the panel\'s corner: a container\'s offset included, which Transform.x and Transform.y leave out.',
+      'Rejected: no result, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'name', type: 'text or list', required: true }],
+    params: [{ name: 'name', type: 'text or list', required: true, summary: 'A control\'s name, or a list of names.\nA name that is not a control: said in the console, and skipped.\nNo control: rejected with a console error.' }],
     scopes: 'any',
   },
   {
     id: 'panelOrder', category: 'Panel structure', signature: 'panelOrder(names, where) -> number',
-    summary: 'Change which controls are drawn on top of which: "front", "forward", "backward" or "back". Controls only move among the others in the same container. Controls that come later in the panel are drawn over earlier ones, so "front" moves a control to the end of its container. Returns how many controls it moved.',
+    summary: 'Bring controls to the front, or send them to the back, among the controls in their container.',
+    example: '`ce.panel.order({ "Glow" }, "back")` draws Glow behind the other controls in its container.',
+    notes: [
+      'A control later in its container is drawn over the ones before it.',
+      'Returns how many controls it placed, whether or not they moved. Rejected: 0, with a console error; nothing moves.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'names', type: 'list', required: true },
-      { name: 'where', type: 'string', required: true, values: LAYOUT_WORDS.panelOrder.values },
+      { name: 'names', type: 'list', required: true, summary: 'Control names: a list, or one name.\nA name that is not a control: said in the console, and skipped.\nNo control: rejected with a console error.' },
+      { name: 'where', type: 'string', required: true, summary: '"front": over all the others.\n"forward": over one more.\n"backward": under one more.\n"back": under all the others.\nCase-insensitive.\nInvalid: rejected with a console error.', values: LAYOUT_WORDS.panelOrder.values },
     ],
     scopes: 'any',
   },
   {
     id: 'panelBatch', category: 'Panel structure', signature: 'panelBatch(fn) -> boolean',
     summary: 'Make a set of changes count as one step, so one undo takes them all back.',
+    example: '`ce.panel.batch(function() ce.panel.grid(pads) end)` makes the grid one undo step.',
     notes: [
       { text: 'Code after an `await` in the function is not part of the batch.', check: 'noAwait' },
       'The panel shows the changes together when the function ends. Code inside it already sees its own earlier changes.',
       'The exported plugin has no undo: there the function just runs.',
+      'Returns true. Rejected: false, with a console error; nothing runs.',
     ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'fn', type: 'function', required: true, summary: 'The function that makes the changes. It runs at once, and the undo step is closed even if it fails with an error.' }],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'The function that makes the changes: run at once.\nIf it fails with an error: the step is closed all the same.\nNot a function, or left out: rejected with a console error.' }],
     scopes: 'any',
     snippet: {
       lua: 'ce.panel.batch(function()\n  $0\nend)',
@@ -2499,9 +4100,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelKeep', category: 'Panel structure', signature: 'panelKeep([path]) -> boolean',
-    summary: 'Keep a change made during preview. Preview is a rehearsal: when it stops, the panel goes back to how you built it, and anything a script changed is undone with it. `ce.panel.keep("Cutoff.Background.Fill.colour")` keeps one property; `ce.panel.keep()` with no path keeps everything this run changed. A control the script created cannot be kept, because the next run builds it again and keeping it would leave an extra copy every time. Returns false when nothing could be kept, including when the panel is not being previewed.',
+    summary: 'Keep a change made in preview, so it stays when preview stops.',
+    example: '`ce.panel.keep("Cutoff.Background.Fill.colour")` keeps the colour a script gave Cutoff\'s fill.',
+    notes: [
+      'Preview is a rehearsal: when it stops, the panel goes back to how it was built, and a script\'s changes with it.',
+      'A control a script made cannot be kept: the next run makes it again.',
+      'Returns true when something was kept; false when nothing could be, as when the panel is not previewing.',
+    ],
     runtime: RUNTIME_WEBVIEW,
-    params: [{ name: 'path', type: 'path', required: false }],
+    params: [{ name: 'path', type: 'path', required: false, summary: 'A property\'s path, as `set()` takes it.\nLeft out: every change this run made.' }],
     scopes: 'any',
     snippet: {
       lua: 'ce.panel.keep("${1:Cutoff.Background.Fill.colour}")$0',
@@ -2510,11 +4117,15 @@ export const COMMANDS = [
   },
   {
     id: 'panelEntries', category: 'Panel structure', signature: 'panelEntries(control, section)',
-    summary: 'List the names of the entries in one of a control\'s collection sections (States, Bindings, Animations, Parts, ValueChannels, Behaviors, HitZones, Generators, Links or Variants), in the order the control holds them. Any other section name is refused with a message listing the ones that work.',
+    summary: 'List the names of the entries in one of a control\'s collection sections.',
+    example: '`ce.panel.entries("Cutoff", "States")` gives { "Hover", "Pressed", … }.',
+    notes: [
+      'Returns the names, in the control\'s order. Rejected: an empty list, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2524,12 +4135,16 @@ export const COMMANDS = [
   },
   {
     id: 'panelEntry', category: 'Panel structure', signature: 'panelEntry(control, section, name)',
-    summary: 'Get one entry from a collection section, or nothing if there is no entry of that name. Capitals in `name` do not matter, just as in a path.',
+    summary: 'Get one entry of a collection section, by its name.',
+    example: '`ce.panel.entry("Cutoff", "States", "Hover")` gives Cutoff\'s Hover state.',
+    notes: [
+      'Returns the entry as a table. Rejected: no result, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
-      { name: 'name', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
+      { name: 'name', type: 'string', required: true, summary: 'The entry\'s name. Case-insensitive.\nNot one of the section\'s: no result, without a word.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2539,13 +4154,19 @@ export const COMMANDS = [
   },
   {
     id: 'panelDefine', category: 'Panel structure', signature: 'panelDefine(control, section, name, spec)',
-    summary: 'Add an entry to a collection section, or replace the entry of that name. `spec` only needs what you want to set; for States and Animations the rest is filled in: a new state has no condition and no changes, and a new animation is a 120 ms change into hover and back, or with `kind = "keyframes"` one that plays all the time over the frames you give. A state applies while its `when` flags hold and its `rule` is true, and a rule can compare the control\'s value: `rule = "value > 64"`. A key the section\'s entries do not have, capitals included, is refused with the keys it takes, and nothing is defined. Returns true if the entry was written.',
+    summary: 'Add an entry to a collection section, or replace the one of that name.',
+    example: '`ce.panel.define("Cutoff", "States", "Held", { when = { pressed = true } })` adds a state that applies while Cutoff is pressed.',
+    notes: [
+      'A new state has no condition and no changes; it applies while its `when` flags hold and its `rule` is true, such as `rule = "value > 64"`.',
+      'A new animation is a 120 ms change into hover and back; with `kind = "keyframes"`, one that plays all the time over the frames given.',
+      'Returns true when it was written. Rejected: false, with a console error; nothing is defined.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
-      { name: 'name', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: false },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
+      { name: 'name', type: 'string', required: true, summary: 'The entry\'s name. Case-insensitive: one of that name is replaced.' },
+      { name: 'spec', type: 'object', required: false, summary: 'The entry\'s settings, only those to set: the rest are the section\'s defaults.\nA key the section\'s entries do not have, in any case: rejected with a console error that lists the ones they take.\nLeft out: every setting its default.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2555,12 +4176,17 @@ export const COMMANDS = [
   },
   {
     id: 'panelUndefine', category: 'Panel structure', signature: 'panelUndefine(control, section, name)',
-    summary: 'Remove an entry from a collection section. Returns true if the entry was there, false if not. `set(path, nil)` does not remove an entry; this command does.',
+    summary: 'Remove an entry from a collection section.',
+    example: '`ce.panel.undefine("Cutoff", "States", "Disabled")` removes Cutoff\'s Disabled state.',
+    notes: [
+      '`set(path, nil)` does not remove an entry: this does.',
+      'Returns true when it was removed; false when there was none. Rejected: false, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'section', type: 'string', required: true },
-      { name: 'name', type: 'string', required: true },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'section', type: 'string', required: true, summary: 'One of "States", "Bindings", "Animations", "Parts", "ValueChannels", "Behaviors", "HitZones", "Generators", "Links" or "Variants". Case-insensitive.\nAny other: rejected with a console error.' },
+      { name: 'name', type: 'string', required: true, summary: 'The entry\'s name. Case-insensitive.\nNot one of the section\'s: false, without a word.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2570,13 +4196,18 @@ export const COMMANDS = [
   },
   {
     id: 'panelPatch', category: 'Panel structure', signature: 'panelPatch(control, state, patch [, part])',
-    summary: 'Change how a control looks in one of its states, such as hovered, pressed or disabled. `patch` maps property paths, such as "Background.Fill.colour", to new values, added to what the state already changes. Give `part` to change one part of a custom component. Returns how many settings were applied, or 0 if the control has no state or part of that name. Each key names one setting, in any capitals; a key that leads nowhere, names a whole section or a property its section lacks is not applied, and a message says why. Colours are stored as `set()` stores them ("red" as "#FF0000"); one it would refuse means nothing is applied. This reaches the settings inside a state, which `set()` cannot.',
+    summary: 'Change how a control looks in one of its states, such as hovered or pressed.',
+    example: '`ce.panel.patch("Cutoff", "Hover", { ["Background.Fill.colour"] = "red" })` turns Cutoff\'s fill red while it is hovered.',
+    notes: [
+      'This reaches the settings inside a state, which `set()` cannot.',
+      'Returns how many settings were applied. Rejected: 0, with a console error.',
+    ],
     runtime: RUNTIME_WEBVIEW,
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'state', type: 'string', required: true },
-      { name: 'patch', type: 'object', required: true, kind: 'patch', at: 'control' },
-      { name: 'part', type: 'string', required: false },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'state', type: 'string', required: true, summary: 'The state\'s name, as `ce.panel.entries(control, "States")` lists them.\nNot one of its states: rejected with a console error.' },
+      { name: 'patch', type: 'object', required: true, summary: 'Property paths, such as "Background.Fill.colour", with their values in that state: added to what it changes already.\nA path in any case.\nA path that leads nowhere, a whole section, or a property its section lacks: not applied, with a console line saying why.\nA colour: stored as `set()` stores it; one it would refuse: rejected with a console error, and nothing is applied.', kind: 'patch', at: 'control' },
+      { name: 'part', type: 'string', required: false, summary: 'One part of a custom component, to change in that state.\nNot one of its parts: rejected with a console error.' },
     ],
     scopes: 'any',
     snippet: {
@@ -2886,9 +4517,13 @@ export const COMMANDS = [
      so the five runtimes cannot disagree about what a parameter descriptor looks like. */
   {
     id: 'deviceProfile', category: 'Device / MIDI', signature: 'deviceProfile([role])',
-    summary: 'Describe the device profile in use for a device: { id, name, role, connected, ... }. Returns nothing when no profile is chosen. `role` names the device and defaults to "mainSynth".',
+    summary: 'Describe the device profile in use for a device.',
+    example: '`deviceProfile().name` gives the main synth\'s profile name.',
+    notes: [
+      'Returns { id, name, role, connected, … }; no profile chosen: no result.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'local p = deviceProfile()\nif p then log("device " .. p.name) end$0',
@@ -2898,9 +4533,13 @@ export const COMMANDS = [
   {
     id: 'deviceParameters', category: 'Device / MIDI', signature: 'deviceParameters([opts])',
     refusal: 'empty list',
-    summary: 'List the synth\'s parameters as the device profile describes them, each as { id, name, group, type, min, max, access }. Use `opts` to narrow the list, for example to one group. Returns an empty list when there is nothing to show, and nothing at all only when the ce.device module is switched off.',
+    summary: 'List the synth\'s parameters, as the device profile describes them.',
+    example: '`deviceParameters({ group = "Filter" })` lists the filter\'s parameters.',
+    notes: [
+      'Returns a list of { id, name, group, type, min, max, access }; none to show: an empty list.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'The options below, every one of which must match.\nLeft out: every parameter.\nNot a table: an empty list, with a console error.', fields: optionFields([
       'role',
       { name: 'query', type: 'text', sample: '"cutoff"',
         summary: 'Keep only parameters whose name or id contains this.' },
@@ -2909,8 +4548,11 @@ export const COMMANDS = [
           + '"Filter" and so on.' },
       { name: 'type', type: 'text', sample: '"number"',
         summary: 'Keep only one kind of parameter, such as "number" or "choice".' },
-      { name: 'access', type: 'text', sample: '"readwrite"',
-        summary: 'Keep only parameters you can read, write, or both.' },
+      { name: 'access', type: 'text', sample: '"writable"',
+        summary: 'Keep only some parameters by what can be done with them: "writable", the ones the '
+          + 'panel can send to the synth; "readonly", the ones the synth only reports; '
+          + '"realtimeWarning", the ones not safe to move while notes are playing.\nAny other '
+          + 'value: not filtered, with a console error.' },
       { name: 'limit', type: 'number', default: 'no limit', sample: '50',
         summary: 'Return at most this many. Useful on a synth with hundreds.' },
     ]) }],
@@ -2922,11 +4564,16 @@ export const COMMANDS = [
   },
   {
     id: 'deviceParameter', category: 'Device / MIDI', signature: 'deviceParameter(id [, role])',
-    summary: 'Describe one of the synth\'s parameters by its id, or return nothing if the device profile has no such parameter. Use it to check whether a synth has something before you try to change it.',
+    summary: 'Describe one of the synth\'s parameters, by its id.',
+    example: '`deviceParameter("cutoff").max` gives the highest value cutoff takes.',
+    notes: [
+      'Returns { id, name, group, type, min, max, access }.',
+      'Use it to see whether a synth has a parameter before writing it.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it.\nNot one of its parameters: no result, without a word.\nLeft out: no result, with a console error.', kind: 'deviceParameter' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2939,11 +4586,15 @@ export const COMMANDS = [
   // that discovered eight oscillators could enumerate them and not address them.
   {
     id: 'deviceRead', category: 'Device / MIDI', signature: 'deviceRead(id [, role]) -> value',
-    summary: 'The last value the synth reported for a parameter, from a dump or a parameter message. Not a live query of the synth: it does not ask the synth anything. Returns nothing if the synth has never reported that parameter, which is different from 0.',
+    summary: 'Read the last value the synth reported for a parameter.',
+    example: '`deviceRead("cutoff")` gives the cutoff the synth last sent.',
+    notes: [
+      'Not a live query: what arrived in a dump or a parameter message; the synth is not asked.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id.\nNever reported: no result, without a word; not 0.\nLeft out: no result, with a console error.', kind: 'deviceParameter' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2953,12 +4604,17 @@ export const COMMANDS = [
   },
   {
     id: 'deviceWrite', category: 'Device / MIDI', signature: 'deviceWrite(id, value [, role]) -> boolean',
-    summary: 'Change a parameter on the synth by its id, without needing a control for it. The device profile builds the right message. `value` is in the parameter\'s own units — the ones deviceParameter gives min and max for. Returns whether the message was dispatched, not whether the synth accepted it. An id the profile does not have is refused with a message, and nothing is sent; so is any id the panel did not declare when no device profile is chosen for `role`.',
+    summary: 'Change a parameter on the synth by its id, without a control.',
+    example: '`deviceWrite("cutoff", 64)` sends cutoff 64 to the synth.',
+    notes: [
+      'The device profile builds the message.',
+      'Returns true when the message was dispatched, not whether the synth took it. Rejected: false, with a console error; nothing is sent.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'id', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'value', type: 'number or text', required: true },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'id', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it or `deviceDefineParameter()` declared it.\nNot one of them: rejected with a console error.', kind: 'deviceParameter' },
+      { name: 'value', type: 'number or text', required: true, summary: 'In the parameter\'s own units: those `deviceParameter()` gives the min and max of.\nA choice: its name, in any case, or its number.\nOne it cannot read: rejected with a console error.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -2968,9 +4624,14 @@ export const COMMANDS = [
   },
   {
     id: 'deviceConnected', category: 'Device / MIDI', signature: 'deviceConnected([role])',
-    summary: 'Check whether a device is connected and ready. It is quick to call, and the right thing to check before asking for a dump.',
+    summary: 'Check whether a device is connected and ready.',
+    example: '`deviceConnected()` gives true once the main synth is.',
+    notes: [
+      'Quick to call: check it before asking for a dump.',
+      'Returns true or false.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'if deviceConnected() then requestDump("patch") end$0',
@@ -2992,10 +4653,15 @@ export const COMMANDS = [
   {
     id: 'deviceDefineParameter', category: 'Device / MIDI',
     signature: 'deviceDefineParameter(id, spec [, role]) -> boolean',
-    summary: 'Describe a synth parameter from your script, for a synth that has no device profile, or to correct one parameter in a profile that has it wrong. `spec` must say how the parameter travels over MIDI — { cc = 74 }, { nrpn = { msb, lsb } } or { sysex = { … } } — and may add a name, group, type, min and max. A spec with anything wrong in it is refused and nothing is defined, with a message saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry. A value that write() cannot read is refused the same way, and nothing is sent.',
+    summary: 'Describe a synth parameter from the script.',
+    example: '`deviceDefineParameter("cutoff", { cc = 74 })` declares cutoff as CC 74.',
+    notes: [
+      'For a synth with no device profile, or a parameter a profile has wrong.',
+      'Returns true when it was defined. Rejected: false, with a console error; nothing is defined.',
+    ],
     params: [
-      { name: 'id', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: true, fields: optionFields([
+      { name: 'id', type: 'string', required: true, summary: 'The id to give it.\nOne the profile has: replaced, for this project.' },
+      { name: 'spec', type: 'object', required: true, summary: 'How it reaches the synth, `cc`, `nrpn` or `sysex`, and the options below.\nAnything wrong in it: rejected with a console error saying what: no MIDI form, a byte that is not one, an unknown type, encoding, checksum or $token, or a range the MIDI form cannot carry.', fields: optionFields([
         { name: 'name', type: 'text', default: 'the id', sample: '"Cutoff"',
           summary: 'What to call it in the parameter list.' },
         { name: 'group', type: 'text', sample: '"Filter"', summary: 'Which group to file it under, such as "Filter".' },
@@ -3068,7 +4734,7 @@ export const COMMANDS = [
           summary: 'For a text parameter, the character code that fills it out to `length` (32 is '
             + 'a space).' },
       ]) },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3079,10 +4745,16 @@ export const COMMANDS = [
   {
     id: 'deviceDefineDump', category: 'Device / MIDI',
     signature: 'deviceDefineDump(kind, spec [, role]) -> boolean',
-    summary: 'Describe a SysEx dump layout from your script: `request` (the bytes that ask for it), `match` (the start and end bytes that recognise it), `offset` and `size` (where the values sit), an optional `checksum`, and `fields` — one { parameter, offset } for each value. Every field must name a parameter already described with defineParameter. Bytes are read the way defineParameter reads them, and a layout with anything wrong in it, or with no prefix to recognise it by, is refused with a message saying what. Once declared, an arriving dump of this layout fills the bound controls and runs onDumpReceived, just like a dump from a device profile.',
+    summary: 'Describe a SysEx dump layout from the script.',
+    example: '`deviceDefineDump("patch", { request = "F0 7D 01 F7", match = { prefix = "F0 7D 02" }, offset = 3, fields = { { parameter = "cutoff", offset = 0 } } })` declares a patch dump that starts with cutoff.',
+    notes: [
+      'Every field\'s parameter must be declared with `deviceDefineParameter()` first.',
+      'A dump of the layout arriving fills the bound controls and runs `onDumpReceived`, as a device profile\'s does.',
+      'Returns true when it was defined. Rejected: false, with a console error; nothing is defined.',
+    ],
     params: [
-      { name: 'kind', type: 'string', required: true },
-      { name: 'spec', type: 'object', required: true, fields: optionFields([
+      { name: 'kind', type: 'string', required: true, summary: 'The name to give the dump, as `requestDump()` and `buildDump()` take it.' },
+      { name: 'spec', type: 'object', required: true, summary: 'The options below: the bytes that ask for it, how to recognise it, and where each value sits.\nBytes are read as `deviceDefineParameter()` reads them.\nAnything wrong in it, or no prefix to recognise it by: rejected with a console error saying what.', fields: optionFields([
         { name: 'name', type: 'text', default: 'the kind', sample: '"Patch"',
           summary: 'What to call this dump where it is listed.' },
         { name: 'request', type: 'text or list',
@@ -3117,7 +4789,7 @@ export const COMMANDS = [
             + 'value. Every parameter must already be declared with defineParameter; an unknown '
             + 'name is refused.' },
       ]) },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3131,11 +4803,16 @@ export const COMMANDS = [
     // Panel view only for the same reason ce.panel.create is: the binding lives on the control
     // model, and there is no control model with the window shut.
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Connect a control to a synth parameter from your script, so moving the control changes the parameter. It replaces any existing connection on the same port rather than adding a second one, and switches the control\'s device binding back on if it was off. The port defaults to "value".',
+    summary: 'Connect a control to a synth parameter, so moving the control changes it.',
+    example: '`deviceBind("Cutoff", "cutoff")` makes the control Cutoff send the synth\'s cutoff.',
+    notes: [
+      'It replaces a binding on the same port, and switches the control\'s device binding back on.',
+      'Returns true when bound. Rejected: false, with a console error.',
+    ],
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'parameterId', type: 'string', required: true, kind: 'deviceParameter' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'parameterId', type: 'string', required: true, summary: 'The parameter\'s id, as the device profile names it or `deviceDefineParameter()` declares it.\nNot one either knows yet: bound all the same, with a console warning; it works if the parameter arrives.', kind: 'deviceParameter' },
+      { name: 'opts', type: 'object', required: false, summary: 'The options below.', fields: optionFields([
         'role',
         { name: 'port', type: 'text', default: '"value"',
           summary: 'Which part of the control is wired up. Binding again on the same port '
@@ -3152,10 +4829,14 @@ export const COMMANDS = [
     id: 'deviceUnbind', category: 'Device / MIDI',
     signature: 'deviceUnbind(control [, port]) -> boolean',
     runtime: RUNTIME_WEBVIEW,
-    summary: 'Disconnect a control from its synth parameter. Returns whether there was a connection to remove.',
+    summary: 'Disconnect a control from its synth parameter.',
+    example: '`deviceUnbind("Cutoff")` stops Cutoff sending to the synth.',
+    notes: [
+      'Returns true when there was a binding to remove, false when not. Rejected: false, with a console error.',
+    ],
     params: [
-      { name: 'control', type: 'string', required: true, kind: 'control' },
-      { name: 'port', type: 'string', required: false },
+      { name: 'control', type: 'string', required: true, summary: 'The control\'s name.\nNot a control: rejected with a console error.', kind: 'control' },
+      { name: 'port', type: 'string', required: false, summary: 'The port to disconnect.\nLeft out: "value".' },
     ],
     scopes: 'any',
     snippet: {
@@ -3165,11 +4846,16 @@ export const COMMANDS = [
   },
   {
     id: 'devicePorts', category: 'Device / MIDI', signature: 'devicePorts([opts]) -> list',
-    summary: 'List the MIDI ports, each as { id, name, direction, type, hardware, role }. `hardware` is false for the two entries the app always shows ("No MIDI Input" and "Preview Only"); `role` names the device currently using the port, or is empty. Set `opts.direction` to "in" or "out" to list only one kind.',
+    summary: 'List the MIDI ports.',
+    example: '`devicePorts({ direction = "out" })` lists the ports that send.',
+    notes: [
+      'Returns a list of { id, name, direction, type, hardware, role }.',
+      '`hardware` is false for the two the app always shows, "No MIDI Input" and "Preview Only"; `role` names the device using the port, or is "".',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields([
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'The option below.\nLeft out: every port.\nNot a table: an empty list, with a console error.', fields: optionFields([
       { name: 'direction', type: 'text', values: ['in', 'out'],
-        summary: 'List only the ports that receive, or only the ones that send.' },
+        summary: '"in": only the ports that receive.\n"out": only the ones that send.\nCase-insensitive.\nAnything else: every port, with a console warning the first time.' },
     ]) }],
     scopes: 'any',
     snippet: {
@@ -3179,9 +4865,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceVariables', category: 'Device / MIDI', signature: 'deviceVariables([role]) -> table',
-    summary: 'The values the device profile fills into its messages — `channel`, `deviceId` and any others the profile has — with this project\'s own settings applied. Returns nothing when no profile is chosen for the device.',
+    summary: 'Read the values the device profile fills into its messages.',
+    example: '`deviceVariables().deviceId` gives the device id the panel sends.',
+    notes: [
+      'Returns `channel`, `deviceId` and any others the profile has, with this project\'s settings applied; no profile chosen: no result.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'log("device id " .. tostring(ce.device.variables().deviceId))$0',
@@ -3191,12 +4881,17 @@ export const COMMANDS = [
   {
     id: 'deviceSetVariable', category: 'Device / MIDI',
     signature: 'deviceSetVariable(name, value [, role]) -> boolean',
-    summary: 'Change one of the values the device profile fills into its messages, from 0 to 127 — for example the device id, to talk to a second unit of the same synth. The change is saved with this project only; the shared device profile is not changed, so two panels can use different device ids for the same synth. Some values are limited further (a channel is 1 to 16). A number is used as the nearest whole number from 0 to 127, which is said the first time it is not the number given; text that is not a number is refused. Refused too, and nothing is changed, for a device no profile is chosen for.',
+    summary: 'Change one of the values the device profile fills into its messages, for this project.',
+    example: '`deviceSetVariable("deviceId", 17)` talks to a second unit of the same synth.',
+    notes: [
+      'Saved with this project: the shared device profile is not changed, so two panels can use different device ids for one synth.',
+      'Returns true when it was set. Rejected: false, with a console error; nothing changes. A device no profile is chosen for: rejected.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'name', type: 'string', required: true },
-      { name: 'value', type: 'number', required: true },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'name', type: 'string', required: true, summary: 'The value\'s name, such as "deviceId" or "channel".\nLeft out: rejected with a console error.' },
+      { name: 'value', type: 'number', required: true, summary: 'A number.\nRange: 0 ↔ 127, whole; a channel 1 ↔ 16.\nA fraction: rounded.\nOutside the range: the nearest end, with a console warning the first time.\nText that is not a number: rejected with a console error.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3206,9 +4901,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceTiming', category: 'Device / MIDI', signature: 'deviceTiming([role]) -> table',
-    summary: 'How fast the panel may send to this device: `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project\'s own settings applied.',
+    summary: 'Read how fast the panel may send to the device.',
+    example: '`deviceTiming().minDelayBetweenMessagesMs` gives the least gap between messages.',
+    notes: [
+      'Returns `minDelayBetweenMessagesMs` and any other timing the device profile sets, with this project\'s settings applied.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'log("gap " .. tostring(ce.device.timing().minDelayBetweenMessagesMs) .. " ms")$0',
@@ -3218,12 +4917,17 @@ export const COMMANDS = [
   {
     id: 'deviceSetTiming', category: 'Device / MIDI',
     signature: 'deviceSetTiming(name, ms [, role]) -> boolean',
-    summary: 'Change one timing setting for this project, in milliseconds from 0 to 60000 — for example to slow the panel down for a synth that cannot keep up. Like deviceSetVariable, this does not change the device profile itself, uses the nearest whole number in range, and is refused for a device no profile is chosen for.',
+    summary: 'Change one timing setting, for this project.',
+    example: '`deviceSetTiming("minDelayBetweenMessagesMs", 20)` leaves at least 20 ms between messages.',
+    notes: [
+      'Saved with this project: the device profile is not changed.',
+      'Returns true when it was set. Rejected: false, with a console error. A device no profile is chosen for: rejected.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'name', type: 'string', required: true },
-      { name: 'ms', type: 'number', required: true },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'name', type: 'string', required: true, summary: 'The setting\'s name, as `deviceTiming()` lists it. Case-insensitive.\nNot one of them, or left out: nothing is changed, with a console error.' },
+      { name: 'ms', type: 'number', required: true, summary: 'Milliseconds.\nRange: 0 ↔ 60000, whole.\nA fraction: rounded.\nOutside the range: the nearest end, with a console warning the first time.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3234,11 +4938,15 @@ export const COMMANDS = [
   {
     id: 'deviceCoverage', category: 'Device / MIDI',
     signature: 'deviceCoverage([feature [, role]]) -> table|string',
-    summary: 'What the device profile says it supports, as words rather than true/false. With no `feature`, returns the whole list — `singleParameterWrite`, `realtimeEditing`, `editBufferDumpParse` and so on. Profiles answer "complete", "partial" or "notImplemented", and sometimes something more specific, so check for the words you care about.',
+    summary: 'Read what the device profile says it supports.',
+    example: '`deviceCoverage("realtimeEditing")` gives "complete", "partial" or "notImplemented".',
+    notes: [
+      'A profile can answer in words of its own: check for the ones that matter.',
+    ],
     requiresDeviceHost: true,
     params: [
-      { name: 'feature', type: 'string', required: false },
-      { name: 'role', type: 'string', required: false, kind: 'deviceRole' },
+      { name: 'feature', type: 'string', required: false, summary: 'A feature\'s name, such as "singleParameterWrite", "realtimeEditing" or "editBufferDumpParse".\nLeft out: every feature, as a table.\nNot one the profile names: no result.' },
+      { name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' },
     ],
     scopes: 'any',
     snippet: {
@@ -3248,9 +4956,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceRecipes', category: 'Device / MIDI', signature: 'deviceRecipes([role]) -> list',
-    summary: 'The names of the message templates this device profile can build — the formats its parameters are sent in. An empty list when no profile is chosen.',
+    summary: 'List the message templates the device profile can build.',
+    example: '`deviceRecipes()` gives the formats the synth\'s parameters are sent in.',
+    notes: [
+      'Returns a list of names; no profile chosen: an empty list.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'for _, id in ipairs(ce.device.recipes()) do log(id) end$0',
@@ -3259,9 +4971,13 @@ export const COMMANDS = [
   },
   {
     id: 'deviceRequests', category: 'Device / MIDI', signature: 'deviceRequests([role]) -> list',
-    summary: 'The names of the requests this device profile can send, such as an identity request or an edit-buffer request. Check here before assuming a synth supports one.',
+    summary: 'List the requests the device profile can send.',
+    example: '`deviceRequests()` gives names such as an identity request.',
+    notes: [
+      'Returns a list of names: check here before assuming a synth answers one.',
+    ],
     requiresDeviceHost: true,
-    params: [{ name: 'role', type: 'string', required: false, kind: 'deviceRole' }],
+    params: [{ name: 'role', type: 'string', required: false, summary: 'The device, by its role as the panel names it.\nLeft out: "mainSynth".', kind: 'deviceRole' }],
     scopes: 'any',
     snippet: {
       lua: 'for _, id in ipairs(ce.device.requests()) do log(id) end$0',
@@ -3345,7 +5061,7 @@ export const COMMANDS = [
     example: '`sendNote(1, "C3", 100, 500)` plays C3 on channel 1 for half a second.',
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
-      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
+      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
       { name: 'velocity', type: 'number', required: true, unit: '0 to 127', summary: 'How hard the note is played, from 0 to 127. 0 means note off.' },
       { name: 'ms', type: 'number', required: false, unit: 'milliseconds', summary: 'How long the note plays, in milliseconds, above 0. The note off is then sent for you. Left out, the note plays until sendNoteOff.' },
     ],
@@ -3416,7 +5132,7 @@ export const COMMANDS = [
     notes: ['Every note started with sendNote without a length needs its own note off.'],
     params: [
       { name: 'channel', type: 'number', required: true, unit: '1 to 16', summary: 'The MIDI channel, from 1 to 16.' },
-      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a capital letter, then # or b if it has one, then the octave. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
+      { name: 'note', type: 'value', required: true, kind: 'note', summary: 'A note number from 0 to 127, or a name such as "C3", "Eb4" or "F#2": a letter from A to G, then # or b if it has one, then the octave, in any case. A name that cannot be read, or a note outside 0 to 127, is refused with a message.' },
       { name: 'velocity', type: 'number', required: false, unit: '0 to 127', summary: 'The release velocity, from 0 to 127. It is 0 when left out.' },
     ],
     scopes: 'any',
@@ -3471,7 +5187,7 @@ export const COMMANDS = [
     id: 'sendTransport', category: 'Device / MIDI', signature: 'sendTransport(action)',
     summary: 'Start, continue or stop a connected sequencer or drum machine.',
     example: '`sendTransport("start")` starts it from the beginning.',
-    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'], summary: '"start" (FA), "continue" (FB) or "stop" (FC), in upper or lower case. Any other action, or none, is refused with a message and nothing is sent.' }],
+    params: [{ name: 'action', type: 'string', required: true, values: ['start', 'continue', 'stop'], summary: '"start" (FA), "continue" (FB) or "stop" (FC). Case-insensitive. Any other action, or none, is refused with a message and nothing is sent.' }],
     scopes: 'any',
     snippet: { lua: 'sendTransport("${1:start}")$0', javascript: 'sendTransport("${1:start}")$0' },
   },
@@ -3494,7 +5210,7 @@ export const COMMANDS = [
     notes: ['The 7-bit types fit in one SysEx byte. The CRC types do not: split their result into bytes with to7bit before sending.'],
     params: [
       { name: 'type', type: 'string', required: true,
-        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". An unknown name, or none, returns nothing and prints the names it accepts.',
+        summary: 'How the synth works it out: "sum-7bit", "roland-7bit" (also written "roland" or "yamaha"), "ones-complement-7bit", "xor-7bit", "offset-7bit", "sum-8bit", "twos-complement-8bit", "crc8", "crc16-ccitt", "crc16-modbus" or "crc32". Case-insensitive. An unknown name, or none, returns nothing and prints the names it accepts.',
         values: ['sum-7bit', 'roland-7bit', 'ones-complement-7bit', 'xor-7bit', 'offset-7bit',
           'sum-8bit', 'twos-complement-8bit', 'crc8', 'crc16-ccitt', 'crc16-modbus', 'crc32'] },
       { name: 'bytes', type: 'bytes', required: true, summary: 'The bytes it covers, as a list or as hex text. Bytes that are not bytes return nothing, with a message.' },
@@ -3528,29 +5244,44 @@ export const COMMANDS = [
   // the first one already, but nothing said so, which made it undefined behaviour people relied on.
   {
     id: 'state', category: 'Storage', signature: 'state',
-    summary: 'A table your script can keep its own values in from one handler call to the next. Only this script can see it. It is emptied when the script reloads, so use `ce.storage.saveSetting()` for anything that must last longer.',
+    summary: 'A table the script keeps its own values in between handler calls.',
+    example: '`state.count = (state.count or 0) + 1` counts the calls.',
+    notes: [
+      'This script\'s only.',
+      'Emptied when the script loads again; `ce.storage.saveSetting()` keeps a value longer.',
+    ],
     params: [],
     scopes: 'any',
     snippet: { lua: 'state.${1:count} = (state.${1:count} or 0) + 1$0', javascript: 'state.${1:count} = (state.${1:count} ?? 0) + 1;$0' },
   },
   {
     id: 'saveSetting', category: 'Storage', signature: 'saveSetting(key, value [, opts]) -> boolean',
-    summary: 'Save a value under `key` so it outlasts the script — unlike `ce.storage.state`, it survives a reload. By default it is stored with the panel and travels with it; in an exported plugin it is saved in the DAW project. `opts.scope` sets who sees it: "panel" (every script on the panel, the default), "script" (only this script) or "local" (only this computer, never saved into the panel; in an exported plugin, only this instance of it). Returns false if the value could not be saved, for example because storage is not available.',
+    summary: 'Save a value under a name, to keep it when the script loads again.',
+    example: '`saveSetting("lastPatch", 12)` keeps 12 under lastPatch.',
+    notes: [
+      'Kept with the panel; in an exported plug-in, in the DAW project.',
+      'Returns true; false when it could not be saved, such as where storage is not available.',
+    ],
     params: [
-      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
+      { name: 'key', type: 'string', required: true, summary: 'A name you choose, matched as written.\nA number: used as text.\nLeft out, or anything else: nothing is saved, with a console error.', kind: 'sharedName' },
+      { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.\nLeft out: nothing is saved, with a console error. `ce.storage.forget()` deletes a setting.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ],
     scopes: 'any',
     snippet: { lua: 'saveSetting("${1:key}", ${2:value})$0', javascript: 'saveSetting("${1:key}", ${2:value})$0' },
   },
   {
     id: 'loadSetting', category: 'Storage', signature: 'loadSetting(key [, fallback [, opts]])',
-    summary: 'Read back a value saved with `ce.storage.saveSetting()`. Returns `fallback` if nothing has been saved under `key` (or nothing, if you did not give a fallback). `opts.scope` must match the scope the value was saved in — the same key in two scopes holds two separate values.',
+    summary: 'Read a value saved with `ce.storage.saveSetting()`.',
+    example: '`loadSetting("lastPatch", 1)` gives the saved patch, or 1 if none was saved.',
+    notes: [
+      'Returns the value.',
+      'Each scope keeps its own: the same name in two scopes is two values.',
+    ],
     params: [
-      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'fallback', type: 'value', required: false },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
+      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.\nA number: used as text.\nLeft out, or anything else: the fallback, with a console error.', kind: 'sharedName' },
+      { name: 'fallback', type: 'value', required: false, summary: 'Given back when nothing is saved under the name.\nLeft out: no result.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ],
     scopes: 'any',
     snippet: { lua: 'local ${1:v} = loadSetting("${2:key}", ${3:default})$0', javascript: 'const ${1:v} = loadSetting("${2:key}", ${3:default});$0' },
@@ -3560,16 +5291,25 @@ export const COMMANDS = [
   // after itself and could not show somebody what it had kept.
   {
     id: 'listSettings', category: 'Storage', signature: 'listSettings([opts]) -> list',
-    summary: 'List the keys saved in one scope, in no particular order. An empty list only means nothing has been saved yet; to check whether storage is working at all, use `ce.storage.info()`. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`. The "panel" scope leaves out every script\'s private keys, including this script\'s own.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }], scopes: 'any',
+    summary: 'List the names saved in one scope.',
+    example: '`listSettings()` gives the names saved for the panel.',
+    notes: [
+      'Returns a list of names, in no order. An empty list: nothing saved yet; `ce.storage.info()` says whether storage works.',
+      'The "panel" scope leaves out every script\'s own.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }], scopes: 'any',
     snippet: { lua: 'for _, k in ipairs(ce.storage.settings()) do $0 end', javascript: 'for (const k of ce.storage.settings()) { $0 }' },
   },
   {
     id: 'forgetSetting', category: 'Storage', signature: 'forgetSetting(key [, opts]) -> boolean',
-    summary: 'Delete a saved setting. Returns true if there was a value to delete and false if there was not. Pick the scope with `opts.scope`, as for `ce.storage.saveSetting()`.',
+    summary: 'Delete one saved value.',
+    example: '`forgetSetting("lastPatch")` deletes lastPatch.',
+    notes: [
+      'Returns true if there was one to delete; false if not.',
+    ],
     params: [
-      { name: 'key', type: 'string', required: true, kind: 'sharedName' },
-      { name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) },
+      { name: 'key', type: 'string', required: true, summary: 'The name it was saved under, matched as written.\nA number: used as text.\nLeft out, or anything else: false, with a console error.', kind: 'sharedName' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) },
     ], scopes: 'any',
     snippet: { lua: 'ce.storage.forget("${1:key}")$0', javascript: 'ce.storage.forget("${1:key}");$0' },
   },
@@ -3588,8 +5328,13 @@ export const COMMANDS = [
      value somewhere the caller did not ask for is how a private setting becomes a shared one. */
   {
     id: 'allSettings', category: 'Storage', signature: 'allSettings([opts]) -> table',
-    summary: 'Return every setting in one scope as a table of keys and values. `opts.scope` is "panel" (the default), "script" or "local". The "panel" scope leaves out every script\'s private settings, including this script\'s own.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
+    summary: 'Give every value saved in one scope, by name.',
+    example: '`allSettings().lastPatch` gives the saved lastPatch.',
+    notes: [
+      'Returns a table of names and values.',
+      'The "panel" scope leaves out every script\'s own.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }],
     scopes: 'any',
     snippet: {
       lua: 'for k, v in pairs(ce.storage.all()) do log(k, v) end$0',
@@ -3598,25 +5343,42 @@ export const COMMANDS = [
   },
   {
     id: 'clearSettings', category: 'Storage', signature: 'clearSettings([opts]) -> number',
-    summary: 'Delete every setting in one scope and return how many were deleted. Clearing the "panel" scope does not touch any script\'s private settings.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
+    summary: 'Delete every value saved in one scope.',
+    example: '`clearSettings({ scope = "script" })` deletes this script\'s own.',
+    notes: [
+      'Returns how many were deleted.',
+      'Clearing "panel" leaves every script\'s own.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'storageInfo', category: 'Storage', signature: 'storageInfo([opts]) -> table',
-    summary: 'Describe where one scope\'s settings are kept: `scope`, `backing`, `available`, `count` (how many settings) and `bytes` (their size as JSON text). `backing` is "panel" (stored with the panel, in the editor), "project" (in the DAW project, in an exported plugin) or "machine" (on this computer only). If `available` is false, nothing you save in this scope will be kept.',
-    params: [{ name: 'opts', type: 'object', required: false, fields: optionFields(['scope']) }],
+    summary: 'Tell where one scope\'s values are kept, and whether they will last.',
+    example: '`storageInfo().available` gives true where saved values are kept.',
+    notes: [
+      'Returns { scope, backing, available, count, bytes }.',
+      '`backing`: "panel", with the panel, in the editor; "project", in the DAW project, in an exported plug-in; "machine", on this computer.',
+      '`available` false: nothing saved there is kept.',
+      '`count`: how many; `bytes`: their size as JSON text.',
+    ],
+    params: [{ name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields(['scope']) }],
     scopes: 'any',
   },
   {
     id: 'encodeJson', category: 'Storage', signature: 'encodeJson(value [, opts]) -> string',
-    summary: 'Turn a value — a table, a list, a number, some text — into JSON text, for example to keep a structure in a setting or copy it to the clipboard. `opts.indent` lays it out over several lines, indented by that many spaces. Keys are always written in sorted order, so the same data always gives the same text. Returns nothing for a value that has no JSON form, such as a function or a table that contains itself. It works the same in every scripting language, including Lua, which has no JSON support of its own.',
+    summary: 'Write a value as JSON text.',
+    example: '`encodeJson({ b = 1, a = 2 })` gives {"a":2,"b":1}.',
+    notes: [
+      'Returns the text, the keys sorted, so the same data gives the same text.',
+      'A value with no JSON form, such as a function or a table inside itself, or left out: no result, without a word.',
+      'The same in every language; Lua has no JSON of its own.',
+    ],
     params: [
-      { name: 'value', type: 'value', required: true },
-      { name: 'opts', type: 'object', required: false, fields: optionFields([
+      { name: 'value', type: 'value', required: true, summary: 'Numbers, text, true or false, lists and tables.' },
+      { name: 'opts', type: 'object', required: false, summary: 'Options, below.\nAn option it does not have: nothing is done, with a console error.', fields: optionFields([
         { name: 'indent', type: 'number', default: '0',
-          summary: 'Lay the JSON out over several lines, indented by this many spaces. 0 keeps it '
-            + 'on one line.' },
+          summary: 'Spaces to indent each level, laid out over several lines.\n0: one line.\nRange: 0 ↔ 10.\nA fraction: rounded down.\nAbove 10: 10, with a console warning the first time.\nBelow 0, or not a number: one line, with a console warning the first time.' },
       ]) },
     ],
     scopes: 'any',
@@ -3624,18 +5386,29 @@ export const COMMANDS = [
   },
   {
     id: 'decodeJson', category: 'Storage', signature: 'decodeJson(text) -> value',
-    summary: 'Turn JSON text back into a value. Text that is not valid JSON returns nothing. A JSON null also reads back as nothing: `{"a":1,"b":null}` comes back with only the key `a`, and `[1,null,2]` as a list of two items. So encoding and then decoding is not a full round trip when nulls are involved.',
-    params: [{ name: 'text', type: 'string', required: true }],
+    summary: 'Read JSON text back into a value.',
+    example: '`decodeJson("[1, 2]")` gives {1, 2}.',
+    notes: [
+      'Returns the value.',
+      'A JSON null is nothing: {"a":1,"b":null} gives a table with a only, and [1,null,2] a list of two.',
+    ],
+    params: [{ name: 'text', type: 'string', required: true, summary: 'JSON text.\nText that is not JSON, not text, or left out: no result, with a console error.' }],
     scopes: 'any',
   },
 
   /* --- Debug --- */
   {
     id: 'log', category: 'Debug', signature: 'log(message [, value])',
-    summary: 'Print a message to the script console, optionally followed by a value. It changes nothing on the panel.',
+    summary: 'Print a message to the script console.',
+    notes: [
+      'Changes nothing on the panel.',
+      'Returns nothing.',
+    ],
+    example: '`log("cutoff", 64)` prints cutoff 64.',
+
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'value', type: 'value', required: false },
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number or a table: written as text.' },
+      { name: 'value', type: 'value', required: false, summary: 'Printed after the message, with a space; a table written out.\nLeft out: the message alone.' },
     ],
     scopes: 'any',
     snippet: { lua: 'log("${1:message}", ${2:value})$0', javascript: 'log("${1:message}", ${2:value})$0' },
@@ -3645,24 +5418,51 @@ export const COMMANDS = [
   // so a real failure read exactly like a debug print.
   {
     id: 'logWarn', category: 'Debug', signature: 'logWarn(message [, value])',
-    summary: 'Print a warning to the script console: something is not right, but the panel carries on. Warnings stand out from ordinary log lines.',
+    summary: 'Print a warning to the script console.',
+    notes: [
+      'Shown as a warning; the handler goes on.',
+      'Returns nothing.',
+    ],
+    example: '`logWarn("no tempo yet")` prints no tempo yet as a warning.',
+
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'value', type: 'value', required: false },
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number or a table: written as text.' },
+      { name: 'value', type: 'value', required: false, summary: 'Printed after the message, with a space; a table written out.\nLeft out: the message alone.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.core.warn("${1:message}")$0', javascript: 'ce.core.warn("${1:message}")$0' },
   },
   {
     id: 'logError', category: 'Debug', signature: 'logError(message [, value])',
-    summary: 'Print an error to the script console: something the panel could not do. It only prints — your handler keeps running. To stop the handler, use your language\'s own way of raising an error (error() in Lua, throw in JavaScript).',
+    summary: 'Print an error to the script console.',
+    notes: [
+      'It only prints: the handler goes on. To stop it, raise an error your language\'s way: error() in Lua, throw in JavaScript, raise in Python.',
+      'Returns nothing.',
+    ],
+    example: '`logError("patch not found")` prints patch not found as an error.',
+
     params: [
-      { name: 'message', type: 'string', required: true },
-      { name: 'value', type: 'value', required: false },
+      { name: 'message', type: 'string', required: true, summary: 'The text.\nA number or a table: written as text.' },
+      { name: 'value', type: 'value', required: false, summary: 'Printed after the message, with a space; a table written out.\nLeft out: the message alone.' },
     ],
     scopes: 'any',
     snippet: { lua: 'ce.core.error("${1:message}")$0', javascript: 'ce.core.error("${1:message}")$0' },
+  },  // Who made a change (docs/design/ce-daw-module.md). A command and not a field, because
+  // onValueChange(value) is given a plain number, and a second argument would break the typed
+  // languages' handlers.
+  {
+    id: 'origin', category: 'Events', signature: 'origin() -> text', refusal: 'nothing',
+    summary: 'Who made the change the running handler is for: "user", "script", "host", "device", "osc" or "load".',
+    example: 'In `onValueChanged`, `origin() == "host"` means the DAW\'s automation moved the knob.',
+    notes: [
+      '"user": a hand on the panel. "script": a set() from any script, outside a handler. "host": the DAW, in an exported plug-in. "device": the synth, through a dump, a parameter or any MIDI it sent. "osc": an OSC message. "load": the panel, a preset or the project being opened.',
+      'Outside a handler, and for an event no change caused (a timer, a key): nothing.',
+      'With the plug-in\'s window shut, a change a hand made while it was open is not raised again; and a script\'s set() raises no value events there, as inside a handler with the window open.',
+    ],
+    params: [],
+    scopes: 'any',
   },
+
 ];
 
 /* --------------------------------------------------------- panel-component verbs */
@@ -3688,6 +5488,11 @@ export const COMMANDS = [
 const PARAM_TYPE_FOR = {
   num: 'number', int: 'number', bool: 'boolean', str: 'string', enum: 'string',
   list: 'list',
+  // Where on an LCD (lcdPositions.js): a row, or a table of layout, row and col. And a layout, by
+  // its number or its name.
+  position: 'number or table', layoutRef: 'number or name',
+  // A key's note, as a name or a number (componentVerbs' pitchClassOf).
+  pitchClass: 'number or name',
 };
 
 /** What the value a component verb writes may be, as the spec says it: the closed list an enum
@@ -3722,117 +5527,204 @@ const T = { name: 'target', type: 'targetRef', required: true };
 
 export const PANEL_COMMANDS = [
   // --- Zone Splitter ---
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.split"): what splitZoneLayout.js's script actions do with each.
   panelVerb('splitPreset', 'splitPreset(target, preset [, lowNote, highNote])',
-    `Apply a split layout — ${oneOf(HAND_WRITTEN_VALUES['split.preset'])} — optionally bounding the key range.`,
-    [T, { name: 'preset', type: 'string', required: true, kind: 'componentWord' },
-     { name: 'lowNote', type: 'number', required: false, kind: 'note' }, { name: 'highNote', type: 'number', required: false, kind: 'note' }]),
-  // A zone is its number counted from 1, as the panel labels it ("Zone 1"), or its label ("Bass").
-  // It was counted from 0, so zone 1 was the one labelled "Zone 2" (handWrittenVerbs.js).
-  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Mute or unmute one zone. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
-  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set a zone\'s MIDI output channel. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the top note of a zone, and with it the bottom of a zone that starts just above it. A zone is its number counted from 1, or its name.',
-    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex' }, { name: 'note', type: 'number', required: true, kind: 'note' }]),
+    `Replace every zone with a layout: ${oneOf(HAND_WRITTEN_VALUES['split.preset'])}.`,
+    [T, { name: 'preset', type: 'string', required: true, kind: 'componentWord',
+      summary: '"whole": one zone, channel 1.\n"classic": the lower half on channel 1, an octave down; the upper half on channel 2.\n"splitLayer": a bass below; two channels layered above.\n"threeWay": bass, pad and lead across channels 1 to 3.\n"velLayer": the same keys, played softly on channel 1 and hard on channel 2.\nCase-insensitive.\nAny other: rejected with a console error.' },
+     { name: 'lowNote', type: 'number', required: false, kind: 'note', summary: 'The lowest note of the layout.\nA MIDI note number, or a name such as "C4".\nRange: 0 ↔ 127.\nOutside the range: the nearest end.\nAny other: rejected with a console error.\nLeft out: 36, C2.' },
+     { name: 'highNote', type: 'number', required: false, kind: 'note', summary: 'The highest note of the layout.\nA MIDI note number, or a name such as "C4".\nRange: 0 ↔ 127.\nOutside the range: the nearest end.\nAny other: rejected with a console error.\nLeft out: 96, C7.\nBelow `lowNote`: the two are swapped.' }],
+    { example: '`ce.components.split.preset("Split", "classic", "C2", "C6")` splits C2 to C6 in two halves.',
+      notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitMute', 'splitMute(target, zone, enabled)', 'Let one zone sound, or mute it.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'enabled', type: 'boolean', required: true, summary: 'true: it sounds.\nfalse: muted.\nLeft out: it sounds.' }],
+    { example: '`ce.components.split.mute("Split", "Bass", false)` mutes the zone called Bass.', notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitChannel', 'splitChannel(target, zone, channel)', 'Set the MIDI channel one zone plays on.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'channel', type: 'number', required: true, summary: 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.split.channel("Split", 2, 5)` sends zone 2 on channel 5.', notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitTranspose', 'splitTranspose(target, zone, semitones)', 'Transpose one zone.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nRange: -48 ↔ 48, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.split.transpose("Split", 1, -12)` plays zone 1 an octave down.', notes: ['Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('splitPoint', 'splitPoint(target, zone, note)', 'Move the top note of one zone.',
+    [T, { name: 'zone', type: 'number', required: true, kind: 'componentIndex', summary: 'The zone: its number, counted from 1, as the panel labels it, or its name, in any case.\nNot a zone: rejected with a console error naming them.' }, { name: 'note', type: 'number', required: true, kind: 'note', summary: 'Its new top note.\nA MIDI note number, or a name such as "C4".\nRange: 0 ↔ 127.\nOutside the range: the nearest end.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.split.point("Split", 1, "B3")` ends zone 1 at B3.',
+      notes: ['A zone that starts just above it moves with it, as a drag of the split point does.', 'Returns true. Rejected: false, with a console error.'] }),
 
   // --- Phrase Sequencer ---
-  panelVerb('phraseSeed', 'phraseSeed(target, seed)', `Fill the grid from a named seed pattern — ${oneOf(HAND_WRITTEN_VALUES['phrase.seed'])}.`,
-    [T, { name: 'seed', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('phraseClear', 'phraseClear(target)', 'Clear every step.', [T]),
-  // A key is a pitch class, a number: "D" is refused, so it is not typed as text.
-  panelVerb('phraseKey', 'phraseKey(target, key)', 'Change the key the degrees resolve against: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.',
-    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord' }]),
-  panelVerb('phraseScale', 'phraseScale(target, scale)', 'Change the scale ("major"/"minor"/"dorian"…).',
-    [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
-  panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose the phrase, leaving the pattern alone.',
-    [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('phraseDirection', 'phraseDirection(target, direction)', `Play direction — ${oneOf(HAND_WRITTEN_VALUES['phrase.direction'])}.`,
-    [T, { name: 'direction', type: 'string', required: true, kind: 'componentWord' }]),
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.phrase"): what phraseLayout.js's phraseScriptPatch does with each.
+  panelVerb('phraseSeed', 'phraseSeed(target, seed)', `Fill the grid with a pattern: ${oneOf(HAND_WRITTEN_VALUES['phrase.seed'])}.`,
+    [T, { name: 'seed', type: 'string', required: true, kind: 'componentWord',
+      summary: '"clear": empty.\n"octaves": the root and the octave above, by turns.\n"arpUp": the chord walked upward across the bar.\n"riff": a one-bar line, off the beat, with ties.\n"random": a note of the scale on each step.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.seed("Phrase", "riff")` fills the grid with a riff.', notes: ['What the grid held is replaced.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseClear', 'phraseClear(target)', 'Empty the grid.', [T],
+    { example: '`ce.components.phrase.clear("Phrase")` switches every cell off.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseKey', 'phraseKey(target, key)', 'Set the key its rows play in.',
+    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord', summary: 'The key\'s note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.key("Phrase", "D")` plays the pattern in D.', notes: ['Row 1 is the key\'s note; each row up is the next step of the scale.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseScale', 'phraseScale(target, scale)', 'Set the scale its rows play.',
+    [T, { name: 'scale', type: 'string', required: true, kind: 'scale', summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.scale("Phrase", "dorian")` plays the pattern in the dorian mode.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseTranspose', 'phraseTranspose(target, semitones)', 'Transpose what the pattern plays, leaving the grid as it is.',
+    [T, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nRange: -48 ↔ 48, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.phrase.transpose("Phrase", 12)` plays the pattern an octave up.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseDirection', 'phraseDirection(target, direction)', `Set the order it plays the steps in: ${oneOf(HAND_WRITTEN_VALUES['phrase.direction'])}.`,
+    [T, { name: 'direction', type: 'string', required: true, kind: 'componentWord',
+      summary: '"forward": first to last.\n"reverse": last to first.\n"pingpong": forward, then back.\n"random": a step at random each time.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.phrase.direction("Phrase", "pingpong")` plays forward and back.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
   panelVerb('phraseRun', 'phraseRun(target, running)', 'Start or stop the sequencer.',
-    [T, { name: 'running', type: 'boolean', required: true }]),
-  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one grid cell on or off. Steps and rows are counted from 1.',
-    [T, { name: 'step', type: 'number', required: true, kind: 'componentIndex' }, { name: 'row', type: 'number', required: true, kind: 'componentIndex' },
-     { name: 'on', type: 'boolean', required: true }]),
+    [T, { name: 'running', type: 'boolean', required: true, summary: 'true: it plays.\nfalse: it stops.\nLeft out: it plays.' }],
+    { example: '`ce.components.phrase.run("Phrase", false)` stops the sequencer.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('phraseCell', 'phraseCell(target, step, row, on)', 'Switch one cell of the grid on or off.',
+    [T, { name: 'step', type: 'number', required: true, kind: 'componentIndex', summary: 'Step, counted from 1, left to right.\nA fraction: rounded.\nNot a step of the grid: rejected with a console error.' },
+     { name: 'row', type: 'number', required: true, kind: 'componentIndex', summary: 'Row, counted from 1, from the bottom: a step of the scale; a semitone in chromatic mode, set in the inspector.\nA fraction: rounded.\nNot a row of the grid: rejected with a console error.' },
+     { name: 'on', type: 'boolean', required: true, summary: 'true: on.\nfalse: off.\nLeft out: toggles.' }],
+    { example: '`ce.components.phrase.cell("Phrase", 1, 3, true)` plays row 3 on the first step.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
 
   // --- Phrase Recorder ---
-  panelVerb('recorderRecord', 'recorderRecord(target [, on])', 'Arm / disarm recording (no argument toggles).',
-    [T, { name: 'on', type: 'boolean', required: false }]),
-  panelVerb('recorderStop', 'recorderStop(target)', 'Stop recording and playback.', [T]),
-  panelVerb('recorderPlay', 'recorderPlay(target [, playing])', 'Start / stop playback (no argument toggles).',
-    [T, { name: 'playing', type: 'boolean', required: false }]),
-  panelVerb('recorderClear', 'recorderClear(target)', 'Erase the take.', [T]),
-  panelVerb('recorderUndo', 'recorderUndo(target)', 'Undo the last recorded pass.', [T]),
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.recorder"): what noteRecorderLayout.js's recorderScriptPatch and the preview do.
+  panelVerb('recorderRecord', 'recorderRecord(target [, on])', 'Arm the recorder, or stop it.',
+    [T, { name: 'on', type: 'boolean', required: false,
+      summary: 'true: armed; it records from the top of the next loop, after `countIn()`.\nfalse: stopped.\nLeft out: armed if stopped, stopped if armed or recording.' }],
+    { example: '`ce.components.recorder.record("Recorder")` arms it, or stops it if it is armed or recording.',
+      notes: ['A take that has notes is recorded over: layered on, until it is stopped.', 'Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderStop', 'recorderStop(target)', 'Stop recording, or arming.', [T],
+    { example: '`ce.components.recorder.stop("Recorder")` stops recording; the loop goes on playing.',
+      notes: ['The take plays on: `play(target, false)` stops it.', 'Returns true. Already stopped: true, with a console line.'] }),
+  panelVerb('recorderPlay', 'recorderPlay(target [, playing])', 'Start or stop playing the take.',
+    [T, { name: 'playing', type: 'boolean', required: false, summary: 'true: it plays.\nfalse: it is silent.\nLeft out: toggles.' }],
+    { example: '`ce.components.recorder.play("Recorder", false)` silences the take.',
+      notes: ['Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderClear', 'recorderClear(target)', 'Delete the take.', [T],
+    { example: '`ce.components.recorder.clear("Recorder")` empties the take.',
+      notes: ['The stored slots are kept.', 'Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderUndo', 'recorderUndo(target)', 'Delete the last pass recorded over the take.', [T],
+    { example: '`ce.components.recorder.undo("Recorder")` takes away what the last pass added.',
+      notes: ['Returns true. Recording, or no take: false, with a console error.'] }),
   panelVerb('recorderQuantize', 'recorderQuantize(target, grid [, strength, scale, key])',
-    'Quantise the take to a grid; strength 0–1, optional pitch repair to a scale/key.',
-    [T, { name: 'grid', type: 'string', required: true }, { name: 'strength', type: 'number', required: false },
-     { name: 'scale', type: 'string', required: false, kind: 'scale' }, { name: 'key', type: 'string', required: false }]),
-  panelVerb('recorderTranspose', 'recorderTranspose(target, semitones)', 'Transpose the take.',
-    [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set the loop length in bars.',
-    [T, { name: 'bars', type: 'number', required: true }]),
-  panelVerb('recorderSource', 'recorderSource(target, source)',
-    `Choose what gets recorded — ${oneOf(HAND_WRITTEN_VALUES['recorder.source'])}.`,
-    [T, { name: 'source', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Shift the take in time by `by` ticks.',
-    [T, { name: 'by', type: 'number', required: true }]),
-  panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Shift the take in pitch without re-quantising.',
-    [T, { name: 'semitones', type: 'number', required: true }]),
-  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Save the take into a slot, 1 to 8.',
-    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex' }, { name: 'name', type: 'string', required: false }]),
-  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Load a take from a slot, counted from 1.',
-    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex' }]),
-  panelVerb('recorderCountIn', 'recorderCountIn(target, bars)', 'Set the count-in length in bars (0 = none).',
-    [T, { name: 'bars', type: 'number', required: true }]),
+    'Move the take\'s notes toward a grid, and into a key.',
+    [T, { name: 'grid', type: 'number', required: true,
+      summary: 'Divisions of the loop: 16 over one bar is sixteenth notes.\nRange: 1 ↔ 64, whole.\nOutside the range: the nearest end.\nText, such as "1/16": rejected with a console error.' },
+     { name: 'strength', type: 'number', required: false,
+       summary: 'How far each note moves: 1 onto the grid, 0.5 halfway, 0 not at all.\nRange: 0 ↔ 1.\nLeft out: the inspector\'s Strength, 0 unless it is set, which moves nothing.' },
+     { name: 'scale', type: 'string', required: false, kind: 'scale',
+       summary: 'With `key`, notes outside the key are moved to the nearest in it, ties down.\nOne of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out, with `key` given: the inspector\'s scale.\nAny other: rejected with a console error.' },
+     { name: 'key', type: 'string', required: false,
+       summary: 'The key\'s note: a name, such as "F#", in any case, or a number round the octave, 0 being C.\nLeft out, with `scale` given: the inspector\'s key.\nBoth left out: the pitches are kept.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.recorder.quantize("Recorder", 16, 1)` puts every note on a sixteenth of the loop.',
+      notes: ['The lengths are kept.', 'Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderTranspose', 'recorderTranspose(target, semitones)', 'Transpose what the take plays, leaving the take as recorded.',
+    [T, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nRange: -48 ↔ 48, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.transpose("Recorder", -12)` plays the take an octave down.',
+      notes: ['`shift()` changes the notes of the take itself.', 'Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderBars', 'recorderBars(target, bars)', 'Set how many bars the loop is, while it follows the Transport.',
+    [T, { name: 'bars', type: 'number', required: true, summary: 'Bars.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.bars("Recorder", 4)` makes the loop four bars long.',
+      notes: ['Following the Transport is set in the inspector; otherwise the loop is a length in seconds.', 'Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderSource', 'recorderSource(target, source)', `Set where the notes it records come from: ${oneOf(HAND_WRITTEN_VALUES['recorder.source'])}.`,
+    [T, { name: 'source', type: 'string', required: true, kind: 'componentWord',
+      summary: '"input": the MIDI input.\n"panel": the panel\'s own note controls, such as a Chord Pad.\n"both": either.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.recorder.source("Recorder", "input")` records only the keyboard played into it.',
+      notes: ['Returns true. Already that way: true, with a console line.'] }),
+  panelVerb('recorderNudge', 'recorderNudge(target, by)', 'Move every note of the take earlier or later.',
+    [T, { name: 'by', type: 'number', required: true, summary: 'Part of the loop: 0.01 is a hundredth later; below 0, earlier.\nPast the end of the loop: round to its start.\n0, or not a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.nudge("Recorder", -0.005)` moves a late take a little earlier.',
+      notes: ['Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderShift', 'recorderShift(target, semitones)', 'Transpose the notes of the take itself.',
+    [T, { name: 'semitones', type: 'number', required: true, summary: 'Semitones: 12 an octave up.\nA fraction: rounded.\nA note that would pass 0 or 127: deleted.\n0, or not a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.shift("Recorder", 7)` moves the take up a fifth.',
+      notes: ['Its timing is kept: nothing is quantized.', '`transpose()` changes only what it plays.', 'Returns true. Recording, or no take: false, with a console error.'] }),
+  panelVerb('recorderStore', 'recorderStore(target, slot [, name])', 'Keep a copy of the take in a slot.',
+    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex', summary: 'Slot, counted from 1.\nRange: 1 ↔ 8.\nA fraction: rounded.\nAny other: rejected with a console error.' },
+     { name: 'name', type: 'string', required: false, summary: 'The slot\'s name.\nLeft out: its name as it was; a new slot is "Take" and its number.' }],
+    { example: '`ce.components.recorder.store("Recorder", 2, "Verse")` keeps the take in slot 2, called Verse.',
+      notes: ['A slot that holds a take: replaced.', 'Returns true. Recording: false, with a console error.'] }),
+  panelVerb('recorderLoad', 'recorderLoad(target, slot)', 'Make a stored take the take.',
+    [T, { name: 'slot', type: 'number', required: true, kind: 'componentIndex', summary: 'Slot, counted from 1.\nA fraction: rounded.\nA slot that holds no take: rejected with a console error.' }],
+    { example: '`ce.components.recorder.load("Recorder", 2)` plays the take stored in slot 2.',
+      notes: ['A copy: the slot is kept as it was.', 'Returns true. Recording: false, with a console error.'] }),
+  panelVerb('recorderCountIn', 'recorderCountIn(target, bars)', 'Set how many bars it waits, once armed, before it records.',
+    [T, { name: 'bars', type: 'number', required: true, summary: 'Bars.\n0: none; it records from the top of the next loop.\nRange: 0 ↔ 4, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.recorder.countIn("Recorder", 1)` waits a bar before recording.',
+      notes: ['Counted in whole loops: a loop longer than the count-in waits one loop.', 'Returns true. Already that way: true, with a console line.'] }),
 
   // --- Harmoniser ---
-  panelVerb('harmonyMode', 'harmonyMode(target, mode)',
-    `Harmoniser mode — ${oneOf(HAND_WRITTEN_VALUES['harmony.mode'])}.`,
-    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Re-key the harmoniser mid-song: a pitch class, 0 to 11 where 0 is C. A number outside that wraps round, so 14 is 2.',
-    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Change the scale the harmony follows.',
-    [T, { name: 'scale', type: 'string', required: true, kind: 'scale' }]),
-  panelVerb('harmonySize', 'harmonySize(target, size)', 'How many voices to add.',
-    [T, { name: 'size', type: 'number', required: true }]),
-  panelVerb('harmonyShape', 'harmonyShape(target, shape)', `Apply a named chord shape — ${oneOf(HAND_WRITTEN_VALUES['harmony.shape'])} — or a list of intervals in semitones.`,
-    [T, { name: 'shape', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)',
-    `Voicing spread — ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
-    [T, { name: 'voicing', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Chord inversion.',
-    [T, { name: 'inversion', type: 'number', required: true }]),
-  panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Octave offset for the added voices.',
-    [T, { name: 'octave', type: 'number', required: true }]),
-  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)',
-    `What to do with out-of-key notes — ${oneOf(HAND_WRITTEN_VALUES['harmony.outOfKey'])}.`,
-    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Keep or drop the note actually played.',
-    [T, { name: 'keep', type: 'boolean', required: false }]),
-  panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'MIDI channel for the harmony voices.',
-    [T, { name: 'channel', type: 'number', required: true }]),
-  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)',
-    `Voice-leading strategy — ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
-    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord' }]),
-  panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the voices over `ms` milliseconds.',
-    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
-  panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Override the chord used for one scale degree.',
-    [T, { name: 'degree', type: 'number', required: true, kind: 'componentIndex' }, { name: 'chord', type: 'string', required: true, kind: 'componentWord' }]),
+  // Done in one pass at the owner's word (docs/design/api-descriptions-handoff.md,
+  // "ce.components.harmony"): what harmoniserLayout.js's harmoniserScriptPatch does with each.
+  panelVerb('harmonyMode', 'harmonyMode(target, mode)', `Set how it builds the harmony: ${oneOf(HAND_WRITTEN_VALUES['harmony.mode'])}.`,
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord',
+      summary: '"diatonic": the chord the played note\'s step of the key has; always in the key.\n"memory": a fixed shape, `shape()`, on whatever note is played, in the key or not.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.mode("Harmoniser", "memory")` plays one chord shape on every note.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyKey', 'harmonyKey(target, key)', 'Set the key it harmonises in.',
+    [T, { name: 'key', type: 'number', required: true, kind: 'componentWord', summary: 'The key\'s note: a name, such as "F#", in any case, or a number round the octave, 0 being C: 14 is 2, D.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.key("Harmoniser", "Bb")` harmonises in B♭.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyScale', 'harmonyScale(target, scale)', 'Set the scale it harmonises in.',
+    [T, { name: 'scale', type: 'string', required: true, kind: 'scale', summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.scale("Harmoniser", "minor")` harmonises in the minor key.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonySize', 'harmonySize(target, size)', 'Set how many notes each chord has.',
+    [T, { name: 'size', type: 'number', required: true, summary: 'Notes: 3 a triad, 4 a seventh chord.\nRange: 2 ↔ 6, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.size("Harmoniser", 4)` plays seventh chords.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyShape', 'harmonyShape(target, shape)', `Set the chord shape it plays: ${oneOf(HAND_WRITTEN_VALUES['harmony.shape'])}, or a list of intervals.`,
+    [T, { name: 'shape', type: 'string', required: true, kind: 'componentWord',
+      summary: 'A shape by name, case-insensitive; or a list of semitones above the played note, such as {0, 4, 7}, -36 to 36 each, 6 at most.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.shape("Harmoniser", "min7")` plays a minor seventh on every note.', notes: ['While `mode()` is "memory".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyVoicing', 'harmonyVoicing(target, voicing)', `Set how the notes of each chord are spread: ${oneOf(HAND_WRITTEN_VALUES['harmony.voicing'])}.`,
+    [T, { name: 'voicing', type: 'string', required: true, kind: 'componentWord',
+      summary: '"close": as close together as they go.\n"open": the middle note an octave up.\n"drop2": the second note from the top an octave down.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.voicing("Harmoniser", "open")` spreads each chord wider.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyInversion', 'harmonyInversion(target, inversion)', 'Set which note of each chord is lowest.',
+    [T, { name: 'inversion', type: 'number', required: true, summary: '0: the root lowest. 1: the third. 2: the fifth. 3: the seventh.\nPast the chord\'s notes: the highest inversion it has, 2 for a triad.\nRange: 0 ↔ 3, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.inversion("Harmoniser", 1)` puts the third lowest.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyOctave', 'harmonyOctave(target, octave)', 'Move the added notes by whole octaves.',
+    [T, { name: 'octave', type: 'number', required: true, summary: 'Octaves: 1 up, -1 down.\nRange: -3 ↔ 3, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.octave("Harmoniser", -1)` puts the harmony an octave below.', notes: ['The played note stays where it is.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyOutOfKey', 'harmonyOutOfKey(target, mode)', `Set what a played note outside the key does: ${oneOf(HAND_WRITTEN_VALUES['harmony.outOfKey'])}.`,
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord',
+      summary: '"pass": the note sounds alone, without harmony.\n"nearest": harmonised as the nearest note of the key.\n"mute": nothing sounds.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.outOfKey("Harmoniser", "nearest")` harmonises a wrong note as the nearest right one.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyKeepPlayed', 'harmonyKeepPlayed(target [, keep])', 'Sound the played note with its harmony, or only the harmony.',
+    [T, { name: 'keep', type: 'boolean', required: false, summary: 'true: the played note sounds too.\nfalse: only the added notes.\nLeft out: toggles.' }],
+    { example: '`ce.components.harmony.keepPlayed("Harmoniser", false)` plays the harmony without the note played.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyChannel', 'harmonyChannel(target, channel)', 'Set the MIDI channel the chords play on.',
+    [T, { name: 'channel', type: 'number', required: true, summary: 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.channel("Harmoniser", 2)` plays the chords on channel 2.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyVoiceLeading', 'harmonyVoiceLeading(target, mode)', `Set how each chord moves from the one before: ${oneOf(HAND_WRITTEN_VALUES['harmony.voiceLeading'])}.`,
+    [T, { name: 'mode', type: 'string', required: true, kind: 'componentWord',
+      summary: '"off": each chord as `inversion()` sets it.\n"closest": the notes move as little as they can, all together.\n"smooth": the top note moves as little as it can.\nCase-insensitive.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.voiceLeading("Harmoniser", "closest")` keeps the chords close together.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyStrum', 'harmonyStrum(target, ms)', 'Spread the notes of each chord out in time, as a strum.',
+    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Milliseconds from the first note to the last.\n0: all together.\nRange: 0 ↔ 400.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.harmony.strum("Harmoniser", 60)` strums each chord over 60 ms.', notes: ['Up or down: set in the inspector.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('harmonyDegree', 'harmonyDegree(target, degree, chord)', 'Play a chord of your own on one step of the key.',
+    [T, { name: 'degree', type: 'number', required: true, kind: 'componentIndex', summary: 'Step of the scale, counted from 1.\nA fraction: rounded.\nNot a step of the scale: rejected with a console error.' },
+     { name: 'chord', type: 'string', required: true, kind: 'componentWord', summary: 'Semitones above the step\'s note, such as {0, 5, 7}, -36 to 36 each, 6 at most.\n"clear": the key\'s own chord again.\nAny other: rejected with a console error.' }],
+    { example: '`ce.components.harmony.degree("Harmoniser", 6, {0, 5, 7})` plays a sus4 on the sixth step.', notes: ['While `mode()` is "diatonic".', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
 
   // --- Setlist ---
   // These move the INDEX; the recall follows from the index changing, so a scripted step and a
-  // footswitch step are indistinguishable downstream.
-  panelVerb('setlistNext', 'setlistNext(target)', 'Advance to the next enabled scene.', [T]),
-  panelVerb('setlistPrev', 'setlistPrev(target)', 'Go back to the previous enabled scene.', [T]),
-  panelVerb('setlistGoto', 'setlistGoto(target, scene)', 'Jump to a scene by index or name.',
-    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex' }]),
-  panelVerb('setlistEnable', 'setlistEnable(target, scene, enabled)', 'Include or skip a scene in the walk order.',
-    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex' }, { name: 'enabled', type: 'boolean', required: true }]),
-  panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Wrap from the last scene back to the first.',
-    [T, { name: 'wrap', type: 'boolean', required: false }]),
-  panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Crossfade scene values over `ms` milliseconds.',
-    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds' }]),
+  // footswitch step are indistinguishable downstream. Done in one pass at the owner's word
+  // (docs/design/api-descriptions-handoff.md, "ce.components.setlist").
+  panelVerb('setlistNext', 'setlistNext(target)', 'Go to the next scene it plays.', [T],
+    { example: '`ce.components.setlist.next("Setlist")` recalls the next scene.',
+      notes: ['Scenes switched off with `enable()` are passed over.', 'At the last: to the first while `wrap()` is on; else rejected with a console error.', 'Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('setlistPrev', 'setlistPrev(target)', 'Go back to the scene before.', [T],
+    { example: '`ce.components.setlist.prev("Setlist")` recalls the scene before.',
+      notes: ['Scenes switched off with `enable()` are passed over.', 'At the first: to the last while `wrap()` is on; else rejected with a console error.', 'Returns true. Rejected: false, with a console error.'] }),
+  panelVerb('setlistGoto', 'setlistGoto(target, scene)', 'Go to a scene by its number or name.',
+    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex', summary: 'Its number, counted from 1, or its name, as written.\nNot a scene: rejected with a console error naming them.' }],
+    { example: '`ce.components.setlist.jump("Setlist", "Ballad")` recalls the scene called Ballad.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('setlistEnable', 'setlistEnable(target, scene, enabled)', 'Play a scene in the set, or pass over it.',
+    [T, { name: 'scene', type: 'number or text', required: true, kind: 'componentIndex', summary: 'Its number, counted from 1, or its name, as written.\nNot a scene: rejected with a console error naming them.' },
+     { name: 'enabled', type: 'boolean', required: true, summary: 'true: played.\nfalse: passed over by `next()` and `prev()`.\nLeft out: played.' }],
+    { example: '`ce.components.setlist.enable("Setlist", 2, false)` skips scene 2 tonight.', notes: ['`jump()` still goes to it.', 'Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('setlistWrap', 'setlistWrap(target [, wrap])', 'Go round from the last scene to the first, or stop at the ends.',
+    [T, { name: 'wrap', type: 'boolean', required: false, summary: 'true: round.\nfalse: stops at the ends.\nLeft out: toggles.' }],
+    { example: '`ce.components.setlist.wrap("Setlist", true)` goes from the last scene to the first.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
+  panelVerb('setlistCrossfade', 'setlistCrossfade(target, ms)', 'Set how long a scene\'s values take to fade in.',
+    [T, { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'Milliseconds.\n0: at once.\nRange: 0 ↔ 10000.\nOutside the range: the nearest end.\nNot a number: rejected with a console error.' }],
+    { example: '`ce.components.setlist.crossfade("Setlist", 800)` fades each scene in over 0.8 s.', notes: ['Returns true. Already that way: true, with a console line.', 'Rejected: false, with a console error.'] }),
 
   /* --- Reading the five (design doc §44) ---
      Every component member in the API was a WRITE. The twenty-three spec-driven families now read
@@ -3840,24 +5732,23 @@ export const PANEL_COMMANDS = [
      spec and have no such map, so they read by the MODEL field name — which is the name their own
      summaries already use. `read(target)` with no field is the whole section either way, so the
      one shape a script is most likely to want is the same across all twenty-eight. */
-  panelVerb('splitRead', 'splitRead(target [, field])',
-    'Read the Zone Splitter\'s settings — the whole section, or one field by name (`zones`, `preset`). '
-    + 'Fields are addressed by model field name, not by verb name.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('phraseRead', 'phraseRead(target [, field])',
-    'Read the Phrase Sequencer\'s settings — the whole section, or one field by name.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('recorderRead', 'recorderRead(target [, field])',
-    'Read the Phrase Recorder\'s state — the whole section, or one field by name. Includes '
-    + 'recording status and the take contents.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('harmonyRead', 'harmonyRead(target [, field])',
-    'Read the Harmoniser\'s settings — the whole section, or one field by name.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
-  panelVerb('setlistRead', 'setlistRead(target [, field])',
-    'Read the Setlist — the whole section, or one field by name. `scenes` is the scene list; '
-    + '`index` is the current position.',
-    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord' }]),
+  panelVerb('splitRead', 'splitRead(target [, field])', 'Read the Zone Splitter\'s settings.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "zones" or "lowNote".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.split.read("Split", "zones")` gives the zones, each { label, lowNote, highNote, channel, transpose, enabled, … }.', notes: ['Returns the value.'] }),
+  panelVerb('phraseRead', 'phraseRead(target [, field])', 'Read the Phrase Sequencer\'s settings.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "key" or "pattern".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.phrase.read("Phrase", "key")` gives the key, 0 being C.', notes: ['Returns the value.'] }),
+  panelVerb('recorderRead', 'recorderRead(target [, field])', 'Read the Phrase Recorder\'s settings and take.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord',
+      summary: 'A setting\'s name, in any case, such as "state" or "take".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.recorder.read("Recorder", "state")` gives "idle", "armed", "recording" or "overdub".',
+      notes: ['"take": { events }, each note { t, note, velocity, dur, pass }, `t` and `dur` as parts of the loop.', 'Returns the value.'] }),
+  panelVerb('harmonyRead', 'harmonyRead(target [, field])', 'Read the Harmoniser\'s settings.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "mode" or "degreeChords".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.harmony.read("Harmoniser", "mode")` gives "diatonic" or "memory".', notes: ['Returns the value.'] }),
+  panelVerb('setlistRead', 'setlistRead(target [, field])', 'Read the Setlist\'s settings and scenes.',
+    [T, { name: 'field', type: 'string', required: false, kind: 'componentWord', summary: 'A setting\'s name, in any case, such as "index" or "scenes".\nLeft out: every setting, as a table.\nNot one of its settings: no result, with a console error naming them.' }],
+    { example: '`ce.components.setlist.read("Setlist", "index")` gives the scene in front, counted from 0.', notes: ['"scenes": each { name, values, enabled, … }.', 'Returns the value.'] }),
 
   // --- Panel values: snapshot / restore ---
   // The two members of ce.panel that are NOT panel-view only. Creating a control needs a renderer;
@@ -3865,14 +5756,25 @@ export const PANEL_COMMANDS = [
   // footswitch action in a DAW with the window shut — which is exactly where it has to work.
   {
     id: 'panelSnapshot', category: 'Panel components', signature: 'panelSnapshot() -> object',
-    summary: 'Capture every control\'s current value, as an object keyed by control name. Controls that have no value of their own are left out. Store it with `ce.storage.saveSetting()` to keep it, or hold it in `state` for an A/B comparison, and put it back with `ce.panel.restore()`.',
+    summary: 'Capture every control\'s value, by name.',
+    example: '`local before = ce.panel.snapshot()` keeps the panel\'s values, to put back with `ce.panel.restore(before)`.',
+    notes: [
+      'A control without a value of its own is left out.',
+      'Keep it with `ce.storage.saveSetting()`, or in `state` for an A/B comparison.',
+      'Returns a table of control names and their values.',
+    ],
     params: [], scopes: 'any',
     snippet: { lua: 'local before = ce.panel.snapshot()$0', javascript: 'const before = ce.panel.snapshot();$0' },
   },
   {
     id: 'panelEach', category: 'Panel components', signature: 'panelEach(fn) -> number',
-    summary: 'Call `fn(name)` once for every control on the panel, including containers and the controls inside them, in the order they appear in the panel. Returns how many controls it visited. The list of names is taken before the first call, so `fn` can safely create or remove controls. To find out more about a control than its name, use `ce.panel.info()`.',
-    params: [{ name: 'fn', type: 'function', required: true }], scopes: 'any',
+    summary: 'Call a function once for every control, with its name.',
+    example: '`ce.panel.each(function(name) log(name) end)` logs every control\'s name.',
+    notes: [
+      '`ce.panel.info()` tells more about each.',
+      'Returns how many controls it was called for. Rejected: 0, with a console error.',
+    ],
+    params: [{ name: 'fn', type: 'function', required: true, summary: 'Called as fn(name) for every control, those inside containers too, in panel order.\nThe names are taken first, so it can make or remove controls.\nNot a function, or left out: rejected with a console error.' }], scopes: 'any',
     snippet: {
       lua: 'ce.panel.each(function(name)\n  $0\nend)',
       javascript: 'ce.panel.each(function (name) {\n  $0\n});',
@@ -3880,8 +5782,12 @@ export const PANEL_COMMANDS = [
   },
   {
     id: 'panelRestore', category: 'Panel components', signature: 'panelRestore(snapshot) -> number',
-    summary: 'Write the values from a `ce.panel.snapshot()` back to the controls. Returns how many values were written. A control the panel no longer has is skipped rather than stopping the whole restore.',
-    params: [{ name: 'snapshot', type: 'object', required: true }], scopes: 'any',
+    summary: 'Write the values of a `ce.panel.snapshot()` back to the controls.',
+    example: '`ce.panel.restore(before)` puts back the values `before` holds.',
+    notes: [
+      'Returns how many values were written. Rejected: 0, with a console error.',
+    ],
+    params: [{ name: 'snapshot', type: 'object', required: true, summary: 'A table of control names and values, as `ce.panel.snapshot()` gives.\nA control the panel no longer has: skipped.\nNot a table, or left out: rejected with a console error.' }], scopes: 'any',
     snippet: { lua: 'ce.panel.restore(before)$0', javascript: 'ce.panel.restore(before);$0' },
   },
 
@@ -3978,7 +5884,7 @@ export const HELPERS = [
     notes: ['For a curve of your own, use `ce.math.map`. For the curves the panel\'s Envelopes use, use `ce.math.shape`.'],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: not held at 0 or 1.' },
-      { name: 'shape', type: 'text', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends).\nLeft out: "linear". An unknown name, or a different case such as "EXP": a note in the console, and "linear" is used.' },
+      { name: 'shape', type: 'text', required: false, summary: '"linear" (unchanged), "exp" (slow, then fast), "log" (fast, then slow) or "s" (slow at both ends). Case-insensitive.\nLeft out: "linear". An unknown name: a note in the console, and "linear" is used.' },
     ],
   },
   {
@@ -4142,7 +6048,7 @@ export const HELPERS = [
       { name: 'a', type: 'number', required: true, summary: 'The value at 0.' },
       { name: 'b', type: 'number', required: true, summary: 'The value at 1.' },
       { name: 't', type: 'number', required: true, summary: 'Range: 0 ↔ 1 (a ↔ b).\nLeft out: 0.\nOutside the range: held at 0 or 1.' },
-      { name: 'law', type: 'text', required: false, summary: '"linear", "equalPower" or "sharp".\nDefault: "linear". An unknown name is used as "linear".' },
+      { name: 'law', type: 'text', required: false, summary: '"linear", "equalPower" or "sharp". Case-insensitive.\nDefault: "linear". An unknown name is used as "linear".' },
     ],
   },
   {
@@ -4351,7 +6257,7 @@ export const HELPERS = [
     ],
     params: [
       { name: 'v', type: 'number', required: true, summary: 'The value.\nRange: 0 ↔ 1.\nOutside the range: held at 0 or 1.' },
-      { name: 'curve', type: 'text', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1).\nLeft out or unknown: "linear".' },
+      { name: 'curve', type: 'text', required: false, summary: '"linear", "exp" (slow, then fast), "log" (fast, then slow), "scurve" or "s" (slow at both ends), or "hold" (0 until the end, then 1). Case-insensitive.\nLeft out or unknown: "linear".' },
       { name: 'tension', type: 'number', required: false, summary: 'How strongly "exp" and "log" bend.\nDefault: 1.6, as in the app; 0 also gives 1.6, not a straight line. At 1 it matches the curve a Macro slot uses.' },
     ],
   },
@@ -4513,6 +6419,259 @@ export const HELPERS = [
       { name: 'fn', type: 'function', required: true, summary: 'The code to run. The script\'s own sequence returns when it ends, even if it ends in an error.' },
     ],
   },
+  // --- ce.format: a value as text, and text back (docs/design/ce-format-module.md) ---
+  // Pure, and the same text in every language: formatCore.js here, and a line-for-line twin in each
+  // prelude, held together by test/formatParity.test.js. Options are checked as everywhere else: a
+  // key a command does not take refuses the call (the design said "ignored"; the contract's rule won).
+  {
+    id: 'formatNumber', category: 'Formatting', signature: 'formatNumber(v [, opts])', refusal: 'nothing',
+    summary: 'A number as text, with as many decimals as it needs.',
+    example: '`ce.format.number(12, { sign = "always" })` gives "+12".',
+    notes: [
+      'A whole number has no decimals unless `decimals` asks for them: 3 gives "3", and with `decimals = 1`, "3.0".',
+      'Otherwise three significant digits, trailing zeros dropped: 2.50 gives "2.5", 0.123456 gives "0.123".',
+      'Rounding is half away from zero and the point is always a point, in every language and on every computer.',
+      'No value (nothing, or text that is not a number) gives the placeholder, "--", never "0".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The number. Text that is a number, such as "440", is read as one.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode']) },
+    ],
+  },
+  {
+    id: 'formatHz', category: 'Formatting', signature: 'formatHz(v [, opts])', refusal: 'nothing',
+    summary: 'A frequency, in Hz or kHz, whichever reads shorter.',
+    example: '`ce.format.hz(1250)` gives "1.25 kHz".',
+    notes: [
+      'kHz from 1000 Hz up: 999 gives "999 Hz", 1000 gives "1 kHz". Below 1 Hz, as an LFO rate can be: 0.25 gives "0.25 Hz".',
+      '`space = false` packs it for a narrow display: "12.3kHz".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, unit: 'hertz', summary: 'The frequency.\nBelow 0: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'scale', type: 'text', default: '"auto"', values: ['auto', 'Hz', 'kHz'],
+          summary: '"Hz" or "kHz" keeps one, so a column of values lines up.' }]) },
+    ],
+  },
+  {
+    id: 'formatTime', category: 'Formatting', signature: 'formatTime(ms [, opts])', refusal: 'nothing',
+    summary: 'A duration, in ms or s, whichever reads shorter.',
+    example: '`ce.format.time(1200)` gives "1.2 s".',
+    notes: [
+      'Seconds from 1000 ms up; below 1 ms, 0.5 gives "0.5 ms".',
+      'For a length in beats, use `ce.format.division`; for minutes, `ce.format.clock`.',
+    ],
+    params: [
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'The duration.\nBelow 0: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'scale', type: 'text', default: '"auto"', values: ['auto', 'ms', 's'],
+          summary: '"ms" or "s" keeps one, so a column of values lines up.' }]) },
+    ],
+  },
+  {
+    id: 'formatDb', category: 'Formatting', signature: 'formatDb(v [, opts])', refusal: 'nothing',
+    summary: 'A level in decibels, with one decimal.',
+    example: '`ce.format.db(-6)` gives "-6.0 dB".',
+    notes: [
+      'One decimal by default, because a readout jumping between "-6 dB" and "-5.9 dB" reads as a fault.',
+      'At or below `floor` it is written "-inf dB": silence, as `ce.math.gainToDb` gives it, is -144 dB.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, unit: 'dB', summary: 'The level, or a gain (1 = 0 dB) with `fromGain`.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'fromGain', type: 'true or false', default: 'false', summary: '`v` is a gain, converted as `ce.math.gainToDb` does.' },
+        { name: 'floor', type: 'number', default: '-144', unit: 'dB', summary: 'At or below this: "-inf dB". A mixer fader often wants -80.' }]) },
+    ],
+  },
+  {
+    id: 'formatPercent', category: 'Formatting', signature: 'formatPercent(v [, opts])', refusal: 'nothing',
+    summary: 'A share, as a percentage.',
+    example: '`ce.format.percent(0.5)` gives "50%".',
+    notes: [
+      'Whole percentages unless `decimals` asks for more; no space before %.',
+      'Outside the range it is written as it is, "120%": hold it with `ce.math.clamp` first.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The share, 0 to 1 unless `min` and `max` say otherwise.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'min', type: 'number', default: '0', summary: 'The value that is 0%.' },
+        { name: 'max', type: 'number', default: '1', summary: 'The value that is 100%. `max = 127` reads a knob\'s raw value.\nThe same as min: the placeholder, with a console error.' }]) },
+    ],
+  },
+  {
+    id: 'formatPan', category: 'Formatting', signature: 'formatPan(v [, opts])', refusal: 'nothing',
+    summary: 'A position from left to right, as a synth\'s display writes it.',
+    example: '`ce.format.pan(-0.5)` gives "L25"; `ce.format.pan(0)` gives "C".',
+    notes: [
+      'With the default range, -1 to 1, the far left and far right read `steps`: -1 gives "L50", 1 gives "R50".',
+      'With a range of your own, the number is the distance from the centre as it is, which is what synths show: with `{ min = 0, max = 127, center = 64 }`, 0 reads "L64" and 127 "R63".',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The position.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatWidth', 'formatPlaceholder',
+        { name: 'min', type: 'number', default: '-1', summary: 'The far left.' },
+        { name: 'max', type: 'number', default: '1', summary: 'The far right.' },
+        { name: 'center', type: 'number', default: 'halfway', summary: 'The value that reads "C".' },
+        { name: 'steps', type: 'number', default: '50', summary: 'What the far left and far right read, for the default range.' },
+        { name: 'style', type: 'text', default: '"L50"', values: ['L50', '50L', '<50', '50>'],
+          summary: '"L50" or "50L"; "<50" (">50" on the right) or "50>" ("50<" on the left) for a display with no letters to spare.' }]) },
+    ],
+  },
+  {
+    id: 'formatRatio', category: 'Formatting', signature: 'formatRatio(v [, opts])', refusal: 'nothing',
+    summary: 'A ratio, as a compressor or a frequency-modulation operator shows it.',
+    example: '`ce.format.ratio(4)` gives "4:1"; with `style = "x"`, 2 gives "x2.00".',
+    notes: ['A ratio of infinity, as a limiter has, is written "inf:1".'],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The ratio.\n0 or below: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatWidth',
+        'formatPlaceholder', 'formatUnicode',
+        { name: 'style', type: 'text', default: '":"', values: [':', 'x'], summary: '":" for "4:1"; "x" for "x2.00", as an FM ratio reads, two decimals.' }]) },
+    ],
+  },
+  {
+    id: 'formatClock', category: 'Formatting', signature: 'formatClock(ms [, opts])', refusal: 'nothing',
+    summary: 'A time as a clock shows it: minutes, seconds and tenths.',
+    example: '`ce.format.clock(83450)` gives "1:23.4".',
+    notes: [
+      'Hours appear from 60 minutes on: "1:02:03.4".',
+      'Cut, not rounded: a clock shows the tenth that has passed, never one still to come.',
+      'For a song position in bars and beats, use `ce.time.position`.',
+    ],
+    params: [
+      { name: 'ms', type: 'number', required: true, unit: 'milliseconds', summary: 'The time.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'decimals', type: 'number', default: '1', summary: 'Decimals of the seconds, 0 to 3.' },
+        { name: 'hours', type: 'true or false', default: 'false', summary: 'Always show hours.' }]) },
+    ],
+  },
+  {
+    id: 'formatNote', category: 'Formatting', signature: 'formatNote(n [, opts])', refusal: 'nothing',
+    summary: 'A MIDI note number as a note name, in the octave numbering the synth uses.',
+    example: '`ce.format.note(60, { middleC = 3 })` gives "C3", as a Yamaha\'s display reads middle C.',
+    notes: [
+      'Makers disagree on middle C: Roland and most software say C4, Yamaha says C3, some old gear C5. Get it wrong and every note on the display is an octave off.',
+      'The same names as `ce.music.name`, which stays for music; this one is for display.',
+    ],
+    params: [
+      { name: 'n', type: 'number', required: true, summary: 'The MIDI note, 0 to 127. A fraction is rounded.\nOutside the range: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'middleC', type: 'number', default: '4', summary: 'The octave number note 60 is written with: 3, 4 or 5.' },
+        { name: 'flats', type: 'true or false', default: 'false', summary: '"Db4" rather than "C#4".' },
+        { name: 'octave', type: 'true or false', default: 'true', summary: 'Off: the letter alone, "C#", for a key or a chord root.' }]) },
+    ],
+  },
+  {
+    id: 'formatDivision', category: 'Formatting', signature: 'formatDivision(beats [, opts])', refusal: 'nothing',
+    summary: 'The note length nearest to a number of beats, by the names the sequencer components use.',
+    example: '`ce.format.division(0.25)` gives "1/16"; `ce.format.division(1/3)` gives "1/8T".',
+    notes: [
+      'The names of `ce.time.divisions()`: "1/1" to "1/32", with "D" for dotted and "T" for triplet.',
+      'A length near no division gives the beats as a number, "0.3 beats", rather than the wrong name.',
+    ],
+    params: [
+      { name: 'beats', type: 'number', required: true, unit: 'beats', summary: 'The length; a quarter note is 1.\n0 or below: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatWidth', 'formatPlaceholder',
+        { name: 'tolerance', type: 'number', default: '0.02', summary: 'How far from a division, as a part of it, still counts as that division. 0 to 0.5.' }]) },
+    ],
+  },
+  {
+    id: 'formatParameter', category: 'Formatting', signature: 'formatParameter(id, v [, opts])', refusal: 'nothing',
+    summary: 'A synth parameter\'s value, written the way the synth\'s own display writes it, from the device profile.',
+    example: '`ce.format.parameter("octaveShift", 61)` gives "-3" on a GAIA, where the value is stored 61 to 67 and the panel reads -3 to +3.',
+    notes: [
+      'What it reads from the profile, in order: a choice\'s label; `display.table`, its first entry for the lowest stored value; `display.min` and `display.max` to scale the stored range to the shown one; `display.format` to pick the command (`hz`, `time`, `db`, `percent`, `pan`, `ratio`, `note`, `division`); `display.unit`; `display.precision`; and `display.middleC`, from the parameter or the profile.',
+      'A parameter the profile says nothing more about is written as its number, which is what the panel shows today.',
+      'A `percent` is how far along the stored range the value is; a `pan` is the distance from the middle of the shown range, or from 0 when the range runs through 0.',
+      'What the call passes wins over what the profile says: `decimals = 0` writes a parameter whose profile gives one decimal without it.',
+      'The one command most panels need: `ce.components.lcd.text("Display", 1, ce.format.parameter(id, value))` shows any parameter as the synth does, once its profile says how.',
+    ],
+    requiresDeviceHost: true,
+    params: [
+      { name: 'id', type: 'string', required: true, kind: 'deviceParameter', summary: 'The parameter, by its id in the device profile.\nNot one of its parameters: the placeholder, with a console error.' },
+      { name: 'v', type: 'number or text', required: true, summary: 'The value as the synth stores it, as `ce.device.read()` gives it.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatDecimals', 'formatDigits', 'formatSign',
+        'formatUnit', 'formatSpace', 'formatWidth', 'formatPlaceholder', 'formatUnicode',
+        { name: 'role', type: 'string', kind: 'deviceRole', default: '"mainSynth"',
+          summary: 'Which device\'s profile to read, when the panel names more than one.' }]) },
+    ],
+  },
+  {
+    id: 'formatTable', category: 'Formatting', signature: 'formatTable(v, table [, opts])', refusal: 'nothing',
+    summary: 'Text from a lookup table, for a value whose display follows no formula.',
+    example: '`ce.format.table(2, {"Off", "I", "II", "I+II"})` gives "II".',
+    notes: [
+      'The first entry is for value 0 in every language, Lua included, because synths count from 0; `start = 1` changes that.',
+      'A list of ranges, `{ upTo, text }`, is read in order: the first whose upTo the value does not pass.',
+      'Past the end of the table: the placeholder, with a console warning.',
+    ],
+    params: [
+      { name: 'v', type: 'number', required: true, summary: 'The value.' },
+      { name: 'table', type: 'list', required: true, summary: 'A list of texts, or a list of { upTo, text } ranges.\nNeither, or empty: the placeholder, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatWidth', 'formatPlaceholder',
+        { name: 'start', type: 'number', default: '0', summary: 'The value the first entry of a list is for.' }]) },
+    ],
+  },
+  {
+    id: 'formatFit', category: 'Formatting', signature: 'formatFit(text, width [, opts])', refusal: 'nothing',
+    summary: 'Text made exactly `width` characters long: shortened the way a synth\'s display shortens it, then padded.',
+    example: '`ce.format.fit("Filter Envelope", 10)` gives "Filter Env".',
+    notes: [
+      'It shortens one step at a time until the text fits: (1) the abbreviation list, Envelope to Env, Resonance to Reso and about 50 more; (2) vowels from the ends of the longest words, never a first letter, Filter to Fltr; (3) the spaces between words, from the right; (4) the end, cut.',
+      'Characters are counted, which is right for an LCD and any monospaced font; for a proportional font, measure with `ce.text.measure`.',
+    ],
+    params: [
+      { name: 'text', type: 'text', required: true, summary: 'The text. A number is written as text first.' },
+      { name: 'width', type: 'number', required: true, summary: 'The characters, from 1.\nBelow 1: nothing, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatAbbreviations',
+        { name: 'align', type: 'text', default: '"left"', values: ['left', 'right', 'center'], summary: 'Where the padding goes.' },
+        { name: 'pad', type: 'true or false', default: 'true', summary: 'Off: shortened but not padded.' },
+        { name: 'steps', type: 'number', default: '4', summary: 'The last shortening step allowed, 1 to 4: 1 for abbreviations only, so a name is never mangled.' }]) },
+    ],
+  },
+  {
+    id: 'formatLine', category: 'Formatting', signature: 'formatLine(left, right, width [, opts])', refusal: 'nothing',
+    summary: 'One display line: a label on the left and a value on the right, with spaces between.',
+    example: '`ce.format.line("Cutoff", "12.3k", 16)` gives "Cutoff     12.3k".',
+    notes: [
+      'When the two do not fit, the label is shortened, as `ce.format.fit` does, never the value: a wrong-looking value is worse than a short name.',
+      'A value wider than the line is cut from the left, so its end, where the unit is, stays.',
+    ],
+    params: [
+      { name: 'left', type: 'text', required: true, summary: 'The label.' },
+      { name: 'right', type: 'text', required: true, summary: 'The value, usually from another ce.format command.' },
+      { name: 'width', type: 'number', required: true, summary: 'The line\'s width in characters.\nBelow 1: nothing, with a console error.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields(['formatAbbreviations',
+        { name: 'gap', type: 'number', default: '1', summary: 'The fewest spaces between the two.' }]) },
+    ],
+  },
+  {
+    id: 'formatParse', category: 'Formatting', signature: 'formatParse(text [, opts]) -> number', refusal: 'nothing',
+    summary: 'A number from text a person typed, in the forms the other ce.format commands write.',
+    example: '`ce.format.parse("1.2k")` gives 1200; `ce.format.parse("C4", { kind = "note" })` gives 60.',
+    notes: [
+      'Without a kind it reads a number, with k for thousands, and Hz, kHz, ms, s, dB and % as units, each turned into the unit its command takes: "1.2 s" gives 1200 (ms), "50%" gives 0.5.',
+      'With a kind it also reads that kind\'s forms: a note name, a division ("1/8T"), a pan ("L25"), a ratio ("4:1"); and a bare number is taken in that kind\'s unit, so "5" is 5 ms as a time.',
+      'Spaces and case do not matter. Nothing it can read: no result, and no console line, because a person typing is not a script\'s mistake.',
+    ],
+    params: [
+      { name: 'text', type: 'text', required: true, summary: 'What was typed.' },
+      { name: 'opts', type: 'object', required: false, fields: optionFields([
+        { name: 'kind', type: 'text', default: '"auto"', values: ['auto', 'hz', 'time', 'db', 'percent', 'pan', 'ratio', 'note', 'division'],
+          summary: 'What the value is. A unit that belongs to another kind gives no result.' },
+        { name: 'min', type: 'number', summary: 'The result is held at or above this; for a pan, the far left.' },
+        { name: 'max', type: 'number', summary: 'The result is held at or below this; for a pan, the far right.' },
+        { name: 'center', type: 'number', summary: 'For a pan: the value that reads "C".' },
+        { name: 'steps', type: 'number', default: '50', summary: 'For a pan, as `ce.format.pan` takes it.' },
+        { name: 'middleC', type: 'number', default: '4', summary: 'For a note, as `ce.format.note` takes it.' }]) },
+    ],
+  },
+
   // music
   // Middle C is C4 — scientific pitch notation, which is what every runtime has always computed.
   // These summaries said "C3" (the Yamaha convention) from the start, so the docs and the code
@@ -4520,16 +6679,26 @@ export const HELPERS = [
   // semitones. The code is right and stays; the wording is what was wrong.
   {
     id: 'noteName', category: 'Music', signature: 'noteName(n [, flats])',
-    summary: 'Turn a MIDI note number into a name: 60 gives "C4" (middle C). With `flats` left out, you get plain text with # for sharps ("C#4"), which is easy to type and compare against. Pass `flats` to get the panel\'s own spelling instead: true gives flats ("D♭4") and false gives sharps ("C♯4"). `ce.music.spelling()` tells you which one a key uses.',
+    summary: 'Give the name of a MIDI note number.',
+    example: '`ce.music.name(61)` gives "C#4".',
+    notes: [
+      'Returns the name as text.',
+      '`ce.music.spelling()` says whether a key is spelled with flats.',
+    ],
     params: [
-      { name: 'n', type: 'number', required: true, kind: 'note' },
-      { name: 'flats', type: 'boolean', required: false },
+      { name: 'n', type: 'number', required: true, summary: 'Note number: 60 is middle C, C4.\nA fraction: rounded down.\nOutside 0 to 127: named the same way; -1 is "B-2".\nNot a number, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'flats', type: 'boolean', required: false, summary: 'Left out: # for a sharp, as "C#4", plain text to type and compare.\ntrue: flats, as the panel spells them: "D♭4".\nfalse: sharps, as the panel spells them: "C♯4".' },
     ],
   },
   {
     id: 'noteNumber', category: 'Music', signature: 'noteNumber(name) -> number',
-    summary: 'Turn a note name into a MIDI note number: "C4" gives 60 (middle C is C4). Sharps and flats can be typed either way, so "C#4", "C♯4", "Db4" and "D♭4" all work. The letter must be a capital and the octave must be there. A name it cannot read returns nothing rather than 0, because 0 is a real note (C-1).',
-    params: [{ name: 'name', type: 'string', required: true, kind: 'note' }],
+    summary: 'Give the MIDI note number of a note name.',
+    example: '`ce.music.number("Eb4")` gives 63.',
+    notes: [
+      'Returns the number. It can pass 127: "G#9" is 128.',
+      'A name it cannot read gives no result rather than 0, since 0 is a note: C-1.',
+    ],
+    params: [{ name: 'name', type: 'string', required: true, summary: 'A letter from A to G, then #, ♯, b or ♭ if it has one, then the octave: "C4" is 60, middle C. Case-insensitive; spaces round it are ignored.\nCb is the B below; B# and E# are not read.\nNo octave, a name that cannot be read, a number, or left out: no result, with a console error.', kind: 'note' }],
   },
   // Scales, chords and quantise-to-scale — what §2 defined ce.music as, finished. The interval
   // tables are the panel's OWN: a script asking for "dorian" and a Chord Pad set to "dorian" mean
@@ -4537,27 +6706,42 @@ export const HELPERS = [
   // every prelude. `root` and `note` accept a MIDI number or a name ("C4"), like sendNote does.
   {
     id: 'scaleNotes', category: 'Music', signature: 'scaleNotes(root [, scale]) -> list',
-    summary: 'One octave of a scale, rising from `root`: seven notes for most scales, five for the pentatonics and six for blues, without repeating the root at the top. `root` can be a note number or a name such as "C4". `scale` defaults to "major" and can be "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" or "blues". A name it does not know returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Give the notes of a scale, one octave up from its root.',
+    example: '`ce.music.scale("D4", "dorian")` gives {62, 64, 65, 67, 69, 71, 72}.',
+    notes: [
+      'Returns 7 notes; 5 for the pentatonic scales, 6 for "blues". The root is not repeated at the top.',
+      'Notes past 127 are given as they are; `sendNote()` refuses them.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'root', type: 'value', required: true, summary: 'The first note.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
     id: 'chordNotes', category: 'Music', signature: 'chordNotes(root [, type]) -> list',
-    summary: 'The notes of a named chord, rising from `root`: a fixed shape such as a D minor 7, not something built from a key. `type` defaults to "major"; the types are major, minor, dim, aug, sus2, sus4, power, maj6, min6, dom7, maj7, min7, minMaj7, dim7, m7b5, aug7, add9, dom9, maj9 and min9. An unknown type returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. To build a chord on a step of a key, use `ce.music.degreeChord()`.',
+    summary: 'Give the notes of a chord of a type, up from its root.',
+    example: '`ce.music.chord("D4", "min7")` gives {62, 65, 69, 72}.',
+    notes: [
+      'Returns the notes, lowest first. Notes past 127 are given as they are.',
+      'A chord on a step of a key: `ce.music.degreeChord()`.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'type', type: 'string', required: false, kind: 'chord' },
+      { name: 'root', type: 'value', required: true, summary: 'The lowest note.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'type', type: 'string', required: false, summary: 'One of "major", "minor", "dim", "aug", "sus2", "sus4", "power", "maj6", "min6", "dom7", "maj7", "min7", "minMaj7", "dim7", "m7b5", "aug7", "add9", "dom9", "maj9" and "min9". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'chord' },
     ],
   },
   {
     id: 'quantizeNote', category: 'Music', signature: 'quantizeNote(note, root [, scale]) -> number',
-    summary: 'Move a note to the nearest note of a scale, looking both up and down; when two scale notes are equally close, it goes up. A note already in the scale comes back unchanged. `scale` defaults to "major" and takes the same names as `ce.music.scale()`; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Move a note to the nearest note of a key.',
+    example: '`ce.music.quantize(61, "C4")` gives 62.',
+    notes: [
+      'Returns the note. A note in the key is returned as it is.',
+      'Equally near two notes of the key: the higher.',
+    ],
     params: [
-      { name: 'note', type: 'value', required: true, kind: 'note' },
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'note', type: 'value', required: true, summary: 'The note to move.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   // Key, degree and voicing — phase 12. The three verbs above answer questions about a note or a
@@ -4567,68 +6751,115 @@ export const HELPERS = [
   // Chord Pad labelling the same chord have to agree, or the panel contradicts itself on screen.
   {
     id: 'noteSpelling', category: 'Music', signature: 'noteSpelling(root [, scale]) -> boolean',
-    summary: 'Whether a key writes its sharps and flats as flats: true for F, B♭, E♭, A♭, D♭ and G♭. A minor-type scale is judged by the major key a minor third above its root, so C minor spells E♭ and A♭ rather than D♯ and G♯. Pass the result to `ce.music.name()` so your labels match the panel\'s. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Tell whether a key is spelled with flats.',
+    example: '`ce.music.spelling("F4")` gives true.',
+    notes: [
+      'Returns true for the keys of F, B♭, E♭, A♭, D♭ and G♭; false for the others.',
+      'A minor-type scale ("minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "locrian", "pentatonicMin") is judged by the key a minor third above its root, as the Chord Pad judges it: C minor is spelled as E♭ major.',
+      'Pass it to `ce.music.name()` to spell as the panel does.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
     id: 'inScale', category: 'Music', signature: 'inScale(note, root [, scale]) -> boolean',
-    summary: 'Whether a note belongs to a key, in any octave: C2 and C5 both count as the tonic of C. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Tell whether a note is in a key.',
+    example: '`ce.music.inScale(66, "C4")` gives false.',
+    notes: [
+      'Returns true or false.',
+      'In any octave: C2 is in the key of C5.',
+    ],
     params: [
-      { name: 'note', type: 'value', required: true, kind: 'note' },
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'note', type: 'value', required: true, summary: 'The note.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
     id: 'scaleDegree', category: 'Music', signature: 'scaleDegree(note, root [, scale]) -> number',
-    summary: 'Which step of the key a note is: 1 for the tonic, 5 for the dominant. A note outside the key returns nothing rather than the nearest step; use `ce.music.quantize()` first if you want to pull it into the key. `scale` defaults to "major"; an unknown name returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which.',
+    summary: 'Give which step of a key a note is.',
+    example: '`ce.music.degree("G4", "C4")` gives 5.',
+    notes: [
+      'Returns the step, counted from 1: 1 the root, 5 the fifth.',
+      'A note not in the key: no result, without a word. `ce.music.quantize()` moves it into the key first.',
+    ],
     params: [
-      { name: 'note', type: 'value', required: true, kind: 'note' },
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: false, kind: 'scale' },
+      { name: 'note', type: 'value', required: true, summary: 'The note, in any octave.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave does not matter.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
     ],
   },
   {
-    id: 'degreeChord', category: 'Music', signature: 'degreeChord(root, scale, degree [, size]) -> table',
-    summary: 'The chord a key builds on one of its steps, by stacking every other note of the scale. Steps count from 1, so `ce.music.degreeChord(60, "major", 5)` is the chord on the fifth, G major. `size` is the number of notes: 3 for a triad (the default), 4 for a seventh chord. Returns a table with the `notes`, their `names`, the chord `name` spelled the way the key spells it (such as "E♭m7"), its `quality` and its `roman` numeral. An unknown scale returns nothing. A note name it cannot read, or a note left out, returns nothing too, and either way a message says which. For a chord you already know by name, use `ce.music.chord()`.',
+    id: 'degreeChord', category: 'Music', signature: 'degreeChord(root [, scale [, degree [, size]]]) -> table',
+    summary: 'Give the chord a key builds on one of its steps.',
+    example: '`ce.music.degreeChord("C4", "major", 5).name` gives "G".',
+    notes: [
+      'Returns { notes, names, name, quality, roman, degree, rootNote, offsets }: the notes; their names without the octave, and the chord\'s ("E♭m7"), spelled as the key is; its quality, as `ce.music.quality()` names it; its roman numeral ("V", "vii°"); the step; its lowest note; the notes as semitones above the root.',
+      'Built from every other note of the scale, as the Chord Pad builds it.',
+      'Named from its first four notes: a chord of 5 or more is named as its seventh chord.',
+      'A chord of a type: `ce.music.chord()`.',
+    ],
     params: [
-      { name: 'root', type: 'value', required: true, kind: 'note' },
-      { name: 'scale', type: 'string', required: true, kind: 'scale' },
-      { name: 'degree', type: 'number', required: true },
-      { name: 'size', type: 'number', required: false },
+      { name: 'root', type: 'value', required: true, summary: 'The key\'s note; its octave places the chord.\nA MIDI note number, or a name such as "C4": a letter from A to G, then #, ♯, b or ♭ if it has one, then the octave. Middle C is 60, C4. Case-insensitive.\nA fraction: rounded down.\nA name that cannot be read, not a note, or left out: no result, with a console error.', kind: 'note' },
+      { name: 'scale', type: 'string', required: false, summary: 'One of "major", "minor", "harmonicMinor", "melodicMinor", "dorian", "phrygian", "lydian", "mixolydian", "locrian", "pentatonicMaj", "pentatonicMin" and "blues". Case-insensitive.\nLeft out: "major".\nAny other: no result, with a console error.', kind: 'scale' },
+      { name: 'degree', type: 'number', required: false, summary: 'Step, counted from 1: 1 the root, 5 the fifth.\nPast the last step: on into the octave above; 8 is the root an octave up.\n0 and below: the octave below; 0 is the last step.\nA fraction: rounded down.\nLeft out: 1.\nNot a number: 1, with a console warning the first time.' },
+      { name: 'size', type: 'number', required: false, summary: 'Notes: 3 a triad, 4 a seventh chord.\nBelow 2: 2.\nA fraction: rounded down.\nLeft out: 3.\nNot a number: 3, with a console warning the first time.' },
     ],
   },
   {
     id: 'chordQuality', category: 'Music', signature: 'chordQuality(notes) -> string',
-    summary: 'Name a chord from its notes: [60, 63, 70] gives "min7". Each note is a MIDI number or a name, such as 60 or "C4"; a list with anything else in it is refused, and says where. It reads the intervals above the lowest note, so put the root at the bottom: an inverted chord is named from its bass note. The possible names are maj, min, dim, aug, sus2, sus4, maj7, dom7, min7, minMaj7, dim7 and m7b5, the same ones the Chord Pad uses. Note that these say maj and min where `ce.music.chord()` says major and minor, and that a chord it cannot place, such as a bare fifth, comes back as maj. Returns nothing for an empty list.',
-    params: [{ name: 'notes', type: 'list', required: true, kind: 'noteList' }],
+    summary: 'Name a chord from its notes.',
+    example: '`ce.music.quality({60, 63, 67, 70})` gives "min7".',
+    notes: [
+      'Returns one of "maj", "min", "dim", "aug", "sus2", "sus4", "maj7", "dom7", "min7", "minMaj7", "dim7" and "m7b5", as the Chord Pad names chords.',
+      'Named from the lowest note: an inverted chord is named from its bass.',
+      'A chord it cannot place, such as a bare fifth or one note: "maj".',
+      'An empty list: no result, without a word.',
+    ],
+    params: [{ name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: no result, with a console error that says where.', kind: 'noteList' }],
   },
   {
-    id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes, previous [, mode]) -> list',
-    summary: 'Rearrange a chord so it moves as little as possible from the chord before it, the way the Harmoniser leads its voices. `mode` "closest" (the default) keeps the total movement of all the notes smallest; "smooth" keeps the top note as still as possible and lets the inner notes jump; "off" just returns the notes sorted from low to high. With no previous chord, the notes also come back sorted but otherwise unchanged. Notes are MIDI numbers or names, and come back as numbers; a list with anything else in it is refused and gives an empty list. A mode there is none of is "closest", which is said the first time.',
+    id: 'voiceLead', category: 'Music', signature: 'voiceLead(notes [, previous [, mode]]) -> list',
+    summary: 'Rearrange a chord so its notes move as little as they can from the chord before.',
+    example: '`ce.music.lead({72, 76, 79}, {60, 64, 67})` gives {60, 64, 67}.',
+    notes: [
+      'Returns the notes as numbers.',
+      'As the Harmoniser leads its voices.',
+    ],
     params: [
-      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
-      { name: 'previous', type: 'list', required: true, kind: 'noteList' },
-      { name: 'mode', type: 'string', required: false, values: VOICE_LEAD_MODES },
+      { name: 'notes', type: 'list', required: true, summary: 'The chord to rearrange: MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
+      { name: 'previous', type: 'list', required: false, summary: 'The chord before, as `notes`.\nLeft out, or empty: the notes sorted, low to high.\nNot a list, or a list with anything else in it: an empty list, with a console error.', kind: 'noteList' },
+      { name: 'mode', type: 'string', required: false, summary: '"closest": all the notes together move as little as they can.\n"smooth": the top note moves as little as it can; the others may jump.\n"off": the notes sorted, low to high.\nCase-insensitive.\nLeft out: "closest".\nAny other: "closest", with a console warning the first time.', values: VOICE_LEAD_MODES },
     ],
   },
   {
     id: 'expandOctaves', category: 'Music', signature: 'expandOctaves(notes [, octaves]) -> list',
-    summary: 'Repeat a set of notes in the octaves above, the way the Arpeggiator spreads its notes before playing them; it is the step before `ce.music.arp()`. The notes are sorted low to high, then repeated 12 semitones higher for each extra octave. `octaves` runs from 1 to 4 and defaults to 1; a number outside that, or not a whole one, is used as the nearest that is, which is said the first time. Notes that would go above 127 are left out, not squeezed onto 127. Notes are MIDI numbers or names, as chordQuality reads them.',
+    summary: 'Repeat notes in the octaves above, as an Arpeggiator spreads them.',
+    example: '`ce.music.octaves({60, 64}, 2)` gives {60, 64, 72, 76}.',
+    notes: [
+      'Returns the notes sorted, low to high, then again an octave up for each octave more.',
+      'A note that would pass 127 is left out.',
+      'The step before `ce.music.arp()`.',
+    ],
     params: [
-      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
-      { name: 'octaves', type: 'number', required: false, kind: 'number' },
+      { name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
+      { name: 'octaves', type: 'number', required: false, summary: 'Octaves, counting the notes\' own.\nRange: 1 ↔ 4, whole.\nOutside the range: the nearest end, with a console warning the first time.\nA fraction: rounded down, with a console warning the first time.\nNot a number: 1, with a console warning the first time.\nLeft out: 1.', kind: 'number' },
     ],
   },
   {
     id: 'arpOrder', category: 'Music', signature: 'arpOrder(notes, pattern) -> list',
-    summary: 'The order an arpeggiator pattern plays the notes in, as a list of steps. Each step is itself a list of notes, so "chord" (everything at once, in one step) has the same shape as the others. Patterns: up, down, updown, downup, asPlayed, random, chord; any other, or none, is "up", said the first time. Notes are used in the order given, so sort them first for a rising run, and come back as MIDI numbers. "updown" and "downup" do not repeat the top and bottom notes at the turn. "random" returns the notes in the order given, as the panel\'s arpeggiator does, because it picks each step as it plays; for a shuffled order use `ce.math.shuffle()`.',
+    summary: 'Give the order an arpeggiator pattern plays notes in.',
+    example: '`ce.music.arp({60, 64, 67}, "updown")` gives {{60}, {64}, {67}, {64}}.',
+    notes: [
+      'Returns a list of steps, each a list of notes.',
+      'Sort the notes first for a rising run; `ce.music.octaves()` sorts them.',
+      'Shuffled: `ce.math.shuffle()`.',
+    ],
     params: [
-      { name: 'notes', type: 'list', required: true, kind: 'noteList' },
-      { name: 'pattern', type: 'string', required: true, values: ARP_ORDER_PATTERNS },
+      { name: 'notes', type: 'list', required: true, summary: 'MIDI note numbers or names, such as {60, "E4", 67}.\nNot a list, a list with anything else in it, or left out: an empty list, with a console error that says where.', kind: 'noteList' },
+      { name: 'pattern', type: 'string', required: true, summary: '"up": in the order given.\n"down": the order given, reversed.\n"updown": up, then down, not playing the top or the bottom twice.\n"downup": down, then up, the same way.\n"asPlayed": in the order given.\n"random": in the order given; the Arpeggiator picks each step as it plays.\n"chord": every note at once, in one step.\nCase-insensitive.\nAny other: "up", with a console warning the first time.\nLeft out: an empty list, with a console error.', values: ARP_ORDER_PATTERNS },
     ],
   },
   // MIDI data encoding (escape hatch — the DPD does this for modeled params)
@@ -4636,19 +6867,21 @@ export const HELPERS = [
     id: 'to7bit', category: 'MIDI encoding', signature: 'to7bit(v, count, order)',
     summary: 'Split a number into SysEx bytes.',
     example: '`to7bit(1000, 2)` gives {7, 104}.',
+    notes: ['Returns a list of bytes, each from 0 to 127.', 'from7bit joins them back.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The number to split. Two bytes hold up to 16383, three up to 2097151 and four up to 268435455.' },
-      { name: 'count', type: 'number', required: false, summary: 'How many bytes of 7 bits to make. Two when it is left out.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+      { name: 'v', type: 'number', required: true, summary: 'The number to split, from 0. Two bytes hold up to 16383, three up to 2097151, four up to 268435455.\nA fraction: rounded down.\nOne that does not fit in the bytes, not a number, or left out: no result, with a console error.' },
+      { name: 'count', type: 'number', required: false, summary: 'How many bytes of 7 bits to make, from 1 to 4.\nLeft out: 2.\nAny other: no result, with a console error.' },
+      { name: 'order', type: 'text', required: false, summary: '"msb": the high byte first.\n"lsb": the low byte first.\nCase-insensitive.\nLeft out: "msb".\nAny other: no result, with a console error.' },
     ],
   },
   {
     id: 'from7bit', category: 'MIDI encoding', signature: 'from7bit(bytes, order)',
     summary: 'Join SysEx bytes back into one number.',
     example: '`from7bit({7, 104})` gives 1000.',
+    notes: ['Returns a number.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The 7-bit bytes, as a list of numbers.' },
-      { name: 'order', type: 'text', required: false, summary: 'Which byte comes first: "msb", the high byte, which is the default, or "lsb", the low byte.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: '1 to 4 bytes, each from 0 to 127, as a list or as hex text.\nMore or fewer, a byte above 127, not a list of bytes, or left out: no result, with a console error.' },
+      { name: 'order', type: 'text', required: false, summary: '"msb": the high byte first.\n"lsb": the low byte first.\nCase-insensitive.\nLeft out: "msb".\nAny other: no result, with a console error.' },
     ],
   },
   // `to14Bit` is the spelling the WebView runtime shipped with before the contract was
@@ -4658,8 +6891,9 @@ export const HELPERS = [
     id: 'to14bit', category: 'MIDI encoding', signature: 'to14bit(v)',
     summary: 'Split a number into two 7-bit halves, msb and lsb.',
     example: '`to14bit(8192)` gives msb 64 and lsb 0.',
+    notes: ['Returns { msb, lsb }, each from 0 to 127.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The number, from 0 to 16383.' },
+      { name: 'v', type: 'number', required: true, summary: 'The number, from 0 to 16383.\nA fraction: rounded down.\nOutside 0 to 16383, not a number, or left out: no result, with a console error.' },
     ],
     aliases: ['to14Bit'],
   },
@@ -4667,98 +6901,106 @@ export const HELPERS = [
     id: 'from14bit', category: 'MIDI encoding', signature: 'from14bit(msb, lsb)',
     summary: 'Join two 7-bit halves into one number.',
     example: '`from14bit(64, 0)` gives 8192.',
+    notes: ['Returns a number from 0 to 16383.'],
     params: [
-      { name: 'msb', type: 'number', required: true, summary: 'The high half, from 0 to 127.' },
-      { name: 'lsb', type: 'number', required: true, summary: 'The low half, from 0 to 127.' },
+      { name: 'msb', type: 'number', required: true, summary: 'The high half, a whole number from 0 to 127.\nAny other, or left out: no result, with a console error.' },
+      { name: 'lsb', type: 'number', required: true, summary: 'The low half, a whole number from 0 to 127.\nAny other, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toNibbles', category: 'MIDI encoding', signature: 'toNibbles(byte)',
-    summary: 'Split a byte into its two 4-bit halves (nibbles), returned as { hi, lo }. Some synths send every byte this way.',
+    summary: 'Split a byte into its two 4-bit halves, its nibbles.',
     example: '`toNibbles(0x4A)` gives hi 0x4 and lo 0xA.',
+    notes: ['Returns { hi, lo }, each from 0 to 15.', 'Some synths send every byte this way.'],
     params: [
-      { name: 'byte', type: 'number', required: true, summary: 'A byte, from 0 to 255.' },
+      { name: 'byte', type: 'number', required: true, summary: 'A byte, from 0 to 255.\nA fraction: rounded down.\nOutside 0 to 255, not a number, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'fromNibbles', category: 'MIDI encoding', signature: 'fromNibbles(hi, lo)',
     summary: 'Join two 4-bit halves back into one byte.',
     example: '`fromNibbles(0x4, 0xA)` gives 0x4A.',
+    notes: ['Returns a byte, from 0 to 255.'],
     params: [
-      { name: 'hi', type: 'number', required: true, summary: 'The high half, from 0 to 15.' },
-      { name: 'lo', type: 'number', required: true, summary: 'The low half, from 0 to 15.' },
+      { name: 'hi', type: 'number', required: true, summary: 'The high half, a whole number from 0 to 15.\nAny other, or left out: no result, with a console error.' },
+      { name: 'lo', type: 'number', required: true, summary: 'The low half, a whole number from 0 to 15.\nAny other, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'nibblize', category: 'MIDI encoding', signature: 'nibblize(bytes)',
     summary: 'Split every byte in a list into two 4-bit halves.',
     example: '`nibblize({0x4A, 0x10})` gives {0x4, 0xA, 0x1, 0x0}.',
-    notes: ['The high half comes first, so the list comes back twice as long.'],
+    notes: ['Returns a list twice as long, the high half of each byte first.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The bytes, as a list.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The bytes, each from 0 to 255, as a list or as hex text.\nNot a list of bytes, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'denibblize', category: 'MIDI encoding', signature: 'denibblize(bytes)',
     summary: 'Join a list of 4-bit halves back into bytes.',
     example: '`denibblize({0x4, 0xA, 0x1, 0x0})` gives {0x4A, 0x10}.',
+    notes: ['Returns a list half as long.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'Pairs of 4-bit halves, the high half first. The list comes back half as long.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: 'Pairs of halves, the high half first, each from 0 to 15, as a list or as hex text.\nAn odd count, a half above 15, not a list of bytes, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toAscii', category: 'MIDI encoding', signature: 'toAscii(str, length)',
     summary: 'Turn text, such as a patch name, into character codes.',
     example: '`toAscii("Lead", 6)` gives {76, 101, 97, 100, 32, 32}.',
+    notes: ['Returns a list of codes, each from 0 to 127.', 'fromAscii turns them back into text.'],
     params: [
-      { name: 'str', type: 'text', required: true, summary: 'The text to turn into codes.' },
-      { name: 'length', type: 'number', required: false, summary: 'The length to fill out to with spaces. Longer text is not cut.' },
+      { name: 'str', type: 'text', required: true, summary: 'The text, in ASCII: letters without accents, digits, spaces and the signs on an English keyboard.\nA character outside ASCII, not text, or left out: no result, with a console error.' },
+      { name: 'length', type: 'number', required: false, summary: 'The length of the field, from 1.\nShorter text: filled out with spaces.\nLonger text: cut to the length, with a console warning the first time.\nLeft out: the text as it is.\nAny other: the text as it is, with a console warning the first time.' },
     ],
   },
   {
     id: 'fromAscii', category: 'MIDI encoding', signature: 'fromAscii(bytes)',
     summary: 'Turn character codes back into text, such as a patch name read from a dump.',
     example: '`fromAscii({76, 101, 97, 100})` gives "Lead".',
+    notes: ['Returns the text.'],
     params: [
-      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The character codes, as a list.' },
+      { name: 'bytes', type: 'list of bytes', required: true, summary: 'The character codes, each from 0 to 127, as a list or as hex text.\nA code above 127, not a list of bytes, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toOffset', category: 'MIDI encoding', signature: 'toOffset(v, center)',
     summary: 'Add a centre to a value that can go below zero, so it fits in a MIDI byte.',
     example: '`toOffset(-10, 64)` gives 54.',
+    notes: ['Returns the value plus the centre, not held to 0 to 127.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The value, which may be negative.' },
-      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.' },
+      { name: 'v', type: 'number', required: true, summary: 'The value, which may be negative.\nNot a number, or left out: no result, with a console error.' },
+      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.\nNot a number, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'fromOffset', category: 'MIDI encoding', signature: 'fromOffset(b, center)',
     summary: 'Take the centre off a MIDI byte, to get back a value that can go below zero.',
     example: '`fromOffset(54, 64)` gives -10.',
+    notes: ['Returns the byte minus the centre.'],
     params: [
-      { name: 'b', type: 'number', required: true, summary: 'The byte, as the synth sends it.' },
-      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.' },
+      { name: 'b', type: 'number', required: true, summary: 'The byte, as the synth sends it.\nNot a number, or left out: no result, with a console error.' },
+      { name: 'center', type: 'number', required: true, summary: 'The number that stands for zero, often 64.\nNot a number, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'toSigned', category: 'MIDI encoding', signature: 'toSigned(v, bits)',
     summary: 'Turn a negative number into the bits a synth stores it as.',
     example: '`toSigned(-1, 8)` gives 255.',
-    notes: ['This is called two\'s complement. fromSigned reads it back.'],
+    notes: ['This is called two\'s complement. fromSigned reads it back.', 'Returns a number from 0 below 2 to the power of bits: 0 to 255 for 8 bits.'],
     params: [
-      { name: 'v', type: 'number', required: true, summary: 'The number. A positive number comes back unchanged.' },
-      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, such as 7 or 8.' },
+      { name: 'v', type: 'number', required: true, summary: 'The number: -128 to 127 for 8 bits, -64 to 63 for 7.\nFrom 0: comes back unchanged.\nA fraction: rounded down.\nOutside the range, not a number, or left out: no result, with a console error.' },
+      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, from 1 to 32, such as 7 or 8.\nAny other, or left out: no result, with a console error.' },
     ],
   },
   {
     id: 'fromSigned', category: 'MIDI encoding', signature: 'fromSigned(b, bits)',
     summary: 'Read a negative number from the bits a synth stores it as.',
     example: '`fromSigned(255, 8)` gives -1.',
-    notes: ['This reads two\'s complement, as toSigned writes it.'],
+    notes: ['This reads two\'s complement, as toSigned writes it.', 'Returns a number: -128 to 127 for 8 bits.'],
     params: [
-      { name: 'b', type: 'number', required: true, summary: 'The stored value, as the synth sends it.' },
-      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, such as 7 or 8.' },
+      { name: 'b', type: 'number', required: true, summary: 'The stored value, as the synth sends it: a whole number from 0 below 2 to the power of bits, 0 to 255 for 8 bits.\nAny other, or left out: no result, with a console error.' },
+      { name: 'bits', type: 'number', required: true, summary: 'How many bits the synth uses for it, from 1 to 32, such as 7 or 8.\nAny other, or left out: no result, with a console error.' },
     ],
   },
 
@@ -4931,14 +7173,14 @@ export const MODULE_GROUPS = [
     blurb: 'Always available, in every script.',
     modules: ['ce.core'] },
   { id: 'sound', label: 'Notes, MIDI and time',
-    blurb: 'MIDI in and out, the connected device, music theory, and musical time.',
-    modules: ['ce.midi', 'ce.device', 'ce.music', 'ce.time'] },
+    blurb: 'MIDI in and out, MPE, the connected device and MIDI-CI, its patches and checking what it holds, music theory, musical time, the DAW an exported plug-in runs in, and OSC.',
+    modules: ['ce.midi', 'ce.mpe', 'ce.device', 'ce.ci', 'ce.patch', 'ce.verify', 'ce.music', 'ce.time', 'ce.daw', 'ce.osc'] },
   { id: 'numbers', label: 'Working out values',
-    blurb: 'Value and range arithmetic, and moving a value over time.',
-    modules: ['ce.math', 'ce.anim'] },
+    blurb: 'Value and range arithmetic, a value as text, and moving a value over time.',
+    modules: ['ce.math', 'ce.format', 'ce.anim'] },
   { id: 'panel', label: 'The panel itself',
-    blurb: 'Creating and arranging controls, and saving things that outlive the session.',
-    modules: ['ce.panel', 'ce.storage'] },
+    blurb: 'Creating and arranging controls, the computer keyboard, saving things that outlive the session, and files.',
+    modules: ['ce.panel', 'ce.keys', 'ce.storage', 'ce.file'] },
   { id: 'appearance', label: 'How it looks',
     blurb: 'Drawing, images, typography, and dialogs with the user.',
     modules: ['ce.draw', 'ce.image', 'ce.text', 'ce.ui'] },
@@ -4970,7 +7212,7 @@ export const COMPONENT_GROUPS = [
 
 export const MODULES = [
   { id: 'ce.core', version: '1.1', requires: [], runtime: RUNTIME_ANY, global: true,
-    summary: 'Values, flow and logging — the commands every script uses. Never namespaced.' },
+    summary: 'Read and change values, listen for events, and print to the console: the commands every script uses.' },
   // requires ce.music because sendNote/sendAftertouch accept a note NAME, and resolving it is
   // noteNumber() — a ce.music member. Gating ce.music away would leave sendNote(1, "C4", …)
   // reading a stub and sending note 0. panelApiParity.test.js walks the preludes and fails on any
@@ -4979,7 +7221,7 @@ export const MODULES = [
   // note off with after(). The prelude-dependency test caught it the moment the call appeared, which
   // is exactly the drift that rule exists to stop.
   { id: 'ce.midi', version: '1.3', requires: ['ce.core', 'ce.music', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'MIDI in and out — notes (with an optional duration), programs, bend, aftertouch, clock, '
+    summary: 'Send and receive MIDI: notes, controllers, programs, bend, clock and SysEx, with filters, routing, panic, checksums and the byte encoders synths use.'
       + 'CC/NRPN/Sysex — plus wire filters, injection, routing, panic, checksums and the 7-bit/nibble/ASCII encoders.' },
   // MIXED, and for the same honest reason ce.panel is: declaring a parameter or a dump layout is
   // data plus a codec and works window-closed, but binding a control to one needs a control model
@@ -4989,58 +7231,84 @@ export const MODULES = [
   // which is precisely the hanging this closed. The prelude-dependency test caught it the moment
   // the call appeared, which is the drift that rule exists to stop.
   { id: 'ce.device', version: '1.3', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'The connected synth: identity, parameters, reading and setting them, and bulk dumps — plus declaring parameters, dump layouts and bindings for a synth the app has no profile for, and enumerating available ports. Needs the device host.' },
+    summary: 'Talk to the connected synth: its parameters, reading and setting them, and its dumps; and describe a synth the app has no profile for. Needs a synth connected.' },
   // requires ce.core because curve() now REPORTS a shape it does not know instead of silently
   // returning the input, and reporting is log(). ce.core is global and never gated, so the
   // dependency costs nothing at runtime — but it is a real call and the prelude-dependency test
   // is right to want it declared.
   { id: 'ce.math', version: '1.8', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Value and range arithmetic: wrapping, curves, list snapping, decibels, colour, and seeded random. Pure — no host involved.' },
+    summary: 'Work with numbers: ranges, curves, snapping, decibels, colours and random numbers.' },
+  { id: 'ce.format', version: '1.1', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Show a value as the text a person reads, such as Hz, dB, a note name or a clock time, and read typed text back as a value.' },
   { id: 'ce.music', version: '1.2', requires: [], runtime: RUNTIME_ANY,
-    summary: 'Note names and numbers, scales, chords, snapping a note to a key, key spelling, scale degrees and degree chords, chord naming, voice leading, and arpeggio expansion and ordering.' },
+    summary: 'Work with notes and keys: note names, scales, chords, snapping to a key, chord names, voice leading and arpeggio orders.' },
   { id: 'ce.time', version: '1.3', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Musical time: tempo, transport position, beat/bar events, timers (plain, one-shot or beat-synced), note divisions, bar/beat at any position, steps between readings, swing, cycles, loop folding, tempo from taps or clock pulses, and a monotonic clock.' },
+    summary: 'Work in musical time: the tempo, the song position, beats and bars, timers, note lengths, swing and tap tempo.' },
   // requires ce.math because envelope() drives the value through ce.math.map — one lookup, shared
   // with the Envelope component — and ce.time because `beats` and `sync` are the transport's.
   { id: 'ce.anim', version: '1.1', requires: ['ce.core', 'ce.math', 'ce.time'], runtime: RUNTIME_ANY,
-    summary: 'Move a value over time: to a destination, with a spring, or through a drawn shape — delayed, staggered, repeating, tempo-synced, with completion callbacks. Cross-runtime: works with the panel shut.' },
+    summary: 'Move a value over time: to a target, with a spring, or along a drawn shape, in time with the tempo or not. Works with the panel window shut.' },
   { id: 'ce.ui', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Notifications (show, retract, replace), questions — a choice, a line of text, or a pick from a list — and the clipboard. Panel view only.' },
+    summary: 'Talk to the person playing: messages, the status bar, questions and the clipboard. Panel view only.' },
   { id: 'ce.draw', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Draw on top of any control: shapes, gradients, dashes, opacity and transforms, plus the panel\'s own LCD font and text measurement. Panel view only.' },
+    summary: 'Draw on top of any control: shapes, gradients and text in the LCD font, and measure it. Panel view only.' },
   // The first MIXED module. Its structure verbs are panel-view only and say so individually, but
   // snapshot/restore are not — so declaring the whole module unavailable window-closed would make
   // ce.has("ce.panel") tell a script to skip two verbs that work perfectly there. The per-member
   // stubs are what state the boundary precisely; the module says "some of this reaches you".
   { id: 'ce.panel', version: '1.4', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Create, clone, parent and find controls, then align, distribute, match, order, grid or circle them — panel view only, each command says so. snapshot/restore work anywhere.' },
+    summary: 'Create, copy, find and arrange controls. Panel view only, but for snapshot and restore, which work anywhere.' },
   { id: 'ce.storage', version: '1.2', requires: ['ce.core'], runtime: RUNTIME_ANY,
-    summary: 'Per-script scratch state, and settings that outlive the session — shared with the panel, private to one script, or kept on this machine only. Plus JSON encode/decode.' },
+    summary: 'Keep values: for the script while it runs, or saved with the panel, for one script or on this computer; and read and write JSON.' },
   // Panel view only, and for a reason worth stating: the font catalogue is the editor's, and the
   // measuring is done on a canvas. A player host has neither, and a typography verb that answered
   // from a guess would be worse than one that says it is not there.
   // Panel view only, for the same reason ce.text is: the icon library and the file cache are the
   // editor's, and a verb that answered from a guess would be worse than one that says it is absent.
   { id: 'ce.image', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'The image layers a control carries — background image and overlay, text image and texture, and the Icon section — plus the icon library they draw from. Background layers composite; text layers are exclusive. Reports which image sources survive an export.' },
+    summary: 'Put pictures on controls, from files or the icon library, and keep them in the panel for an export. Panel view only.' },
+  // requires the four whose commands it reads and sends through, so they are there whenever it is.
+  { id: 'ce.patch', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.panel', 'ce.math', 'ce.storage'], runtime: RUNTIME_ANY,
+    summary: 'Work with a synth\'s whole sound: capture, morph, randomize, merge, compare, send and keep patches.' },
+  // requires ce.core only: the transport is the device layer's, and messages arrive as events.
+  { id: 'ce.osc', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Send and receive Open Sound Control messages, using the network only after the user says yes.' },
+  // requires ce.core only: it asks the plug-in, and names controls as set does.
+  { id: 'ce.daw', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_ANY,
+    summary: 'Work with the DAW an exported plug-in runs in: its parameters, programs, gestures, names and spare parameters.' },
+  // requires ce.midi, whose sends MPE goes out through and whose note names it reads.
+  { id: 'ce.mpe', version: '1.0', requires: ['ce.core', 'ce.midi'], runtime: RUNTIME_ANY,
+    summary: 'Play and read MPE, where each note has a channel of its own and can bend, swell and change tone by itself.' },
+  // requires ce.device, whose role ports MIDI-CI goes out and comes back on.
+  { id: 'ce.ci', version: '1.0', requires: ['ce.core', 'ce.device'], runtime: RUNTIME_ANY,
+    summary: 'Ask a MIDI-CI device who it is, read and change its properties, and turn its profiles on and off. Not yet tried against a real MIDI-CI device.' },
+  // requires ce.time, whose tempo and beats per bar midiWrite uses when a song gives neither. The
+  // dialogs are the panel view's; the byte commands run everywhere.
+  { id: 'ce.file', version: '1.0', requires: ['ce.core', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Open, save and take apart librarian files, such as .syx and MIDI files, through the person\'s own file dialogs.' },
+  // requires ce.device, whose dumps it asks for, and ce.time, whose after() spaces the asks.
+  { id: 'ce.verify', version: '1.0', requires: ['ce.core', 'ce.device', 'ce.time'], runtime: RUNTIME_ANY,
+    summary: 'Ask the synth whether it holds what was sent, and report what matched, what differed and what could not be checked.' },
+  { id: 'ce.keys', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
+    summary: 'Use the computer keyboard: shortcuts, the keys held and a piano on the letter keys. Panel view only.' },
   { id: 'ce.text', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Typography: which fonts exist and what they support, style writes that keep weight consistent, variable axes, and measuring a control\'s text in its own font to fit it to its box.' },
+    summary: 'Set a control\'s typography, list the fonts there are, and measure text to fit its box. Panel view only.' },
   { id: 'ce.components.split', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Zone Splitter. Panel view only — the component is modelled there.' },
+    summary: 'Split the keyboard into zones, each with its own channel and transpose. Panel view only.' },
   { id: 'ce.components.phrase', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Phrase Sequencer. Panel view only.' },
+    summary: 'Drive the Phrase Sequencer: its pattern, key, scale, direction and cells. Panel view only.' },
   { id: 'ce.components.recorder', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Phrase Recorder. Panel view only.' },
+    summary: 'Record, play and edit takes on the Phrase Recorder, and keep them in slots. Panel view only.' },
   { id: 'ce.components.harmony', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Harmoniser. Panel view only.' },
+    summary: 'Set how the Harmoniser turns each played note into a chord. Panel view only.' },
   { id: 'ce.components.setlist', version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: 'Setlist. Panel view only.' },
+    summary: 'Move through the Setlist\'s scenes, and set which it plays. Panel view only.' },
   // …and one per remaining family, expanded from the same spec the verbs come from. One module
   // per family rather than one for all of them: a panel with an Arpeggiator should not pay for the
   // LCD, the Matrix and the Orbit, and the cost report is per module.
   ...COMPONENT_FAMILIES.map((fam) => ({
     id: moduleIdFor(fam.id), version: '1.0', requires: ['ce.core'], runtime: RUNTIME_WEBVIEW,
-    summary: `${fam.summary} Panel view only — the component is modelled there.`,
+    summary: `${fam.summary} Panel view only.`,
   })),
 ];
 
@@ -5097,7 +7365,8 @@ const MODULE_MEMBERS = {
   'ce.core': { set: 'set', get: 'get', log: 'log', warn: 'logWarn', error: 'logError',
                on: 'on', off: 'off', emit: 'emit', run: 'run',
                noTransmit: 'noTransmit', transmit: 'transmit',
-               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction' },
+               watch: 'watch', compute: 'compute', intercept: 'intercept', action: 'defineAction',
+               origin: 'origin' },
   'ce.midi': [
     'sendCC', 'sendNRPN', 'sendRPN', 'sendSysex', 'checksum', 'panic', 'sendSongPosition',
     'sendMidi', 'sendNote', 'sendNoteOff', 'sendProgramChange', 'sendPitchBend',
@@ -5170,6 +7439,13 @@ const MODULE_MEMBERS = {
                // a panel author would give their own helper, so a qualifier would only be noise.
                smooth: 'smooth', hysteresis: 'hysteresis', median: 'median', unshape: 'unshape',
                euclid: 'euclid' },
+  // Every namespaced name is a bare word (`number`, `time`, `table`, `line`, `fit`, `parse`), so
+  // every flat alias keeps the format prefix.
+  'ce.format': {
+    number: 'formatNumber', hz: 'formatHz', time: 'formatTime', db: 'formatDb', percent: 'formatPercent',
+    pan: 'formatPan', ratio: 'formatRatio', clock: 'formatClock', note: 'formatNote', division: 'formatDivision',
+    parameter: 'formatParameter', table: 'formatTable', fit: 'formatFit', line: 'formatLine', parse: 'formatParse',
+  },
   'ce.music': { name: 'noteName', number: 'noteNumber',
                 scale: 'scaleNotes', chord: 'chordNotes', quantize: 'quantizeNote',
                 spelling: 'noteSpelling', inScale: 'inScale', degree: 'scaleDegree',
@@ -5208,6 +7484,41 @@ const MODULE_MEMBERS = {
   // §1 once more, and this module is the clearest case of it: every namespaced spelling here is a
   // bare English word, so every flat alias keeps the text prefix. `read`, `style`, `fit` and
   // `measure` as globals would be four collisions waiting to happen.
+  'ce.patch': {
+    current: 'patchCurrent', read: 'patchRead', load: 'patchLoad', morph: 'patchMorph', blend: 'patchBlend',
+    random: 'patchRandom', mutate: 'patchMutate', merge: 'patchMerge', diff: 'patchDiff', equal: 'patchEqual',
+    apply: 'patchApply', save: 'patchSave', list: 'patchList', forget: 'patchForget', write: 'patchWrite',
+    scopes: 'patchScopes', define: 'patchDefine',
+  },
+  'ce.osc': {
+    listen: 'oscListen', stop: 'oscStop', on: 'oscOn', off: 'oscOff', target: 'oscTarget', send: 'oscSend',
+    bundle: 'oscBundle', status: 'oscStatus',
+  },
+  'ce.daw': {
+    host: 'dawHost', parameters: 'dawParameters', parameter: 'dawParameter', program: 'dawProgram',
+    programs: 'dawPrograms', beginGesture: 'dawBeginGesture', endGesture: 'dawEndGesture', rename: 'dawRename',
+    assign: 'dawAssign', markChanged: 'dawMarkChanged',
+  },
+  'ce.mpe': {
+    zone: 'mpeZone', noteOn: 'mpeNoteOn', express: 'mpeExpress', noteOff: 'mpeNoteOff',
+    allOff: 'mpeAllOff', notes: 'mpeNotes', listen: 'mpeListen',
+  },
+  'ce.ci': {
+    discover: 'ciDiscover', devices: 'ciDevices', get: 'ciGet', set: 'ciSet', subscribe: 'ciSubscribe',
+    unsubscribe: 'ciUnsubscribe', profiles: 'ciProfiles', setProfile: 'ciSetProfile', draftProfile: 'ciDraftProfile',
+  },
+  'ce.file': {
+    open: 'fileOpen', save: 'fileSave', read: 'fileRead', write: 'fileWrite', folder: 'fileFolder', list: 'fileList',
+    saveIn: 'fileSaveIn', syxSplit: 'fileSyxSplit', syxJoin: 'fileSyxJoin', midiRead: 'fileMidiRead', midiWrite: 'fileMidiWrite',
+  },
+  'ce.verify': {
+    coverage: 'verifyCoverage', check: 'verifyCheck', dump: 'verifyDump', write: 'verifyWrite', probe: 'verifyProbe',
+    patch: 'verifyPatch', summary: 'verifySummary', running: 'verifyRunning', cancel: 'verifyCancel',
+  },
+  'ce.keys': {
+    shortcut: 'keysShortcut', remove: 'keysRemove', list: 'keysList', isDown: 'keysIsDown', held: 'keysHeld',
+    piano: 'keysPiano', pianoInfo: 'keysPianoInfo', focus: 'keysFocus', focused: 'keysFocused',
+  },
   'ce.text': {
     fonts: 'textFonts', font: 'textFont', style: 'textStyle', axis: 'textAxis',
     read: 'textRead', measure: 'textMeasure', fit: 'textFit',
@@ -5471,10 +7782,13 @@ export function resolveModules(declared) {
 // What a reference to a member looks like in the languages a panel can be written in. Both
 // spellings count: the flat alias (`sendCC(`) and the namespaced path (`ce.midi.sendCC`).
 // Value members have no call parens, so they are matched as bare words.
-function memberReferenceRe(memberId, shortName) {
+function memberReferenceRe(memberId, shortName, isModuleName = false) {
   const flat = escapeForRe(memberId);
   const short = escapeForRe(shortName);
-  return new RegExp(`\\b${flat}\\b|\\.\\s*${short}\\b`);
+  // A member whose short name is also a module's (ce.format.time beside ce.time) would otherwise be
+  // found in every script that reaches for that module, so `ce.time` itself does not count for it.
+  const before = isModuleName ? '(?<!\\bce\\s*)' : '';
+  return new RegExp(`\\b${flat}\\b|${before}\\.\\s*${short}\\b`);
 }
 
 function escapeForRe(s) {
@@ -5502,7 +7816,10 @@ function scanMatchers() {
   const known = allModules();
   const members = Object.entries(memberModule())
     .filter(([, at]) => !moduleById(at.module)?.global)
-    .map(([id, at]) => ({ module: at.module, re: memberReferenceRe(id, at.name) }));
+    .map(([id, at]) => ({
+      module: at.module,
+      re: memberReferenceRe(id, at.name, known.some((m) => m.id === `ce.${at.name}`)),
+    }));
   const paths = known.filter((module) => !module.global)
     .map((module) => ({ module: module.id, re: new RegExp(`\\b${escapeForRe(module.id)}\\b`) }));
   return moduleScanMatchers = { known, members, paths };
@@ -5702,6 +8019,7 @@ const TYPE_WORDS = {
   number: 'number', string: 'text', dumpKind: 'text', scriptRef: 'text', boolean: 'true or false',
   array: 'list', targetRef: 'control name', eventName: 'event name',
   'number or division': 'number or text', value: 'any value',
+  'number or table': 'number or table', 'number or name': 'number or name',
 };
 const KIND_WORDS = {
   note: 'note', noteList: 'list of notes', colour: 'colour', bytes: 'bytes',

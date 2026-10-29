@@ -125,6 +125,55 @@ inline DeviceOverrideValue deviceOverrideValue (const juce::String& label, const
     return out;
 }
 
+/** A script's value for a control bound to a host parameter, as the parameter takes it, or why it
+ *  cannot, in the editor's words (deviceDefinitions.js, numberFor): a number is the parameter's own
+ *  value, text that is one is read as one, and true and false are 1 and 0; a choice is also matched
+ *  by its name, in any case, as its index; a switch reads "on", "off", "true" or "false" too.
+ *  `refused` follows `set("…"): `. The plug-in sent a bound control's text as 0, a choice's name
+ *  included (the noticed items, at the owner's word). `kind` and `choices` are PanelParameter's
+ *  valueKind and choiceLabels. */
+struct ScriptParameterValue { bool ok = false; float value = 0.0f; juce::String refused; };
+inline ScriptParameterValue scriptParameterValue (const juce::String& kind, const juce::StringArray& choices,
+                                                  const juce::var& v)
+{
+    ScriptParameterValue out;
+    const auto take = [&out] (double d) { out.ok = true; out.value = static_cast<float> (d); return out; };
+    double d = 0.0;
+    const bool number = (v.isInt() || v.isInt64() || v.isDouble()) ? std::isfinite (d = static_cast<double> (v))
+                                                                   : v.isString() && decimalTextValue (v.toString(), d);
+    if (v.isBool()) return take (static_cast<bool> (v) ? 1.0 : 0.0);
+    if (kind == "bool")
+    {
+        if (number) return take (d != 0.0 ? 1.0 : 0.0);
+        const auto word = v.isString() ? v.toString().toLowerCase() : juce::String();
+        if (word == "on" || word == "true") return take (1.0);
+        if (word == "off" || word == "false") return take (0.0);
+        out.refused = shownScriptValue (v) + " is not on or off, so nothing was sent. Write true or false, a number "
+                      "(0 is off, any other number is on), or \"on\", \"off\", \"true\" or \"false\".";
+        return out;
+    }
+    if (kind == "choice" && v.isString() && ! number)
+    {
+        auto at = choices.indexOf (v.toString());
+        if (at < 0) at = choices.indexOf (v.toString(), true);
+        if (at >= 0) return take (at);
+        juce::StringArray quoted;
+        for (const auto& c : choices) quoted.add ("\"" + c + "\"");
+        const auto list = quoted.isEmpty() ? juce::String ("It has no choices.")
+                        : quoted.size() == 1 ? "The only choice is " + quoted[0] + "."
+                        : "The choices are " + quoted.joinIntoString (", ", 0, quoted.size() - 1) + " and "
+                              + quoted[quoted.size() - 1] + ".";
+        out.refused = shownScriptValue (v) + " is not one of its choices, so nothing was sent. " + list;
+        return out;
+    }
+    if (! number)
+    {
+        out.refused = shownScriptValue (v) + " is not a number, so nothing was sent.";
+        return out;
+    }
+    return take (d);
+}
+
 /** One item of a script's list of bytes: a whole number from 0 to 255, or text that is one hex
  *  byte. -1 when it is neither. */
 inline int scriptListByte (const juce::var& v)
@@ -184,6 +233,9 @@ public:
         // Whether a path names a control the panel does not have, which ce.anim refuses to move
         // (namesMissingControl). Unset: none does, as before.
         std::function<bool (const juce::String& path)> namesMissingControl;
+        // Whether a write to a path has to be a number: a range control's own value, or a
+        // .normalizedValue (PanelValueModel::writeNeedsNumber). Unset: none has, as before.
+        std::function<bool (const juce::String& path, const juce::String& form)> writeNeedsNumber;
         // Whether a transmitting write to `path` would reach the synth at all — the path is bound to
         // a device parameter. Only those writes spend the MIDI flood budget. Unset: every
         // transmitting write counts, which is how every set() was counted before this existed.
@@ -261,11 +313,22 @@ public:
     static std::pair<juce::String, juce::String> splitAccessor (const juce::String& path,
                                                                 const juce::String& explicitForm)
     {
-        const bool explicitIsDerived = explicitForm == "normalizedValue" || explicitForm == "midiValue";
-        const auto tail = path.fromLastOccurrenceOf (".", false, false);
+        const auto form = formWord (explicitForm);
+        const bool explicitIsDerived = form == "normalizedValue" || form == "midiValue";
+        const auto tail = path.containsChar ('.') ? formWord (path.fromLastOccurrenceOf (".", false, false)) : juce::String();
         if (tail == "normalizedValue" || tail == "midiValue")
-            return { path.upToLastOccurrenceOf (".", false, false), explicitIsDerived ? explicitForm : tail };
-        return { path, explicitIsDerived ? explicitForm : juce::String ("value") };
+            return { path.upToLastOccurrenceOf (".", false, false), explicitIsDerived ? form : tail };
+        return { path, explicitIsDerived ? form : juce::String ("value") };
+    }
+
+    /** A form in any case and with spaces around it, as it is spelled, or empty: "NormalizedValue"
+        is normalizedValue, as the WebView's formWord reads it. "normalised" is still not a form. */
+    static juce::String formWord (const juce::String& text)
+    {
+        const auto written = text.trim();
+        for (const auto* form : { "value", "normalizedValue", "midiValue" })
+            if (written.equalsIgnoreCase (form)) return form;
+        return {};
     }
 
     /** The form `text` is another way of writing (other capitals, the label's leading dot, or
@@ -295,7 +358,7 @@ public:
         calls in the same words (formRefusal in panelRuntime.js; scriptGetReports.test.js). */
     static juce::String formRefusal (const juce::String& call, const juce::String& outcome, const juce::String& form)
     {
-        if (form.isEmpty() || form == "value" || form == "normalizedValue" || form == "midiValue") return {};
+        if (form.isEmpty() || formWord (form).isNotEmpty()) return {};
         const auto meant = formMeant (form);
         return call + ": \"" + form + "\" is not a value form, so " + outcome
              + ". The forms are value, normalizedValue and midiValue." + (meant.isNotEmpty() ? " Write " + meant + "." : juce::String());
@@ -352,6 +415,16 @@ public:
     // set("cutoff.normalizedValue", 0.5). Text was dropped here, so that spelling wrote 0.5 as it was.
     void setValue (const juce::String& path, const juce::var& value, const juce::var& options) override
     {
+        // A value left out is refused, where it was written as nothing: set("Cutoff.value") cleared
+        // the knob's value. The editor's set() says the same (scriptSet in panelRuntime.js). A colour
+        // property says it in its own words, with the forms a colour takes (colourWrites, below).
+        if ((value.isVoid() || value.isUndefined())
+            && ! (callbacks.isColourProperty
+                  && callbacks.isColourProperty (splitAccessor (path, options.isString() ? options.toString() : juce::String()).first)))
+        {
+            logAt ("error", "set(\"" + path + "\"): no value was given, so nothing was set.", juce::var());
+            return;
+        }
         const auto form = options.isString() ? options.toString() : juce::String();
         if (const auto refusal = formRefusal ("set(\"" + path + "\")", "nothing was set", form); refusal.isNotEmpty())
         {
@@ -392,6 +465,29 @@ public:
                 return;
             }
             toWrite = read.value;
+        }
+
+        // A range control's value and a .normalizedValue are numbers: text that is one is read as
+        // one, and anything else is refused, where "x" was written as given. One bound to a device
+        // parameter is the binding's to read. The editor's set() says the same (setNumber in
+        // panelRuntime.js).
+        if (callbacks.writeNeedsNumber && callbacks.writeNeedsNumber (addressed.first, addressed.second))
+        {
+            double d = 0.0;
+            const bool number = (toWrite.isInt() || toWrite.isInt64() || toWrite.isDouble())
+                                    ? std::isfinite (d = static_cast<double> (toWrite))
+                                    : toWrite.isString() && decimalTextValue (toWrite.toString(), d);
+            if (! number)
+            {
+                logAt ("error", "set(\"" + path + "\"): " + shownScriptValue (toWrite) + " is not a number, so nothing was set.",
+                       juce::var());
+                return;
+            }
+            // Stored as a whole number where it is one, as a script's own 100 is, so a Lua get() reads
+            // 100 back and not 100.0.
+            if (toWrite.isString())
+                toWrite = (d == std::floor (d) && std::abs (d) < 9007199254740992.0) ? juce::var (static_cast<juce::int64> (d))
+                                                                                     : juce::var (d);
         }
 
         bool transmit = runtime ? runtime->defaultTransmit() : true;

@@ -485,6 +485,30 @@ function unexportableControlNames(panel) {
  * controls a display should export the rest and not fail.
  */
 export function collectExportParameters(panel) {
+  return withDawGroups(panel, collectParameterList(panel));
+}
+
+/**
+ * Each parameter's folder in the DAW: the "DAW group" its control's inspector names (Core.dawGroup),
+ * or none. Baked as `group`; the plug-in makes a folder of each run of one group, so the list keeps
+ * its order and the automation in saved projects stays where it was (Player/PanelParameters.h).
+ */
+function withDawGroups(panel, list) {
+  const groups = new Map();
+  for (const control of flatControls(Array.isArray(panel?.controls) ? panel.controls : [])) {
+    const core = control?._children?.Core;
+    const group = typeof core?.dawGroup === 'string' ? core.dawGroup.trim() : '';
+    const name = core?.name ?? core?.id;
+    if (group && name != null) groups.set(String(name), group);
+  }
+  if (!groups.size) return list;
+  return list.map((parameter) => {
+    const group = groups.get(String(parameter.controlName));
+    return group ? { ...parameter, group } : parameter;
+  });
+}
+
+function collectParameterList(panel) {
   const explicit = Array.isArray(panel?.exportParameters) ? panel.exportParameters : [];
   if (!explicit.length) return deriveExportParameters(panel);
 

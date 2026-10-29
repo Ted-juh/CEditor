@@ -17,6 +17,28 @@
 // and a fifteenth was spelled differently, and forty-seven panel verbs existed here and nowhere
 // else. Bind nothing panelApi.js doesn't declare, and declare nothing you don't bind.
 
+import {
+  formatNumber, formatHz, formatTime, formatDb, formatPercent, formatPan, formatRatio, formatClock,
+  formatNote, formatDivision, formatTable, formatFit, formatLine, formatParse, formatDescribed,
+  formatPlaceholderFor,
+} from './formatCore.js';
+import {
+  addShortcut as keysAddShortcut, removeShortcut as keysRemoveShortcut, listShortcuts as keysListShortcuts,
+  isDown as keysIsDownRead, heldKeys as keysHeldRead, setPiano as keysSetPiano, pianoInfo as keysPianoInfoRead,
+  focusControl as keysFocusControl, focusedControl as keysFocusedControl, resetKeys, setShortcutRunner,
+  setKeysPanelResolver,
+} from './scriptKeys.js';
+import { patchCommands } from './patchCore.js';
+import { verifyCommands } from './verifyCore.js';
+import { fileCommands } from './fileCore.js';
+import { createFileDialogs } from './scriptFileHost.js';
+import { createCiBridge } from './ciHost.js';
+import { createMidiInDecoder } from './midiInDecoder.js';
+import { mpeCommands } from './mpeCore.js';
+import { dawCommands } from './dawCore.js';
+import { oscCommands, oscMatches } from './oscCore.js';
+import { OSC_CONTROL_KIND, parseOscTargets } from '../utils/oscControlBindings.js';
+import { collectExportParameters } from '../utils/exportParameters.js';
 import { get } from 'svelte/store';
 import { runBoundedLuaSource } from './boundedLua.js';
 import { evaluatePanelSource, ensureScriptSandbox, disposeJavascriptSandboxes } from './scriptSandbox.js';
@@ -38,8 +60,9 @@ import {
   shownNumber, storedColour, unitProblem, orderedColour, ORDERED_FORMS, colourFromRgb, colourFromHsl, hslOfChannels,
 } from './scriptColours.js';
 import { dashPattern, strokeEnd } from './drawDash.js';
+import { listWord } from '../utils/wordLists.js';
 import { timeNumber } from './timeWords.js';
-import { HAND_WRITTEN, handWrittenRefusal, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
+import { HAND_WRITTEN, handWrittenRefusal, recorderQuantizeArgs, reducerArgs, sectionFieldRefusal, sectionRefusalLine } from './handWrittenVerbs.js';
 import { layoutWord } from './layoutWords.js';
 import { noteList, voiceLeadMode, arpOrderPattern, octaveCount } from './noteLists.js';
 import {
@@ -47,6 +70,10 @@ import {
   drawOption, textSize, polygonSides, gridCount, gridStep, flatPointList, segmentList,
 } from './drawShapes.js';
 import { lcdLineWords } from './lcdLines.js';
+import { lcdReadAt, lcdWriteAt, lcdRows, lcdLayoutIndex, lcdShownLayout, lcdZonePlaceOf, lcdZoneSourceFor, lcdZoneSourceName } from './lcdPositions.js';
+import { layoutShowing, showLayout } from '../stores/displayLayouts.js';
+import { phaseNow, seekPhase } from '../stores/componentPhases.js';
+import { contextForControl } from '../utils/panelKey.js';
 import { recallNoProfileWords } from './presetWords.js';
 import { addScriptTrace } from '../stores/scriptConsole.js';
 import { envelopeRefusal, envelopePointParts } from './animEnvelope.js';
@@ -82,7 +109,7 @@ import { profileSources } from '../stores/deviceProfileStores.js';
 import { parameterTable, requestParameterTable } from '../stores/deviceParameterTable.js';
 import {
   deviceWriteUnknownWords, deviceWriteNoProfileWords, deviceBindUnknownWords, DEVICE_OVERRIDES, deviceOverrideValue,
-  deviceSetNoNameWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
+  deviceSetNoNameWords, deviceTimingUnknownWords, deviceNoIdWords, deviceNotOptionsWords, devicePortsDirectionWords, deviceSetNoProfileWords, profileDumpKinds, dumpKindUnknownWords,
 } from './deviceWords.js';
 import { parseProfileSourceText } from '../stores/deviceProfileLocalEngine.js';
 import { mapDeviceRole } from '../stores/deviceProfileSession.js';
@@ -146,8 +173,8 @@ import {
   setInboundMidiFilter, setOutboundMidiFilter, clearMidiFilters, filterInboundMidi,
 } from './midiFilters.js';
 import {
-  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentClampWarning, familyVerbRefusal, readIndexRefusal, LIST_KINDS,
-  itemListLength, LINK_KIND, ELEM_KIND,
+  COMPONENT_VERBS, componentScriptPatch, componentRequestLegal, componentRefusalLine, componentRefusalReason, componentClampWarning, familyVerbRefusal, familyVerbNamed, readIndexRefusal, LIST_KINDS,
+  itemListLength, LINK_KIND, ELEM_KIND, LAYOUT_KIND,
 } from './componentVerbs.js';
 import {
   SOURCE_KINDS, sourceAccepts, sourceByName, sourceName,
@@ -317,6 +344,7 @@ export function setRuntimeHost(h) {
     live.activePanelId = host.panel?.id ?? 'player';
     snapshotValues();
     seedSessionSnapshot();
+    syncOscBindings();   // the player's panel: open its OSC port when it has OSC bindings
   }
 }
 
@@ -599,9 +627,13 @@ function formMeant(text) {
   return VALUE_ACCESSOR_IDS.find((id) => id.toLowerCase() === canonical) ?? '';
 }
 
+/** A form in any case and with spaces around it, as the list spells it, or '': "NormalizedValue" is
+ *  normalizedValue (utils/wordLists.js). Another spelling ("normalised") is still not a form. */
+const formWord = (text) => listWord(VALUE_ACCESSOR_IDS, text) ?? '';
+
 /** The console's line refusing `form`, given explicitly to `call`, or '' when it is a form or none. */
 function formRefusal(call, outcome, form) {
-  if (typeof form !== 'string' || form === '' || VALUE_ACCESSOR_IDS.includes(form)) return '';
+  if (typeof form !== 'string' || form === '' || formWord(form)) return '';
   const meant = formMeant(form);
   return `${call}: "${form}" is not a value form, so ${outcome}. The forms are ${andList(VALUE_ACCESSOR_IDS)}.`
     + (meant ? ` Write ${meant}.` : '');
@@ -609,10 +641,10 @@ function formRefusal(call, outcome, form) {
 
 function splitAccessor(path, explicitForm) {
   const text = String(path ?? '');
-  const form = VALUE_ACCESSOR_IDS.includes(explicitForm) ? explicitForm : '';
+  const form = formWord(explicitForm);
   const dot = text.lastIndexOf('.');
   if (dot > 0) {
-    const tail = text.slice(dot + 1);
+    const tail = formWord(text.slice(dot + 1));
     if (DERIVED_ACCESSORS.has(tail)) return { path: text.slice(0, dot), form: form || tail };
   }
   return { path: text, form: form || 'value' };
@@ -682,9 +714,9 @@ function valueBindingFor(control) {
  * it ("at colour"); `wholePath` for a call whose own arguments do not already say which property it
  * was; componentPlace for a component verb, which counts list positions from 1.
  */
-function colourWrites(call, outcome, root, path, value, place = belowPath) {
+function colourWrites(call, outcome, root, path, value, place = belowPath, say = null) {
   return readColours(call, outcome, path, place,
-    (colour) => mapColourWrites(root, path, value, colour));
+    (colour) => mapColourWrites(root, path, value, colour), say);
 }
 
 /** The same for a write to the panel document itself, `path` below the panel: the panel's own
@@ -695,7 +727,9 @@ function panelColourWrites(call, outcome, path, value) {
     (colour) => mapPanelColourWrites(path, value, colour));
 }
 
-function readColours(call, outcome, path, place, map) {
+/** `say`, where given, writes the line from where the colour is, why it is refused and the advice:
+ *  a component verb's, in the form its other refusals take. */
+function readColours(call, outcome, path, place, map, say = null) {
   // Asked only of a control-set reference, so an ordinary write does not look the set up.
   const resolves = (name) => resolveToken(name, controlSetForPanel(activePanel())) !== undefined;
   let refused = false;
@@ -703,7 +737,8 @@ function readColours(call, outcome, path, place, map) {
     const read = panelColour(written, field, resolves);
     if (!read.why) return read.colour;
     refused = true;
-    addScriptTrace('error', '', `${call}: ${place(at, path)}${read.why}, so ${outcome}. ${read.advice}`);
+    addScriptTrace('error', '', say ? say(place(at, path), read.why, read.advice)
+      : `${call}: ${place(at, path)}${read.why}, so ${outcome}. ${read.advice}`);
     return written;
   });
   return refused ? null : { value: stored };
@@ -722,7 +757,35 @@ function wholePath(at) {
 // The third argument carries two different things, as the contract's own signature does:
 // set(path, value, opts) with { transmit }, and the second-argument spelling of the value form.
 // A string is a form, an object is opts.
+// The value of a range control (a Knob, a Slider, a Number, a Range) and any .normalizedValue are
+// numbers: text that is one is read as one, and anything else is refused, where "x" was written as
+// given. One bound to a device parameter is read by the binding instead. BridgeScriptHost::setValue
+// says the same.
+function setNumber(path, value) {
+  const n = realNumber(value);
+  if (n === undefined) addScriptTrace('error', '', `set("${path}"): ${shownValue(value)} is not a number, so nothing was set.`);
+  return n;
+}
+
+// A script's set(): a value left out is refused, where it was written as nothing. The plug-in's host
+// says the same (BridgeScriptHost::setValue). A colour property says it in its own words, with the
+// forms a colour takes (colourWrites). The runtime's own writes go to setValue directly.
+function scriptSet(path, value, form) {
+  if ((value === undefined || value === null) && !isColourPath(splitAccessor(String(path), typeof form === 'string' ? form : '').path)) {
+    addScriptTrace('error', '', `set("${path}"): no value was given, so nothing was set.`);
+    return;
+  }
+  setValue(path, value, typeof form === 'string' || isOptionsTable(form) ? form : '');
+}
+
 function setValue(path, value, formOrOpts = '') {
+  // A write outside any handler (after(), a timer's own callback) raises the value events itself:
+  // origin() then says a script made it, unless whoever called this said otherwise first.
+  if (!dispatchingNow() && panelsOrigin == null) {
+    panelsOrigin = 'script';
+    // A write that changed nothing raises nothing, and must not lend its origin to a later one.
+    queueMicrotask(() => { panelsOrigin = null; });
+  }
   const form = typeof formOrOpts === 'string' ? formOrOpts : '';
   const opts = formOrOpts && typeof formOrOpts === 'object' ? formOrOpts : null;
   const notAForm = formRefusal(`set("${path}")`, 'nothing was set', form);
@@ -740,9 +803,11 @@ function setValue(path, value, formOrOpts = '') {
       addScriptTrace('error', '', `set: "${name}" has no numeric range (Behavior.min/max), so .normalizedValue means nothing here`);
       return;
     }
+    const position = setNumber(path, value);
+    if (position === undefined) return;
     // Clamp: a 0–1 position outside 0–1 is a bug in the caller's maths, and letting it through
     // would drive the control past its own limits.
-    const t = Math.max(0, Math.min(1, Number(value)));
+    const t = Math.max(0, Math.min(1, position));
     // Boolean controls must keep their raw value type after a normalized write.
     const valueType = String(control?._children?.Behavior?.valueType ?? "").toLowerCase();
     value = valueType === "bool" || valueType === "boolean"
@@ -777,6 +842,14 @@ function setValue(path, value, formOrOpts = '') {
   const colours = colourWrites(`set("${path}")`, 'nothing was set', control, modelPath, value);
   if (!colours) return;
   value = colours.value;
+  // A control bound to a device parameter is read by its binding, which takes a choice by its name
+  // ("LP") and says what it cannot read.
+  if (isLiveValuePath(modelPath) && String(control?._children?.Behavior?.family ?? '').trim().toLowerCase() === 'range'
+      && !valueBindingFor(control)) {
+    const n = setNumber(path, value);
+    if (n === undefined) return;
+    value = n;
+  }
 
   // A write that goes nowhere used to VANISH. The contract's own headline (Q1) is that coverage is
   // total and you can never pick wrong, so a path that resolves to nothing has to say so — without
@@ -1167,9 +1240,15 @@ const musicMod12 = (n) => ((Math.floor(n) % 12) + 12) % 12;
 // A number has to be a finite one: NaN, true or a table went through Number(v) || 0 and rooted the
 // answer at C-1 or C#-1 just as an unreadable name had. The answer itself may pass 127 (a chord on
 // G9 does), since these compute pitches; a sender refuses one that is not a MIDI note.
-const musicPitch = (v) => (typeof v === 'string' ? helpers.noteNumber(v)
+const musicPitch = (v) => (typeof v === 'string' ? noteNumberOf(v)
   : typeof v === 'number' && Number.isFinite(v) ? Math.floor(v) : undefined);
-const musicSteps = (table, name) => table[name == null ? 'major' : String(name)];
+// A name in any case (utils/wordLists.js): "Dorian" and "MAJ7" are dorian and maj7. Never one of
+// Object's own: table["toString"] was a function.
+const musicSteps = (table, name) => {
+  if (name == null) return table.major;
+  const word = listWord(Object.keys(table), String(name));
+  return word ? table[word] : undefined;
+};
 function musicPitchOf(verb, v) {
   // A note left out altogether went the numeric way and became 0, the scale on C-1 again.
   if (v === undefined || v === null) {
@@ -1181,7 +1260,7 @@ function musicPitchOf(verb, v) {
   if (n === undefined) {
     addScriptTrace('error', '', typeof v === 'string'
       ? `${verb}: "${v}" is not a note name, so there is no answer. A name is `
-        + 'a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
+        + 'a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".'
       : `${verb}: ${shownValue(v)} is not a note, so there is no answer. A note is a MIDI `
         + 'number or a name, such as 60 or "C4".');
   }
@@ -1219,10 +1298,19 @@ function musicSaid(said) {
   musicWarned.add(said);
   addScriptTrace('warn', '', `${said} This is said only the first time.`);
 }
-// A count argument that is not a finite number falls back to its default. Written out rather than
-// leaning on falsiness, because `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree
-// or a size differing by one between runtimes is a chord differing by a third.
-const musicCount = (v, fallback) => (Number.isFinite(Number(v)) ? Math.floor(Number(v)) : fallback);
+// degreeChord's step and size: left out, the default; a number, or text that is one, rounded down;
+// anything else the default, said once. Written out rather than leaning on falsiness, because
+// `0 || 3` is 3 in JavaScript and Python and 0 in Lua — and a degree or a size differing by one
+// between runtimes is a chord differing by a third. They were read with each language's own
+// conversion, so "x" was the default without a word, null was step 0 here and 1 in Lua, and "0x10"
+// was 16 in two runtimes and the default in the third.
+function musicStep(what, v, fallback) {
+  if (v === undefined || v === null) return fallback;
+  const n = realNumber(v);
+  if (n !== undefined) return Math.floor(n);
+  musicSaid(`ce.music.degreeChord: ${what} is ${shownValue(v)}, which is not a number, so ${fallback} was used.`);
+  return fallback;
+}
 
 // Stack scale thirds from a 0-based degree — the Chord Pad's `stackedChord`, offsets from the
 // TONIC. Wrapping past the top of the scale adds an octave, so degree 8 of a seven-note scale is
@@ -1230,7 +1318,7 @@ const musicCount = (v, fallback) => (Number.isFinite(Number(v)) ? Math.floor(Num
 const musicStack = (steps, degree, size) => {
   const n = steps.length;
   const out = [];
-  for (let k = 0; k < Math.max(2, musicCount(size, 3)); k += 1) {
+  for (let k = 0; k < Math.max(2, size); k += 1) {
     const idx = degree + k * 2;
     out.push(steps[((idx % n) + n) % n] + Math.floor(idx / n) * 12);
   }
@@ -1580,7 +1668,7 @@ function indexImpl(t, count) {
 function crossfadeImpl(a, b, t, law) {
   const x = normImpl(t, 0, 1);
   const from = num(a), to = num(b);
-  const kind = String(law ?? 'linear').toLowerCase();
+  const kind = String(law ?? 'linear').trim().toLowerCase();
   if (kind === 'equalpower') {
     const angle = (x * Math.PI) / 2;
     return from * Math.cos(angle) + to * Math.sin(angle);
@@ -1785,7 +1873,7 @@ function polarImpl(angle, radius) {
 function shapeImpl(v, curve, tension) {
   const t = normImpl(v, 0, 1);
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
-  switch (String(curve)) {
+  switch (String(curve).trim().toLowerCase()) {   // in any case: "SCurve" is "scurve"
     case 'exp': return t ** k;
     case 'log': return 1 - (1 - t) ** k;
     // Both spellings, because the panel says "scurve" and the script API has always said "s".
@@ -1978,7 +2066,7 @@ function unshapeImpl(y, curve, tension) {
   // The same k as shape(), including the 1.6 default — an inverse computed against a different
   // exponent would be an inverse of nothing.
   const k = 1 + Math.max(0, num(tension, 0) || 1.6);
-  switch (String(curve)) {
+  switch (String(curve).trim().toLowerCase()) {
     case 'exp': return v ** (1 / k);
     case 'log': return 1 - (1 - v) ** (1 / k);
     // The closed-form inverse of smoothstep. Solving the cubic numerically would be slower and
@@ -1987,6 +2075,11 @@ function unshapeImpl(y, curve, tension) {
     case 'hold': return v >= 1 ? 1 : 0;
     default: return v;
   }
+}
+
+// ce.format's console: a rejected argument is an error, a value past the end of a table a warning.
+function formatSay(level, text) {
+  addScriptTrace(level === 'warn' ? 'warn' : 'error', '', text);
 }
 
 const helpers = {
@@ -2013,10 +2106,12 @@ const helpers = {
   // A shape the list does not have used to return v in silence, which reads as a curve that does
   // nothing rather than as a name that was never applied.
   curve: (v, shape) => {
-    if (shape === 'exp') return v * v;
-    if (shape === 'log') return Math.sqrt(Math.max(0, v));
-    if (shape === 's') return v * v * (3 - 2 * v);
-    if (shape !== undefined && shape !== null && shape !== '' && shape !== 'linear') {
+    // A name in any case, as every word from a list is read: "EXP" is "exp".
+    const name = shape === undefined || shape === null ? 'linear' : String(shape).trim().toLowerCase();
+    if (name === 'exp') return v * v;
+    if (name === 'log') return Math.sqrt(Math.max(0, v));
+    if (name === 's') return v * v * (3 - 2 * v);
+    if (name !== '' && name !== 'linear') {
       addScriptTrace('log', '',
         `curve(v, ${JSON.stringify(String(shape))}): unknown shape — using linear. `
         + 'The names are "linear", "exp", "log" and "s"; for any other shape use map(v, points).');
@@ -2088,6 +2183,33 @@ const helpers = {
     const db = 20 * Math.log10(g);
     return db < MIN_DB ? MIN_DB : db;
   },
+  // @module ce.format
+  // Pure, and line for line the preludes' own (formatCore.js says why that matters here).
+  formatNumber: (v, opts) => formatNumber(v, opts, formatSay),
+  formatHz: (v, opts) => formatHz(v, opts, formatSay),
+  formatTime: (ms, opts) => formatTime(ms, opts, formatSay),
+  formatDb: (v, opts) => formatDb(v, opts, formatSay),
+  formatPercent: (v, opts) => formatPercent(v, opts, formatSay),
+  formatPan: (v, opts) => formatPan(v, opts, formatSay),
+  formatRatio: (v, opts) => formatRatio(v, opts, formatSay),
+  formatClock: (ms, opts) => formatClock(ms, opts, formatSay),
+  formatNote: (n, opts) => formatNote(n, opts, formatSay),
+  formatDivision: (beats, opts) => formatDivision(beats, opts, formatSay),
+  formatTable: (v, table, opts) => formatTable(v, table, opts, formatSay),
+  formatFit: (text, width, opts) => formatFit(text, width, opts, formatSay),
+  formatLine: (left, right, width, opts) => formatLine(left, right, width, opts, formatSay),
+  formatParse: (text, opts) => formatParse(text, opts),
+  // The one ce.format command that reads the device: the profile's description, then the pure part.
+  formatParameter: (id, v, opts) => {
+    const role = opts && typeof opts === 'object' && opts.role ? String(opts.role) : DEFAULT_ROLE;
+    const desc = deviceParameterRead(id, role);
+    if (!desc || typeof desc !== 'object') {
+      const shown = formatPlaceholderFor(opts);
+      formatSay('error', `ce.format.parameter: the device profile has no parameter "${String(id)}", so "${shown}" is shown.`);
+      return shown;
+    }
+    return formatDescribed(desc, v, opts, formatSay);
+  },
   // @module ce.music
   // Two spellings, chosen by whether the second argument is there at all. Omitted, you get this
   // module's own plain-ASCII names (C#4) — what every script written so far compares against, and
@@ -2095,18 +2217,40 @@ const helpers = {
   // same table the Chord Pad, the Harmoniser and the Arpeggiator print from, so a script can label
   // a control with the spelling the component beside it is using.
   // The rule is musicTheory's, which the script editor's Values sidebar reads a note by too.
-  noteName: (n, flats) => noteNameOf(n, flats),
+  // A number, or text that is one, rounded down; anything else is no answer, and says why, in each
+  // prelude's words. A name ("C4") raised in Lua and Python and gave "undefinedNaN" in the
+  // JavaScript engine (ce.music's review, docs/design/api-descriptions-handoff.md).
+  noteName: (n, flats) => {
+    const v = typeof n === 'boolean' ? undefined : realNumber(n);
+    if (v === undefined) {
+      addScriptTrace('error', '', n === undefined || n === null
+        ? 'ce.music.name: no note was given, so there is no answer. A note is a MIDI number, such as 60.'
+        : `ce.music.name: ${shownValue(n)} is not a note number, so there is no answer. A note is a MIDI number, such as 60.`);
+      return undefined;
+    }
+    return noteNameOf(v, flats);
+  },
   // Reads all four spellings: C4, C#4, C♯4, Db4, D♭4. An unreadable name is NIL, not 0 — 0 is a
   // perfectly good MIDI note (C-1), so returning it for "Eb4" meant a typo played a wrong note in
-  // silence rather than showing up.
-  noteNumber: (name) => noteNumberOf(name),
+  // silence rather than showing up. It now says why, as the other ce.music commands do; the senders
+  // and those commands read a name with noteNumberOf, and say their own why.
+  noteNumber: (name) => {
+    const n = typeof name === 'string' ? noteNumberOf(name) : undefined;
+    if (n === undefined) {
+      addScriptTrace('error', '', name === undefined || name === null
+        ? 'ce.music.number: no note name was given, so there is no answer.'
+        : `ce.music.number: ${shownValue(name)} is not a note name, so there is no answer. A name is a letter `
+          + 'from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".');
+    }
+    return n;
+  },
   // Does this key write its accidentals as flats? The Chord Pad's rule, exactly: judged by the
   // RELATIVE MAJOR, so C minor spells E♭/A♭ rather than D♯/G♯. Pass the answer straight to
   // noteName and a script's labels match the panel's without deciding anything itself.
   noteSpelling: (root, scale) => {
     const steps = musicSetOf('ce.music.spelling', 'scale', scale);
     if (!steps) return undefined;
-    const name = scale == null ? 'major' : String(scale);
+    const name = scale == null ? 'major' : (listWord(SCALE_NAMES, String(scale)) ?? String(scale));
     const pitch = musicPitchOf('ce.music.spelling', root);
     if (pitch === undefined) return undefined;
     const pc = musicMod12(pitch);
@@ -2146,8 +2290,8 @@ const helpers = {
     const name = scale == null ? 'major' : String(scale);
     const base = musicPitchOf('ce.music.degreeChord', root);
     if (base === undefined) return undefined;
-    const d = musicCount(degree, 1) - 1;
-    const offsets = musicStack(steps, d, size);
+    const d = musicStep('degree', degree, 1) - 1;
+    const offsets = musicStack(steps, d, musicStep('size', size, 3));
     const quality = helpers.chordQuality(offsets);
     const flats = helpers.noteSpelling(root, name);
     const spell = (n) => (flats ? NOTE_FLAT : NOTE_SHARP)[musicMod12(n)];
@@ -2235,7 +2379,8 @@ const helpers = {
   arpOrder: (notes, pattern) => {
     const asc = musicNoteList('arpOrder', 'notes', notes);
     if (!asc) return [];
-    const { which, said } = arpOrderPattern(pattern);
+    const { which, said, refused } = arpOrderPattern(pattern);
+    if (refused) { addScriptTrace('error', '', refused); return []; }
     musicSaid(said);
     if (!asc.length) return [];
     switch (which) {
@@ -2385,43 +2530,22 @@ const helpers = {
   // MIDI data encoding — the escape hatch for hand-built SysEx, for the parameters the DPD
   // doesn't model. Ported byte-for-byte from the Lua/JS/Python preludes in CE/src/Scripting so a
   // script packs a value identically whether it runs here or in the shipped plugin.
-  to14bit: (v) => { v = Math.floor(v); return { msb: Math.floor(v / 128) % 128, lsb: v % 128 }; },
-  from14bit: (msb, lsb) => msb * 128 + lsb,
-  to7bit: (v, count = 2, order = 'msb') => {
-    v = Math.floor(v);
-    const out = [];
-    for (let i = 0; i < count; i++) { out.push(v % 128); v = Math.floor(v / 128); }
-    return order === 'msb' ? out.reverse() : out;
-  },
-  from7bit: (bytes, order = 'msb') => {
-    const b = order === 'msb' ? bytes : [...bytes].reverse();
-    let v = 0;
-    for (const x of b) v = v * 128 + x;
-    return v;
-  },
-  toNibbles: (b) => { b = Math.floor(b); return { hi: Math.floor(b / 16) % 16, lo: b % 16 }; },
-  fromNibbles: (hi, lo) => hi * 16 + lo,
-  nibblize: (bytes) => {
-    const o = [];
-    for (const x of bytes) { const n = { hi: Math.floor(x / 16) % 16, lo: x % 16 }; o.push(n.hi, n.lo); }
-    return o;
-  },
-  denibblize: (bytes) => {
-    const o = [];
-    for (let i = 0; i < bytes.length; i += 2) o.push(bytes[i] * 16 + (bytes[i + 1] ?? 0));
-    return o;
-  },
-  toAscii: (str, length) => {
-    const o = [];
-    for (let i = 0; i < String(str).length; i++) o.push(String(str).charCodeAt(i));
-    if (length) while (o.length < length) o.push(32);
-    return o;
-  },
-  fromAscii: (bytes) => { let s = ''; for (const b of bytes) s += String.fromCharCode(b); return s; },
-  toOffset: (v, center) => v + center,
-  fromOffset: (b, center) => b - center,
-  toSigned: (v, bits) => { const m = 2 ** bits; return v < 0 ? v + m : v; },
-  fromSigned: (b, bits) => { const m = 2 ** bits; return b >= m / 2 ? b - m : b; },
+  // Each answers nothing and says why for a value that does not fit, as the byte lists below do
+  // ("the older encoding helpers").
+  to14bit: (v) => packTo14bit(v),
+  from14bit: (msb, lsb) => packFrom14bit(msb, lsb),
+  to7bit: (v, count, order) => packTo7bit(v, count, order),
+  from7bit: (bytes, order) => packFrom7bit(bytes, order),
+  toNibbles: (b) => packToNibbles(b),
+  fromNibbles: (hi, lo) => packFromNibbles(hi, lo),
+  nibblize: (bytes) => packNibblize(bytes),
+  denibblize: (bytes) => packDenibblize(bytes),
+  toAscii: (str, length) => packToAscii(str, length),
+  fromAscii: (bytes) => packFromAscii(bytes),
+  toOffset: (v, center) => packOffset('ce.midi.toOffset', 'v', v, center, 1),
+  fromOffset: (b, center) => packOffset('ce.midi.fromOffset', 'b', b, center, -1),
+  toSigned: (v, bits) => packToSigned(v, bits),
+  fromSigned: (b, bits) => packFromSigned(b, bits),
   // Byte lists — see "byte lists" below, and docs/design/script-bytes.md for why lists.
   getBits: (value, start, count) => bytesGetBits(value, start, count),
   setBits: (value, start, count, bits) => bytesSetBits(value, start, count, bits),
@@ -2555,7 +2679,8 @@ const doesNotFit = (v, bits) => (v === undefined || v === null ? 'the value to w
     : v < 0 || v >= 2 ** bits ? `${v} does not fit in ${plural(bits, 'bit')}` : '');
 function bytesOpts(verb, opts) {
   const bits = opts?.bits ?? 7;
-  const order = opts?.order ?? 'msb';
+  // In any case, as every word from a list is read: "MSB" is "msb".
+  const order = typeof opts?.order === 'string' ? opts.order.trim().toLowerCase() : (opts?.order ?? 'msb');
   if (bits !== 7 && bits !== 8) return bytesRefuse(verb, 'bits must be 7 or 8');
   if (order !== 'msb' && order !== 'lsb') return bytesRefuse(verb, 'order must be "msb" or "lsb"');
   return { bits, order };
@@ -2742,6 +2867,181 @@ function bytesFromBase64(text) {
   }
   return out;
 }
+/* ------------------------------------------------------------- the older encoding helpers */
+// to7bit to fromSigned, held to the byte lists' rule: a value that does not fit, a number that is
+// not one and a list that is not bytes answer nothing and say why. They answered a wrong number
+// without a word: to14bit(20000) wrapped to 3616, nibblize({300}) split 300, toSigned(-200, 8) gave
+// 56, denibblize joined an odd half with 0. A value to split is rounded down first, as it always
+// was; a part to join must be whole. The same words in every prelude, which
+// scriptPreludeAgreement.test.js checks.
+// A number, or text that is one; undefined after the error.
+function packNumber(verb, what, v) {
+  const n = realNumber(v);
+  if (n !== undefined) return n;
+  return bytesRefuse(verb, `${what} is a number, and ${v === undefined || v === null ? 'none was given' : `${shownValue(v)} is not`}`);
+}
+// A number already read, as a whole number from 0 below 2 ** bits; undefined after the error.
+function packRange(verb, what, n, bits, room, roundDown) {
+  const m = roundDown ? Math.floor(n) : n;
+  if (!Number.isInteger(m)) return bytesRefuse(verb, `${what} is ${String(n)}, which is not a whole number`);
+  if (m < 0 || m >= 2 ** bits) return bytesRefuse(verb, `${what} is ${String(n)}, which does not fit in ${room}`);
+  return m;
+}
+function packFit(verb, what, v, bits, room, roundDown) {
+  const n = packNumber(verb, what, v);
+  return n === undefined ? undefined : packRange(verb, what, n, bits, room, roundDown);
+}
+// A whole-number setting from lo to hi: to7bit's count, the bits of a signed number. Left out, the
+// fallback when there is one.
+function packSetting(verb, what, v, lo, hi, fallback) {
+  if ((v === undefined || v === null) && fallback !== undefined) return fallback;
+  const n = realNumber(v);
+  if (n === undefined || !Number.isInteger(n) || n < lo || n > hi) {
+    return bytesRefuse(verb, `${what} must be a whole number from ${lo} to ${hi}`);
+  }
+  return n;
+}
+// "msb" or "lsb", in any case; left out, "msb". Anything else was read as "lsb".
+function packOrder(verb, order) {
+  const o = order === undefined || order === null ? 'msb' : typeof order === 'string' ? order.trim().toLowerCase() : order;
+  return o === 'msb' || o === 'lsb' ? o : bytesRefuse(verb, 'order must be "msb" or "lsb"');
+}
+// A list of bytes whose every item is below 2 ** bits; `why` says what one that is not is.
+function packList(verb, input, bits, why) {
+  const list = bytesIn(verb, input);
+  if (!list) return undefined;
+  const at = list.findIndex((b) => b >= 2 ** bits);
+  return at < 0 ? list : bytesRefuse(verb, `${list[at]} at position ${at} ${why}`);
+}
+function packTo14bit(v) {
+  const n = packFit('ce.midi.to14bit', 'v', v, 14, '14 bits', true);
+  return n === undefined ? undefined : { msb: Math.floor(n / 128), lsb: n % 128 };
+}
+function packFrom14bit(msb, lsb) {
+  const verb = 'ce.midi.from14bit';
+  const hi = packFit(verb, 'msb', msb, 7, '7 bits');
+  if (hi === undefined) return undefined;
+  const lo = packFit(verb, 'lsb', lsb, 7, '7 bits');
+  return lo === undefined ? undefined : hi * 128 + lo;
+}
+function packTo7bit(v, count, order) {
+  const verb = 'ce.midi.to7bit';
+  const n = packNumber(verb, 'v', v);
+  if (n === undefined) return undefined;
+  const k = packSetting(verb, 'count', count, 1, 4, 2);
+  if (k === undefined) return undefined;
+  const o = packOrder(verb, order);
+  if (o === undefined) return undefined;
+  let x = packRange(verb, 'v', n, 7 * k, `${plural(k, 'byte')} of 7 bits`, true);
+  if (x === undefined) return undefined;
+  const out = [];
+  for (let i = 0; i < k; i += 1) { out.push(x % 128); x = Math.floor(x / 128); }
+  return o === 'msb' ? out.reverse() : out;
+}
+function packFrom7bit(bytes, order) {
+  const verb = 'ce.midi.from7bit';
+  const list = packList(verb, bytes, 7, 'does not fit in 7 bits');
+  if (!list) return undefined;
+  if (list.length < 1 || list.length > 4) return bytesRefuse(verb, `it joins 1 to 4 bytes, and ${list.length} were given`);
+  const o = packOrder(verb, order);
+  if (o === undefined) return undefined;
+  let v = 0;
+  for (const b of o === 'msb' ? list : list.slice().reverse()) v = v * 128 + b;
+  return v;
+}
+function packToNibbles(b) {
+  const n = packFit('ce.midi.toNibbles', 'byte', b, 8, '8 bits', true);
+  return n === undefined ? undefined : { hi: Math.floor(n / 16), lo: n % 16 };
+}
+function packFromNibbles(hi, lo) {
+  const verb = 'ce.midi.fromNibbles';
+  const h = packFit(verb, 'hi', hi, 4, '4 bits');
+  if (h === undefined) return undefined;
+  const l = packFit(verb, 'lo', lo, 4, '4 bits');
+  return l === undefined ? undefined : h * 16 + l;
+}
+function packNibblize(bytes) {
+  const list = bytesIn('ce.midi.nibblize', bytes);
+  if (!list) return undefined;
+  const out = [];
+  for (const b of list) out.push(Math.floor(b / 16), b % 16);
+  return out;
+}
+function packDenibblize(bytes) {
+  const verb = 'ce.midi.denibblize';
+  const list = packList(verb, bytes, 4, 'does not fit in 4 bits');
+  if (!list) return undefined;
+  if (list.length % 2 === 1) return bytesRefuse(verb, `the halves come in pairs, and ${list.length} is an odd count`);
+  const out = [];
+  for (let i = 0; i < list.length; i += 2) out.push(list[i] * 16 + list[i + 1]);
+  return out;
+}
+// Text longer than the length is cut to it, and a length that is not one is no length; each said
+// once. The text went out whole, past the field a patch name has in a dump, and a length of "x"
+// or 0 filled nothing without a word.
+const packWarned = new Set();
+function packSaid(key, said) {
+  if (packWarned.has(key)) return;
+  packWarned.add(key);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+function packToAscii(str, length) {
+  const verb = 'ce.midi.toAscii';
+  if (typeof str !== 'string') {
+    return bytesRefuse(verb, `str is text, and ${str === undefined || str === null ? 'none was given' : `${shownValue(str)} is not`}`);
+  }
+  const out = [];
+  for (let i = 0; i < str.length; i += 1) {
+    const c = str.charCodeAt(i);
+    if (c > 127) return bytesRefuse(verb, 'the text has a character outside ASCII');
+    out.push(c);
+  }
+  if (length === undefined || length === null) return out;
+  const n = realNumber(length);
+  if (n === undefined || !Number.isInteger(n) || n < 1) {
+    packSaid('toAscii length', `${verb}: length is ${shownValue(length)}, which is not a whole number from 1, so the text was neither filled out nor cut.`);
+    return out;
+  }
+  if (out.length > n) {
+    packSaid('toAscii cut', `${verb}: "${str}" is longer than ${plural(n, 'character')}, so it was cut to ${n}.`);
+    out.length = n;
+  }
+  while (out.length < n) out.push(32);
+  return out;
+}
+function packFromAscii(bytes) {
+  const list = packList('ce.midi.fromAscii', bytes, 7, 'is not an ASCII character');
+  return list ? list.map((b) => String.fromCharCode(b)).join('') : undefined;
+}
+function packOffset(verb, what, v, center, sign) {
+  const n = packNumber(verb, what, v);
+  if (n === undefined) return undefined;
+  const c = packNumber(verb, 'center', center);
+  return c === undefined ? undefined : n + sign * c;
+}
+function packToSigned(v, bits) {
+  const verb = 'ce.midi.toSigned';
+  const n = packNumber(verb, 'v', v);
+  if (n === undefined) return undefined;
+  const k = packSetting(verb, 'bits', bits, 1, 32);
+  if (k === undefined) return undefined;
+  const m = Math.floor(n);
+  const half = 2 ** (k - 1);
+  if (m < -half || m >= half) {
+    return bytesRefuse(verb, `v is ${String(n)}, and in ${plural(k, 'bit')} a signed number is from ${-half} to ${half - 1}`);
+  }
+  return m < 0 ? m + 2 ** k : m;
+}
+function packFromSigned(b, bits) {
+  const verb = 'ce.midi.fromSigned';
+  const n = packNumber(verb, 'b', b);
+  if (n === undefined) return undefined;
+  const k = packSetting(verb, 'bits', bits, 1, 32);
+  if (k === undefined) return undefined;
+  const m = packRange(verb, 'b', n, k, plural(k, 'bit'));
+  if (m === undefined) return undefined;
+  return m >= 2 ** (k - 1) ? m - 2 ** k : m;
+}
 // checksum(kind, bytes). "roland"/"yamaha" are the same two's-complement 7-bit sum — Roland
 // documents it as (128 - sum) & 0x7F and Yamaha as (0 - sum) & 0x7F, which are the same number —
 // so both spellings are accepted rather than pretending to tell them apart. "sum" is the plain
@@ -2869,7 +3169,7 @@ function midiArg(verb, kind, v) {
 // data byte, which a synth reads as a status byte. Anything else, NaN or a table included, played
 // C-1 by the numeric path. Each is refused by refuseNote, in the preludes' __badNote words.
 const midiNote = (n) => {
-  const v = typeof n === 'string' ? helpers.noteNumber(n)
+  const v = typeof n === 'string' ? noteNumberOf(n)
     : typeof n === 'number' && Number.isFinite(n) ? Math.floor(n + 0.5) : undefined;
   return v !== undefined && v >= 0 && v <= 127 ? v : undefined;
 };
@@ -2879,8 +3179,8 @@ function refuseNote(verb, note) {
   if (note === undefined || note === null) {
     why = 'no note was given, so nothing was sent. A note is a MIDI number or a name, such as 60 or "C4".';
   } else if (typeof note === 'string') {
-    why = helpers.noteNumber(note) === undefined
-      ? `"${note}" is not a note name, so nothing was sent. A name is a capital letter, then # or b if it `
+    why = noteNumberOf(note) === undefined
+      ? `"${note}" is not a note name, so nothing was sent. A name is a letter from A to G, then # or b if it `
         + 'has one, then the octave: "C4", "Eb3", "F#-1".'
       : `"${note}" is outside the MIDI notes, so nothing was sent. ${range}`;
   } else if (typeof note === 'number' && Number.isFinite(note)) {
@@ -3076,7 +3376,7 @@ const midiApi = {
       addScriptTrace('error', '', `${verb}: no action given, so nothing was sent. ${actions}`);
       return;
     }
-    const a = typeof action === 'string' ? action.toLowerCase() : '';
+    const a = typeof action === 'string' ? action.trim().toLowerCase() : '';
     const status = { start: 0xFA, continue: 0xFB, stop: 0xFC }[a];
     if (status === undefined) {
       addScriptTrace('error', '', `${verb}: ${shownValue(action)} is not a transport action, so nothing was sent. ${actions}`);
@@ -3271,20 +3571,38 @@ function wrongTargetMessage(path, section, label) {
   return `"${path}" is ${/^[AEIOU]/i.test(type) ? 'an' : 'a'} ${type}, not ${article} ${label}. ${instead}`;
 }
 
+// The call a hand-written verb was given, as the script wrote it: its short name and the arguments
+// after the target. Its refusal line named the reducer's action and that action's arguments as JSON
+// (`quantize {"grid":16}`), where every generated verb names the call (`rate(200)`); both name the
+// call now (sectionRefusalLine). Set around each call by shownCalls, below.
+let handWrittenCall = null;
+function shownCalls(api) {
+  for (const [id, fn] of Object.entries(api)) {
+    api[id] = (target, ...args) => {
+      const outer = handWrittenCall;
+      handWrittenCall = { verb: MEMBER_MODULE[id]?.name ?? id, args };
+      try { return fn(target, ...args); } finally { handWrittenCall = outer; }
+    };
+  }
+  return api;
+}
+const handWrittenRefusalLine = (family, target, action, reason) =>
+  sectionRefusalLine(family, target, handWrittenCall?.verb ?? action, handWrittenCall?.args ?? [], reason);
+
 function splitAction(path, action, args) {
   const target = String(path ?? '');
   const zonesPath = `${target}.SplitZone.zones`;
   const current = getValue(zonesPath);
   if (!Array.isArray(current)) {
     addScriptTrace('error', '', `split: ${wrongTargetMessage(target, 'SplitZone', 'Zone Splitter')}`);
-    return;
+    return false;
   }
   // A zone that is not one, or a preset there is none of, is refused, and says which there are
   // (handWrittenVerbs.js). The zone was logged as though it had been set, and nothing changed; the
   // preset replaced every zone with one whole-keyboard zone.
   const refused = handWrittenRefusal('split', action, { zones: current }, args ?? {});
   if (refused) {
-    addScriptTrace('error', '', sectionRefusalLine('split', target, action, args, refused.reason));
+    addScriptTrace('error', '', handWrittenRefusalLine('split', target, action, refused.reason));
     return false;
   }
   // A script counts zones from 1, as the panel labels them; the reducer indexes them from 0.
@@ -3293,7 +3611,7 @@ function splitAction(path, action, args) {
   addScriptTrace('log', '', `split ${target}: ${action} ${JSON.stringify(args ?? {})}`);
   return true;
 }
-const splitApi = {
+const splitApi = shownCalls({
   // Their arguments are built where the Values tab builds them (handWrittenVerbs.js).
   splitPreset: (target, preset, lowNote, highNote) => splitAction(target, 'preset', HAND_WRITTEN.splitPreset.args(preset, lowNote, highNote)),
   splitMute: (target, zone, enabled) => splitAction(target, 'mute', HAND_WRITTEN.splitMute.args(zone, enabled)),
@@ -3301,7 +3619,7 @@ const splitApi = {
   splitTranspose: (target, zone, semitones) => splitAction(target, 'transpose', HAND_WRITTEN.splitTranspose.args(zone, semitones)),
   splitPoint: (target, zone, note) => splitAction(target, 'splitPoint', HAND_WRITTEN.splitPoint.args(zone, note)),
   splitRead: (target, field) => sectionRead(target, 'SplitZone', 'split', field),
-};
+});
 
 // --- Phrase Sequencer --------------------------------------------------------
 // Same idea, one level up: the reducer patches the whole config rather than one
@@ -3313,28 +3631,30 @@ function phraseAction(path, action, args) {
   const cfg = getValue(`${target}.Phrase`);
   if (!cfg || typeof cfg !== 'object') {
     addScriptTrace('error', '', `phrase: ${wrongTargetMessage(target, 'Phrase', 'Phrase Sequencer')}`);
-    return;
+    return false;
   }
   // A cell off the grid, a seed or a direction there is none of, and a key that is not a pitch
   // class are refused, and say what there is (handWrittenVerbs.js). They said "nothing to change".
   const refused = handWrittenRefusal('phrase', action, cfg, args ?? {});
   if (refused) {
-    addScriptTrace('error', '', sectionRefusalLine('phrase', target, action, args, refused.reason));
+    addScriptTrace('error', '', handWrittenRefusalLine('phrase', target, action, refused.reason));
     return false;
   }
   // A script counts steps and rows from 1; the reducer indexes them from 0.
   const patch = phraseScriptPatch(cfg, action, reducerArgs('phrase', action, cfg, args), () => Math.random());
   const keys = Object.keys(patch);
+  // What reaches here is a request the Phrase can take, so an empty patch is one already met (a cell
+  // already on, the key it has). It answered nothing either way; it answers true, as the other
+  // components do (the Phrase Sequencer's review).
   if (keys.length === 0) {
-    // Not an error — an unknown seed or an out-of-grid cell is a no-op by
-    // design. But silence would look like the footswitch was dead.
-    addScriptTrace('log', '', `phrase ${target}: ${action} ${JSON.stringify(args ?? {})} — nothing to change`);
-    return;
+    addScriptTrace('log', '', `phrase ${target}: ${action} — already that way`);
+    return true;
   }
   for (const key of keys) setValue(`${target}.Phrase.${key}`, patch[key]);
   addScriptTrace('log', '', `phrase ${target}: ${action} → ${keys.join(', ')}`);
+  return true;
 }
-const phraseApi = {
+const phraseApi = shownCalls({
   phraseSeed: (target, seed) => phraseAction(target, 'seed', HAND_WRITTEN.phraseSeed.args(seed)),
   phraseClear: (target) => phraseAction(target, 'clear', {}),
   phraseKey: (target, key) => phraseAction(target, 'key', HAND_WRITTEN.phraseKey.args(key)),
@@ -3344,7 +3664,7 @@ const phraseApi = {
   phraseRun: (target, running) => phraseAction(target, 'run', { running: running !== false }),
   phraseCell: (target, step, row, on) => phraseAction(target, 'cell', HAND_WRITTEN.phraseCell.args(step, row, on)),
   phraseRead: (target, field) => sectionRead(target, 'Phrase', 'phrase', field),
-};
+});
 
 // --- Recorder / Harmoniser / Setlist -----------------------------------------
 // All three follow the Phrase Sequencer's shape exactly: read the section, hand
@@ -3380,7 +3700,7 @@ function sectionAction(path, section, reducer, action, args) {
     // a scene name that does not exist is a typo somebody needs to see.
     // With why (handWrittenVerbs.js): the words there are, a slot that holds no take, the scenes.
     const family = section.toLowerCase();
-    addScriptTrace('error', '', sectionRefusalLine(family, target, action, args, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
+    addScriptTrace('error', '', handWrittenRefusalLine(family, target, action, handWrittenRefusal(family, action, cfg, args ?? {})?.reason ?? null));
     return false;
   }
   for (const key of keys) setValue(`${target}.${section}.${key}`, patch[key]);
@@ -3388,14 +3708,20 @@ function sectionAction(path, section, reducer, action, args) {
   return true;
 }
 const recAction = (t, a, g) => sectionAction(t, 'Recorder', recorderScriptPatch, a, g);
-const recorderApi = {
+const recorderApi = shownCalls({
   recorderRecord: (target, on) => recAction(target, 'record', on === undefined ? {} : { on: on !== false }),
   recorderStop: (target) => recAction(target, 'stop', {}),
   recorderPlay: (target, playing) => recAction(target, 'play', playing === undefined ? {} : { playing: playing !== false }),
   recorderClear: (target) => recAction(target, 'clear', {}),
   recorderUndo: (target) => recAction(target, 'undo', {}),
-  recorderQuantize: (target, grid, strength, scale, key) =>
-    recAction(target, 'quantize', { grid, strength, scale, key }),
+  recorderQuantize: (target, grid, strength, scale, key) => {
+    const read = recorderQuantizeArgs({ grid, strength, scale, key });
+    if (read.reason) {
+      addScriptTrace('error', '', handWrittenRefusalLine('recorder', String(target ?? ''), 'quantize', read.reason));
+      return false;
+    }
+    return recAction(target, 'quantize', read.args);
+  },
   recorderTranspose: (target, semitones) => recAction(target, 'transpose', { transpose: semitones }),
   recorderBars: (target, bars) => recAction(target, 'bars', { bars }),
   recorderSource: (target, source) => recAction(target, 'source', HAND_WRITTEN.recorderSource.args(source)),
@@ -3405,10 +3731,10 @@ const recorderApi = {
   recorderLoad: (target, slot) => recAction(target, 'load', HAND_WRITTEN.recorderLoad.args(slot)),
   recorderCountIn: (target, bars) => recAction(target, 'countIn', { bars }),
   recorderRead: (target, field) => sectionRead(target, 'Recorder', 'recorder', field),
-};
+});
 
 const harmAction = (t, a, g) => sectionAction(t, 'Harmoniser', harmoniserScriptPatch, a, g);
-const harmoniserApi = {
+const harmoniserApi = shownCalls({
   harmonyMode: (target, mode) => harmAction(target, 'mode', HAND_WRITTEN.harmonyMode.args(mode)),
   harmonyKey: (target, key) => harmAction(target, 'key', HAND_WRITTEN.harmonyKey.args(key)),
   harmonyScale: (target, scale) => harmAction(target, 'scale', { scale }),
@@ -3424,7 +3750,7 @@ const harmoniserApi = {
   harmonyStrum: (target, ms) => harmAction(target, 'strum', { ms }),
   harmonyDegree: (target, degree, chord) => harmAction(target, 'degree', HAND_WRITTEN.harmonyDegree.args(degree, chord)),
   harmonyRead: (target, field) => sectionRead(target, 'Harmoniser', 'harmony', field),
-};
+});
 
 // --- The other twenty-three families (phase 7) -------------------------------
 // Same shape as everything above — read the section, reduce, write back only what changed — but
@@ -3462,11 +3788,17 @@ function componentPlace(at, path) {
 function writeComponentFields(verb, path, patch) {
   const control = findControlByName(path);
   const call = `${memberPath(verb.id)}("${path}")`;
+  // A colour refused in a verb the script called is said as the verb's other refusals are, the call
+  // as written and then why: it named the call as set()'s line does, `ce.components.drumpads.
+  // colour("Kit"): in pad 2, …`, the one refusal of a component verb in another form.
+  const asked = componentCall && componentCall.verb === verb ? componentCall : null;
+  const say = asked ? (place, why, advice) => `${verb.family} ${path}: ${verb.v}(${asked.shown}) — refused, nothing changed. `
+    + `${place ? place.charAt(0).toUpperCase() + place.slice(1) : ''}${why}.${advice ? ` ${advice}` : ''}` : null;
   const written = [];
   let refused = false;
   for (const [field, value] of Object.entries(patch)) {
     const at = `${verb.section}.${field}`;
-    const colours = colourWrites(call, 'nothing was set', control, at, value, componentPlace);
+    const colours = colourWrites(call, 'nothing was set', control, at, value, componentPlace, say);
     if (colours) written.push([field, colours.value]);
     else refused = true;
   }
@@ -3475,19 +3807,57 @@ function writeComponentFields(verb, path, patch) {
   return true;
 }
 
+/** The LCD's text and clear, and read's "text": addressed by position, on a layout (lcdPositions.js). */
+const isLcdText = (verb) => verb.family === 'lcd' && verb.k === 'line';
+
+/**
+ * A display's section with the layout it is showing, as the preview hands it to the renderer
+ * (`__page.activeLayoutId`), so text(), clear() and read() with no layout act on the layout on
+ * screen. The preview decides it (stores/displayLayouts.js); with none, the display rests on its
+ * default and lcdPositions.js finds that itself.
+ */
+function withLayoutShowing(path, section) {
+  const id = layoutShowing(findControlByName(path)?._children?.Core?.id);
+  return id ? { ...section, __page: { activeLayoutId: id } } : section;
+}
+
 const componentClampWarned = new Set();   // the verbs that have said a number was past their range; resetScriptState clears it
+// The verb a script called and its arguments as shown, while it runs, for writeComponentFields to
+// say a refused colour in the verb's own form. Set by componentVerbApi, below.
+let componentCall = null;
 function componentVerbAction(verb, target, args) {
   const path = String(target ?? '');
-  const cfg = getValue(`${path}.${verb.section}`);
-  if (!cfg || typeof cfg !== 'object') {
+  const stored = getValue(`${path}.${verb.section}`);
+  if (!stored || typeof stored !== 'object') {
     addScriptTrace('error', '', `${verb.family}: ${wrongTargetMessage(path, verb.section, verb.label)}`);
     return false;
   }
-  const patch = componentScriptPatch(verb, cfg, args);
-  const keys = Object.keys(patch);
+  const cfg = isLcdText(verb) ? withLayoutShowing(path, stored) : stored;
   const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  if (verb.seek) return componentSeekAction(verb, path, cfg, args, shown);
+  // zoneSource (and pixel.source) is given a control's name and stores its id, as the picker does
+  // (lcdPositions.js). A zone that is not there is said by the reducer's own refusal, below.
+  let given = args;
+  if (verb.k === ELEM_KIND && verb.link) {
+    const selfId = findControlByName(path)?._children?.Core?.id;
+    const { id, refusal } = lcdZoneSourceFor(activePanel()?.controls ?? [], args[1], selfId, verb.list === 'zones' ? 'zone' : 'element');
+    if (refusal && elementSites(cfg, args[0], verb.list).length) {
+      addScriptTrace('error', '', `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed. ${refusal}`);
+      return false;
+    }
+    given = [args[0], id ?? undefined];
+  }
+  const patch = componentScriptPatch(verb, cfg, given);
+  // followPanelKey(t, true) takes the panel's key and scale at once, in the same write, as the
+  // inspector's toggle does (stores/panelKeyActions.setFollowsPanelKey): it set the flag alone, and
+  // the control kept its own key until the panel's next change. Again when already following, so a
+  // key() written on a follower since is brought back into line.
+  if (verb.f === 'followPanelKey' && ('followPanelKey' in patch ? patch.followPanelKey === true : cfg.followPanelKey === true)) {
+    Object.assign(patch, panelKeyCatchUp(path, verb.section, cfg));
+  }
+  const keys = Object.keys(patch);
   // A number past the verb's range is used as the nearest end, and said once per verb.
-  const clamped = componentClampWarning(verb, path, args);
+  const clamped = componentClampWarning(verb, path, args, cfg);
   if (clamped && !componentClampWarned.has(verb.id)) {
     componentClampWarned.add(verb.id);
     addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
@@ -3497,7 +3867,7 @@ function componentVerbAction(verb, target, args) {
     // current value — so ask the spec whether the request was one the component could have
     // honoured at all. "Already that way" is a success; an unknown enum or an index past the end
     // of the list is not, and used to be indistinguishable from both success and silence.
-    if (componentRequestLegal(verb, cfg, args)) {
+    if (componentRequestLegal(verb, cfg, given)) {
       addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v}(${shown}) — already that way`);
       lcdLineSaid(verb, path, cfg, args, shown);
       return true;
@@ -3513,13 +3883,54 @@ function componentVerbAction(verb, target, args) {
   return true;
 }
 
+/**
+ * phase(t, x) on a component that runs in the preview: a seek, not a write (stores/componentPhases.js).
+ * The value is read as the verb reads it (range, the nearest end, refusals) against no stored value,
+ * so seeking to the number already stored still seeks.
+ */
+function componentSeekAction(verb, path, cfg, args, shown) {
+  const patch = componentScriptPatch(verb, { ...cfg, [verb.f]: null }, args);
+  if (!(verb.f in patch)) {
+    addScriptTrace('error', '', componentRefusalLine(verb, path, args, cfg));
+    return false;
+  }
+  const clamped = componentClampWarning(verb, path, args, cfg);
+  if (clamped && !componentClampWarned.has(verb.id)) {
+    componentClampWarned.add(verb.id);
+    addScriptTrace('warn', '', `${clamped} This is said only the first time.`);
+  }
+  if (verb.seek.clock && cfg[verb.seek.clock] === true) {
+    addScriptTrace('warn', '', `${verb.family} ${path}: ${verb.v}(${shown}) — synced to the Transport, whose position decides; nothing changed.`);
+    return true;
+  }
+  seekPhase(findControlByName(path)?._children?.Core?.id, patch[verb.f]);
+  addScriptTrace('log', '', `${verb.family} ${path}: ${verb.v} → ${patch[verb.f]}`);
+  return true;
+}
+
+/** The key and scale a control that follows the panel's key should have, where they differ from its own. */
+function panelKeyCatchUp(path, section, cfg) {
+  const control = findControlByName(path);
+  if (!control) return {};
+  const following = { ...control, _children: { ...control._children, [section]: { ...cfg, followPanelKey: true } } };
+  const context = contextForControl(activePanel(), following);
+  if (!context?.following) return {};
+  const out = {};
+  if (Number(cfg.key) !== context.root) out.key = context.root;
+  if (String(cfg.scale) !== context.scale) out.scale = context.scale;
+  return out;
+}
+
 // A line the LCD cannot show all of (cut at its width, a character it has no shape for, a display
 // showing its layouts instead) is said once per line and reason (lcdLines.js).
 const lcdLineWarned = new Set();   // resetScriptState clears it
 function lcdLineSaid(verb, path, display, args, shown) {
   if (verb.family !== 'lcd' || verb.v !== 'text') return;
-  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, args[1])) {
-    const key = `${path}\u0000${args[0]}\u0000${reason}`;
+  // The row as written, which from a column on is more than the text given.
+  const { line } = lcdWriteAt(display, args[0], args[1]);
+  if (line === undefined) return;
+  for (const { reason, message } of lcdLineWords(display, `lcd ${path}: text(${shown})`, line)) {
+    const key = `${path}\u0000${JSON.stringify(args[0])}\u0000${reason}`;
     if (lcdLineWarned.has(key)) continue;
     lcdLineWarned.add(key);
     addScriptTrace('warn', '', `${message} This is said only the first time.`);
@@ -3616,6 +4027,12 @@ function componentListValue(cfg, verb) {
   return [...list];
 }
 
+/** A seek verb's read: where the component is now (stores/componentPhases.js), else the stored value. */
+function componentPhaseNow(path, cfg, spec) {
+  const now = phaseNow(findControlByName(path)?._children?.Core?.id);
+  return now ?? componentScalarValue(cfg, spec);
+}
+
 function componentReadAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'read');
   if (!cfg) return undefined;
@@ -3629,38 +4046,71 @@ function componentReadAction(verb, path, args) {
       // A link reads back as the NAME it was written by — '' when it points at nothing, which is
       // the truthful answer for both "unlinked" and "linked to a control that has been deleted".
       if (spec.k === LINK_KIND) out[verbName] = sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+      else if (spec.k === LAYOUT_KIND) out[verbName] = lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
+      else if (spec.seek) out[verbName] = componentPhaseNow(path, cfg, spec);
       else if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') out[verbName] = componentScalarValue(cfg, spec);
     }
     return out;
   }
 
-  const spec = specs[String(name)];
+  const spec = familyVerbNamed(verb.family, name);
   const refusedName = familyVerbRefusal(verb.family, 'read', name);
   if (refusedName) {
     addScriptTrace('error', '', refusedName);
     return undefined;
   }
   if (spec.k === LINK_KIND) return sourceName(activePanel()?.controls ?? [], cfg[spec.f]);
+  // The layout showing, counted from 1 as layout() takes it: 1 on a display without layouts.
+  if (spec.k === LAYOUT_KIND) return lcdShownLayout(withLayoutShowing(path, cfg)) + 1;
+  // Where it is now, as the preview runs it; the stored phase, where it starts, when nothing runs it.
+  if (spec.seek) return componentPhaseNow(path, cfg, spec);
   if (SCALAR_KINDS.includes(spec.k) || spec.k === 'xy') return componentScalarValue(cfg, spec);
 
   // A name-addressed scene reads back BY NAME, in both shapes: the whole table, which is also how a
   // script discovers what the display has, or one element's value. A positional index would be the
   // wrong question — see LIST_KINDS in componentVerbs.js — so it is refused rather than guessed at.
+  // An LCD's zones read the same way, a zone's place as zoneAt takes it and its source by name.
   if (spec.k === ELEM_KIND) {
-    const table = elementPropTable(cfg, spec.item);
+    const list = spec.list ?? 'elements';
+    const readAs = spec.place ? (zone) => lcdZonePlaceOf(cfg, zone)
+      : spec.link ? (zone) => lcdZoneSourceName(activePanel()?.controls ?? [], zone?.[spec.item])
+        : (el) => el?.[spec.item] ?? spec.absent;
+    const table = elementPropTable(cfg, spec.item, list, readAs);
     if (index === undefined || index === null || index === '') return table;
-    const sites = elementSites(cfg, index);
+    const sites = elementSites(cfg, index, list);
     if (!sites.length) {
       addScriptTrace('error', '',
-        `${verb.family}.read("${name}", "${index}"): this display has no element called `
+        `${verb.family}.read("${name}", "${index}"): this display has no ${list === 'zones' ? 'zone' : 'element'} called `
         + `"${index}". One of: ${Object.keys(table).join(', ') || '(none)'}.`);
       return undefined;
     }
-    return elementAt(cfg, sites[0])?.[spec.item];
+    return readAs(elementAt(cfg, sites[0], list));
+  }
+
+  // The LCD's text is read by position (lcdPositions.js): every row of the layout showing, one row,
+  // the columns of one, or another layout's.
+  if (isLcdText(spec)) {
+    const { value, refusal } = lcdReadAt(withLayoutShowing(path, cfg), index);
+    if (refusal) addScriptTrace('error', '', `${verb.family}.read("${spec.v}", ${JSON.stringify(index)}): ${refusal}`);
+    return refusal ? undefined : value;
   }
 
   const list = componentListValue(cfg, spec);
   if (!list) return undefined;
+  // A set of steps (the Arpeggiator's mutes) reads as the steps counted from 1, as mute() takes them,
+  // and one step as whether it is in the set. It read as the stored list, counted from 0, and one
+  // entry of it by position (item 7 of the owner's review of the arp).
+  if (spec.k === 'indexset') {
+    const steps = [...new Set(list.map((n) => Math.round(Number(n))).filter(Number.isFinite))]
+      .sort((a, b) => a - b).map((n) => n + 1);
+    if (index === undefined || index === null) return steps;
+    const refused = componentRefusalReason(spec, cfg, [index]);
+    if (refused) {
+      addScriptTrace('error', '', `${verb.family}.read("${spec.v}", ${JSON.stringify(index)}): ${refused}`);
+      return undefined;
+    }
+    return steps.includes(Math.round(Number(index)));
+  }
   if (index === undefined || index === null) return list;
 
   // 1-based, as everywhere else in this module — and for a grid the second index is the column.
@@ -3687,6 +4137,7 @@ function componentSizeAction(verb, path, args) {
   const lists = Object.entries(specs).filter(([, s]) => LIST_KINDS.includes(s.k) && !s.clear);
 
   const sizeOf = (spec) => {
+    if (isLcdText(spec)) return lcdRows(cfg);
     const list = componentList(cfg, spec);
     if (!list) return undefined;
     if (spec.k === 'cell' && spec.grid) {
@@ -3701,7 +4152,7 @@ function componentSizeAction(verb, path, args) {
   if (name === undefined || name === null || name === '') {
     return Object.fromEntries(lists.map(([verbName, spec]) => [verbName, sizeOf(spec)]));
   }
-  const spec = specs[String(name)];
+  const spec = familyVerbNamed(verb.family, name);
   if (!spec || !LIST_KINDS.includes(spec.k)) {
     addScriptTrace('error', '', familyVerbRefusal(verb.family, 'size', name));
     return undefined;
@@ -3714,8 +4165,7 @@ function componentFillAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'fill');
   if (!cfg) return false;
   const [name, values] = args;
-  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const spec = specs[String(name ?? '')];
+  const spec = familyVerbNamed(verb.family, name);
   if (!spec || !LIST_KINDS.includes(spec.k) || spec.clear) {
     addScriptTrace('error', '', familyVerbRefusal(verb.family, 'fill', name));
     return false;
@@ -3724,6 +4174,7 @@ function componentFillAction(verb, path, args) {
     addScriptTrace('error', '', `${verb.family}.fill("${name}"): needs a list of values.`);
     return false;
   }
+  if (isLcdText(spec)) return lcdFill(verb, path, cfg, name, values);
   const list = componentList(cfg, spec);
   if (!list) return false;
 
@@ -3774,6 +4225,35 @@ function componentFillAction(verb, path, args) {
   return true;
 }
 
+/** fill(t, "text", rows): the rows of the layout showing from the first, as text() writes each. */
+function lcdFill(verb, path, cfg, name, values) {
+  const rows = lcdRows(cfg);
+  if (values.length > rows) {
+    addScriptTrace('error', '',
+      `${verb.family}.fill("${name}"): ${values.length} values for ${rows} rows — refused. `
+      + `${verb.family}.size("${name}") says how many there are.`);
+    return false;
+  }
+  let work = withLayoutShowing(path, cfg);
+  let patch = {};
+  for (const [i, value] of values.entries()) {
+    const done = lcdWriteAt(work, i + 1, value);
+    if (done.refusal) {
+      addScriptTrace('error', '', `${verb.family}.fill("${name}"): row ${i + 1}: ${done.refusal} Nothing was written.`);
+      return false;
+    }
+    patch = { ...patch, ...done.patch };
+    work = { ...work, ...done.patch };
+  }
+  if (!Object.keys(patch).length) {
+    addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") — already that way`);
+    return true;
+  }
+  if (!writeComponentFields(verb, path, patch)) return false;
+  addScriptTrace('log', '', `${verb.family} ${path}: fill("${name}") → ${values.length} value(s)`);
+  return true;
+}
+
 /** Add one element to a component's list, using the template the canvas uses. */
 function componentInsertAction(verb, path, args) {
   const cfg = componentConfig(verb, path, 'insert');
@@ -3818,8 +4298,7 @@ function componentRemoveAction(verb, path, args) {
 
 /** The list-addressing verb a name refers to, having complained if it is not one. */
 function componentListSpec(verb, forWhat, name) {
-  const specs = COMPONENT_VERB_BY_NAME[verb.family] ?? {};
-  const spec = specs[String(name ?? '')];
+  const spec = familyVerbNamed(verb.family, name);
   if (spec && LIST_KINDS.includes(spec.k) && !spec.clear) return spec;
   addScriptTrace('error', '', familyVerbRefusal(verb.family, forWhat, name));
   return null;
@@ -3861,18 +4340,20 @@ function componentLinkAction(verb, path, args) {
     return true;
   }
 
+  // Refused in the words every other verb is (componentRefusalLine's), which these two lines were
+  // not: "arp.link: no control named …" and "arp.link("Knob"): refused — it is not …" (item 10 of
+  // the owner's review of the arp, for every family's link).
+  const refuse = (why) => {
+    const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+    addScriptTrace('error', '', `${verb.family} ${path}: ${verb.v}(${shown}) — refused, nothing changed. ${why}`);
+    return false;
+  };
   const found = sourceByName(controls, wanted);
-  if (!found) {
-    addScriptTrace('error', '',
-      `${verb.family}.${verb.v}: no control named "${wanted}" on this panel.`);
-    return false;
-  }
+  if (!found) return refuse(`There is no control called ${shownValue(wanted)} on this panel.`);
   if (!sourceAccepts(verb.sourceKind, found, selfId)) {
-    const why = String(found._children?.Core?.id ?? '') === selfId
-      ? 'a control cannot drive itself'
-      : `it is not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}`;
-    addScriptTrace('error', '', `${verb.family}.${verb.v}("${wanted}"): refused — ${why}.`);
-    return false;
+    return refuse(String(found._children?.Core?.id ?? '') === selfId
+      ? 'A control cannot drive itself.'
+      : `${shownValue(wanted)} is not ${SOURCE_KINDS[verb.sourceKind]?.label ?? 'a usable source'}.`);
   }
 
   const id = String(found._children.Core.id);
@@ -3885,6 +4366,29 @@ function componentLinkAction(verb, path, args) {
   return true;
 }
 
+/**
+ * layout(t, which): show one of a display's layouts, as a soft key does (stores/displayLayouts.js).
+ * Not a write to the panel: which layout shows is the preview's, and is not saved.
+ */
+function componentLayoutAction(verb, path, args) {
+  const cfg = componentConfig(verb, path, 'layout');
+  if (!cfg) return false;
+  const shown = args.map((x) => JSON.stringify(x) ?? 'nil').join(', ');
+  const named = lcdLayoutIndex(cfg, args[0], verb.flat);
+  if (named.refusal) {
+    addScriptTrace('error', '', `${verb.family} ${path}: layout(${shown}) — refused, nothing changed. ${named.refusal}`);
+    return false;
+  }
+  const layouts = Array.isArray(cfg.layouts) ? cfg.layouts : [];
+  const already = !layouts.length || lcdShownLayout(withLayoutShowing(path, cfg)) === named.index;
+  // Shown again even when it is showing, as a second press of a soft key restarts its timeout.
+  if (layouts.length) showLayout(findControlByName(path)?._children?.Core?.id, layouts[named.index]?.id);
+  addScriptTrace('log', '', already
+    ? `${verb.family} ${path}: layout(${shown}) — already that way`
+    : `${verb.family} ${path}: layout → ${named.index + 1}`);
+  return true;
+}
+
 /** The five kinds every family gets are not writes of a field, so they dispatch elsewhere. */
 const COMPONENT_KIND_ACTION = {
   read: componentReadAction,
@@ -3893,6 +4397,7 @@ const COMPONENT_KIND_ACTION = {
   insert: componentInsertAction,
   remove: componentRemoveAction,
   [LINK_KIND]: componentLinkAction,
+  [LAYOUT_KIND]: componentLayoutAction,
 };
 
 const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
@@ -3901,9 +4406,13 @@ const componentVerbApi = Object.fromEntries(COMPONENT_VERBS.map((verb) => [
   // named them would have to be generated per kind for no gain. `target` is always first.
   (target, ...rest) => {
     const special = COMPONENT_KIND_ACTION[verb.k];
-    return special
-      ? special(verb, String(target ?? ''), rest)
-      : componentVerbAction(verb, target, rest);
+    const outer = componentCall;
+    componentCall = { verb, shown: rest.map((x) => JSON.stringify(x) ?? 'nil').join(', ') };
+    try {
+      return special
+        ? special(verb, String(target ?? ''), rest)
+        : componentVerbAction(verb, target, rest);
+    } finally { componentCall = outer; }
   },
 ]));
 
@@ -3937,7 +4446,7 @@ function sectionRead(path, section, label, field) {
 }
 
 const setAction = (t, a, g) => sectionAction(t, 'Setlist', setlistScriptPatch, a, g);
-const setlistApi = {
+const setlistApi = shownCalls({
   // These move the INDEX. The recall follows from the index changing, so a
   // scripted step and a footswitch step are the same event downstream.
   setlistNext: (target) => setAction(target, 'next', {}),
@@ -3947,7 +4456,7 @@ const setlistApi = {
   setlistWrap: (target, wrap) => setAction(target, 'wrap', wrap === undefined ? {} : { wrap: wrap !== false }),
   setlistCrossfade: (target, ms) => setAction(target, 'crossfade', { ms }),
   setlistRead: (target, field) => sectionRead(target, 'Setlist', 'setlist', field),
-};
+});
 
 /* -------------------------------------------------------------- flow: on / emit / run */
 // These three were `() => {}` until the API audit: a script could register a listener, announce an
@@ -3976,8 +4485,26 @@ function listenerEventName(event) {
   return EVENT_BY_ID[name]?.fn ?? name;
 }
 
+/** Why on(), watch(), compute(), intercept() or defineAction() sets nothing up, or '' when it does:
+ *  the event, path or name left out, or a function that is not one. Each set nothing up without a
+ *  word. The preludes say the same (__hookRefusal). */
+function hookRefusal(verb, what, name, fn) {
+  if (name === undefined || name === null || (typeof name === 'string' && !name.trim())) {
+    return `${verb}: no ${what} was given, so nothing was set up.`;
+  }
+  if (typeof fn === 'function') return '';
+  return fn === undefined || fn === null
+    ? `${verb}: no function was given, so nothing was set up.`
+    : `${verb}: ${shownValue(fn)} is not a function, so nothing was set up.`;
+}
+function hookRefused(scriptId, verb, what, name, fn) {
+  const why = hookRefusal(verb, what, name, fn);
+  if (why) addScriptTrace('error', scriptId, why);
+  return Boolean(why);
+}
+
 function addListener(scriptId, target, event, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.on', 'event', event, fn)) return;
   listeners.push({ scriptId, target: String(target ?? '*'), event: listenerEventName(event), fn });
 }
 
@@ -4035,7 +4562,7 @@ function putRule(list, rule) {
 }
 
 function addWatch(scriptId, path, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.watch', 'path', path, fn)) return;
   // Seeded with the CURRENT value, not undefined: a watcher must not fire once on registration
   // just because it has never seen the value before. It reports changes, not existence.
   const value = readWatch(path);
@@ -4043,18 +4570,18 @@ function addWatch(scriptId, path, fn) {
 }
 
 function addCompute(scriptId, path, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.compute', 'path', path, fn)) return;
   putRule(computeds, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn, failed: false });
 }
 
 function addIntercept(scriptId, path, fn) {
-  if (typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.intercept', 'path', path, fn)) return;
   putRule(filters, { scriptId, key: reactiveKey(path), path: String(path ?? ''), fn });
 }
 
 function defineActionImpl(scriptId, name, fn) {
-  const id = String(name ?? '').trim();
-  if (!id || typeof fn !== 'function') return;
+  if (hookRefused(scriptId, 'ce.core.action', 'name', name, fn)) return;
+  const id = String(name).trim();
   const existing = actions.get(id.toLowerCase());
   if (existing && existing.scriptId !== scriptId) {
     // Reported, not silently overwritten: two scripts claiming one name is a real conflict, and
@@ -4486,19 +5013,20 @@ function animationTarget(verb, target) {
   return undefined;
 }
 
+/** Whether `path` is a colour property, a control's or the panel's own (panel.bgColour). */
+function isColourPath(path) {
+  const { name, segs } = splitScriptPath(String(path));
+  if (!segs.length) return false;
+  if (isPanelTarget(name)) return Boolean(panelColourFieldAt(segs.join('.')));
+  const control = findControlByName(name);
+  return Boolean(control && colourFieldAt(control, resolveModelPath(control, segs)));
+}
+
 /** True, after saying so, when `path` is a colour property, a control's or the panel's own
  *  (panel.bgColour): ce.anim moves numbers, and every tick would write one into the colour (set()
  *  refuses each, sixty times a second). */
 function animatesColour(verb, path) {
-  const { name, segs } = splitScriptPath(String(path));
-  if (!segs.length) return false;
-  let colour;
-  if (isPanelTarget(name)) colour = panelColourFieldAt(segs.join('.'));
-  else {
-    const control = findControlByName(name);
-    colour = control ? colourFieldAt(control, resolveModelPath(control, segs)) : null;
-  }
-  if (!colour) return false;
+  if (!isColourPath(path)) return false;
   addScriptTrace('error', '', `${verb}: "${path}" is a colour, and ce.anim moves numbers, so nothing was started.`);
   return true;
 }
@@ -4652,7 +5180,8 @@ function startAnimationImpl(scriptId, kind, path, target, opts = {}, group = nul
   // option is (warnAnimTiming): it was a line on every call, and a curve that was neither a name
   // nor numbers (curve = 5) was linear without a word. ScriptRuntime::startAnimation says the same.
   const curveVerb = `ce.anim.${kind}`;
-  let curve = typeof opts?.curve === 'string' ? opts.curve : 'linear';
+  // A name in any case (utils/wordLists.js): "OutCubic" is "outCubic". ScriptRuntime reads it so too.
+  let curve = typeof opts?.curve === 'string' ? (listWord(ANIM_CURVE_NAMES, opts.curve) ?? opts.curve) : 'linear';
   let bezier = null;
   if (!spring && !envelope && opts?.curve && typeof opts.curve === 'object') {
     bezier = drawnCurve(opts.curve);
@@ -4982,33 +5511,70 @@ export function stopAllAnimations() {
 // notify() returns its ID, not merely true. The id was always computed and then thrown away, and
 // without it nothing else here is addressable: a message you cannot name is a message you cannot
 // take back or replace, which is why "Sending dump… 40%" used to mean ten stacked toasts.
+// ce.ui's review (docs/design/api-descriptions-handoff.md): a message left out, an id that is not
+// one, and a dialog that asks nothing did nothing without a word; a kind or a duration that is not
+// one was used as the default without one. Each is now said, a default the first time only.
+const UI_KINDS = ['info', 'warn', 'error'];
+function uiKind(verb, kind) {
+  if (kind === undefined || kind === null) return undefined;
+  const word = listWord(UI_KINDS, String(kind));
+  if (!word) uiSaid(`${verb}: "${kind}" is not a kind, so "info" was used. One of: ${UI_KINDS.join(', ')}.`);
+  return word ?? 'info';
+}
+function uiDuration(verb, duration) {
+  if (duration === undefined || duration === null) return undefined;
+  const ms = realNumber(duration);
+  if (ms === undefined) uiSaid(`${verb}: the duration ${shownValue(duration)} is not a number of milliseconds, so 3000 was used.`);
+  return ms ?? 3000;
+}
+const uiWarned = new Set();
+function uiSaid(said) {
+  if (uiWarned.has(said)) return;
+  uiWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+
 function uiNotifyImpl(message, opts) {
   const text = String(message ?? '').trim();
-  if (!text) return undefined;
+  if (!text) {
+    addScriptTrace('error', '', 'ce.ui.notify: no message was given, so nothing was shown.');
+    return undefined;
+  }
   return uiNotifyStore(text, {
-    kind: opts?.kind,
-    duration: opts?.duration != null ? Number(opts.duration) : undefined,
+    kind: uiKind('ce.ui.notify', opts?.kind),
+    duration: uiDuration('ce.ui.notify', opts?.duration),
   }) ?? undefined;
 }
 
 /** Take a message back. No id clears every one — "stop saying things" is a real request, and making
  *  a script remember six ids to make it would be busywork. Returns how many went. */
 function uiDismissImpl(id) {
+  if (id != null && realNumber(id) === undefined) {
+    addScriptTrace('error', '', `ce.ui.dismiss: ${shownValue(id)} is not a message's id, so nothing was removed.`);
+    return 0;
+  }
   return uiDismissStore(id == null ? null : Number(id));
 }
 
 /** Replace a live message in place. Returns false when it has already gone, which is how a script
  *  learns its progress message was dismissed by hand and it should stop updating one. */
 function uiUpdateImpl(id, message, opts) {
-  if (id == null) return false;
+  if (id == null || realNumber(id) === undefined) {
+    addScriptTrace('error', '', `ce.ui.update: ${id == null ? 'no id was given' : `${shownValue(id)} is not a message's id`}, so nothing was changed.`);
+    return false;
+  }
+  if (!String(message ?? '').trim()) {
+    addScriptTrace('error', '', 'ce.ui.update: no message was given, so nothing was changed.');
+    return false;
+  }
   return uiUpdateStore(Number(id), message, {
-    kind: opts?.kind,
-    duration: opts?.duration != null ? Number(opts.duration) : undefined,
+    kind: uiKind('ce.ui.update', opts?.kind),
+    duration: uiDuration('ce.ui.update', opts?.duration),
   });
 }
 
 function uiStatusImpl(message, opts) {
-  uiStatusStore(message ?? '', { kind: opts?.kind });
+  uiStatusStore(message ?? '', { kind: uiKind('ce.ui.status', opts?.kind) });
   return true;
 }
 
@@ -5028,7 +5594,7 @@ function uiStateImpl() {
  */
 function uiCopyImpl(scriptId, text) {
   const value = text == null ? '' : String(text);
-  if (!value) return false;
+  if (!value) { addScriptTrace('error', scriptId ?? '', 'ce.ui.copy: no text was given, so nothing was copied.'); return false; }
   const clip = typeof navigator !== 'undefined' ? navigator.clipboard : null;
   if (!clip || typeof clip.writeText !== 'function') {
     addScriptTrace('log', scriptId ?? '',
@@ -5060,7 +5626,19 @@ function uiDialogImpl(scriptId, opts, onChoice) {
     catch (e) { reportScriptError(scriptId, e); }
   };
   const id = uiDialogStore(opts, answer);
-  if (id == null) { answer(undefined); return false; }
+  if (id == null) {
+    // Another dialog open is a reason ce.ui.state() reports; a dialog that asks nothing is a mistake.
+    const o = opts && typeof opts === 'object' ? opts : {};
+    const verb = o.ask === 'text' ? 'ce.ui.prompt' : o.ask === 'list' ? 'ce.ui.choose' : 'ce.ui.dialog';
+    const items = (Array.isArray(o.items) ? o.items : []).filter((i) => String(i ?? '').trim());
+    if (!String(o.title ?? '').trim() && !String(o.message ?? '').trim()) {
+      addScriptTrace('error', '', `${verb}: no title and no message were given, so nothing was asked.`);
+    } else if (o.ask === 'list' && !items.length && !uiStateImpl().dialog) {
+      addScriptTrace('error', '', `${verb}: no items were given, so there is nothing to choose.`);
+    }
+    answer(undefined);
+    return false;
+  }
   return true;
 }
 
@@ -5559,6 +6137,14 @@ function drawMeasureImpl(text, opts) {
  */
 
 /** The font catalogue as descriptors, from the app's own availableFonts store. */
+/** A lookup's name given, or why not (ce.image's and ce.text's reviews): a name left out found
+    nothing without a word, where a name that matches nothing is a query with no answer. */
+function lookupNamed(verb, what, name) {
+  if (name !== undefined && name !== null && String(name).trim() !== '') return true;
+  addScriptTrace('error', '', `${verb}: no ${what} was given, so there is no answer.`);
+  return false;
+}
+
 function textCatalogue() {
   return fontCatalogue(get(availableFonts), currentDocumentFonts());
 }
@@ -5571,9 +6157,11 @@ function textFontNode(name) {
 
 /** Report the same way for every ce.text verb that needs a Text section and did not find one. */
 function textNeedsTextSection(verb, name) {
-  addScriptTrace('error', '',
-    `ce.text.${verb}("${name}"): this control has no Text section, so it has no typography. `
-    + 'ce.panel.info() reports the type; a Knob or a Meter draws its own labels.');
+  // A name that is no control was told it had no Text section (ce.text's review).
+  addScriptTrace('error', '', findControlByName(name)
+    ? `ce.text.${verb}("${name}"): this control has no Text section, so it has no typography. `
+      + 'ce.panel.info() reports the type; a Knob or a Meter draws its own labels.'
+    : `ce.text.${verb}("${name}"): this panel has no control by that name.`);
   return undefined;
 }
 
@@ -5621,9 +6209,11 @@ function imageNode(name, layer) {
 }
 
 function imageNeedsNode(verb, name, layer) {
-  addScriptTrace('error', '',
-    `ce.image.${verb}("${name}"): this control has no ${layer.node}, so it has no ${layer.label}. `
-    + 'ce.panel.info() reports the type.');
+  // A name that is no control was told it had no such layer (ce.image's review).
+  addScriptTrace('error', '', findControlByName(name)
+    ? `ce.image.${verb}("${name}"): this control has no ${layer.node}, so it has no ${layer.label}. `
+      + 'ce.panel.info() reports the type.'
+    : `ce.image.${verb}("${name}"): this panel has no control by that name.`);
   return undefined;
 }
 
@@ -5676,6 +6266,10 @@ function imageSetImpl(target, src, opts) {
       `ce.image.set("${name}"): ${problem.option} refused — ${problem.reason}.`);
   }
   for (const warning of warnings) addScriptTrace('warn', '', `ce.image.set("${name}"): ${warning}`);
+  // Neither a picture nor an option: it did nothing without a word (ce.image's review).
+  if (!writes.length && !refused.length) {
+    addScriptTrace('error', '', `ce.image.set("${name}"): no picture and no option were given, so nothing was set.`);
+  }
   if (!writes.length) return false;
 
   let all = true;
@@ -5799,7 +6393,10 @@ function imageIconImpl(target, idOrName, opts) {
       }
       tint = read.colour;
     }
-    const value = key === 'tint' ? tint.replace(/^#/, '') : opts[key];
+    // A fit is one of the Icon section's two words, in any case (utils/wordLists.js): the renderer
+    // reads "cover" and takes anything else as "contain", so "Cover" was drawn contained.
+    const value = key === 'tint' ? tint.replace(/^#/, '')
+      : key === 'fit' ? (listWord(['contain', 'cover'], opts.fit) ?? opts.fit) : opts[key];
     setValue(`${name}.Icon.${field}`, value);
     // The other half of the pair planImage warns about: ce.image.set's opacity runs to 100, and
     // here 50 is clamped to fully solid by the renderer. Applied as written, with the reading, and
@@ -6223,8 +6820,20 @@ function applyControlProps(control, props, sections, scriptId, call) {
   const core = control._children.Core;
   const transform = control._children.Transform;
   if (props.name != null) core.name = String(props.name);
+  // A place or a size that is not a number, or a size not above 0, leaves the control's own, and is
+  // said: it was dropped without a word.
   for (const [prop, key] of [['x', 'x'], ['y', 'y'], ['width', 'width'], ['height', 'height']]) {
-    if (props[prop] != null && Number.isFinite(Number(props[prop]))) transform[key] = Number(props[prop]);
+    const value = props[prop];
+    if (value == null) continue;
+    const n = Number(value);
+    const size = prop === 'width' || prop === 'height';
+    if (typeof value === 'boolean' || !Number.isFinite(n)) {
+      panelSaid(`${call}: the ${prop} ${JSON.stringify(value)} is not a number, so its own ${transform[key] ?? 0} was kept.`);
+    } else if (size && n <= 0) {
+      panelSaid(`${call}: the ${prop} ${n} is not above 0, so its own ${transform[key] ?? 0} was kept.`);
+    } else {
+      transform[key] = n;
+    }
   }
   // Section overrides: { Behavior: { min: 0, max: 127 } } and friends, merged not replaced, so a
   // script setting one field does not wipe the rest of the section.
@@ -6302,13 +6911,29 @@ function childToMerge(node, name) {
 
 const isPlainTable = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 
+/** Why a `parent` given to create or clone cannot hold the control, or null when it can or none was given. */
+function containerRefusal(parentName, call, outcome) {
+  if (parentName == null || parentName === '') return null;
+  const parent = controlNamed(parentName);
+  if (!parent) return `${call}: no control named "${parentName}" to put it in, so ${outcome}.`;
+  if (!isContainerControl(parent)) return `${call}: "${parentName}" is not a container (it has no Children section), so ${outcome}.`;
+  return null;
+}
+
 function panelCreateImpl(type, props, scriptId) {
-  const typeName = String(type ?? '');
-  if (!COMPONENT_TYPES[typeName]) {
-    addScriptTrace('error', '',
-      `ce.panel.create("${typeName}"): no such component type. ce.panel.types() lists them.`);
+  // The type in any case, as every word from a list the app defines is read: "knob" was refused.
+  const given = String(type ?? '').trim();
+  const typeName = typeNamed(given);
+  if (!typeName) {
+    addScriptTrace('error', '', given
+      ? `ce.panel.create("${given}"): no such component type. ce.panel.types() lists them.`
+      : 'ce.panel.create: no type was given. ce.panel.types() lists them.');
     return null;
   }
+  // A container that is not there, or is not a container, refuses the call: the control was made at
+  // the top level with an error said, and an error means the call did nothing.
+  const parentRefusal = containerRefusal(props?.parent, `ce.panel.create("${typeName}")`, 'nothing was created');
+  if (parentRefusal) { addScriptTrace('error', '', parentRefusal); return null; }
   let control;
   try { control = createControl(typeName); }
   catch (e) { addScriptTrace('error', '', `ce.panel.create("${typeName}"): ${e?.message ?? e}`); return null; }
@@ -6322,14 +6947,7 @@ function panelCreateImpl(type, props, scriptId) {
 
   const parentName = props?.parent ? String(props.parent) : null;
   const parent = parentName ? controlNamed(parentName) : null;
-  if (parentName && !parent) {
-    addScriptTrace('error', '', `ce.panel.create: no control named "${parentName}" to parent into.`);
-  }
   const parentId = parent && isContainerControl(parent) ? parent._children.Core.id : null;
-  if (parent && !parentId) {
-    addScriptTrace('error', '',
-      `ce.panel.create: "${parentName}" is not a container (it has no Children section), so the new control went to the top level.`);
-  }
 
   return updateControls((controls) => insertControlIntoTree(controls, parentId, control))
     ? control._children.Core.name
@@ -6337,8 +6955,13 @@ function panelCreateImpl(type, props, scriptId) {
 }
 
 function panelCloneImpl(name, props, scriptId) {
+  if (name == null || name === '') { addScriptTrace('error', '', 'ce.panel.clone: no control was named, so nothing was copied.'); return null; }
   const source = controlNamed(name);
   if (!source) { addScriptTrace('error', '', `ce.panel.clone: no control named "${name}".`); return null; }
+  // A container given that is not one refuses the call, as create's does: the copy went to the top
+  // level without a word.
+  const parentRefusal = containerRefusal(props?.parent, `ce.panel.clone("${name}")`, 'nothing was copied');
+  if (parentRefusal) { addScriptTrace('error', '', parentRefusal); return null; }
 
   const copy = remintControlIds(source);
   // Only what the script passes is read: the source's own colours are stored already.
@@ -6359,6 +6982,7 @@ function panelCloneImpl(name, props, scriptId) {
 }
 
 function panelDestroyImpl(name) {
+  if (name == null || name === '') { addScriptTrace('error', '', 'ce.panel.destroy: no control was named, so nothing was removed.'); return false; }
   const control = controlNamed(name);
   if (!control) return false;
   const id = control._children.Core.id;
@@ -6451,7 +7075,18 @@ function findQueryProblem(query) {
     if (v === undefined || v === null || typeof v === type) continue;
     return `${key} takes ${FIND_TAKES[type]}, not ${shownQueryValue(v)}, so nothing was found.`;
   }
+  // A type is one of the types, in any case: "knob" found nothing, and a type that is none found
+  // nothing without a word.
+  if (typeof query.type === 'string' && !typeNamed(query.type)) {
+    return `"${query.type}" is not a control type, so nothing was found. ce.panel.types() lists them.`;
+  }
   return null;
+}
+
+/** A control type spelled in any case, under its own spelling, or undefined. */
+function typeNamed(given) {
+  const wanted = String(given ?? '').trim().toLowerCase();
+  return Object.keys(COMPONENT_TYPES).find((t) => t.toLowerCase() === wanted);
 }
 
 function panelFindImpl(query) {
@@ -6466,15 +7101,16 @@ function panelFindImpl(query) {
     .map((c) => ({ control: c, info: controlSummary(c, controls) }))
     .filter(({ info }) => {
       if (q.name != null && !info.name.toLowerCase().includes(String(q.name).toLowerCase())) return false;
-      if (q.type != null && info.type !== String(q.type)) return false;
+      if (q.type != null && info.type !== typeNamed(q.type)) return false;
       if (q.generated != null && info.generated !== (q.generated === true)) return false;
-      if (q.parent != null && info.parent !== String(q.parent)) return false;
+      if (q.parent != null && String(info.parent ?? '').toLowerCase() !== String(q.parent).trim().toLowerCase()) return false;
       return true;
     })
     .map(({ info }) => info.name);
 }
 
 function panelInfoImpl(name) {
+  if (name == null || name === '') { addScriptTrace('error', '', 'ce.panel.info: no control was named.'); return null; }
   const control = controlNamed(name);
   if (!control) return null;
   return controlSummary(control, activePanel()?.controls ?? []);
@@ -6498,7 +7134,9 @@ function panelInfoImpl(name) {
 
 /** Transforms for a list of names, in PANEL space, skipping names that are not controls. */
 function panelTransforms(names, verb) {
-  const list = Array.isArray(names) ? names : (names == null ? [] : Object.values(names));
+  // One name is a list of one: a text was read letter by letter, each "no control named".
+  const list = Array.isArray(names) ? names
+    : (names == null ? [] : (typeof names === 'object' ? Object.values(names) : [names]));
   const controls = activePanel()?.controls ?? [];
   const out = [];
   for (const raw of list) {
@@ -6586,7 +7224,17 @@ function panelArrange(memberId, transforms, which, opts) {
     addScriptTrace('error', '', plan.refused);
     return 0;
   }
+  for (const said of plan.said ?? []) panelSaid(said);
   return panelApplyPatches(transforms, plan.patches);
+}
+
+// An option or a prop used as its default, said once (the owner's word on ce.panel); resetScriptState
+// clears it.
+const panelWarned = new Set();
+function panelSaid(said) {
+  if (!said || panelWarned.has(said)) return;
+  panelWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
 }
 
 function panelAlignImpl(names, edge, opts) {
@@ -6665,7 +7313,10 @@ function panelOrderImpl(names, where) {
     return 0;
   }
   const wanted = new Set(panelTransforms(names, 'order').map((t) => t.id));
-  if (!wanted.size) return 0;
+  if (!wanted.size) {
+    addScriptTrace('error', '', 'ce.panel.order: no control was named, so nothing was moved.');
+    return 0;
+  }
 
   const reorder = (siblings) => {
     const mine = siblings.filter((c) => wanted.has(c?._children?.Core?.id));
@@ -7220,7 +7871,10 @@ function panelSnapshotImpl() {
 }
 
 function panelRestoreImpl(snap) {
-  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) return 0;
+  if (!snap || typeof snap !== 'object' || Array.isArray(snap)) {
+    addScriptTrace('error', '', `ce.panel.restore: ${snap == null ? 'no snapshot was given' : `${JSON.stringify(snap)} is not a snapshot`}: a table of control names and values, as ce.panel.snapshot() gives. Nothing was restored.`);
+    return 0;
+  }
   let n = 0;
   for (const [name, value] of Object.entries(snap)) {
     if (getValue(`${name}.value`) === undefined) continue;
@@ -7406,6 +8060,8 @@ function stopAllTimers() {
     sendRawMidiForRole([0x80 | active.channel, active.note, 0], `noteoff_${active.note}`, active.role);
   }
   activeScriptNotes.clear();
+  // ce.mpe's notes likewise: ended, with each member channel's bend put back, before the panel goes.
+  if (mpeShared !== null) { mpeShared.allOff(); mpeShared = null; }
   afterCallbacks.clear();   // a one-shot outliving its panel would fire into nothing
   for (const handle of timers.values()) clearInterval(handle);
   timers.clear();
@@ -7660,7 +8316,7 @@ function deviceTimingRead(role = DEFAULT_ROLE) {
 const deviceOverrideWarned = new Set();   // label, role and name of each override that has said so; resetScriptState clears it
 function deviceOverrideWrite(kind, name, value, role) {
   const { label, min, max } = DEVICE_OVERRIDES[kind];
-  const key = String(name ?? '').trim();
+  let key = String(name ?? '').trim();
   if (!key) {
     addScriptTrace('error', '', deviceSetNoNameWords(label));
     return false;
@@ -7669,6 +8325,17 @@ function deviceOverrideWrite(kind, name, value, role) {
   if (!mapping?.profileId) {
     addScriptTrace('error', '', deviceSetNoProfileWords(label, role));
     return false;
+  }
+  // A timing is one the profile has, read in any case and written in its spelling: a name it has
+  // not was stored and never read. A variable may be the script's own, for a recipe it declared.
+  if (kind === 'timingOverrides') {
+    const names = Object.keys(deviceTimingRead(role) ?? {});
+    const known = names.find((n) => n.toLowerCase() === key.toLowerCase());
+    if (known === undefined) {
+      addScriptTrace('error', '', deviceTimingUnknownWords(key, role, names));
+      return false;
+    }
+    key = known;
   }
   const { n: next, refused, said } = deviceOverrideValue(label, key, value, min, max);
   if (refused) {
@@ -7753,9 +8420,11 @@ function deviceConnectedRead(role = DEFAULT_ROLE) {
  * asynchronous and this verb is not — and nothing comes back when the device has never reported it,
  * which a script must be able to tell apart from zero.
  */
+// An id left out, or blank, is refused, where it answered nothing without a word.
+const deviceIdMissing = (id) => id === undefined || id === null || (typeof id === 'string' && !id.trim());
 function deviceValueRead(id, role) {
-  const key = String(id ?? '');
-  if (!key) return undefined;
+  if (deviceIdMissing(id)) { addScriptTrace('error', '', deviceNoIdWords('read')); return undefined; }
+  const key = String(id);
   const forRole = (get(deviceRuntimeState) ?? {})[role];
   if (!forRole || typeof forRole !== 'object') return undefined;
   const v = forRole[key];
@@ -7821,6 +8490,25 @@ function deviceValueWrite(id, value, role) {
  * id overrides it — which is what lets a script correct one wrong parameter in an otherwise good
  * profile without having to redeclare the rest.
  */
+// The access filter, the same three words the exported plug-in's engines take
+// (descriptorMatches in DeviceProfileServiceInternal.h). This read used to match the text of
+// `access` as a substring — but a profile's access is an object, whose text is "[object Object]",
+// so any value at all filtered every profile parameter out, while the plug-in ignored the
+// "readwrite" the manual's example passed and returned them all.
+const ACCESS_FILTERS = new Set(['writable', 'readonly', 'realtimeWarning']);
+function accessMatches(access, filter) {
+  if (!ACCESS_FILTERS.has(filter)) return true;
+  // A profile gives { canWrite, realtimeSafe }; a declared parameter gives text such as "read" or
+  // "readWrite". Missing means writable and safe, as the engine reads it.
+  const canWrite = typeof access === 'string'
+    ? /write/i.test(access)
+    : access?.canWrite !== false;
+  const realtimeSafe = typeof access === 'string' ? true : access?.realtimeSafe !== false;
+  if (filter === 'writable') return canWrite;
+  if (filter === 'readonly') return !canWrite;
+  return !realtimeSafe;
+}
+
 function deviceParametersRead(opts = {}) {
   const role = opts.role || DEFAULT_ROLE;
   const declared = definedParameters(role);
@@ -7859,9 +8547,15 @@ function deviceParametersRead(opts = {}) {
   for (const p of [...fromProfile, ...declared]) byId.set(String(p?.id ?? ''), p);
 
   const wanted = (field, value) => !value || String(field ?? '').toLowerCase().includes(String(value).toLowerCase());
+  const access = String(opts.access ?? '');
+  if (access && !ACCESS_FILTERS.has(access)) {
+    addScriptTrace('error', '',
+      `deviceParameters(): access "${access}" is not one of "writable", "readonly" or "realtimeWarning"; `
+      + 'the list is not filtered by access.');
+  }
   let out = [...byId.values()].filter((p) => wanted(p?.group, opts.group)
     && wanted(p?.type, opts.type)
-    && wanted(p?.access, opts.access)
+    && accessMatches(p?.access, access)
     && (!opts.query
       || String(p?.id ?? '').toLowerCase().includes(String(opts.query).toLowerCase())
       || String(p?.name ?? '').toLowerCase().includes(String(opts.query).toLowerCase())));
@@ -7871,8 +8565,8 @@ function deviceParametersRead(opts = {}) {
 }
 
 function deviceParameterRead(id, role = DEFAULT_ROLE) {
-  const wanted = String(id ?? '');
-  if (!wanted) return null;
+  if (deviceIdMissing(id)) { addScriptTrace('error', '', deviceNoIdWords('parameter')); return null; }
+  const wanted = String(id);
   // A declared parameter answers without touching the profile cache, so `parameter()` on a synth
   // with no profile is a plain lookup rather than a cold-cache notice about a table that will
   // never arrive.
@@ -7961,7 +8655,8 @@ function deviceBindImpl(controlName, parameterId, opts = {}) {
   const table = profileId ? parameterTable(profileId) : null;
   if (profileId && !table) requestParameterTable(profileId, role);
   const known = hasDefinedParameter(role, key) || Boolean(table?.some((p) => String(p?.id ?? '') === key));
-  if (!known) addScriptTrace('log', '', deviceBindUnknownWords(name, key));
+  // A warning, not a plain line: the binding is made, and may never do anything.
+  if (!known) addScriptTrace('warn', '', deviceBindUnknownWords(name, key));
 
   const port = String(opts?.port ?? 'value');
   const existing = Array.isArray(control?._children?.DeviceBindings?.bindings)
@@ -8003,8 +8698,26 @@ function deviceUnbindImpl(controlName, port = 'value') {
  * `role` on a port is the role currently using it, or "" — which is what makes "is anything using
  * this?" a field rather than a cross-reference the script has to build itself.
  */
+// parameters() and ports() take a table of options or nothing: a number or a text was read as no
+// options at all, so ports("in") listed every port without a word.
+function deviceOptionsRefused(verb, opts) {
+  if (opts === undefined || opts === null || isOptionsTable(opts)) return false;
+  addScriptTrace('error', '', deviceNotOptionsWords(verb, shownValue(opts)));
+  return true;
+}
+const devicePortsWarned = new Set();   // each direction that was not one, said once; resetScriptState clears it
 function devicePortsRead(opts = {}) {
-  const direction = String(opts?.direction ?? '').toLowerCase();
+  // In any case, as every word from a list is read; one that is not "in" or "out" (or "input",
+  // "output") lists every port, as it did, and now says so once.
+  let direction = typeof opts?.direction === 'string' ? opts.direction.trim().toLowerCase() : '';
+  if (opts?.direction !== undefined && opts?.direction !== null && !['in', 'input', 'out', 'output'].includes(direction)) {
+    const said = devicePortsDirectionWords(shownValue(opts.direction));
+    if (!devicePortsWarned.has(said)) {
+      devicePortsWarned.add(said);
+      addScriptTrace('warn', '', `${said} This is said only the first time.`);
+    }
+    direction = '';
+  }
   const mappings = get(deviceRoleMappings) ?? {};
 
   const roleUsing = (portId, which) => {
@@ -8180,7 +8893,7 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   const role = DEFAULT_ROLE;
 
   if (typeof fn === 'function') {
-    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : 3000;
+    const ms = Number(opts?.timeout) > 0 ? Math.round(Number(opts.timeout)) : requestWaitMs(role, key);
     // A request's answer arrives under the dump it answers with ("requestSystem" brings "system"),
     // so that is what the callback waits for, in every runtime; waiting for the request's own id,
     // it heard only the timeout.
@@ -8223,6 +8936,23 @@ function requestDumpImpl(kind, fn, opts, scriptId = '') {
   return false;
 }
 
+/**
+ * How long requestDump(kind, fn) waits when the script gives no timeout: the request's own timeoutMs
+ * for every try the profile allows (the service sends it 1 + retries times), and never less than the
+ * 3000 ms it always waited. A fixed 3000 ms reported an AN1x request, whose profile gives it 4000 ms,
+ * as unanswered while its reply was still on the way. The plug-in's "answerWaitMs" query is the
+ * same sum.
+ */
+function requestWaitMs(role, kind) {
+  const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
+  if (!request) return 3000;
+  const timeoutMs = Number(request.timeoutMs) > 0 ? Math.round(Number(request.timeoutMs)) : 2000;
+  const retries = Number(request.retries) > 0 ? Math.round(Number(request.retries)) : 0;
+  return Math.max(3000, timeoutMs * (1 + retries) + 500);
+}
+
+export function requestWaitMsForTesting(role, kind) { return requestWaitMs(role, kind); }
+
 /** The dump a request of the role's profile answers with, or null (the plug-in's "answers" query). */
 function requestAnswer(role, kind) {
   const request = (deviceProfileSource(role)?.requests ?? []).find((r) => String(r?.id ?? '') === kind);
@@ -8258,6 +8988,16 @@ export function clearDeviceRuntimeDefinitions() {
     waiter.done = true;
     if (waiter.timerId) stopTimer(waiter.timerId);
   }
+  // A check outliving its panel would never finish, and its device would stay busy.
+  for (const role of Object.keys(verifyJobs)) delete verifyJobs[role];
+  forgetChosenFiles();
+  ciBridge.reset();   // …and a device's answer to a panel that is gone reaches nobody
+  midiInDecode.reset();     // …and a bend half way through its thinning belongs to no panel
+  mpeShared = null;         // …and a new panel sets its own zone
+  dawPageGestures.clear();  // …and the plug-in ended the window's gestures with it
+  forgetOsc();              // …and its OSC port closes, and its targets are forgotten
+  controlOrigins.clear();
+  if (midiInTimer !== null) { clearTimeout(midiInTimer); midiInTimer = null; }
 }
 
 // @module ce.storage
@@ -8329,10 +9069,11 @@ function storageScopeOf(opts, scriptId, verb) {
   }
   const raw = typeof opts === 'string' ? opts : opts?.scope;
   if (raw == null || raw === '') return 'panel';
-  const scope = String(raw);
+  // In any case, as every word from a list is read: "Local" is "local".
+  const scope = String(raw).trim().toLowerCase();
   if (STORAGE_SCOPES.includes(scope)) return scope;
   addScriptTrace('error', scriptId ?? '',
-    `${verb}: "${scope}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
+    `${verb}: "${String(raw)}" is not a scope, so nothing was done. One of: ${STORAGE_SCOPES.join(', ')}.`);
   return undefined;
 }
 
@@ -8393,10 +9134,32 @@ function localWrite(map) {
   catch { return false; }         // quota, private browsing — reported by the caller, never thrown
 }
 
+/** A setting's name: text, or a number used as text. Left out, or anything else, is refused,
+ *  `outcome` finishing "so …"; left out, it was saved under "" or read from there without a word.
+ *  "" itself is text, and a name: clear() and all() reach what an older script saved there. */
+function storageName(verb, key, scriptId, outcome) {
+  if (typeof key === 'string') return key;
+  if (typeof key === 'number' && Number.isFinite(key)) return String(key);
+  addScriptTrace('error', scriptId ?? '', key === undefined || key === null
+    ? `${verb}: no name was given, so ${outcome}.`
+    : `${verb}: ${shownValue(key)} is not a name, so ${outcome}. A name is text, or a number used as text.`);
+  return undefined;
+}
+
 function saveSetting(key, value, opts, scriptId) {
-  const scope = storageScopeOf(opts, scriptId, 'ce.storage.saveSetting');
+  const verb = 'ce.storage.saveSetting';
+  const name = storageName(verb, key, scriptId, 'nothing was saved');
+  if (name === undefined) return false;
+  // Nothing to save is no value, where it answered true and saved nothing: a Lua table cannot hold
+  // nil, so no runtime could keep one.
+  if (value === undefined || value === null) {
+    addScriptTrace('error', scriptId ?? '', `${verb}: no value was given for "${name}", so nothing was saved. `
+      + 'ce.storage.forget() deletes a setting.');
+    return false;
+  }
+  const scope = storageScopeOf(opts, scriptId, verb);
   if (!scope) return false;
-  const stored = storageKeyFor(scope, key, scriptId);
+  const stored = storageKeyFor(scope, name, scriptId);
   // In the player, both scopes are the instance's, and every write goes back to it.
   if (host?.storage) return host.storage.write(scope === 'local' ? 'local' : 'panel', stored, value);
   if (scope === 'local') {
@@ -8422,9 +9185,11 @@ function saveSetting(key, value, opts, scriptId) {
 }
 
 function loadSetting(key, fallback, opts, scriptId) {
+  const name = storageName('ce.storage.loadSetting', key, scriptId, 'the fallback was given back');
+  if (name === undefined) return fallback;
   const scope = storageScopeOf(opts, scriptId, 'ce.storage.loadSetting');
   if (!scope) return fallback;
-  const stored = storageKeyFor(scope, key, scriptId);
+  const stored = storageKeyFor(scope, name, scriptId);
   const source = scope === 'local' ? localRead() : settingsStore();
   const v = source?.[stored];
   return v === undefined ? fallback : v;
@@ -8458,9 +9223,11 @@ function allSettings(opts, scriptId) {
 /** Delete one. Returns whether there was one, so "cleaned up" reads differently from "nothing
  *  there" — the distinction the whole module keeps. */
 function forgetSetting(key, opts, scriptId) {
+  const name = storageName('ce.storage.forget', key, scriptId, 'nothing was deleted');
+  if (name === undefined) return false;
   const scope = storageScopeOf(opts, scriptId, 'ce.storage.forget');
   if (!scope) return false;
-  const stored = storageKeyFor(scope, key, scriptId);
+  const stored = storageKeyFor(scope, name, scriptId);
   if (host?.storage) return host.storage.forget(scope === 'local' ? 'local' : 'panel', stored);
   if (scope === 'local') {
     const map = localRead();
@@ -8537,12 +9304,32 @@ function jsonKeysOf(value, out, seen) {
   return out;
 }
 
+// encode's indent as it reads it: left out, one line; a number, or text that is one, rounded down
+// and held to 0 to 10; anything else one line. Each value it cannot use as written is said once,
+// where it was used without a word, and differently in each runtime ("2" was one line in Python and
+// two spaces elsewhere, 20 was 20 spaces in Lua and Python and 10 here).
+const storageWarned = new Set();
+function storageSaid(said) {
+  if (storageWarned.has(said)) return;
+  storageWarned.add(said);
+  addScriptTrace('warn', '', `${said} This is said only the first time.`);
+}
+function jsonIndent(opts) {
+  const raw = isOptionsTable(opts) ? opts.indent : undefined;
+  if (raw === undefined || raw === null) return 0;
+  const n = realNumber(raw);
+  const said = (why, used) => storageSaid(`ce.storage.encode: indent is ${shownValue(raw)}, which is ${why}, so ${used}.`);
+  if (n === undefined) { said('not a number', 'the text is on one line'); return 0; }
+  if (n < 0) { said('below 0', 'the text is on one line'); return 0; }
+  if (n > 10) { said('above 10', '10 was used'); return 10; }
+  return Math.floor(n);
+}
+
 function encodeJson(value, opts) {
+  const indent = jsonIndent(opts);
   try {
-    const indent = Number(opts?.indent);
     const keys = [...jsonKeysOf(value, new Set(), new Set())].sort();
-    return JSON.stringify(value, keys.length ? keys : undefined,
-      Number.isFinite(indent) && indent > 0 ? indent : undefined);
+    return JSON.stringify(value, keys.length ? keys : undefined, indent > 0 ? indent : undefined);
   } catch {
     // A cycle, or a value with no JSON form. Nothing back rather than a string that is not the
     // value — which is the same rule every "cannot read that" in this API follows.
@@ -8566,11 +9353,26 @@ function stripJsonNulls(v) {
   return v;
 }
 
+// Text that is not JSON answers nothing and says so: telling a bad config from an empty one is the
+// point of answering nothing, and the script was told neither. Nothing given, or a value that is not
+// text, is refused the same way; a number was read as its own text.
 function decodeJson(text) {
+  const verb = 'ce.storage.decode';
+  if (text === undefined || text === null) {
+    addScriptTrace('error', '', `${verb}: no text was given, so there is no answer.`);
+    return undefined;
+  }
+  if (typeof text !== 'string') {
+    addScriptTrace('error', '', `${verb}: ${shownValue(text)} is not text, so there is no answer.`);
+    return undefined;
+  }
   try {
-    const v = JSON.parse(String(text ?? ''));
+    const v = JSON.parse(text);
     return v === null ? undefined : stripJsonNulls(v);
-  } catch { return undefined; }
+  } catch {
+    addScriptTrace('error', '', `${verb}: the text is not JSON, so there is no answer.`);
+    return undefined;
+  }
 }
 
 /* --------------------------------------------------------- reading what a script passed */
@@ -8694,10 +9496,162 @@ export function optionCheckedMembersForTesting() {
 }
 
 // @module -
+/**
+ * ce.patch over the panel view: patchCore.js's commands, reading and sending through the same
+ * functions the ce.device, ce.panel, ce.math and ce.storage commands use, for this script.
+ */
+function patchHostFor(scriptId) {
+  return {
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    profile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
+    parameters: (role) => deviceParametersRead({ role: role || DEFAULT_ROLE }),
+    read: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    write: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    fill: (values) => midiApi.applyDump(values),
+    snapshot: () => panelSnapshotImpl(),
+    restore: (values) => panelRestoreImpl(values),
+    requestDump: (kind, fn, opts) => requestDumpImpl(kind, fn, opts, scriptId),
+    sendDump: (kind) => midiApi.sendDump(kind),
+    setVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
+    patchSection: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE, { own: true });
+      return source && typeof source.patch === 'object' ? source.patch : null;
+    },
+    random: () => randomImpl(scriptId),
+    now: () => new Date().toISOString(),
+    store: {
+      get: (key) => loadSetting(key, undefined, undefined, scriptId),
+      set: (key, value) => saveSetting(key, value, undefined, scriptId),
+      keys: () => listSettings(undefined, scriptId) ?? [],
+      remove: (key) => forgetSetting(key, undefined, scriptId),
+    },
+  };
+}
+
+/**
+ * ce.verify's host for one script (docs/design/ce-verify-module.md). The checks themselves are the
+ * panel's, in verifyJobs, so a script's Stop button can cancel what another script's Check button
+ * started; the report reaches every script as onVerifyDone.
+ */
+const verifyJobs = {};
+
+function verifyHostFor(scriptId) {
+  return {
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    parameters: (role) => deviceParametersRead({ role: role || DEFAULT_ROLE }),
+    layout: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE);
+      if (!source) return null;
+      const encodings = {};
+      for (const p of Array.isArray(source.parameters) ? source.parameters : []) {
+        if (p && typeof p.id === 'string' && p.encoding && typeof p.encoding === 'object') encodings[p.id] = p.encoding;
+      }
+      return {
+        dumps: Array.isArray(source.dumpDefinitions) ? source.dumpDefinitions : [],
+        requests: Array.isArray(source.requests) ? source.requests : [],
+        encodings,
+        gapMs: deviceTimingRead(role || DEFAULT_ROLE)?.minDelayBetweenMessagesMs,
+      };
+    },
+    read: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
+    write: (id, value, role) => deviceValueWrite(id, value, role || DEFAULT_ROLE),
+    sendDump: (kind) => midiApi.sendDump(kind),
+    patchSection: (role) => {
+      const source = deviceProfileSource(role || DEFAULT_ROLE, { own: true });
+      return source && typeof source.patch === 'object' ? source.patch : null;
+    },
+    connected: (role) => deviceConnectedRead(role || DEFAULT_ROLE) === true,
+    requestDump: (kind, fn) => requestDumpImpl(kind, fn, undefined, scriptId),
+    after: (ms, fn) => afterFor(scriptId, ms, fn, 'ce.verify'),
+    clock: () => (typeof performance !== 'undefined' ? performance.now() : Date.now()),
+    emit: (report) => deliverEmit('onVerifyDone', null, report),
+    jobs: verifyJobs,
+  };
+}
+
+/**
+ * ce.file (docs/design/ce-file-module.md). The byte commands are fileCore.js, the same code the
+ * JavaScript prelude runs; the dialogs are scriptFileHost.js over the native side's "scriptFile"
+ * event (CE/src/ScriptFiles.h), one per script so its messages and functions are its own, with the
+ * folders' listings shared, as a folder one script chose is every script's to list.
+ */
+const fileDialogSet = new Set();
+const fileListings = new Map();
+let fileResultsHeard = false;
+
+function fileDialogsFor(scriptId) {
+  if (!fileResultsHeard && isJuceAvailable() && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    fileResultsHeard = true;
+    window.__JUCE__.backend.addEventListener('scriptFileResult', (result) => {
+      for (const dialogs of fileDialogSet) dialogs.receive(result);
+    });
+  }
+  const dialogs = createFileDialogs({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    send: (payload) => {
+      if (!isJuceAvailable()) return false;
+      window.__JUCE__.backend.emitEvent('scriptFile', payload);
+      return true;
+    },
+    call: (fn, ...args) => runScriptCallback(scriptId, 'ce.file', () => fn(...args)),
+    listings: fileListings,
+  });
+  fileDialogSet.add(dialogs);
+  return dialogs;
+}
+
+/**
+ * ce.ci (docs/design/ce-ci-module.md): one bridge to the device layer's MIDI-CI session for the panel,
+ * with what it has heard of devices and profiles; each script gets its own commands over it.
+ */
+const ciBridge = createCiBridge({
+  send: (name, payload) => {
+    if (!isJuceAvailable()) return false;
+    window.__JUCE__.backend.emitEvent(name, payload);
+    return true;
+  },
+  raise: (name, payload) => deliverEmit(name, null, payload),
+});
+let ciHeard = false;
+
+function ciFor(scriptId) {
+  if (!ciHeard && isJuceAvailable() && typeof window.__JUCE__.backend.addEventListener === 'function') {
+    ciHeard = true;
+    for (const name of ['ciCommandAnswered', 'ciReply', 'ciDiscovered', 'ciDeviceRemoved', 'ciProfileChanged']) {
+      window.__JUCE__.backend.addEventListener(name, (payload) => ciBridge.heard(name, payload));
+    }
+  }
+  return ciBridge.forScript({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    call: (fn, value) => runScriptCallback(scriptId, 'ce.ci', () => fn(value)),
+  });
+}
+
+/** Tests stand in for the native side: what it sends back, as it would arrive. */
+export function ciHeardForTesting(name, payload) { ciBridge.heard(name, payload); }
+
+/** The panel closed: the files the person chose go with it, here and natively. */
+function forgetChosenFiles() {
+  if (fileDialogSet.size === 0 && fileListings.size === 0) return;
+  for (const dialogs of fileDialogSet) dialogs.forget();
+  fileDialogSet.clear();
+  fileListings.clear();
+}
+
 function buildApi(ownerName, scriptId = '', guardExecution = false) {
+  const fileBytes = fileCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    clock: () => { const t = transportSnapshot(); return { tempo: t.bpm, beatsPerBar: t.beatsPerBar }; },
+  });
+  let fileDialogs = null;
+  const dialogs = () => (fileDialogs ??= fileDialogsFor(scriptId));
+  let ciCommandsOwn = null;
+  const ci = () => (ciCommandsOwn ??= ciFor(scriptId));
+  const patch = patchCommands(patchHostFor(scriptId));
+  const verify = verifyCommands(verifyHostFor(scriptId));
+  const daw = dawCommands(dawHostFor(scriptId));
   const self = {
-    set: (p, v, form) => setValue(ownerName ? `${ownerName}.${p}` : p, v,
-      typeof form === 'string' || isOptionsTable(form) ? form : ''),
+    set: (p, v, form) => scriptSet(ownerName ? `${ownerName}.${p}` : p, v, form),
     get: (p, form) => getValue(ownerName ? `${ownerName}.${p}` : p, form, true),
   };
   const api = {
@@ -8705,7 +9659,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     // object: setValue reads a string as a form and an object as opts. This passed '' for an
     // object, so set(path, v, { transmit = false }) was accepted and its `transmit` never reached
     // the write, in the editor only: the player's host has always read it.
-    set: (path, value, form) => setValue(path, value, typeof form === 'string' || isOptionsTable(form) ? form : ''),
+    set: (path, value, form) => scriptSet(path, value, form),
     get: (path, form) => getValue(path, form, true),
     log: (msg, val) => scriptPrint('log', scriptId, msg, val),
     // Levels the console already renders differently — the runtime uses the distinction constantly
@@ -8922,16 +9876,16 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
             + 'ce.image.asset(name).dataUrl for a library icon.');
         return false;
       }
-      // A fit that is not one of its three words is "fill", and said once: it was "fill" in silence.
-      const fit = opts?.fit;
-      const fits = ['fill', 'contain', 'cover'];
-      if (fit !== undefined && fit !== null && !fits.includes(fit)) {
-        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
+      // A fit that is not one of its three words, in any case, is "fill", and said once: it was
+      // "fill" in silence.
+      const fit = listWord(['fill', 'contain', 'cover'], opts?.fit);
+      if (opts?.fit !== undefined && opts?.fit !== null && !fit) {
+        drawSaid('drawImage\u0000fit', `ce.draw.image: fit is ${shownValue(opts.fit)}, not "fill", "contain" or "cover", so "fill" was used.`);
       }
       return pushCommand(null, ownerName, {
         op: 'image', src: source,
         x: drawNum('drawImage', 'x', x), y: drawNum('drawImage', 'y', y), w: drawNum('drawImage', 'w', w), h: drawNum('drawImage', 'h', h),
-        fit: fits.includes(fit) ? fit : 'fill',
+        fit: fit ?? 'fill',
       }, 'drawImage');
     },
     // Clip and blend are STYLE, not shapes: they apply to every command issued after them, the way
@@ -8960,10 +9914,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
         addScriptTrace('error', '', 'ce.draw.blend: mode was not given, so the blend stays as it was.');
         return false;
       }
-      const wanted = String(mode);
-      if (!legal.includes(wanted)) {
+      // In any case: "Multiply" is "multiply", handed on as the list spells it.
+      const wanted = listWord(legal, String(mode));
+      if (!wanted) {
         addScriptTrace('error', '',
-          `ce.draw.blend("${wanted}"): not a blend mode. One of: ${legal.join(', ')}.`);
+          `ce.draw.blend("${String(mode)}"): not a blend mode. One of: ${legal.join(', ')}.`);
         return false;
       }
       drawState.blend = wanted === 'normal' ? null : wanted;
@@ -8985,13 +9940,11 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
 
     /* ce.image (§50). assets/asset answer from the icon library and the icons the panel carries; the
        rest work on one control. */
-    imageAssets: (opts) => {
-      const all = imageCatalogue();
-      if (opts?.embeddable === true) return all.filter((a) => a.embeddable);
-      if (opts?.vector === true) return all.filter((a) => a.vector);
-      return all;
-    },
-    imageAsset: (idOrName) => findAsset(imageCatalogue(), idOrName) ?? undefined,
+    // Both filters at once, where the first one given used to be the only one applied.
+    imageAssets: (opts) => imageCatalogue()
+      .filter((a) => (opts?.embeddable !== true || a.embeddable) && (opts?.vector !== true || a.vector)),
+    imageAsset: (idOrName) => (lookupNamed('ce.image.asset', 'id or name', idOrName)
+      ? findAsset(imageCatalogue(), idOrName) ?? undefined : undefined),
     imageSet: (target, src, opts) => imageSetImpl(target, src, opts),
     imageClear: (target, layer) => imageClearImpl(target, layer),
     imageRead: (target, layer) => imageReadImpl(target, layer),
@@ -8999,25 +9952,122 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     imageEmbed: (target, layer) => imageEmbedImpl(target, layer),
     imageLoad: (path) => {
       const p = String(path ?? '');
-      if (!p) return false;
+      if (!p) { addScriptTrace('error', '', 'ce.image.load: no path was given, so nothing is read.'); return false; }
       if (sourceKind(p) !== 'file') return true;    // a data URL needs no loading
       loadFile(p);
       return String(get(fileCache)[p] ?? '').startsWith('data:');
     },
 
     // ce.text (§46). fonts/font answer from the catalogue; the rest work on one control's Text.
-    textFonts: (opts) => {
-      const all = textCatalogue();
-      if (opts?.portable === true) return all.filter((f) => f.portable);
-      if (opts?.variable === true) return all.filter((f) => f.variable);
-      return all;
-    },
-    textFont: (family) => findFont(textCatalogue(), family) ?? undefined,
+    textFonts: (opts) => textCatalogue()
+      .filter((f) => (opts?.portable !== true || f.portable) && (opts?.variable !== true || f.variable)),
+    textFont: (family) => (lookupNamed('ce.text.font', 'family', family)
+      ? findFont(textCatalogue(), family) ?? undefined : undefined),
     textStyle: (target, opts) => textStyleImpl(target, opts),
     textAxis: (target, tag, value) => textAxisImpl(target, tag, value),
     textRead: (target, field) => textReadImpl(target, field),
     textMeasure: (target, text) => textMeasureImpl(target, text),
     textFit: (target, opts) => textFitImpl(target, opts),
+
+    // ce.keys (docs/design/ce-keys-module.md). The keyboard itself, and who gets each key, is
+    // scriptKeys.js's; the preview surface feeds it and plays the piano's notes.
+    keysShortcut: (keys, fn, opts) => keysAddShortcut(scriptId, keys, fn, opts, (level, text) => addScriptTrace(level, scriptId, text)),
+    keysRemove: (id) => keysRemoveShortcut(id),
+    keysList: () => keysListShortcuts(),
+    keysIsDown: (key) => keysIsDownRead(key),
+    keysHeld: () => keysHeldRead(),
+    keysPiano: (opts) => keysSetPiano(opts, (level, text) => addScriptTrace(level, scriptId, text)),
+    keysPianoInfo: () => keysPianoInfoRead(),
+    keysFocus: (control) => keysFocusControl(control),
+    keysFocused: () => keysFocusedControl(),
+
+    // ce.patch (docs/design/ce-patch-module.md): patchCore.js, the same code the JavaScript prelude runs.
+    patchCurrent: (scope, opts) => patch.current(scope, opts),
+    patchRead: (scope, fn, opts) => patch.read(scope, fn, opts),
+    patchLoad: (name, opts) => patch.load(name, opts),
+    patchMorph: (a, b, t, opts) => patch.morph(a, b, t, opts),
+    patchBlend: (patches, weights, opts) => patch.blend(patches, weights, opts),
+    patchRandom: (opts) => patch.random(opts),
+    patchMutate: (p, amount, opts) => patch.mutate(p, amount, opts),
+    patchMerge: (base, other, opts) => patch.merge(base, other, opts),
+    patchDiff: (a, b, opts) => patch.diff(a, b, opts),
+    patchEqual: (a, b, opts) => patch.equal(a, b, opts),
+    patchApply: (p, opts) => patch.apply(p, opts),
+    patchSave: (name, p, opts) => patch.save(name, p, opts),
+    patchList: (opts) => patch.list(opts),
+    patchForget: (name, opts) => patch.forget(name, opts),
+    patchWrite: (p, slot, opts) => patch.write(p, slot, opts),
+    patchScopes: (role) => patch.scopes(role),
+    patchDefine: (scope, spec, role) => patch.define(scope, spec, role),
+
+    // ce.verify (docs/design/ce-verify-module.md): verifyCore.js, the same code the JavaScript prelude runs.
+    verifyCoverage: (opts) => verify.coverage(opts),
+    verifyCheck: (opts, fn) => verify.check(opts, fn),
+    verifyDump: (kind, opts, fn) => verify.dump(kind, opts, fn),
+    verifyWrite: (id, value, opts, fn) => verify.write(id, value, opts, fn),
+    verifyProbe: (id, opts, fn) => verify.probe(id, opts, fn),
+    verifyPatch: (opts, fn) => verify.patch(opts, fn),
+    verifySummary: (report, opts) => verify.summary(report, opts),
+    verifyRunning: (role) => verify.running(role),
+    verifyCancel: (role) => verify.cancel(role),
+
+    // ce.file (docs/design/ce-file-module.md): the byte commands run everywhere, the dialogs here.
+    fileOpen: (opts, fn) => dialogs().open(opts, fn),
+    fileSave: (name, data, opts, fn) => dialogs().save(name, data, opts, fn),
+    fileRead: (file, fn) => dialogs().read(file, fn),
+    fileWrite: (file, data, fn) => dialogs().write(file, data, fn),
+    fileFolder: (opts, fn) => dialogs().folder(opts, fn),
+    fileList: (dir, opts) => dialogs().list(dir, opts),
+    fileSaveIn: (dir, name, data, opts, fn) => dialogs().saveIn(dir, name, data, opts, fn),
+    fileSyxSplit: (bytes, opts) => fileBytes.syxSplit(bytes, opts),
+    fileSyxJoin: (messages) => fileBytes.syxJoin(messages),
+    fileMidiRead: (bytes, opts) => fileBytes.midiRead(bytes, opts),
+    fileMidiWrite: (song, opts) => fileBytes.midiWrite(song, opts),
+
+    // ce.ci (docs/design/ce-ci-module.md): ciCore.js over the device layer's MIDI-CI session.
+    ciDiscover: (opts, fn) => ci().discover(opts, fn),
+    ciDevices: (role) => ci().devices(role),
+    ciGet: (muid, resource, opts, fn) => ci().get(muid, resource, opts, fn),
+    ciSet: (muid, resource, body, opts, fn) => ci().set(muid, resource, body, opts, fn),
+    ciSubscribe: (muid, resource, opts, fn) => ci().subscribe(muid, resource, opts, fn),
+    ciUnsubscribe: (id) => ci().unsubscribe(id),
+    ciProfiles: (muid, fn) => ci().profiles(muid, fn),
+    ciSetProfile: (muid, id, on, opts) => ci().setProfile(muid, id, on, opts),
+    ciDraftProfile: (muid, fn) => ci().draftProfile(muid, fn),
+
+    // origin() (docs/design/ce-daw-module.md): who made the change the running handler is for.
+    origin: () => currentOrigin ?? undefined,
+    // ce.daw: dawCore.js, answered from the plug-in's picture with the window open, and from the
+    // panel in the editor, which has no DAW.
+    dawHost: () => daw.host(),
+    dawParameters: () => daw.parameters(),
+    dawParameter: (path) => daw.parameter(path),
+    dawProgram: () => daw.program(),
+    dawPrograms: () => daw.programs(),
+    dawBeginGesture: (path) => daw.beginGesture(path),
+    dawEndGesture: (path) => daw.endGesture(path),
+    dawRename: (path, name) => daw.rename(path, name),
+    dawAssign: (slot, path, opts) => daw.assign(slot, path, opts),
+    dawMarkChanged: () => daw.markChanged(),
+
+    // ce.osc: oscCore.js over the device layer's OSC transport.
+    oscListen: (opts) => oscFor(scriptId).listen(opts),
+    oscStop: () => oscFor(scriptId).stop(),
+    oscOn: (pattern, fn) => oscFor(scriptId).on(pattern, fn),
+    oscOff: (id) => oscFor(scriptId).off(id),
+    oscTarget: (name, address) => oscFor(scriptId).target(name, address),
+    oscSend: (to, address, args, types) => oscFor(scriptId).send(to, address, args, types),
+    oscBundle: (to, messages, opts) => oscFor(scriptId).bundle(to, messages, opts),
+    oscStatus: () => oscFor(scriptId).status(),
+
+    // ce.mpe: mpeCore.js, one per panel; reading MPE back in is the input decoder's.
+    mpeZone: (opts) => mpeFor(scriptId).zone(opts),
+    mpeNoteOn: (note, velocity, opts) => mpeFor(scriptId).noteOn(note, velocity, opts),
+    mpeExpress: (id, values) => mpeFor(scriptId).express(id, values),
+    mpeNoteOff: (id, velocity) => mpeFor(scriptId).noteOff(id, velocity),
+    mpeAllOff: () => mpeFor(scriptId).allOff(),
+    mpeNotes: () => mpeFor(scriptId).notes(),
+    mpeListen: (opts) => mpeFor(scriptId).listen(opts),
     // Each coordinate read as drawShapes.js reads it: a number or text that is one, else 0, said.
     drawRect: (x, y, w, h, radius) => drawRejected('drawRect', { x, y, w, h }) ? false : pushCommand(null, ownerName,
       { op: 'rect', x: drawNum('drawRect', 'x', x), y: drawNum('drawRect', 'y', y), w: drawNum('drawRect', 'w', w),
@@ -9105,7 +10155,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     runningTimers: () => runningTimersRead(),
     // ce.device — reads
     deviceProfile: (role) => deviceProfileRead(role || DEFAULT_ROLE),
-    deviceParameters: (opts) => deviceParametersRead(opts ?? {}),
+    deviceParameters: (opts) => (deviceOptionsRefused('parameters', opts) ? [] : deviceParametersRead(opts ?? {})),
     deviceParameter: (id, role) => deviceParameterRead(id, role || DEFAULT_ROLE),
     deviceConnected: (role) => deviceConnectedRead(role || DEFAULT_ROLE),
     deviceRead: (id, role) => deviceValueRead(id, role || DEFAULT_ROLE),
@@ -9115,7 +10165,7 @@ function buildApi(ownerName, scriptId = '', guardExecution = false) {
     deviceDefineDump: (kind, spec, role) => deviceDefineDumpImpl(kind, spec, role || DEFAULT_ROLE),
     deviceBind: (control, parameterId, opts) => deviceBindImpl(control, parameterId, opts ?? {}),
     deviceUnbind: (control, port) => deviceUnbindImpl(control, port),
-    devicePorts: (opts) => devicePortsRead(opts ?? {}),
+    devicePorts: (opts) => (deviceOptionsRefused('ports', opts) ? [] : devicePortsRead(opts ?? {})),
     deviceVariables: (role) => deviceVariablesRead(role || DEFAULT_ROLE),
     deviceSetVariable: (name, value, role) => deviceOverrideWrite('variables', name, value, role || DEFAULT_ROLE),
     deviceTiming: (role) => deviceTimingRead(role || DEFAULT_ROLE),
@@ -10098,7 +11148,12 @@ function resetScriptState() {
   textAxisWarned.clear();
   deviceOverrideWarned.clear();
   musicWarned.clear();
+  packWarned.clear();
+  storageWarned.clear();
+  devicePortsWarned.clear();
   drawWarned.clear();
+  panelWarned.clear();
+  uiWarned.clear();
   disposeJavascriptSandboxes();
   if (luaEnginePromise) {
     luaEnginePromise.then(lua => lua.global.close(), () => {});
@@ -10106,6 +11161,7 @@ function resetScriptState() {
   }
   handlerCache.clear();
   listeners.length = 0;
+  oscInstances.clear();   // a script's OSC patterns go when it reloads
   watchers.length = 0;
   computeds.length = 0;
   filters.length = 0;
@@ -10115,6 +11171,7 @@ function resetScriptState() {
   clearMidiFilters();
   routedRole = null;
   stopAllTimers();
+  resetKeys();           // a script's shortcuts and piano go with it; the keys held stay the user's
   scriptState.clear();   // `state` lives exactly as long as the loaded script does
   resetRandomStreams();
 }
@@ -10134,13 +11191,16 @@ async function invokeHandler(script, hook = null, payload = undefined) {
     // Only the synchronous part belongs to this transaction. If the handler returns a promise,
     // publish before awaiting so UI state is not held hostage by network or timer work. Writes
     // after an await keep their existing immediate semantics unless the script explicitly batches.
-    const result = withDocumentWriteBatch(() =>
+    let result = withDocumentWriteBatch(() =>
       fn(payload !== undefined ? payload : samplePayload(fnName)));
-    if (result && typeof result.then === 'function') await result;
+    if (result && typeof result.then === 'function') result = await result;
     addScriptTrace('log', script.id, `ran ${fnName}() in "${script.name}"`);
+    // What it answered: keyDown keeps a key when a handler returns true.
+    return result;
   } catch (e) {
     reportScriptError(script.id, e);
   }
+  return undefined;
 }
 
 /**
@@ -10367,47 +11427,62 @@ function drainInteractionEvents() {
   const current = [];
   for (const entry of pending) {
     if (live.enabledGlobal && entry.panelId === panelId) current.push(entry);
-    else entry.resolve();
+    else entry.resolve(entry.answer ? false : undefined);
   }
   if (current.length) {
     dispatchEvents(current.map((entry) => entry.event)).then(
-      () => { for (const entry of current) entry.resolve(); },
+      (answers) => { current.forEach((entry, i) => entry.resolve(entry.answer ? answers?.[i] === true : undefined)); },
       (error) => { for (const entry of current) entry.reject(error); });
   }
 }
 
+/**
+ * Run each event's handlers. Answers, per event, whether any handler returned true (keyDown keeps
+ * its key that way; every other event ignores the answer).
+ */
 async function dispatchEvents(events, { inbound = false } = {}) {
-  if (!events.length) return;
-  if (!ensurePanelExecutionApproved()) { resetScriptState(); return; }
+  const answers = events.map(() => false);
+  if (!events.length) return answers;
+  if (!ensurePanelExecutionApproved()) { resetScriptState(); return answers; }
   const scripts = activeScripts();
   const epoch = executionEpoch;
+  const outerOrigin = currentOrigin;
   live.dispatching = true;
   if (inbound) origin.inboundDepth += 1;
   try {
     // Load everything first: a script that only registers on(…) listeners has no `event` of its
     // own, so it would never be loaded by the match loop below and its listeners would never fire.
     await primeHandlers();
-    for (const ev of events) {
-      if (epoch !== executionEpoch) return;
+    for (let i = 0; i < events.length; i += 1) {
+      const ev = events[i];
+      if (epoch !== executionEpoch) return answers;
+      // origin(): who made the change this event is for. Inbound events came from the device.
+      currentOrigin = ev.origin ?? (inbound ? 'device' : null);
+      if (ev.event === 'onValueChange' && currentOrigin !== 'host' && currentOrigin !== 'load') dawFollowSpare(ev.controlName, ev.payload);
+      if (ev.event === 'onValueChange' && currentOrigin !== 'osc') oscFollowBinding(ev.controlName, ev.payload);
       const matches = scripts.filter((s) =>
         s.enabled !== false && s.event === ev.event &&
         (ev.controlName == null || scriptMatchesControl(s, ev.controlName)));
       for (const s of matches) {
-        if (epoch !== executionEpoch) return;
-        await invokeHandler(s, s.event, ev.payload);
+        if (epoch !== executionEpoch) return answers;
+        if (await invokeHandler(s, s.event, ev.payload) === true) answers[i] = true;
       }
-      if (epoch !== executionEpoch) return;
+      if (epoch !== executionEpoch) return answers;
       // …then the explicit on(target, event, fn) listeners for the same event.
       for (const l of [...listeners]) {
         if (l.event !== ev.event || !listenerMatches(l, ev.controlName)) continue;
-        try { withDocumentWriteBatch(() => l.fn(ev.payload)); } catch (e) { reportScriptError(l.scriptId, e); }
+        try {
+          if (withDocumentWriteBatch(() => l.fn(ev.payload)) === true) answers[i] = true;
+        } catch (e) { reportScriptError(l.scriptId, e); }
       }
     }
   } finally {
+    currentOrigin = outerOrigin;
     if (inbound) origin.inboundDepth -= 1;
     if (epoch === executionEpoch) {
       snapshotValues();          // absorb panels writes our scripts just made
       live.dispatching = false;
+      scheduleDawStateSave();    // the processor saves what the scripts would now say
       // Changes that raised declared events skipped the reactive pass while this async
       // dispatch was busy. Settle their watchers before absorbing the session baseline.
       runReactive();
@@ -10428,6 +11503,7 @@ async function dispatchEvents(events, { inbound = false } = {}) {
       }
     }
   }
+  return answers;
 }
 
 /* --- source 1: panels store (script-driven value changes) --- */
@@ -10464,6 +11540,12 @@ function onPanelsChanged() {
     }
   }
   live.last = next;
+  syncOscBindings();   // a binding or the panel's OSC settings may have changed
+  // Who made the change: a script's set() outside a handler, a spare parameter the DAW moved, or a
+  // hand in the editor's inspector.
+  const why = panelsOrigin ?? 'user';
+  panelsOrigin = null;
+  for (const e of events) e.origin = why;
   // Returned, as the session diff's is, so a test can wait for the handlers; the store subscriber
   // ignores it.
   const dispatched = events.length ? dispatchEvents(events) : null;
@@ -10587,7 +11669,14 @@ function onPreviewSessionsChanged(sessions) {
   const events = [];
   const next = new Map();
   let controlsById = null;
+  // Who moved each control: a hand, unless the plug-in said the DAW or a project did (noteHostValue)
+  // or a dump filled it (sessionsOrigin).
+  const spans = [];
+  const byDefault = sessionsOrigin ?? 'user';
+  sessionsOrigin = null;
   for (const [id, s] of Object.entries(sessions ?? {})) {
+    spans.push({ from: events.length, origin: controlOrigins.get(id) ?? byDefault });
+    controlOrigins.delete(id);
     const prev = live.sessionLast.get(id);
     controlsById ??= new Map(flatControls(livePanel()?.controls ?? []).map((c) => [c?._children?.Core?.id, c]));
     const cur = sessionEntry(s, prev, controlsById.get(id));
@@ -10708,6 +11797,10 @@ function onPreviewSessionsChanged(sessions) {
     }
   }
   live.sessionLast = next;
+  for (let k = 0; k < spans.length; k += 1) {
+    const to = k + 1 < spans.length ? spans[k + 1].from : events.length;
+    for (let i = spans[k].from; i < to; i += 1) events[i].origin = spans[k].origin;
+  }
   const dispatched = events.length ? dispatchEvents(events) : null;
   // The reactive rules settle AFTER the declared events, and run even when there were no
   // events at all: a nested field moving (a colour, a section property) produces no
@@ -10720,6 +11813,82 @@ function onPreviewSessionsChanged(sessions) {
 
 let previewStopWork = null;
 let previewStartWork = null;
+
+/* --- the DAW-state hooks, in the panel view (exported plug-in, window open) ---
+ *
+ * onDawSaveState and onDawRestoreState were raised only by the window-shut engines. With the
+ * plug-in's window open the scripts that run are these, so the state the DAW saved with the project
+ * was the window-shut engines', frozen at the moment the window opened, and a project restored with
+ * the window open never reached these scripts at all.
+ *
+ * Now, in the player (setDawStateSink installs the way out; the editor has none and raises neither):
+ *   - after anything a script does, the page's onDawSaveState handlers are run and their merged
+ *     answer handed to the processor, which saves it with the project while the window is open;
+ *   - the panel starts from the processor's state: onDawRestoreState runs after onPanelBuild, before
+ *     onPanelReady, with what the window-shut engines last saved (setDawRestoreForNextStart);
+ *   - a project restored while the window is open is raised here too (raiseDawRestoreState).
+ * When the window closes, the processor hands the page's last state to the window-shut engines.
+ * The contract is the C++ one (ScriptRuntime::onDawSaveState): a handler RETURNS its keys, which are
+ * merged into one store; `store` is for reading.
+ */
+let dawStateSink = null;
+let dawStateTimer = null;
+let dawRestoreForNextStart = null;
+
+export function setDawStateSink(fn) {
+  dawStateSink = typeof fn === 'function' ? fn : null;
+  if (!dawStateSink && dawStateTimer) { clearTimeout(dawStateTimer); dawStateTimer = null; }
+}
+
+export function setDawRestoreForNextStart(store) {
+  dawRestoreForNextStart = store && typeof store === 'object' && Object.keys(store).length ? store : null;
+}
+
+function hasDawSaveScripts() {
+  return activeScripts().some((s) => s.enabled !== false && s.event === 'onDawSaveState');
+}
+
+/** Every onDawSaveState handler's answer, merged into one store, as ScriptRuntime does it. */
+export async function collectDawSaveState() {
+  const store = {};
+  if (!ensurePanelExecutionApproved()) return store;
+  const epoch = executionEpoch;
+  for (const s of activeScripts()) {
+    if (s.enabled === false || s.event !== 'onDawSaveState') continue;
+    const handlers = await handlersFor(s);
+    if (epoch !== executionEpoch) return store;
+    const fn = handlers?.onDawSaveState;
+    if (typeof fn !== 'function') continue;
+    try {
+      // A copy: a handler that writes into `store` instead of returning would otherwise change what
+      // the next handler is given, and the C++ engines do not let it.
+      const answer = await fn(deepClone(store));
+      if (answer && typeof answer === 'object' && !Array.isArray(answer)) Object.assign(store, answer);
+    } catch (e) {
+      reportScriptError(s.id, e);
+    }
+  }
+  return store;
+}
+
+/** Hand the processor the page's state soon after scripts have run; coalesced, and only when a
+    script saves anything, so a panel without save handlers never claims the state. */
+function scheduleDawStateSave() {
+  if (!dawStateSink || dawStateTimer || !hasDawSaveScripts()) return;
+  dawStateTimer = setTimeout(async () => {
+    dawStateTimer = null;
+    const sink = dawStateSink;
+    if (!sink) return;
+    const store = await collectDawSaveState();
+    if (sink === dawStateSink) sink(store);
+  }, 150);
+}
+
+export function raiseDawRestoreState(store) {
+  if (!store || typeof store !== 'object') return Promise.resolve();
+  return dispatchEvents([{ event: 'onDawRestoreState', controlName: null, payload: store }]);
+}
+
 function onPreviewModeChanged(on) {
   if (on && !ensurePanelExecutionApproved()) {
     live.prevPreviewOn = false;
@@ -10736,9 +11905,13 @@ function onPreviewModeChanged(on) {
     // declares what it declares, rather than accumulating a second copy on every run.
     clearGeneratedControls();
     clearDeviceRuntimeDefinitions();
+    const restore = dawStateSink ? dawRestoreForNextStart : null;
+    dawRestoreForNextStart = null;
     previewStartWork = dispatchEvents([
       { event: 'onPanelLoad', controlName: null, payload: undefined },
       { event: 'onPanelBuild', controlName: null, payload: undefined },
+      // The plug-in's window opening: the scripts start from what was saved (see setDawStateSink).
+      ...(restore ? [{ event: 'onDawRestoreState', controlName: null, payload: restore }] : []),
       { event: 'onPanelReady', controlName: null, payload: { firstTime } },
     ]);
   } else if (live.enabledGlobal && !on && live.prevPreviewOn) {
@@ -10772,7 +11945,10 @@ function onPreviewModeChanged(on) {
 function onDumpParsed(payload) {
   const values = payload?.values ?? payload?.parsed?.values ?? null;
   const role = payload?.deviceRole ?? DEFAULT_ROLE;
-  if (values && typeof values === 'object') syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  if (values && typeof values === 'object') {
+    sessionsOrigin = 'device';
+    syncDeviceRuntimeStateToPanelPreview({ [role]: values });
+  }
 
   const events = [{ event: 'onDumpReceived', controlName: null,
     payload: { values: values ?? {}, kind: payload?.dumpId ?? payload?.dumpName ?? '', role } }];
@@ -10836,24 +12012,448 @@ function noteEventFor(bytes) {
   return { event: off ? 'onNoteOffIn' : 'onNoteIn', payload };
 }
 
+/**
+ * The MIDI a device sends, decoded once for every script (midiInDecoder.js; the plug-in's
+ * MidiInDecoder.h decodes it the same way with its window shut): notes with their MPE ids, bends,
+ * pressure, programs with their bank select, NRPNs and RPNs, transport. A thinned bend, or an NRPN's
+ * coarse half, waits for its time; the timer below lets it go.
+ */
+const midiInDecode = createMidiInDecoder();
+let midiInTimer = null;
+const midiInNow = () => (typeof performance !== 'undefined' ? performance.now() : Date.now());
+
+function scheduleMidiInFlush() {
+  if (midiInTimer !== null) return;
+  const due = midiInDecode.nextDue();
+  if (due === null) return;
+  midiInTimer = setTimeout(() => {
+    midiInTimer = null;
+    const events = midiInDecode.flush(midiInNow()).map((e) => ({ event: e.event, controlName: null, payload: e.payload }));
+    if (events.length && !live.dispatching && live.enabledGlobal) dispatchEvents(events, { inbound: true });
+    scheduleMidiInFlush();
+  }, Math.max(1, Math.ceil(due - midiInNow())));
+}
+
+/** ce.mpe.listen's reading of MPE, for the decoder. */
+export function midiInListen(role, opts) { midiInDecode.listen(role, opts); }
+
+// ce.mpe (docs/design/midi-input-and-mpe.md): one zone and one set of sounding notes for the panel,
+// as the JavaScript prelude has (it runs once per panel). What it says goes to the script that called.
+let mpeSayTo = '';
+let mpeShared = null;
+function mpeFor(scriptId) {
+  mpeSayTo = scriptId;
+  mpeShared ??= mpeCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', mpeSayTo, text),
+    send: (bytes, role) => sendRawMidiForRole(bytes, 'mpe', role || DEFAULT_ROLE),
+    note: midiNote,
+    listen: (role, opts) => midiInDecode.listen(role, opts),
+  });
+  return mpeShared;
+}
+
+
+/* ------------------------------------------------------------------------------- ce.osc */
+// docs/design/ce-osc-module.md. The port, the reading and writing of OSC and the user's yes live with
+// the device layer in C++ (Osc/OscService.h). The page sends each command over the bridge
+// ("oscCommand") and cannot wait for the answer while a script runs, so a command answers true when
+// sent, a refusal arrives a moment later as a console line, and status() answers from the last status
+// the transport gave. Each script's patterns are its own, and go when the scripts reload.
+
+const oscInstances = new Map();   // scriptId -> oscCommands
+const oscAsked = new Map();       // requestId -> { scriptId, op }
+let oscStatusSeen = { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+let oscRequests = 0;
+let oscBridgeListening = false;
+
+/** Which panel a yes for the network is for: its name, as the exported plug-in names it too (a saved
+    panel keeps no id), so the window open and shut ask once between them. */
+function oscPanelKey() {
+  const panel = livePanel();
+  return String(panel?.name || panel?.id || 'panel');
+}
+
+function ensureOscBridge() {
+  const backend = window.__JUCE__?.backend;
+  if (oscBridgeListening || typeof backend?.addEventListener !== 'function') return;
+  oscBridgeListening = true;
+  backend.addEventListener('oscCommandAnswered', (p) => oscHeard('oscCommandAnswered', p));
+  backend.addEventListener('oscMessage', (p) => oscHeard('oscMessage', p));
+}
+
+/** One command to the transport; false when there is no app or plug-in to send it to. */
+function oscSendCommand(fields, scriptId) {
+  if (!isJuceAvailable()) return false;
+  oscRequests += 1;
+  const requestId = `osc${oscRequests}`;
+  if (scriptId !== null) oscAsked.set(requestId, { scriptId, op: fields.op });
+  ensureOscBridge();
+  window.__JUCE__.backend.emitEvent('oscCommand', { ...fields, requestId, panel: oscPanelKey() });
+  return true;
+}
+
+/** What the transport sends back: an answer to a command, or a message that arrived. */
+function oscHeard(name, payload) {
+  if (name === 'oscCommandAnswered') {
+    const key = String(payload?.requestId ?? '');
+    const asked = oscAsked.get(key);
+    oscAsked.delete(key);
+    const answer = payload?.answer;
+    if (payload?.op === 'status') {
+      if (answer && typeof answer === 'object') oscStatusSeen = { ...answer };
+      return;
+    }
+    if (asked && answer && typeof answer === 'object' && answer.ok === false) {
+      addScriptTrace('error', asked.scriptId, `ce.osc.${asked.op}: ${answer.why || answer.error || 'it was refused'}.`);
+    }
+    oscSendCommand({ op: 'status' }, null);   // and the picture after it
+    return;
+  }
+  if (name !== 'oscMessage' || !payload || typeof payload.address !== 'string') return;
+  oscStatusSeen = { ...oscStatusSeen, received: (Number(oscStatusSeen.received) || 0) + 1 };
+  const outer = currentOrigin;
+  currentOrigin = 'osc';
+  try {
+    for (const o of oscInstances.values()) o.receive(payload);
+  } finally {
+    currentOrigin = outer;
+  }
+  oscBindingsHeard(payload);
+  dispatchEvents([{ event: 'onOscIn', controlName: null, payload, origin: 'osc' }]);
+}
+
+/** Tests stand in for the native side: what it sends back, as it would arrive. */
+export function oscHeardForTesting(name, payload) { oscHeard(name, payload); }
+
+function oscFor(scriptId) {
+  const known = oscInstances.get(scriptId);
+  if (known) return known;
+  const listenersOwn = [];
+  const o = oscCommands({
+    say: (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text),
+    listeners: () => listenersOwn,
+    call: (fn, value) => runScriptCallback(scriptId, 'osc', () => fn(value)),
+    query(op, fields) {
+      if (op === 'status') {
+        oscSendCommand({ op: 'status' }, null);
+        return { ...oscStatusSeen };
+      }
+      if (!isJuceAvailable()) return { ok: false, why: 'OSC needs the app or the plug-in, which have a network port' };
+      oscSendCommand({ ...fields, op }, scriptId);
+      if (op === 'stop') {
+        const was = oscStatusSeen.listening === true || oscStatusSeen.waiting === true;
+        oscStatusSeen = { ...oscStatusSeen, listening: false, waiting: false };
+        return was;
+      }
+      return { ok: true };
+    },
+  });
+  oscInstances.set(scriptId, o);
+  return o;
+}
+
+/** The panel went: the transport stops listening and forgets its targets. */
+function forgetOsc() {
+  oscBindingsSignature = '';
+  oscLearnWaiter = null;
+  oscLastSender.clear();
+  oscInstances.clear();
+  oscAsked.clear();
+  if (oscStatusSeen.listening || oscStatusSeen.waiting || oscRequests > 0) oscSendCommand({ op: 'reset' }, null);
+  oscStatusSeen = { listening: false, waiting: false, received: 0, sent: 0, dropped: 0 };
+}
+
+
+/* ---------------------------------------------------------------------- OSC learn (no script) */
+// docs/design/ce-osc-module.md, "Panel side". A control with an oscControl binding follows an OSC
+// address and, unless told not to, sends its value back there when anything else moves it. The panel's
+// settings (panel.osc: port, network, targets) say where to listen and the names to send to. A
+// control moved by OSC is written as a script's set() is, with origin() giving "osc", so it reaches
+// the synth through its own binding and is never sent back to the address it came from.
+
+const oscLastSender = new Map();   // control name -> { host, port } the last message for it came from
+let oscBindingsSignature = '';
+let oscLearnWaiter = null;
+
+/** Every OSC binding on the panel, with the control it is on. */
+function oscBindingsOf(panel) {
+  const out = [];
+  for (const control of flatControls(panel?.controls ?? [])) {
+    const bindings = control?._children?.DeviceBindings;
+    if (!bindings || bindings.enabled === false || !Array.isArray(bindings.bindings)) continue;
+    for (const b of bindings.bindings) {
+      if (b?.kind !== OSC_CONTROL_KIND || typeof b.address !== 'string' || !b.address.startsWith('/')) continue;
+      out.push({ control, name: String(control._children.Core?.name ?? control._children.Core?.id), binding: b });
+    }
+  }
+  return out;
+}
+
+/** The panel's OSC settings, read as the editor writes them. */
+function panelOscSettings(panel) {
+  const osc = panel?.osc && typeof panel.osc === 'object' ? panel.osc : {};
+  const port = Number.isInteger(osc.port) && osc.port >= 1024 && osc.port <= 65535 ? osc.port : 8000;
+  return { port, network: osc.network === true, targets: parseOscTargets(osc.targets) };
+}
+
+/** Open the panel's port when it has OSC bindings (or a learn is waiting), and name its targets.
+    Sent again only when something it depends on changed. */
+function syncOscBindings() {
+  const panel = livePanel();
+  const settings = panelOscSettings(panel);
+  const wanted = oscBindingsOf(panel).length > 0 || oscLearnWaiter !== null;
+  const signature = wanted ? JSON.stringify(settings) : '';
+  if (signature === oscBindingsSignature) return;
+  oscBindingsSignature = signature;
+  if (!wanted) return;
+  oscSendCommand({ op: 'listen', port: settings.port, network: settings.network, nextFree: true }, null);
+  for (const t of settings.targets) oscSendCommand({ op: 'target', name: t.name, host: t.host, port: t.port }, null);
+}
+
+/** A message for the bindings: each control whose address matches takes the value. */
+function oscBindingsHeard(message) {
+  if (oscLearnWaiter) {
+    const waiter = oscLearnWaiter;
+    oscLearnWaiter = null;
+    try { waiter(message.address, message); } catch { /* the editor's, not a script's */ }
+  }
+  for (const { name, binding } of oscBindingsOf(livePanel())) {
+    if (!oscMatches(binding.address, message.address)) continue;
+    const at = Math.max(1, Math.floor(Number(binding.valueIndex) || 1)) - 1;
+    let v = message.args?.[at];
+    if (typeof v === 'boolean') v = v ? 1 : 0;
+    if (typeof v !== 'number' || !Number.isFinite(v)) continue;
+    const min = Number.isFinite(Number(binding.min)) ? Number(binding.min) : 0;
+    const max = Number.isFinite(Number(binding.max)) ? Number(binding.max) : 1;
+    const t = max === min ? 0 : Math.max(0, Math.min(1, (v - min) / (max - min)));
+    if (message.from) oscLastSender.set(name, message.from);
+    panelsOrigin = 'osc';
+    setValue(`${name}.value`, t, 'normalizedValue');
+    panelsOrigin = null;
+  }
+}
+
+/** A control with an OSC binding moved, not by OSC: its value goes back to the address. */
+function oscFollowBinding(controlName, value) {
+  if (controlName == null) return;
+  for (const { control, name, binding } of oscBindingsOf(livePanel())) {
+    if (name !== controlName || binding.sendBack === false) continue;
+    const range = rangeOf(control);
+    const v = Number(value);
+    if (!range || !Number.isFinite(v)) continue;
+    const t = Math.max(0, Math.min(1, (v - range.min) / (range.max - range.min)));
+    const min = Number.isFinite(Number(binding.min)) ? Number(binding.min) : 0;
+    const max = Number.isFinite(Number(binding.max)) ? Number(binding.max) : 1;
+    const to = typeof binding.sendTo === 'string' && binding.sendTo.trim() !== '' ? binding.sendTo.trim() : oscLastSender.get(name);
+    if (!to) continue;   // nobody has sent to it yet, and no target is named
+    oscSendCommand({ op: 'send', to, address: binding.address.replace(/[*?[\]{}]/g, ''), args: [min + t * (max - min)], types: 'f' }, null);
+  }
+}
+
+/** The editor's Learn: the next message's address goes to `fn`. Opens the panel's port for it. */
+export function oscLearnNext(fn) {
+  oscLearnWaiter = typeof fn === 'function' ? fn : null;
+  oscBindingsSignature = '';
+  syncOscBindings();
+  return oscLearnWaiter !== null && Boolean(isJuceAvailable());
+}
+
+/** Tests: what the runtime does when the panel loads or changes. */
+export function syncOscBindingsForTesting() { syncOscBindings(); }
+
+/* ------------------------------------------------------------------ ce.daw and origin() */
+// docs/design/ce-daw-module.md. With the plug-in's window open the page reads the DAW from what the
+// processor pushes (PlayerHost::pushDawInfo), since the bridge cannot answer while a script waits,
+// and sends what a script changes back (dawCommand). In the editor there is no DAW: the questions
+// that need one answer nothing, and parameters gives the list the next export would bake.
+
+let currentOrigin = null;          // what origin() answers inside a handler
+/** Whether handlers are running (setValue has a `live` of its own, so it asks here). */
+function dispatchingNow() { return live.dispatching; }
+let panelsOrigin = null;           // who made the next panel-document change, when not a hand
+let sessionsOrigin = null;         // who made the next preview change, when not a hand: a dump
+const controlOrigins = new Map();  // control id -> "host" | "load", from the plug-in's pushes
+let dawInfo = null;                // the plug-in's picture; null in the editor
+let dawCommandSink = null;         // sends a change to the plug-in
+let dawParamSink = null;           // sends a spare parameter's new position
+const dawPageGestures = new Set(); // paths a script in this window holds a gesture on
+
+/** The plug-in's picture of the DAW, as PlayerHost pushes it. null: the editor. */
+export function setDawInfo(info) {
+  dawInfo = info && typeof info === 'object' ? info : null;
+  if (!dawInfo) dawPageGestures.clear();
+}
+export function setDawCommandSink(fn) { dawCommandSink = typeof fn === 'function' ? fn : null; }
+export function setDawParamSink(fn) { dawParamSink = typeof fn === 'function' ? fn : null; }
+
+/** The plug-in pushed a value for this control: the DAW's move, or a project's ("load"). */
+export function noteHostValue(controlId, why) {
+  if (controlId != null && (why === 'host' || why === 'load')) controlOrigins.set(String(controlId), why);
+}
+
+function dawEntry(id) {
+  return (Array.isArray(dawInfo?.parameters) ? dawInfo.parameters : []).find((p) => p?.id === id) ?? null;
+}
+
+/** The DAW moved parameter `id`: automationIn, after the control's own value events. */
+export function raiseAutomationIn(id, value) {
+  const entry = dawEntry(String(id));
+  if (!entry?.path) return null;
+  const control = entry.control ?? String(entry.path).split('.')[0];
+  return dispatchEvents([{ event: 'onAutomationIn', controlName: null, origin: 'host',
+    payload: { control, path: entry.path, value, id: entry.id } }]);
+}
+
+/** The DAW chose a program, and the plug-in has sent it. */
+export function raiseDawProgramIn(program) {
+  if (!program || typeof program !== 'object') return null;
+  const payload = { index: program.index, number: program.number, name: program.name };
+  if (dawInfo) dawInfo = { ...dawInfo, program: { ...(dawInfo.program ?? {}), ...payload } };
+  return dispatchEvents([{ event: 'onDawProgramIn', controlName: null, origin: 'host', payload }]);
+}
+
+/** A spare parameter moved in the DAW (or arrived with a project): its control moves with it. */
+export function dawSpareMoved(slot, at, why = 'host') {
+  const entry = dawEntry(`spare${slot}`);
+  if (!entry?.path) return;
+  const min = Number(entry.min), max = Number(entry.max);
+  if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) return;
+  let value = min + Math.max(0, Math.min(1, Number(at) || 0)) * (max - min);
+  if (entry.kind === 'choice') value = Math.round(value);
+  panelsOrigin = why === 'load' ? 'load' : 'host';
+  setValue(entry.path, value);
+  panelsOrigin = null;
+  if (why !== 'load') raiseAutomationIn(entry.id, value);
+}
+
+/** A control on a spare moved, not by the spare: the spare follows, so the DAW sees it. */
+function dawFollowSpare(controlName, value) {
+  if (!dawInfo || !dawParamSink || controlName == null) return;
+  for (const entry of dawInfo.parameters ?? []) {
+    if (!entry?.path || !String(entry.id).startsWith('spare') || entry.control !== controlName) continue;
+    const min = Number(entry.min), max = Number(entry.max);
+    const v = Number(value);
+    if (!Number.isFinite(v) || !(max > min)) continue;
+    dawParamSink(entry.id, Math.max(0, Math.min(1, (v - min) / (max - min))));
+  }
+}
+
+/** The list the next export would bake, as ce.daw.parameters gives it in the editor. */
+function editorDawParameters() {
+  const panel = livePanel();
+  const list = collectExportParameters(panel).map((p) => {
+    const entry = {
+      id: p.id, name: p.label ?? p.id, path: p.path, control: p.controlName ?? String(p.path).split('.')[0],
+      min: p.min, max: p.max, default: p.defaultValue, unit: p.unit ?? '', kind: p.valueKind ?? 'float',
+      value: getValue(p.path),
+    };
+    if (entry.kind === 'choice' && Array.isArray(p.choiceLabels)) entry.choices = [...p.choiceLabels];
+    if (p.group) entry.group = p.group;
+    return entry;
+  });
+  const spares = Math.max(0, Math.min(32, Math.floor(Number(panel?.exportSettings?.spareDawParameters) || 0)));
+  for (let slot = 1; slot <= spares; slot += 1) {
+    list.push({ id: `spare${slot}`, name: `Spare ${slot}`, slot, min: 0, max: 1, default: 0, unit: '', kind: 'float', value: 0 });
+  }
+  return list;
+}
+
+/** What a control on a spare is shown as: its exported parameter's range, else its own. */
+function spareDisplayFor(path) {
+  const name = String(path).split('.')[0];
+  const exported = collectExportParameters(livePanel()).find((p) => p.path === path);
+  if (exported) {
+    const d = { min: exported.min, max: exported.max, unit: exported.unit ?? '' };
+    if (exported.valueKind === 'choice' && Array.isArray(exported.choiceLabels)) d.choices = [...exported.choiceLabels];
+    return d;
+  }
+  const control = findControlByName(name);
+  const range = control ? rangeOf(control) : null;
+  if (!range) return null;
+  const unit = control?._children?.Behavior?.unit;
+  return { min: range.min, max: range.max, unit: typeof unit === 'string' ? unit : '' };
+}
+
+function dawHostFor(scriptId) {
+  const say = (level, text) => addScriptTrace(level === 'warn' ? 'warn' : 'error', scriptId, text);
+  const send = (command) => { if (dawCommandSink) dawCommandSink(command); };
+  return {
+    say,
+    query(op, fields) {
+      if (!dawInfo) {
+        if (op === 'parameters') return editorDawParameters();
+        if (op === 'programs') return [];
+        if (op === 'host' || op === 'program') return undefined;
+        return false;
+      }
+      const params = Array.isArray(dawInfo.parameters) ? dawInfo.parameters : [];
+      const named = (path) => params.find((p) => p?.path === (String(path).includes('.') ? path : `${path}.value`)
+        && !String(p.id).startsWith('spare'));
+      if (op === 'host') return dawInfo.host ? { ...dawInfo.host, editorOpen: true } : undefined;
+      if (op === 'parameters') return params.map((p) => ({ ...p, ...(p.path ? { value: getValue(p.path) } : {}) }));
+      if (op === 'program') return dawInfo.program ?? undefined;
+      if (op === 'programs') return Array.isArray(dawInfo.programs) ? dawInfo.programs : [];
+      if (op === 'beginGesture' || op === 'endGesture') {
+        const p = named(fields.path);
+        if (!p) return false;
+        if (op === 'beginGesture' ? dawPageGestures.has(p.path) : !dawPageGestures.has(p.path)) return false;
+        if (op === 'beginGesture') dawPageGestures.add(p.path); else dawPageGestures.delete(p.path);
+        send({ op, path: p.path });
+        return true;
+      }
+      if (op === 'rename') {
+        const p = named(fields.path);
+        if (!p) return false;
+        send({ op, path: p.path, name: fields.name });
+        return true;
+      }
+      if (op === 'assign') {
+        const count = Math.floor(Number(dawInfo.spares) || 0);
+        if (fields.slot > count) return false;
+        if (fields.path === '') { send({ op, slot: fields.slot, path: '', name: '' }); return true; }
+        const path = String(fields.path).includes('.') ? fields.path : `${fields.path}.value`;
+        const display = spareDisplayFor(path);
+        if (!display) return false;
+        send({ op, slot: fields.slot, path, name: fields.name, display });
+        return true;
+      }
+      if (op === 'markChanged') {
+        send({ op });
+        scheduleDawStateSave();
+        return true;
+      }
+      return undefined;
+    },
+  };
+}
+
+/** Tests feed the decoder through the same door the bridge does, at a time they choose. */
+export function midiInputForTesting(payload) { onMidiInputMessage(payload); }
+export function midiInFlushForTesting(now) {
+  const events = midiInDecode.flush(now).map((e) => ({ event: e.event, controlName: null, payload: e.payload }));
+  if (events.length) dispatchEvents(events, { inbound: true });
+}
+
 function onMidiInputMessage(payload) {
   if (live.dispatching || !live.enabledGlobal) return;
   if (!payload) return;
   const bytes = hexToBytes(payload.hex);
   if (!bytes.length) return;
   const status = bytes[0] ?? 0;
+  const from = String(payload.deviceRole ?? '') || DEFAULT_ROLE;
   const events = [{
     event: 'onMidiIn',
     controlName: null,
-    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0 },
+    payload: { bytes, status, channel: status !== 0 ? (status & 0x0f) : 0, from },
   }];
-  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3) {
+  const decoded = midiInDecode.feed(from, bytes, Number.isFinite(payload.atForTesting) ? payload.atForTesting : midiInNow());
+  if (String(payload.messageType ?? '') === 'cc' && bytes.length >= 3 && !decoded.ccTaken) {
     events.push({ event: 'onCcIn', controlName: null,
-      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2] } });
+      payload: { channel: bytes[0] & 0x0f, cc: bytes[1], value: bytes[2], from } });
   }
-  const note = noteEventFor(bytes);
-  if (note) events.push({ event: note.event, controlName: null, payload: note.payload });
+  for (const e of decoded.events) events.push({ event: e.event, controlName: null, payload: e.payload });
   dispatchEvents(events, { inbound: true });
+  if (!Number.isFinite(payload.atForTesting)) scheduleMidiInFlush();
 
   // A Program Change is the instrument saying which preset it is on. Raised AFTER the events above
   // rather than folded into them, because onPresetChange carries the profile's reading of the slot
@@ -11076,5 +12676,38 @@ export function dispatchInteraction(controlId, eventName, payload) {
   }
   // The promise is returned rather than dropped. Callers in the UI ignore it — an interaction is
   // fire-and-forget — but returning it is what lets anything else wait for the handlers to finish.
-  return dispatchEvents([event]);
+  return dispatchEvents([event]).then(() => undefined);
+}
+
+/**
+ * ce.keys: raise keyDown or keyUp ('onKeyDown' / 'onKeyUp') for the panel's scripts. Resolves true
+ * when a handler returned true, which for keyDown keeps the key from the DAW and the editor.
+ */
+export function dispatchKeyEvent(eventName, payload) {
+  if (!live.enabledGlobal) return Promise.resolve(false);
+  const event = { event: eventName, controlName: null, payload };
+  if (live.dispatching) {
+    return new Promise((resolve, reject) => {
+      live.interactions.push({ event, panelId: String(livePanel()?.id ?? live.activePanelId), resolve, reject, answer: true });
+    });
+  }
+  return dispatchEvents([event]).then((answers) => answers[0] === true);
+}
+
+// A shortcut's function is a script's: run it as an on(…) listener is run, so its writes batch and a
+// failure is that script's error rather than the keyboard's.
+setShortcutRunner((shortcut, fields) => {
+  try { withDocumentWriteBatch(() => shortcut.fn(fields)); } catch (e) { reportScriptError(shortcut.scriptId, e); }
+});
+
+// The keyboard belongs to the surface showing the panel these scripts run on.
+setKeysPanelResolver(() => {
+  try { return String(livePanel()?.id ?? live.activePanelId ?? ''); } catch { return ''; }
+});
+
+/** Whether any loaded script hears `eventName` ('onKeyDown'): only then is a key held back for it. */
+export function scriptsHear(eventName) {
+  if (!live.enabledGlobal) return false;
+  return activeScripts().some((s) => s.enabled !== false && s.event === eventName)
+    || listeners.some((l) => l.event === eventName);
 }

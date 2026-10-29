@@ -70,10 +70,31 @@ test('http, https and in-page anchors are allowed', () => {
   assert.equal(safeHref('#a-section'), '#a-section');
 });
 
-test('a relative link becomes plain text — there is no file to open in here', () => {
+test('a relative link the caller cannot resolve becomes plain text', () => {
   const html = renderMarkdown('see [the plan](./other-doc.md) for more');
   assert.ok(!html.includes('<a '), 'a link that goes nowhere is worse than no link');
   assert.match(html, /the plan/);
+  const unresolved = renderMarkdown('see [the plan](./other-doc.md) for more', { resolveLink: () => null });
+  assert.ok(!unresolved.includes('<a '));
+});
+
+test('an in-page anchor stays in the page: no new window, marked for the viewer', () => {
+  // Every anchor used to carry target="_blank", and in the app that is a new window on the app's
+  // own origin — the user's browser opened on a page that does not exist outside the program.
+  const html = renderMarkdown('[Hooks](#3-when-a-script-runs)');
+  assert.equal(html, '<p><a href="#3-when-a-script-runs" data-help-anchor="3-when-a-script-runs">Hooks</a></p>');
+});
+
+test('an outside page still opens elsewhere', () => {
+  assert.match(renderMarkdown('[site](https://example.com/x)'),
+    /<a href="https:\/\/example\.com\/x" target="_blank" rel="noreferrer">site<\/a>/);
+});
+
+test('a resolved document link carries its target as attributes, escaped', () => {
+  const html = renderMarkdown('[x](a.md)', { resolveLink: () => ({ doc: 'a"b', anchor: '<s>' }) });
+  assert.match(html, /data-help-doc="a&quot;b"/);
+  assert.match(html, /data-help-anchor="&lt;s&gt;"/);
+  assert.ok(!html.includes('<s>'), 'a resolver answer became markup');
 });
 
 test('quotes and ampersands in text cannot break out of an attribute', () => {

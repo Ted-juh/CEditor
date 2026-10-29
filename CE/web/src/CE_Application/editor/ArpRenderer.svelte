@@ -6,8 +6,8 @@
   // arrives via Arp.__phase and the linked Chord Pad's held notes via
   // Arp.__sourceNotes.
   import {
-    arpConfig, arpPattern, arpPhase, arpRate, arpBaseNotes, arpSequence,
-    stepFires, stepEverFires, stepIndexAt, arpUseFlats, midiNoteLabel,
+    arpConfig, arpPattern, arpRate, arpBaseNotes, arpSequence,
+    stepFires, stepEverFires, arpHead, arpUseFlats, midiNoteLabel,
     arpGeometry, arpCell, ARP_PATTERN_LABELS, arpSynced, arpDivisionLabel,
   } from '../utils/arpLayout.js';
 
@@ -28,7 +28,8 @@
   let cfg = $derived(arpConfig(control));
   let flats = $derived(arpUseFlats(control));
   let seq = $derived(arpSequence(control, arpBaseNotes(control)));
-  let head = $derived(seq.length ? stepIndexAt(arpPhase(control), seq.length) : -1);
+  // Where the phase is, or for "random" the cell the preview last played (Arp.__head).
+  let head = $derived(seq.length ? arpHead(control, seq.length) : -1);
 
   let fieldCss = $derived(css(cfg.fieldColour, 'rgba(16,16,23,1)'));
   let stepCss = $derived(css(cfg.stepColour, 'rgba(91,155,213,1)'));

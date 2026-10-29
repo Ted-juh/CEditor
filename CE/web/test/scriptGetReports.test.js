@@ -138,10 +138,10 @@ test('a form that is not one refuses get and set, and names the form meant', () 
       [`set("cutoff"): "normalisedValue" is not a value form, so nothing was set. ${FORMS} Write normalizedValue.`]);
     assert.equal(value(), 100, 'nothing was written');
 
-    // A form written another way: other capitals, the label's leading dot, "normalise" and "normalize".
-    for (const [given, meant] of [['NormalizedValue', 'normalizedValue'], ['.normalizedValue', 'normalizedValue'],
-      ['normaliseValue', 'normalizedValue'], ['normalizeValue', 'normalizedValue'], ['MIDIValue', 'midiValue'],
-      ['Value', 'value']]) {
+    // A form written another way: the label's leading dot, "normalise" and "normalize". Other capitals
+    // are the form itself now (a word from a list is read in any case), and are not refused.
+    for (const [given, meant] of [['.normalizedValue', 'normalizedValue'],
+      ['normaliseValue', 'normalizedValue'], ['normalizeValue', 'normalizedValue'], ['.MIDIValue', 'midiValue']]) {
       assert.deepEqual(errorsOf(() => api.get('cutoff', given)).errors,
         [`get("cutoff"): "${given}" is not a value form, so there is no answer. ${FORMS} Write ${meant}.`], given);
     }
@@ -157,6 +157,11 @@ test('a form that is not one refuses get and set, and names the form meant', () 
     assert.deepEqual(errorsOf(() => api.self.set('cutoff', 1, 'Normalized')).errors,
       [`set("cutoff"): "Normalized" is not a value form, so nothing was set. ${FORMS}`]);
     assert.equal(value(), 100, 'nothing was written');
+    for (const given of ['NormalizedValue', ' MIDIValue ', 'Value']) {
+      assert.deepEqual(errorsOf(() => api.get('cutoff', given)).errors.filter((e) => /not a value form/.test(e)), [], given);
+    }
+    assert.equal(api.get('cutoff', 'NormalizedValue'), 0.5);
+    assert.equal(api.get('cutoff.NORMALIZEDVALUE'), 0.5, 'and as the path\'s suffix');
   });
 });
 
@@ -183,11 +188,11 @@ test('the plug-in\'s sequence gives the same lines here', () => {
     say(`g ${shown(api.get('cutoff', 'normalizedValue'))}`);
     api.set('cutoff', 120, { transmit: false });
     say(`h ${shown(api.get('cutoff', { transmit: false }))}`);
-    assert.deepEqual(lines, ['a nothing', 'b 100', 'c nothing', 'd nothing', 'e 100', 'f 50', 'g 0.75', 'h 120']);
+    // c: a form in any case is that form; "NormalizedValue" was refused with "Write normalizedValue".
+    assert.deepEqual(lines, ['a nothing', 'b 100', 'c 0.5', 'd nothing', 'e 100', 'f 50', 'g 0.75', 'h 120']);
     assert.deepEqual(get(scriptTrace).filter((t) => t.kind === 'error').map((t) => t.message), [
       `get("cutoff"): "normalisedValue" is not a value form, so there is no answer. ${FORMS} Write normalizedValue.`,
       `set("cutoff"): "normalisedValue" is not a value form, so nothing was set. ${FORMS} Write normalizedValue.`,
-      `get("cutoff"): "NormalizedValue" is not a value form, so there is no answer. ${FORMS} Write normalizedValue.`,
       `set("cutoff"): "percent" is not a value form, so nothing was set. ${FORMS}`,
       `set("cutoff.value"): "Normalized" is not a value form, so nothing was set. ${FORMS}`,
       `get("cutoff.value"): ".normalizedValue" is not a value form, so there is no answer. ${FORMS} Write normalizedValue.`,

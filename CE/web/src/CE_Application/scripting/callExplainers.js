@@ -47,7 +47,8 @@ function bytesOf(value) {
 function sevenBit(args) {
   const v = written(args, 'v');
   const count = written(args, 'count') ?? 2;
-  const order = written(args, 'order') ?? 'msb';
+  const given = written(args, 'order') ?? 'msb';
+  const order = typeof given === 'string' ? given.trim().toLowerCase() : given;   // in any case, as to7bit reads it
   if (!isWhole(count) || count < 1 || count > 4 || (order !== 'msb' && order !== 'lsb')) return null;
   if (v !== undefined && (!isWhole(v) || v < 0 || v >= 128 ** count)) return null;
   const known = v !== undefined;

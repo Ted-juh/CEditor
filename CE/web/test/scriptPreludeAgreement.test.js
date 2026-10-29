@@ -70,6 +70,9 @@ const CASES = [
   ['distance', [0, 0, 3, 4]], ['euclid', [8, 3]], ['almost', [0.1 + 0.2, 0.3]],
   ['indexOfRange', [0.5, 4]], ['approach', [0, 10, 0.5]],
   ['curve', [0.5, 'exp']], ['curve', [0.25, 'log']], ['curve', [0.5, 's']], ['curve', [0.5, 'linear']],
+  // A name in any case is the name, in every runtime: "EXP" was an unknown shape, and linear.
+  ['curve', [0.5, 'EXP']], ['curve', [0.5, ' S ']], ['crossfade', [0, 1, 0.5, 'EqualPower']],
+  ['shapeCurve', [0.3, 'SCurve']], ['unshape', [0.5, 'Exp']], ['mapCurve', [0.5, [[0, 0], [1, 1, 'HOLD']]]],
   ['noteName', [60]], ['noteName', [61]], ['noteName', [0]],
   // The panel's spelling, selected by the second argument being PRESENT — so all three states
   // (absent, true, false) are cases, not just the two values.
@@ -78,12 +81,20 @@ const CASES = [
   // Every accidental spelling the panel can print, plus the two that must be REFUSED. "Eb4"
   // returning 0 rather than nothing is how a misspelling used to play C-1 in silence.
   ['noteNumber', ['C♯4']], ['noteNumber', ['Eb4']], ['noteNumber', ['E♭4']],
+  // …and in any case: the letter, and "B" as the flat after it, since the octave follows.
+  ['noteNumber', ['c4']], ['noteNumber', ['eb4']], ['noteNumber', ['BB3']], ['noteNumber', [' f#2 ']], ['noteNumber', ['H4']],
   ['noteNumber', ['Db-1']], ['noteNumber', ['Cb3']], ['noteNumber', ['Fb4']],
   ['noteNumber', ['B#3']], ['noteNumber', ['H4']], ['noteNumber', ['C']],
   ['noteNumber', [60]],
   ['noteSpelling', [60, 'major']], ['noteSpelling', [60, 'minor']], ['noteSpelling', ['F4', 'major']],
   ['noteSpelling', ['A4', 'minor']], ['noteSpelling', [60]], ['noteSpelling', [60, 'bogus']],
-  ['noteSpelling', ['c4', 'major']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
+  // A scale, chord, arp pattern or lead mode in any case, in every runtime: "Dorian" and "MAJ7" were
+  // not names, "DOWN" was "up" and "SMOOTH" was "closest", each with a message.
+  ['scaleNotes', ['C4', 'Dorian']], ['chordNotes', ['C4', ' MAJ7 ']], ['noteSpelling', ['A4', 'MINOR']],
+  ['degreeChord', ['C4', 'HarmonicMinor', 5]], ['inScale', [61, 60, 'Phrygian']],
+  ['arpOrder', [[60, 64, 67], 'DOWN']], ['arpOrder', [[60, 64, 67], 'asplayed']],
+  ['voiceLead', [[60, 64, 67], [65, 69, 72], 'SMOOTH']], ['scaleNotes', ['C4', 'toString']],
+  ['noteSpelling', ['H4', 'major']], ['inScale', ['H4', 60, 'major']], ['scaleDegree', [60, 'H4', 'major']],
   ['inScale', [62, 60, 'major']], ['inScale', [61, 60, 'major']], ['inScale', [61, 60]],
   ['inScale', [75, 60, 'minor']], ['inScale', [61, 60, 'bogus']],
   ['scaleDegree', [60, 60, 'major']], ['scaleDegree', [67, 60, 'major']],
@@ -140,10 +151,20 @@ const CASES = [
   ['hslToHex', [210, 50, 40]], ['hslToHex', [0, 0, 100]], ['hslToHex', [359, 100, 50]],
   ['from14bit', [1, 0]], ['from14bit', [127, 127]],
   ['from7bit', [[1, 0], 'msb']], ['from7bit', [[1, 0], 'lsb']], ['from7bit', [[1, 0]]],
+  // A word in any case, in every runtime: "LSB" was read as "msb" by to7bit and refused by read.
+  ['from7bit', [[1, 0], 'LSB']], ['to7bit', [128, 2, ' Lsb ']], ['bytesRead', [[1, 2], 0, 2, { order: 'LSB' }]],
+  ['checksum', [' Roland ', [0x01, 0x02, 0x03]]], ['checksum', ['CRC8', [0x01, 0x02, 0x03]]],
   ['fromNibbles', [0xA, 0xB]],
   ['fromAscii', [[72, 105]]],
   ['toOffset', [-64, 64]], ['fromOffset', [0, 64]],
   ['toSigned', [-1, 8]], ['fromSigned', [255, 8]], ['fromSigned', [127, 8]],
+  // The older encoding helpers read text that is a number as one, and hex text as a list of bytes,
+  // round a value to split down, and answer nothing for what does not fit (REFUSAL_CASES says why).
+  ['from14bit', ['64', '0']], ['from7bit', ['02 2C']], ['from7bit', [[1, 0, 0, 0], 'lsb']], ['fromNibbles', ['10', 11]],
+  ['toOffset', ['5', 64]], ['fromOffset', [0, '64']], ['toSigned', [-128, 8]], ['toSigned', [-1.5, 8]],
+  ['toSigned', [-1, 32]], ['fromSigned', [128, 8]], ['fromSigned', [4294967295, 32]], ['fromAscii', ['48 69']],
+  ['from14bit', [200, 0]], ['from7bit', [[1, 200]]], ['fromNibbles', [16, 0]], ['toSigned', [-200, 8]],
+  ['fromSigned', [300, 8]], ['fromAscii', [[72, 200]]], ['toOffset', ['x', 64]],
   // All eleven checksum algorithms in all four runtimes (design doc §48). This is the case that most
   // needs to be here: a checksum that differs between the editor and the export means the synth
   // accepts a dump from one and rejects it from the other, silently. The CRCs especially — Lua's
@@ -241,6 +262,11 @@ const NOTE_CALLS = [
   ['expandOctaves', [['C4', 'E4'], 2]], ['expandOctaves', [[60], 7]], ['expandOctaves', [[60], 0]],
   ['expandOctaves', [[60], 2.5]], ['expandOctaves', [[60], 'two']], ['expandOctaves', [[60, false]]],
   ['arpOrder', [['C4', 'E4', 'G4'], 'down']], ['arpOrder', [[60, 64], 'sideways']], ['arpOrder', [[60, 64]]],
+  // degreeChord's step and size as numbers, or text that is one; anything else the default, said
+  // once. null was step 0 in two runtimes and 1 in Lua; "0x10" was 16 in two and the default in one.
+  ['degreeChord', [60, 'major', 'x']], ['degreeChord', [60, 'major', '5']], ['degreeChord', [60, 'major', null, 4]],
+  ['degreeChord', [60, 'major', true]], ['degreeChord', [60, 'major', 2, '0x10']], ['degreeChord', [60, 'major', 2, 'x']],
+  ['degreeChord', [60]], ['arpOrder', [[60, 64], null]],
   ['arpOrder', [[60, {}], 'up']],
 ];
 
@@ -253,10 +279,14 @@ const STRUCT_CASES = [
   ['toNibbles', [0xAB]],
   ['nibblize', [[0xAB, 0xCD]]], ['denibblize', [[0xA, 0xB, 0xC, 0xD]]],
   ['toAscii', ['Hi', 4]],
+  ['to14bit', [16383.9]], ['to14bit', ['100']], ['to7bit', [2097151, 3]], ['to7bit', [1000.5]],
+  ['toNibbles', [255]], ['toNibbles', ['74']], ['nibblize', ['4A 10']], ['denibblize', [[]]],
+  ['to14bit', [20000]], ['to7bit', [20000, 2]], ['toNibbles', [300]], ['nibblize', [[300]]],
+  ['denibblize', [[1, 2, 3]]], ['toAscii', ['é']],
   ['scaleNotes', [60, 'dorian']], ['scaleNotes', [60]], ['scaleNotes', [60, 'bogus']],
   // An unreadable root is no answer in every runtime, not the scale on C-1.
-  ['scaleNotes', ['c4', 'major']], ['chordNotes', ['c4', 'major']], ['quantizeNote', ['c4', 60, 'major']],
-  ['degreeChord', ['c4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
+  ['scaleNotes', ['H4', 'major']], ['chordNotes', ['H4', 'major']], ['quantizeNote', ['H4', 60, 'major']],
+  ['degreeChord', ['H4', 'major', 1]], ['scaleNotes', ['C-1', 'major']],
   ['scaleNotes', [null, 'major']], ['degreeChord', [null, 'major', 1]],
   ['chordNotes', ['C4', 'min7']], ['chordNotes', [60, 'bogus']],
   ['quantizeNote', [61, 60, 'major']], ['quantizeNote', [66, 60, 'major']], ['quantizeNote', [61, 60, 'bogus']],
@@ -648,7 +678,7 @@ const ENVELOPE_TAKEN = [
 const ENVELOPE_TOO_FEW = [[{ x: 0, y: 0 }], [], 'up', 5, null];
 const REFUSAL_CASES = [
   // MIDI senders: an unreadable note name sends nothing.
-  ['sendNote', [1, 'c4', 100]], ['sendNoteOff', [1, 'c4']], ['sendAftertouch', [1, 90, 'c4']],
+  ['sendNote', [1, 'H4', 100]], ['sendNoteOff', [1, 'H4']], ['sendAftertouch', [1, 90, 'H4']],
   ['sendNote', [1, 'C4', 100]],
   // Divisions: any case is read, and a name that is not a division says so.
   ['beatsPerDivision', ['1/6']], ['stepAt', [2, 'nope']], ['stepsBetween', [0, 1, '1/3']],
@@ -666,10 +696,10 @@ const REFUSAL_CASES = [
   ['clockTempo', [null]], ['clockTempo', ['x']], ['clockTempo', [[20.8, 20.8]]],
   ['beatsPerDivision', ['1/8t']], ['stepAt', [2.5, '1/16D']], ['swingOffset', [1, 0.5, '1/4d']],
   // Music helpers: an unreadable note name, an unknown scale or chord, the scale checked first.
-  ['scaleNotes', ['c4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
-  ['chordNotes', ['Hb2', 'min7']], ['quantizeNote', [61, 'c4', 'major']], ['quantizeNote', ['x', 'y', 'nope']],
-  ['noteSpelling', ['c4', 'minor']], ['inScale', ['c4', 60, 'major']], ['scaleDegree', [60, 'c4', 'major']],
-  ['degreeChord', ['c4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
+  ['scaleNotes', ['H4', 'major']], ['scaleNotes', [60, 'lokrian']], ['chordNotes', [60, 'maj']],
+  ['chordNotes', ['Hb2', 'min7']], ['quantizeNote', [61, 'H4', 'major']], ['quantizeNote', ['x', 'y', 'nope']],
+  ['noteSpelling', ['H4', 'minor']], ['inScale', ['H4', 60, 'major']], ['scaleDegree', [60, 'H4', 'major']],
+  ['degreeChord', ['H4', 'major', 1]], ['degreeChord', [60, 'lokrian', 1]],
   ['scaleNotes', ['C-1', 'major']], ['degreeChord', [60, 'major', 5]],
   // checksum reads hex text a byte at a time, and names the algorithms it knows.
   ['checksum', ['roland', '40007F00']], ['checksum', ['roland', '40 00 zz 00']], ['checksum', ['40 0 7F 00']],
@@ -679,6 +709,38 @@ const REFUSAL_CASES = [
   ['sendNote', [1, null, 100]], ['sendNoteOff', [1, null]], ['sendAftertouch', [1, 90, null]],
   ['scaleNotes', [null, 'major']], ['quantizeNote', [61, null, 'major']], ['degreeChord', [null, 'major', 1]],
   ['inScale', [null, 60, 'major']],
+  // The older encoding helpers: a value that does not fit, a number that is not one, a part that is
+  // not whole, a list that is not bytes, a count, bits or order that is not one. Each answered a
+  // wrong number without a word. A fraction to split, and hex text, must stay silent.
+  ['to14bit', [20000]], ['to14bit', [-1]], ['to14bit', [null]], ['to14bit', ['x']], ['to14bit', [16383.9]],
+  ['from14bit', [200, 0]], ['from14bit', [64, 0.5]], ['from14bit', [64, null]], ['from14bit', [true, 0]],
+  ['to7bit', [20000, 2]], ['to7bit', [1000, 5]], ['to7bit', [1000, 0]], ['to7bit', [1000, 2, 'middle']],
+  ['to7bit', [null]], ['to7bit', [-1]], ['to7bit', [1000, '2']],
+  ['from7bit', [[1, 200]]], ['from7bit', [[]]], ['from7bit', [[1, 2, 3, 4, 5]]], ['from7bit', ['02 2C']],
+  ['from7bit', [null]], ['from7bit', [[1], 'x']], ['from7bit', ['zz']],
+  ['toNibbles', [300]], ['toNibbles', [-1]], ['fromNibbles', [16, 0]], ['fromNibbles', [1, 1.5]],
+  ['nibblize', [[300]]], ['nibblize', [null]], ['denibblize', [[1, 2, 3]]], ['denibblize', [[1, 16]]],
+  ['toAscii', [123]], ['toAscii', [null]], ['toAscii', ['é']], ['toAscii', ['Hi', 4]],
+  ['fromAscii', [[72, 200]]], ['fromAscii', [5]],
+  ['toOffset', ['x', 64]], ['toOffset', [1, null]], ['fromOffset', [null, 64]],
+  ['toSigned', [-200, 8]], ['toSigned', [128, 8]], ['toSigned', [-1, 0]], ['toSigned', [-1, 33]],
+  ['toSigned', [-1, null]], ['toSigned', [-0.5, 1]],
+  ['fromSigned', [300, 8]], ['fromSigned', [1.5, 8]], ['fromSigned', [255, 'x']], ['fromSigned', [-1, 8]],
+  // ce.storage: a setting with no name or no value, a name that is not one, and text that is not
+  // JSON, each refused where it saved under "", answered true having saved nothing, or answered
+  // nothing without a word. A number is a name, and "" is one.
+  ['saveSetting', [null, 1]], ['saveSetting', ['k', null]], ['saveSetting', [true, 1]], ['saveSetting', [[1], 1]],
+  ['loadSetting', [null, 5]], ['forgetSetting', [null]], ['loadSetting', [{ a: 1 }]], ['loadSetting', [5, 1]],
+  ['loadSetting', ['', 1]],
+  ['decodeJson', ['{oops']], ['decodeJson', [null]], ['decodeJson', [5]], ['decodeJson', ['']], ['decodeJson', ['NaN']],
+  ['decodeJson', ['null']], ['decodeJson', ['[1, 2]']],
+  // ce.core's rules and listeners: an event, path or name left out, or a function that is not one,
+  // sets nothing up and says so, where each set nothing up without a word (Lua stopped the script in
+  // sol2's words). A target left out is "*".
+  ['on', ['*', null, FN]], ['on', ['*', 'onClick', null]], ['on', ['*', 'onClick', 'x']], ['on', ['*', '  ', FN]],
+  ['on', [null, 'onClick', FN]], ['watch', [null, FN]], ['watch', ['K.value', 5]], ['compute', ['K.value', null]],
+  ['intercept', [null, null]], ['defineAction', ['', FN]], ['defineAction', ['go', true]], ['defineAction', [null, FN]],
+  ['defineAction', ['go', FN]],
   // Byte lists: every way each helper can refuse, and two that must not.
   ['getBits', [180, -1, 3]], ['getBits', [180, 0, 33]], ['getBits', [180, 30, 4]], ['getBits', [180, 31, 2]],
   ['getBits', [[1], 4, 8]], ['getBits', [[1], 8, 1]], ['getBits', ['F041', 0, 8]], ['getBits', [180, 4, 3]],
@@ -805,6 +867,12 @@ const REFUSAL_CASES = [
   ['hslToHex', [0, 'x', 50]], ['hslToHex', [NaN, 100, 50]], ['mixColour', ['000000', 'FFFFFF', 'x']],
   ['snap', [37]], ['snap', ['x', 10]], ['lerp', [10, 20]], ['lerp', [10, 'x', 0.5]],
   ['random', [1.2, 1.8]], ['random', ['x', 6]], ['random', [1, 6]],
+  // ce.music.name takes a number, or text that is one, and ce.music.number a name: anything else is
+  // no answer, and says why. A name given to name() raised in Lua and Python and gave "undefinedNaN"
+  // in the JavaScript engine; number() gave nothing without a word.
+  ['noteName', [null]], ['noteName', ['C4']], ['noteName', [true]], ['noteName', [NaN]], ['noteName', ['60']],
+  ['noteName', [60.7]], ['noteNumber', [null]], ['noteNumber', [60]], ['noteNumber', ['H4']],
+  ['noteNumber', ['C']], ['noteNumber', ['B#3']], ['noteNumber', ['Eb4']], ['noteNumber', [[60]]],
 ];
 
 /** The case's arguments with FN made a function in this realm. */
@@ -852,7 +920,8 @@ test('the engines refuse the same mistakes in the same words', async (t) => {
       // that is accepted arms rather than stopping at "no tempo", which is an error now.
       // `set` is a host binding in this engine, and has to exist before the prelude loads for the
       // option check to wrap it, as the real engine binds it first.
-      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer',
+        '__loadSetting', '__saveSetting', '__forgetSetting', '__settingsAvailable', 'watch', 'compute', 'intercept', 'defineAction']) {
         lua.global.set(name, () => {});
       }
       lua.global.set('__transportState', () => TEMPO_120);
@@ -1290,6 +1359,28 @@ const OPTION_ANSWER_CASES = [
   ['devicePorts', [{ dir: 'in' }]], ['checksum', ['roland', [1, 2], { ofset: 1 }]],
   ['panic', [{ reset: false }]], ['encodeJson', [{ a: 1 }, { indnt: 2 }]],
   ['bytesRead', [[1, 2], 0, 2, { ordr: 'lsb' }]], ['bytesWrite', [[1, 2], 0, 2, 300, { bit: 8 }]],
+  ['formatNumber', [1, { decimal: 2 }]], ['formatHz', [440, { flats: true }]], ['formatTime', [5, { scal: 's' }]],
+  ['formatDb', [-6, { fromgain: true }]], ['formatPercent', [0.5, { mx: 2 }]], ['formatPan', [0, { sign: 'always' }]],
+  ['formatRatio', [4, { stile: 'x' }]], ['formatClock', [1000, { hour: true }]], ['formatNote', [60, { middlec: 3 }]],
+  ['formatDivision', [1, { tol: 0.1 }]], ['formatTable', [0, ['a'], { strt: 1 }]], ['formatFit', ['a', 4, { allign: 'right' }]],
+  ['formatLine', ['a', 'b', 8, { gaps: 2 }]], ['formatParse', ['5', { knd: 'hz' }]],
+  ['formatParameter', ['cutoff', 5, { rol: 'mainSynth' }]],
+  ['patchCurrent', ['voice', { grups: ['x'] }]], ['patchRead', ['voice', 'fn', { tmeout: 5 }]],
+  ['patchLoad', ['x', { rle: 'a' }]], ['patchMorph', [{}, {}, 0.5, { switchat: 0.5 }]],
+  ['patchBlend', [[{}, {}], [1, 1], { onlly: ['x'] }]], ['patchRandom', [{ sed: 1 }]],
+  ['patchMutate', [{}, 0.1, { sed: 1 }]], ['patchMerge', [{}, {}, { grups: ['x'] }]],
+  ['patchDiff', [{}, {}, { exept: ['x'] }]], ['patchEqual', [{}, {}, { lok: ['x'] }]],
+  ['patchApply', [{}, { sned: 'none' }]], ['patchSave', ['x', {}, { replce: true }]],
+  ['patchList', [{ scpe: 'voice' }]], ['patchForget', ['x', { rle: 'a' }]], ['patchWrite', [{}, 1, { rle: 'a' }]],
+  ['verifyCoverage', [{ grop: 'x' }]], ['verifyCheck', [{ idz: ['x'] }, 'fn']], ['verifyDump', ['common', { tims: 2 }, 'fn']],
+  ['verifyWrite', ['x', 1, { setleMs: 5 }, 'fn']], ['verifyProbe', ['x', { valus: [1] }, 'fn']],
+  ['verifyPatch', [{ vai: 'dump' }, 'fn']], ['verifySummary', [{}, { widht: 8 }]],
+  ['ciDiscover', [{ timeout: 5 }, 'fn']], ['ciGet', [7, 'R', { resid: 'a' }, 'fn']], ['ciSet', [7, 'R', {}, { partal: true }, 'fn']],
+  ['ciSubscribe', [7, 'R', { resid: 'a' }, 'fn']], ['ciSetProfile', [7, 'X', true, { chanel: 1 }]],
+  ['mpeZone', [{ membrs: 7 }]], ['mpeNoteOn', [60, 100, { bnd: 1 }]], ['mpeExpress', [1, { presure: 1 }]],
+  ['mpeListen', [{ form: 'controller' }]], ['dawAssign', [1, 'x.value', { nmae: 'x' }]],
+  ['oscListen', [{ prot: 9000 }]], ['oscBundle', ['127.0.0.1:9000', [{ address: '/a' }], { tme: 1 }]],
+  ['fileSyxSplit', [[0xF0, 0xF7], { partal: true }]], ['fileMidiRead', [[1], { trak: 1 }]], ['fileMidiWrite', [[], { tempoo: 90 }]],
 ];
 
 test('a refused call answers the same in every engine', async (t) => {
@@ -1347,7 +1438,12 @@ test('a refused call answers the same in every engine', async (t) => {
 // the first time for each command a warning says so. Two calls, one warning, the same words in every
 // engine; an address past its range is refused instead, and is in REFUSAL_CASES above.
 const EDGE_CALLS = [['sendCC', [1, 7, 200]], ['sendCC', [1, 7, 300]], ['sendNote', [1, 60, -5]],
-  ['sendPitchBend', [1, 20000]], ['sendNRPN', [1, 0, 0, -1]], ['sendAftertouch', [1, 128.4]]];
+  ['sendPitchBend', [1, 20000]], ['sendNRPN', [1, 0, 0, -1]], ['sendAftertouch', [1, 128.4]],
+  // A name longer than its field is cut to it, and a length that is not one is no length.
+  ['toAscii', ['Lead Synth', 8]], ['toAscii', ['Lead Synth Pad', 8]], ['toAscii', ['Lead', 0]], ['toAscii', ['Lead', 'x']],
+  // An indent it cannot use as written: one line, or 10; each said once.
+  ['encodeJson', [{ a: 1 }, { indent: 'x' }]], ['encodeJson', [{ a: 1 }, { indent: -2 }]], ['encodeJson', [{ a: 1 }, { indent: 20 }]],
+  ['encodeJson', [{ a: 1 }, { indent: 20 }]], ['encodeJson', [{ a: 1 }, { indent: '2' }]]];
 
 test('a value past its end is sent as the nearest end and said once, in the same words everywhere', async (t) => {
   resetScriptStateForTesting();
@@ -1360,7 +1456,12 @@ test('a value past its end is sent as the nearest end and said once, in the same
     'sendPitchBend: the bend 20000 is outside 0 to 16383, so 16383 was sent. This is said only the first time.',
     'sendNRPN: the value -1 is outside 0 to 16383, so 0 was sent. This is said only the first time.',
     'sendAftertouch: the pressure 128.4 is outside 0 to 127, so 127 was sent. This is said only the first time.',
-  ], 'the second sendCC says nothing');
+    'ce.midi.toAscii: "Lead Synth" is longer than 8 characters, so it was cut to 8. This is said only the first time.',
+    'ce.midi.toAscii: length is 0, which is not a whole number from 1, so the text was neither filled out nor cut. This is said only the first time.',
+    'ce.storage.encode: indent is "x", which is not a number, so the text is on one line. This is said only the first time.',
+    'ce.storage.encode: indent is -2, which is below 0, so the text is on one line. This is said only the first time.',
+    'ce.storage.encode: indent is 20, which is above 10, so 10 was used. This is said only the first time.',
+  ], 'the second sendCC, the second cut, the second length and the second indent of 20 say nothing');
   assert.deepEqual(get(scriptTrace).filter((e) => e.kind === 'error'), []);
 
   // JavaScript, under node:vm.
@@ -1873,6 +1974,76 @@ sys.stdout.write(json.dumps(heard))
   assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
 });
 
+// Left out, requestDump's timeout is what the profile's request deserves (the plug-in's
+// "answerWaitMs" query): a fixed 3000 ms reported an AN1x request, whose own timeout is 4000 ms, as
+// unanswered while its reply was on the way. A given timeout still wins, and a kind that is no
+// request keeps the 3000 ms.
+test('requestDump waits as long as the profile asks, in every prelude', async (t) => {
+  const query = (kind, payload) => (kind === 'answerWaitMs' && payload?.request === 'requestVoice' ? 4500 : undefined);
+  const want = [4500, 3000, 50];
+  {
+    const waits = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, { get: (_t, prop) => (prop === 'deviceQuery' ? query : () => undefined) });
+    sandbox.after = (ms) => { waits.push(ms); };
+    sandbox.requestDump('requestVoice', () => {});
+    sandbox.requestDump('voiceCommon', () => {});
+    sandbox.requestDump('requestVoice', () => {}, { timeout: 50 });
+    assert.deepEqual(waits, want, 'JS prelude');
+  }
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'sendCC', 'sendNRPN', 'sendMidi', 'startTimer', 'stopTimer', '__transportState', '__requestDump', 'on']) {
+        lua.global.set(name, () => {});
+      }
+      lua.global.set('__deviceQuery', (kind, payload) => query(kind, payload));
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const waits = [];
+      lua.global.set('after', (ms) => { waits.push(Number(ms)); });
+      await lua.doString(`requestDump("requestVoice", function() end)
+requestDump("voiceCommon", function() end)
+requestDump("requestVoice", function() end, { timeout = 50 })`);
+      assert.deepEqual(waits, want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its wait was not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name):
+        if name == "deviceQuery":
+            return lambda kind, payload=None: 4500 if kind == "answerWaitMs" and (payload or {}).get("request") == "requestVoice" else None
+        return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "logWarn", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+waits = []
+g["after"] = lambda ms, fn: waits.append(ms)
+g["requestDump"]("requestVoice", lambda values, info: None)
+g["requestDump"]("voiceCommon", lambda values, info: None)
+g["requestDump"]("requestVoice", lambda values, info: None, { "timeout": 50 })
+sys.stdout.write(json.dumps(waits))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY') }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
+});
+
 test('the note lists and their words are read, refused and said alike in every engine', async (t) => {
   resetScriptStateForTesting();
   clearScriptTrace();
@@ -1885,7 +2056,7 @@ test('the note lists and their words are read, refused and said alike in every e
   resetScriptStateForTesting();
   assert.deepEqual(said[0], [], 'a chord by name is read');
   assert.deepEqual(said[2], ['error: ce.music.quality: "X9" at position 2 of notes is not a note name, so there is no answer. '
-    + 'A name is a capital letter, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
+    + 'A name is a letter from A to G, then # or b if it has one, then the octave: "C4", "Eb3", "F#-1".']);
   assert.deepEqual([said[7].length, said[8].length], [1, 0], 'a word used as its default is said once');
   // JavaScript, under node:vm.
   {
@@ -1948,4 +2119,119 @@ sys.stdout.write(json.dumps(out, ensure_ascii=False))
   });
   assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
   assert.deepEqual(JSON.parse(run.stdout), said, 'Python prelude');
+});
+
+/* ----------------------------------------------- ce.device's silences, said in every engine */
+
+// What ce.device says with no id, with something that is not a table of options, with a direction
+// that is not one and with a timing the profile has not, compared with what the editor says for a
+// panel whose main synth is the GAIA, whose one timing is minDelayBetweenMessagesMs. Each answered
+// nothing, or listed every port, or stored the timing, without a word. The host is stood in for: the
+// profile's timing for a timing query, nothing for the rest, and true for a set.
+const DEVICE_CALLS = [
+  ['deviceParameter', [null]], ['deviceParameter', ['  ']], ['deviceRead', [null]],
+  ['deviceParameters', [5]], ['devicePorts', ['in']], ['devicePorts', [{ direction: 'sideways' }]],
+  ['devicePorts', [{ direction: 'sideways' }]], ['devicePorts', [{ direction: ' IN ' }]],
+  ['deviceSetTiming', ['speed', 5]], ['deviceSetTiming', ['MINDELAYBETWEENMESSAGESMS', 30]],
+];
+const GAIA_TIMING = { minDelayBetweenMessagesMs: 20 };
+
+test('ce.device says what it did with an id, options, a direction or a timing it could not use, in every engine', async (t) => {
+  const { panels, activePanelId } = await import('../src/CE_Application/stores/panels.js');
+  const { deviceRoleMappings } = await import('../src/CE_Application/stores/deviceProfiles.js');
+  const { profileSources } = await import('../src/CE_Application/stores/deviceProfileStores.js');
+  const gaiaFile = join(here, '..', '..', 'profiles', 'test', 'roland-gaia-sh01.ceditor-device.json');
+  const gaia = JSON.parse(readFileSync(gaiaFile, 'utf8'));
+  assert.deepEqual(gaia.timing, GAIA_TIMING, 'the stand-in host answers with the GAIA\'s own timing');
+  resetScriptStateForTesting();
+  panels.set([{ id: 'p', name: 'P', controls: [], scripting: { modules: ['ce.core', 'ce.device'] } }]);
+  activePanelId.set('p');
+  profileSources.set({ [gaia.id]: { profileId: gaia.id, source: JSON.stringify(gaia) } });
+  deviceRoleMappings.set({ mainSynth: { role: 'mainSynth', profileId: gaia.id, variables: {}, timingOverrides: {} } });
+  const said = (kind, m) => `${kind}: ${m}`;
+  let want;
+  try {
+    const api = scriptApiForTesting('', 'device-silences');
+    want = DEVICE_CALLS.map(([fn, args]) => {
+      clearScriptTrace();
+      api[fn](...args);
+      return get(scriptTrace).filter((e) => e.kind === 'error' || e.kind === 'warn').map((e) => said(e.kind, e.message));
+    });
+    assert.equal(get(deviceRoleMappings).mainSynth.timingOverrides.minDelayBetweenMessagesMs, 30,
+      'a timing in any case is written in the profile\'s spelling');
+  } finally {
+    panels.set([]); profileSources.set({}); deviceRoleMappings.set({}); resetScriptStateForTesting();
+  }
+  assert.deepEqual(want.flat().filter((l) => l.startsWith('error')).length, 6, 'six refusals');
+
+  // JavaScript, under node:vm.
+  {
+    const lines = [];
+    const sandbox = { __api: new Proxy({}, { get: () => () => undefined }), log: () => {}, logError: () => {} };
+    vm.createContext(sandbox);
+    vm.runInContext(extractRawString('JsScriptEngine.cpp', 'JS'), sandbox);
+    sandbox.__api = new Proxy({}, {
+      get: (_t, prop) => (prop === 'logAt' ? (kind, m) => { if (kind === 'error' || kind === 'warn') lines.push(said(kind, String(m))); }
+        : prop === 'deviceQuery' ? (kind) => (kind === 'timing' ? { ...GAIA_TIMING } : undefined)
+          : prop === 'deviceSet' ? () => true : () => undefined),
+    });
+    const got = DEVICE_CALLS.map(([fn, args]) => { lines.length = 0; sandbox[fn](...args); return [...lines]; });
+    assert.deepEqual(got, want, 'JS prelude');
+  }
+  // Lua, under wasmoon: the host's two device primitives stood in for in Lua itself.
+  {
+    const { LuaFactory } = await import('wasmoon');
+    const lua = await new LuaFactory().createEngine();
+    try {
+      for (const name of ['log', 'logError', 'logWarn', 'set', 'sendCC', 'sendNRPN', 'sendMidi', 'on', 'startTimer', 'stopTimer']) {
+        lua.global.set(name, () => {});
+      }
+      await lua.doString('function __deviceQuery(kind) if kind == "timing" then return { minDelayBetweenMessagesMs = 20 } end return nil end\n'
+        + 'function __deviceSet() return true end');
+      await lua.doString(extractRawString('LuaScriptEngine.cpp', 'LUA'));
+      const calls = DEVICE_CALLS.map(([fn, args]) =>
+        `__lines = {}\n${fn}(${args.map(luaLiteral).join(', ')})\n__out[#__out + 1] = table.concat(__lines, "\\1")`).join('\n');
+      const got = String(await lua.doString('__out = {}\n'
+        + 'logError = function(m) __lines[#__lines + 1] = "error: " .. tostring(m) end\n'
+        + 'logWarn = function(m) __lines[#__lines + 1] = "warn: " .. tostring(m) end\n'
+        + `${calls}\nreturn table.concat(__out, "\\n")`)).split('\n');
+      assert.deepEqual(got.map((g) => (g ? g.split('\u0001') : [])), want, 'Lua prelude');
+    } finally {
+      lua.global.close();
+    }
+  }
+  // Python, when python3 is here.
+  const { spawnSync } = await import('node:child_process');
+  const python = findPython3(spawnSync);
+  if (!python) { t.diagnostic('Python 3 is not on this machine: its words were not compared'); return; }
+  const driver = `
+import sys, json
+class _Bridge:
+    def __getattr__(self, name):
+        if name == "deviceQuery": return lambda kind, payload=None: {"minDelayBetweenMessagesMs": 20} if kind == "timing" else None
+        if name == "deviceSet": return lambda *a, **k: True
+        return lambda *a, **k: None
+sys.modules["ceditor"] = _Bridge()
+payload = json.loads(sys.stdin.read())
+g = {"__name__": "prelude"}
+for name in ["log", "logError", "on", "off", "emit", "run", "set", "get", "sendCC", "startTimer", "stopTimer"]:
+    g[name] = (lambda *a, **k: None)
+exec(compile(payload["prelude"], "prelude", "exec"), g)
+lines = []
+g["logError"] = lambda m, *rest: lines.append("error: " + str(m))
+g["logWarn"] = lambda m, *rest: lines.append("warn: " + str(m))
+out = []
+for fn, args in payload["calls"]:
+    del lines[:]
+    g[fn](*args)
+    out.append(list(lines))
+sys.stdout.write(json.dumps(out, ensure_ascii=False))
+`;
+  const run = spawnSync(python, ['-c', driver], {
+    input: JSON.stringify({ prelude: extractRawString('PythonScriptEngine.cpp', 'PY'), calls: DEVICE_CALLS }),
+    encoding: 'utf8',
+    env: { ...process.env, PYTHONUTF8: '1', PYTHONIOENCODING: 'utf-8' },
+  });
+  assert.equal(run.status, 0, `the Python prelude failed to run:\n${run.stderr}`);
+  assert.deepEqual(JSON.parse(run.stdout), want, 'Python prelude');
 });

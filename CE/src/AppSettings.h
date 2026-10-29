@@ -49,6 +49,27 @@ public:
         });
     }
 
+    /** Where the documentation's own window was last, or an empty rectangle if it never opened. */
+    juce::Rectangle<int> getDocumentationWindowBounds() const
+    {
+        const auto values = propertiesFile->read().value_or (juce::StringPairArray());
+        if (! values.containsKey ("documentationWindowWidth"))
+            return {};
+        return { values["documentationWindowX"].getIntValue(), values["documentationWindowY"].getIntValue(),
+                 values["documentationWindowWidth"].getIntValue(), values["documentationWindowHeight"].getIntValue() };
+    }
+
+    void setDocumentationWindowBounds (juce::Rectangle<int> bounds)
+    {
+        propertiesFile->update ([&] (juce::PropertySet& values)
+        {
+            values.setValue ("documentationWindowX",      bounds.getX());
+            values.setValue ("documentationWindowY",      bounds.getY());
+            values.setValue ("documentationWindowWidth",  bounds.getWidth());
+            values.setValue ("documentationWindowHeight", bounds.getHeight());
+        });
+    }
+
     /** Get the list of panel file paths that were open last session */
     juce::StringArray getOpenPanelPaths() const
     {

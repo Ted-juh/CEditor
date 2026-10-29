@@ -246,7 +246,7 @@ test('a description with its detail moved out keeps every fact somewhere a reade
   assert.match(words('sendSongPosition'), /six clock ticks/);
   assert.match(words('sendMidi'), /longer run/);
   assert.match(words('sendMidi'), /Nothing is added or changed/);
-  assert.match(words('sendNote'), /capital letter/);
+  assert.match(words('sendNote'), /a letter from A to G, then # or b if it has one, then the octave, in any case/);
   assert.match(words('sendNote'), /0 means note off/);
   assert.match(words('sendNote'), /until sendNoteOff/);
   assert.match(words('feedMidi'), /interceptMidiIn sees the message first/);
@@ -260,7 +260,7 @@ test('a description with its detail moved out keeps every fact somewhere a reade
   assert.match(words('sendAftertouch'), /polyphonic aftertouch/);
   assert.match(words('sendAftertouch'), /channel pressure/);
   assert.match(words('sendClock'), /24 ticks/);
-  assert.match(words('sendTransport'), /upper or lower case/);
+  assert.match(words('sendTransport'), /Case-insensitive/);
   assert.match(words('sendSysex'), /System Exclusive/);
   assert.match(words('sendSysex'), /F04110/);
   assert.match(words('panic'), /All Sound Off/);

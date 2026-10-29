@@ -46,6 +46,28 @@ export function deviceSetNoNameWords(label) {
   return `ce.device.${label}: a name is required, so nothing was changed.`;
 }
 
+/** setTiming of a name the profile has no timing for: refused, where it was stored and never read.
+ *  The names in the profile's spelling, sorted, as every runtime lists them. */
+export function deviceTimingUnknownWords(name, role, names) {
+  return `ce.device.setTiming: the profile for ${role} has no timing called "${name}", so nothing was changed. `
+    + (names.length ? `Its timings: ${[...names].sort().join(', ')}.` : 'It has none.');
+}
+
+/** parameter() or read() with no id: refused, where it answered nothing without a word. */
+export function deviceNoIdWords(verb) {
+  return `ce.device.${verb}: no parameter id was given, so there is no answer.`;
+}
+
+/** parameters() or ports() given something that is not a table of options. */
+export function deviceNotOptionsWords(verb, shown) {
+  return `ce.device.${verb}: ${shown} is not a table of options, so the answer is an empty list.`;
+}
+
+/** ports() with a direction that is not one: every port, said once. */
+export function devicePortsDirectionWords(shown) {
+  return `ce.device.ports: direction is ${shown}, which is not "in" or "out", so every port was listed.`;
+}
+
 /** A role no profile is chosen for: refused, as ce.device.write refuses it. */
 export function deviceSetNoProfileWords(label, role) {
   return `ce.device.${label}: no device profile is chosen for ${role}, so nothing was changed.`;

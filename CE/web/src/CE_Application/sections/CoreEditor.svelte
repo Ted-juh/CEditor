@@ -125,6 +125,9 @@
         ontoggle={(key, next) => set(key, next)}
       />
     </PropertyCell>
+    <PropertyCell label="DAW group" span={2} hint="The folder this control's parameter is listed in by a DAW, when the panel is exported as a plugin. Empty: no folder.">
+      <PropertyText value={core.dawGroup ?? ''} onfocus={selectAll} commit={(v) => set('dawGroup', String(v ?? '').trim())} />
+    </PropertyCell>
     <PropertyCell label="Z-Index" span={2} hint="Stacking order within the panel. Higher draws in front.">
       <NumberCell value={core.zIndex} step={1} min={0} onchange={(v) => set('zIndex', v)} />
     </PropertyCell>

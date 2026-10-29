@@ -2,7 +2,7 @@
 // Fixtures use real document loading. Property edits and gestures use the actual App UI.
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
-import { chromiumLaunchOptions } from './chromiumLaunch.mjs';
+import { chromiumLaunchOptions, DEV_SERVER_FIRST_LOAD_MS } from './chromiumLaunch.mjs';
 import { createServer } from 'vite';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
@@ -17,6 +17,10 @@ const browser = await chromium.launch(chromiumLaunchOptions({ channel: 'msedge' 
 const page = await browser.newPage({ viewport: { width: 1680, height: 1050 } });
 page.setDefaultTimeout(6000);
 const errors = [], results = [];
+// CEDITOR_BEHAVIOR_CASE runs only the cases whose names contain it; several, separated by "|",
+// run each one's. CI runs every case (the component-behavior job in .github/workflows/ci.yml).
+const onlyCases = String(process.env.CEDITOR_BEHAVIOR_CASE ?? '').split('|').map(n => n.trim()).filter(Boolean);
+const matchedCases = new Set();
 page.on('pageerror', e => errors.push(String(e)));
 const settle = () => page.waitForTimeout(120);
 const props = page.locator('.properties-panel');
@@ -28,7 +32,10 @@ async function fixture(type, sections = {}, children = [], siblings = []) {
     const { createControl } = await import('/src/CE_Application/models/componentTypes.js');
     const { createPanel, serializePanel, deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
     const stores = await import('/src/CE_Application/stores/panels.js');
-    const p = createPanel(`Behavior ${type}`); p.width = 900; p.height = 600;
+    // On plain Graphite, as screenDock.mjs is: a new panel starts on the designed Graphite, whose
+    // forms draw a Meter, a Knob or a ProgressBar in place of the control's own renderer, and whose
+    // Pixel Display has square dots. These cases are of each control's own properties.
+    const p = createPanel(`Behavior ${type}`); p.width = 900; p.height = 600; p.controlSet = { id: 'graphite' }; p.controlSets = [];
     const c = createControl(type);
     Object.assign(c._children.Transform, {x:50,y:50,width:300,height:160});
     for (const [key,value] of Object.entries(sections)) Object.assign(c._children[key] ??= {}, value);
@@ -68,8 +75,10 @@ async function reopen(id) {
     return serializePanel(get(activePanel));
   });
   await writeFile(join(out, `${id}.cepanel`), text);
-  // A fresh browser document discards all in-memory runtime/renderer state.
-  await page.reload(); await page.waitForSelector('.app');
+  // A fresh browser document discards all in-memory runtime/renderer state. It is a page load, not
+  // a step in the UI, so it gets the first load's allowance rather than the 6 s default: a busy
+  // machine took a reload past 6 s in a case that passes otherwise.
+  await page.reload({timeout:DEV_SERVER_FIRST_LOAD_MS}); await page.waitForSelector('.app',{timeout:DEV_SERVER_FIRST_LOAD_MS});
   await page.evaluate(async ({text,id}) => {
     const {deserializePanel} = await import('/src/CE_Application/stores/panelModel.js');
     const {addPanel,selectedComponentIds} = await import('/src/CE_Application/stores/panels.js');
@@ -78,7 +87,9 @@ async function reopen(id) {
   await settle();
 }
 async function check(name,fn) {
-  if (process.env.CEDITOR_BEHAVIOR_CASE && !name.includes(process.env.CEDITOR_BEHAVIOR_CASE)) return;
+  const wanted = onlyCases.filter(n => name.includes(n));
+  if (onlyCases.length && !wanted.length) return;
+  for (const n of wanted) matchedCases.add(n);
   const before=errors.length;
   try { await fn(); assert.deepEqual(errors.slice(before),[]); results.push({name,status:'pass'}); console.log('PASS',name); }
   catch(e) { results.push({name,status:'fail',error:String(e)}); console.error('FAIL',name,String(e)); await page.screenshot({path:join(out,`${name.replace(/[^a-z0-9]/gi,'-')}.png`)}); }
@@ -102,7 +113,7 @@ async function paintedPixels(id, points, padding = 0) {
   },{data:png.toString('base64'),points});
 }
 try {
-  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, {waitUntil:'networkidle',timeout:60000});
+  await page.goto(`http://127.0.0.1:${server.httpServer.address().port}/`, {waitUntil:'networkidle',timeout:DEV_SERVER_FIRST_LOAD_MS});
   await page.waitForSelector('.app');
   await check('Meter bar thickness controls the visible bar after reopening',async()=>{
     const id=await fixture('Meter',{Meter:{value:0.5}}); await tab('Meter'); await number('Thick',12);
@@ -405,6 +416,19 @@ try {
       const x=await handle.evaluate(e=>Number(e.getAttribute('x'))+Number(e.getAttribute('width'))/2);assert.equal(x,80,'return rests at configured 0.25');
       assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'&&e.payload.parameterId==='mix').at(-1)?.payload.value),0.25,'return emits its target');};await verify();await reopen(id);await verify();
   });
+  await check('A script write to a source reaches its bound parameter once, and a drag is not sent twice',async()=>{
+    // ce.components.crossfader.mix() and the other sources' verbs write the stored value; only a
+    // drag or a ticker used to send it, so a script moved the handle and nothing else.
+    const id=await fixture('Crossfader',{DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'mix',deviceRole:'mainSynth',parameterId:'mix',dryRun:true}]}});
+    await props.getByTitle('Enter Preview',{exact:true}).click();await settle();await captureMidi();
+    const sent=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter'&&e.payload.parameterId==='mix').map(e=>e.payload.value));
+    const write=(value)=>page.evaluate(async({id,value})=>{const {updateControlProperty}=await import('/src/CE_Application/stores/controls.js');updateControlProperty(id,'Crossfader.mix',value);},{id,value});
+    assert.deepEqual(await sent(),[],'opening sends nothing');
+    await write(0.8);await settle();assert.deepEqual(await sent(),[0.8],'a stored write is sent');
+    await write(0.8);await settle();assert.deepEqual(await sent(),[0.8],'the same value again is not');
+    await captureMidi();await node(id).click({position:{x:80,y:80}});await settle();
+    const after=await sent();assert.ok(after.length>0,'the click sends');assert.equal(after.filter(v=>v===after.at(-1)).length<=2,true,`the release is not sent again when it is stored: ${JSON.stringify(after)}`);
+  });
   await check('Joystick geometry grid corners puck and six bound outputs follow real gestures',async()=>{
     const ports=['x','y','cornerTL','cornerTR','cornerBL','cornerBR'];
     const id=await fixture('VectorJoystick',{Joystick:{cornerLabels:['Top left','Top right','Bottom left','Bottom right'],puckColour:'FFFF0000',padColour:'FF000080',cornerColour:'FF00FF00'},DeviceBindings:{enabled:true,bindings:ports.map(port=>({kind:'deviceParameter',port,deviceRole:'mainSynth',parameterId:port,dryRun:true}))}});
@@ -463,6 +487,22 @@ try {
     await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();const b=await node(id).boundingBox();await page.mouse.move(b.x+150,b.y+80);await page.mouse.down();await page.waitForTimeout(180);
     const count=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='triggerRawMidiAction').length);
     assert.ok(await count()>=2);await node(id).dispatchEvent('pointercancel',{pointerId:1,bubbles:true});const cancelled=await count();await page.waitForTimeout(180);assert.equal(await count(),cancelled,'cancelled pointer must not leave the repeat timer running');
+  });
+  await check('A Keyboard key held while the window loses focus is released, once',async()=>{
+    // A sibling bound to a device gives the panel one, so its notes have somewhere to go.
+    const id=await fixture('Keyboard',{},[],[{type:'Knob',sections:{DeviceBindings:{enabled:true,bindings:[{kind:'midiControl',port:'value',deviceRole:'mainSynth',message:'cc',controller:74,channel:1,dryRun:true}]}}}]);
+    await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
+    const notes=()=>page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='triggerRawMidiAction').map(e=>String(e.payload.message??'')));
+    const b=await node(id).boundingBox();await page.mouse.move(b.x+8,b.y+b.height-8);await page.mouse.down();await settle();
+    assert.ok((await notes()).some(m=>/^9/.test(m)),`pressing a key sends its note-on (saw: ${JSON.stringify(await page.evaluate(()=>window.__behaviorMidi))})`);
+    // A pointerup that lands in another window never reaches the page; losing focus is all it hears.
+    await page.evaluate(()=>{document.hasFocus=()=>false;window.dispatchEvent(new Event('blur'));});await settle();
+    const afterBlur=await notes();
+    assert.ok(afterBlur.some(m=>/^8/.test(m)),`losing focus must send the note-off (sent: ${afterBlur.join(' | ')})`);
+    await page.evaluate(()=>{delete document.hasFocus;});
+    await page.mouse.up();await settle();
+    assert.equal((await notes()).length,afterBlur.length,'the late pointerup must not send a second note-off');
+    await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();
   });
   await check('Ribbon text stays visible and wheel styles honour Touch glow off',async()=>{
     const id=await fixture('Ribbon',{Ribbon:{label:'Pitch',showValue:true,value:0.75,bipolar:true,showGlow:false,glowColour:'FFFF0000'}});
@@ -978,3 +1018,5 @@ try {
   await browser.close(); await server.close();
 }
 if(results.some(r=>r.status==='fail')) process.exitCode=1;
+// A case name that matches nothing (mistyped, or a case renamed) would otherwise pass having run nothing.
+for(const n of onlyCases.filter(n=>!matchedCases.has(n))){console.error(`FAIL no case matches CEDITOR_BEHAVIOR_CASE "${n}"`);process.exitCode=1;}

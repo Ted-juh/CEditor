@@ -47,8 +47,10 @@ test('read and write are declared, cross-runtime, and need the device host', () 
 test('the summaries say what read actually is, and what write actually promises', () => {
   // Both are easy to over-read. read is not a live query; write's true does not mean the synth
   // agreed. Saying so in the contract is cheaper than a support thread.
-  assert.match(MEMBER_BY_ID.deviceRead.summary, /LAST KNOWN|Not a live query/);
-  assert.match(MEMBER_BY_ID.deviceWrite.summary, /dispatched/);
+  // In the summary or its notes, where the reviewed form says what a call returns.
+  const contract = (id) => [MEMBER_BY_ID[id].summary, ...(MEMBER_BY_ID[id].notes ?? [])].join(' ');
+  assert.match(contract('deviceRead'), /LAST KNOWN|Not a live query/);
+  assert.match(contract('deviceWrite'), /dispatched/);
 });
 
 /* ---------------------------------------------------------------------------------- read */

@@ -560,9 +560,12 @@ void DeviceProfileService::processIncomingMidiMessage (const juce::String& devic
 
     if (messageType == "sysex")
     {
-        // Feed MIDI-CI replies (Universal SysEx) to the discovery session. Additive: the session ignores
-        // non-CI SysEx and CI replies don't match the dump/identity logic below.
-        if (midiCiActive && midiCiSession != nullptr && role == midiCiRole)
+        // Feed MIDI-CI messages (Universal SysEx, sub-ID 0D) to the role's session whenever it has one,
+        // not only in a window after a Discovery: a slow reply, a later read and a subscription's
+        // updates come when they come. Additive: CI messages do not match the dump/identity logic below.
+        auto* midiCiSession = ciSessionFor (role, false);
+        if (midiCiSession != nullptr && hex.startsWithIgnoreCase ("F0 7E") && hex.length() >= 14
+            && hex.substring (9, 11).equalsIgnoreCase ("0D"))
         {
             juce::Array<int> ciBytes;
             juce::String ciError;

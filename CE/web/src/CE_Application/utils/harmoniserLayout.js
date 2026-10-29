@@ -12,6 +12,7 @@ import {
   noteName, useFlats, romanNumeral,
 } from './chordPadLayout.js';
 import { UNCHANGED } from './scriptPatchOutcome.js';
+import { listWord } from './wordLists.js';
 
 function num(value, fallback = 0) {
   const n = Number(value);
@@ -493,8 +494,9 @@ export function harmoniserScriptPatch(cfg, action, args = {}) {
       return Number.isFinite(k) ? { key: mod12(k) } : {};
     }
     case 'scale': {
-      const s = String(a.scale ?? '');
-      return SCALES[s] ? { scale: s } : {};
+      // In any case, as every word from a list is read: "Dorian" is "dorian" (utils/wordLists.js).
+      const s = listWord(Object.keys(SCALES), String(a.scale ?? ''));
+      return s ? { scale: s } : {};
     }
     case 'size': {
       const n = Number(a.size);

@@ -64,6 +64,17 @@ export function applyParameterAdoption(set, controlType, parameter) {
     set('Behavior.displayMax', remapped ? displayMax : null);
     set('Behavior.unit', parameter?.display?.unit ? String(parameter.display.unit) : '');
     set('Behavior.showSign', remapped && displayMin < 0);
+    // How the synth writes it (parameterDisplay.js): Hz, a pan, a note, a table. Written on every
+    // adoption for the same reason as the four above — a cutoff's "kHz" must not outlive a rebind
+    // to a level — but as `undefined` when the parameter has none, not null: JSON leaves an
+    // undefined key out, so a panel whose parameters say nothing of this saves exactly as before.
+    const format = typeof parameter?.display?.format === 'string' ? parameter.display.format : '';
+    const table = Array.isArray(parameter?.display?.table) && parameter.display.table.length
+      ? JSON.parse(JSON.stringify(parameter.display.table)) : undefined;
+    const middleC = parameter?.display?.middleC === null ? NaN : Number(parameter?.display?.middleC);
+    set('Behavior.displayFormat', format && format !== 'number' ? format : undefined);
+    set('Behavior.displayTable', table);
+    set('Behavior.displayMiddleC', Number.isFinite(middleC) ? middleC : undefined);
   }
 
   if (parameter?.type === 'choice' && Array.isArray(parameter?.choices)) {

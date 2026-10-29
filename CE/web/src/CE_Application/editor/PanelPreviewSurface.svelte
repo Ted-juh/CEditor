@@ -21,7 +21,7 @@
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
   } from '../utils/returnToRest.js';
   import {
-    collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout,
+    collectSourceIds, resolveActiveLayoutId, isActiveSource, activeFilterOf, findLayout, backlightOnFrom,
     pressTargetAt, layoutTimeout, isParamSource, parseParamSource, parameterInfo,
     isStateSource, stateKeyOf, stateInfo, moveCursor, regionStartOffset,
   } from '../utils/lcdZones.js';
@@ -41,6 +41,8 @@
   import * as textEdit from '../utils/textEditBuffer.js';
   import { get } from 'svelte/store';
   import { lcdDesignLayoutIds } from '../stores/lcdDesignLayout.js';
+  import { provideDisplayLayouts } from '../stores/displayLayouts.js';
+  import { provideComponentPhases, takePendingPhase } from '../stores/componentPhases.js';
   import { updateControlProperty } from '../stores/controls.js';
   import { commitDeviceParameter } from '../stores/deviceProfiles.js';
   import { showGuides } from '../stores/editorView.js';
@@ -79,7 +81,7 @@
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
     envDragNode, envAddNode, envRemoveNode, normalizePoints,
   } from '../utils/envelopeLayout.js';
-  import { controlPortValues } from '../utils/controlPortValues.js';
+  import { controlPortValues, isFanoutControl } from '../utils/controlPortValues.js';
   import {
     matrixConfig, matrixAmounts, matrixGeometry, matrixCellAtPoint, matrixCellRect,
     matrixAmountAt, matrixAmountFromDrag, matrixSetAmount, matrixIndex, matrixCols,
@@ -138,7 +140,7 @@
   } from '../utils/chordPadLayout.js';
   import {
     arpConfig, arpRate, arpVelocity, arpChannel, arpBaseNotes, arpSequence,
-    stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds,
+    stepFires, stepIndexAt, swingDelay, gateSeconds, stepSeconds, arpStepCell, arpHead,
     effectiveSwing as arpEffectiveSwing,
     arpGeometry, arpCellAt, toggleMute, arpPhase,
     arpSynced, arpDivision, syncedPhaseAt,
@@ -223,7 +225,7 @@
     setTransportLoop, startTransportWithCountIn, isCountingIn, countInBeatsLeft,
   } from '../stores/transport.js';
   import { noteLevels } from '../utils/midiNoteInput.js';
-  import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries } from '../utils/midiNoteInput.js';
+  import { heldNotes as inputHeldNotes, heldNoteEntries as inputHeldEntries, heldNotesInOrder as inputHeldInOrder } from '../utils/midiNoteInput.js';
   import { triggerRawMidiAction } from '../bridge/bridge.js';
   import {
     activeMidiControlBindings,
@@ -311,7 +313,13 @@
     sliderControlWheelValue,
   } from '../utils/sliderControlPart.js';
   import { floating } from '../utils/floatingUi.js';
-  import { dispatchInteraction } from '../scripting/panelRuntime.js';
+  import { dispatchInteraction, dispatchKeyEvent, scriptsHear } from '../scripting/panelRuntime.js';
+  import {
+    registerKeysSurface, isLiveSurface, keysCapture, keysBubble, keysUp, letGo as keysLetGo,
+    noteRaised as keysNoteRaised, keyFields, pianoSilence, keyIsTheEditors,
+  } from '../scripting/scriptKeys.js';
+  import { sendKeyToHostLate } from '../utils/hostKeys.js';
+  import { isTextEntryTarget } from '../utils/textEntry.js';
   import { customNumericFields, customNumericPatch, customArpeggiatorKeyPatch } from '../utils/customNumericEditing.js';
   import { numberOr } from '../utils/primitives.js';
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
@@ -593,6 +601,15 @@
       { target: componentTargetName(control), ...payload });
   }
 
+  /** What a value source notices (a meter's band, an envelope's stage, a constellation's star) it
+   *  notices while the preview is drawn: resolvedPreviewFor runs in the template. A dispatch writes
+   *  state (the runtime's execution status, and whatever a handler sets), which Svelte refuses
+   *  inside a derivation: state_unsafe_mutation stopped the drawing of a meter a route moved
+   *  across a band. So those are raised once the drawing is done, in the order they were seen. */
+  function afterDraw(raise) {
+    queueMicrotask(raise);
+  }
+
   /** Raise onCycle when a 0..1 phase has just wrapped. The tickers all advance phase with `% 1`,
    *  so a phase that went DOWN is a wrap — the same test each ticker already makes to decide
    *  whether to re-baseline. */
@@ -847,6 +864,25 @@
   // TRANSIENT, exactly like lcdEdit above it — a press is a performance action, not an edit to the
   // panel document, so it must not reach the store and must not survive leaving preview.
   let lcdPressedLayout = $state({});
+
+  // The layout each display shows, and showing another, for scripts (stores/displayLayouts.js):
+  // text() and clear() with no layout act on the layout on screen, and layout() shows one as a soft
+  // key does, timeout and all. A Pixel Display has no soft keys; a script's layout() is kept in the
+  // same map and wins over its selector the same way.
+  onDestroy(provideDisplayLayouts({
+    showing: (id) => {
+      const control = controlById(id);
+      if (!control) return '';
+      return String(control?._children?.Core?.controlType ?? '') === 'PixelDisplay'
+        ? resolvePixelActiveLayoutId(control) : resolveLcdActiveLayoutId(control);
+    },
+    show: (id, layoutId) => {
+      const control = controlById(id);
+      if (!control) return;
+      lcdPressedLayout = { ...lcdPressedLayout, [id]: String(layoutId ?? '') };
+      lcdScheduleLayoutTimeout(control, String(layoutId ?? ''));
+    },
+  }));
 
   function lcdDisplayOf(control) {
     return String(control?._children?.Core?.controlType ?? '') === 'LcdDisplay'
@@ -1636,7 +1672,7 @@
         const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));
         cd.brightness = Math.round(frac * 100);
       }
-      if (backInfo) cd.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
+      if (backInfo) cd.backlightOn = backlightOnFrom(backInfo);
       if (primary) { cd.value = primary.value; cd.valueMin = primary.min; cd.valueMax = primary.max; }
       // Direct device bindings win over source-control drives (more specific).
       if (ownSession.brightnessOverride !== undefined) cd.brightness = ownSession.brightnessOverride;
@@ -1717,7 +1753,7 @@
       const previous = componentLastZone[id];
       componentLastZone[id] = zone;
       if (previous !== undefined && previous !== zone) {
-        raiseComponent(control, 'onZone', { zone: zone + 1, previous: previous + 1, value });
+        afterDraw(() => raiseComponent(control, 'onZone', { zone: zone + 1, previous: previous + 1, value }));
       }
     }
 
@@ -1850,6 +1886,7 @@
     const values = controlPortValues(control);
     if (!values) return;
     const controlId = getControlId(control);
+    portsSentAs[controlId] = JSON.stringify(values);
     for (const binding of activeDeviceBindings(control)) {
       const v = values[String(binding?.port ?? '')];
       if (v === undefined) continue;
@@ -1863,6 +1900,41 @@
       });
     }
   }
+  // A SCRIPT'S WRITE TO A SOURCE IS SENT. Only a drag, a running ticker or an incoming signal sent
+  // a source's ports, so ce.components.macro.value(), ribbon.value(), joystick.move(),
+  // constellation.probe() and the rest moved what was drawn and left every bound parameter where it
+  // was (the Constellation's review, docs/design/api-descriptions-handoff.md). So a change to what a
+  // stored source sends is sent, once, as a commit. Not on opening: what is stored was never sent
+  // on opening, and that is unchanged. Not what a drag has just sent and committed (`portsSentAs`).
+  // Not a running Orbit, Looper, Kinetic or wandering Constellation: its ticker sends what it
+  // plays, from where it is. Not a Router, whose ports follow its input, nor a Turing Machine,
+  // whose follow the step it is on: each sends on its own clock.
+  const portsSentAs = {};     // { [id]: the port values last sent, as JSON }
+  const portsStoredAs = {};   // { [id]: what the stored control sends, as JSON; '' while a ticker sends }
+  function storedSourceSends(control) {
+    switch (String(control?._children?.Core?.controlType ?? '')) {
+      case 'Keyboard': case 'Router': case 'Turing': return null;
+      case 'Orbit': return orbitConfig(control).running !== false ? null : orbitControlWith(control, orbitPhaseFor(control));
+      case 'Looper': return looperConfig(control).running !== false ? null : looperControlWith(control, looperPhaseFor(control));
+      case 'Kinetic': return kineticConfig(control).running !== false ? null : kineticControlWith(control, kineticStateFor(control));
+      case 'Constellation': return constellationConfig(control).running === true ? null : control;
+      default: return control;
+    }
+  }
+  $effect(() => {
+    for (const c of allControls) {
+      if (!isFanoutControl(c)) continue;
+      const id = getControlId(c);
+      if (!id) continue;
+      const sends = storedSourceSends(c);
+      const values = sends ? controlPortValues(sends) : null;
+      const seen = values ? JSON.stringify(values) : '';
+      const before = portsStoredAs[id];
+      portsStoredAs[id] = seen;
+      if (!seen || !before || before === seen || portsSentAs[id] === seen) continue;
+      untrack(() => emitControlPortFanout(sends, 'commit'));
+    }
+  });
   // Inject the live working points + resolved phase onto the resolved Envelope
   // so the renderer draws the in-progress drag and the playhead.
   function applyEnvelopeValueSource(control, resolved) {
@@ -1892,7 +1964,7 @@
       const at = nextEnv.__phase;
       const stage = at >= 1 ? 'end'
         : (sustainX !== null && at >= sustainX ? 'release' : (at <= 0 ? 'start' : 'attack'));
-      raiseComponentStage(control, stage);
+      afterDraw(() => raiseComponentStage(control, stage));
     }
     return { ...resolved, control: { ...base, _children: { ...base._children, Envelope: nextEnv } } };
   }
@@ -2398,8 +2470,16 @@
   function orbitControls() {
     return allControls.filter((c) => isOrbitControl(c));
   }
+  // Bumped by a seek, so a stopped Orbit or Looper, which reads no clock, is drawn where it was
+  // moved to.
+  let sourceSought = $state(0);
   function orbitPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts, as the arp's.
+    if (orbitPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) orbitPhaseState[id] = sought;
+    }
     if (orbitPhaseState[id] !== undefined) return orbitPhaseState[id];
     return ((numberOr(orbitConfig(control).phase, 0) % 1) + 1) % 1;
   }
@@ -2484,7 +2564,7 @@
     const base = resolved?.control ?? control;
     const orbit = base?._children?.Orbit;
     if (!orbit) return resolved;
-    if (orbit.running !== false) { ensureOrbitTicker(); void orbitClock; }
+    if (orbit.running !== false) { ensureOrbitTicker(); void orbitClock; } else void sourceSought;
     const nextOrbit = { ...orbit, __phase: orbitPhaseFor(control) };
     const sess = sessionFor(control);
     if (Array.isArray(sess?.orbitNodes)) nextOrbit.nodes = sess.orbitNodes;
@@ -2547,6 +2627,11 @@
   }
   function looperPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts, as the arp's.
+    if (looperPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) looperPhaseState[id] = sought;
+    }
     if (looperPhaseState[id] !== undefined) return looperPhaseState[id];
     return ((numberOr(looperConfig(control).phase, 0) % 1) + 1) % 1;
   }
@@ -2600,7 +2685,7 @@
     const base = resolved?.control ?? control;
     const looper = base?._children?.Looper;
     if (!looper) return resolved;
-    if (looper.running !== false) { ensureLooperTicker(); void orbitClock; }
+    if (looper.running !== false) { ensureLooperTicker(); void orbitClock; } else void sourceSought;
     const next = { ...looper, __phase: looperPhaseFor(control) };
     if (looperSynced(control)) next.__beatsPerBar = $transport.beatsPerBar;
     const sess = sessionFor(control);
@@ -2860,6 +2945,11 @@
   }
   function turingPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts, as the arp's.
+    if (turingPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) turingPhaseState[id] = sought;
+    }
     if (turingPhaseState[id] !== undefined) return turingPhaseState[id];
     return ((numberOr(turingConfig(control).phase, 0) % 1) + 1) % 1;
   }
@@ -2867,6 +2957,21 @@
     const sess = sessionFor(control)?.turingSteps;
     return Array.isArray(sess) ? sess : turingSteps(control);
   }
+  // The register a running machine mutates is its own copy, in the session: a change to the
+  // panel's steps (a script's step() or fill(), the inspector) was never heard again once it had
+  // mutated. So a change to the stored steps starts the register from them (the Turing Machine's
+  // review, docs/design/api-descriptions-handoff.md).
+  const turingStoredSteps = {};   // { [id]: the stored steps last seen, as JSON }
+  $effect(() => {
+    for (const c of turingControls()) {
+      const id = getControlId(c);
+      const seen = JSON.stringify(turingConfig(c).steps ?? null);
+      if (turingStoredSteps[id] !== undefined && turingStoredSteps[id] !== seen) {
+        untrack(() => { if (Array.isArray(sessionFor(c)?.turingSteps)) patchControlSession(id, { turingSteps: undefined }); });
+      }
+      turingStoredSteps[id] = seen;
+    }
+  });
   /** The step the renderer highlights: its `head`, from the phase this injects. `raw` is the
       document's control, which the phase is kept under. */
   function turingShownStep(control, raw = control) {
@@ -3003,6 +3108,24 @@
   function kineticStateFor(control) {
     return kineticStateMap[getControlId(control)] ?? kineticInitial(control);
   }
+  // A running ball moves from its own state, and the stored launch (`initial`) was read only before
+  // its first frame: a script's launch() or velocity() was never seen once it ran. So a change to
+  // the launch throws the ball again from it (the Kinetic Modulator's review,
+  // docs/design/api-descriptions-handoff.md).
+  const kineticStoredLaunch = {};   // { [id]: the stored launch last seen, as JSON }
+  $effect(() => {
+    for (const c of kineticControls()) {
+      const id = getControlId(c);
+      const seen = JSON.stringify(kineticConfig(c).initial ?? null);
+      if (kineticStoredLaunch[id] !== undefined && kineticStoredLaunch[id] !== seen) {
+        untrack(() => {
+          kineticStateMap[id] = { ...kineticInitial({ ...c, _children: { ...c._children, Kinetic: { ...kineticConfig(c), __state: undefined } } }), bounced: false };
+          if (kineticConfig(c).running !== false) ensureKineticTicker();
+        });
+      }
+      kineticStoredLaunch[id] = seen;
+    }
+  });
   function kineticControlWith(control, state, trail, extra) {
     const k = { ...control._children?.Kinetic, __state: state };
     if (Array.isArray(trail)) k.__trail = trail;
@@ -3192,7 +3315,7 @@
       const nowId = String(near?.id ?? '');
       componentLastPreset[id] = nowId;
       if (previous !== undefined && previous !== nowId && nowId) {
-        raiseComponent(control, 'onRecall', { id: nowId, label: String(near?.label ?? '') });
+        afterDraw(() => raiseComponent(control, 'onRecall', { id: nowId, label: String(near?.label ?? '') }));
       }
     }
     return { ...resolved, control: { ...base, _children: { ...base._children, Constellation: next } } };
@@ -3513,6 +3636,7 @@
   const arpTimers = {};         // id -> [timeoutId...]  (swing delays + note-offs)
   const arpSounding = {};       // id -> Set(note) currently ringing
   const arpLatched = {};        // id -> last non-empty linked note set
+  const arpPlayedCell = {};     // id -> the cell a "random" arp last played, for its playhead
   const arpBeatsState = {};     // id -> last transport reading, for synced arps
   const arpJumpState = {};      // id -> transport jump counter seen (see tickSyncedArp)
   let arpTickerRunning = false;
@@ -3543,12 +3667,13 @@
       // Straight off the hardware keyboard — the same held-note model the echo
       // displays use, so an arp and a lit Chord Pad always agree.
       ensureNoteInput();
-      live = inputHeldNotes($midiNoteState.notes, numberOr(cfg.inputChannel, 0));
+      live = inputHeldInOrder($midiNoteState.notes, numberOr(cfg.inputChannel, 0));
     } else {
       const linkId = String(cfg.linkId ?? '');
       const map = linkId ? (chordHeld[linkId] ?? {}) : {};
-      live = [...new Set(Object.values(map).flat())].sort((a, b) => a - b);
+      live = [...new Set(Object.values(map).flat())];
     }
+    // In the order pressed, for "asPlayed" (arpLayout.arpSequence); every other pattern sorts them.
     const id = getControlId(control);
     if (live.length) { arpLatched[id] = live; return live; }
     if (cfg.latch === true && Array.isArray(arpLatched[id])) return arpLatched[id];
@@ -3561,6 +3686,8 @@
     const arp = { ...control._children?.Arp };
     if (phase !== null) arp.__phase = phase;
     if (notes) arp.__sourceNotes = notes;
+    const played = arpPlayedCell[getControlId(control)];
+    if (played !== undefined) arp.__head = played;
     return { ...control, _children: { ...control._children, Arp: arp } };
   }
   /** What the renderer draws that moves: its `head` into the sequence, and the notes the sequence is
@@ -3568,12 +3695,64 @@
   function arpShownStep(control, raw = control) {
     const live = arpControlWith(control, arpPhaseFor(raw));
     const seq = arpSequence(live, arpBaseNotes(live));
-    return `${seq.length ? stepIndexAt(arpPhase(live), seq.length) : -1}:${seq.map(String).join(' ')}`;
+    return `${seq.length ? arpHead(live, seq.length) : -1}:${seq.map(String).join(' ')}`;
+  }
+  /** The cell a step plays, picked once per step; a "random" arp's pick is its playhead too. */
+  function arpPlayCell(control, live, idx, length) {
+    const id = getControlId(control);
+    const cell = arpStepCell(live, idx, length, Math.random());
+    if (cell !== idx) arpPlayedCell[id] = cell; else delete arpPlayedCell[id];
+    return cell;
   }
   function arpPhaseFor(control) {
     const id = getControlId(control);
+    // A seek made while no preview ran (stores/componentPhases.js) is where it starts.
+    if (arpPhaseState[id] === undefined) {
+      const sought = takePendingPhase(id);
+      if (sought !== undefined) arpPhaseState[id] = sought;
+    }
     return arpPhaseState[id] !== undefined ? arpPhaseState[id] : arpPhase(control);
   }
+  // A script's phase() and read(t, "phase") ask here (stores/componentPhases.js): where the arp is in
+  // its sequence, and a seek. Running, the next step plays from there; stopped, it starts there. A
+  // synced arp's position is the Transport's, so the runtime does not seek one.
+  onDestroy(provideComponentPhases({
+    where: (id) => {
+      const control = controlById(id);
+      if (control && isArpControl(control)) return arpPhaseFor(control);
+      // The Turing Machine, the Orbit and the Looper keep their position the same way (their
+      // reviews): their phase() is a seek too.
+      if (control && isTuringControl(control)) return turingPhaseFor(control);
+      if (control && isOrbitControl(control)) return orbitPhaseFor(control);
+      if (control && isLooperControl(control)) return looperPhaseFor(control);
+      return null;
+    },
+    seek: (id, phase) => {
+      const control = controlById(id);
+      const at = ((numberOr(phase, 0) % 1) + 1) % 1;
+      if (control && isArpControl(control)) {
+        arpPhaseState[id] = at;
+        // Drawn there at once, stopped too: a stopped arp has no ticker to redraw it.
+        showStep(control, arpShownStep(withLiveSections(control), control));
+      } else if (control && isTuringControl(control)) {
+        turingPhaseState[id] = at;
+        showStep(control, turingShownStep(control));
+      } else if (control && isOrbitControl(control)) {
+        orbitPhaseState[id] = at;
+        // A stopped Orbit has no ticker to redraw it or send what its satellites now say.
+        if (orbitConfig(control).running === false) {
+          sourceSought += 1;
+          emitControlPortFanout(orbitControlWith(control, at), 'commit');
+        }
+      } else if (control && isLooperControl(control)) {
+        looperPhaseState[id] = at;
+        if (looperConfig(control).running === false) {
+          sourceSought += 1;
+          emitControlPortFanout(looperControlWith(control, at), 'commit');
+        }
+      }
+    },
+  }));
   function arpAllOff(control) {
     const id = getControlId(control);
     const timers = arpTimers[id] ?? [];
@@ -3632,10 +3811,12 @@
       if (arpLastIdx[id] > idx) raiseComponentCycle(control, 0, 1);
       arpLastIdx[id] = idx;
       // `global` is the free-running step number and `idx` the position in the note sequence: the
-      // Euclidean mask is measured in the former, hand mutes in the latter.
-      if (stepFires(live, idx, global)) {
-        arpFireStep(control, seq[idx], idx, bpm);
-        raiseComponent(control, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
+      // Euclidean mask is measured in the former, hand mutes in the latter. "random" plays a cell
+      // of its own picking (arpStepCell); swing still follows the step.
+      const cell = arpPlayCell(control, live, idx, seq.length);
+      if (stepFires(live, cell, global)) {
+        arpFireStep(control, seq[cell], idx, bpm);
+        raiseComponent(control, 'onStep', { index: cell + 1, of: seq.length, notes: [...seq[cell]] });
       }
     }
   }
@@ -3657,6 +3838,7 @@
         if (!seq.length) {                       // nothing held — park at the start
           arpPhaseState[id] = 0;
           arpLastIdx[id] = -1;
+          delete arpPlayedCell[id];
           arpCycles[id] = 0;
           delete arpLastStep[id];
           // Forget the synced reading too, or the first frame after notes come
@@ -3693,9 +3875,10 @@
           arpLastStep[id] = global;
           // A muted step is not a step that fired, so it raises nothing — the event follows the
           // notes, which is what a script lighting an LED off it wants.
-          if (stepFires(live, idx, global)) {
-            arpFireStep(c, seq[idx], idx);
-            raiseComponent(c, 'onStep', { index: idx + 1, of: seq.length, notes: [...seq[idx]] });
+          const cell = arpPlayCell(c, live, idx, seq.length);
+          if (stepFires(live, cell, global)) {
+            arpFireStep(c, seq[cell], idx);
+            raiseComponent(c, 'onStep', { index: cell + 1, of: seq.length, notes: [...seq[cell]] });
           }
         }
       }
@@ -3709,10 +3892,14 @@
     const base = resolved?.control ?? control;
     const arp = base?._children?.Arp;
     if (!arp) return resolved;
-    if (arp.running !== false) { ensureArpTicker(); void shownSteps[getControlId(control)]; }
+    if (arp.running !== false) ensureArpTicker();
+    // Read stopped too, so a script's seek redraws the playhead where it will start.
+    void shownSteps[getControlId(control)];
     const notes = arpSourceNotes(control);
     const next = { ...arp, __phase: arpPhaseFor(control) };
     if (notes) next.__sourceNotes = notes;
+    const played = arpPlayedCell[getControlId(control)];
+    if (played !== undefined) next.__head = played;
     return { ...resolved, control: { ...base, _children: { ...base._children, Arp: next } } };
   }
   function arpGeomFor(control) {
@@ -5663,6 +5850,7 @@
   // rig is worse than useless.
   function firePanicEmergency({ flashButtons = true } = {}) {
     try { silenceLocalNoteControls(); } catch { /* mid-teardown: the blanket set still covers it */ }
+    if (isLiveSurface(panel?.id)) pianoSilence();   // ce.keys' piano: its notes off, the piano stays on
     for (const bytes of panicMessages(EMERGENCY_PANIC)) sendNoteBytes(bytes, 'panic');
     clearNoteInput();
     sentAnyNote = false;
@@ -5684,10 +5872,152 @@
     // can. A configured non-Escape panic shortcut remains available while an overlay is open.
     if (event.key === 'Escape' && typeof document !== 'undefined'
       && document.querySelector('dialog[open], [role="dialog"], [role="menu"]')) return;
-    if (!isPanicShortcut(event, { shortcut, lcdEditing: lcdEdit.active === true })) return;
+    if (!isPanicShortcut(event, { shortcut, lcdEditing: lcdEdit.active === true })) {
+      routeScriptKey(event);
+      return;
+    }
     event.preventDefault();
     firePanicEmergency();
   }
+
+  // --- ce.keys: the computer keyboard for the panel's scripts --------------------------------
+  // scriptKeys.js decides who gets a key; this feeds it. On the way IN (capture) shortcuts with a
+  // modifier and the piano take their keys before any control; on the way OUT (handleGlobalKeyDown,
+  // after the focused control had its chance) a shortcut without a modifier runs, or scripts hear
+  // keyDown. Only the surface showing the panel the scripts run on takes part: a gallery draws
+  // sample panels with this same component.
+  const keysHeldForHost = new Map();   // code -> the key-down, held back for keyDown, then the DAW's
+
+  function keyTargetControlName(event) {
+    const node = event?.target?.closest?.('.canvas-control[data-control-id]');
+    const id = node?.getAttribute?.('data-control-id');
+    return id ? String(controlById(id)?._children?.Core?.name ?? '') : '';
+  }
+  function keysContext(event) {
+    const target = event?.target;
+    const typing = isTextEntryTarget(target) || lcdEdit.active === true || event?.isComposing === true
+      || event?.keyCode === 229 || (typeof target?.closest === 'function' && target.closest('[data-editing]') !== null);
+    const panic = isPanicShortcut(event, { shortcut: panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT, lcdEditing: lcdEdit.active === true });
+    return { typing, panic, control: keyTargetControlName(event) };
+  }
+  function onKeysCaptureDown(event) {
+    if (!isLiveSurface(panel?.id)) return;
+    if (keysCapture(event, keysContext(event))) { event.preventDefault(); event.stopPropagation(); }
+  }
+  function onKeysCaptureUp(event) {
+    if (!isLiveSurface(panel?.id)) return;
+    const { piano, fields } = keysUp(event, { control: keyTargetControlName(event) });
+    if (piano) { event.preventDefault(); event.stopPropagation(); }
+    if (fields && scriptsHear('onKeyUp')) dispatchKeyEvent('onKeyUp', fields);
+    const heldBack = keysHeldForHost.get(event.code);
+    if (heldBack) {
+      keysHeldForHost.delete(event.code);
+      event.preventDefault();
+      sendKeyToHostLate(event, 'up');
+    }
+  }
+  function routeScriptKey(event) {
+    if (!isLiveSurface(panel?.id)) return;
+    const ctx = keysContext(event);
+    const route = keysBubble(event, ctx);
+    if (route === 'shortcut') { event.preventDefault(); return; }
+    if (route !== 'event') return;
+    const fields = keyFields(event, ctx.control);
+    keysNoteRaised(event, fields);
+    if (!scriptsHear('onKeyDown')) return;
+    // A handler keeps a key by returning true, and it can only say so after it has run. So while a
+    // script listens, the key is held back from the DAW and handed over once no handler kept it.
+    // The editor's own keys are never held back: they go on whatever a script answers.
+    const holdBack = event.key !== 'Tab' && !keyIsTheEditors(event);
+    if (holdBack) event.preventDefault();
+    const down = { key: event.key, code: event.code, keyCode: event.keyCode, repeat: event.repeat,
+      ctrlKey: event.ctrlKey, shiftKey: event.shiftKey, altKey: event.altKey, metaKey: event.metaKey,
+      isComposing: event.isComposing, target: event.target };
+    dispatchKeyEvent('onKeyDown', fields).then((kept) => {
+      if (!holdBack || kept) return;
+      if (sendKeyToHostLate(down, 'down')) keysHeldForHost.set(down.code, down);
+    });
+  }
+  // The panel lost the keyboard: every held key gets its keyUp, every piano note its note-off.
+  function keysLostKeyboard() {
+    if (!isLiveSurface(panel?.id)) return;
+    const ups = keysLetGo();
+    if (scriptsHear('onKeyUp')) for (const up of ups) dispatchKeyEvent('onKeyUp', up);
+    keysHeldForHost.clear();
+  }
+  function onKeysVisibility() {
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') keysLostKeyboard();
+  }
+  function controlByName(name) {
+    const wanted = String(name ?? '');
+    if (!wanted) return null;
+    return allControls.find((c) => String(c?._children?.Core?.name ?? '') === wanted)
+      ?? flatControls(panel?.controls ?? []).find((c) => String(c?._children?.Core?.name ?? '') === wanted) ?? null;
+  }
+  function controlElement(control) {
+    const id = getControlId(control);
+    return surfaceRef && [...surfaceRef.querySelectorAll('.canvas-control[data-control-id]')]
+      .find((node) => node.getAttribute('data-control-id') === id) || null;
+  }
+  function sendPianoBytes(bytes, role) {
+    if ((bytes?.[0] & 0xF0) === 0x90) sentAnyNote = true;
+    const deviceRole = role || noteDeviceRole;
+    if (deviceRole) triggerRawMidiAction({ deviceRole, actionId: 'keys_piano', message: bytesToHex(bytes), dryRun: false });
+    const tapped = noteOutputFromBytes(bytes, 'Piano', 'ce.keys');
+    if (tapped) publishNoteOutput(tapped);
+  }
+  const keysHost = {
+    playNote(note, velocity, on, piano) {
+      if (piano.target) {
+        const control = controlByName(piano.target);
+        if (!control || !isKeyboardControl(control)) return;
+        if (on) playKeyboardKey(control, note, false);
+        else releaseKeyboardKey(getControlId(control), note);
+        return;
+      }
+      sendPianoBytes(on ? noteOnBytes(piano.channel, note, velocity) : noteOffBytes(piano.channel, note), piano.role);
+    },
+    isKeyboard: (name) => isKeyboardControl(controlByName(name)),
+    canPlay: (piano) => (piano.target ? isKeyboardControl(controlByName(piano.target)) : !!(piano.role || noteDeviceRole)),
+    focus(name) {
+      if (typeof document === 'undefined') return false;
+      if (!name) {
+        const active = document.activeElement;
+        if (active?.closest?.('.canvas-control')) active.blur?.();
+        keyboardFocusControlId = '';
+        return true;
+      }
+      const control = controlByName(name);
+      if (!control || isDisabled(control) || control?._children?.Core?.visible === false) return false;
+      if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false
+        || getMouse(control)?.focusable === false) return false;
+      const element = controlElement(control);
+      if (!element || element.getClientRects().length === 0) return false;
+      lastInputMode = 'keyboard';
+      element.focus?.();
+      const has = document.activeElement === element || element.contains(document.activeElement);
+      if (has) keyboardFocusControlId = getControlId(control);
+      return has;
+    },
+    focused: () => (keyboardFocusControlId ? String(controlById(keyboardFocusControlId)?._children?.Core?.name ?? '') : ''),
+    panicShortcut: () => panel?.panicShortcut ?? DEFAULT_PANIC_SHORTCUT,
+  };
+  $effect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const unregister = registerKeysSurface(panel?.id, keysHost);
+    window.addEventListener('keydown', onKeysCaptureDown, true);
+    window.addEventListener('keyup', onKeysCaptureUp, true);
+    window.addEventListener('blur', keysLostKeyboard);
+    document.addEventListener('visibilitychange', onKeysVisibility);
+    return () => {
+      window.removeEventListener('keydown', onKeysCaptureDown, true);
+      window.removeEventListener('keyup', onKeysCaptureUp, true);
+      window.removeEventListener('blur', keysLostKeyboard);
+      document.removeEventListener('visibilitychange', onKeysVisibility);
+      keysLostKeyboard();
+      unregister();
+    };
+  });
 
   // Inject the sounding pads + last hit so the renderer can light up.
   function applyDrumPadsValueSource(control, resolved) {
@@ -5740,6 +6070,11 @@
     const designId = String(get(lcdDesignLayoutIds)[getControlId(control)] ?? '');
     const hasDesign = designId && layouts.some((l) => String(l?.id ?? '') === designId);
     const effPages = hasDesign ? { ...pages, defaultLayoutId: designId } : pages;
+    // A script's layout() beats the selector and the design default, as a soft key does on an LCD.
+    const shown = String(lcdPressedLayout[getControlId(control)] ?? '');
+    if (shown && layouts.some((l) => String(l?.id ?? '') === shown)) {
+      return resolveActiveLayoutId({ ...effPages, defaultLayoutId: shown }, layouts, { activeOverlayLayoutId });
+    }
     return resolveActiveLayoutId(effPages, layouts, { selectorValue, activeOverlayLayoutId });
   }
 
@@ -5777,7 +6112,7 @@
       const frac = span === 0 ? 0 : Math.max(0, Math.min(1, (brightRange.value - brightRange.min) / span));
       cp.brightness = Math.round(frac * 100);
     }
-    if (backInfo) cp.backlightOn = backInfo.on === true || numberOr(backInfo.value, 0) >= 0.5;
+    if (backInfo) cp.backlightOn = backlightOnFrom(backInfo);
     // Direct device bindings win over source-control drives (more specific).
     if (ownSession.brightnessOverride !== undefined) cp.brightness = ownSession.brightnessOverride;
     if (ownSession.backlightOverride !== undefined) cp.backlightOn = ownSession.backlightOverride === true;
@@ -6325,7 +6660,7 @@
   }
 
   function commitSpinnerField(control, role) {
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -6352,7 +6687,7 @@
 
   function handleSpinnerFieldInput(control, role, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const handle = spinnerHandleForRole(role);
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
@@ -7125,7 +7460,7 @@
   }
 
   function commitRangeFieldInput(control) {
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const controlId = getControlId(control);
     const session = sessionFor(control);
     if (session?.valueInputActive !== true) return;
@@ -7146,7 +7481,7 @@
 
   function handleRangeFieldInput(control, event) {
     event.stopPropagation();
-    if (getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
+    if (isReadOnly(control) || getBehavior(control)?.keyboardEnabled === false || getBehavior(control)?.focusable === false || getMouse(control)?.focusable === false) return;
     const rawValue = String(event?.currentTarget?.value ?? '');
     patchControlSession(getControlId(control), {
       valueInputActive: true,
@@ -7295,7 +7630,9 @@
   }
 
   function adjustRangeFromKey(control, key) {
-    if (!isRangeControl(control)) return;
+    // A display's value field is readonly to the browser, which stops typing and not this: ArrowUp
+    // in a Number display's field walked its value up, and a Range display's handles with it.
+    if (!isRangeControl(control) || isReadOnly(control)) return;
 
     const behavior = getBehavior(control);
     if (behavior.keyboardEnabled === false) return;
@@ -7653,6 +7990,8 @@
     window.removeEventListener('pointermove', handleWindowPointerMove);
     window.removeEventListener('pointerup', handleWindowPointerUp);
     window.removeEventListener('pointercancel', handleKeyboardCancel);
+    window.removeEventListener('blur', handlePressLost);
+    document.removeEventListener('visibilitychange', handlePressLost);
     rangeScrub?.end();
     rangeScrub = null;
     sliderScrub?.end();
@@ -8202,9 +8541,7 @@
           ...knobFocus,
         });
       }
-      window.addEventListener('pointermove', handleWindowPointerMove);
-      window.addEventListener('pointerup', handleWindowPointerUp);
-      window.addEventListener('pointercancel', handleKeyboardCancel);
+      addPressListeners();
       return;
     }
 
@@ -8277,9 +8614,24 @@
       updateSliderRangeFromPointer(control, event, nextSliderHandle);
     }
 
+    addPressListeners();
+  }
+
+  // While a press is held, the page must hear its end however it comes. A pointerup that lands in
+  // another window never arrives: switching to the DAW or alt-tabbing with a key, pad or ribbon held
+  // left its note sounding until the panel closed. Losing focus and being hidden end the press the
+  // way a cancelled pointer does — Hostage's keyboard does the same on blur and on a hidden page.
+  function addPressListeners() {
     window.addEventListener('pointermove', handleWindowPointerMove);
     window.addEventListener('pointerup', handleWindowPointerUp);
     window.addEventListener('pointercancel', handleKeyboardCancel);
+    window.addEventListener('blur', handlePressLost);
+    document.addEventListener('visibilitychange', handlePressLost);
+  }
+
+  function handlePressLost() {
+    if (typeof document !== 'undefined' && document.visibilityState === 'visible' && document.hasFocus?.()) return;
+    handleKeyboardCancel({ clientX: Number.NaN, clientY: Number.NaN });
   }
 
   function handleWindowPointerMove(event) {

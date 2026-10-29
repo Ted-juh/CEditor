@@ -10,12 +10,16 @@ import assert from 'node:assert/strict';
 
 import {
   COMPONENT_FAMILIES, COMPONENT_VERBS, COMPONENT_VERB_BY_ID, componentScriptPatch,
-  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
+  componentRequestLegal, moduleIdFor, verbSignature, verbArgs, verbArgOptional, itemCurrent, componentRefusalReason, componentClampWarning, familyVerbNamed, familyVerbRefusal, verbExample, verbNotes, verbParamSummary, verbArgKinds } from '../src/CE_Application/scripting/componentVerbs.js';
 import {
   MEMBER_BY_ID, MODULE_BY_ID, WEBVIEW_ONLY_MEMBERS, memberPath, memberModule, moduleMemberMap,
 } from '../src/CE_Application/scripting/panelApi.js';
 import { apiSurfaceNames as runtimeNames } from '../src/CE_Application/scripting/panelRuntime.js';
 import { SECTION_DEFAULTS } from '../src/CE_Application/models/sectionDefaults.js';
+import { glyphRows } from '../src/CE_Application/utils/pixelFont.js';
+import { PIXEL_ELEMENT_KINDS } from '../src/CE_Application/utils/pixelElements.js';
+import { ORBIT_OUTPUTS, nodeOutput } from '../src/CE_Application/utils/orbitLayout.js';
+import { VERB_VALUES } from '../src/CE_Application/scripting/componentTables.js';
 
 const byId = (id) => COMPONENT_VERB_BY_ID[id];
 
@@ -126,7 +130,8 @@ test('a number verb clamps rather than refusing', () => {
   const cfg = cfgFor('Arp');
   assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [0.4]), { gate: 0.4 });
   assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [99]), { gate: 1 });
-  assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [-99]), { gate: 0 });
+  // The arp's gate starts at 0.05, the inspector's end (item 4 of the owner's review of the arp).
+  assert.deepEqual(componentScriptPatch(byId('arpGate'), cfg, [-99]), { gate: 0.05 });
 });
 
 test('an int verb rounds', () => {
@@ -159,6 +164,35 @@ test('an xy verb moves one axis or both, and leaves the other alone', () => {
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [0.2, 0.8]), { x: 0.2, y: 0.8 });
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [0.2]), { x: 0.2 });
   assert.deepEqual(componentScriptPatch(byId('timbreMove'), cfg, [undefined, 0.8]), { y: 0.8 });
+});
+
+test('an xy verb given an axis that is not a number refuses the call, and moves neither', () => {
+  // timbre.move(t, "x", 0.8) moved y and dropped the "x" without a word, and returned true.
+  const verb = byId('timbreMove');
+  const cfg = cfgFor('Timbre');
+  assert.deepEqual(componentScriptPatch(verb, cfg, ['x', 0.8]), {});
+  assert.equal(componentRequestLegal(verb, cfg, ['x', 0.8]), false);
+  assert.equal(componentRefusalReason(verb, cfg, ['x', 0.8]), '"x" is not a number.');
+  assert.equal(componentRefusalReason(verb, cfg, []), 'No number was given.');
+  assert.equal(componentRequestLegal(verb, cfg, [undefined, 0.8]), true, 'one left out is still a move');
+  assert.deepEqual(verbArgOptional(verb), [true, true]);
+  assert.equal(MEMBER_BY_ID.timbreMove.signature, 'timbreMove(target [, x] [, y]) -> boolean');
+});
+
+test('the LCD cursor is held to the display, counted from 1, and whole', () => {
+  // cursorAt(t, 40, 9) on a 2 x 16 display was stored as it was and drawn nowhere; 2.6 was stored
+  // as 2.6, read back as 2.6 and drawn at 3.
+  const verb = byId('lcdCursorAt');
+  const display = { ...cfgFor('Display'), rows: 2, cols: 16, cursorCol: 0, cursorRow: 0 };
+  assert.deepEqual(componentScriptPatch(verb, display, [40, 9]), { cursorCol: 15, cursorRow: 1 });
+  assert.deepEqual(componentScriptPatch(verb, { ...display, cols: 20, rows: 4 }, [40, 9]), { cursorCol: 19, cursorRow: 3 });
+  assert.deepEqual(componentScriptPatch(verb, display, [2.6, 2]), { cursorCol: 2, cursorRow: 1 });
+  assert.deepEqual(componentScriptPatch(verb, display, [0, 1]), {}, '0 is column 1, where it is');
+  assert.equal(componentClampWarning(verb, 'Screen', [40, 9], display),
+    'lcd Screen: cursorAt(40, 9) — the col 40 is outside 1 to 16, so 16 was used.');
+  assert.equal(componentClampWarning(verb, 'Screen', [40, 'x'], display), null, 'a refused call used nothing');
+  assert.deepEqual(componentScriptPatch(verb, display, [5, 'x']), {});
+  assert.equal(componentRequestLegal(verb, display, [5, 'x']), false);
 });
 
 test('a nested xy verb merges into the object rather than replacing it', () => {
@@ -242,7 +276,8 @@ test('a verb that needs a list finds none and yields nothing', () => {
 // they have no patch to make and are exercised in scriptComponents.test.js instead.
 // …and `link`, which resolves a control NAME against the live panel — something the reducer is
 // deliberately blind to. Driven end to end in scriptControlSources.test.js instead.
-const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link'];
+// …and `layout`, which shows a layout the preview keeps, not the panel (lcdPositions.test.js).
+const REDUCERLESS_KINDS = ['read', 'size', 'fill', 'insert', 'remove', 'link', 'layout'];
 
 test('every verb either changes something or explains why it cannot', () => {
   // The catch-all. For each verb, feed it a plausible argument and assert the reducer produced a
@@ -257,9 +292,17 @@ test('every verb either changes something or explains why it cannot', () => {
     id: 'el_probe', name: 'probe', kind: 'static', text: '', label: '',
     x: 0, y: 0, w: 0, h: 0, visible: true, blink: false,
   };
+  // An LCD's zones live only on its layouts, so its probe zone is on one.
+  const PROBE_ZONE = {
+    id: 'z_probe', name: 'probe', row: 1, colStart: 1, colEnd: 8,
+    show: 'static', sourceId: '', text: '', label: '', align: 'left', radix: 'dec',
+  };
   const probeCfg = (verb) => {
     const cfg = cfgFor(verb.section);
     if (verb.k !== 'elem') return cfg;
+    if (verb.list === 'zones') {
+      return { ...cfg, layouts: [{ id: 'lay_probe', name: 'Probe', zones: [{ ...PROBE_ZONE }] }] };
+    }
     return {
       ...cfg,
       elements: [{ ...PROBE_ELEMENT }],
@@ -280,9 +323,20 @@ test('every verb either changes something or explains why it cannot', () => {
         const current = itemCurrent(verb, cfgFor(verb.section), 0);
         if (verb.kind === 'bool') return [1, !(current === true)];
         if (verb.kind === 'enum') return [1, verb.values.find((x) => x !== current)];
-        if (verb.kind === 'str') return [1, current === 'spec-probe' ? 'spec-probe-2' : 'spec-probe'];
+        if (verb.kind === 'str') {
+          // A verb that refuses what it cannot use (glyph takes only cells) is fed something it can.
+          const [one, two] = verb.refuseValue ? ['#', '.#'] : ['spec-probe', 'spec-probe-2'];
+          return [1, current === one ? two : one];
+        }
         // A number inside the ITEM's own range rather than a fixed 0.375, which lands on the
         // default of any integer item whose range does not happen to start near it.
+        // An item whose range is its own (an envelope's point lies between its neighbours, and the
+        // first is pinned at 0) is probed at element 2, inside that range.
+        if (verb.itemRange) {
+          const range = verb.itemRange(cfgFor(verb.section), 1);
+          const mid = (range.min + range.max) / 2;
+          return [2, mid === itemCurrent(verb, cfgFor(verb.section), 1) ? (range.min + mid) / 2 : mid];
+        }
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
         const hi = Number.isFinite(verb.max) ? verb.max : 1;
         const step = verb.kind === 'int' ? 1 : (hi - lo) / 3;
@@ -291,6 +345,9 @@ test('every verb either changes something or explains why it cannot', () => {
       }
       case 'elem': {
         // Addressed by NAME, and the element the probe carries answers to "probe".
+        if (verb.place) return ['probe', { row: 2, col: [3, 6] }];
+        if (verb.kind === 'enum') return ['probe', verb.values.find((x) => x !== (verb.list === 'zones' ? PROBE_ZONE : PROBE_ELEMENT)[verb.item])];
+        if (verb.list === 'zones' && verb.kind === 'bool') return ['probe', false];
         if (verb.kind === 'bool') return ['probe', !(PROBE_ELEMENT[verb.item] === true)];
         if (verb.kind === 'str') return ['probe', 'spec-probe'];
         const lo = Number.isFinite(verb.min) ? verb.min : 0;
@@ -637,8 +694,8 @@ test('a verb that rewrites a list of colours reads every colour in it, and names
     meter._children.Meter.zones[1].colour = 'redd';
     clearScriptTrace();
     assert.equal(api.meterZoneAt('M', 1, 0.1), false);
-    assert.deepEqual(lines(), ['error: ce.components.meter.zoneAt("M"): in zone 2, "redd" is not a colour the panel '
-      + 'can read, so nothing was set. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
+    assert.deepEqual(lines(), ['error: meter M: zoneAt(1, 0.1) — refused, nothing changed. In zone 2, "redd" is not a '
+      + 'colour the panel can read. A colour is 6 hex digits (RRGGBB) or 8 (AARRGGBB), with or without "#", '
       + 'or "#RGB", a CSS colour name, rgb() or hsl().']);
     assert.equal(meter._children.Meter.zones[0].from, 0, 'nothing was written');
   } finally {
@@ -678,16 +735,677 @@ test('every component verb has an example, notes and a text for each parameter, 
 test('the LCD\'s verbs say what each setting is, with its range and what is rejected', () => {
   const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
   assert.equal(MEMBER_BY_ID.lcdBrightness.summary, 'Set the brightness of the lit segments or pixels.');
-  assert.equal(text('lcdBrightness', 'brightness'), 'Brightness.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdBrightness', 'brightness'), 'How bright the lit characters are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // Item 8: no LCD parameter's text is only its name ("Brightness.", "Value prefix."), except
+  // valueMin and valueMax, kept as merged at the owner's word (item 5).
+  const nameOnly = COMPONENT_VERBS.filter((v) => v.family === 'lcd')
+    .flatMap((v) => MEMBER_BY_ID[v.id].params.map((p) => [v, p]))
+    .filter(([v, p]) => p.name !== 'target' && !['valueMin', 'valueMax'].includes(v.v)
+      && p.summary.split('\n')[0].toLowerCase().replace(/[^a-z]/g, '') === p.name.toLowerCase())
+    .map(([v, p]) => `${v.v}.${p.name}`);
+  assert.deepEqual(nameOnly, []);
+  assert.deepEqual(MEMBER_BY_ID.lcdValue.notes[0], 'While `valueSource()` links a control, that control sets the value and its range.');
+  assert.equal(text('lcdEditText', 'editText').split('\n')[1], 'Not held to the field\'s characters or length: those apply to typing.');
+  // Item 9: the four overlays say what each is, and a plural takes "they" in every example.
+  assert.equal(MEMBER_BY_ID.lcdShowGhost.summary, 'Show or hide the ghost: the faint unlit cells behind the text.');
+  assert.equal(MEMBER_BY_ID.lcdShowGrid.summary, 'Show or hide the grid: faint lines between the cells or pixels.');
+  assert.equal(MEMBER_BY_ID.lcdShowScanlines.example,
+    '`ce.components.lcd.showScanlines("Screen")` shows the scanlines if they are hidden, and hides them if they are shown.');
+  assert.equal(MEMBER_BY_ID.drumPadsZones.example,
+    '`ce.components.drumpads.zones("DrumPads")` switches the zones on if they are off, and off if they are on.');
+  assert.equal(MEMBER_BY_ID.lcdShowGlass.example,
+    '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
+  // Item 10: read's, size's and fill's texts name the component's own lists.
+  assert.equal(MEMBER_BY_ID.lcdRead.notes[0], '`read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. `read(target, "zoneText")`: every zone\'s, by name; `read(target, "zoneText", "Title")`: one zone\'s.');
+  assert.equal(MEMBER_BY_ID.lcdSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number.');
+  assert.equal(MEMBER_BY_ID.lcdFill.example, '`ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2.');
+  assert.equal(MEMBER_BY_ID.lcdFill.notes[0], 'One undo step for the whole list, instead of one per element.');
+  assert.equal(MEMBER_BY_ID.transportRead.notes[0], '`read(target)`: every setting as a table, by verb name.', 'no lists: no list sentence');
+  assert.equal(MEMBER_BY_ID.matrixSize.notes[0], '`size(target)`: every list as a table, by verb name; `size(target, "cell")`: { rows, cols }.');
+  // Item 11: a source any control can be says so once, and when it lights the backlight.
+  assert.equal(text('lcdBacklightSource', 'name'), 'The driving control\'s name.\nLeft out, or "": unlinked.\nOn while the control is on, or past halfway.\nNot on this panel: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.lcdBacklightSource.example, '`ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight.');
+  assert.match(text('lcdValueSource', 'name'), /Not on this panel, or not a knob, slider or other range control: rejected with a console error\.$/);
+  // Item 14: the preset speed takes the inspector's range, 0.1 to 5, on both displays. 0 played at
+  // normal speed and 0.02 at 0.05, neither of which the inspector could show.
+  for (const id of ['lcdAnimSpeed', 'pixelAnimSpeed']) {
+    const speed = COMPONENT_VERBS.find((v) => v.id === id);
+    assert.deepEqual(componentScriptPatch(speed, { animSpeed: 1 }, [0]), { animSpeed: 0.1 }, id);
+    assert.deepEqual(componentScriptPatch(speed, { animSpeed: 1 }, [8]), { animSpeed: 5 }, id);
+    assert.match(componentClampWarning(speed, 'Screen', [8], {}), /is outside 0\.1 to 5, so 5 was used\.$/);
+  }
+  assert.equal(text('lcdAnimSpeed', 'animSpeed'), 'Speed factor.\nRange: 0.1 ↔ 5.\n1: normal.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  for (const verb of COMPONENT_VERBS.filter((v) => v.k === 'fill')) {
+    assert.doesNotMatch(MEMBER_BY_ID[verb.id].example, /, values\)/, `${verb.id}: a list written out`);
+  }
   assert.equal(text('lcdScrollRepeat', 'scrollRepeat'), 'Number of times.\nRange: 0 ↔ 999, whole.\n0: forever.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
-  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-sensitive.\nInvalid: rejected with a console error.');
-  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0 or "": false; any other value: true.');
+  assert.equal(text('lcdScroll', 'scroll'), 'One of "off", "left" or "right". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('lcdBacklight', 'backlight'), 'Left out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
   assert.equal(text('lcdBacklight', 'target'), 'The LCD Display\'s control, by name.\nNot an LCD Display: rejected with a console error.');
-  assert.equal(text('lcdCursorAt', 'col').split('\n')[0], 'Column, counted from 1.');
+  assert.equal(text('lcdCursorAt', 'col'), 'Column, counted from 1.\nRange: 1 ↔ the display\'s columns.\nA fraction: rounded.\nOutside the range: the nearest end.\nLeft out: unchanged.\nInvalid: rejected with a console error.\nBoth left out: rejected with a console error.');
+  assert.equal(text('lcdCursorAt', 'row').split('\n')[1], 'Range: 1 ↔ the display\'s rows.');
+  assert.equal(MEMBER_BY_ID.lcdCursorAt.params.find((p) => p.name === 'col').required, false);
+  assert.equal(MEMBER_BY_ID.lcdCursorAt.notes[0], 'The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off".');
   assert.equal(MEMBER_BY_ID.lcdBacklight.example, '`ce.components.lcd.backlight("Screen")` switches the backlight on if it is off, and off if it is on.');
   assert.equal(MEMBER_BY_ID.lcdShowGlass.example, '`ce.components.lcd.showGlass("Screen")` shows the glass if it is hidden, and hides it if it is shown.');
   assert.equal(MEMBER_BY_ID.lcdValueSource.example, '`ce.components.lcd.valueSource("Screen", "Cutoff")` makes the control called Cutoff drive the value.');
-  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true; already that way: true, with a line in the console.', 'Rejected with a console error: false, and nothing changed.']);
+  assert.deepEqual(MEMBER_BY_ID.lcdValuePrefix.notes, ['Returns true. Already set: true, with a console line.', 'Rejected: false, with a console error. Nothing changes.']);
+  assert.deepEqual(MEMBER_BY_ID.lcdRead.notes.slice(-2), ['Returns the value.', 'Rejected: no result, with a console error.']);
+});
+
+// The owner's review of ce.components.arp, one item at a time (docs/design/api-descriptions-handoff.md).
+test('the Arpeggiator\'s verbs say what each setting does, as the owner approved them', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  // Item 1: pattern.
+  assert.equal(MEMBER_BY_ID.arpPattern.summary, 'Set the order the notes are played in.');
+  assert.equal(MEMBER_BY_ID.arpPattern.example, '`ce.components.arp.pattern("Arp", "updown")` plays the notes low to high, then back down.');
+  assert.equal(text('arpPattern', 'pattern'), ['"up": low to high.', '"down": high to low.',
+    '"updown": up, then down; the top and bottom notes once.', '"downup": down, then up; the same.',
+    '"asPlayed": in the order the notes were pressed. Its own chord: as "up".', '"random": one note at random each step.',
+    '"chord": every note at once, each step.', 'Case-insensitive.', 'Invalid: rejected with a console error.'].join('\n'));
+  assert.equal(MEMBER_BY_ID.arpPattern.notes[0], 'Default: "up".');
+  // Item 2: rate, the inspector's range.
+  assert.equal(MEMBER_BY_ID.arpRate.summary, 'Set how many steps a second it plays, while not synced.');
+  assert.equal(MEMBER_BY_ID.arpRate.example, '`ce.components.arp.rate("Arp", 8)` plays eight steps a second.');
+  assert.equal(text('arpRate', 'rate'), 'Steps per second.\nRange: 0.1 ↔ 40.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpRate.notes.slice(0, 2), ['While synced to the Transport: no effect; `division()` sets the step.', 'Default: 6.']);
+  const rate = COMPONENT_VERBS.find((verb) => verb.id === 'arpRate');
+  assert.deepEqual([rate.min, rate.max], [0.1, 40]);
+  assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [0.05]), { rate: 0.1 });
+  assert.deepEqual(componentScriptPatch(rate, { rate: 6 }, [300]), { rate: 40 });
+  // Item 3: octaves, what plays and what the inspector offers.
+  assert.equal(MEMBER_BY_ID.arpOctaves.summary, 'Set how many octaves the notes are repeated over, upward.');
+  assert.equal(MEMBER_BY_ID.arpOctaves.example, '`ce.components.arp.octaves("Arp", 2)` plays the notes, then the same notes an octave up.');
+  assert.equal(text('arpOctaves', 'octaves'), 'Octaves, from the notes up.\n1: the notes only.\nRange: 1 ↔ 4, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpOctaves.notes.slice(0, 3), ['A note above 127 is left out.', 'With "chord": every octave at once.', 'Default: 1.']);
+  const octaves = COMPONENT_VERBS.find((verb) => verb.id === 'arpOctaves');
+  assert.deepEqual(componentScriptPatch(octaves, { octaves: 1 }, [6]), { octaves: 4 });
+  // Item 4: gate, the inspector's range.
+  assert.equal(MEMBER_BY_ID.arpGate.summary, 'Set how long each note is held, as a part of its step.');
+  assert.equal(MEMBER_BY_ID.arpGate.example, '`ce.components.arp.gate("Arp", 0.5)` holds each note for half its step.');
+  assert.equal(text('arpGate', 'gate'), 'Part of the step.\n1: held to the next step; 99% of it, so a repeated note sounds again.\nRange: 0.05 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.arpGate.notes[0], 'Default: 0.6.');
+  const gate = COMPONENT_VERBS.find((verb) => verb.id === 'arpGate');
+  assert.deepEqual(componentScriptPatch(gate, { gate: 0.6 }, [0]), { gate: 0.05 });
+  // Item 5: swing, as the engine reads it, and whose swing a synced arp plays.
+  assert.equal(MEMBER_BY_ID.arpSwing.summary, 'Set how far every second step is delayed.');
+  assert.equal(MEMBER_BY_ID.arpSwing.example, '`ce.components.arp.swing("Arp", 0.5)` delays every second step by a quarter of a step.');
+  assert.equal(text('arpSwing', 'swing'), 'Part of half a step: 1 delays every second step by half a step.\n0: straight.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpSwing.notes.slice(0, 2), ['While synced: the Transport\'s swing, unless `swingSource()` is "own".', 'Default: 0.']);
+  const swing = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwing');
+  assert.deepEqual(componentScriptPatch(swing, { swing: 0.3 }, [-0.5]), { swing: 0 });
+  assert.equal(MEMBER_BY_ID.arpSwingSource.summary, 'Set whose swing a synced arp plays: the Transport\'s or its own.');
+  assert.equal(MEMBER_BY_ID.arpSwingSource.example, '`ce.components.arp.swingSource("Arp", "own")` plays its own swing while synced.');
+  assert.equal(text('arpSwingSource', 'swingSource'), '"transport": the Transport\'s swing, while synced.\n"own": `swing()`, always.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpSwingSource.notes.slice(0, 2), ['Not synced: its own swing, either way.', 'Default: "transport".']);
+  const source = COMPONENT_VERBS.find((verb) => verb.id === 'arpSwingSource');
+  assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['OWN']), { swingSource: 'own' });
+  assert.deepEqual(componentScriptPatch(source, { swingSource: 'transport' }, ['clock']), {});
+  // Item 6: phase is a seek (arpPhaseSeek.test.js drives it).
+  assert.equal(MEMBER_BY_ID.arpPhase.summary, 'Move the arp to a point in its sequence.');
+  assert.equal(MEMBER_BY_ID.arpPhase.example, '`ce.components.arp.phase("Arp", 0.5)` moves it halfway through its sequence.');
+  assert.equal(text('arpPhase', 'phase'), 'Where in the sequence: 0 the start, 0.5 halfway.\n1: the start again.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpPhase.notes.slice(0, 4), ['Running: the next step plays from there. Stopped: it starts from there.',
+    'While synced: no effect; the Transport\'s position decides.', '`read(target, "phase")` gives where it is now.', 'Nothing is written to the panel.']);
+  // Item 7: mute.
+  assert.equal(MEMBER_BY_ID.arpMute.summary, 'Mute or unmute one step.');
+  assert.equal(MEMBER_BY_ID.arpMute.example, '`ce.components.arp.mute("Arp", 3)` mutes step 3 if it plays, and lets it play if it is muted.');
+  assert.equal(text('arpMute', 'index'), 'Step number, counted from 1, as the cells are drawn from the left.\nA fraction: rounded.\nPast the last step: kept, for when the sequence grows.\nBelow 1, or invalid: rejected with a console error.');
+  assert.equal(text('arpMute', 'on'), 'true: muted.\nfalse: plays.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(MEMBER_BY_ID.arpMute.notes.slice(0, 3), ['A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change.',
+    '`read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted.', 'Default: none muted.']);
+  // Item 8: its own chord (arpOwnChord.test.js drives it).
+  assert.equal(MEMBER_BY_ID.arpKey.example, '`ce.components.arp.key("Arp", "F#")` builds its chord in F♯.');
+  assert.equal(MEMBER_BY_ID.arpKey.params.find((p) => p.name === 'key').type, 'number or name');
+  assert.equal(text('arpKey', 'key'), 'The key\'s note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B.\nPast 11 or below 0: round the octave; 12 is C.\nA fraction: rounded.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpKey.notes.slice(0, 3), ['Its own chord only: with `source()` "link" or "input" the notes come from there.',
+    'Following the panel\'s key: replaced at its next change.', 'Default: 0 (C).']);
+  assert.equal(MEMBER_BY_ID.arpDegree.summary, 'Set which step of the scale its chord is built on.');
+  assert.equal(text('arpDegree', 'degree'), 'Step of the scale, counted from 1: 1 is the key\'s own chord.\nRange: 1 ↔ the scale\'s notes: 7, 6 for "blues", 5 for the pentatonics.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(text('arpFollowPanelKey', 'followPanelKey'), 'true: the panel\'s key and scale, at once and at every change.\nfalse: its own.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.arpChordType.summary, 'Set how many notes its chord has.');
+  assert.equal(MEMBER_BY_ID.arpScale.summary, 'Set the scale of its own chord.');
+  // Item 15: the family. "Arp" in the examples, the summary, and read's texts.
+  assert.equal(MODULE_BY_ID['ce.components.arp'].summary.split(' Panel view only')[0],
+    'Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm.');
+  assert.equal(MEMBER_BY_ID.arpRead.example, '`ce.components.arp.read("Arp")` gives every setting as a table.');
+  assert.equal(text('arpRead', 'index'), 'For "mute": a step number, counted from 1; true if that step is muted.\nA fraction: rounded.\nBelow 1, or invalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpRead.notes.slice(0, 3), ['`read(target)`: every setting as a table, by verb name.', '`read(target, "phase")`: where it is now.',
+    '`read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is.']);
+  // Item 14: editable, showNotes and showHeader, declared rather than derived, in the same place.
+  assert.equal(MEMBER_BY_ID.arpEditable.summary, 'Let a click on a step mute it, or not.');
+  assert.equal(MEMBER_BY_ID.arpEditable.example, '`ce.components.arp.editable("Arp", false)` stops clicks muting steps.');
+  assert.equal(MEMBER_BY_ID.arpEditable.notes[0], 'Only clicks are locked: `mute()` still works.');
+  assert.equal(text('arpShowNotes', 'showNotes'), 'true: each step shows its note, "C3", or a chord\'s count, "3♪".\nfalse: hidden.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.arpShowNotes.notes[0], 'A step narrower than 22 or shorter than 26 pixels shows no name either way.');
+  assert.equal(MEMBER_BY_ID.arpShowHeader.example, '`ce.components.arp.showHeader("Arp", false)` hides the strip, and the steps take its room.');
+  const arpOrder = COMPONENT_VERBS.filter((verb) => verb.family === 'arp').map((verb) => verb.v);
+  assert.deepEqual(arpOrder.slice(arpOrder.indexOf('link'), arpOrder.indexOf('link') + 4), ['link', 'editable', 'showNotes', 'showHeader']);
+  assert.equal(arpOrder.filter((name) => name === 'editable').length, 1, 'declared once, not derived again');
+  // Item 13: velocity and channel.
+  assert.equal(MEMBER_BY_ID.arpVelocity.summary, 'Set how hard every note it plays is struck.');
+  assert.equal(MEMBER_BY_ID.arpVelocity.example, '`ce.components.arp.velocity("Arp", 110)` plays every note at velocity 110.');
+  assert.equal(text('arpVelocity', 'velocity'), 'MIDI velocity.\nRange: 1 ↔ 127, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpVelocity.notes.slice(0, 2), ['The same for every note: the velocity the notes were held at is not used.', 'Default: 96.']);
+  assert.equal(MEMBER_BY_ID.arpChannel.summary, 'Set which MIDI channel it plays on.');
+  assert.equal(MEMBER_BY_ID.arpChannel.example, '`ce.components.arp.channel("Arp", 10)` plays its notes on channel 10.');
+  assert.equal(text('arpChannel', 'channel'), 'MIDI channel.\nRange: 1 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // Item 12: the Euclidean rhythm.
+  assert.equal(MEMBER_BY_ID.arpEuclid.summary, 'Switch the Euclidean rhythm on or off.');
+  assert.equal(MEMBER_BY_ID.arpEuclid.example, '`ce.components.arp.euclid("Arp", true)` plays only the steps the rhythm hits.');
+  assert.equal(MEMBER_BY_ID.arpEuclid.notes[0], 'The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`.');
+  assert.equal(MEMBER_BY_ID.arpEuclidSteps.summary, 'Set how many steps the rhythm is long.');
+  assert.equal(text('arpEuclidPulses', 'euclidPulses'), 'Hits, spread as evenly as they go.\n0: none sound.\nRange: 0 ↔ `euclidSteps()`, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.arpEuclidPulses.notes[0], 'Steps lowered below it later: every step sounds.');
+  assert.equal(MEMBER_BY_ID.arpEuclidRotate.example, '`ce.components.arp.euclidRotate("Arp", 1)` moves every hit a step earlier.');
+  assert.equal(text('arpEuclidRotate', 'euclidRotate'), 'Steps to turn it: each hit that many steps earlier.\nPast the steps, or below 0: round them; -1 is the last.\nA fraction: rounded.\nInvalid: rejected with a console error.');
+  // Item 11: run, sync and division.
+  assert.equal(MEMBER_BY_ID.arpRun.summary, 'Start or stop the arp.');
+  assert.equal(MEMBER_BY_ID.arpRun.example, '`ce.components.arp.run("Arp", false)` stops it.');
+  assert.equal(text('arpRun', 'run'), 'true: plays.\nfalse: stops.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(MEMBER_BY_ID.arpRun.notes.slice(0, 3), ['Free-running: it starts again where it stopped.', 'Synced: it plays only while the Transport runs.', 'Default: true.']);
+  assert.equal(MEMBER_BY_ID.arpSync.summary, 'Follow the Transport\'s tempo, or run at its own rate.');
+  assert.equal(MEMBER_BY_ID.arpSync.example, '`ce.components.arp.sync("Arp", true)` steps in time with the Transport, one step per `division()`.');
+  assert.match(text('arpSync', 'sync'), /^true: one step per `division\(\)` at the Transport's tempo, in step with its position\.\nfalse: `rate\(\)` steps a second\.\nLeft out: toggles\./);
+  assert.equal(MEMBER_BY_ID.arpDivision.summary, 'Set how long each step is while synced.');
+  assert.equal(MEMBER_BY_ID.arpDivision.example, '`ce.components.arp.division("Arp", "1/8T")` plays eighth-note triplets.');
+  assert.equal(text('arpDivision', 'division'), ['A note value, "1/1" a whole note to "1/32".', '"D" after it: dotted, half as long again.',
+    '"T" after it: a triplet, two-thirds as long.',
+    'One of "1/1", "1/2", "1/4", "1/8", "1/16", "1/32", "1/2D", "1/4D", "1/8D", "1/16D", "1/2T", "1/4T", "1/8T" or "1/16T". Case-insensitive.',
+    'Invalid: rejected with a console error.'].join('\n'));
+  // Item 10: source, link and inputChannel.
+  assert.equal(MEMBER_BY_ID.arpSource.summary, 'Set where the notes come from.');
+  assert.equal(text('arpSource', 'source'), '"chord": its own chord, from `key()`, `scale()` and `degree()`.\n"link": the notes held on the Chord Pad set by `link()`.\n"input": the notes held on the MIDI input, on `inputChannel()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.arpLink.summary, 'Set the Chord Pad it plays from.');
+  assert.equal(MEMBER_BY_ID.arpLink.example, '`ce.components.arp.link("Arp", "Pads")` plays the chords held on the Chord Pad called Pads.');
+  assert.equal(text('arpLink', 'name'), 'The Chord Pad\'s name. Case-insensitive.\nLeft out, or "": none.\nNot on this panel, or not a Chord Pad: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.arpLink.notes.slice(0, 3), ['Played only while `source()` is "link".', 'The Chord Pad stays silent while the arp plays from it.', 'Default: none.']);
+  assert.equal(MEMBER_BY_ID.arpInputChannel.summary, 'Set which MIDI channel it takes notes from.');
+  assert.equal(text('arpInputChannel', 'inputChannel'), 'Channel 1 ↔ 16, or 0: any channel.\nRange: 0 ↔ 16, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // Item 9: latch.
+  assert.equal(MEMBER_BY_ID.arpLatch.summary, 'Keep playing the last notes held after they are let go.');
+  assert.equal(MEMBER_BY_ID.arpLatch.example, '`ce.components.arp.latch("Arp", true)` keeps playing the last chord held on the linked Chord Pad after it is let go.');
+  assert.equal(text('arpLatch', 'latch'), 'true: the last notes held keep playing.\nfalse: it stops when they are let go.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(MEMBER_BY_ID.arpLatch.notes.slice(0, 4), ['With `source()` "link" or "input" only: its own chord always plays.',
+    'Notes held again replace the latched ones.', 'A Panic lets them go.', 'Default: false.']);
+  assert.equal(MEMBER_BY_ID.arpBaseOctave.example, '`ce.components.arp.baseOctave("Arp", 4)` puts the chord\'s root in octave 4, as in C4, middle C.');
+});
+
+// The owner's review of ce.components.pixel, one item at a time (docs/design/api-descriptions-handoff.md).
+test('the Pixel Display\'s verbs say what each setting does, as the owner approved them', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  // Item 1: show and blink, and the name all eight element verbs take.
+  const name = 'The element\'s name, as given in the element table. Case-insensitive.\nEvery element with that name, on every layout.\nNot an element of the display: rejected with a console error.';
+  for (const id of ['pixelText', 'pixelLabel', 'pixelShow', 'pixelBlink', 'pixelX', 'pixelY', 'pixelW', 'pixelH']) assert.equal(text(id, 'name'), name, id);
+  assert.equal(MEMBER_BY_ID.pixelShow.summary, 'Show or hide an element, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelShow.example, '`ce.components.pixel.show("Screen", "Title")` hides the element called Title if it is shown, and shows it if it is hidden.');
+  assert.equal(text('pixelShow', 'on'), 'true: shown.\nfalse: hidden.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.summary, 'Make an element blink, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.example, '`ce.components.pixel.blink("Screen", "Title")` makes the element called Title blink if it is steady, and steady if it blinks.');
+  assert.equal(text('pixelBlink', 'on'), 'true: blinks: 530 ms shown, 530 ms hidden.\nfalse: steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.equal(MEMBER_BY_ID.pixelBlink.notes[0], 'Every blinking element blinks in step. A hidden element does not blink.');
+  // Item 2: x, y, w and h, as the renderer draws them.
+  const range = (min) => `Range: ${min} ↔ 4096, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.`;
+  const offScreen = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
+  const textKinds = 'The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock".';
+  assert.equal(MEMBER_BY_ID.pixelX.summary, 'Set an element\'s left edge, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelX.example, '`ce.components.pixel.x("Screen", "Title", 10)` puts the element called Title 10 pixels from the screen\'s left edge.');
+  assert.equal(text('pixelX', 'x'), `Pixels of the grid, from the screen's left edge; 0: at the edge.\n${range(-4096)}`);
+  assert.equal(MEMBER_BY_ID.pixelX.notes[0], offScreen);
+  assert.equal(MEMBER_BY_ID.pixelY.summary, 'Set an element\'s top edge, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelY.example, '`ce.components.pixel.y("Screen", "Title", 20)` puts the element called Title 20 pixels below the screen\'s top edge.');
+  assert.equal(text('pixelY', 'y'), `Pixels of the grid, from the screen's top edge; 0: at the edge.\n${range(-4096)}`);
+  assert.equal(MEMBER_BY_ID.pixelY.notes[0], offScreen);
+  assert.equal(MEMBER_BY_ID.pixelW.summary, 'Set an element\'s width, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelW.example, '`ce.components.pixel.w("Screen", "Title", 64)` makes the element called Title 64 pixels wide.');
+  assert.equal(text('pixelW', 'w'), ['Pixels of the grid.', 'A text kind: the box its text is aligned and cut in; 0: as wide as the text.',
+    'Any other kind: its width; drawn at least 1 wide, 4 for "anim".', range(0)].join('\n'));
+  assert.deepEqual(MEMBER_BY_ID.pixelW.notes.slice(0, 2), [textKinds, 'A text kind 0 wide is not wrapped or scrolled.']);
+  assert.equal(MEMBER_BY_ID.pixelH.summary, 'Set an element\'s height, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelH.example, '`ce.components.pixel.h("Screen", "Title", 16)` draws the text of the element called Title at twice the size.');
+  assert.equal(text('pixelH', 'h'), ['Pixels of the grid.',
+    'A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height.',
+    'Any other kind: its height; drawn at least 1 high, 4 for "anim".', range(0)].join('\n'));
+  assert.equal(MEMBER_BY_ID.pixelH.notes[0], textKinds);
+  // Item 3: text and label, which kinds draw each, and what the font cannot.
+  assert.equal(MEMBER_BY_ID.pixelText.summary, 'Set the text of a "static" element, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelText.example, '`ce.components.pixel.text("Screen", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title.');
+  assert.equal(text('pixelText', 'text'), ['The text.', 'Shown by "static", between its prefix and suffix.',
+    'Shown by "name" while it has no label and no control, and by "edit" while its control has no text.',
+    '"\\n": a new line while the element wraps; a blank otherwise.',
+    'A character the font cannot draw: a blank. The built-in font has none for $ & ^ ` { | } ~ and letters with accents.',
+    'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
+  assert.equal(MEMBER_BY_ID.pixelLabel.summary, 'Set an element\'s caption, or the name a "name" element shows, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelLabel.example, '`ce.components.pixel.label("Screen", "Cutoff", "CUT")` shows CUT under the element called Cutoff.');
+  assert.equal(text('pixelLabel', 'label'), ['The text.', '"name": shown in place of its control\'s name; "": the control\'s name.',
+    '"hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none.',
+    'Other kinds: not shown.', 'A character the font cannot draw: a blank.', 'A number: written as text.', 'Left out: rejected with a console error.'].join('\n'));
+  const lacking = Array.from({ length: 95 }, (_, i) => String.fromCharCode(32 + i)).filter((c) => !glyphRows(c));
+  assert.deepEqual(lacking, ['$', '&', '^', '`', '{', '|', '}', '~'], 'the printable ASCII the built-in font has no glyph for, as the text names it');
+  // Item 4: kind and source, as the LCD's zones have them; the kinds are the inspector's.
+  assert.equal(MEMBER_BY_ID.pixelKind.summary, 'Set what an element is, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelKind.example, '`ce.components.pixel.kind("Screen", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar.');
+  assert.equal(text('pixelKind', 'kind'), 'One of "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon", "clock", "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope", "adsr", "anim" or "bitmap". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.pixelKind.notes[0], 'Its other settings are kept: its place, size, text and source.');
+  assert.deepEqual(byId('pixelKind').values, PIXEL_ELEMENT_KINDS);
+  assert.equal(MEMBER_BY_ID.pixelSource.summary, 'Link an element to a control, by its name.');
+  assert.equal(MEMBER_BY_ID.pixelSource.example, '`ce.components.pixel.source("Screen", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance.');
+  assert.equal(text('pixelSource', 'control'), text('lcdZoneSource', 'control'));
+  assert.equal(text('pixelSource', 'control'), ['The control\'s name. Case-insensitive.', '"": unlinked.', '"@active": the control last touched.',
+    '"@active#value", "@active#switch" or "@active#choice": the last of that kind.', '"@edit": the display\'s editable field.',
+    'This display, or not on this panel: rejected with a console error.', 'Left out: rejected with a console error.'].join('\n'));
+  assert.deepEqual(MEMBER_BY_ID.pixelSource.notes.slice(0, 3), [
+    'Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"\'s level and "scope". Not used by "adsr", "anim" or "bitmap".',
+    '"wave"\'s cutoff, resonance, LFO and pitch, and "adsr"\'s four: set in the inspector.',
+    '`read(target, "source", "Cutoff")` gives the control\'s name.']);
+  // Items 5 to 13: the screen as a whole, as the canvas and the renderer draw it.
+  assert.equal(MEMBER_BY_ID.pixelBrightness.summary, 'Set how bright the lit pixels are.');
+  assert.equal(text('pixelBrightness', 'brightness'), 'How bright the lit pixels are.\nRange: 0 ↔ 100.\n0: the dimmest, still lit: a tenth as bright.\nShaped by `gamma()`.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.pixelBrightness.notes.slice(0, 2), ['While `brightnessSource()` links a control, that control sets the brightness.', 'Default: 100.']);
+  assert.equal(MEMBER_BY_ID.pixelContrast.summary, 'Set the contrast: how visible the unlit pixels are.');
+  assert.equal(text('pixelContrast', 'contrast'), 'How visible the unlit pixels are.\nAlso how strongly the backlight glows.\nRange: 0 ↔ 100.\n0: the unlit pixels at their faintest, still visible.\n100: the unlit pixels half opaque.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(MEMBER_BY_ID.pixelContrast.notes.slice(0, 2), ['The unlit pixels show only while `showGhost()` is on.', 'Default: 55.']);
+  // Gamma: the canvas's and the inspector's 0.2, where 0.1 was stored and drawn as 0.2.
+  assert.deepEqual([byId('pixelGamma').min, byId('pixelGamma').max], [0.2, 4]);
+  assert.deepEqual(componentScriptPatch(byId('pixelGamma'), { gamma: 1 }, [0.1]), { gamma: 0.2 });
+  assert.equal(text('pixelGlow', 'glow'), 'How large and strong the halo is.\n0: none.\n1: the largest, 2.6 times a pixel\'s size.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // The animation layer: the LCD's texts.
+  for (const v of ['Anim', 'AnimPreset', 'AnimSpeed', 'AnimLoop', 'AnimFps']) {
+    assert.equal(text(`pixel${v}`, `a${v.slice(1)}`), text(`lcd${v}`, `a${v.slice(1)}`), v);
+  }
+  assert.equal(MEMBER_BY_ID.pixelAnim.summary, 'Set the animation behind the elements: off, a file, or a preset.');
+  // A layout's transition: the inspector's 2000 ms, where 5000 was stored.
+  assert.equal(text('pixelLayoutTransition', 'layoutTransition'), '"none": at once.\n"fade": faded in.\n"slide": faded in, sliding from the right.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.deepEqual(componentScriptPatch(byId('pixelTransitionMs'), { transitionMs: 250 }, [3000]), { transitionMs: 2000 });
+  assert.equal(text('pixelEditText', 'editText'), 'The text in the field.\nShown by an "edit" element linked to "@edit".\nNot held to the field\'s characters or length: those apply to typing.\nA number: written as text.\nLeft out: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.pixelShowGrid.summary, 'Show or hide the design grid: lines every few pixels, in the editor only.');
+  assert.equal(MEMBER_BY_ID.pixelShowGhost.summary, 'Show or hide the ghost: the faint unlit pixels behind the elements.');
+  // Item 14: the family.
+  assert.equal(MEMBER_BY_ID.pixelRead.example, '`ce.components.pixel.read("Screen")` gives every setting as a table.');
+  assert.equal(text('pixelRead', 'index'), 'For an element verb, such as "text": the element\'s name. Case-insensitive.\nLeft out: every element\'s, by name.\nNot an element of the display: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.pixelRead.params.find((p) => p.name === 'index').type, 'string');
+  // …and a number past the range is said, one that is not a number refused with why.
+  const cfg = pixelCfg();
+  assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['title', -3], cfg), 'pixel Px: w("title", -3) — the w -3 is outside 0 to 4096, so 0 was used.');
+  assert.equal(componentClampWarning(byId('pixelW'), 'Px', ['tempo', -3], cfg), null, 'no such element: refused, nothing used');
+  assert.equal(componentRefusalReason(byId('pixelX'), cfg, ['title', 'left']), '"left" is not a number.');
+  assert.equal(componentRefusalReason(byId('pixelX'), cfg, ['title']), 'No number was given.');
+});
+
+test('an element without `visible` is shown and one without `blink` steady, so a bare call starts from there', () => {
+  // The renderer draws an element unless `visible` is false. The toggle started from the missing
+  // value, so the first show() on such an element wrote the true it already was and nothing hid.
+  const cfg = pixelCfg();
+  delete cfg.elements[0].visible;
+  delete cfg.layouts[0].elements[0].visible;
+  const show = byId('pixelShow');
+  const hidden = componentScriptPatch(show, cfg, ['title']);
+  assert.equal(hidden.elements[0].visible, false, 'the first bare show hides it');
+  assert.equal(hidden.layouts[0].elements[0].visible, false, 'on the page too');
+  assert.deepEqual(componentScriptPatch(show, cfg, ['title', true]), {}, 'shown already: nothing to write');
+  assert.equal(componentRequestLegal(show, cfg, ['title', true]), true);
+  const blink = byId('pixelBlink');
+  assert.equal(componentScriptPatch(blink, cfg, ['title']).elements[0].blink, true, 'a bare blink starts it');
+  assert.deepEqual(componentScriptPatch(blink, cfg, ['title', false]), {}, 'steady already');
+});
+
+// ce.components.meter, done in one pass at the owner's word (docs/design/api-descriptions-handoff.md).
+test('the Meter\'s verbs say what MeterRenderer draws for each', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  const summaries = {
+    meterValue: 'Set the level shown, in the meter\'s own units.',
+    meterScale: 'Set how the level is placed along the meter: in proportion, or in decibels.',
+    meterPeakHold: 'Show or hide the peak marker: a line at the highest recent level.',
+    meterHoldMs: 'Set how long the peak marker holds before it falls.',
+    meterDecay: 'Set how fast the peak marker falls.',
+    meterValueMin: 'Set the value at which the meter is empty.',
+    meterValueMax: 'Set the value at which the meter is full.',
+    meterDbFloor: 'Set the level in decibels at which the meter is empty, on a dB scale.',
+    meterDbCeil: 'Set the level in decibels at which the meter is full, on a dB scale.',
+    meterOrientation: 'Set which way the meter runs: across, up, or round an arc.',
+    meterGradient: 'Blend the zone colours into each other, or step from one to the next.',
+    meterLabel: 'Set the caption shown with the meter.',
+    meterLabelPosition: 'Set where the caption sits.',
+    meterValuePrecision: 'Set how many decimal places the readout shows.',
+    meterZoneAt: 'Set where a colour zone starts along the meter, by its number.',
+    meterSource: 'Name the control that drives the level.',
+    meterShowValue: 'Show or hide the readout: the value as a number.',
+  };
+  for (const [id, summary] of Object.entries(summaries)) assert.equal(MEMBER_BY_ID[id].summary, summary, id);
+  assert.equal(MEMBER_BY_ID.meterValue.example, '`ce.components.meter.value("Meter", 0.5)` fills the meter halfway while its range is 0 to 1.');
+  assert.equal(text('meterScale', 'scale'), '"linear": in proportion to the value.\n"db": the value\'s part of its range as a level in decibels, the top of the range being 0 dB, placed between `dbFloor()` and `dbCeil()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('meterDecay', 'decay'), 'Lengths of the meter per second.\n0: it does not fall.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.meterValue.notes[0], 'While `source()` links a control, that control sets the value and its range.');
+  assert.deepEqual(MEMBER_BY_ID.meterGradient.notes.slice(0, 1), ['Default: on; a Progress Bar\'s: off.']);
+  // The caption's position is new: the caption is drawn only where it says, and only the inspector could.
+  assert.deepEqual(byId('meterLabelPosition').values, ['none', 'above', 'below']);
+  assert.deepEqual(componentScriptPatch(byId('meterLabelPosition'), { labelPosition: 'none' }, ['Below']), { labelPosition: 'below' });
+});
+
+// ce.components.chordpad, done in one pass at the owner's word.
+test('the Chord Pad\'s verbs say what its pads build and play', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  const summaries = {
+    chordPadMode: 'Set what a pad plays: a chord, or one note of the scale.',
+    chordPadKey: 'Set the key the pads are built in.',
+    chordPadVoicing: 'Set how each chord\'s notes are spread.',
+    chordPadInversion: 'Set how many of each chord\'s lowest notes move up an octave.',
+    chordPadStrum: 'Set the time between a chord\'s notes, lowest first.',
+    chordPadLayout: 'Set how the pads are laid out: a circle of fifths, or a grid.',
+    chordPadEcho: 'Light the pads from the notes held on the MIDI input, as well as from taps.',
+    chordPadShowRomans: 'Show or hide the roman numerals on the pads, such as "I", "ii" and "♭VII".',
+  };
+  for (const [id, summary] of Object.entries(summaries)) assert.equal(MEMBER_BY_ID[id].summary, summary, id);
+  assert.equal(MEMBER_BY_ID.chordPadMode.notes[0], 'With `layout()` "wheel": chords either way.');
+  assert.equal(text('chordPadStrum', 'strum'), 'Milliseconds from one note to the next.\n0: all at once.\nRange: 0 ↔ 2000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  // The key reads as the arp's: a note's name, or a number round the octave.
+  assert.equal(text('chordPadKey', 'key'), text('arpKey', 'key'));
+  const key = byId('chordPadKey');
+  assert.deepEqual(componentScriptPatch(key, { key: 0 }, ['Eb']), { key: 3 });
+  assert.deepEqual(componentScriptPatch(key, { key: 0 }, [14]), { key: 2 }, '14 is D, round the octave');
+  assert.equal(componentRefusalReason(key, { key: 0 }, ['H']), '"H" is not a note: a name such as "C", "F#" or "Eb", or 0 to 11.');
+  assert.equal(MEMBER_BY_ID.chordPadKey.params.find((p) => p.name === 'key').type, 'number or name');
+});
+
+// ce.components.noteribbon, done in one pass at the owner's word.
+test('the Note Ribbon\'s verbs say what the strip plays and sends', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.noteRibbonMode.summary, 'Set how the strip plays: the notes of the scale, every semitone, or a gliding pitch.');
+  assert.equal(text('noteRibbonMode', 'mode'), '"snap": the notes of the scale only, one zone each.\n"chromatic": every semitone, one zone each.\n"glide": the pitch follows the finger, by pitch bend; past `bendRange()` the note starts again from a new one.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('noteRibbonVelocityFrom', 'velocityFrom'), '"fixed": `velocity()`.\n"position": 8 at the bottom edge to 127 at the top; a vertical strip\'s left edge to its right.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('noteRibbonKey', 'key'), text('arpKey', 'key'));
+  assert.deepEqual(componentScriptPatch(byId('noteRibbonKey'), { key: 0 }, ['bb']), { key: 10 });
+  // Whole semitones, as the engine reads the bend range.
+  assert.deepEqual(componentScriptPatch(byId('noteRibbonBendRange'), { bendRange: 2 }, [2.6]), { bendRange: 3 });
+});
+
+// ce.components.drumpads, done in one pass at the owner's word.
+test('the Drum Pads\' verbs say what drumPadLayout.js resolves and a hit plays', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.drumPadsMap.summary, 'Set how the pads are named, and whether the hi-hats choke each other.');
+  assert.equal(text('drumPadsMap', 'map'), '"gm": General MIDI drum names; the closed, pedal and open hi-hats choke each other.\n"chromatic": named by pitch.\n"custom": named as "gm", no choke groups.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('drumPadsVelocityFrom', 'velocityFrom'), '"fixed": `velocity()`.\n"position": how high up the pad it lands, 10 at the bottom to 127 at the top.\n"centre": `velocity()` in the middle, down to 28% of it at the edges.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.match(text('drumPadsCornerBottomRight', 'cornerBottomRight'), /^"none": a plain hit\.\n"roll": rolls while held/);
+  assert.equal(MEMBER_BY_ID.drumPadsNote.summary, 'Set the note one pad plays, by its number.');
+  // The gate takes what the engine plays and the inspector offers: 5 to 2000 ms, whole.
+  const gate = byId('drumPadsGate');
+  assert.deepEqual([gate.min, gate.max], [5, 2000]);
+  assert.deepEqual(componentScriptPatch(gate, { gateMs: 60 }, [1]), { gateMs: 5 });
+  assert.deepEqual(componentScriptPatch(gate, { gateMs: 60 }, [99.6]), { gateMs: 100 });
+});
+
+// ce.components.transport, done in one pass at the owner's word.
+test('the Transport\'s verbs take the clock\'s own ranges and say what each sets', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  const range = (id) => [byId(id).min, byId(id).max];
+  // The clock's ranges (transportLayout.js), where a script reached past each.
+  assert.deepEqual(range('transportBpm'), [20, 300]);
+  assert.deepEqual(range('transportSwing'), [0, 1]);
+  assert.deepEqual(range('transportLoopStart'), [1, 999]);
+  assert.deepEqual(range('transportLoopBars'), [0.25, 64]);
+  assert.deepEqual(range('transportCountIn'), [0, 8]);
+  assert.deepEqual(componentScriptPatch(byId('transportLoopBars'), { loopLengthBars: 4 }, [0.5]), { loopLengthBars: 0.5 }, 'half a bar, as the inspector takes');
+  assert.deepEqual(componentScriptPatch(byId('transportBpm'), { bpm: 120 }, [400]), { bpm: 300 });
+  assert.equal(MEMBER_BY_ID.transportSource.summary, 'Set which clock the panel follows: its own, a MIDI clock, or the host.');
+  assert.equal(text('transportSwing', 'swing'), 'Part of half a step: 1 delays every second step by half a step.\n0: straight.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.transportBeatUnit.notes[0], 'Shown only: a beat is a quarter note whatever it says.');
+});
+
+// ce.components.envelope, done in one pass at the owner's word.
+test('the Envelope\'s verbs keep its points as the canvas does, and its preset seeds its shape', () => {
+  const env = () => ({ ...SECTION_DEFAULTS.Envelope });
+  // preset() writes the shape with the name, as the inspector's Preset does.
+  const seeded = componentScriptPatch(byId('envelopePreset'), env(), ['AD']);
+  assert.equal(seeded.preset, 'ad');
+  assert.deepEqual(seeded.points.map((p) => [p.x, p.y]), [[0, 0], [0.3, 1], [1, 0]]);
+  assert.equal(seeded.sustainIndex, -1);
+  // A point stays between its neighbours; the first at 0, the last at 1.
+  const pointX = byId('envelopePointX');
+  assert.equal(componentScriptPatch(pointX, env(), [2, 0.9]).points[1].x, 0.5, 'point 2 stops at point 3');
+  assert.deepEqual(componentScriptPatch(pointX, env(), [1, 0.3]), {}, 'point 1 stays at 0');
+  assert.equal(componentClampWarning(pointX, 'Env', [2, 0.9], env()), 'envelope Env: pointX(2, 0.9) — the x 0.9 is outside 0 to 0.5, so 0.5 was used.');
+  // Counted from 1 to the points there are; 0 was stored as -1.
+  assert.deepEqual(componentScriptPatch(byId('envelopeLoopStart'), env(), [0]), {}, '0 is 1, point 1, already the start');
+  assert.deepEqual(componentScriptPatch(byId('envelopeLoopEnd'), env(), [9]), { loopEnd: 3 }, 'past the points: the last');
+  assert.deepEqual(componentScriptPatch(byId('envelopeSustain'), env(), [0]), { sustainIndex: -1 }, '0: none');
+  assert.equal(MEMBER_BY_ID.envelopePreset.summary, 'Give the envelope a preset shape.');
+  assert.equal(MEMBER_BY_ID.envelopePointX.summary, 'Move one point along the time axis, by its number.');
+  assert.equal(MEMBER_BY_ID.envelopeTimeMax.notes[0], 'The times read out only: it does not change the shape.');
+});
+
+// ce.components.turing, done in one pass at the owner's word.
+test('the Turing Machine\'s verbs say what the loop does, and its length starts at 2, as it plays', () => {
+  assert.deepEqual([byId('turingLength').min, byId('turingLength').max], [2, 64]);
+  assert.deepEqual(componentScriptPatch(byId('turingLength'), { length: 8 }, [1]), { length: 2 });
+  assert.ok(byId('turingPhase').seek, 'phase is a seek, as the arp\'s');
+  assert.equal(MEMBER_BY_ID.turingRandomness.summary, 'Set how likely a step is to change as the loop comes round to it.');
+  assert.equal(MEMBER_BY_ID.turingQuantize.params.find((p) => p.name === 'quantize').summary.split('\n')[1], '0 or 1: not snapped.');
+  assert.equal(MEMBER_BY_ID.turingRun.example, '`ce.components.turing.run("Turing", false)` stops it on the step it is at.');
+});
+
+// ce.components.crossfader, done in one pass at the owner's word.
+test('the Crossfader\'s verbs say how the blend sounds and springs back', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.crossfaderMix.summary, 'Set the blend between A and B.');
+  assert.equal(text('crossfaderLaw', 'law'), '"equalPower": constant loudness; each side at 71% (-3 dB) in the middle.\n"linear": the two add up to 1; each side at half (-6 dB) in the middle.\n"sharp": both full through the middle; a side cut only towards the far end.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(text('crossfaderReturnMode', 'returnMode'), '"none": it stays where it is let go.\n"center": back to the middle.\n"min": back to all A.\n"max": back to all B.\n"rest": back to `returnValue()`.\nCase-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.crossfaderDetent.notes[0], 'A drag only: `mix()` is not snapped.');
+});
+
+// ce.components.router, done in one pass at the owner's word.
+test('the Router\'s verbs say what it follows and sends, and its curve keeps its points in order', () => {
+  const cfg = { ...SECTION_DEFAULTS.Router };
+  const curveX = byId('routerCurveX');
+  assert.deepEqual(componentScriptPatch(curveX, cfg, [1, 0.3]), {}, 'the first point stays at 0');
+  assert.equal(componentScriptPatch(curveX, cfg, [2, 1.5]).curve[1].x, cfg.curve[2].x, 'point 2 stops at point 3');
+  assert.equal(MEMBER_BY_ID.routerSource.summary, 'Set the signal it follows.');
+  assert.equal(MEMBER_BY_ID.routerDestDepth.params.find((p) => p.name === 'depth').summary.split('\n')[1], 'Below 0: the curve upside down.');
+});
+
+// ce.components.ribbon, done in one pass at the owner's word.
+test('the Ribbon\'s verbs say what a strip or wheel sends, and where it goes when let go', () => {
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(MEMBER_BY_ID.ribbonValue.summary, 'Set its position.');
+  assert.equal(MEMBER_BY_ID.ribbonSnap.notes[0], 'A drag only: `value()` is not snapped.');
+  assert.equal(text('ribbonStyle', 'style').split('\n')[2], '"wheel3d": a wheel drawn in 3D.');
+  assert.ok(MEMBER_BY_ID.ribbonReturnMode, 'the return spring is the Crossfader\'s, worded for a strip');
+});
+
+// ce.components.kinetic, done in one pass at the owner's word.
+test('the Kinetic\'s gravity and bounce take what the ball plays', () => {
+  // The physics plays 0..4 and 0..1 (kineticParams): an upward pull played as none, and a wall
+  // that kept more than all of the ball's speed played as one that kept it all.
+  assert.deepEqual([byId('kineticGravity').min, byId('kineticGravity').max], [0, 4]);
+  assert.deepEqual([byId('kineticBounce').min, byId('kineticBounce').max], [0, 1]);
+  assert.deepEqual(componentScriptPatch(byId('kineticGravity'), { ...SECTION_DEFAULTS.Kinetic }, [-1]), {}, '-1 is 0, already set');
+  assert.equal(MEMBER_BY_ID.kineticLaunch.notes[0], 'With the speed `velocity()` sets. A running ball is thrown again at once.');
+});
+
+// ce.components.orbit, done in one pass at the owner's word.
+test('the Orbit\'s phase is a seek, and its bars and depth take what it plays', () => {
+  assert.ok(byId('orbitPhase').seek, 'phase is a seek, as the arp\'s');
+  assert.equal(byId('orbitPhase').seek.clock, 'syncToTransport');
+  // orbitCycleBars plays 0.25..64; orbitNodes clamps a depth to 0..1.
+  assert.deepEqual([byId('orbitBars').k, byId('orbitBars').min, byId('orbitBars').max], ['num', 0.25, 64]);
+  assert.deepEqual([byId('orbitNodeDepth').min, byId('orbitNodeDepth').max], [0, 1]);
+  const cfg = { ...SECTION_DEFAULTS.Orbit };
+  assert.equal(componentScriptPatch(byId('orbitNodeDepth'), cfg, [2, -0.5]).nodes[1].depth, 0);
+  assert.deepEqual(componentScriptPatch(byId('orbitBars'), cfg, [0.5]), { cycleBars: 0.5 });
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(text('orbitNodeRatio', 'ratio').split('\n')[1], 'Above 0: counter-clockwise. Below 0: clockwise.');
+  assert.equal(MEMBER_BY_ID.orbitShowValues.summary, 'Show or hide each satellite\'s value, as a percentage, above it.');
+});
+
+// What a node sends and whether it is turned upside down had no verbs, only the inspector's
+// Satellites rows (the noticed items, at the owner's word). One list for the engine, the inspector's
+// select and the verb.
+test('the Orbit sets what a node sends, and turns it upside down, as the inspector does', () => {
+  assert.deepEqual(VERB_VALUES['orbit.nodeOutput'], ORBIT_OUTPUTS);
+  assert.deepEqual(ORBIT_OUTPUTS, ['y', 'x', 'sine', 'radius']);
+  const cfg = { ...SECTION_DEFAULTS.Orbit };
+  const output = componentScriptPatch(byId('orbitNodeOutput'), cfg, [1, 'SINE']).nodes;
+  assert.deepEqual([output[0].output, output[1].output], ['sine', cfg.nodes[1].output], 'one node, in any case');
+  assert.equal(componentRequestLegal(byId('orbitNodeOutput'), cfg, [1, 'wobble']), false);
+  const before = cfg.nodes[0].invert === true;
+  assert.equal(componentScriptPatch(byId('orbitNodeInvert'), cfg, [1]).nodes[0].invert, !before, 'left out: toggles');
+  assert.equal(componentScriptPatch(byId('orbitNodeInvert'), cfg, [1, 'off']).nodes?.[0]?.invert ?? false, false);
+  // What it sends then, as nodeOutput (the engine) plays it.
+  const node = { ...cfg.nodes[0], output: 'radius', radius: 0.4, depth: 1 };
+  assert.equal(nodeOutput(node, 0), 0.4);
+  assert.ok(Math.abs(nodeOutput({ ...node, invert: true }, 0) - 0.6) < 1e-9);
+});
+
+// ce.components.looper, done in one pass at the owner's word.
+test('the Looper\'s phase is a seek, and its bars take quarters, as it plays', () => {
+  assert.ok(byId('looperPhase').seek, 'phase is a seek, as the arp\'s');
+  assert.deepEqual([byId('looperBars').k, byId('looperBars').min], ['num', 0.25]);
+  assert.deepEqual(componentScriptPatch(byId('looperBars'), { ...SECTION_DEFAULTS.Looper }, [0.25]), { loopBars: 0.25 });
+  assert.equal(MEMBER_BY_ID.looperLane.params.find((p) => p.name === 'enabled').summary.split('\n')[1], 'false: it sends its rest value, and is drawn faded.');
+  assert.equal(MEMBER_BY_ID.looperQuantize.notes[0], 'While not synced; `seconds()` keeps the number set.');
+});
+
+// ce.components.constellation, done in one pass at the owner's word.
+test('the Constellation\'s blend takes what it plays, and its probe says what is sent', () => {
+  // blendWeights takes a power of 0.5 at least.
+  assert.equal(byId('constellationBlend').min, 0.5);
+  assert.deepEqual(componentScriptPatch(byId('constellationBlend'), { ...SECTION_DEFAULTS.Constellation }, [0.1]), { blendPower: 0.5 });
+  assert.deepEqual([byId('constellationBars').k, byId('constellationBars').min], ['num', 0.25]);
+  assert.equal(MEMBER_BY_ID.constellationProbe.notes[1], 'While `run()` is on, the wander places the probe; it comes back here when it stops.');
+  assert.equal(MEMBER_BY_ID.constellationMode.params.find((p) => p.name === 'mode').summary.split('\n')[1], '"snap": the nearest preset\'s values, and `onRecall` when that changes.');
+});
+
+// ce.components.panic, done in one pass at the owner's word.
+test('the Panic\'s verbs say what a press sends', () => {
+  assert.equal(MEMBER_BY_ID.panicSetScope.notes[0], 'Each channel is sent All Sound Off (CC 120), then All Notes Off (CC 123).');
+  assert.equal(MEMBER_BY_ID.panicSetLabel.params.find((p) => p.name === 'label').summary.split('\n')[1], '"": PANIC.');
+  assert.equal(MEMBER_BY_ID.panicSetShowSummary.notes[0], 'Drawn only on a button 46 pixels tall or more.');
+});
+
+// ce.components.timbre, macro, constraint and joystick, done in one pass at the owner's word.
+test('a Constraint\'s member keeps its rule, as a drag keeps it', () => {
+  // The verb wrote the one value and left the others: "sum" members added up to 1.3.
+  const cfg = { ...SECTION_DEFAULTS.Constraint };
+  const sum = componentScriptPatch(byId('constraintMember'), cfg, [1, 0.8]).members.map((m) => m.value);
+  assert.deepEqual(sum.map((x) => Math.round(x * 1000) / 1000), [0.8, 0.12, 0.08]);
+  const order = componentScriptPatch(byId('constraintMember'), { ...cfg, mode: 'order', minGap: 0.1 }, [2, 0.9]).members.map((m) => m.value);
+  assert.ok(order[2] >= 1 - 1e-9 && order[0] <= order[1], `order is kept: ${order}`);
+  const free = componentScriptPatch(byId('constraintMember'), { ...cfg, mode: 'free' }, [1, 0.8]).members.map((m) => m.value);
+  assert.deepEqual(free, [0.8, 0.3, 0.2], 'free moves the one');
+});
+
+test('the Timbre Pad, Macro and Vector Joystick say what each sends, and the blend takes what it plays', () => {
+  assert.equal(byId('timbrePower').min, 0.5, 'anchorWeights takes a power of 0.5 at least');
+  const text = (id, name) => MEMBER_BY_ID[id].params.find((p) => p.name === name).summary;
+  assert.equal(text('macroSlotDepth', 'depth').split('\n')[1], 'Below 0: it goes down as the knob turns up.');
+  assert.equal(MEMBER_BY_ID.macroValue.notes[0], 'Every slot that is on is sent its value from there.');
+  // The corners by number, as joystickCornerLabels orders them: the third is the bottom left.
+  assert.deepEqual(MEMBER_BY_ID.joystickCornerLabel.params.map((p) => p.name), ['target', 'index', 'text']);
+  assert.equal(text('joystickCornerLabel', 'index').split('\n')[0], 'Corner: 1 the top left, 2 the top right, 3 the bottom left, 4 the bottom right.');
+  assert.equal(text('joystickReturnValue', 'returnValue').split('\n')[1], 'Range: 0 ↔ 1.');
+  assert.equal(text('joystickReturnTime', 'returnTime').split('\n')[2], 'Range: 0 ↔ 5000.');
+});
+
+test('a number counted from 1 is rounded, and every such parameter says so', () => {
+  // indexOf rounds: row 1.5 is row 2, slot 1.5 is slot 2. The texts said nothing of it.
+  const lines = { lines: ['A', 'B'] };
+  const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
+  assert.deepEqual(componentScriptPatch(text, lines, [1.5, 'X']), { lines: ['A', 'X'] });
+  assert.deepEqual(componentScriptPatch(text, lines, [1.4, 'X']), { lines: ['X', 'B'] });
+  assert.equal(componentRefusalReason(text, lines, [2.5, 'X']), 'There is no row 2.5: the rows are 1 to 2.');
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const slots = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
+  assert.equal(componentScriptPatch(glyph, slots, [1.5, '#']).glyphs[1].bits, '#');
+  let counted = 0;
+  for (const verb of COMPONENT_VERBS) {
+    for (const param of MEMBER_BY_ID[verb.id].params) {
+      const rules = param.summary.split('\n');
+      if (!/counted from 1/.test(rules[0])) continue;
+      counted += 1;
+      assert.ok(rules.includes('A fraction: rounded.'), `${verb.id}.${param.name}: ${param.summary}`);
+    }
+  }
+  assert.ok(counted > 40, `only ${counted} parameters count from 1`);
+  assert.equal(MEMBER_BY_ID.lcdGlyph.params.find((p) => p.name === 'index').summary,
+    'Glyph slot.\nRange: 1 ↔ 8.\nA fraction: rounded.\nOutside the range: rejected with a console error.');
+});
+
+test('a line\'s text left out is refused, as every text verb\'s is; "" still blanks it', () => {
+  // text(t, 1) and text(t, 1, null) blanked the row and returned true.
+  const text = COMPONENT_VERBS.find((v) => v.id === 'lcdText');
+  const lines = { lines: ['A', 'B'] };
+  for (const left of [[1], [1, undefined], [1, null]]) {
+    assert.deepEqual(componentScriptPatch(text, lines, left), {});
+    assert.equal(componentRequestLegal(text, lines, left), false);
+    assert.equal(componentRefusalReason(text, lines, left), 'No text was given.');
+  }
+  assert.deepEqual(componentScriptPatch(text, lines, [1, '']), { lines: ['', 'B'] });
+  assert.deepEqual(componentScriptPatch(text, lines, [2, 42]), { lines: ['A', '42'] });
+  assert.match(MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'text').summary, /\nLeft out: rejected with a console error\.$/);
+  const at = MEMBER_BY_ID.lcdText.params.find((p) => p.name === 'at').summary.split('\n');
+  assert.equal(at[0], 'Row, counted from 1, of the layout showing.');
+  assert.ok(at.includes('A fraction: rounded.'));
+});
+
+test('the LCD\'s blink rate is the time on, then off, from 60 ms as the display draws it', () => {
+  // The text said "Period" and "250 blinks four times a second"; the renderer lights the text for
+  // blinkRate ms and darkens it for as long, and draws nothing faster than 60, where 50 was stored.
+  const verb = byId('lcdBlinkRate');
+  const display = cfgFor('Display');
+  assert.deepEqual(componentScriptPatch(verb, display, [55]), { blinkRate: 60 });
+  assert.equal(componentClampWarning(verb, 'Screen', [55]), 'lcd Screen: blinkRate(55) — the blinkRate 55 is outside 60 to 5000, so 60 was used.');
+  const member = MEMBER_BY_ID.lcdBlinkRate;
+  assert.equal(member.summary, 'Set how fast the text blinks.');
+  assert.equal(member.example, '`ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second.');
+  assert.equal(member.params.find((p) => p.name === 'blinkRate').summary,
+    'Time on, then the same time off, in milliseconds.\nRange: 60 ↔ 5000.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
+  assert.deepEqual(member.notes.slice(0, 2), ['Has an effect only while `blink()` is on. Default: off.', 'The cursor blinks at its own fixed speed.']);
+});
+
+test('an on/off verb reads false, off and 0 as off, as words in any case too', () => {
+  // Any text but "" was on, so blink(t, "false") and blink(t, "OFF") switched blinking on.
+  const verb = byId('lcdBlink');
+  const on = { ...cfgFor('Display'), blink: true };
+  const off = { ...cfgFor('Display'), blink: false };
+  for (const word of [false, 0, '', 'false', 'FALSE', 'False', 'off', 'OFF', ' Off ', '0']) {
+    assert.deepEqual(componentScriptPatch(verb, on, [word]), { blink: false }, `${JSON.stringify(word)} is off`);
+  }
+  for (const word of [true, 1, -1, 'true', 'on', 'ON', 'x', '1']) {
+    assert.deepEqual(componentScriptPatch(verb, off, [word]), { blink: true }, `${JSON.stringify(word)} is on`);
+  }
+  // The set of steps that are on reads its second argument the same way.
+  const mute = COMPONENT_VERBS.find((v) => v.k === 'indexset');
+  const muted = { ...cfgFor(COMPONENT_FAMILIES.find((f) => f.id === mute.family).section), [mute.f]: [0] };
+  assert.deepEqual(componentScriptPatch(mute, muted, [1, 'Off']), { [mute.f]: [] });
+  const member = MEMBER_BY_ID.lcdBlink;
+  assert.equal(member.summary, 'Switch the text blinking on or off.');
+  assert.equal(member.example, '`ce.components.lcd.blink("Screen", true)` makes the text blink.');
+  assert.equal(member.params.find((p) => p.name === 'blink').summary,
+    'true: the text blinks.\nfalse: the text is steady.\nLeft out: toggles.\n0, "", "false", "off" or "0": false. Case-insensitive.\nAny other value: true.');
+  assert.deepEqual(member.notes.slice(0, 2), ['Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay.',
+    'The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off.']);
+});
+
+test('a word from a list is read in any case, and a preset animation is one of the six it draws', () => {
+  // animPreset stored any word and the display drew nothing for one it did not know; every list of
+  // words was case-sensitive, so scroll(t, "LEFT") was refused.
+  const preset = byId('lcdAnimPreset');
+  const display = cfgFor('Display');
+  assert.deepEqual(preset.values, ['wave', 'scanner', 'rain', 'starfield', 'spinner', 'plasma']);
+  assert.deepEqual(byId('pixelAnimPreset').values, preset.values);
+  assert.deepEqual(componentScriptPatch(preset, display, ['PLASMA']), { animPreset: 'plasma' });
+  assert.deepEqual(componentScriptPatch(preset, display, [' Starfield ']), { animPreset: 'starfield' });
+  for (const bad of ['bogus', 5, undefined]) {
+    assert.deepEqual(componentScriptPatch(preset, display, [bad]), {});
+    assert.equal(componentRequestLegal(preset, display, [bad]), false, `${JSON.stringify(bad)} is refused`);
+  }
+  assert.deepEqual(componentScriptPatch(byId('lcdScroll'), display, ['LEFT']), { scroll: 'left' });
+  assert.equal(MEMBER_BY_ID.lcdAnimPreset.params.find((p) => p.name === 'animPreset').summary,
+    'One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive.\nInvalid: rejected with a console error.');
+  assert.equal(MEMBER_BY_ID.lcdAnimPreset.notes[0], 'Plays only on a graphic display, while `anim()` is "preset".');
+  // …and the verb names read, size, fill, insert and remove take.
+  assert.equal(familyVerbNamed('lcd', 'SCROLLSPEED')?.v, 'scrollSpeed');
+  assert.equal(familyVerbNamed('lcd', 'toString'), null, 'never one of Object\'s own');
+  assert.equal(familyVerbRefusal('lcd', 'size', 'GLYPH'), null);
 });
 
 test('text left out is refused, where it was written as ""', () => {
@@ -704,4 +1422,25 @@ test('text left out is refused, where it was written as ""', () => {
   const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '' })) };
   assert.equal(componentRequestLegal(glyph, display, [1, undefined]), false);
   assert.equal(componentRefusalReason(glyph, display, [1, undefined]), 'No text was given.');
+});
+
+test('glyph refuses what it cannot draw as written, and stores what it can', () => {
+  // "abc" was stored and the slot drew nothing; a ninth row or a sixth cell was cut off. Both are
+  // rejected with the reason. A short glyph is still drawn as far as it goes, and "" clears.
+  const glyph = COMPONENT_VERBS.find((v) => v.id === 'lcdGlyph');
+  const display = { glyphs: Array.from({ length: 8 }, () => ({ bits: '#####' })) };
+  for (const [bits, why] of [
+    ['abc', '"a", "b", "c" are not cells of a glyph: "#" or "1" is lit, "." or "0" unlit, and "|" ends a row.'],
+    ['#|#|#|#|#|#|#|#|#', 'It has 9 rows, and a glyph has 8.'],
+    ['######|#', 'Row 1 has 6 cells, and a row has 5.'],
+  ]) {
+    assert.deepEqual(componentScriptPatch(glyph, display, [1, bits]), {}, bits);
+    assert.equal(componentRequestLegal(glyph, display, [1, bits]), false, bits);
+    assert.equal(componentRefusalReason(glyph, display, [1, bits]), why);
+  }
+  for (const bits of ['#|#|#', '']) {
+    assert.equal(componentScriptPatch(glyph, display, [1, bits]).glyphs[0].bits, bits);
+    assert.equal(componentRequestLegal(glyph, display, [1, bits]), true);
+    assert.equal(componentRefusalReason(glyph, display, [1, bits]), null);
+  }
 });

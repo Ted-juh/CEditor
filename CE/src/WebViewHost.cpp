@@ -1,5 +1,7 @@
 #include "WebViewHost.h"
 #include "TrustedWebBrowser.h"
+#include "DocumentationWindow.h"
+#include "AppSettings.h"
 
 #include "InstrumentHost/PluginCatalog.h"
 #include "PngResourceValidation.h"
@@ -335,9 +337,81 @@ public:
         return juce::WebBrowserComponent::pageLoadHadNetworkError (errorInfo);
     }
 };
+
+juce::WebBrowserComponent::Options::WinWebView2 makeWebView2Options()
+{
+    auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
+        .withBackgroundColour (juce::Colour (0xFF1E1E1E))
+        .withStatusBarDisabled();
+
+   #if CEDITOR_DEV_MODE
+    // Use a fixed user data folder so we can locate/clear WebView2 cache,
+    // and pass flags to disable aggressive caching during development.
+    return webview2Options.withUserDataFolder (getDevWebView2ProfileFolder());
+   #else
+    auto installedWebViewProfile = getInstalledWebView2ProfileFolder();
+    installedWebViewProfile.createDirectory();
+    return webview2Options.withUserDataFolder (installedWebViewProfile);
+   #endif
+}
+
+// What every browser on the editor's origin starts from: the backend, the WebView2 profile and
+// the resource provider. The editor's own page adds the bridge to it; the documentation window
+// adds its one event and nothing else. One function, so the two cannot disagree about the
+// profile — WebView2 refuses a second environment on one profile with different options.
+juce::WebBrowserComponent::Options makeEditorOriginOptions()
+{
+    // Ask for WebView2 by name only where it exists. Everywhere else JUCE's areOptionsSupported
+    // answers true for the platform default alone (WebKitGTK on Linux, WKWebView on macOS) and
+    // false for any named backend - so naming webview2 there is not "try WebView2", it is
+    // "show the missing-runtime message and stop". The bridge is JUCE's own window.__JUCE__
+    // integration on every backend, so nothing above this line cares which one it got.
+    auto options = juce::WebBrowserComponent::Options()
+       #if JUCE_WINDOWS
+        .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
+       #endif
+        .withKeepPageLoadedWhenBrowserIsHidden()
+        .withWinWebView2Options (makeWebView2Options());
+
+   #if CEDITOR_DEV_MODE
+    // In dev mode, allow the Vite dev server as an origin for resource provider access
+    return options.withResourceProvider (
+        [] (const juce::String& path)
+        {
+            return provideFrontendResource (path);
+        },
+        juce::String ("http://localhost:5173")
+    );
+   #else
+    return options.withResourceProvider (
+        [] (const juce::String& path)
+        {
+            return provideFrontendResource (path);
+        }
+    );
+   #endif
+}
+
+/** Where the editor's pages are served from, with the trailing slash. */
+juce::String editorOrigin()
+{
+   #if CEDITOR_DEV_MODE
+    return "http://localhost:5173/";
+   #else
+    return juce::WebBrowserComponent::getResourceProviderRoot();
+   #endif
+}
+
+juce::String stringProperty (const juce::var& payload, const char* name)
+{
+    if (auto* object = payload.getDynamicObject())
+        return object->getProperty (name).toString();
+    return {};
+}
 }
 
 WebViewHost::WebViewHost (AppSettings* settings)
+    : appSettings (settings)
 {
     bridge.setAppSettings (settings);
 
@@ -351,57 +425,26 @@ WebViewHost::WebViewHost (AppSettings* settings)
     };
     bridge.setEditorPane (&editorPane);
 
-    auto webview2Options = juce::WebBrowserComponent::Options::WinWebView2()
-        .withBackgroundColour (juce::Colour (0xFF1E1E1E))
-        .withStatusBarDisabled();
-
    #if CEDITOR_DEV_MODE
-    auto devWebViewProfile = getDevWebView2ProfileFolder();
-    trimDevWebView2Caches (devWebViewProfile);
-
-    // Use a fixed user data folder so we can locate/clear WebView2 cache,
-    // and pass flags to disable aggressive caching during development.
-    webview2Options = webview2Options
-        .withUserDataFolder (devWebViewProfile);
-   #else
-    auto installedWebViewProfile = getInstalledWebView2ProfileFolder();
-    installedWebViewProfile.createDirectory();
-    webview2Options = webview2Options
-        .withUserDataFolder (installedWebViewProfile);
+    trimDevWebView2Caches (getDevWebView2ProfileFolder());
    #endif
-
-    // Ask for WebView2 by name only where it exists. Everywhere else JUCE's areOptionsSupported
-    // answers true for the platform default alone (WebKitGTK on Linux, WKWebView on macOS) and
-    // false for any named backend - so naming webview2 there is not "try WebView2", it is
-    // "show the missing-runtime message and stop". The bridge is JUCE's own window.__JUCE__
-    // integration on every backend, so nothing above this line cares which one it got.
-    auto options = juce::WebBrowserComponent::Options()
-       #if JUCE_WINDOWS
-        .withBackend (juce::WebBrowserComponent::Options::Backend::webview2)
-       #endif
-        .withKeepPageLoadedWhenBrowserIsHidden()
-        .withWinWebView2Options (webview2Options);
 
     // Register bridge event listeners and native functions
-    options = bridge.buildOptions (options);
+    auto options = bridge.buildOptions (makeEditorOriginOptions());
 
-   #if CEDITOR_DEV_MODE
-    // In dev mode, allow the Vite dev server as an origin for resource provider access
-    options = options.withResourceProvider (
-        [] (const juce::String& path)
+    // The manual's own window. Not the bridge's business: it is a window of this host's, like the
+    // editor pane, and the page that asks for it needs nothing back.
+    juce::Component::SafePointer<WebViewHost> safeThis (this);
+    options = options.withEventListener ("openDocumentationWindow", [safeThis] (const juce::var& payload)
+    {
+        const auto doc = stringProperty (payload, "doc");
+        const auto anchor = stringProperty (payload, "anchor");
+        juce::MessageManager::callAsync ([safeThis, doc, anchor]
         {
-            return provideFrontendResource (path);
-        },
-        juce::String ("http://localhost:5173")
-    );
-   #else
-    options = options.withResourceProvider (
-        [] (const juce::String& path)
-        {
-            return provideFrontendResource (path);
-        }
-    );
-   #endif
+            if (safeThis != nullptr)
+                safeThis->openDocumentationWindow (doc, anchor);
+        });
+    });
 
     if (! juce::WebBrowserComponent::areOptionsSupported (options))
     {
@@ -471,4 +514,81 @@ void WebViewHost::resized()
 
     if (statusLabel != nullptr)
         statusLabel->setBounds (getLocalBounds());
+}
+
+WebViewHost::~WebViewHost()
+{
+    // A window still open when the program quits is remembered where it was, like the main one.
+    closeDocumentationWindow();
+}
+
+void WebViewHost::openDocumentationWindow (const juce::String& doc, const juce::String& anchor)
+{
+    if (documentationWindow != nullptr)
+    {
+        documentationWindow->showDocument (doc, anchor);
+        return;
+    }
+
+    juce::Component::SafePointer<WebViewHost> safeThis (this);
+
+    auto options = makeEditorOriginOptions()
+        .withNativeIntegrationEnabled()
+        .withEventListener ("dockDocumentation", [safeThis] (const juce::var& payload)
+        {
+            const auto doc = stringProperty (payload, "doc");
+            const auto anchor = stringProperty (payload, "anchor");
+            // Not from inside the window's own browser callback: docking destroys that browser.
+            juce::MessageManager::callAsync ([safeThis, doc, anchor]
+            {
+                if (safeThis != nullptr)
+                    safeThis->dockDocumentation (doc, anchor);
+            });
+        });
+
+    if (! juce::WebBrowserComponent::areOptionsSupported (options))
+        return;
+
+    const auto savedBounds = appSettings != nullptr ? appSettings->getDocumentationWindowBounds()
+                                                    : juce::Rectangle<int>();
+
+    documentationWindow = std::make_unique<ceditor::DocumentationWindow> (
+        options,
+        ceditor::DocumentationWindow::pageUrl (editorOrigin(), doc, anchor),
+        savedBounds,
+        [safeThis]
+        {
+            juce::MessageManager::callAsync ([safeThis]
+            {
+                if (safeThis != nullptr)
+                    safeThis->closeDocumentationWindow();
+            });
+        });
+}
+
+void WebViewHost::closeDocumentationWindow()
+{
+    if (documentationWindow == nullptr)
+        return;
+
+    if (appSettings != nullptr && ! documentationWindow->isMinimised())
+        appSettings->setDocumentationWindowBounds (documentationWindow->getBounds());
+
+    documentationWindow.reset();
+}
+
+void WebViewHost::dockDocumentation (const juce::String& doc, const juce::String& anchor)
+{
+    closeDocumentationWindow();
+
+    if (webView != nullptr)
+    {
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("doc", doc);
+        payload->setProperty ("anchor", anchor);
+        webView->emitEventIfBrowserIsVisible ("documentationDocked", juce::var (payload));
+    }
+
+    if (auto* top = getTopLevelComponent())
+        top->toFront (true);
 }

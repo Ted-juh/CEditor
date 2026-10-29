@@ -16,7 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { get } from 'svelte/store';
 
-import { scriptApiForTesting, onDumpParsedForTesting, resetScriptStateForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { scriptApiForTesting, onDumpParsedForTesting, resetScriptStateForTesting, requestWaitMsForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
 import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
 import { deviceRoleMappings } from '../src/CE_Application/stores/deviceProfiles.js';
 import { profileSources } from '../src/CE_Application/stores/deviceProfileStores.js';
@@ -161,6 +161,26 @@ test('a callback for a request waits for the dump it answers with', () => {
     onDumpParsedForTesting({ deviceRole: 'mainSynth', dumpId: 'common', values: {} });
   });
   assert.deepEqual(heard, [[true, 'system'], [true, 'common']]);
+});
+
+test('a callback with no timeout waits as long as the profile asks for the request', () => {
+  // Every try the profile allows (timeoutMs, sent 1 + retries times), and never less than the 3000 ms
+  // it always waited: a fixed 3000 ms reported an AN1x request, whose own timeout is 4000 ms, as
+  // unanswered while its reply was on the way. The plug-in's "answerWaitMs" query is the same sum.
+  const slow = structuredClone(GAIA);
+  const system = slow.requests.find((r) => r.id === 'requestSystem');
+  system.timeoutMs = 4000;
+  system.retries = 1;
+  withGaia(() => {
+    profileSources.set({ [GAIA.id]: { profileId: GAIA.id, source: JSON.stringify(slow) } });
+    assert.equal(requestWaitMsForTesting('mainSynth', 'requestSystem'), 8500);
+    assert.equal(requestWaitMsForTesting('mainSynth', 'system'), 3000, 'a dump, not a request: the old wait');
+  });
+  withGaia(() => {
+    const quick = GAIA.requests.find((r) => r.id === 'requestSystem');
+    const sum = (quick.timeoutMs ?? 2000) * (1 + (quick.retries ?? 0)) + 500;
+    assert.equal(requestWaitMsForTesting('mainSynth', 'requestSystem'), Math.max(3000, sum));
+  });
 });
 
 /* ------------------------------------------------------------------------- the Values rows */

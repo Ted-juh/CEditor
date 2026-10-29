@@ -120,6 +120,21 @@ export const PURE = {
   tapTempo: [[[0,500,1000,1500]], 120],
   encodeJson: [[{"a":1,"b":[true,2]}], "{\"a\":1,\"b\":[true,2]}"],
   decodeJson: [["{\"a\":1,\"b\":[true,2]}"], {"a":1,"b":[true,2]}],
+  // ce.format
+  formatNumber: [[3.14159,{"decimals":2}], "3.14"],
+  formatHz: [[1234], "1.23 kHz"],
+  formatTime: [[1500], "1.5 s"],
+  formatDb: [[-6.02], "-6.0 dB"],
+  formatPercent: [[0.5], "50%"],
+  formatPan: [[-0.5], "L25"],
+  formatRatio: [[4], "4:1"],
+  formatClock: [[83450], "1:23.4"],
+  formatNote: [[61], "C#4"],
+  formatDivision: [[0.333333], "1/8T"],
+  formatTable: [[2,["Saw","Square","Triangle","Sine"]], "Triangle"],
+  formatFit: [["Cutoff Frequency",8], "Ctff Frq"],
+  formatLine: [["Cutoff","1.2 kHz",16], "Cutoff   1.2 kHz"],
+  formatParse: [["1.2 kHz"], 1200],
 };
 
 export { WRITTEN } from './apiExamplesWritten.mjs';

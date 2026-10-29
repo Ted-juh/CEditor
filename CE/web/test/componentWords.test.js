@@ -51,16 +51,17 @@ test.after(() => resetScriptStateForTesting());
 
 test('a hand-written verb refuses a word it has none of, and names the words', () => {
   const cases = [
-    [(api) => api.splitPreset('Split', 'single'), 'split Split: preset {"preset":"single"} — refused, nothing changed. One of: whole, classic, splitLayer, threeWay, velLayer.'],
-    [(api) => api.phraseSeed('Phr', 'nope'), 'phrase Phr: seed {"seed":"nope"} — refused, nothing changed. One of: clear, octaves, arpUp, riff, random.'],
-    [(api) => api.phraseDirection('Phr', 'sideways'), 'phrase Phr: direction {"direction":"sideways"} — refused, nothing changed. One of: forward, reverse, pingpong, random.'],
-    [(api) => api.phraseKey('Phr', 'D'), 'phrase Phr: key {"key":"D"} — refused, nothing changed. A key is a pitch class, a number from 0 to 11 where 0 is C.'],
-    [(api) => api.recorderSource('Rec', 'mic'), 'recorder Rec: source {"source":"mic"} — refused, nothing changed. One of: input, panel, both.'],
-    [(api) => api.harmonyMode('Harm', 'chordz'), 'harmoniser Harm: mode {"mode":"chordz"} — refused, nothing changed. One of: diatonic, memory.'],
-    [(api) => api.harmonyShape('Harm', 'blob'), 'harmoniser Harm: shape {"shape":"blob","preset":"blob"} — refused, nothing changed. One of: major, minor, sus4, maj7, min7, fifths, octaves, or a list of intervals in semitones.'],
-    [(api) => api.harmonyOutOfKey('Harm', 'skip'), 'harmoniser Harm: outOfKey {"outOfKey":"skip"} — refused, nothing changed. One of: pass, nearest, mute.'],
-    [(api) => api.harmonyDegree('Harm', 9, [0, 4, 7]), 'harmoniser Harm: degree {"degree":9,"chord":[0,4,7]} — refused, nothing changed. There is no degree 9: the scale has 7, 1 to 7.'],
-    [(api) => api.setlistGoto('Songs', 'Encore'), 'setlist Songs: goto {"scene":"Encore"} — refused, nothing changed. There is no scene "Encore": a scene is its number from 1 to 3, or its name, "Opener", "Ballad", "Closer".'],
+    [(api) => api.splitPreset('Split', 'single'), 'split Split: preset("single") — refused, nothing changed. One of: whole, classic, splitLayer, threeWay, velLayer.'],
+    [(api) => api.phraseSeed('Phr', 'nope'), 'phrase Phr: seed("nope") — refused, nothing changed. One of: clear, octaves, arpUp, riff, random.'],
+    [(api) => api.phraseDirection('Phr', 'sideways'), 'phrase Phr: direction("sideways") — refused, nothing changed. One of: forward, reverse, pingpong, random.'],
+    // A key's name is read, as the arp's (its review, item 8); a word that is no note is refused.
+    [(api) => api.phraseKey('Phr', 'H'), 'phrase Phr: key("H") — refused, nothing changed. A key is a note\'s name, such as "F#", in any case, or a number round the octave, 0 being C.'],
+    [(api) => api.recorderSource('Rec', 'mic'), 'recorder Rec: source("mic") — refused, nothing changed. One of: input, panel, both.'],
+    [(api) => api.harmonyMode('Harm', 'chordz'), 'harmoniser Harm: mode("chordz") — refused, nothing changed. One of: diatonic, memory.'],
+    [(api) => api.harmonyShape('Harm', 'blob'), 'harmoniser Harm: shape("blob") — refused, nothing changed. One of: major, minor, sus4, maj7, min7, fifths, octaves, or a list of intervals in semitones.'],
+    [(api) => api.harmonyOutOfKey('Harm', 'skip'), 'harmoniser Harm: outOfKey("skip") — refused, nothing changed. One of: pass, nearest, mute.'],
+    [(api) => api.harmonyDegree('Harm', 9, [0, 4, 7]), 'harmoniser Harm: degree(9, [0,4,7]) — refused, nothing changed. There is no degree 9: the scale has 7, 1 to 7.'],
+    [(api) => api.setlistGoto('Songs', 'Encore'), 'setlist Songs: jump("Encore") — refused, nothing changed. There is no scene "Encore": a scene is its number from 1 to 3, or its name, "Opener", "Ballad", "Closer".'],
   ];
   for (const [call, said] of cases) {
     const { result, lines } = run(call);
@@ -110,7 +111,7 @@ test('a hand-written family reads a field in any case, and names the fields when
 
 test('ce.panel\'s arrangement verbs refuse a word they do not take, in their own sentence', () => {
   const cases = [
-    [(api) => api.panelAlign(['K'], 'Left'), 'ce.panel.align: "Left" is not an edge. One of: left, hCenter, right, top, vCenter, bottom.'],
+    [(api) => api.panelAlign(['K'], 'lefft'), 'ce.panel.align: "lefft" is not an edge. One of: left, hCenter, right, top, vCenter, bottom.'],
     [(api) => api.panelDistribute(['K'], 'edges'), 'ce.panel.distribute: "edges" is not something to spread. One of: leftEdges, hCenters, rightEdges, topEdges, vCenters, bottomEdges, hSpacing, vSpacing.'],
     [(api) => api.panelMatch(['K'], 'size'), 'ce.panel.match: "size" is not width, height or both.'],
     [(api) => api.panelFlip(['K'], 'diagonal'), 'ce.panel.flip: "diagonal" is not horizontal or vertical.'],
@@ -121,6 +122,21 @@ test('ce.panel\'s arrangement verbs refuse a word they do not take, in their own
   for (const [id, { param, values }] of Object.entries(LAYOUT_WORDS)) {
     assert.deepEqual(MEMBER_BY_ID[id].params.find((p) => p.name === param).values, values, id);
   }
+});
+
+test('a word from a list is read in any case, by ce.panel and the hand-written families alike', () => {
+  // "Left", "Classic" and "Memory" were refused for a capital letter.
+  for (const call of [(api) => api.panelAlign(['K'], 'LEFT'), (api) => api.panelFlip(['K'], 'Vertical'),
+    (api) => api.panelOrder(['K'], ' Front '), (api) => api.splitPreset('Split', 'Classic'),
+    (api) => api.harmonyMode('Harm', 'Memory'), (api) => api.harmonyVoicing('Harm', 'CLOSE'),
+    (api) => api.phraseDirection('Phr', 'Forward'), (api) => api.phraseScale('Phr', 'Dorian'),
+    (api) => api.harmonyScale('Harm', 'MIXOLYDIAN')]) {
+    const { result, lines } = run(call);
+    assert.notEqual(result, false, `${call}: ${lines.join(' / ')}`);
+    assert.ok(!lines.some((l) => /refused|is not/.test(l)), `${call}: ${lines.join(' / ')}`);
+  }
+  assert.equal(rowNamed('ce.panel.align({"K"}, "HCENTER")', 'edge').problem, null);
+  assert.equal(rowNamed('harmonyMode("Harm", "MEMORY")', 'mode').problem, null);
 });
 
 test('the rows offer the words, and say the refusal in the console\'s words', () => {
@@ -141,8 +157,8 @@ test('the rows offer the words, and say the refusal in the console\'s words', ()
   said('splitRead("Split", "zonez")', 'field', (api) => api.splitRead('Split', 'zonez'));
   said('ce.panel.flip({"K"}, "diagonal")', 'axis', (api) => api.panelFlip(['K'], 'diagonal'));
   // align's row adds the near miss to the runtime's sentence.
-  assert.equal(rowNamed('ce.panel.align({"K"}, "Left")', 'edge').problem.message,
-    'ce.panel.align: "Left" is not an edge. One of: left, hCenter, right, top, vCenter, bottom. Did you mean "left"?');
+  assert.equal(rowNamed('ce.panel.align({"K"}, "lefft")', 'edge').problem.message,
+    'ce.panel.align: "lefft" is not an edge. One of: left, hCenter, right, top, vCenter, bottom. Did you mean "left"?');
 
   // The words, as a dropdown.
   const choices = (src, name) => { const row = rowNamed(src, name); return [row.editable, row.meaning.choices]; };
@@ -165,4 +181,43 @@ test('the rows offer the words, and say the refusal in the console\'s words', ()
     ['harmonyRead("Harm", "mode")', 'field'], ['ce.panel.distribute({"K"}, "hSpacing")', 'what']]) {
     assert.equal(rowNamed(src, name).problem, null, src);
   }
+});
+
+/* ------------------------------------------------- the hand-written families' reviews (group 22) */
+
+test('the Zone Splitter reads its notes and numbers, and refuses what is not one', () => {
+  // A transpose of "x" was -48 and a split point of "x" the zone's lowest note, without a word; a
+  // preset's notes were stored as given, "x" as no note and 200 past the keyboard.
+  const { result, lines, controls } = run((api) => [
+    api.ce.components.split.transpose('Split', 1, 'x'), api.ce.components.split.point('Split', 1, 'x'),
+    api.ce.components.split.preset('Split', 'whole', 'C6', 'C2'), api.ce.components.split.channel('Split', 1, '5')]);
+  assert.deepEqual(result, [false, false, true, true]);
+  assert.match(lines[0], /A transpose is a number of semitones/);
+  assert.match(lines[1], /A note is a MIDI number from 0 to 127, or a name such as "C4"/);
+  const zone = controls.find((c) => c._children.Core.name === 'Split')._children.SplitZone.zones[0];
+  assert.deepEqual([zone.lowNote, zone.highNote, zone.channel], [36, 84, 5], 'names read, lowest first');
+});
+
+test('the Phrase and the Harmoniser take a key by its name, and the Phrase answers true', () => {
+  const { result, lines } = run((api) => [
+    api.ce.components.phrase.key('Phr', 'd'), api.ce.components.harmony.key('Harm', 'Bb'),
+    api.ce.components.phrase.scale('Phr', 'nope'), api.ce.components.harmony.strum('Harm', 'x'),
+    api.ce.components.phrase.run('Phr', true)]);
+  assert.deepEqual(result, [true, true, false, false, true]);
+  assert.match(lines[0], /^phrase Phr: scale\("nope"\) .* One of: major, minor/);
+  assert.match(lines[1], /A time is a number of milliseconds\.$/);
+});
+
+test('the Setlist says why next and prev did nothing at an end of the set', () => {
+  const { result, lines } = run((api) => [api.ce.components.setlist.prev('Songs')]);
+  assert.deepEqual(result, [false]);
+  assert.match(lines[0], /It is at the first scene it plays, and `wrap\(\)` is off\.$/);
+});
+
+test('a Mod Matrix cell takes 0 to 1 while it is not bipolar, as a drag does', () => {
+  const { controls } = run((api) => {
+    api.ce.components.matrix.bipolar('Mat', false);
+    return api.ce.components.matrix.cell('Mat', 1, 1, -0.5);
+  });
+  assert.equal(controls.find((c) => c._children.Core.name === 'Mat')._children.Matrix.amounts[0], 0);
 });

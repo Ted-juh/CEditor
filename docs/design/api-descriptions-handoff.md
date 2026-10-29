@@ -75,6 +75,14 @@ is the table of wording the owner rejected and what replaced it; read it before 
   the panel's own arithmetic; rejected where the result would be meaningless.
 - Text that is a number is read as one, except a timer's interval or delay (two runtimes could not
   read it, so "250" is refused everywhere).
+- A word from a list the app defines is read in any case, and with spaces around it, everywhere
+  (the owner, 2026-10-24, on `ce.components.lcd.animPreset`), and stored or used as the list spells
+  it: `listWord` in `utils/wordLists.js`, `__word` in each prelude. A name an author makes up is
+  matched as it was: this rule does not reach it. (A control's name and a pixel element's were
+  matched in any case and trimmed already, `nameIndexFor` and `elementAnswersTo`; the records
+  below said "exact" of them until 2026-10-24, which was never so.) The text says
+  `Case-insensitive.` on the line that lists the words; the manual and the API explorer add it to
+  a list they print from `values`.
 - Shown to the owner one item at a time for a new module, until the owner says to continue without
   showing each item (said on `ce.draw.gradient`); then the rest of the module in one pass, with
   the decisions recorded in this file for review.
@@ -83,30 +91,24 @@ is the table of wording the owner rejected and what replaced it; read it before 
   edge to the module's test file, regenerate, run the full suite, one commit per module, push,
   pull request, merge when green, rebuild the branch from `main`.
 
-### Deferred, for the owner to decide
+### Deferred, then decided
 
-- `ce.midi`'s older helpers answer outside their range without a word: `to7bit(20000, 2)`,
-  `to14bit(20000)`, `fromNibbles(16, 0)`, `nibblize({300})`, `denibblize` with an odd count,
-  `toSigned(-200, 8)`, `from7bit("02 2C")`, `toAscii` not cutting long text. Their parameters say
-  the ranges, not that a value outside them goes unnoticed. Rejecting them is the rule above; it
-  was left for the owner since it is behaviour older scripts may lean on.
-- `ce.time`'s helpers took a required number left out as its default (bar 1, 0 ms) by an earlier
-  session's decision; `ce.time` reversed it under the rule above. If the owner prefers the old
-  behaviour for the transport helpers, it is `optional: true` on those arguments in `timeWords.js`
-  and the three `__TIME_NUMBERS` tables.
+Six items were left here for the owner: silences in `ce.core`, `ce.storage`, `ce.device` and
+`ce.music`, each a change in four runtimes, the older `ce.midi` helpers that answered outside their
+range, and whether `ce.time`'s transport helpers should go back to their old defaults. The owner
+answered on 2026-10-26: "As recommended, do the deferred items too". Each was done by the rules
+above, and [The deferred items](#the-deferred-items) records what each one does now.
 
 ### Left
 
-The table under [The branch](#the-branch): 580 descriptions in the modules not yet done, of which
-154 need the most work by the 2026-10-21 measure (every component verb already has the generated
-form; see [`ce.components.lcd`: done](#cecomponentslcd-done-and-the-component-generator-with-it)). The `ce.components.*` modules are the bulk
-(roughly 400 descriptions over 20 components); they are panel-window only, so their runtime is
-`panelRuntime.js` and the C++ engines define them as explaining stubs: no prelude work, and the
-sidebar's `readDrawShape`-style readers do not apply. Then `ce.panel`, `ce.device`, `ce.music`,
-`ce.core`, `ce.storage`, `ce.image`, `ce.text`, `ce.ui` and the lifecycle hooks. After the
-commands: the module descriptions (41, the picker's group headings) and the event descriptions
-(38), with the same rules. Next by the table: `ce.components.arp` (30 descriptions, 15 that need
-the most work).
+Every module in the table under [The branch](#the-branch) is done, and so are the module and event
+descriptions and the deferred items: see [The remaining modules, in one pass](#the-remaining-modules-in-one-pass)
+and [The deferred items](#the-deferred-items), which record each decision for the owner's review.
+The four lines noticed and not changed are done too, at the owner's word: see [The noticed
+items](#the-noticed-items). So are `browser-checks/componentBehavior.mjs` in CI, its twenty-one
+failing cases, and the whole file in CI: see [componentBehavior in CI](#componentbehavior-in-ci),
+[The twenty-one, fixed](#the-twenty-one-fixed) and [The whole file in CI](#the-whole-file-in-ci).
+Nothing of this branch's is left.
 
 ---
 
@@ -373,7 +375,8 @@ table. `ce.midi` is finished. Decided with it, and to follow in the modules afte
 - **A helper with only a signature gets a parameter list**, type `value`, as `to7bit`'s, so its
   parameters can be described. Thirteen in `ce.midi` had none.
 
-Found on the way and left for the owner, since it is behaviour: the older helpers give an answer
+Found on the way and left for the owner, since it is behaviour (done since, at the owner's word: [The
+deferred items](#the-deferred-items)): the older helpers give an answer
 without a message where the byte-list helpers refuse. `to7bit(20000, 2)`, `to14bit(20000)`,
 `from14bit(128, 0)` and `fromNibbles(16, 0)` answer outside their range, `nibblize({300})` gives
 `{2, 12}`, `denibblize` drops an odd last half, `toSigned(-200, 8)` gives 56, `from7bit("02 2C")`
@@ -729,8 +732,11 @@ form at once:
 - `verbExample`: `` `ce.components.lcd.brightness("Screen", 80)` sets the brightness to 80. `` from
   the kind and a sample inside the range, a verb's own `ex` ([arguments, gloss]) winning; the
   family's `sample` names the control in them ("Screen" for the LCD).
-- `verbNotes`: what the call returns (true; already that way: true with a console line; rejected:
-  false), a verb's own `notes` first.
+- `verbNotes`: what the call returns, a verb's own `notes` first. Reworded at the owner's word on
+  2026-10-24 (`RETURNS_SET`, `RETURNS_TRUE`, `RETURNS_VALUE`): "Returns true. Already set: true,
+  with a console line." / "Rejected: false, with a console error. Nothing changes." for a verb that
+  sets something; "Returns the value." / "Rejected: no result, with a console error." for `read`
+  and `size`. It said "Returns true; already that way: true, with a line in the console."
 - `verbParamSummary`: each parameter's text, one rule per line, by kind and place: the target
   ("The LCD Display's control, by name. / Not an LCD Display: rejected…"), a number's `Range: lo ↔
   hi.` with "Outside the range: the nearest end." (the reducer clamps) and "Invalid: rejected",
@@ -758,6 +764,445 @@ control name; probe its reducer edges (they share `componentScriptPatch`, so mos
 widen the one-sentence check in `componentVerbs.test.js` to that family. Next by the table:
 `ce.components.arp` (30 descriptions, 15 that need the most work).
 
+### The owner's review, one item at a time
+
+`ce.components.lcd` was merged (#69) without the owner seeing its items; the owner's "Ok, next
+module?" was taken as the "continue without abruption" of `ce.draw`. On 2026-10-24 the owner asked
+for it to be gone through one item at a time, as a new module is. The queue, from a read of every
+LCD text against the rules above and a probe of each verb's edges in the runtime:
+
+1. `cursorAt`: done, below.
+2. `blinkRate`: done, below.
+3. `blink`: done, below.
+4. `animPreset`: done, below.
+5. `valueMin` and `valueMax`: kept as merged, below.
+6. `glyph`: done, below.
+7. `text`: done, below.
+8. Parameter texts that are only the name: done, below.
+9. `showGhost`, `showGlass`, `showScanlines`, `showGrid`: done, below.
+10. The notes every family shares: done, below.
+11. `backlightSource`: done, below.
+12. The manual: done, below.
+13. Case "everywhere": done, below.
+14. `animSpeed`: done, below.
+15. `clear`: done, by the LCD's script model, below: `clear("Screen", 2)` blanks row 2. That
+    every verb drops an argument it does not take, without a word, is wider than the LCD and is
+    not on this queue unless the owner puts it there.
+
+**Item 1, `cursorAt`: done.** Three decisions the owner made, from the probe:
+
+- A column or row past the display (`cursorAt("Screen", 40, 9)` on 2 x 16) was stored and the
+  cursor drawn nowhere; the range was 1 to 256 whatever the display. It is the display's last
+  column or row now, with the one-time warning, rather than refused as `text` refuses a row the
+  display does not have: a script stepping the cursor right stops at the last column. The spec
+  says so with `fit: { cursorCol: 'cols', cursorRow: 'rows' }`, which `axisRange` reads in the
+  reducer, in `componentClampWarning` (which the runtime now hands the control's settings) and in
+  the parameter's text ("Range: 1 ↔ the display's columns.").
+- One number given that is not a number (`cursorAt("Screen", "x", 2)`) moved the row, dropped the
+  "x" without a word and returned true. The call is refused with a console error ("\"x\" is not
+  a number.") and moves nothing. This is the XY kind's rule, so `joystick.move`, `timbre.move`,
+  `kinetic.launch`, `kinetic.velocity` and `constellation.probe` follow it too. Either number may
+  still be left out, so both are optional in the data (`verbArgOptional`): the type line said
+  "number, required" beside "Left out: unchanged."
+- A fraction (2.6) was stored as 2.6, read back as 2.6 and drawn at 3. A one-based axis is rounded
+  when written.
+
+The inspector's Cursor Row and Cursor Col counted from 0 ("0-based") where the script counts from
+1; at the owner's word they count from 1 now and stop at the display's size (`DisplayEditor.svelte`).
+
+The owner asked why the text as merged was better than the one proposed. It was better in two
+ways, both kept: every rule about a parameter sat in its own row, where the sidebar hint shows it
+on the parameter's name (the proposal had moved "Both left out" into the notes, which the hint does
+not show), and its range line had no bracket ("16 by default" went). It was wrong in four, after
+the decisions: "required", "1 ↔ 256", "invalid: unchanged", and no word on a fraction. As written:
+
+| Field | Text |
+| --- | --- |
+| `col` (number, optional) | Column, counted from 1. / Range: 1 ↔ the display's columns. / A fraction: rounded. / Outside the range: the nearest end. / Left out: unchanged. / Invalid: rejected with a console error. / Both left out: rejected with a console error. |
+| `row` (number, optional) | The same, with "Row" and "the display's rows". |
+| notes | The cursor shows only when `cursor()` is set to "block" or "underline". Default: "off". Then the two every verb has. |
+
+**Item 2, `blinkRate`: done.** The text said "Period in milliseconds" and its example "250 blinks
+four times a second". The renderer lights the text for `blinkRate` ms and darkens it for as long
+(`Math.floor(frameTime / rate) % 2`; the inspector's hint said "half-cycle"), so 250 blinks twice a
+second. What the number means is kept: the full cycle would make every saved panel blink twice as
+fast. Two decisions the owner made: the range is 60 ↔ 5000, since the renderer draws nothing faster
+than 60 and the inspector's minimum was 60 (55 was stored, read back as 55 and drawn as 60; it is
+60 with the one-time warning now), and the inspector's Blink Rate stops at 5000 as a script does.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how fast the text blinks. |
+| Example | `ce.components.lcd.blinkRate("Screen", 250)` shows the text for 250 ms, then hides it for 250 ms: two blinks a second. |
+| `blinkRate` (number, required) | Time on, then the same time off, in milliseconds. / Range: 60 ↔ 5000. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Has an effect only while `blink()` is on. Default: off. / The cursor blinks at its own fixed speed. / Then the two every verb has. |
+| Inspector hint | Time on, then off, in milliseconds. |
+
+**Item 3, `blink`: done.** "Switch blinking of the whole display on or off." was wrong: the
+renderer hides only the lit glyphs on the off phase, and draws the unlit segments, the backlight,
+the cursor, images and animations throughout. The owner's decision, for every on/off verb of every
+component (134, through `coerce` BOOL and the Arpeggiator's `mute` set; `isOff` in `componentVerbs.js`): the
+text "false", "off" and "0", in any case and with spaces around it, is off, as `false`, 0 and ""
+are. Any text but "" was on, so `blink(t, "false")` and `blink(t, "OFF")` switched it on. Every
+on/off parameter's text says it: `0, "", "false", "off" or "0": false. Case-insensitive.` / `Any
+other value: true.` (`OFF_RULE`).
+
+| Field | Text |
+| --- | --- |
+| Description | Switch the text blinking on or off. |
+| Example | `ce.components.lcd.blink("Screen", true)` makes the text blink. |
+| `blink` (true or false, optional) | true: the text blinks. / false: the text is steady. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
+| notes | Only the text blinks: the backlight, the unlit segments, the cursor, images and animations stay. / The speed is set by `blinkRate()`. Default: 500 ms on, then 500 ms off. / Then the two every verb has. |
+
+**Item 4, `animPreset`: done.** Any word was stored ("bogus", "RAIN", 5) and returned true, and
+the display drew nothing for a name `presetInto` does not know. Two decisions the owner made:
+
+- An unknown name is refused with a console error that lists the six, as `scroll` and `cursor`
+  refuse one: `animPreset` is an enum now, for the LCD and the Pixel Display alike, its list
+  `ANIM_PRESETS` in `componentTables.js`.
+- Case does not matter, "everywhere". For the component verbs that is every list of words
+  (`coerce` ENUM through `wordIn`: any case, spaces trimmed, stored as the list spells it; the text
+  says `Case-insensitive.` where it said `Case-sensitive.`), and the verb names `read`, `size`,
+  `fill`, `insert` and `remove` take (`familyVerbNamed`, which also stops "toString" finding
+  Object's own). The Values sidebar takes "LEFT" for a component verb (`readEnum`'s `anyCase`).
+  Control names and element names are not touched by it. (This said they "stay exact"; they were
+  matched in any case already, and still are.) The rest of the API is the next item.
+
+| Field | Text |
+| --- | --- |
+| `animPreset` (options, required) | One of "wave", "scanner", "rain", "starfield", "spinner" or "plasma". Case-insensitive. / Invalid: rejected with a console error. |
+| notes | Plays only on a graphic display, while `anim()` is "preset". / Then the two every verb has. |
+
+Found on the way, for the queue: `animSpeed`'s range is 0 ↔ 16 in a script and 0.1 ↔ 5 on the
+inspector's preset Speed.
+
+**Item 5, `valueMin` and `valueMax`: kept as merged**, at the owner's word: the parameter lines
+proposed ("The value at 0 % and an empty bar.", the reversed range, the equal pair) and the notes
+on {value} and a value outside the range were worse than the text as it stands. Texts and
+behaviour are unchanged: a minimum above the maximum is still a reversed range, accepted without a
+word, and an equal pair still gives {pct} 0 and an empty bar.
+
+**Item 6, `glyph`: done.** Three decisions the owner made, from the probe:
+
+- A character that is not a cell ("abc", "#x###") was stored and the slot drew nothing. It is
+  refused with a console error that names it.
+- The "|" was dropped and the rest read five at a time, so a short row ran into the next: "#|#|#"
+  lit three cells of the top row. Each row between "|" is read on its own and padded to five
+  (`parseGlyph`). A flat string without "|" is read five at a time, as before; the inspector writes
+  full rows, so no saved panel draws differently.
+- More than eight rows, or a row longer than five, was cut off without a word. It is refused with a
+  console error ("It has 9 rows, and a glyph has 8.", "Row 1 has 6 cells, and a row has 5.").
+
+The three refusals are `glyphBitsRefusal` in `utils/lcdUserGlyphs.js`, which the verb names as its
+`refuseValue`; an ITEM verb with one refuses, in the reducer, the legality check and the reason
+alike, what it names.
+
+| Field | Text |
+| --- | --- |
+| `bits` (text, required) | Eight rows of five: "#" lit, "." unlit, rows separated by "\|". / Shown in a line by \x00 to \x07 for slots 1 to 8. / "1" and "0": the same as "#" and ".". / Fewer than eight rows, or fewer than five cells in a row: the rest unlit. / Empty, or nothing lit: the slot is cleared. / Other characters: rejected with a console error. / More than eight rows, or a row longer than five: rejected with a console error. |
+
+Description, example and `index` unchanged.
+
+**Item 7, `text`: done.** Two decisions the owner made, from the probe:
+
+- A fraction of a row was rounded without the text saying so: 1.5 wrote row 2, 0.5 row 1, and 2.5
+  on two rows was refused. `indexOf` does it for every number counted from 1, so a glyph slot, a
+  pad, a step and a lane round alike. Kept, as `cursorAt` rounds, and every such parameter says
+  "A fraction: rounded." after its first line: the 37 indexed verbs (line, item, cell, the
+  Arpeggiator's `mute` set, and the glyph slot's own text) and each family's `read`, `insert` and
+  `remove`, which take a position counted from 1 and round it too. The hand-written families'
+  zones, slots and cells are their modules' reviews.
+- Text left out (`text("Screen", 1)`, or nil/None/null) blanked the row and returned true under a
+  type that says "required". It is refused with "No text was given.", as every text verb's is;
+  `""` still blanks a row on purpose.
+
+| Field | Text |
+| --- | --- |
+| `row` (number, required) | Row, counted from 1. / A fraction: rounded. / Not a row the display has: rejected with a console error. |
+| `text` (text, required) | The four lines as merged, then: Left out: rejected with a console error. |
+
+Description and example unchanged.
+
+**Item 8, texts that were only the name: done.** Eight parameters said their own name and nothing
+else ("Brightness.", "Value prefix."); `valueMin` and `valueMax` stay as merged (item 5). Each first
+line now says what the setting is, and the probe added what it found unsaid. Three decisions the
+owner made, each the recommendation, all texts and no change to behaviour:
+
+- `editText` from a script is stored as given: the field's character set (upper case by default)
+  and its length (16) govern typing at the screen. A script may set a name read from the synth.
+- A linked control wins: while `brightnessSource()` or `valueSource()` links one, the script's
+  `brightness()` or `value()` is stored and the control sets what is shown. Said in a note.
+- Brightness 0 is not dark (the lit text is drawn at 35% + 65% of it), and the text says so; the
+  drawing is as it was.
+
+| Parameter | Text |
+| --- | --- |
+| `brightness` | How bright the lit characters are. / Range: 0 ↔ 100. / 0: the dimmest, still lit. / Outside the range: the nearest end. / Invalid: rejected with a console error. Note: While `brightnessSource()` links a control, that control sets the brightness. |
+| `contrast` | How visible the unlit segments are. / Also how strongly the backlight glows. / Range: 0 ↔ 100. / 0: unlit segments hidden. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| `value` | The number shown. / Outside valueMin ↔ valueMax: shown as it is; `{pct}` and `{bar}` stop at the ends. / Invalid: rejected with a console error. Note: While `valueSource()` links a control, that control sets the value and its range. |
+| `valuePrecision` | Decimal places `{value}` shows. `{pct}` is always whole. / then its range lines. |
+| `valuePrefix`, `valueSuffix` | Text before (after) the number in `{value}`. Not used by `{pct}` or `{bar}`. / A number: written as text. / Left out: rejected with a console error. |
+| `editText` | The text in the field. / Not held to the field's characters or length: those apply to typing. / A number: written as text. / Left out: rejected with a console error. |
+| `animFps` | Frames per second. / Only for a sprite sheet: a GIF or APNG plays at its own speed. / then its range lines. |
+
+The Pixel Display's `brightness`, `contrast`, `editText` and `animFps` say only their names too;
+they are that module's review.
+
+**Item 9, the four overlays: done.** "Show or hide the ghost." said nothing of what the ghost
+is, and `showScanlines`' example said "if it is hidden" of a plural. The four are declared in the
+LCD's family now, rather than derived from the model (`derivedFlagVerbs`), for what each is. Two
+decisions the owner made, each the recommendation:
+
+- The example generator (`toggleGloss`) gives a plural name "they" and "them": "shows the
+  scanlines if they are hidden, and hides them if they are shown", "switches the zones on if they
+  are off". Thirty-one examples across the components changed, in grammar only.
+- The grid is "between the cells or pixels": a graphic display draws it between pixels.
+
+| Command | Description | Note |
+| --- | --- | --- |
+| `showGlass` | Show or hide the glass: a sheen across the screen. | Its tint is set in the inspector, under Colour ▸ Glass. Default: shown. |
+| `showGhost` | Show or hide the ghost: the faint unlit cells behind the text. | How faint is set by `contrast()`. Default: shown. |
+| `showScanlines` | Show or hide the scanlines: thin horizontal lines across the screen. | Default: hidden. |
+| `showGrid` | Show or hide the grid: faint lines between the cells or pixels. | Default: hidden. |
+
+The Pixel Display's four are still derived, and say only their names: that module's review.
+
+**Item 10, the notes every family shares: done.** `read`'s note named a `"step"` list, `size`'s a
+`"node"` one and the Mod Matrix, on all 23 components, and only the Turing Machine, the Orbit and
+the Mod Matrix have each; eight components have no lists at all and their `read` note described
+reading one. `fill`'s example passed a `values` never shown, and its note said "One document
+change". Two decisions the owner made, each the recommendation:
+
+- The texts are made from each component's own lists, for all 23 (`familyNotes` and `sampleList`
+  in `componentVerbs.js`): `read` and `size` name the first list by name, a grid answers in rows
+  and columns, a Pixel Display's elements are read by name, and a component without lists has only
+  the first sentence of `read`'s note.
+- `fill`'s example writes its list out, as `ce.draw`'s do, in the first list's own kind of value:
+  `{"PATCH 12", "VOL 100"}` on the LCD, `{0.25, 0.5, 0.75}` for steps, `{true, false, true}` for
+  lanes, `{{0.5, 0}, {0, 0.5}}` for the Mod Matrix.
+
+| Field, on the LCD | Text |
+| --- | --- |
+| `read` note | `read(target)`: every setting as a table, by verb name. `read(target, "glyph")`: the whole list; `read(target, "glyph", 3)`: one glyph, counted from 1. |
+| `size` note | `size(target)`: every list as a table, by verb name; `size(target, "glyph")`: one number. |
+| `fill` example | `ce.components.lcd.fill("Screen", "text", {"PATCH 12", "VOL 100"})` writes rows 1 and 2. |
+| `fill` note | One undo step for the whole list, instead of one per element. |
+
+**Item 11, `backlightSource`: done.** Its refusal line said "Not on this panel, or not a control
+on this panel": any control can drive the backlight, so the second half only repeated the first.
+The text never said when the backlight is on, and the example drove it with a knob called Cutoff.
+Two decisions the owner made, each the recommendation:
+
+- A control lights the backlight while it is on, or at or past halfway along its range
+  (`backlightOnFrom` in `utils/lcdZones.js`, which the preview uses for the LCD and the Pixel
+  Display alike). It was 0.5 of the control's own number, so a knob from 0 to 127 lit it at 1 and
+  one from -64 to 63 stayed dark up to 0. A saved panel that links a knob switches at a different
+  point; a switch or a button is as it was. The inspector's hint says the same.
+- The example is a switch called Light, on both displays.
+
+| Field | Text |
+| --- | --- |
+| Example | `ce.components.lcd.backlightSource("Screen", "Light")` makes the control called Light switch the backlight. |
+| `name` | The driving control's name. / Left out, or "": unlinked. / On while the control is on, or past halfway. / Not on this panel: rejected with a console error. |
+
+**Item 12, the manual: done.** Its component chapter gave each component one line, a summary and
+its commands' names, so the texts the picker, the hover card and the API explorer show were in the
+manual nowhere. At the owner's word ("Full entries"), every component command has a full entry now,
+as every other module's has: 499 of them, under a heading per component (`#### ce.components.lcd:
+LCD Display`) inside its group (`componentChapter` in `generate-scripting-manual.mjs`). The ones
+not yet reviewed print what the generator writes for them today, which is what the picker shows.
+
+What it costs: the manual went from 256 KB to 568 KB, and the in-app help bundle from about 470 KB
+to about 780 KB. The help overlay loads the bundle the first time it opens, not at start-up, so
+`helpDocs.test.js`'s guard (which said the bundle sat in the eager entry chunk) was corrected and
+raised from 600 KB to 1 MB.
+
+**Item 14, `animSpeed`: done.** A script could set the preset speed from 0 to 16, and the
+inspector's preset Speed (and a Pixel element's speed) runs from 0.1 to 5. The graphic canvas reads
+it as `Math.max(0.05, Number(animSpeed) || 1)`, so 0 played at normal speed and 0.02 at 0.05, which
+the text had to say and the inspector could not show. At the owner's word scripts take the
+inspector's range, 0.1 ↔ 5, on the LCD and the Pixel Display alike; past it, the nearest end with
+the one-time warning. A script that set 8 plays at 5. The text loses its two lines about the low
+end: "Speed factor. / Range: 0.1 ↔ 5. / 1: normal. / Outside the range: the nearest end. /
+Invalid: rejected with a console error."
+
+**After the queue: "line" wording, done.** The model says "row", and five texts still said "line":
+`scroll`'s description and example ("the rows"), `value`'s and `glyph`'s examples and `glyph`'s
+`bits` ("in a row"), `layout`'s "A display without layouts: 1, its own rows." (and its refusals),
+and the family's summary, "Write to a character LCD by layout, row and column, plus backlight,
+brightness and scrolling." `scroll` gained two notes, because "the rows scroll" would have been
+untrue on a display with layouts: "Only a row longer than the display moves." and "On a display
+with layouts: no effect. A zone set to scroll does so at `scrollSpeed()`." (A layout's rows are
+composed at the display's width, and the renderer moves only a row longer than that.)
+
+**Item 13, case everywhere: done**, module by module, one commit each (ce.ui, ce.draw, ce.image
+and ce.text, ce.panel with the hand-written component verbs, ce.anim, ce.math, ce.midi, ce.music
+with ce.time, ce.storage with ce.device and ce.core), the owner having agreed the split: a word
+from a list the app defines is read in any case; a name an author makes up is matched as it was.
+
+- One helper per runtime: `listWord(values, value)` in `utils/wordLists.js` (the list's spelling,
+  or null), `__word` beside `__steps` in each prelude, and `animCurveName` / `formWord` on the C++
+  side (`ScriptRuntime.cpp`, `BridgeScriptHost.h`). Where every word in a list is lower-case
+  (`ce.math`'s names, the storage scope, the byte order), the runtimes compare trimmed and
+  lower-cased.
+- Reversed on the way: `ce.draw`'s "Case-sensitive." on `cap`, `join`, `fit` and `blend`, which the
+  owner had approved; note names' "a capital letter" (the refusal says "a letter from A to G" in
+  every runtime, and "H4" is the unreadable example in the tests where "c4" was); `get`'s form in
+  another case, refused with "Write normalizedValue" (another spelling, ".normalizedValue" or
+  "normalised", still is).
+- Already any case, and left: `ce.time`'s divisions, `ce.device`'s type, encoding, direction and
+  filters, crossfade's law, a checksum's name, `sendTransport`'s action, the image layer, colour
+  names.
+- The Values tab reads every list in any case (`readEnum`'s `anyCase` defaults to true), except a
+  value written straight into a property, which the renderer reads only as it is spelled.
+- Verified: the full web suite, `scriptPreludeAgreement.test.js` for every prelude change, and the
+  C++ targets that run the preludes and the host (ScriptRuntime, PlayerScriptIntegration,
+  PythonScriptEngine with Python 3.13, PanelValueModel), built and run with GCC. MSVC has not seen
+  the C++ changes; CI will.
+
+Not done, and noted for the owner: an unknown `ce.ui` kind still falls back to "info" without a
+word, and `ce.image.icon`'s fit still stores an unknown word as it is; both are those modules'
+reviews.
+
+### The LCD's script model
+
+Item 15 raised it. The owner read `clear("System1", 2)` as "page 2" as readily as "row 2", and
+asked for the whole of the LCD's scripting to be rethought as display → page → row → character.
+The owner's five decisions, 2026-10-24, from the proposal:
+
+1. Every display has pages. A display without layouts has one: its lines.
+2. A script writes a page's own text, drawn where no zone paints. Zones keep showing their
+   controls.
+3. A position is one table, every part optional: `{page = 2, row = 4, col = 15}` in Lua,
+   `{page: 2, row: 4, col: 15}` in JavaScript, `{"page": 2, "row": 4, "col": 15}` in Python. The
+   bare forms stay: `text(t, row, text)`, `clear(t)`, `clear(t, row)`.
+4. A page left out is the page showing.
+5. The Pixel Display has the same pages.
+
+The facts it is built on. A display without layouts draws `lines`, one text per row. A display
+with layouts draws the page showing from its zones (`composeLayout`, which starts from a blank grid
+and paints each zone's region) and never shows `lines`. A page stores no characters. Which page
+shows is decided as the panel runs: a soft key's `{ layout }` press (`lcdPressedLayout` in
+`PanelPreviewSurface.svelte`, transient), an overlay, the Selector's value, the default, with a
+page's `timeoutMs` returning it; in design mode, the inspector's Edit/Preview layout. Component
+verbs run only with the panel window open (the preludes' webview-only stubs), so the page showing
+is always there to ask.
+
+Then, from the owner's later answers: **the word is "layout"**, the inspector's own, so nothing in
+it was renamed (its Layouts are the screens and its Pages the rules that switch between them, and
+"page" in a script would have meant the one while the inspector said the other); and **a range is
+a list**, `col = {5, 10}`, because "col = 5, 10" cannot be written in a table (Lua reads the 10 as
+an entry of its own; JavaScript and Python refuse it). Open points a to e below were not answered
+one by one: the owner's go-ahead was on the summary that carried them, so their recommendations
+hold.
+
+**The model, as built** (`scripting/lcdPositions.js`):
+
+- **A layout** is addressed by its number in the inspector (counted from 1) or its name (in any
+  case and trimmed, as a control's name and a pixel element's are matched). A number is a
+  position, text a name, and text that names no layout but reads as a number is that number. A
+  display without layouts has layout 1: an LCD's lines, a Pixel Display's elements.
+- **A layout's text** is stored on the layout as `lines`, one string per row, saved as the
+  display's `lines` are. `composeLayout` starts from it, so a cell no zone paints shows it, with
+  `{value}`, `{pct}` and `{bar}` filled in. It never scrolls: a layout's rows are composed at the
+  display's width. Panels that already have layouts are not changed (they carry default lines
+  nobody sees, which would appear under their zones); "+ Enable" gives the first layout the lines,
+  so the screen does not go blank when an author turns layouts on.
+- **The position** is a row number, or a table of `layout`, `row` and `col` (the names in any
+  case). `row` and `col` are a number or a range; each counted from 1, a fraction rounded. A part
+  the display does not have is refused with why; a range past its edge stops there, said once.
+  Another key (`{pg = 2}`), an entry without a name (Lua's `{row = 2, col = 5, 10}`), a list for
+  the whole position, a range that is not two numbers or runs backwards: refused with why.
+- **The layout showing** comes from the preview, through `stores/displayLayouts.js`, which the
+  preview provides while it is mounted: the same answer it gives the renderer. With no preview,
+  the layout the design canvas shows (the inspector's Edit / Preview Layout).
+
+| Call | Does |
+| --- | --- |
+| `text(t, 2, "VOL")` | Row 2 of the layout showing: replaced. On a display without layouts, as before. |
+| `text(t, {layout = 2, row = 4}, "VOL")` | Row 4 of layout 2: replaced. |
+| `text(t, {row = 4, col = 15}, "X")` | From column 15 of row 4: written over, the rest of the row kept, as a hardware LCD prints at its cursor. |
+| `text(t, {row = 4, col = {5, 10}}, "VOL")` | Into columns 5 to 10: padded with blanks, or cut at 10. |
+| `text(t, {layout = 2}, "VOL")`, `text(t, {row = {1, 2}}, "VOL")` | Rejected: text writes one row. |
+| `clear(t)` | The layout showing's text: blanked. |
+| `clear(t, 4)`, `clear(t, {row = 4})` | Row 4 of the layout showing. It blanked every row, the 4 dropped. |
+| `clear(t, {layout = 2})`, `clear(t, {col = {1, 3}})` | All of layout 2's text; columns 1 to 3 of every row. |
+| `clear(t, {layout = 2, row = 4, col = 15})` | One character. |
+| `read(t, "text")`, `read(t, "text", 2)`, `read(t, "text", {row = 4, col = {5, 10}})` | Every row, one row, columns of one; one `col` is one character. |
+| `layout(t, 2)`, `layout(t, "Edit")` | Shows it as a soft key does (`lcdPressedLayout`, and the layout's timeout), until a soft key, an overlay or the Selector changes it. Not written to the panel. New, on the LCD and the Pixel Display. |
+| `read(t, "layout")` | The number of the layout showing; 1 without layouts. New. |
+| `fill(t, "text", {...})`, `size(t, "text")` | The layout showing's rows. |
+
+`clear` takes away only text: a zone still shows its control. On a display with layouts,
+`text(t, 2, "VOL")` wrote `lines` nobody saw and warned so; it writes the layout showing now. The
+Joystick's `cornerLabel`, the other LINE verb, is as it was. The Values tab reads a position and a
+layout as the runtime does.
+
+**The open points, as built:** (a) the inspector's Text rows (Row 1, Row 2, ...) edit the text of
+the layout being edited once there are layouts, and every list of layouts shows its number
+("1 · Home"); (b) `read(t, "layout")` gives a number, as names can repeat; (c) tokens filled in,
+no scrolling; (d) the cursor stays one per display and `cursorAt` is as it was; (e) the Pixel
+Display's element verbs stay by name.
+
+| Field | Text |
+| --- | --- |
+| `text` description | Write one row of the display. |
+| `text` `at` (number or table, required) | Row, counted from 1, of the layout showing. / Or a table: {layout = 2, row = 4, col = 15}, `layout` and `col` optional. / `layout`: its number, counted from 1, or its name. Left out: the layout showing. / `col`: written from that column on, the rest of the row kept. / `col` as a range {5, 10}: written into those columns, padded with blanks or cut. / A fraction: rounded. / A range past the display: to its last column. / Not on the display: rejected with a console error. |
+| `text` `text` | The text. / Longer than the display: cut at its width, with a console warning the first time. / On a display without layouts that scrolls: scrolled in instead. / The other three lines as they were. |
+| `text` notes | On a display with layouts: written on the layout, shown where no zone paints. |
+| `clear` description | Blank the layout showing, or part of it. |
+| `clear` `at` (number or table, optional) | As `text`'s, with `row`, `col`: a number, or a range {5, 10}. Left out: every row, every column. / Left out: the whole layout showing. |
+| `clear` notes | Only text is blanked: a zone still shows its control. |
+| `layout` `layout` (number or name, required) | Its number, counted from 1, or its name. / A name: case-insensitive. / A fraction: rounded. / A display without layouts: 1, its lines (its elements). / Not a layout of the display: rejected with a console error. |
+| `layout` notes | Shown as a soft key shows it: until a soft key, an overlay or the Selector changes it, or its own timeout returns it. (Pixel: until an overlay or the Selector changes it.) / `read(target, "layout")` gives the number of the layout showing. |
+| `read` `index`, the LCD's | One line more: For "text": a row or a table, as `text()` takes it. |
+
+Then items 8 to 14, one at a time.
+
+### Zones by name
+
+**Built, 2026-10-25**, after the owner's "1, 2 and 3 as recommended" on the proposal: six commands,
+one per property, and a name reaches every zone carrying it on every layout, as a Pixel Display's
+element names do. The Pixel's helpers (`utils/pixelElements.js`) take the list's key, `elements` or
+`zones`, so one set of rules decides what a name reaches on both displays; the verbs are ELEM verbs
+with `list: 'zones'` in `componentVerbs.js`.
+
+- **The zone table has a Name column**, after the zone's number. The name is never drawn.
+- **Names match in any case.** "Cutoff" on one layout and "cutoff" on another are one zone to a
+  script, so `read` lists the name once, as first spelled, and so does a refusal's list of the
+  names there are. (This was not true of the Pixel's elements either; it is now, for both.)
+- **An unnamed zone answers to its id** (`z_…`), the Pixel's rule. The proposal said such a zone
+  "can't be reached"; the id is shown nowhere in the inspector, so in practice it cannot, but
+  `read(t, "zoneText")` lists it under its id.
+
+| Command | Does |
+| --- | --- |
+| `zoneText(t, "Title", "VOL")` | A fixed-text zone's text. |
+| `zoneLabel(t, "Cutoff", "CUT")` | The name a name zone shows in place of its control's; `""`: the control's own. |
+| `zoneShow(t, "Cutoff" [, on])` | Shown or hidden; left out, toggles from the first zone's state. A zone without `visible` is shown. |
+| `zoneAt(t, "Cutoff", {row = 2, col = {1, 8}})` | Moves it. `col` alone keeps its width up to the edge; a range is exact; `layout` is refused, a zone stays on its layout. |
+| `zoneSource(t, "Cutoff", "Resonance")` | Links it to a control by name, stored by id as the picker stores it; `""` unlinks. |
+| `zoneKind(t, "Cutoff", "bar")` | What it shows: one of the zone table's sixteen kinds (`lcd.zoneKind` in `componentTables.VERB_VALUES`, the table's own list). |
+| `read(t, "zoneText")`, `read(t, "zoneText", "Title")` | Every zone's, by name, or one zone's. `zoneAt` reads as `{row, col = {first, last}}`, which `zoneAt` takes back; `zoneSource` as the control's name. |
+
+**Made on the way, kept at the owner's word** ("Keep @active and @edit"): `zoneSource` also takes
+the picker's other two entries, `"@active"` (with `"#value"`, `"#switch"` or `"#choice"`) and
+`"@edit"`, as the picker writes them. Without them `read(t, "zoneSource")` would answer `""` for a
+zone following the active control, which reads as unlinked.
+
+| Field | Text |
+| --- | --- |
+| `name` (every zone command) | The zone's name, as given in the zone table. Case-insensitive. / Every zone with that name, on every layout. / Not a zone of the display: rejected with a console error. |
+| `zoneText` `text` | The text. / Shown by a zone that shows fixed text. / A number: written as text. / Left out: rejected with a console error. |
+| `zoneLabel` `label` | The name shown. / "": the control's own name. / Shown by a zone that shows a name. / A number: written as text. / Left out: rejected with a console error. |
+| `zoneShow` `on` | true: shown. / false: hidden; the layout's text shows through. / Left out: toggles. / The usual false words. |
+| `zoneAt` `place` | A table: {row = 2, col = {1, 8}}, each part optional. / `row`: one row, counted from 1. / `col`: the first column, the zone keeping its width up to the display's edge; or a range {1, 8}. / A row number alone: the row. / A part left out: unchanged. / A fraction: rounded. / A range past the display: to its last column. / Not on the display: rejected with a console error. |
+| `zoneSource` `control` | The control's name. Case-insensitive. / "": unlinked. / "@active": the control last touched. / "@active#value", "@active#switch" or "@active#choice": the last of that kind. / "@edit": the display's editable field. / This display, or not on this panel: rejected with a console error. / Left out: rejected with a console error. |
+| `read` `index`, the LCD's and the Pixel's | One line more: For a zone verb, such as "zoneText": the zone's name, case-insensitive. (Pixel: an element verb, such as "text".) |
+
+Tests: `test/lcdZonesByName.test.js` (places, sources, every command and `read` through the runtime,
+refusals); the catch-all in `componentVerbs.test.js` gives the probe LCD a zone called "probe".
+
 ### The branch
 
 Everything above is on `main`, merged through three pull requests the owner asked for and merged
@@ -782,27 +1227,27 @@ parameter names, with a bracketed aside, or over 25 words):
 | ce.draw | 27 | 18, all done |
 | ce.time | 22 | 15, all done |
 | ce.components.lcd | 37 | 22, all done |
-| ce.components.arp | 30 | 15 |
-| ce.components.pixel | 28 | 13 |
-| ce.components.meter | 25 | 11 |
-| ce.components.chordpad | 22 | 11 |
-| ce.components.noteribbon | 20 | 11 |
-| ce.components.drumpads | 37 | 10 |
-| ce.components.transport | 16 | 10 |
-| ce.panel | 25 | 8 |
-| ce.components.envelope | 23 | 8 |
-| ce.components.turing | 16 | 8 |
-| ce.components.crossfader | 15 | 8 |
-| ce.device | 24 | 7 |
-| ce.components.router | 21 | 7 |
-| ce.components.ribbon | 15 | 7 |
-| ce.components.kinetic | 12 | 7 |
-| ce.components.orbit, looper, constellation, panic | 20, 17, 13, 9 | 6 each |
-| ce.music | 13 | 5 |
-| ce.core, ce.storage, ce.components.recorder, timbre, joystick | 15, 10, 15, 15, 16 | 4 each |
-| ce.image, ce.text, ce.components.macro, constraint | 8, 7, 16, 11 | 3 each |
-| ce.ui, ce.components.matrix | 9, 11 | 2 each |
-| lifecycle hooks, ce.components.harmony, phrase, setlist, split | 9, 15, 9, 7, 6 | 1 each |
+| ce.components.arp | 31 | 15, all done |
+| ce.components.pixel | 28 | 13, all done |
+| ce.components.meter | 25 | 11, all done |
+| ce.components.chordpad | 22 | 11, all done |
+| ce.components.noteribbon | 20 | 11, all done |
+| ce.components.drumpads | 37 | 10, all done |
+| ce.components.transport | 16 | 10, all done |
+| ce.panel | 25 | 8, all done |
+| ce.components.envelope | 23 | 8, all done |
+| ce.components.turing | 16 | 8, all done |
+| ce.components.crossfader | 15 | 8, all done |
+| ce.device | 24 | 7, all done |
+| ce.components.router | 21 | 7, all done |
+| ce.components.ribbon | 15 | 7, all done |
+| ce.components.kinetic | 12 | 7, all done |
+| ce.components.orbit, looper, constellation, panic | 20, 17, 13, 9 | 6 each, all done |
+| ce.music | 13 | 5, all done |
+| ce.core, ce.storage, ce.components.recorder, timbre, joystick | 15, 10, 15, 15, 16 | 4 each, all done |
+| ce.image, ce.text, ce.components.macro, constraint | 8, 7, 16, 11 | 3 each, all done |
+| ce.ui, ce.components.matrix | 9, 11 | 2 each, all done |
+| lifecycle hooks, ce.components.harmony, phrase, setlist, split | 9, 15, 9, 7, 6 | 1 each, all done |
 
 After the commands: the module descriptions (41, the picker's group headings) and the event
 descriptions (38), with the same rules. Parameter and option descriptions only where they are
@@ -810,6 +1255,940 @@ unreadable or wrong; that is where the detail lives now, and it can be longer.
 
 Not in scope: names, signatures, behaviour, and the console messages a refused call writes. Those
 are the runtime's words and their tests pin them.
+
+## `ce.components.arp`: the owner's review
+
+Started 2026-10-25, one item at a time as the LCD's was. The queue, from a read of the 30 texts
+against the engine (`utils/arpLayout.js`, the preview's ticker in `PanelPreviewSurface.svelte`) and
+the inspector (`ArpEditor.svelte`), and a probe of each command's edges in the runtime:
+
+1. `pattern`: done, below.
+2. `rate`: done, below.
+3. `octaves`: done, below.
+4. `gate`: done, below.
+5. `swing`: done, below, with `swingSource`.
+6. `phase`: done, below.
+7. `mute`: done, below.
+8. The own chord (`key`, `scale`, `degree`, `chordType`, `baseOctave`, `followPanelKey`): done,
+   below.
+9. `latch`: done, below.
+10. `source`, `link`, `inputChannel`: done, below.
+11. `run`, `sync`, `division`: done, below.
+12. `euclid`, `euclidSteps`, `euclidPulses`, `euclidRotate`: done, below.
+13. `velocity`, `channel`: done, below.
+14. `editable`, `showNotes`, `showHeader`: done, below.
+15. The family: done, below. The arp's review is done.
+
+**Item 1, `pattern`: done.** "random" and "asPlayed" played exactly as "up" for as long as they
+were offered: every note set was sorted on the way (`arpBaseNotes`, `expandOctaves`, and the
+preview's linked and MIDI notes), and nothing chose at random. No test covered either. At the
+owner's word ("As recommended") both work:
+
+- "random": each step plays a cell picked at random (`arpStepCell`, its randomness passed in as
+  the file's other functions take theirs). The cells are drawn low to high; the playhead shows the
+  cell that played (`__head`, `arpHead`); `onStep` names it; a hand mute silences the cell, and
+  swing still follows the step.
+- "asPlayed": the preview hands a linked Chord Pad's notes over in the order the pads went down
+  and MIDI input in the order it arrived (`heldNotesInOrder`, by the arrival time the store
+  already kept), and `arpSequence` walks them in that order, repeated an octave up per octave. Its
+  own chord has no order but its own: as "up".
+
+Checked in a running preview (a scratch Playwright probe): a "random" arp's playhead went
+1 4 0 5 1 4 1 2 … while an "up" one walked 0 to 5 in turn, and an "asPlayed" arp on MIDI input
+laid out G4 C4 E4 as the keys went down, C4 E4 G4 once switched to "up".
+
+| Field | Text |
+| --- | --- |
+| Description | Set the order the notes are played in. |
+| Example | `ce.components.arp.pattern("Arpeggiator", "updown")` plays the notes low to high, then back down. |
+| `pattern` (string, required) | "up": low to high. / "down": high to low. / "updown": up, then down; the top and bottom notes once. / "downup": down, then up; the same. / "asPlayed": in the order the notes were pressed. Its own chord: as "up". / "random": one note at random each step. / "chord": every note at once, each step. / Case-insensitive. / Invalid: rejected with a console error. |
+| notes | Default: "up". / Then the two every command has. |
+
+**Item 2, `rate`: done.** It took 0.01 to 200. The engine plays nothing slower than 0.1 (`arpRate`),
+so 0.05 was stored and played at 0.1 without a word; and the preview moves once a frame and does
+not play the steps it slept through, so above about 60 steps a second steps were skipped. The
+inspector offers 0.1 to 40. At the owner's word ("As recommended") a script takes the inspector's
+range, as the LCD's `animSpeed` does: outside it, the nearest end with the one-time warning.
+`RATE` in `componentVerbs.js` is the arp's alone.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how many steps a second it plays, while not synced. |
+| Example | `ce.components.arp.rate("Arpeggiator", 8)` plays eight steps a second. |
+| `rate` (number, required) | Steps per second. / Range: 0.1 ↔ 40. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | While synced to the Transport: no effect; `division()` sets the step. / Default: 6. / Then the two every command has. |
+
+**Item 3, `octaves`: done.** It took 1 to 6; the engine repeats the notes over at most four octaves
+(`expandOctaves`, and `arpSequence`'s "asPlayed" walk), so 5 and 6 were stored and played as 4
+without a word. The inspector offers 1 to 4. At the owner's word ("As recommended") a script takes
+1 to 4: past it, the nearest end with the one-time warning.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how many octaves the notes are repeated over, upward. |
+| Example | `ce.components.arp.octaves("Arpeggiator", 2)` plays the notes, then the same notes an octave up. |
+| `octaves` (number, required) | Octaves, from the notes up. / 1: the notes only. / Range: 1 ↔ 4, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | A note above 127 is left out. / With "chord": every octave at once. / Default: 1. / Then the two every command has. |
+
+**Item 4, `gate`: done.** It took 0 to 1. The engine holds a note for at least 10 ms and at most
+99% of its step (`gateSeconds`: a repeated note at a full gate would race its own note-off), so 0
+played a 10 ms blip. The inspector offers 0.05 to 1. At the owner's word ("As recommended") a
+script takes 0.05 to 1: past it, the nearest end with the one-time warning.
+
+| Field | Text |
+| --- | --- |
+| Description | Set how long each note is held, as a part of its step. |
+| Example | `ce.components.arp.gate("Arpeggiator", 0.5)` holds each note for half its step. |
+| `gate` (number, required) | Part of the step. / 1: held to the next step; 99% of it, so a repeated note sounds again. / Range: 0.05 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Default: 0.6. / Then the two every command has. |
+
+**Item 5, `swing`: done, and `swingSource` added.** It took -1 to 1; the engine reads it from 0 to 1
+(`effectiveSwing`), so a negative swing was stored and played straight. The inspector offers 0 to 1.
+And while synced an arp plays the Transport's swing unless the inspector's "Swing from" is "Its
+own": a script's `swing()` on a synced arp did nothing, and no script could change that. At the
+owner's word ("Do recommended") a script takes 0 to 1, and `swingSource(t, "transport" | "own")`
+sets whose swing a synced arp plays, read back by `read(t, "swingSource")`. `swingSource` joins the
+Arp's section defaults as "transport", which is what an absent one always read as, so no saved
+panel changes; its words are `SWING_SOURCES`, the module's own (`componentTables.VERB_VALUES`).
+
+| Field | Text |
+| --- | --- |
+| `swing` description | Set how far every second step is delayed. |
+| `swing` example | `ce.components.arp.swing("Arpeggiator", 0.5)` delays every second step by a quarter of a step. |
+| `swing` (number, required) | Part of half a step: 1 delays every second step by half a step. / 0: straight. / Range: 0 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| `swing` notes | While synced: the Transport's swing, unless `swingSource()` is "own". / Default: 0. / Then the two every command has. |
+| `swingSource` description | Set whose swing a synced arp plays: the Transport's or its own. |
+| `swingSource` example | `ce.components.arp.swingSource("Arpeggiator", "own")` plays its own swing while synced. |
+| `swingSource` (string, required) | "transport": the Transport's swing, while synced. / "own": `swing()`, always. / Case-insensitive. / Invalid: rejected with a console error. |
+| `swingSource` notes | Not synced: its own swing, either way. / Default: "transport". / Then the two every command has. |
+
+**Item 6, `phase`: done, as a seek.** It wrote the stored phase, which the preview reads only when
+it opens (`arpPhaseFor`: its own state wins from the first frame). Checked in a running preview: an
+arp on cell 2 of 6 took `phase("Arp", 0.5)`, returned true, stayed on cell 2 and walked on to 4;
+stopped, `phase("Arp", 0)` and started again, it went on from 4; `read(t, "phase")` gave the 0.5
+written. At the owner's word ("As recommended") `phase()` is a seek, as `layout()` is the LCD's:
+`stores/componentPhases.js` asks the preview, which moves a running arp at once (its next step
+plays from there) and a stopped one where it starts, redrawn there; `read(t, "phase")` answers
+where it is. Nothing is written to the panel. A synced arp's position is the Transport's, so it is
+not moved, with a console warning. With no preview a seek waits for the next one to open. The verb
+says so with `seek: { clock: 'syncToTransport' }`; the value is read as any number verb's (range,
+nearest end, refusals) against no stored value, so seeking to the stored number still seeks. The
+same check in the preview afterwards: cell 2, `phase(0.5)`, cell 4 at once; `read` 0.76 a moment
+later; stopped, `phase(0)` drew it on cell 1 and it started there.
+
+The Orbit's and the Looper's `phase` keep their position the same way and are likely as dead;
+that is their reviews', and `componentPhases.js` is where their preview code would answer.
+
+| Field | Text |
+| --- | --- |
+| Description | Move the arp to a point in its sequence. |
+| Example | `ce.components.arp.phase("Arpeggiator", 0.5)` moves it halfway through its sequence. |
+| `phase` (number, required) | Where in the sequence: 0 the start, 0.5 halfway. / 1: the start again. / Range: 0 ↔ 1. / Outside the range: the nearest end. / Invalid: rejected with a console error. |
+| notes | Running: the next step plays from there. Stopped: it starts from there. / While synced: no effect; the Transport's position decides. / `read(target, "phase")` gives where it is now. / Nothing is written to the panel. / Then the two every command has. |
+
+**Item 7, `mute`: done.** `mute(t, 3)` muted step 3 as it should, and clicking a cell does the
+same; but "on" meant muted and nothing said so (the example read "switches step 3 on"),
+`read(t, "mute")` gave the stored steps, counted from 0 (`[2]` after `mute(t, 3)`), and
+`read(t, "mute", 1)` the list's first entry rather than whether step 1 was muted. A step past the
+sequence is stored without a word, and plays once the sequence reaches it. At the owner's word
+("As recommended") `read(t, "mute")` gives the muted steps counted from 1 and `read(t, "mute", 3)`
+true or false (panelRuntime's read, for the one `indexset` verb there is); a step past the end is
+kept, since the sequence grows with the notes held, and the text says so. `scriptComponents.test.js`
+held the script and the grid's toggle to one shape through the old read; it does now through the
+new one.
+
+| Field | Text |
+| --- | --- |
+| Description | Mute or unmute one step. |
+| Example | `ce.components.arp.mute("Arpeggiator", 3)` mutes step 3 if it plays, and lets it play if it is muted. |
+| `index` (number, required) | Step number, counted from 1, as the cells are drawn from the left. / A fraction: rounded. / Past the last step: kept, for when the sequence grows. / Below 1, or invalid: rejected with a console error. |
+| `on` (true or false, optional) | true: muted. / false: plays. / Left out: toggles. / 0, "", "false", "off" or "0": false. Case-insensitive. / Any other value: true. |
+| notes | A step is a place in the sequence, not a note: the mute stays on step 3 when the notes change. / `read(target, "mute")`: the muted steps, counted from 1; `read(target, "mute", 3)`: true if step 3 is muted. / Default: none muted. / Then the two every command has. |
+
+**Item 8, its own chord: done.** Six commands that matter only while it plays its own chord
+(the inspector hides them for a linked Chord Pad or MIDI input). Four decisions, at the owner's word
+("As recommended"):
+
+- `degree` counts from 1, as `ce.music.degreeChord` does, stored one lower (`oneBased`), so saved
+  panels are unchanged; the inspector's "Deg" counts from 1 too. It counted from 0.
+- Its range is the scale's own length (`rangeFrom`, the new hook for a number verb whose range
+  the control gives): 1 to 7, 6 for "blues", 5 for the pentatonics, past it the nearest end with the
+  one-time warning. It took 0 to 6 on any scale, and degrees 5 and 6 of a pentatonic played as 4.
+- `key` takes a note's name too, "C", "F#", "Eb", in any case (`pitchClassOf` in `musicTheory.js`,
+  by `ce.music`'s own note reading; a name it cannot read is refused, not taken as C as the panel
+  key's `rootFrom` takes it), and a number goes round the octave, 12 is C, as `phrase.key` does.
+  `key(t, 12)` was B, the nearest end. The hooks: `readValue` reads the value before the verb's
+  range, `valueRefusal` says why one cannot be read, `argKind` types the parameter "number or name".
+- `followPanelKey(t, true)` takes the panel's key and scale at once, in the same write, as the
+  inspector's toggle does (`setFollowsPanelKey`); it set the flag alone, and the control kept its
+  own key until the panel's next change. Again when already following, so a `key()` written on a
+  follower since is brought back. The runtime's `panelKeyCatchUp` does it for every family's
+  `followPanelKey` (the Chord Pad's, the Note Ribbon's and the rest), whose texts are their reviews'.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `key` | Set the key of its own chord. · `key("Arpeggiator", "F#")` builds its chord in F♯. | The key's note: "C", "F#", "Eb", in any case; or a number, 0 C to 11 B. / Past 11 or below 0: round the octave; 12 is C. / A fraction: rounded. / Invalid: rejected with a console error. | Its own chord only: with `source()` "link" or "input" the notes come from there. / Following the panel's key: replaced at its next change. / Default: 0 (C). |
+| `scale` | Set the scale of its own chord. · `scale("Arpeggiator", "dorian")` builds its chord from the Dorian scale. | (the list) | Its own chord only. / Following the panel's key: replaced at its next change. / Default: "minor". |
+| `degree` | Set which step of the scale its chord is built on. · `degree("Arpeggiator", 5)` builds its chord on the fifth step. | Step of the scale, counted from 1: 1 is the key's own chord. / Range: 1 ↔ the scale's notes: 7, 6 for "blues", 5 for the pentatonics. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Its own chord only. / A scale changed to a shorter one: its last step. / Default: 1. |
+| `chordType` | Set how many notes its chord has. · `chordType("Arpeggiator", "seventh")` adds the seventh: four notes. | "triad": three notes. / "seventh": four, the seventh added. / Case-insensitive. / Invalid: rejected with a console error. | Its own chord only. / Default: "triad". |
+| `baseOctave` | Set the octave its chord starts in. · `baseOctave("Arpeggiator", 4)` puts the chord's root in octave 4, as in C4, middle C. | The root's octave, as in C3. Middle C is C4. / Range: -1 ↔ 8, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Its own chord only. / A note above 127 is left out. / Default: 3. |
+| `followPanelKey` | Follow the panel's key and scale, or keep its own. · `followPanelKey("Arpeggiator", true)` takes the panel's key and scale, and changes with them. | true: the panel's key and scale, at once and at every change. / false: its own. / Left out: toggles. / The usual false words. | Default: false. |
+
+Each ends with the two notes every command has.
+
+**Item 9, `latch`: done, texts only.** It does what it should (`arpSourceNotes`): with a linked
+Chord Pad or MIDI input, the last notes held keep playing after they are let go, notes held again
+replace them, turning it off while nothing is held stops it, and a Panic with "clear local" (its
+default) lets them go. With its own chord it does nothing, which the inspector's hint said and the
+script's text did not. Approved as proposed ("As recommended").
+
+| Field | Text |
+| --- | --- |
+| Description | Keep playing the last notes held after they are let go. |
+| Example | `ce.components.arp.latch("Arpeggiator", true)` keeps playing the last chord held on the linked Chord Pad after it is let go. |
+| `latch` (true or false, optional) | true: the last notes held keep playing. / false: it stops when they are let go. / Left out: toggles. / The usual false words. |
+| notes | With `source()` "link" or "input" only: its own chord always plays. / Notes held again replace the latched ones. / A Panic lets them go. / Default: false. / Then the two every command has. |
+
+**Item 10, `source`, `link` and `inputChannel`: done.** `link`'s text was the generic link's
+("Name the control that drives the link.", its example naming "Cutoff", which it refuses), and its
+refusals were worded unlike every other command's: `arp.link("Knob"): refused — it is not a Chord
+Pad.` and `arp.link: no control named "Nope" on this panel.` At the owner's word ("As
+recommended"): `link` and `source` stay apart, the text saying the Chord Pad plays only while
+`source()` is "link"; and a refused link, on all nine link verbs of every family, says so as every
+verb does (`componentLinkAction`): `arp Arp: link("Knob") — refused, nothing changed. "Knob" is not
+a Chord Pad.`, `… There is no control called "Nope" on this panel.`, `… A control cannot drive
+itself.` `scriptControlSources.test.js` asked every link's summary to name "a name" and its
+parameter to say "unlink"; it takes the name in the parameter's first line and "": none too, which
+is where the approved text says both.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `source` | Set where the notes come from. · `source("Arpeggiator", "input")` plays the notes held on the MIDI input. | "chord": its own chord, from `key()`, `scale()` and `degree()`. / "link": the notes held on the Chord Pad set by `link()`. / "input": the notes held on the MIDI input, on `inputChannel()`. / Case-insensitive. / Invalid: rejected with a console error. | Default: "chord". |
+| `link` | Set the Chord Pad it plays from. · `link("Arpeggiator", "Pads")` plays the chords held on the Chord Pad called Pads. | The Chord Pad's name. Case-insensitive. / Left out, or "": none. / Not on this panel, or not a Chord Pad: rejected with a console error. | Played only while `source()` is "link". / The Chord Pad stays silent while the arp plays from it. / `read(target, "link")` gives the Chord Pad's name. / Default: none. |
+| `inputChannel` | Set which MIDI channel it takes notes from. · `inputChannel("Arpeggiator", 2)` plays only the notes held on channel 2. | Channel 1 ↔ 16, or 0: any channel. / Range: 0 ↔ 16, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Only while `source()` is "input". / Default: 0, any channel. |
+
+Each ends with the two notes every command has.
+
+**Item 11, `run`, `sync` and `division`: done, texts only.** All three do what they should:
+stopped, a free-running arp holds its place and starts again from there; synced, it takes one step
+per division at the Transport's tempo, in step with its position, silent while the Transport is
+stopped, `rate()` and `phase()` without effect and the Transport's swing played unless
+`swingSource()` is "own"; "D" is dotted (x1.5) and "T" a triplet (x2/3), `DIVISIONS` in
+`transportLayout.js`. Approved as proposed ("Approved"). The division's list in its text is the
+transport's own (`DIVISION_WORDS`, from `DIVISION_IDS`).
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `run` | Start or stop the arp. · `run("Arpeggiator", false)` stops it. | true: plays. / false: stops. / Left out: toggles. / The usual false words. | Free-running: it starts again where it stopped. / Synced: it plays only while the Transport runs. / Default: true. |
+| `sync` | Follow the Transport's tempo, or run at its own rate. · `sync("Arpeggiator", true)` steps in time with the Transport, one step per `division()`. | true: one step per `division()` at the Transport's tempo, in step with its position. / false: `rate()` steps a second. / Left out: toggles. / The usual false words. | Synced: silent while the Transport is stopped. / Synced: `rate()` and `phase()` have no effect, and the Transport's swing plays unless `swingSource()` is "own". / Default: false. |
+| `division` | Set how long each step is while synced. · `division("Arpeggiator", "1/8T")` plays eighth-note triplets. | A note value, "1/1" a whole note to "1/32". / "D" after it: dotted, half as long again. / "T" after it: a triplet, two-thirds as long. / One of "1/1", … "1/16T". Case-insensitive. / Invalid: rejected with a console error. | While synced only: free-running, `rate()` sets the step. / Default: "1/16". |
+
+Each ends with the two notes every command has.
+
+**Item 12, the Euclidean rhythm: done.** `euclidPulses()` hits spread over `euclidSteps()` steps,
+turned by `euclidRotate()` (`arpLayout.euclid`), measured in the free-running step number so a
+rhythm of one length runs against a note set of another. Two decisions, at the owner's word ("As
+recommended"): pulses take 0 to the rhythm's own steps (`rangeFrom`), as the inspector's do,
+past them the nearest end with the one-time warning (20 on 8 steps was stored and played every
+step); and a rotation goes round the steps, as the engine already did (`readValue`, now handed
+the control's settings too): -1 is the last, 40 on 8 steps is 0, no warning since nothing is cut
+off (it took -32 to 32 and stopped there). Checked in the engine: rotate 1 moves hits 3 6 8 to
+2 5 7, each a step earlier.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `euclid` | Switch the Euclidean rhythm on or off. · `euclid("Arpeggiator", true)` plays only the steps the rhythm hits. | true: the rhythm decides which steps sound. / false: every step sounds. / Left out: toggles. / The usual false words. | The rhythm: `euclidPulses()` hits spread evenly over `euclidSteps()` steps, turned by `euclidRotate()`. / It runs against the notes: an 8-step rhythm over a 3-note chord lands on different notes each time round. / Hand mutes stay silent either way. / Default: false. |
+| `euclidSteps` | Set how many steps the rhythm is long. · `euclidSteps("Arpeggiator", 8)` makes an 8-step rhythm. | Steps in the rhythm. / Range: 1 ↔ 32, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Default: 8. |
+| `euclidPulses` | Set how many of the rhythm's steps sound. · `euclidPulses("Arpeggiator", 3)` sounds 3 steps, spread as evenly as they go. | Hits, spread as evenly as they go. / 0: none sound. / Range: 0 ↔ `euclidSteps()`, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Steps lowered below it later: every step sounds. / Default: 5. |
+| `euclidRotate` | Turn the rhythm by a number of steps. · `euclidRotate("Arpeggiator", 1)` moves every hit a step earlier. | Steps to turn it: each hit that many steps earlier. / Past the steps, or below 0: round them; -1 is the last. / A fraction: rounded. / Invalid: rejected with a console error. | Default: 0. |
+
+Each ends with the two notes every command has.
+
+**Item 13, `velocity` and `channel`: done, texts only.** Every note plays at the arp's own
+velocity (`arpFireStep` reads `arpVelocity`), the velocity a linked Chord Pad or the MIDI input held
+it at not used, on its own channel. Approved as proposed ("Item 13 approved").
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `velocity` | Set how hard every note it plays is struck. · `velocity("Arpeggiator", 110)` plays every note at velocity 110. | MIDI velocity. / Range: 1 ↔ 127, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | The same for every note: the velocity the notes were held at is not used. / Default: 96. |
+| `channel` | Set which MIDI channel it plays on. · `channel("Arpeggiator", 10)` plays its notes on channel 10. | MIDI channel. / Range: 1 ↔ 16, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Default: 1. |
+
+Each ends with the two notes every command has.
+
+**Item 14, `editable`, `showNotes` and `showHeader`: done, texts only.** They were derived
+(`derivedFlagVerbs`: "Allow or lock touch control of the Arpeggiator.", "Show or hide the notes.")
+and are declared now, at the end of the family where the derived ones came, as the LCD's overlays
+are. A click on a step mutes it unless `editable` is off, `mute()` working either way; a step
+narrower than 22 or shorter than 26 pixels shows no note name whatever `showNotes` says; the strip
+`showHeader` hides gives the steps its room. Approved as proposed ("Approved").
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `editable` | Let a click on a step mute it, or not. · `editable("Arpeggiator", false)` stops clicks muting steps. | true: a click on a step mutes or unmutes it. / false: clicks do nothing. / Left out: toggles. / The usual false words. | Only clicks are locked: `mute()` still works. / Default: true. |
+| `showNotes` | Show or hide the note names in the steps. · `showNotes("Arpeggiator", false)` hides the note names. | true: each step shows its note, "C3", or a chord's count, "3♪". / false: hidden. / Left out: toggles. / The usual false words. | A step narrower than 22 or shorter than 26 pixels shows no name either way. / Default: true. |
+| `showHeader` | Show or hide the strip above the steps. · `showHeader("Arpeggiator", false)` hides the strip, and the steps take its room. | true: the strip shows the pattern, where the notes come from and the rate. / false: hidden; the steps take its room. / Left out: toggles. / The usual false words. | Default: true. |
+
+Each ends with the two notes every command has.
+
+**Item 15, the family: done.** At the owner's word ("Arp it is") every example names the control
+"Arp", the component's name in the type list, rather than its label: the tables above, written
+before, say "Arpeggiator" where the texts now say "Arp". The summary and `read`'s texts were
+proposed with it; `read` takes its own index text and notes from the family (`readIndex`,
+`readNotes`), since the arp has no lists and its only index is `read(t, "mute", 3)`.
+
+| Field | Text |
+| --- | --- |
+| Summary | Play notes one at a time from its own chord, a Chord Pad or the MIDI input: their order, speed, length, swing and rhythm. (Then "Panel view only", as every module's.) |
+| `read` `index` | For "mute": a step number, counted from 1; true if that step is muted. / A fraction: rounded. / Below 1, or invalid: rejected with a console error. |
+| `read` notes | `read(target)`: every setting as a table, by verb name. / `read(target, "phase")`: where it is now. / `read(target, "mute")`: the muted steps; `read(target, "mute", 3)`: whether step 3 is. / Then the two `read` always has. |
+
+**CI, 2026-10-25.** From 19:02 UTC Microsoft's download host refused .NET 10.0.403 and the
+10.0.14 runtime (HTTP 409 from `dotnetorigin.blob.core.windows.net`) to `actions/setup-dotnet`, and
+`web-tests` and `windows` failed before building or testing anything, three runs in a row. At the
+owner's word ("Do what is necessary to get it through") `ci.yml`'s two `setup-dotnet` steps carry
+on past a failed download, and a step after each lists the runner image's SDKs, failing when there
+is no .NET at all and saying in the annotations when the fallback was used; both C# checks take the
+newest SDK present when 10 is not. When the download works again, nothing is to undo. It did on the
+next run (44710fd, 20:11 UTC): `setup-dotnet` installed 10.0.x and the fallback was not used.
+
+## `ce.components.pixel`: the owner's review
+
+Started 2026-10-25, one item at a time as the arp's was. The queue, from a read of the 29 texts
+against the renderer (`PixelDisplayRenderer.svelte`, `LcdGraphicCanvas.svelte`) and the inspector
+(`PixelDisplayEditor.svelte`), and a probe of each command's edges in the runtime:
+
+1. `show`, `blink`, and the `name` all eight element commands take: done, below.
+2. `x`, `y`, `w`, `h`: done, below.
+3. `text`, `label`: done, below.
+4. Parity with the LCD's zones: an element's `kind` and `source`: done, below.
+5. `brightness`, `contrast`: done, below.
+6. `gamma`: done, below.
+7. `glow`: done, below.
+8. The animation: `anim`, `animPreset`, `animSpeed`, `animLoop`, `animFps`: done, below.
+9. `layoutTransition`, `transitionMs`: done, below.
+10. `editText`: done, below.
+11. `backlight`, `brightnessSource`: done, below.
+12. The overlays: `showGlass`, `showGhost`, `showScanlines`, `showGrid`: done, below.
+13. `layout`: done, below.
+14. The family: its summary, the name in the examples (`"PixelDisplay"`), and `read`'s texts: done,
+    below. The pixel's review is done.
+
+**Item 1, `show`, `blink` and `name`: done.** The renderer draws an element unless its `visible`
+is false, and the inspector's Vis toggle reads it the same way, but a bare `show()` toggled from
+the value stored, so on an element without one the first call wrote the true it already was and
+nothing hid; `read(t, "show")` gave nil for it. At the owner's word ("As recommended") an element
+without `visible` counts as shown (`absent: true`, as the LCD's zones), and one without `blink` as
+steady (`absent: false`), so `read` answers false rather than nil. The third argument is named
+`on`, as `lcd.zoneShow`'s. The blink rate stays the renderer's, 530 ms each way on one clock for
+every element (`blinkPhase`), and is written down. The name was matched in any case and on every
+layout, and the text said neither.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `show` | Show or hide an element, by its name. · `show("PixelDisplay", "Title")` hides the element called Title if it is shown, and shows it if it is hidden. | `on`: true: shown. / false: hidden. / Left out: toggles. / The usual false words. | |
+| `blink` | Make an element blink, by its name. · `blink("PixelDisplay", "Title")` makes the element called Title blink if it is steady, and steady if it blinks. | `on`: true: blinks: 530 ms shown, 530 ms hidden. / false: steady. / Left out: toggles. / The usual false words. | Every blinking element blinks in step. A hidden element does not blink. |
+
+`name`, on all eight: The element's name, as given in the element table. Case-insensitive. / Every
+element with that name, on every layout. / Not an element of the display: rejected with a console
+error.
+
+Each ends with the two notes every command has. The examples say "PixelDisplay" until item 14.
+
+**Item 2, `x`, `y`, `w` and `h`: done.** A number past the range was used as its nearest end
+without a word, and a refusal gave no reason (`x("Title", "big")`: "refused, nothing changed"),
+where every other number command says both. At the owner's word ("As recommended") they say both
+(`componentClampWarning` and `componentRefusalReason` take an element's number), and the ranges
+stay: -4096 to 4096 for a position, 0 to 4096 for a size, wider than any grid (the inspector's is
+8 to 1024, and its X/Y/W/H cells have no limit) so an element can be parked off the screen. What
+each draws is the renderer's: a text kind's `w` is the box it is aligned and cut in, 0 as wide as
+the text and neither wrapped nor scrolled; its `h` sizes the letters (`pixelTextMetrics`: the
+built-in font 1× below 16, then by 8); any other kind draws at least 1, `anim` at least 4.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `x` | Set an element's left edge, by its name. · `x("PixelDisplay", "Title", 10)` puts the element called Title 10 pixels from the screen's left edge. | Pixels of the grid, from the screen's left edge; 0: at the edge. / Range: -4096 ↔ 4096, whole. / A fraction: rounded. / Outside the range: the nearest end. / Invalid: rejected with a console error. | Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default. |
+| `y` | Set an element's top edge, by its name. · `y("PixelDisplay", "Title", 20)` puts the element called Title 20 pixels below the screen's top edge. | As `x`, from the screen's top edge. | As `x`. |
+| `w` | Set an element's width, by its name. · `w("PixelDisplay", "Title", 64)` makes the element called Title 64 pixels wide. | Pixels of the grid. / A text kind: the box its text is aligned and cut in; 0: as wide as the text. / Any other kind: its width; drawn at least 1 wide, 4 for "anim". / Range: 0 ↔ 4096, whole. / Then as `x`. | The text kinds: "static", "name", "value", "pct", "midiValue", "note", "text", "state", "edit", "icon" and "clock". / A text kind 0 wide is not wrapped or scrolled. |
+| `h` | Set an element's height, by its name. · `h("PixelDisplay", "Title", 16)` draws the text of the element called Title at twice the size. | Pixels of the grid. / A text kind: the size of its letters. The built-in font: 1× below 16, 2× from 16, 3× from 24, and on by 8. A custom font: by its glyph height. / Any other kind: its height; drawn at least 1 high, 4 for "anim". / Range: 0 ↔ 4096, whole. / Then as `x`. | The text kinds, as `w`. |
+
+Each ends with the two notes every command has.
+
+**Item 3, `text` and `label`: done, texts only.** Which kinds draw each was nowhere: `text` is
+drawn by "static" between its prefix and suffix, by "name" while it has no label and no control,
+and by "edit" while its control has no text (`resolveZoneContent`); `label` by "name" in place of
+its control's name, and by the eight widget kinds as a caption 7 pixels high under the widget, or
+above it with no room below. The built-in font has no glyph for `` $ & ^ ` { | } ~ ``, letters with
+accents, "€", "♯", "♭" or a tab, and draws each as a blank. At the owner's word ("As
+recommended") both are written down and neither is said in the console, as the LCD's `zoneText`
+and `zoneLabel`: a check against the font would need each element's, built-in or a custom sheet.
+A text on a kind that does not draw it is stored, as there. A test holds the list to the font.
+
+| Command | Description · Example | Parameter |
+| --- | --- | --- |
+| `text` | Set the text of a "static" element, by its name. · `text("PixelDisplay", "Title", "INIT VOICE")` writes INIT VOICE in the element called Title. | The text. / Shown by "static", between its prefix and suffix. / Shown by "name" while it has no label and no control, and by "edit" while its control has no text. / "\n": a new line while the element wraps; a blank otherwise. / A character the font cannot draw: a blank. The built-in font has none for $ & ^ \` { \| } ~ and letters with accents. / A number: written as text. / Left out: rejected with a console error. |
+| `label` | Set an element's caption, or the name a "name" element shows, by its name. · `label("PixelDisplay", "Cutoff", "CUT")` shows CUT under the element called Cutoff. | The text. / "name": shown in place of its control's name; "": the control's name. / "hbar", "vbar", "hslider", "vslider", "needle", "wave", "scope" and "adsr": a caption 7 pixels high, centred under it, or above it when there is no room below; "": none. / Other kinds: not shown. / A character the font cannot draw: a blank. / A number: written as text. / Left out: rejected with a console error. |
+
+Each ends with the two notes every command has.
+
+**Item 4, `kind` and `source`: done.** Neither existed: the spec left them out as authoring
+choices ("what an element IS and what drives it"), and the LCD's zones have had `zoneKind` and
+`zoneSource` since "Zones by name". At the owner's word ("As recommended") an element has both,
+by its name on every layout, as a zone does. The 21 kinds moved from the inspector into
+`utils/pixelElements.js` (`PIXEL_ELEMENT_KINDS`, with `PIXEL_TEXT_KINDS` and `PIXEL_BAR_KINDS`),
+which the inspector's kind list and `componentTables`' `pixel.kind` both read; `w`'s and `h`'s
+text-kinds note is built from the same list. `source` takes what the element's picker offers and
+`zoneSource` takes, through the same resolver (`lcdZoneSourceFor`, whose refusal now says "in an
+element" for one), is stored by id, and `read` gives the control's name; both share the parameter
+text (`SOURCE_BY_NAME`). `colour` stays out as styling, and so do "wave"'s cutoff, resonance, LFO
+and pitch sources and "adsr"'s four.
+
+| Command | Description · Example | Parameter | Notes |
+| --- | --- | --- | --- |
+| `kind` | Set what an element is, by its name. · `kind("PixelDisplay", "Cutoff", "vbar")` makes the element called Cutoff a vertical bar. | One of the 21, the inspector's. Case-insensitive. / Invalid: rejected with a console error. | Its other settings are kept: its place, size, text and source. |
+| `source` | Link an element to a control, by its name. · `source("PixelDisplay", "Cutoff", "Resonance")` makes the element called Cutoff show the control called Resonance. | As `lcd.zoneSource`'s `control`. | Shown by the text kinds but "static", "icon" and "clock"; drives the bars, sliders and "needle", "wave"'s level and "scope". Not used by "adsr", "anim" or "bitmap". / "wave"'s cutoff, resonance, LFO and pitch, and "adsr"'s four: set in the inspector. / `read(target, "source", "Cutoff")` gives the control's name. |
+
+Each ends with the two notes every command has.
+
+**Items 5 to 14: done in one pass**, at the owner's word on 2026-10-26 ("I think you know what to
+do, could you just continue through the modules and finish it?"): each item's recommendation
+taken, as item 5 was shown, and recorded here for review. The texts say what the canvas
+(`LcdGraphicCanvas.svelte`) and the renderer draw:
+
+- **5, `brightness` and `contrast`**, as shown: lit pixels at 10% + 90% of the brightness through
+  the gamma, so 0 is dim and lit; a linked `brightnessSource` sets it; the contrast is the unlit
+  pixels' visibility (half of it, never below 3%) and the backlight wash's strength.
+- **6, `gamma`: 0.2 ↔ 4**, the canvas's and the inspector's; 0.1 was stored and drawn as 0.2.
+  Above 1 lifts the lower brightnesses.
+- **7, `glow`**: a halo under each lit pixel, at most 2.6 times its size.
+- **8, the animation**: the LCD's approved texts, "behind the elements"; `animFps` keeps the LCD's
+  1 ↔ 120 (both inspectors stop at 60), for one range on the one engine.
+- **9, `layoutTransition` and `transitionMs`**: what each word does (a CSS fade, or a fade and a
+  10% slide from the right, on a change of layout); `transitionMs` takes the inspector's 0 ↔ 2000,
+  whole, where it took 5000.
+- **10, `editText`**: the LCD's text, and that an "edit" element linked to "@edit" shows it.
+- **11, `backlight` and `brightnessSource`**: a linked control wins over the script, said; the
+  source's range maps to 0 ↔ 100.
+- **12, the overlays**: declared as the LCD's; the grid is the editor's only (`editable` in the
+  renderer), never drawn in the preview or a plug-in, its spacing the inspector's Snap or 8.
+- **13, `layout`**: as made in "The LCD's script model"; nothing to change.
+- **14, the family**: "Screen" in every example, as the LCD's (the inspector's section is called
+  Screen too); the summary says what the module does; `read`'s index is a name (`readIndexKind`,
+  so it is typed "string"), and its notes name the element tables and the layout.
+
+Defaults are given in each note ("Default: 55."), as the arp's are.
+
+## The remaining modules, in one pass
+
+At the owner's word on 2026-10-26 ("I think you know what to do, could you just continue through the
+modules and finish it?"), each module after the pixel is done in one pass: its texts read against
+its renderer, layout engine and inspector, each command probed at its edges in the runtime (a probe
+that calls every verb of a family with nothing, a word, numbers past both ends, a fraction, its
+range's ends and a number as text), every silence or wrong answer decided by the rules above with
+the recommendation taken, and the texts pinned in `componentVerbs.test.js`. What was decided is
+listed here per module, for review; the texts themselves are in `componentVerbs.js` and the manual.
+
+### `ce.components.meter`
+
+- **Texts** for all 26: what `MeterRenderer.svelte` and `utils/meterLayout.js` draw. "db" places the
+  value's part of its range as decibels, the top of the range being 0 dB, between `dbFloor()` and
+  `dbCeil()` (so a ceiling above 0 leaves headroom); `decay()` is in lengths of the meter per
+  second; the readout shows the value as it is, never in decibels; a zone colours from its start to
+  the next, and the lowest from 0; a linked `source()` sets the value and its range.
+- **`labelPosition`, new.** The caption is drawn only above or below (`labelPosition`, "none" by
+  default), and only the inspector could set where, so `label()` on a new meter showed nothing.
+  `componentTables.METER_LABEL_POSITIONS`, which the inspector's select now names as its table.
+- **Kept**: `valueMin` above `valueMax` fills the other way, and `dbFloor` above `dbCeil` too, as
+  the LCD's value range was kept; the texts say so. The styling fields (segments, thickness, arc
+  angles, colours, tick count) stay the inspector's, as styling does.
+- **Defaults** differ by type: a Progress Bar has no gradient and shows its readout; the notes say
+  both.
+
+### `ce.components.chordpad`
+
+- **Texts** for all 22, from `utils/chordPadLayout.js`, `ChordPadRenderer.svelte` and the preview's
+  `chordNoteOn`. The wheel always plays chords, whatever `mode()` says; `inversion()` stops at 2 on
+  a triad; a voicing is applied after the inversion; a note past the MIDI range sounds at 0 or 127
+  (`chordNotes` clamps, it does not leave the note out); while an Arp takes the pad's chords
+  (`arp.link()`) the pads sound nothing themselves.
+- **`strum`'s text was wrong**: it said the chord is spread over this many milliseconds, and it is
+  the time from one note to the next, lowest first. The inspector's hint had it right.
+- **`key` reads as the arp's** (its item 8): a note's name, in any case, or a number round the
+  octave, where 12 and above were stored as 11. Its texts and the arp's now share `KEY_NOTE` and
+  `FOLLOW_PANEL_KEY`, and velocity, channel and the echo channel share theirs.
+
+### `ce.components.noteribbon`
+
+- **Texts** for all 20, from `utils/noteRibbonLayout.js` and the preview: "snap" has a zone per note
+  of the scale, "chromatic" per semitone, "glide" bends and starts a new note past `bendRange()`;
+  across the strip (velocity from position, the CC) runs from the bottom edge to the top, or a
+  vertical strip's left to its right; the strip stops at note 127.
+- **`key`** reads as the arp's and the Chord Pad's; **`bendRange`** is whole semitones, as
+  `ribbonBendRange` and the inspector read it (a fraction was stored).
+
+### `ce.components.drumpads`
+
+- **Texts** for all 37, from `utils/drumPadLayout.js` and the preview's `drumStrike`. Every map
+  plays pad 1 = `baseNote()` and a semitone a pad (`resolveDrumPads`); the maps differ in the names
+  and the choke groups the pads start with ("gm" chokes the hi-hats, "custom" names as "gm" and
+  chokes nothing). "centre" velocity falls to 28% at the edges; "accent" strikes at `velocity()`
+  wherever the pad is hit; "choke" silences the group and plays nothing; a flam's grace note is at
+  `ghostVelocity()`.
+- **`gate` takes 5 ↔ 2000**, whole, as `drumGateMs` plays it and the inspector offers it (it took 1
+  to 5000); `rollDelay` and `flamMs` are whole milliseconds, as the engine rounds them.
+- **Noticed, then done** ([The noticed items](#the-noticed-items)): a colour `colour()` cannot read
+  is refused by the shared colour writer (`writeComponentFields`), whose console line named the call
+  differently from the other refusals (`ce.components.drumpads.colour("Kit"): in pad 2, … so nothing
+  was set.`), as `set()`'s line does.
+
+### `ce.components.transport`
+
+- **The ranges are the clock's own**, imported from `utils/transportLayout.js` (`MIN_BPM`,
+  `MAX_BPM`, `MIN_BARS`, `MAX_BARS`, `MAX_LOOP_BAR`, `MAX_COUNT_IN_BARS`): the tempo 20 ↔ 300 (it
+  took 400), the swing 0 ↔ 1 (below 0 played straight), the loop's start 1 ↔ 999 (9999), its length
+  0.25 ↔ 64 bars in any fraction (whole bars 1 to 9999, where the inspector takes quarters), the
+  count-in 0 ↔ 8 (16).
+- **Texts** for all 16: a beat is a quarter note whatever `beatUnit()` says, which is shown only;
+  following an external clock or the host, the tempo, tapping and clock out are not used; a count-in
+  holds every follower quiet; `clockDevice("")` is the panel's own device when it names exactly one.
+
+### `ce.panel`
+
+Panel view only (`RUNTIME_WEBVIEW`), so no prelude changed. Every command's text rewritten to the
+form: one sentence, an example, the rules a line each, and what it returns; the shared `props`
+options (`controlName` and the rest) and every option field likewise. Decided by the rules:
+
+- **A type is a word from a list the app defines**, so `create("knob")` and `find({ type = "knob" })`
+  read it in any case (`typeNamed`); a type that is not one refuses `find` with why (it found
+  nothing without a word). `find`'s `parent` filter reads a name in any case, as names are.
+- **An error means the call did nothing**: `create` and `clone` with a `parent` that is not there,
+  or not a container, made the control at the top level and said an error (`create`), or said
+  nothing (`clone`). Both now refuse, and nothing is made (`containerRefusal`).
+- **A value used as its default is said once**: `x`, `y`, `width` and `height` that are not numbers,
+  or a size not above 0, keep the control's own (`applyControlProps`, `panelSaid`); `distribute`'s
+  `gap`, `grid`'s `columns`, `gapX` and `gapY`, `circle`'s `radius` and `startAngle` that are not
+  numbers fall back to their defaults, and `columns` below 1 is 1, each said
+  (`arrangementPlan`'s `said`, which the Values tab shares).
+- **Refused with why, where it did nothing without a word**: no control named, or one where the
+  verb needs two (`distribute`, `match`, `grid`, `circle`, `flip`); a radius below 0 (it put each
+  control on the far side of the circle); `destroy()`, `info()`, `clone()` with no name;
+  `restore()` with no snapshot, or not a table.
+- **One name is a list of one** for the arranging commands: a text was read letter by letter, six
+  "no control named" lines for "Cutoff".
+- **Kept**: `destroy("Nobody")`, `info("Nobody")`, `entry` and `undefine` of an entry that is not
+  there answer false or nothing without a word, as a query with no result does; the texts say so.
+  The arranging commands return how many controls they placed or sized, moved or not, which the
+  texts now say rather than "moved".
+- `test/panelReview.test.js` pins each.
+
+### `ce.components.envelope`
+
+- **`preset()` seeds the shape**, points and sustain point, as the inspector's Preset does
+  (`applyPreset`); it wrote the name only, and the canvas then locked the new preset's levels on the
+  old points. A verb hook, `alsoWrites`, writes the other fields a setting brings with it.
+- **`pointX` keeps a point between its neighbours**, the first at 0 and the last at 1, as a drag
+  does (`envDragNode`): a point moved past the next was drawn re-sorted, under the numbers a script
+  went on using. A verb hook, `itemRange(c, at)`, gives an item its own range; the clamp warning
+  names it ("outside 0 to 0.5").
+- **`sustain`, `loopStart` and `loopEnd` count to the points there are** (`rangeFrom`); the loop's
+  start at 1, where 0 was taken and stored as -1. `sustain` 0 or -1 is none, as it was.
+- **Texts**: `timeMax` is the readout's only; the loop is marked on the curve; the snaps are a drag's.
+
+### `ce.components.turing`
+
+- **`phase()` is a seek**, as the arp's (its item 6): the preview keeps the Turing Machine's position
+  in its ticker, and `provideComponentPhases` now answers and moves it too.
+- **A change to the stored steps starts the running register from them** (an `$effect` in the
+  preview): once the register had mutated, the preview played its own copy and a script's `step()`
+  or `fill()`, or the inspector, was never heard.
+- **`length` takes 2 ↔ 64**, as the engine plays it (`turingLength`); 1 was stored and played as 2.
+  The texts give the rest: 0 or 1 levels is no quantizing; a longer loop's new steps start at 0.
+- The examples name the control "Turing", the type list's name.
+
+### `ce.components.crossfader`
+
+- **Texts** for all 15, from `crossfaderLayout.js`; the detent snaps a drag, not `mix()`. The four
+  return-spring verbs are one helper, `returnVerbs`, worded for each control's range, for the
+  Ribbon and the Vector Joystick to use too.
+
+### `ce.device`
+
+Runs in the panel window (`panelRuntime.js`) and in the plug-in (`ScriptRuntime.cpp` and the three
+preludes), so its texts were rewritten to the form and say what each does now, and its silences were
+left for the owner, since each one is a change in four runtimes ([The deferred items](#the-deferred-items)
+has them done). The option fields of
+`deviceDefineParameter` and `deviceDefineDump` keep their prose, which was already full.
+
+### `ce.components.router`
+
+- **Texts** for all 17, from `routerLayout.js`: each source's CC, the dead zone spread over the rest,
+  a negative depth turns the curve upside down.
+- **`curveX` keeps a point between its neighbours**, as the Envelope's do: the curve is sampled by
+  the Envelope's own `envValueAt`.
+
+### `ce.components.ribbon`
+
+- **Texts** for all 14, from `ribbonLayout.js` and the preview: a Pitch Wheel and a Mod Wheel are
+  Ribbons with other defaults, which each note gives; `bipolar` sends -1 to 1 and fills from the
+  middle; `snap()` steps a drag, not `value()`. The four return-spring verbs are the Crossfader's
+  `returnVerbs`, worded for a strip.
+- `editable`, `showGlow` and `showValue`, which were derived with a generic line, have texts of
+  their own.
+
+### `ce.components.kinetic`
+
+- **`gravity` takes 0 ↔ 4 and `bounce` 0 ↔ 1**, what the physics plays (`kineticParams`): the
+  inspector's field set widened both for a script (gravity -4, to pull up; bounce 1.5, for a wall
+  that adds speed), and the engine played an upward pull as none and 1.5 as 1. The widening is gone
+  from `inspectorFieldSets.js`, with a comment saying why.
+- **A change to the launch throws the ball again** (an `$effect` in the preview): the running ball
+  read `initial` only before its first frame, so `launch()` and `velocity()` were never seen once
+  it ran. Same class as the Turing Machine's register.
+- **Texts** for all 11: the units (boxes a second), the speed limit of 2.5, what `keepAlive` kicks.
+
+### `ce.components.orbit`
+
+- **`phase()` is a seek**, as the arp's and the Turing Machine's: the preview keeps the Orbit's
+  position, and `provideComponentPhases` now answers and moves it. A stopped Orbit is drawn there
+  and sends what its satellites say there at once (a counter, `sourceSought`, redraws it).
+- **`bars` takes 0.25 ↔ 64 in quarters**, as `orbitCycleBars` plays it (whole bars 1 to 64 could
+  not reach below 1); **`nodeDepth` takes 0 ↔ 1**, as `orbitNodes` clamps it (-1 to 0 was taken
+  and sent 0).
+- **Kept**: `nodeRatio` -16 ↔ 16 and `nodeAngle` -360 ↔ 360, wider than the inspector's, since the
+  engine plays any; the texts say where the inspector stops.
+- **Noticed, then done** ([The noticed items](#the-noticed-items)): what a node sends (its height,
+  its place across, a sine of its angle, or its radius) and whether it is turned upside down had no
+  verbs; the depth note said they are set in the inspector.
+
+### `ce.components.looper`
+
+- **`phase()` is a seek**, as the Orbit's.
+- **`bars` takes 0.25 ↔ 64 in quarters**, as `looperLoopBars` plays it and the inspector offers it.
+- **Texts** for all 12: a lane that is off, or has no recording, sends its rest value; `quantize`
+  rounds the played length to whole beats and keeps the number set; a drag records a lane, replacing
+  what it had.
+
+### `ce.components.constellation`
+
+- **`blend` takes 0.5 ↔ 16**, as `blendWeights` plays it (0.1 to 0.5 was taken and blended as 0.5);
+  **`bars` takes 0.25 ↔ 64 in quarters**, as `constellationWanderBars` plays it.
+- **Texts** for all 12. The probe's text said "the targets follow, which is the whole point", and
+  in the preview they did not: see the next section.
+
+### A script's write to a source is sent
+
+Found on the Constellation, and true of every source: a script's `macro.value()`, `ribbon.value()`,
+`crossfader.mix()`, `joystick.move()`, `timbre.move()`, `constellation.probe()`, a Mod Matrix cell or
+an Envelope point moved what was drawn and left every bound parameter where it was. Only a drag, a
+running ticker or an incoming signal sent a source's ports (`emitControlPortFanout`,
+`emitClockFanout`). An `$effect` in the preview now sends a change to what a stored source sends,
+once, as a commit:
+
+- Not on opening, as before: what is stored was never sent on opening.
+- Not what a drag has just sent and committed (`portsSentAs`), so a release is not sent twice.
+- Not a running Orbit, Looper, Kinetic or wandering Constellation, whose ticker sends what it plays,
+  nor a Router or a Turing Machine, which send on their own clock.
+
+`browser-checks/componentBehavior.mjs` ("A script write to a source reaches its bound parameter
+once") checks it on a Crossfader: it fails without the effect. CI runs the file, every case of it
+([componentBehavior in CI](#componentbehavior-in-ci)).
+
+### `ce.components.panic`
+
+- **Texts** for all 8, from `panicLayout.js` and the preview's `firePanic`: All Sound Off then All
+  Notes Off on each channel; Reset All Controllers after them; a centred bend; `clearLocal` stops
+  the panel's own note controls; `""` writes PANIC; the summary line is drawn on a button 46 pixels
+  tall or more; the panic key works whether or not the button can be pressed, and sends the most.
+- The summary no longer says pressing it is the global `panic()`, which sends no pitch bend and
+  stops nothing on the panel.
+
+### `ce.music`
+
+Runs in the panel window (`panelRuntime.js`) and in the plug-in's three engines (the preludes in
+`LuaScriptEngine.cpp`, `PythonScriptEngine.cpp` and `JsScriptEngine.cpp`).
+
+- **Texts** for all 13. The examples name the `ce.music` commands, not the short names, which
+  differ (`lead` is `voiceLead`, `arp` is `arpOrder`). They no longer say a note name's letter
+  must be a capital, which has not been so since names were read in any case.
+- **`name()` takes a number, or text that is one**, rounded down; anything else is refused with
+  why, in all four runtimes. A name ("C4") stopped a Lua or Python script with an error, gave
+  "undefinedNaN" in the plug-in's JavaScript, and nothing in the panel window.
+- **`number()` says why it has no answer**: nothing given, a number, or a name it cannot read. It
+  gave nothing without a word, where every other `ce.music` command says. The senders and the other
+  commands read a name with the reader they had (`noteNumberOf`, `__noteNumberOf` in each prelude)
+  and say their own why. `scriptPreludeAgreement.test.js` holds the four runtimes to the same words.
+- **Optional where every runtime takes them so**: `degreeChord`'s scale and step ("major", 1) and
+  `lead`'s previous chord (the notes sorted). The signatures say so.
+- **Kept**: `scale()` and `chord()` give notes past 127 as they are, and `name()` names a number
+  outside 0 to 127 ("B-2" for -1): both are arithmetic a script may go on with; the texts say so.
+
+### `ce.components.timbre`, `macro`, `constraint` and `joystick`
+
+- **A Constraint's `member()` keeps the rule**, as a drag does (`applyConstraint`): it wrote the one
+  value and left the others, so "sum" members added up to 1.3. A verb hook, `solve(list, c, at,
+  value)`, gives an item verb what else the change moves. `fill()` still writes every value as
+  given; the note says so.
+- **The Timbre Pad's `power` takes 0.5 ↔ 16**, as `anchorWeights` plays it, as the
+  Constellation's blend does.
+- **The Vector Joystick's corners**: `cornerLabel` said "clockwise from the top left", and the
+  third is the bottom left (`joystickCornerLabels`: top left, top right, bottom left, bottom right).
+  Its arguments were a display's ("row", "longer than the display"): a list of text outside a
+  display now has `index` and `text`, and the corner's own words. The return-spring verbs are the
+  Crossfader's `returnVerbs`, given the joystick's ranges, which have no inspector field set.
+- **Texts** for all: the Macro's depth below 0 turns a slot down as the knob turns up, its min
+  above its max runs the other way, its caption is drawn in capitals; the Timbre Pad's axis names
+  are where they are drawn; the Constraint's rules, one a line.
+
+### `ce.core` and `ce.storage`
+
+Both run in the panel window and the plug-in's three engines, so their texts were rewritten to the
+form and say what each does now; their silences were left for the owner, as `ce.device`'s were
+([The deferred items](#the-deferred-items) has them done). `ce.storage`'s scope option and `set`'s transmit option are rewritten too; the other options
+keep their prose. `defineAction`'s text said a name defined again is replaced; one another script
+defined is ignored, with a console error, which the text now says.
+
+### `ce.components.recorder`
+
+- **A slot past 8 is refused**: `store(target, 9)` answered true and stored nothing (`storeSlot`
+  left the list as it was, which read as "already that way").
+- **The take-editing commands say why they did nothing**: `clear`, `undo`, `quantize`, `nudge` and
+  `shift` with no take, or while recording, said "refused, nothing changed" and no more.
+- **`quantize` reads what it is given or refuses it**: a grid written as text ("1/16") was one
+  division of the loop, a scale it has not was no scale, and a key's name was C, each without a
+  word. The key reads as the arp's (a note's name in any case, or a number round the octave), the
+  scale in any case.
+- **Texts were wrong in four places**: `stop` stops recording, not playback; `transpose` changes
+  what is played, not the take (`shift` changes the take); `nudge` moves by a part of the loop, not
+  by ticks; `quantize`'s strength left out is the inspector's, 0 unless set, which moves nothing.
+- **Noticed, then done** ([The noticed items](#the-noticed-items)): a refused hand-written component
+  command wrote its arguments as JSON (`quantize {"grid":16} — refused, nothing changed. …`), as the
+  Phrase, Harmoniser, Setlist and Split did; a change of form for all five.
+
+### `ce.image` and `ce.text`
+
+- **A name that is no control** was told "this control has no Background.Fill" or "no Text
+  section"; it is now told the panel has no control by that name.
+- **A lookup with nothing to look up** (`asset()`, `font()`, `load()`) answered nothing without a
+  word; a set with neither a picture nor an option (`imageSet("Pad")`) answered false without one.
+  Each now says so. A name that matches nothing is still a query with no answer.
+- **Both filters at once**: `assets({ vector = true, embeddable = true })` and `fonts({ portable =
+  true, variable = true })` applied the first only.
+- **`imageSet`'s picture** is a file's path or address, or a data URL, not an image's id or name
+  (`imageIcon` takes those); its text said both.
+- **Texts** for all 15 in the form; the option fields keep their prose, which was already full.
+
+### `ce.components.split`, `phrase`, `harmony` and `setlist`
+
+The four older hand-written components, panel view only. Their texts were one line each; each
+command now has the form, its words and their meanings, and its ranges. Decided by the rules:
+
+- **A number that is not one is refused, with why.** The Zone Splitter took a transpose of "x" as
+  -48, a split point of "x" as the zone's lowest note, a channel of "x" as 1; a preset's notes were
+  stored as given ("x" as no note, 200 past the keyboard). Its notes are now read as notes (a number,
+  or a name such as "C4"), held to the keyboard and put lowest first. Every hand-written family's
+  refusal of a number or a scale now says what it takes (`NUMBER_ARGS` in `handWrittenVerbs.js`);
+  they said "refused, nothing changed" and no more.
+- **A key by its name**, in any case, or a number round the octave, as the arp's (its item 8), the
+  Chord Pad's and the Recorder's: the Phrase and the Harmoniser refused "D".
+- **The Phrase answers true**, as the other components do: it answered nothing, refused or not,
+  and an unknown scale or a transpose of "x" did nothing without a word.
+- **The Setlist says why** `next()` and `prev()` did nothing at an end of the set with `wrap()` off.
+
+### `ce.components.matrix`
+
+- **A cell takes 0 ↔ 1 while the matrix is not bipolar**, as a drag keeps it (`matrixSetAmount`):
+  -0.5 was stored, and sent to the bound parameter. A CELL verb now takes `rangeFrom`.
+- **Texts** for all 8.
+
+### `ce.ui`
+
+Panel view only, so its silences were decided rather than left: a message, an id, a question or
+the text to copy left out is refused with a console error (each answered nothing, or false, without
+a word); a `kind` that is not "info", "warn" or "error", and a `duration` that is not a number,
+are the default with a warning the first time. Another dialog open stays a reason without a word,
+as a query with no answer: `ce.ui.state()` reports it. Texts for all 9.
+
+### The lifecycle hooks
+
+Their texts are one sentence each now, the rest in notes, as the commands'.
+
+### The module and event descriptions
+
+- **The 41 module descriptions**, the picker's group headings, are one sentence each, in a
+  musician's words, where they were lists with dashes and asides ("Values, flow and logging — the
+  commands every script uses. Never namespaced."). Each component module is its family's summary
+  and "Panel view only."; the five older ones had their name alone ("Setlist. Panel view only.").
+- **The 38 event descriptions** say what happened first, then the fields, without brackets or
+  "Note that"; the component events name the components that raise them in the first sentence.
+
+With these, every module in the table above is done.
+
+### The deferred items
+
+At the owner's word on 2026-10-26 ("As recommended, do the deferred items too"), each item that was
+left under [Deferred, then decided](#deferred-then-decided), done by the rules: a required value
+left out, or of the wrong type, is refused with an error; a word or number with a wrong value is
+its fallback, said once; a value outside its range is refused where the answer would mean nothing.
+Every runtime says the same words: `scriptPreludeAgreement.test.js` runs the Lua, JavaScript and
+Python preludes against the panel window's answers, and `PlayerScriptIntegrationTests.cpp` runs the
+plug-in's own `set()` and the Lua bindings.
+
+- **`ce.midi`'s encoding helpers**, `to7bit` to `fromSigned`, refuse what does not fit, by the byte
+  lists' rule ("…, so there is no answer."): a value to split past its bytes or below 0, a part to
+  join past its bits or not whole, an odd count of halves, a byte past 7 bits where a 7-bit byte is
+  joined, a number that is not one, a list that is not bytes. A value to split is rounded down, as
+  it always was. `to7bit`'s count is 1 to 4 and its order "msb" or "lsb" (anything else was "lsb");
+  `toSigned`'s value is held to the signed range of its bits, -128 to 127 for 8, and its bits to 1 to
+  32. A number may be text that is one, and `from7bit` reads hex text as the byte lists do.
+  `toAscii` refuses a character outside ASCII (the four runtimes gave four answers for "é") and cuts
+  text longer than its length to it, said once; a length that is not a whole number from 1 is no
+  length, said once. `toOffset` and `fromOffset` refuse a number that is not one and keep their sum
+  unheld, as their notes say.
+- **`ce.music`**: `degreeChord`'s step and size are their defaults, said once, when they are not a
+  number, and a number written as text is one; `null` was step 0 in two runtimes and 1 in Lua, and
+  "0x10" 16 in two and the default in one. `arp`'s pattern left out is refused with an empty list,
+  in the words its notes are refused in.
+- **`ce.storage`**: `saveSetting` refuses a name or a value left out (a table cannot hold nil, so no
+  runtime could keep one); `loadSetting` and `forget` refuse a name left out; a name is text, or a
+  number used as text, and `""` stays a name, so `clear()` and `all()` reach what an older script
+  saved there. `decodeJson` refuses text that is not JSON, nothing, and a value that is not text,
+  and Python's reader now refuses NaN and Infinity as the other three do. `encodeJson`'s indent is
+  read as a number, held to 10 and said once, or one line, said once, where each runtime read it
+  its own way.
+- **`ce.core`**: `set()` refuses a value left out, and a Knob's, a Slider's, a Number's or a Range's
+  value, or any `.normalizedValue`, that is not a number; text that is a number is stored as one. The
+  plug-in's host asks `PanelValueModel::writeNeedsNumber` and says the same words
+  (`BridgeScriptHost::setValue`). A control bound to a device parameter is not held to numbers: its
+  binding reads the value, and in the editor takes a choice by its name ("LP") and says what it
+  cannot read. Other properties are not held to a type: their types are not modelled, and colours
+  are read by their own rule; a colour left out is said in a colour's words, as it was.
+  **Noticed, then done** ([The noticed items](#the-noticed-items)): in the plug-in a bound control's
+  value went to its host parameter as `(float) value`, so a choice's name, or "x", was sent as 0
+  (`PluginProcessor.h`, `cb.setValue`). `on`,
+  `watch`, `compute`, `intercept` and `defineAction` refuse an event, path or name left out, or a
+  function that is not one. In Lua those five are the host's bindings, so the prelude wraps them; a
+  name left out there stopped the script in sol2's words. `on`'s target left out is `"*"`, as its
+  text says, which the plug-in's JavaScript did not do.
+- **`ce.device`**: `parameter` and `read` refuse an id left out; `parameters` and `ports` refuse
+  something that is not a table of options (`ports("in")` listed every port); `ports` says once of a
+  direction that is not "in" or "out", and reads one in any case; `setTiming` refuses a name the
+  profile has no timing for, listing the ones it has, and takes a name in any case, written in the
+  profile's spelling so the override is read; and the preludes send a name left out of `setTiming`
+  or `setVariable` as `""`, which the host refuses, where "nil", "undefined" or "None" was stored.
+  `bind` to an id neither the profile nor a declaration knows was already said, as a plain line, and
+  bound anyway, since a script may bind before it declares and a profile's table can still be
+  loading; refusing would break both, so it stays bound and the line is a warning. A variable is
+  not checked against the profile's: a recipe a script declares may use its own.
+- **`ce.time`**: kept as it is. A required number left out is refused, the rule above; the old
+  defaults would be `optional: true` on those arguments in `timeWords.js` and the three
+  `__TIME_NUMBERS` tables, if the owner ever wants them back.
+
+### The noticed items
+
+At the owner's word on 2026-10-26 ("As recommended, do the noticed items too"), the four lines the
+records above left as noticed and not changed, done by the rules:
+
+- **A component verb's refused colour** is said in the form of the verb's other refusals, the call
+  as the script wrote it and then why: `drumpads Kit: colour(3, "redd") — refused, nothing changed.
+  In pad 3, "redd" is not a colour the panel can read. A colour is …`. `writeComponentFields` asks
+  the shared colour reader for the line in that form (`readColours`'s `say`) while a script's call
+  is running (`componentCall`, set by the verbs' dispatcher); `set()`, `ce.panel.patch` and the
+  others keep theirs.
+- **The five hand-written families' refusals** (the Zone Splitter, Phrase Sequencer, Recorder,
+  Harmoniser and Setlist) name the call as the script wrote it, its short name and its arguments,
+  `recorder Rec: store(9)`, where they printed the reducer's action and arguments as JSON, `store
+  {"slot":9}`: `sectionRefusalLine`, which the Values tab uses too. Each API wrapper is run with the
+  call it was given (`shownCalls`).
+- **The Orbit's node output and invert** have verbs, `nodeOutput` and `nodeInvert`, beside the
+  other node verbs; the outputs are one list, `ORBIT_OUTPUTS` in `utils/orbitLayout.js`, which the
+  engine plays, the inspector's select offers and the verb takes.
+- **The plug-in's write to a bound control's host parameter** reads the value as the editor does
+  (`scriptParameterValue` in `BridgeScriptHost.h`, from `deviceDefinitions.js`'s `numberFor`): a
+  number is the parameter's own value, and text that is one is read as one; a choice parameter takes a
+  choice by its label, in any case, as its index; a switch takes "on", "off", "true" or "false"; other
+  text is refused in the editor's words, where `(float) value` sent it as 0. A parameter exported as
+  a number takes numbers only: its choices, if the synth has any, are the profile's, which the
+  plug-in does not read here. The control's mirror is written as the editor writes the control.
+
+### componentBehavior in CI
+
+At the owner's word on 2026-10-26 ("As recommended, add componentBehavior to CI too"). The whole of
+`browser-checks/componentBehavior.mjs` was run first, here and on `main`, to see what CI would get:
+
+| | Cases | Pass | Fail | Time |
+| --- | --- | --- | --- | --- |
+| this branch | 95 | 74 | 21 | 944 s |
+| `main` | 94 | 73 | 21 | 922 s |
+
+The twenty-one are the same twenty-one, so none of them is this branch's. Eleven wait six seconds
+for a part of the control the case expects and do not find it (`.meter-track`, `.meter-readout`,
+`.slider-readout` and the like); ten find a different answer from the one the case expects (a
+detent that does not catch, a round dot with a painted corner). Which of the two is wrong, the
+renderer or the case, was not looked into. They are: Meter bar thickness, segmented readout, orientations, arc sweep,
+segmented gradient and linked source peak; Route into Meter; Nested Meter; Crossfader laws and
+detent, and its set-value return; Slider and Knob readout, and typed display values; Macro curves;
+ProgressBar; Number and Range Display mode; Slider fractional steps, reversed mouse, and rotary and
+knob drag; Pixel appearance dots and Reset appearance; LCD soft key grouped target.
+
+The whole file would have made the browser-checks job red on every pull request and added sixteen
+minutes to a job that takes about ten and stops at thirty. So `runAll.mjs` runs the one case that
+holds this branch's change, "A script write to a source reaches its bound parameter once, and a drag
+is not sent twice" (about half a minute), by the harness's own case filter (`CASES` in
+`runAll.mjs`), with its screenshots in a temporary folder rather than `work/`. The rest stays run by
+hand: `npm run test:component-behavior`. With it:
+
+- A case filter that matches no case fails, where it passed having run nothing; a renamed case
+  cannot quietly drop out of CI.
+- The page's first load waits as long as the other dev-server checks' (`DEV_SERVER_FIRST_LOAD_MS`),
+  where it had 60 s: a cold runner compiles the editor's modules on that request.
+
+A case fixed later can join it by its name in `CASES`, and the whole file once the twenty-one pass.
+
+### The twenty-one, fixed
+
+At the owner's word on 2026-10-26 ("As recommended, fix the 21 componentBehavior failures too").
+All 95 cases pass together; `docs/design/component-behavior-2026-09-13.md` ("2026-10-26: 95
+scenarios pass together again") is the harness's own record of it. Nineteen were the fixture and
+two the app:
+
+- **Nineteen: the fixture.** Since 8 October a new panel starts on the designed Graphite, whose forms
+  draw a Meter, a Knob and a ProgressBar in place of the control's own renderer, and whose Pixel
+  Display has square dots, so the cases found nothing to measure or measured the set's drawing. The
+  fixture's panel is on plain Graphite, as `screenDock.mjs`'s has been since then: the cases are of
+  each control's own properties. They pass with no other change.
+- **Route into Meter: an event raised while drawing.** The Meter's `onZone`, the Envelope's
+  `onStage` and the Constellation's `onRecall` were raised from the value sources, inside the
+  Preview's drawing, where the panel runtime's write of its execution status is refused
+  (`state_unsafe_mutation`): a page error, and the handler never ran. `afterDraw` in
+  `PanelPreviewSurface.svelte` raises them once the drawing is done, in order.
+- **Number and Range Display: keys in a display's field.** The field is `readonly`, which stops
+  typing and not the key handler: ArrowUp took a display from 40 to 41 and sent it. The shared
+  `adjustRangeFromKey`, and the fields' input and commit, refuse a display.
+- **The reload in `reopen()`** gets the first load's allowance, not the 6 s default: one whole run
+  had a reload take longer, in a case that passes otherwise.
+
+`CEDITOR_BEHAVIOR_CASE` takes several names separated by `|`, and each must match a case.
+
+### The whole file in CI
+
+At the owner's word on 2026-10-26 ("As recommended, add the whole file to CI too"). The file takes
+seventeen to eighteen minutes here (996 s and 1086 s for the two whole runs above). The
+browser-checks job ran its 40 checks in 11.1 minutes on its last run and stops at thirty, so the
+file did not fit in it; raising that job's limit would have made a run about thirty minutes. It has
+a job of its own instead, `component-behavior` on `windows-latest` beside the other three, with a
+limit of forty minutes: a run takes as long as that job. On its first run (40361234538) the job took
+16.3 minutes, 15.6 of them the 95 cases, all passing, beside browser-checks' 13.1, web-tests' 12.8
+and the build's 7.8; a run took about thirteen before it.
+
+- No bundle: the harness runs the editor in a Vite dev server, which compiles the modules as they
+  are asked for, so the job is checkout, `npm ci` and the cases.
+- The browser is the one the browser-checks job finds, Chrome or else Edge, by `CHROMIUM_PATH`.
+- A failing case's screenshot and `results.json` are kept as the run's `component-behavior`
+  artifact.
+- The three cases `runAll.mjs` ran (`CASES`) are gone from it: the job runs them with the rest, and
+  `npm run test:browser` is the 39 checks it was.
+
+CLAUDE.md's "twelve minutes" a run, said five times, is "sixteen" now, and its local-verification
+section names the job and how to run a few cases.
 
 ## Checking each batch
 
@@ -835,13 +2214,13 @@ not open a pull request unless asked.
 ## Prompt for Claude Code
 
 ```
-Read docs/design/api-descriptions-handoff.md and follow it, above all the sections "ce.anim: state
-on 2026-10-22", "ce.draw: done", "ce.time: done" and "ce.components.lcd: done". ce.midi, ce.math,
-ce.anim, ce.draw, ce.time and ce.components.lcd are done; continue with ce.components.arp, in
-technical English, schematic, one rule per line, with ranges, as its table says, showing every
-parameter and option of the command in its item. The component texts are generated from
-componentVerbs.js (see the lcd section): a family's own doc, ex and argDocs are what to write. Check
-each command at its edges in the runtime first, and put what is silent or wrong to me as a decision.
-Show me one item at a time, its text now and every field as proposed, and wait for my answer before
-the next.
+Read docs/design/api-descriptions-handoff.md. Every module's descriptions are done: the owner's
+item-by-item reviews of the LCD, the arp and the pixel, then every other module, the module and event
+descriptions, the items once deferred and the lines once noticed, each in one pass at the owner's
+word ("The remaining modules, in one pass", "The deferred items" and "The noticed items" in this
+file record each decision for review), and the script-write case of
+browser-checks/componentBehavior.mjs's 95 cases pass ("The twenty-one, fixed") and run in CI in a
+job of their own ("The whole file in CI"). Nothing of this work is left. A change to a control's
+renderer, the inspector or the preview's input handling is checked by that job; run the cases it
+touches locally first (CEDITOR_BEHAVIOR_CASE, several separated by "|").
 ```

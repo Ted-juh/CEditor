@@ -90,6 +90,11 @@ export function pxToOrbit(px, py, geom) {
   return { radius, angle };
 }
 
+// What a satellite can send, in the inspector's order: its height, its place across, a sine of its
+// angle, its distance from the centre. nodeProjection's cases; the inspector and ce.components.orbit's
+// nodeOutput read the list from here.
+export const ORBIT_OUTPUTS = ['y', 'x', 'sine', 'radius'];
+
 // The satellite's raw projection 0..1 for its output mode at a phase.
 export function nodeProjection(node, phase) {
   const p = nodePos(node, phase);

@@ -278,6 +278,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
         "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+        "${CE_ROOT}/src/Osc/OscService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
         "${CE_ROOT}/src/WebViewHost.cpp"
         "${CE_ROOT}/src/ValueTreeBridge.cpp"
@@ -413,6 +414,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
         "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+        "${CE_ROOT}/src/Osc/OscService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
     )
 
@@ -544,6 +546,7 @@ if(CEDITOR_BUILD_APP)
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
         "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+        "${CE_ROOT}/src/Osc/OscService.cpp"
         "${CE_ROOT}/src/DeviceProfile/DeviceRuntimeBridge.cpp"
     )
 
@@ -829,6 +832,7 @@ add_executable(CEditorDeviceProfileTests
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceMidiCi.cpp"
     "${CE_ROOT}/src/DeviceProfile/DeviceProfileServiceVars.cpp"
     "${CE_ROOT}/src/DeviceProfile/MidiCiSession.cpp"
+    "${CE_ROOT}/src/Osc/OscService.cpp"
     "${CE_ROOT}/tests/DeviceProfileEngineTests.cpp"
 )
 
@@ -1033,6 +1037,32 @@ target_include_directories(CEditorNativeFileAccessTests PRIVATE "${CE_ROOT}/src"
 target_link_libraries(CEditorNativeFileAccessTests PRIVATE juce::juce_core)
 add_test(NAME NativeFileAccess COMMAND CEditorNativeFileAccessTests)
 ce_configure_test(CEditorNativeFileAccessTests)
+
+# ce.file's native side (ScriptFiles.h): a file only after a dialog, ids that cannot be made up,
+# only the listed types, writing only where the person agreed. The dialog is a function in the test,
+# so it is plain juce_core and needs no window.
+add_executable(CEditorScriptFilesTests "${CE_ROOT}/tests/ScriptFilesTests.cpp")
+target_include_directories(CEditorScriptFilesTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorScriptFilesTests PRIVATE juce::juce_core)
+add_test(NAME ScriptFiles COMMAND CEditorScriptFilesTests)
+ce_configure_test(CEditorScriptFilesTests)
+
+# The MIDI a device sends, decoded for the plug-in's window-shut scripts (Scripting/MidiInDecoder.h),
+# against the table the panel view's midiInDecoder.js is held to as well.
+add_executable(CEditorMidiInDecoderTests "${CE_ROOT}/tests/MidiInDecoderTests.cpp")
+target_include_directories(CEditorMidiInDecoderTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorMidiInDecoderTests PRIVATE juce::juce_core)
+add_test(NAME MidiInDecoder COMMAND CEditorMidiInDecoderTests "${CE_ROOT}/tests/fixtures/midiInCases.json")
+ce_configure_test(CEditorMidiInDecoderTests)
+
+# ce.osc's reading and writing of OSC (Osc/OscCodec.h), against the packets in the OSC 1.0
+# specification and the types Max, Pure Data and DAWs send, and its transport (Osc/OscService.cpp)
+# over this computer's own loopback.
+add_executable(CEditorOscTests "${CE_ROOT}/tests/OscTests.cpp" "${CE_ROOT}/src/Osc/OscService.cpp")
+target_include_directories(CEditorOscTests PRIVATE "${CE_ROOT}/src")
+target_link_libraries(CEditorOscTests PRIVATE juce::juce_core juce::juce_events)
+add_test(NAME Osc COMMAND CEditorOscTests)
+ce_configure_test(CEditorOscTests)
 
 # --- CTRL49 control surface (Phase 1): vendor SysEx protocol library ---
 # Pure std, no I/O; golden bytes from the external CTRL49 reverse-engineering handoff.

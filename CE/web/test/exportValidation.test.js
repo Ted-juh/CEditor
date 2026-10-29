@@ -242,6 +242,10 @@ test('the staged Windows exporter works away from the checkout with bundled Node
     assert.equal(existsSync(path.join(root, 'exports/Validation')), false);
     assert.equal(existsSync(path.join(root, 'exports/Validation.lv2')), false);
   } finally {
-    rmSync(root, { recursive: true, force: true });
+    // This folder holds the node.exe the test has just run, and Windows can keep an executable
+    // busy for a moment after it exits: on 2026-10-26 the delete failed with EBUSY after every
+    // assertion had passed. rmSync retries what Windows reports busy, waiting a little longer
+    // each time (100 ms, 200 ms and so on, up to five and a half seconds in all).
+    rmSync(root, { recursive: true, force: true, maxRetries: 10, retryDelay: 100 });
   }
 });

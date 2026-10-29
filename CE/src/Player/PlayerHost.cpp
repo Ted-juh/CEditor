@@ -1,4 +1,5 @@
 #include "PlayerHost.h"
+#include "Osc/OscQuestion.h"
 #include "WebViewProfileFolders.h"
 #include "TrustedWebBrowser.h"
 #include "DeviceProfile/DeviceRuntimeBridge.h"
@@ -161,6 +162,9 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         .withWinWebView2Options (webview2Options)
         .withNativeIntegrationEnabled();
 
+    // ce.osc asks the user before the network is used. The plug-in's processor sets this for itself,
+    // since it asks with the window shut too; the standalone player asks here.
+    if (service.askAboutNetwork == nullptr) service.askAboutNetwork = ceditor::osc::askAboutNetworkWithDialog;
     // Shared device-runtime surface (Phase B1), reporting to this player's WebView.
     options = ceditor::device::withDeviceRuntimeEvents (
         std::move (options), service,
@@ -188,6 +192,19 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
                              (float) (double) payload.getProperty ("value", 0.0));
     });
 
+    options = options.withEventListener ("paramGesture", [this] (const juce::var& payload)
+    {
+        if (onUiParamGesture != nullptr)
+            onUiParamGesture (payload.getProperty ("id", "").toString(),
+                              payload.getProperty ("phase", "").toString() == "begin");
+    });
+
+    // ce.daw: what a page's script changed in what the DAW sees (PlayerHost.h, onDawCommand).
+    options = options.withEventListener ("dawCommand", [this] (const juce::var& payload)
+    {
+        if (onDawCommand != nullptr) onDawCommand (payload);
+    });
+
     // The JS player finished loading the panel and wants every parameter's current value pushed
     // (so the on-screen controls reflect a restored/automated state on open).
     options = options.withEventListener ("requestParamSync", [this] (const juce::var&)
@@ -203,6 +220,12 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
         if (onScriptSetting != nullptr) onScriptSetting (payload);
     });
 
+    // What the page's onDawSaveState handlers would save now (panelRuntime.js, setDawStateSink).
+    options = options.withEventListener ("scriptDawState", [this] (const juce::var& payload)
+    {
+        if (onScriptDawState != nullptr) onScriptDawState (payload.getProperty ("state", {}));
+    });
+
     // The answer to the restore question: "always", "never", or "load" (take the synth's patch
     // instead). "Not now" simply dismisses the bar, because a restore the user deferred is still
     // pending and should be offered again next time the project opens.
@@ -210,6 +233,19 @@ PlayerHost::PlayerHost (juce::File panelFileToLoad, ceditor::device::DeviceProfi
     {
         if (onRestoreAnswer != nullptr)
             onRestoreAnswer (payload.getProperty ("answer", "").toString());
+    });
+
+    // ce.file's dialogs and the files the person chose (ScriptFiles.h), answered as "scriptFileResult".
+    options = options.withEventListener ("scriptFile", [safe = juce::Component::SafePointer<PlayerHost> (this)] (const juce::var& payload)
+    {
+        juce::MessageManager::callAsync ([safe, payload]()
+        {
+            if (safe == nullptr) return;
+            safe->scriptFiles.handle (payload, [safe] (const juce::var& result)
+            {
+                if (safe != nullptr) safe->emitToWebView ("scriptFileResult", result);
+            });
+        });
     });
 
     // A key the page did not use, for the DAW (utils/hostKeys.js, HostKeyForwarding.h).
@@ -325,6 +361,23 @@ void PlayerHost::showRestorePrompt (const juce::String& deviceName)
     emitToWebView ("restorePrompt", juce::var (obj));
 }
 
+void PlayerHost::pushDawInfo (const juce::var& info)
+{
+    emitToWebView ("dawInfo", info);
+}
+
+void PlayerHost::pushDawProgram (const juce::var& program)
+{
+    emitToWebView ("dawProgram", program);
+}
+
+void PlayerHost::pushDawRestoreToPage (const juce::var& state)
+{
+    auto* obj = new juce::DynamicObject();
+    obj->setProperty ("state", state);
+    emitToWebView ("scriptDawRestore", juce::var (obj));
+}
+
 void PlayerHost::notifySessionRestored()
 {
     emitToWebView ("sessionRestored", juce::var (new juce::DynamicObject()));
@@ -344,11 +397,12 @@ void PlayerHost::emitToWebView (const juce::String& eventName, const juce::var& 
         webView->emitEventIfBrowserIsVisible (eventName, payload);
 }
 
-void PlayerHost::pushParamToUi (const juce::String& parameterId, float value)
+void PlayerHost::pushParamToUi (const juce::String& parameterId, float value, bool fromHost)
 {
     auto* obj = new juce::DynamicObject();
     obj->setProperty ("id", parameterId);
     obj->setProperty ("value", value);
+    obj->setProperty ("host", fromHost);
     emitToWebView ("paramSync", juce::var (obj));
 }
 
@@ -385,8 +439,12 @@ void PlayerHost::loadPanelIntoWebView()
     // And whether the keys it does not use go to the host (utils/hostKeys.js).
     const bool restored = isSessionRestored != nullptr && isSessionRestored();
     const auto stores = scriptStores != nullptr ? juce::JSON::toString (scriptStores(), true) : juce::String ("null");
+    // Present only for a plug-in instance: the page installs its DAW-state hand-off when it is.
+    const auto dawState = scriptDawState != nullptr
+        ? ", dawState: " + juce::JSON::toString (scriptDawState(), true)
+        : juce::String();
     webView->evaluateJavascript (juce::String ("window.__CE_PLAYER_SESSION__ = { restored: ")
-                                 + (restored ? "true" : "false") + ", storage: " + stores
+                                 + (restored ? "true" : "false") + ", storage: " + stores + dawState
                                  + ", hostKeys: " + (keysGoToHost() ? "true" : "false") + " };"
                                  + "if (window.__CE_LOAD_PANEL__) window.__CE_LOAD_PANEL__(" + panelJson + ");");
 }

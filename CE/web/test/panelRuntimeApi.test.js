@@ -55,8 +55,9 @@ test('nibbles split and recombine a byte', () => {
   assert.equal(api.fromNibbles(0xA, 0xB), 0xAB);
   assert.deepEqual(api.nibblize([0xAB, 0xCD]), [0xA, 0xB, 0xC, 0xD]);
   assert.deepEqual(api.denibblize([0xA, 0xB, 0xC, 0xD]), [0xAB, 0xCD]);
-  // Odd tail: the missing low nibble reads as zero rather than NaN.
-  assert.deepEqual(api.denibblize([0xA, 0xB, 0xC]), [0xAB, 0xC0]);
+  // An odd count has no low half to join the last one with: refused, where it read the missing half
+  // as 0 without a word (scriptPreludeAgreement.test.js has the words, in every engine).
+  assert.equal(api.denibblize([0xA, 0xB, 0xC]), undefined);
 });
 
 test('ASCII helpers pad to length and read back', () => {
@@ -539,6 +540,23 @@ test('ce.device.profile reports what is mapped to the role', () => {
     assert.equal(p.role, 'mainSynth');
     assert.equal(p.connected, true);
     assert.equal(api.ce.device.profile, api.deviceProfile, 'both spellings are the same function');
+  });
+});
+
+test('ce.device.parameters filters by access with the words the plug-in takes', () => {
+  // The panel view used to match access as text, and a profile's access is an object, so every
+  // value filtered every parameter out; the plug-in ignored "readwrite" and returned them all.
+  const fixture = structuredClone(DEVICE_FIXTURE);
+  const [cutoff, resonance, attack] = fixture.params['test-cc-synth'];
+  cutoff.access = { canRead: true, canWrite: true, realtimeSafe: true };
+  resonance.access = { canRead: true, canWrite: false };
+  attack.access = { canWrite: true, realtimeSafe: false };
+  withDevice(fixture, () => {
+    const api = scriptApiForTesting('', 'dev-access');
+    assert.deepEqual(api.deviceParameters({ access: 'writable' }).map((p) => p.id), ['cutoff', 'attack']);
+    assert.deepEqual(api.deviceParameters({ access: 'readonly' }).map((p) => p.id), ['resonance']);
+    assert.deepEqual(api.deviceParameters({ access: 'realtimeWarning' }).map((p) => p.id), ['attack']);
+    assert.equal(api.deviceParameters({ access: 'readwrite' }).length, 3, 'an unknown word filters nothing');
   });
 });
 

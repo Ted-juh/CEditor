@@ -137,6 +137,17 @@ test('a background layer is enabled AND put into layerOrder', () => {
   });
 });
 
+test('the layer, fit, align, blend and clip mode are read in any case, and stored as the lists spell them', () => {
+  withControls((api) => {
+    assert.equal(api.imageSet('L', PNG, { layer: 'OVERLAY', fit: 'Tile', align: 'TOP-LEFT', blend: 'Multiply', clipMode: 'Box' }), true);
+    assert.equal(api.get('L.Background.Fill.overlayFit'), 'tile');
+    assert.equal(api.get('L.Background.Fill.overlayAlign'), 'top-left');
+    assert.equal(api.get('L.Background.Fill.overlayBlend'), 'multiply');
+    assert.equal(api.get('L.Background.Fill.overlayClipMode'), 'box');
+    assert.equal(api.imageSet('L', PNG, { fit: 'Tiled' }), false, 'a word not in the list is still refused');
+  });
+});
+
 test('a text layer sets the mode, because the renderer reads mode and not Enabled', () => {
   withControls((api) => {
     assert.equal(api.imageSet('L', PNG, { layer: 'textImage' }), true);
@@ -402,6 +413,9 @@ test('icon writes the id AND the name, so the fallback is not left deciding', ()
     assert.equal(api.get('B.Icon.source'), 'library');
     assert.equal(api.get('B.Icon.size'), 20);
     assert.equal(api.get('B.Icon.tint'), '5B9BD5', 'a leading # is stripped');
+    // The renderer reads "cover" and draws anything else contained, so "Cover" is stored "cover".
+    assert.equal(api.imageIcon('B', 'waveform', { fit: 'Cover' }), true);
+    assert.equal(api.get('B.Icon.fit'), 'cover');
   }));
 });
 
@@ -475,4 +489,24 @@ test('imageLayer defaults to the background image layer', () => {
   assert.equal(imageLayer(undefined).id, 'image');
   assert.equal(imageLayer('OVERLAY').id, 'overlay');
   assert.equal(imageLayer('nope'), null);
+});
+
+/* ------------------------------------------------------------ the review of ce.image and ce.text */
+
+test('a name that is no control, a lookup with no name and a set with nothing to set say so', () => {
+  withControls((api) => {
+    const errors = (fn) => { clearScriptTrace(); fn(); return storeGet(scriptTrace).filter((e) => e.kind === 'error').map((e) => e.message); };
+    // It was told it had no Background.Fill, or no Text section.
+    assert.deepEqual(errors(() => api.imageSet('Nobody', PNG)), ['ce.image.set("Nobody"): this panel has no control by that name.']);
+    assert.deepEqual(errors(() => api.textRead('Nobody')), ['ce.text.read("Nobody"): this panel has no control by that name.']);
+    assert.match(errors(() => api.textRead('K'))[0], /has no Text section/, 'a control without one still says so');
+    // A name left out found nothing without a word; a name that matches nothing is a query with no answer.
+    assert.deepEqual(errors(() => api.imageAsset()), ['ce.image.asset: no id or name was given, so there is no answer.']);
+    assert.deepEqual(errors(() => api.imageAsset('nope')), []);
+    assert.deepEqual(errors(() => api.textFont()), ['ce.text.font: no family was given, so there is no answer.']);
+    assert.deepEqual(errors(() => api.imageLoad()), ['ce.image.load: no path was given, so nothing is read.']);
+    assert.deepEqual(errors(() => api.imageSet('L')), ['ce.image.set("L"): no picture and no option were given, so nothing was set.']);
+    // Both filters at once: the first one given was the only one applied.
+    assert.ok(api.textFonts({ portable: true, variable: true }).every((f) => f.portable && f.variable));
+  });
 });

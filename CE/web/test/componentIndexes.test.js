@@ -52,7 +52,7 @@ test('a generated verb says which element there is no such one of, and which the
     [(api) => api.ce.components.drumpads.note('Pads', 3, 'x'), 'drumpads Pads: note(3, "x") — refused, nothing changed. "x" is not a number.'],
     [(api) => api.ce.components.matrix.cell('Mat', 9, 1, 0.5), 'matrix Mat: cell(9, 1, 0.5) — refused, nothing changed. There is no row 9: the rows are 1 to 4.'],
     [(api) => api.ce.components.matrix.cell('Mat', 1, 9, 0.5), 'matrix Mat: cell(1, 9, 0.5) — refused, nothing changed. There is no column 9: the columns are 1 to 4.'],
-    [(api) => api.ce.components.lcd.text('Lcd', 9, 'hi'), 'lcd Lcd: text(9, "hi") — refused, nothing changed. There is no line 9: the lines are 1 to 2.'],
+    [(api) => api.ce.components.lcd.text('Lcd', 9, 'hi'), 'lcd Lcd: text(9, "hi") — refused, nothing changed. There is no row 9: the rows are 1 to 2.'],
     [(api) => api.ce.components.pixel.text('Pix', 'tempo', '120'), 'pixel Pix: text("tempo", "120") — refused, nothing changed. There is no element called "tempo". It has none yet.'],
     [(api) => api.ce.components.turing.step('Tur', 40, 0.5), 'turing Tur: step(40, 0.5) — refused, nothing changed. There is no step 40: the steps are 1 to 8.'],
     [(api) => api.ce.components.arp.mute('Arp', 0), 'arp Arp: mute(0) — refused, nothing changed. 0 is not a step: the steps count from 1.'],
@@ -69,7 +69,7 @@ test('a generated verb says which element there is no such one of, and which the
 test('a hand-written verb refuses an element it has no such one of, and says which there are', () => {
   const zone = run((api) => api.splitMute('Split', 9, false));
   assert.equal(zone.result, false);
-  assert.deepEqual(zone.lines, ['split Split: mute {"zone":9,"enabled":false} — refused, nothing changed. There is no zone 9: '
+  assert.deepEqual(zone.lines, ['split Split: mute(9, false) — refused, nothing changed. There is no zone 9: '
     + 'a zone is its number from 1 to 2, or its name, "Bass", "Lead".']);
   assert.equal(zone.controls[7]._children.SplitZone.zones.every((z) => z.enabled !== false), true, 'nothing was written');
   assert.match(run((api) => api.splitChannel('Split', 'Bas', 3)).lines[0], /There is no zone "Bas": /);
@@ -85,7 +85,7 @@ test('a hand-written verb refuses an element it has no such one of, and says whi
 
   const cell = run((api) => api.phraseCell('Phr', 20, 1, true));
   assert.equal(cell.result, false);
-  assert.deepEqual(cell.lines, ['phrase Phr: cell {"step":20,"row":1,"on":true} — refused, nothing changed. There is no step 20: the steps are 1 to 16.']);
+  assert.deepEqual(cell.lines, ['phrase Phr: cell(20, 1, true) — refused, nothing changed. There is no step 20: the steps are 1 to 16.']);
   assert.match(run((api) => api.phraseCell('Phr', 1, 9, true)).lines[0], /There is no row 9: the rows are 1 to 8\.$/);
   assert.match(run((api) => api.phraseCell('Phr', 0, 1, true)).lines[0], /There is no step 0: the steps are 1 to 16\.$/);
   // Step 1, row 1 is the grid's first cell, and step 16, row 8 its last.
@@ -93,9 +93,9 @@ test('a hand-written verb refuses an element it has no such one of, and says whi
   assert.deepEqual([first.lines, Object.keys(first.controls[8]._children.Phrase.pattern).sort()], [[], ['0:0', '15:7']]);
 
   assert.deepEqual(run((api) => api.recorderLoad('Rec', 2)).lines,
-    ['recorder Rec: load {"slot":2} — refused, nothing changed. There is no take in slot 2: no slot holds one yet.']);
+    ['recorder Rec: load(2) — refused, nothing changed. There is no take in slot 2: no slot holds one yet.']);
   assert.deepEqual(run((api) => api.recorderStore('Rec', 9)).lines,
-    ['recorder Rec: store {"slot":9} — refused, nothing changed. There is no slot 9: the slots are 1 to 8.']);
+    ['recorder Rec: store(9) — refused, nothing changed. There is no slot 9: the slots are 1 to 8.']);
   assert.deepEqual(run((api) => api.recorderStore('Rec', 2)).lines, []);
 });
 
@@ -134,7 +134,7 @@ test('the rows say what an index addresses, and the refusal in the console\'s wo
 
   // What a good index addresses, now.
   assert.equal(meaningLine(rowNamed('ce.components.drumpads.note("Pads", 3, 40)', 'index')), 'pad 3 of 16 · note now 38');
-  assert.equal(meaningLine(rowNamed('ce.components.lcd.text("Lcd", 1, "hi")', 'row')), 'line 1 of 2 · now "PATCH:INIT VOICE"');
+  assert.equal(meaningLine(rowNamed('ce.components.lcd.text("Lcd", 1, "hi")', 'at')), 'row 1 of 2 · now "PATCH:INIT VOICE"');
   assert.equal(meaningLine(rowNamed('splitMute("Split", 2, false)', 'zone')), 'zone 2 is "Lead"');
   assert.equal(meaningLine(rowNamed('splitChannel("Split", "Bass", 3)', 'zone')), 'zone 1 of 2');
   assert.deepEqual(['min', 'max'].map((k) => rowNamed('splitMute("Split", 2, false)', 'zone').meaning[k]), [1, 2]);

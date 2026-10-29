@@ -252,15 +252,17 @@ test('a pad colour the panel cannot read is refused, in set()\'s words with the 
     clearScriptTrace();
     assert.equal(d.colour('Kit', 3, 'redd'), false, 'false, as the verb answers any refusal');
     assert.equal(refusalOf(MEMBER_BY_ID.drumPadsColour), 'false');
-    assert.deepEqual(console_(), [`error: ce.components.drumpads.colour("Kit"): in pad 3, "redd" is not a colour `
-      + `the panel can read, so nothing was set. ${PAD_FORMS}`]);
+    // In the form of the verb's other refusals, the call as written, where it named the call as set()'s
+    // line does (the noticed items, at the owner's word).
+    assert.deepEqual(console_(), [`error: drumpads Kit: colour(3, "redd") — refused, nothing changed. In pad 3, "redd" is `
+      + `not a colour the panel can read. ${PAD_FORMS}`]);
     assert.deepEqual(live()._children.DrumPads.pads, before);
 
     // fill writes every pad at once, so one it cannot read refuses them all, and says which.
     clearScriptTrace();
     assert.equal(d.fill('Kit', 'colour', ['#abc', 'teal', '#0008']), false);
-    assert.deepEqual(console_(), [`error: ce.components.drumpads.fill("Kit"): in pad 3, "#0008" is not a colour `
-      + `the panel can read, so nothing was set. ${PAD_FORMS} Write "88000000".`]);
+    assert.deepEqual(console_(), [`error: drumpads Kit: fill("colour", ["#abc","teal","#0008"]) — refused, nothing changed. `
+      + `In pad 3, "#0008" is not a colour the panel can read. ${PAD_FORMS} Write "88000000".`]);
     assert.deepEqual(live()._children.DrumPads.pads, before);
     assert.equal(d.fill('Kit', 'colour', ['#abc', 'teal']), true);
     assert.deepEqual(d.read('Kit', 'colour').slice(0, 3), ['#AABBCC', '#008080', '']);

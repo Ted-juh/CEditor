@@ -296,7 +296,6 @@ int main()
         const juce::StringArray expectedRefusals {
             "get(\"cutoff\"): \"normalisedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
             "set(\"cutoff\"): \"normalisedValue\" is not a value form, so nothing was set." + forms + " Write normalizedValue.",
-            "get(\"cutoff\"): \"NormalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
             "set(\"cutoff\"): \"percent\" is not a value form, so nothing was set." + forms,
             "set(\"cutoff.value\"): \"Normalized\" is not a value form, so nothing was set." + forms,
             "get(\"cutoff.value\"): \".normalizedValue\" is not a value form, so there is no answer." + forms + " Write normalizedValue.",
@@ -325,10 +324,11 @@ int main()
                 expectedRefusals[0], "a " + nothing,
                 expectedRefusals[1],
                 "b 100",
-                expectedRefusals[2], "c " + nothing,
+                // A form in any case is that form: "NormalizedValue" was refused with "Write normalizedValue".
+                "c 0.5",
+                expectedRefusals[2],
                 expectedRefusals[3],
-                expectedRefusals[4],
-                expectedRefusals[5], "d " + nothing,
+                expectedRefusals[4], "d " + nothing,
                 "e 100",
                 "f 50",
                 "g 0.75",
@@ -342,6 +342,8 @@ int main()
         check (BridgeScriptHost::formMeant ("normalised") == "" && BridgeScriptHost::formMeant (" Normalisedvalue ") == "normalizedValue"
                    && BridgeScriptHost::formMeant ("MIDIVALUE") == "midiValue" && BridgeScriptHost::formMeant (".value") == "value"
                    && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "normalizedValue").isEmpty()
+                   && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", " MIDIValue ").isEmpty()
+                   && BridgeScriptHost::splitAccessor ("cutoff.NormalizedValue", {}).second == "normalizedValue"
                    && BridgeScriptHost::formRefusal ("get(\"x\")", "there is no answer", "").isEmpty(),
                "formMeant names the form written another way, and formRefusal passes a form and no form");
     }
@@ -1099,6 +1101,134 @@ int main()
                    && (double) colourModel.getValue ("lbl.transform.x") == 50.0
                    && (double) colourModel.getValue ("lbl.transform.width") == 100.0,
                "so no tick wrote a number into a colour, nothing in a refused list moved, and the list that started did");
+    }
+
+    // set() refuses a value left out, and a range control's value that is not a number, in the
+    // editor's words (scriptSet and setNumber in panelRuntime.js), from Lua, from JavaScript and at
+    // the host's own door; text that is a number is read as one, and a label's text is not held to
+    // numbers, nor a control bound to a device parameter, which its binding reads. A value left out
+    // cleared the knob, and "x" was written as given. A colour left out is said in a colour's words. And
+    // on(), watch(), compute(), intercept() and defineAction() with nothing to set up say so (the
+    // preludes' __hookRefused), where Lua's bindings stopped the script in sol2's words; what is set
+    // up through the wrapped bindings still runs, a target left out being "*".
+    {
+        const char* kSetPanel = R"JSON({
+          "name": "Sets",
+          "scripting": { "enabled": true, "runOnExport": true },
+          "scripts": [
+            { "id": "sl", "name": "sl", "language": "lua", "scope": "panel", "event": "onSetLua", "target": "*", "enabled": true,
+              "source": "function onSetLua()\n  set(\"cutoff.value\", 64)\n  set(\"cutoff.value\")\n  set(\"cutoff.value\", \"x\")\n  set(\"cutoff.value\", true)\n  log(\"lua \" .. tostring(get(\"cutoff.value\")))\n  set(\"cutoff.value\", \"100\")\n  log(\"lua text \" .. tostring(get(\"cutoff.value\")))\n  on(\"*\", \"onPing\")\n  watch(nil, function() end)\n  defineAction(\"go\", 5)\n  on(nil, \"onPing\", function() log(\"lua heard\") end)\n  defineAction(\"go\", function() log(\"lua go\") end)\n  emit(\"onPing\")\n  run(\"go\")\nend\n" },
+            { "id": "sj", "name": "sj", "language": "javascript", "scope": "panel", "event": "onSetJs", "target": "*", "enabled": true,
+              "source": "function onSetJs(){ set('cutoff.value', 'y'); set('cutoff.normalizedValue', 'half'); set('cutoff.value'); compute('cutoff.value'); intercept('', function(){}); set('lbl.text.content', 'x'); log('js ' + get('cutoff.value') + ' ' + get('lbl.text.content')); }" }
+          ],
+          "controls": [
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "c1", "name": "cutoff" },
+              "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 127 },
+              "Value": { "_type": "Value", "value": 0 }
+            } },
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "c2", "name": "bound" },
+              "Behavior": { "_type": "Behavior", "family": "range", "role": "knob", "min": 0, "max": 127 },
+              "Value": { "_type": "Value", "value": 0 },
+              "DeviceBindings": { "_type": "DeviceBindings", "bindings": [ { "kind": "deviceParameter", "parameterId": "filter" } ] }
+            } },
+            { "_type": "Control", "_children": {
+              "Core": { "_type": "Core", "id": "l1", "name": "lbl" },
+              "Text": { "_type": "Text", "content": "" },
+              "Background": { "_type": "Background", "_children": { "Fill": { "_type": "Fill", "colour": "FF112233" } } }
+            } }
+          ]
+        })JSON";
+
+        PanelValueModel setModel;
+        check (setModel.loadFromJson (kSetPanel), "loaded the set panel");
+        check (setModel.writeNeedsNumber ("cutoff.value", "value") && setModel.writeNeedsNumber ("cutoff", "normalizedValue")
+                   && ! setModel.writeNeedsNumber ("lbl.text.content", "value") && ! setModel.writeNeedsNumber ("nobody.value", "value")
+                   && ! setModel.writeNeedsNumber ("panel.width", "value") && ! setModel.writeNeedsNumber ("bound.value", "value"),
+               "writeNeedsNumber: a range control's value and its .normalizedValue, not a label's text, a control that is "
+               "not there, the panel, or a control bound to a device parameter, whose binding reads a choice by its name");
+        juce::StringArray setLogs;
+        BridgeScriptHost::Callbacks scb;
+        scb.getValue = [&] (const juce::String& path, const juce::String& form) { return setModel.getValue (path, form); };
+        scb.writeNeedsNumber = [&] (const juce::String& path, const juce::String& form) { return setModel.writeNeedsNumber (path, form); };
+        scb.colourWrites = [&] (const juce::String& call, const juce::String& path, const juce::var& value, const juce::String& form)
+        { return setModel.colourWrites (call, path, value, form); };
+        scb.isColourProperty = [&] (const juce::String& path) { return setModel.isColourProperty (path); };
+        scb.setValue = [&] (const juce::String& path, const juce::var& v, bool, const juce::String& form) { setModel.setValue (path, v, form); };
+        scb.log = [&] (const juce::String& m, const juce::var&) { setLogs.add (m); };
+        BridgeScriptHost setHost (std::move (scb));
+        ScriptRuntime setRuntime (setHost);
+        setHost.attachRuntime (&setRuntime);
+        setRuntime.setErrorLogger ([] (const juce::String& line) { std::cout << "  [error] " << line << "\n"; });
+        setRuntime.loadScripts (gatherPanelScripts (setModel.panel()));
+
+        setRuntime.runAction ("onSetLua", juce::var());
+        check (setLogs.joinIntoString (" | ") ==
+                   "set(\"cutoff.value\"): no value was given, so nothing was set. | "
+                   "set(\"cutoff.value\"): \"x\" is not a number, so nothing was set. | "
+                   "set(\"cutoff.value\"): true is not a number, so nothing was set. | "
+                   "lua 64 | lua text 100 | "
+                   "ce.core.on: no function was given, so nothing was set up. | "
+                   "ce.core.watch: no path was given, so nothing was set up. | "
+                   "ce.core.action: 5 is not a function, so nothing was set up. | "
+                   "lua heard | lua go",
+               "Lua: set() refuses a value left out and one that is not a number, and on(), watch() and defineAction() with "
+               "nothing to set up say so; the wrapped on() and defineAction() still set up what they are given (got "
+                   + setLogs.joinIntoString (" | ") + ")");
+
+        setLogs.clear();
+        setRuntime.runAction ("onSetJs", juce::var());
+        check (setLogs.joinIntoString (" | ") ==
+                   "set(\"cutoff.value\"): \"y\" is not a number, so nothing was set. | "
+                   "set(\"cutoff.normalizedValue\"): \"half\" is not a number, so nothing was set. | "
+                   "set(\"cutoff.value\"): no value was given, so nothing was set. | "
+                   "ce.core.compute: no function was given, so nothing was set up. | "
+                   "ce.core.intercept: no path was given, so nothing was set up. | "
+                   "js 100 x",
+               "JavaScript: the same refusals in the same words, and a label's text left alone (got "
+                   + setLogs.joinIntoString (" | ") + ")");
+
+        // A native handler's set() and Python's are this same call on the host, with no prelude in front.
+        setLogs.clear();
+        setHost.setValue ("cutoff.value", juce::var(), juce::var());
+        setHost.setValue ("cutoff.value", juce::var (" 12 "), juce::var());
+        check (setLogs.joinIntoString (" | ") == "set(\"cutoff.value\"): no value was given, so nothing was set."
+                   && setModel.getValue ("cutoff.value").isInt64() && (int) setModel.getValue ("cutoff.value") == 12,
+               "the host's own door refuses a value left out, and stores text that is a whole number as one (got "
+                   + setLogs.joinIntoString (" | ") + ", " + setModel.getValue ("cutoff.value").toString() + ")");
+
+        // A colour left out is said in a colour's words, with the forms it takes, as the editor says it.
+        setLogs.clear();
+        setHost.setValue ("lbl.background.fill.colour", juce::var(), juce::var());
+        check (setLogs.size() == 1
+                   && setLogs[0].startsWith ("set(\"lbl.background.fill.colour\"): no colour was given, so nothing was set. ")
+                   && setModel.getValue ("lbl.background.fill.colour").toString() == "FF112233",
+               "a colour left out is refused in a colour's words (got " + setLogs.joinIntoString (" | ") + ")");
+    }
+
+    // A bound control's value as its host parameter takes it (scriptParameterValue, which the
+    // plug-in's set() reads it through), in the editor's words: a choice by its name in any case, a
+    // switch by on or off, text that is a number as one; anything else refused, where `(float) value`
+    // sent it as 0.
+    {
+        const juce::StringArray filters { "LP", "HP", "BP" };
+        const auto hp = scriptParameterValue ("choice", filters, juce::var ("hp"));
+        const auto two = scriptParameterValue ("choice", filters, juce::var (2));
+        const auto notch = scriptParameterValue ("choice", filters, juce::var ("Notch"));
+        const auto on = scriptParameterValue ("bool", {}, juce::var ("On"));
+        const auto enabled = scriptParameterValue ("bool", {}, juce::var ("enabled"));
+        const auto yes = scriptParameterValue ("float", {}, juce::var (true));
+        const auto text = scriptParameterValue ("float", {}, juce::var (" 64 "));
+        const auto x = scriptParameterValue ("float", {}, juce::var ("x"));
+        check (hp.ok && hp.value == 1.0f && two.ok && two.value == 2.0f && on.ok && on.value == 1.0f
+                   && yes.ok && yes.value == 1.0f && text.ok && text.value == 64.0f,
+               "a bound control takes a choice by its name, a switch by its word, true as 1 and text that is a number");
+        check (! notch.ok && notch.refused == "\"Notch\" is not one of its choices, so nothing was sent. "
+                                              "The choices are \"LP\", \"HP\" and \"BP\"."
+                   && ! enabled.ok && enabled.refused.startsWith ("\"enabled\" is not on or off, so nothing was sent. ")
+                   && ! x.ok && x.refused == "\"x\" is not a number, so nothing was sent.",
+               "…and refuses the rest in the editor's words (got " + notch.refused + " | " + enabled.refused + " | " + x.refused + ")");
     }
 
     std::cout << "--------------------------------------------\n"

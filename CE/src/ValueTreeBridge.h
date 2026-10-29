@@ -1,5 +1,6 @@
 #pragma once
 #include "NativeFileAccess.h"
+#include "ScriptFileDialog.h"
 
 #include <juce_data_structures/juce_data_structures.h>
 #include <juce_gui_extra/juce_gui_extra.h>
@@ -138,6 +139,10 @@ private:
     AppSettings* appSettings = nullptr;
     ceditor::NativeFileAccess fileAccess;
     std::unique_ptr<juce::FileChooser> fileChooser;
+    // ce.file: the files and folders the person chose for a panel's scripts (ScriptFiles.h), asked
+    // for with a chooser of its own so a script's dialog never replaces the editor's.
+    std::shared_ptr<std::unique_ptr<juce::FileChooser>> scriptFileChooser = std::make_shared<std::unique_ptr<juce::FileChooser>>();
+    ceditor::ScriptFiles scriptFiles { ceditor::scriptFileDialog (scriptFileChooser) };
     // Active/last in-app VST3 build, held as its Timer base so this header needn't see the concrete
     // VstBuildJob (it lives in the handlers .cpp). Timer has a virtual destructor, so deleting
     // through the base correctly tears down the real job. Busy-state is read via isTimerRunning().

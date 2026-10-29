@@ -21,6 +21,16 @@ test('workspace chrome ownership follows active workspace type', () => {
   assert.equal(workspaceOwnsChrome('script'), true);
 });
 
+test('the documentation tab is a reading page: the panel docks give it their width', () => {
+  assert.equal(classifyWorkspace({ activeTab: { type: 'documentation' } }), 'documentation');
+  assert.equal(classifyWorkspace({ activeTab: { type: 'documentation' }, componentWorkspaceMode: 'surface' }), 'documentation');
+  const chrome = resolveWorkspaceChrome({ activeTab: { type: 'documentation' }, showTreePanel: true, showDisplayPanel: true, showPropertiesPanel: true });
+  assert.equal(chrome.showTreePanel, false);
+  assert.equal(chrome.showDisplayPanel, false);
+  assert.equal(chrome.showPropertiesPanel, false);
+  assert.equal(chrome.railInsertEnabled, false);
+});
+
 test('stale component surface mode does not override standalone workspaces', () => {
   assert.equal(classifyWorkspace({ activeTab: { type: 'script' }, componentWorkspaceMode: 'surface' }), 'script');
   assert.equal(classifyWorkspace({ activeTab: { type: 'deviceProfile' }, componentWorkspaceMode: 'surface' }), 'device');

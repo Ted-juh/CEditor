@@ -246,6 +246,41 @@ public:
         return scripting::colours::colourFieldAt (control, resolveModelPath (control, split.second)).has_value();
     }
 
+    /** Whether a write to `scriptPath` has to be a number, for BridgeScriptHost to refuse one that
+        is not (setNumber in panelRuntime.js): a range control's own value, a Knob's, a Slider's, a
+        Number's or a Range's, and any control's .normalizedValue where it has a range to map onto.
+        A control bound to a device parameter is not: its binding reads the value, a choice by its
+        name included. A path it cannot place is not its to judge: setValue reports it as it always
+        has. */
+    bool writeNeedsNumber (const juce::String& scriptPath, const juce::String& form) const
+    {
+        const auto split = splitScriptPath (scriptPath);
+        if (isPanelTarget (split.first)) return false;
+        const auto control = findControlByName (split.first);
+        if (! control.isObject()) return false;
+        if (form == "normalizedValue")
+        {
+            double lo = 0.0, hi = 0.0;
+            return rangeOf (control, lo, hi);
+        }
+        auto* behavior = readChildValue (control, "Behavior").getDynamicObject();
+        if (behavior == nullptr || ! behavior->getProperty ("family").toString().trim().equalsIgnoreCase ("range"))
+            return false;
+        // valueBindingFor in panelRuntime.js: an enabled section with a device parameter on "value".
+        if (auto* bindings = readChildValue (control, "DeviceBindings").getDynamicObject())
+            if (! bindings->hasProperty ("enabled") || ! bindings->getProperty ("enabled").isBool()
+                || static_cast<bool> (bindings->getProperty ("enabled")))
+                if (auto* list = bindings->getProperty ("bindings").getArray())
+                    for (const auto& b : *list)
+                        if (b.getProperty ("kind", {}).toString() == "deviceParameter"
+                            && b.getProperty ("parameterId", {}).toString().isNotEmpty()
+                            && (b.getProperty ("port", {}).isVoid() || b.getProperty ("port", {}).toString() == "value"))
+                            return false;
+        // isLiveValuePath in scripting/liveValue.js.
+        const auto path = resolveModelPath (control, split.second).toLowerCase();
+        return path == "value" || path == "value.value" || path.endsWith (".currentvalue");
+    }
+
     /** Whether `scriptPath` names a control the panel does not have, for ce.anim to refuse it as a
         path (animatesNoControl in panelRuntime.js): every tick of the move would be a write set()
         refuses. `panel.*` is the panel document, which is always there. */
@@ -288,6 +323,10 @@ public:
 
     /** Find a control's live var by friendly name (case-insensitive) or id — for event dispatch. */
     juce::var controlByName (const juce::String& name) const { return findControlByName (name); }
+
+    /** Every control in the document, containers included, in document order (forEachControl). */
+    template <typename Fn>
+    void eachControl (Fn&& fn) const { forEachControl (std::forward<Fn> (fn)); }
 
     // ---- path navigation (mirrors controlTreeUtils.js / panelRuntime.js) -------------------------
 
