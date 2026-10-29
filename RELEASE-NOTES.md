@@ -161,6 +161,12 @@ direction: choosing a page sent it, and the synth reporting the same parameter c
 the editor or the exported plug-in. The page now turns, by its number or by a label that names the
 choice, so a panel whose pages are the synth's parts shows the part the synth is on.
 
+**An arpeggio grid can be set to edit a synth's pattern.** Which synth's user pattern a grid reads
+and sends (GAIA SH-01 or SH-201) could only be set by a panel generator. It is on the grid's Device
+tab now, under Arpeggio Pattern, with the End Step binding the transfer needs. It is the copy's own
+setting: it does not make the copy an edited one, an update from the library keeps it, and Save to
+library does not pass it on.
+
 **A shared panel brings its library components.** File → Share Panel carried images, fonts and
 icons, not the library packages its custom components were placed from, so on another computer every
 copy said "Not in this library" until the library file was sent and imported too. The package now

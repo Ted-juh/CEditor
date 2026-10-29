@@ -539,6 +539,15 @@ The dock's **Routes** tool links one control to another: moving the source moves
 chosen amount and curve. A route that ends at a parameter of the synth does not send anything yet —
 bind the target control instead.
 
+### A synth's arpeggio pattern
+
+A custom component with an arpeggiator grid can edit a synth's own user arpeggio pattern. The GAIA
+panel's grid does this: its READ PATTERN and SEND PATTERN zones bring the pattern from the synth and
+write it back. Choose whose pattern on the grid's **Device** tab, under **Arpeggio Pattern**:
+**Roland GAIA SH-01** or **Roland SH-201**. Then bind the grid's **Loop End Step** port to that
+synth's End Step parameter. The pattern is read from and sent to that binding's device. The choice
+belongs to this copy of the grid, not to its library component.
+
 ## 6. Describing a synth: device profiles
 
 A **device profile** is the description of one synth: its parameters, with their names, ranges and

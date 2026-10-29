@@ -17,6 +17,7 @@ export const ARP_PATTERN_LAYOUTS = {
   gaia: {
     kind: 'gaia',
     synth: 'GAIA',
+    label: 'Roland GAIA SH-01',
     lanes: 16,
     steps: 32,
     endStep: 'arp.endStep',
@@ -28,6 +29,7 @@ export const ARP_PATTERN_LAYOUTS = {
   sh201: {
     kind: 'sh201',
     synth: 'SH-201',
+    label: 'Roland SH-201',
     lanes: 16,
     steps: 32,
     endStep: 'arpeggio.endStep',
@@ -51,4 +53,34 @@ export function hasPatternEditing(control) {
  *  before there was a choice — a grid built without the mark still reads and writes a GAIA. */
 export function layoutFor(control) {
   return patternLayoutOf(control) ?? ARP_PATTERN_LAYOUTS.gaia;
+}
+
+/** A custom component with an arpeggiator grid: the only kind a pattern layout means anything on. */
+export function isPatternGrid(control) {
+  return control?._children?.Core?.controlType === 'CustomComponent'
+    && control?._children?.Designer?.arpeggiator?.enabled === true;
+}
+
+/**
+ * What the Device tab shows for a grid: which synth's pattern it edits, the choices, and whether
+ * the one thing a pattern read needs from the panel is there — a binding of the synth's End Step,
+ * whose device role is the device Read Pattern and Send Pattern talk to.
+ */
+export function patternEditingChoice(control) {
+  if (!isPatternGrid(control)) return null;
+  const layout = patternLayoutOf(control);
+  const binding = layout
+    ? (control._children.DeviceBindings?.bindings ?? []).find((entry) => entry?.parameterId === layout.endStep) ?? null
+    : null;
+  return {
+    kind: layout?.kind ?? '',
+    options: [{ kind: '', label: 'None' }, ...Object.values(ARP_PATTERN_LAYOUTS).map(({ kind, label }) => ({ kind, label }))],
+    endStep: layout?.endStep ?? '',
+    deviceRole: binding?.deviceRole ?? '',
+  };
+}
+
+/** The change that marks a grid for a synth's pattern, or clears the mark ('' or an unknown kind). */
+export function patternEditingPatch(kind) {
+  return { 'Designer.patternEditing': ARP_PATTERN_LAYOUTS[kind] ? { kind, mode: 'manual' } : null };
 }

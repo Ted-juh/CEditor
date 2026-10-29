@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty } from '../stores/controls.js';
+  import { applyControlPatch, getSection, updateControlProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { getBindableComponentPorts } from '../models/componentPorts.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -8,6 +8,8 @@
   import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import Plug from 'lucide-svelte/icons/plug';
   import Link2 from 'lucide-svelte/icons/link-2';
+  import Music from 'lucide-svelte/icons/music';
+  import { patternEditingChoice, patternEditingPatch } from '../utils/arpPatternLayouts.js';
   import { MIDI_CONTROL_KIND, MIDI_CONTROL_MESSAGES, midiControlBindingFrom, midiControlLabel, isMidiControlBinding, canSendMidiControl } from '../utils/midiControlBindings.js';
   import { deviceRoleMappings, midiDestinations, latestMidiInputMessage } from '../stores/deviceProfiles.js';
   import { previewModeEnabled } from '../stores/interactionPreview.js';
@@ -24,6 +26,16 @@
   let bindings = $derived(Array.isArray(deviceBindings?.bindings) ? deviceBindings.bindings : []);
 
   let selectedIndex = $state(0);
+
+  // An arpeggiator grid edits a synth's user pattern only when it is marked for that synth's
+  // layout. The mark used to be settable by a generator alone; this is where an author sets it.
+  let patternChoice = $derived(patternEditingChoice(control));
+  let patternStatus = $derived.by(() => {
+    if (!patternChoice) return '';
+    if (!patternChoice.kind) return 'Not a synth\'s pattern: the grid plays and edits on its own.';
+    if (patternChoice.deviceRole) return `Loop End Step is bound to ${patternChoice.endStep} on ${patternChoice.deviceRole}: Read Pattern and Send Pattern talk to it.`;
+    return `Bind the Loop End Step port to ${patternChoice.endStep} (Add, then Port: Loop End Step). Its device is the one Read Pattern and Send Pattern talk to.`;
+  });
 
   let selectedBinding = $derived(bindings[selectedIndex] ?? null);
   let bindingRole = $derived(selectedBinding?.deviceRole || DEFAULT_DEVICE_ROLE);
@@ -220,6 +232,21 @@
       </div>
     </PropertyCell>
   </PropertySection>
+
+  {#if patternChoice}
+    <PropertySection title="Arpeggio Pattern" icon={Music}>
+      <PropertyCell label="Synth" span={2} hint="Whose user arpeggio pattern this grid reads and sends. Read Pattern, Send Pattern and the readback status use that synth's parameters and requests. A per-copy setting: it does not change the library component.">
+        <select class="val" value={patternChoice.kind} onchange={(e) => applyControlPatch(core.id, patternEditingPatch(e.target.value))}>
+          {#each patternChoice.options as option (option.kind)}
+            <option value={option.kind}>{option.label}</option>
+          {/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Device" span={2} hint="Which device the pattern is read from and sent to.">
+        <div class="binding-status" role="status">{patternStatus}</div>
+      </PropertyCell>
+    </PropertySection>
+  {/if}
 
   {#if bindings.length > 0}
     <PropertySection title="Selected Binding" icon={Link2}>
