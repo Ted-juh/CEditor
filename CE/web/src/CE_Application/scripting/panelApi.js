@@ -46,6 +46,7 @@ import { ANIM_CURVE_NAMES } from './easingTables.js';
 // The two vocabularies a component verb's enum may be, so its argument can say which (verbValueTyping).
 import { DIVISION_NAMES } from './timeTables.js';
 import { SCALE_NAMES } from './musicTheory.js';
+import { controlsInTree } from './scriptPanelExport.js';
 
 /** `"a", "b" or "c"` from a table, for a summary that names the values a verb accepts.
  *
@@ -5541,11 +5542,12 @@ export function modulesUsedBy(source) {
   return [...result];
 }
 
-/** The scripts a panel ships, flattened — panel-level plus per-control. Sources only. */
+/** The scripts a panel ships, flattened — panel-level plus per-control, a container's children
+ *  included (controlsInTree). Sources only. */
 function panelScriptSources(panel) {
   const out = [];
   for (const s of panel?.scripts ?? []) if (typeof s?.source === 'string') out.push(s.source);
-  for (const control of panel?.controls ?? []) {
+  for (const control of controlsInTree(panel?.controls)) {
     for (const s of control?._children?.Scripts?.scripts ?? []) {
       if (typeof s?.source === 'string') out.push(s.source);
     }

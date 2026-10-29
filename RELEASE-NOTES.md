@@ -146,6 +146,10 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
   explorer. The LCD Display's verbs say what each setting is: the scrolling speed in characters
   per second, the blink period in milliseconds, the value the {value}, {pct} and {bar} tokens show.
 
+**A script on a control inside a container now runs in the exported plug-in.** It ran in the
+editor and was left out of the plug-in: not loaded, its modules not built in, its TypeScript not
+compiled. Scripts on top-level controls and panel scripts were never affected.
+
 ## What you get
 
 - **A first-panel walkthrough** in Help, with binding status explaining missing MIDI settings,

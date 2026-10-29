@@ -1,6 +1,7 @@
 #pragma once
 
 #include <juce_core/juce_core.h>
+#include <functional>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -1164,18 +1165,30 @@ inline juce::var gatherPanelScripts (const juce::var& panelDoc)
         for (const auto& s : *arr)
             if (isEnabled (s) && isSourceScript (s)) out.add (withDefaults (s, "panel", {}));
 
+    // Every control in the tree, in document order with a container before its children — the walk
+    // forEachControl makes. A container's children live in its `Children._children` map, not in
+    // `controls`, and reading only the top level left the script of any control inside a container
+    // out of the plug-in.
+    std::function<void (const juce::var&)> addControlScripts = [&] (const juce::var& c)
+    {
+        if (! c.isObject()) return;
+        const auto core = PanelValueModel::readChildValue (c, "Core");
+        const auto cid  = core.getDynamicObject() != nullptr ? core.getDynamicObject()->getProperty ("id").toString() : juce::String();
+        if (auto* scriptsSection = PanelValueModel::readChildValue (c, "Scripts").getDynamicObject())
+            if (! scriptsSection->hasProperty ("enabled") || (bool) scriptsSection->getProperty ("enabled"))
+                if (auto* cs = scriptsSection->getProperty ("scripts").getArray())
+                    for (const auto& s : *cs)
+                        if (isEnabled (s) && isSourceScript (s)) out.add (withDefaults (s, "component", cid));
+
+        if (auto* kids = PanelValueModel::readChildValue (c, "Children").getDynamicObject())
+            if (auto* nested = kids->getProperty ("_children").getDynamicObject())
+                for (const auto& prop : nested->getProperties())
+                    addControlScripts (prop.value);
+    };
+
     if (auto* controls = doc->getProperty ("controls").getArray())
         for (const auto& c : *controls)
-        {
-            const auto core = PanelValueModel::readChildValue (c, "Core");
-            const auto cid  = core.getDynamicObject() != nullptr ? core.getDynamicObject()->getProperty ("id").toString() : juce::String();
-            auto* scriptsSection = PanelValueModel::readChildValue (c, "Scripts").getDynamicObject();
-            if (scriptsSection == nullptr) continue;
-            if (scriptsSection->hasProperty ("enabled") && ! (bool) scriptsSection->getProperty ("enabled")) continue;
-            if (auto* cs = scriptsSection->getProperty ("scripts").getArray())
-                for (const auto& s : *cs)
-                    if (isEnabled (s) && isSourceScript (s)) out.add (withDefaults (s, "component", cid));
-        }
+            addControlScripts (c);
 
     return juce::var (out);
 }
