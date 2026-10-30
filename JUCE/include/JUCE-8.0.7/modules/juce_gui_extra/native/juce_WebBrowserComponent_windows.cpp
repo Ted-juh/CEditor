@@ -593,6 +593,29 @@ public:
             webView->Reload();
     }
 
+    // CEditor: JUCE/VENDORED.md, patch 10. A webview whose host sets its zoom has none of its own:
+    // Ctrl+wheel and Ctrl+plus/minus no longer zoom its page. Kept for a controller that does not
+    // exist yet, and applied by setWebViewPreferences when it does.
+    void setZoomFactor (double factor) override
+    {
+        zoomFactor = factor;
+        applyHostZoom();
+    }
+
+    void applyHostZoom()
+    {
+        if (! zoomFactor.has_value() || webView == nullptr || webViewController == nullptr)
+            return;
+
+        ComSmartPtr<ICoreWebView2Settings> settings;
+        webView->get_Settings (settings.resetAndGetPointerAddress());
+
+        if (settings != nullptr)
+            settings->put_IsZoomControlEnabled (FALSE);
+
+        webViewController->put_ZoomFactor (*zoomFactor);
+    }
+
     void setWebViewSize (int width, int height) override
     {
         setSize (width, height);
@@ -1050,6 +1073,8 @@ private:
                 settings4->put_IsPasswordAutosaveEnabled (FALSE);
             }
         }
+
+        applyHostZoom(); // CEditor, patch 10
     }
 
     void createWebView()
@@ -1227,6 +1252,7 @@ private:
                            webMessageReceivedToken   { 0 };
 
     bool inMoveFocusRequested = false;
+    std::optional<double> zoomFactor; // CEditor, patch 10: set once the host sets the zoom
 
     struct URLRequest
     {

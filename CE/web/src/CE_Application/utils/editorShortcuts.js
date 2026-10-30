@@ -40,6 +40,20 @@ function bracketOf(e) {
  * selection exists, the panel is unlocked, the control is not locked — stays in
  * the dispatcher, where the order of those guards is itself load-bearing.
  */
+/**
+ * The canvas zoom chord `e` is, or null: 'zoom-in', 'zoom-out' or 'fit-to-window'.
+ *
+ * App.svelte asks this of every key, wherever focus is. The rest of this table only applies while
+ * focus is in the canvas, the tree or the page body; these three would otherwise reach the browser
+ * engine from the dock, the properties panel or a text field, and zoom the whole interface.
+ */
+export function canvasZoomCommand(e) {
+  for (const id of ['zoom-in', 'zoom-out', 'fit-to-window']) {
+    if (EDITOR_SHORTCUTS.find((row) => row.id === id).match(e)) return id;
+  }
+  return null;
+}
+
 export const EDITOR_SHORTCUTS = [
   // --- View ---
   { id: 'zoom-in', section: 'View', keys: 'Ctrl++', description: 'Zoom In',

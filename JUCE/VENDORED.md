@@ -11,7 +11,7 @@ corruption. `.gitignore` now has an explicit exception and
 
 ## Local modifications
 
-Upstream JUCE is otherwise untouched. There are exactly nine patches, and they are listed here because a
+Upstream JUCE is otherwise untouched. There are exactly ten patches, and they are listed here because a
 patch inside a vendored tree is invisible in a diff against upstream and dies silently the day
 somebody drops in a new JUCE.
 
@@ -262,3 +262,31 @@ pages' own garbage, and the low target does not touch that.
 **If you upgrade JUCE:** if `setWebViewPreferences` is still there, re-apply the hunk; if JUCE grows
 options for these, use them instead.
 
+### 10. Windows WebView2: the page's size is the editor's, not Ctrl+wheel's
+
+**Files:** `include/JUCE-8.0.7/modules/juce_gui_extra/misc/juce_WebBrowserComponent.h` and `.cpp`
+(`WebBrowserComponent::setZoomFactor`, and a `setZoomFactor` on the platform interface that does
+nothing by default), and `native/juce_WebBrowserComponent_windows.cpp` (`WebView2::setZoomFactor`,
+`WebView2::applyHostZoom`, its call at the end of `WebView2::setWebViewPreferences`, and the
+`zoomFactor` member).
+
+**Guard:** none. Off Windows `setZoomFactor` does nothing, and a webview whose host never calls it
+is stock JUCE.
+
+**Pinned by:** `CE/web/test/vendoredJucePatches.test.js`.
+
+**What it does.** Lets the host set the page's `ZoomFactor`, and switches WebView2's own zoom off
+(`put_IsZoomControlEnabled (FALSE)`) in a webview whose host does that. WebView2 zoomed the whole
+page on any Ctrl+wheel or Ctrl+plus/minus the page did not take itself: over the dock or the
+properties panel, Ctrl+scroll scaled the entire editor, canvas included, by accident and with nothing
+on screen to say so. The editor's page now takes those for its canvas, and the interface size is a
+setting (Settings → General → Interface Size) that `WebViewHost` passes to `setZoomFactor`. A factor
+asked for before the controller exists is kept and applied by `setWebViewPreferences`. Only the
+editor's window calls it, so the manual's own window keeps Ctrl+scroll for reading.
+
+A CSS `zoom` on the page would have needed no patch, and was measured first: at 125% a dragged
+control moved 125 pixels for 100 of the pointer, because the canvas mixes pointer positions with
+element sizes and CSS zoom puts those in different units. The engine's zoom keeps them in one.
+
+**If you upgrade JUCE:** if `setWebViewPreferences` is still there, re-apply `applyHostZoom` and its
+call; if JUCE grows a zoom call, use it and drop `setZoomFactor`.

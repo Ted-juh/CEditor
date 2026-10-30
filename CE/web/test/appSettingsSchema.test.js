@@ -30,6 +30,14 @@ test('a component file is imported when chosen only when the setting says so', (
   assert.equal(normalizeGeneralSettings({ importComponentFileAtOnce: true }).importComponentFileAtOnce, true);
 });
 
+test('the interface size is one of the sizes Settings offers, 100% otherwise', () => {
+  assert.equal(normalizeGeneralSettings({}).interfaceZoom, 100);
+  assert.equal(normalizeGeneralSettings({ interfaceZoom: 125 }).interfaceZoom, 125);
+  assert.equal(normalizeGeneralSettings({ interfaceZoom: '150' }).interfaceZoom, 150, 'a select hands back text');
+  assert.equal(normalizeGeneralSettings({ interfaceZoom: 133 }).interfaceZoom, 100, 'not a size on offer');
+  assert.equal(normalizeGeneralSettings({ interfaceZoom: 5 }).interfaceZoom, 100);
+});
+
 test('normalizeSettings filters invalid assets', () => {
   const normalized = normalizeSettings({
     general: {},

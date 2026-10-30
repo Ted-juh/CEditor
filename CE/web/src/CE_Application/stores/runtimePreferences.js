@@ -1,4 +1,5 @@
 import { writable } from 'svelte/store';
+import { normalizeInterfaceZoom } from '../utils/pageZoomGuard.js';
 
 export const DEFAULT_GENERAL_SETTINGS = {
   reopenLastSession: true,
@@ -31,6 +32,10 @@ export const DEFAULT_GENERAL_SETTINGS = {
   // it as soon as it is chosen; the owner pressed File, saw the packages listed, and took them for
   // imported.
   importComponentFileAtOnce: false,
+  // The size of the whole interface, in percent (utils/pageZoomGuard.js INTERFACE_ZOOM_CHOICES).
+  // It was the browser engine's Ctrl+wheel zoom, which took any Ctrl+wheel the canvas did not;
+  // that is off, and this is where the size is set. The canvas's own zoom is on top of it.
+  interfaceZoom: 100,
   // Visual language assigned to newly created panels. Kept as an id so a built-in can be
   // selected without copying its full definition into the application settings file. The designed
   // Graphite (models/controlSets.js NEW_PANEL_CONTROL_SET_ID; written out so this module stays free
@@ -94,6 +99,7 @@ export const duplicateOffset = writable(DEFAULT_GENERAL_SETTINGS.duplicateOffset
 export const keyboardNudgeSmall = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeSmall);
 export const keyboardNudgeLarge = writable(DEFAULT_GENERAL_SETTINGS.keyboardNudgeLarge);
 export const importComponentFileAtOnce = writable(DEFAULT_GENERAL_SETTINGS.importComponentFileAtOnce);
+export const interfaceZoom = writable(DEFAULT_GENERAL_SETTINGS.interfaceZoom);
 export const defaultControlSetId = writable(DEFAULT_GENERAL_SETTINGS.defaultControlSetId);
 export const exportVendor = writable(DEFAULT_GENERAL_SETTINGS.exportVendor);
 export const exportManufacturerCode = writable(DEFAULT_GENERAL_SETTINGS.exportManufacturerCode);
@@ -120,6 +126,7 @@ export function applyGeneralSettingsToRuntime(settings) {
   keyboardNudgeSmall.set(settings.keyboardNudgeSmall);
   keyboardNudgeLarge.set(settings.keyboardNudgeLarge);
   importComponentFileAtOnce.set(settings.importComponentFileAtOnce === true);
+  interfaceZoom.set(normalizeInterfaceZoom(settings.interfaceZoom));
   defaultControlSetId.set(settings.defaultControlSetId ?? DEFAULT_GENERAL_SETTINGS.defaultControlSetId);
   exportVendor.set(settings.exportVendor ?? '');
   exportManufacturerCode.set(normalizeManufacturerCode(settings.exportManufacturerCode));

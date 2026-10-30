@@ -245,6 +245,11 @@ Zoom with **Ctrl++** and **Ctrl+-**, or **Ctrl+scroll wheel** to zoom where the 
 fits the whole panel in the window. The scroll wheel scrolls; **Shift+wheel** scrolls sideways. Hold
 **Space** and drag, or drag with the middle mouse button, to move around.
 
+The zoom keys zoom the canvas wherever you are, even while typing in a field. **Ctrl+scroll wheel**
+zooms only the canvas, the Viewer and the Component Designer, whichever is under the pointer;
+anywhere else it does nothing. The size of the whole window's contents, menus and panels included, is
+**Settings → General → Interface Size**, and the canvas's zoom works on top of it.
+
 ### Copying, duplicating and deleting
 
 **Ctrl+C**, **Ctrl+X** and **Ctrl+V** copy, cut and paste within CEditor (not to other programs).
@@ -977,7 +982,8 @@ every change.
 Open **File → Settings...** (Ctrl+,). Changes apply straight away. There are six pages:
 
 - **General** — what happens at start-up (**Reopen Last Session**, **Restore Unsaved Work**, **Check for
-  Updates on Startup**, off by default), autosave, the grid for new panels, what the canvas shows
+  Updates on Startup**, off by default), autosave, the **Interface Size** (80% to 200%; the size of
+  everything in the window, canvas included), the grid for new panels, what the canvas shows
   (rulers, guides, distances), and editing distances: how far a pasted or duplicated control is
   offset, and how far the arrow keys move a control (1 pixel, or 10 with Shift).
 - **Control Sets** — the ready-made looks for controls: the default for new panels, the built-in sets,

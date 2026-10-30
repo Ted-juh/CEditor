@@ -249,3 +249,36 @@ test('a panel in a Windows webview has no autofill, and a hidden one is left to 
   assert.ok(!visibleBody.includes('MemoryUsageTargetLevel'), 'the low memory target came out (VENDORED.md, patch 9)');
   assert.match(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8'), /### 9\. Windows WebView2: no autofill in a panel/);
 });
+
+test('the editor sets the size of a Windows webview page, and Ctrl+wheel does not', () => {
+  // Patch 10: WebView2 zoomed the whole page on any Ctrl+wheel or Ctrl+plus/minus the page did not
+  // take itself, by accident and with nothing on screen to say so. The editor's window sets its
+  // size through setZoomFactor, which JUCE has no call for, and a webview whose host does that has
+  // no zoom of its own.
+  const gui = 'JUCE/include/JUCE-8.0.7/modules/juce_gui_extra';
+  const header = readFileSync(join(repoRoot, gui, 'misc/juce_WebBrowserComponent.h'), 'utf8');
+  const common = readFileSync(join(repoRoot, gui, 'misc/juce_WebBrowserComponent.cpp'), 'utf8');
+  const windows = readFileSync(join(repoRoot, gui, 'native/juce_WebBrowserComponent_windows.cpp'), 'utf8');
+  assert.ok(header.includes('void setZoomFactor (double factor);'), `WebBrowserComponent::setZoomFactor is gone. ${REAPPLY}`);
+  assert.ok(common.includes('virtual void setZoomFactor (double) {}'), `the platform's default is gone. ${REAPPLY}`);
+  assert.match(common, /void WebBrowserComponent::setZoomFactor \(double factor\)\s*\{\s*impl->setZoomFactor \(factor\);/);
+
+  const webView2 = windows.slice(windows.indexOf('class WebBrowserComponent::Impl::Platform::WebView2 final'));
+  assert.match(webView2, /void setZoomFactor \(double factor\) override\s*\{\s*zoomFactor = factor;\s*applyHostZoom\(\);/,
+    `WebView2 no longer takes the host's zoom. ${REAPPLY}`);
+  const apply = webView2.slice(webView2.indexOf('void applyHostZoom()'));
+  const applyBody = apply.slice(0, apply.indexOf('\n    }\n'));
+  // Only a webview whose host sets the zoom loses the engine's own: the manual's window keeps it.
+  assert.match(applyBody, /if \(! zoomFactor\.has_value\(\)/, `every webview lost its own zoom. ${REAPPLY}`);
+  assert.ok(applyBody.includes('settings->put_IsZoomControlEnabled (FALSE);'), `the engine's zoom is on again under the host's. ${REAPPLY}`);
+  assert.ok(applyBody.includes('webViewController->put_ZoomFactor (*zoomFactor);'), `WebView2 no longer sets its ZoomFactor. ${REAPPLY}`);
+  const preferences = webView2.slice(webView2.indexOf('void setWebViewPreferences()'));
+  const preferencesBody = preferences.slice(0, preferences.indexOf('void createWebView()'));
+  assert.ok(preferencesBody.includes('applyHostZoom();'),
+    `a size asked for before the controller existed is no longer applied when it does. ${REAPPLY}`);
+  assert.match(readFileSync(join(repoRoot, 'JUCE/VENDORED.md'), 'utf8'), /### 10\. Windows WebView2: the page's size is the editor's, not Ctrl\+wheel's/);
+
+  const host = readFileSync(join(repoRoot, 'CE/src/WebViewHost.cpp'), 'utf8');
+  assert.match(host, /withEventListener \("setInterfaceZoom"[\s\S]{0,500}webView->setZoomFactor \(factor\)/,
+    'the editor window no longer passes the interface size to its webview');
+});

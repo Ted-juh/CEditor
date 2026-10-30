@@ -446,6 +446,18 @@ WebViewHost::WebViewHost (AppSettings* settings)
         });
     });
 
+    // The interface size, Settings → General. The page sends it when it has read its settings and
+    // whenever it changes; WebView2's own Ctrl+wheel zoom is off (JUCE/VENDORED.md, patch 10).
+    options = options.withEventListener ("setInterfaceZoom", [safeThis] (const juce::var& payload)
+    {
+        const auto factor = juce::jlimit (0.5, 2.0, payload.isObject() ? (double) payload.getProperty ("factor", 1.0) : 1.0);
+        juce::MessageManager::callAsync ([safeThis, factor]
+        {
+            if (safeThis != nullptr && safeThis->webView != nullptr)
+                safeThis->webView->setZoomFactor (factor);
+        });
+    });
+
     if (! juce::WebBrowserComponent::areOptionsSupported (options))
     {
         showStatusMessage ("WebView2 Runtime Unavailable", makeMissingWebView2Message());

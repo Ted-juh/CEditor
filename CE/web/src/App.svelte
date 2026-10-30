@@ -31,6 +31,10 @@
   import { previewModeEnabled } from './CE_Application/stores/interactionPreview.js';
   import { handleEditorShortcut } from './CE_Application/utils/editorShortcuts.js';
   import { isEditableTarget, resolveGlobalShortcut } from './CE_Application/utils/globalShortcuts.js';
+  import { canvasZoomCommand } from './CE_Application/utils/editorShortcuts.js';
+  import { installPageZoomGuard } from './CE_Application/utils/pageZoomGuard.js';
+  import { interfaceZoom } from './CE_Application/stores/runtimePreferences.js';
+  import { setInterfaceZoom } from './CE_Application/bridge/bridge.js';
   import { isEditorShortcutFocus } from './CE_Application/utils/editorShortcutFocus.js';
   import { initScriptWorkspaceBridge } from './CE_Application/stores/scriptWorkspace.js';
   import { initAppSettingsBridge } from './CE_Application/stores/appSettings.js';
@@ -129,6 +133,21 @@
         case 'undo': undo(); break;
         case 'redo': redo(); break;
       }
+      return;
+    }
+
+    // Ctrl+plus, Ctrl+minus and Ctrl+0 are the canvas's zoom wherever focus is: in the dock, the
+    // properties panel or a text field they used to reach the browser engine, which zoomed the
+    // whole interface instead. The canvas wrapper takes them itself when it has focus
+    // (defaultPrevented). The Component Designer's surface is not the canvas; there they only
+    // stay away from the engine.
+    const zoomCommand = e.defaultPrevented ? null : canvasZoomCommand(e);
+    if (zoomCommand) {
+      e.preventDefault();
+      if ($componentWorkspaceMode === 'surface') return;
+      if (zoomCommand === 'zoom-in') requestZoomStep(1);
+      else if (zoomCommand === 'zoom-out') requestZoomStep(-1);
+      else requestFitToWindow();
       return;
     }
 
@@ -381,7 +400,11 @@
     const updateTimer = setTimeout(() => runStartupUpdateCheck(), 4000);
     // The manual's own window asks, through the native side, to go back into a tab.
     const offDocumentationDocked = installDocumentationWindowEvents();
-    return () => { clearTimeout(updateTimer); offDocumentationDocked(); };
+    // Ctrl+wheel zooms the view under the cursor that zooms, never the whole interface; its size is
+    // Settings → General → Interface Size, sent to the native page zoom whenever it changes.
+    const offPageZoomGuard = installPageZoomGuard(window);
+    const offInterfaceZoom = interfaceZoom.subscribe((percent) => setInterfaceZoom(percent));
+    return () => { clearTimeout(updateTimer); offDocumentationDocked(); offPageZoomGuard(); offInterfaceZoom(); };
   });
 
 </script>

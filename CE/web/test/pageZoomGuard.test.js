@@ -1,0 +1,82 @@
+// pageZoomGuard.test.js — Ctrl+scroll and the zoom keys zoom the canvas, never the whole interface.
+//
+// The browser engine zoomed the whole page on any Ctrl+wheel or Ctrl+plus/minus/0 the page did not
+// take itself: over the dock or the properties panel, Ctrl+scroll scaled everything, canvas
+// included, with nothing on screen to say so. The canvas only takes them while it has the pointer
+// or focus. Now the page cancels the engine's zoom everywhere, the zoom keys mean the canvas
+// wherever focus is, and the size of the interface is a setting the native side applies.
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+
+import { blockPageZoom, installPageZoomGuard, INTERFACE_ZOOM_CHOICES, normalizeInterfaceZoom } from '../src/CE_Application/utils/pageZoomGuard.js';
+import { canvasZoomCommand } from '../src/CE_Application/utils/editorShortcuts.js';
+
+const here = dirname(fileURLToPath(import.meta.url));
+const src = (path) => readFileSync(join(here, '..', 'src', path), 'utf8');
+
+function wheel(init = {}) {
+  return { ctrlKey: false, metaKey: false, defaultPrevented: false, ...init, preventDefault() { this.defaultPrevented = true; } };
+}
+
+test('a Ctrl+wheel is kept from the engine, a plain wheel is not', () => {
+  for (const init of [{ ctrlKey: true }, { metaKey: true }]) {
+    const e = wheel(init);
+    blockPageZoom(e);
+    assert.equal(e.defaultPrevented, true, JSON.stringify(init));
+  }
+  const plain = wheel();
+  blockPageZoom(plain);
+  assert.equal(plain.defaultPrevented, false, 'a plain wheel still scrolls');
+});
+
+test('the guard listens on the window, not passively, so it can cancel the engine zoom', () => {
+  const added = [];
+  const removed = [];
+  const target = {
+    addEventListener: (...args) => added.push(args),
+    removeEventListener: (...args) => removed.push(args),
+  };
+  const off = installPageZoomGuard(target);
+  assert.deepEqual(added, [['wheel', blockPageZoom, { passive: false }]]);
+  off();
+  assert.equal(removed.length, 1);
+  assert.equal(removed[0][1], blockPageZoom);
+});
+
+test('the zoom keys are recognised as the canvas zoom', () => {
+  const key = (k, extra = {}) => ({ key: k, ctrlKey: true, metaKey: false, shiftKey: false, altKey: false, ...extra });
+  assert.equal(canvasZoomCommand(key('=')), 'zoom-in');
+  assert.equal(canvasZoomCommand(key('+', { shiftKey: true })), 'zoom-in', 'Ctrl+Shift+= types a plus');
+  assert.equal(canvasZoomCommand(key('-')), 'zoom-out');
+  assert.equal(canvasZoomCommand(key('0')), 'fit-to-window');
+  assert.equal(canvasZoomCommand(key('0', { ctrlKey: false })), null, 'a plain 0 is typing');
+  assert.equal(canvasZoomCommand(key('1')), null, 'Ctrl+1 is a tab');
+});
+
+test('the interface sizes on offer include 100%, and anything else reads as 100%', () => {
+  assert.ok(INTERFACE_ZOOM_CHOICES.includes(100));
+  assert.deepEqual([...INTERFACE_ZOOM_CHOICES].sort((a, b) => a - b), INTERFACE_ZOOM_CHOICES, 'smallest first');
+  assert.equal(normalizeInterfaceZoom('125'), 125);
+  assert.equal(normalizeInterfaceZoom(undefined), 100);
+  assert.equal(normalizeInterfaceZoom(Number.NaN), 100);
+});
+
+test('the app installs the guard, takes the zoom keys wherever focus is, and sends the size on', () => {
+  const app = src('App.svelte');
+  assert.match(app, /const offPageZoomGuard = installPageZoomGuard\(window\);/);
+  assert.match(app, /interfaceZoom\.subscribe\(\(percent\) => setInterfaceZoom\(percent\)\)/);
+  // Before the editor fallback, which only runs while focus is in the canvas, the tree or the page.
+  const keys = app.slice(app.indexOf('function handleGlobalKeyDown'));
+  const zoom = keys.indexOf('canvasZoomCommand(e)');
+  const fallback = keys.indexOf('isEditorShortcutFocus(e.target');
+  assert.ok(zoom > 0 && zoom < fallback, 'the zoom keys are taken before the focus test that left them to the engine');
+  assert.match(keys, /const zoomCommand = e\.defaultPrevented \? null : canvasZoomCommand\(e\);/,
+    'the canvas wrapper takes them itself when it has focus; taking them again zooms twice');
+
+  const bridge = src('CE_Application/bridge/bridge.js');
+  assert.match(bridge, /emitEvent\('setInterfaceZoom', \{ factor: Number\(percent\) \/ 100 \}\)/);
+});

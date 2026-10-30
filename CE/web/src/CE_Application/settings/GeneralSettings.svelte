@@ -5,6 +5,7 @@
   import { registerGeneralSettingsHistory } from './generalSettingsHistory.js';
   import NumberCell from '../properties/NumberCell.svelte';
   import { normalizeManufacturerCode } from '../stores/runtimePreferences.js';
+  import { INTERFACE_ZOOM_CHOICES } from '../utils/pageZoomGuard.js';
 
   let general = $derived($generalSettings);
 
@@ -133,6 +134,28 @@
         />
       </div>
     </div>
+  </section>
+
+  <section class="settings-card">
+    <div class="card-head">
+      <h2>Interface</h2>
+      <p>The size of this window's contents.</p>
+    </div>
+
+    <label class="setting-row">
+      <div class="setting-copy">
+        <strong>Interface Size</strong>
+        <span>Menus, docks, the properties panel and the canvas with them. The canvas's own zoom, in
+          the bottom bar, works on top of this. Ctrl+scroll does not change it: over the canvas it
+          zooms the canvas, elsewhere it does nothing.</span>
+      </div>
+      <select class="text-setting short" value={String(general.interfaceZoom ?? 100)}
+              onchange={(event) => setNumber('interfaceZoom', Number(event.target.value))}>
+        {#each INTERFACE_ZOOM_CHOICES as percent (percent)}
+          <option value={String(percent)}>{percent}%</option>
+        {/each}
+      </select>
+    </label>
   </section>
 
   <section class="settings-card">

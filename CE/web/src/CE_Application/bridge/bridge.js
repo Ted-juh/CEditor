@@ -94,6 +94,15 @@ export function openPanel() {
   window.__JUCE__.backend.emitEvent('openPanel', {});
 }
 
+/**
+ * The interface size, Settings → General, in percent. WebViewHost sets the window's page zoom from
+ * it (WebView2's ZoomFactor, JUCE/VENDORED.md patch 10); the engine's own Ctrl+wheel zoom is off.
+ */
+export function setInterfaceZoom(percent) {
+  if (!isJuceAvailable()) return;
+  window.__JUCE__.backend.emitEvent('setInterfaceZoom', { factor: Number(percent) / 100 });
+}
+
 /** Open a specific panel file by path (used for session restore). */
 export function openPanelFile(filePath) {
   if (!isJuceAvailable()) return;

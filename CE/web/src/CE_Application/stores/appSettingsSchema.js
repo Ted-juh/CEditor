@@ -1,4 +1,5 @@
 import { DEFAULT_GENERAL_SETTINGS, normalizeManufacturerCode } from './runtimePreferences.js';
+import { normalizeInterfaceZoom } from '../utils/pageZoomGuard.js';
 import { DEFAULT_DEVICE_ROLE } from './deviceConstants.js';
 
 const BUILTIN_FONTS = [
@@ -365,6 +366,7 @@ export function normalizeGeneralSettings(general) {
       200
     ),
     importComponentFileAtOnce: general?.importComponentFileAtOnce === true,
+    interfaceZoom: normalizeInterfaceZoom(general?.interfaceZoom),
     keyboardNudgeLarge: clampInteger(
       general?.keyboardNudgeLarge,
       DEFAULT_GENERAL_SETTINGS.keyboardNudgeLarge,

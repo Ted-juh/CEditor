@@ -459,6 +459,11 @@ public:
         platform->refresh();
     }
 
+    void setZoomFactor (double factor)
+    {
+        platform->setZoomFactor (factor);
+    }
+
     void evaluateJavascript (const String& script, EvaluationCallback callback)
     {
         platform->evaluateJavascript (script, std::move (callback));
@@ -504,6 +509,7 @@ private:
 
         virtual void focusGainedWithDirection (FocusChangeType, FocusChangeDirection) {}
         virtual void fallbackPaint (Graphics&) {}
+        virtual void setZoomFactor (double) {} // CEditor, patch 10
     };
 
     static void makeFunctionsProviderIfNecessary (std::optional<NativeFunctionsProvider>& provider,
@@ -678,6 +684,11 @@ void WebBrowserComponent::goForward()
 void WebBrowserComponent::refresh()
 {
     impl->refresh();
+}
+
+void WebBrowserComponent::setZoomFactor (double factor)
+{
+    impl->setZoomFactor (factor);
 }
 
 void WebBrowserComponent::paint (Graphics& g)

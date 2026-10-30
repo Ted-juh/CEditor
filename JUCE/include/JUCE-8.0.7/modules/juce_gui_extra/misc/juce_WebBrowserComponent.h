@@ -486,6 +486,10 @@ public:
     /** Refreshes the browser. */
     void refresh();
 
+    /** CEditor (JUCE/VENDORED.md, patch 10): the page's zoom, 1.0 being 100%, as the browser's own
+        Ctrl+wheel would set it. WebView2 only; elsewhere it does nothing. */
+    void setZoomFactor (double factor);
+
     /** Clear cookies that the OS has stored for the WebComponents of this application */
     static void clearCookies();
 
