@@ -67,8 +67,13 @@ test('the bundle is not so large it becomes the reason the app is slow to start'
   // first opens. The scripting manual gave every component command a full entry at the owner's
   // word (2026-10-25, the LCD's review, item 12), which took the bundle from about 470 KB to about
   // 780 KB. A limit that catches growth by an order of magnitude, not one meant to be met.
+  //
+  // It was 1,000,000 characters until the SH-201 merge (3a5e1a11) took the bundle from 992,849 to
+  // 1,002,169 with release notes and a manual paragraph: ordinary growth meeting a round number,
+  // not the runaway this is for. 778,349 of it is the scripting manual. The limit is now half as
+  // much again; a jump past it is still worth a look at what got into the bundle.
   const bytes = HELP_DOCS.reduce((sum, doc) => sum + doc.text.length, 0);
-  assert.ok(bytes < 1_000_000, `the help bundle is ${(bytes / 1024).toFixed(0)} KB`);
+  assert.ok(bytes < 1_500_000, `the help bundle is ${(bytes / 1024).toFixed(0)} KB`);
 });
 
 // --- search ---------------------------------------------------------------------------------
