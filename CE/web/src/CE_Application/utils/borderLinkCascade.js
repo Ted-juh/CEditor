@@ -13,6 +13,18 @@
 export const SIDES = ['top', 'right', 'bottom', 'left'];
 export const CORNERS = ['topLeft', 'topRight', 'bottomLeft', 'bottomRight'];
 
+/**
+ * The corner switches that go with a linked border's own on/off, as props under Corners.
+ *
+ * A corner's arc is drawn by its own `borderEnabled`, whatever the border's `enabled` says, so a
+ * linked border switched off from one of its sides kept four rounded corners on every section:
+ * the owner had to click each corner as well. Both the linked value and each corner's own are
+ * listed, so the corners read as switched however their `linked` flag is set.
+ */
+export function cornerBorderSwitchProps() {
+  return ['borderEnabled', ...CORNERS.map((key) => `${key}.borderEnabled`)];
+}
+
 export const BORDER_UNLINK_PROPS = [
   ['style',           r => r.style || 'solid'],
   ['thickness',       r => r.thickness || 1],

@@ -1,7 +1,14 @@
 import { writable, get } from 'svelte/store';
 import { activePanel, resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
 import { controlSetForPanel, isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
-import { inspectorStateNameForPath, updateControlProperty, updateInspectorControlProperty } from './controls.js';
+import {
+  applyInspectorControlPatchesById, inspectorStateNameForPath, updateControlProperty, updateInspectorControlProperty,
+  updateSelectedInspectorProperty,
+} from './controls.js';
+import { valueAtPath } from './controlTreeUtils.js';
+import { findControlById } from '../utils/containment.js';
+import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
+import { deepClone } from '../utils/deepClone.js';
 import { stateEditScope } from './stateEditScope.js';
 
 /**
@@ -78,7 +85,46 @@ export function activateInspectorColorTarget(target, currentColor) {
   const stateName = target?.type === 'control'
     ? inspectorStateNameForPath(target.path)
     : '';
-  return activateColorTarget({ ...target, _inspectorStateName: stateName }, currentColor);
+  return activateColorTarget({ ...target, _inspectorStateName: stateName, ...selectionTargetOf(target, stateName) }, currentColor);
+}
+
+/**
+ * With several controls selected, a colour picked from the inspector goes on all of them, as the
+ * inspector's typed fields always did; each one's own colour is kept so Cancel can give it back.
+ *
+ * Before, the dock painted only the control whose swatch was clicked. The SH-201 tutorial asks
+ * for a thin grey border on 22 sections at once: the Border tab's thickness reached all 22, and
+ * the colour picked from its Fill swatch reached one. The target is cleared when the selection
+ * changes (below), so the selection it writes to is always the one it was armed for.
+ */
+function selectionTargetOf(target, stateName) {
+  if (target?.type !== 'control' || !target.path) return {};
+  const ids = get(selectedComponentIds);
+  if (ids.size < 2 || !ids.has(target.controlId)) return {};
+  const controls = get(activePanel)?.controls ?? [];
+  const originals = new Map();
+  for (const id of ids) {
+    const control = findControlById(controls, id);
+    if (!control) continue;
+    const source = stateName ? resolveStateScopedControl(control, stateName) : control;
+    originals.set(id, deepClone(valueAtPath(source, target.path)));
+  }
+  return { _selection: originals };
+}
+
+/**
+ * Cancel for a target armed on a selection: every control gets its own colour back, in one
+ * update. Returns false when the target is not one, and the caller restores it as before.
+ */
+export function restoreColorTargetSelection(target, dirty) {
+  if (!target?._selection) return false;
+  if (!dirty) return true;
+  const patches = new Map();
+  for (const [id, value] of target._selection) {
+    if (value !== undefined) patches.set(id, { [target.path]: value });
+  }
+  applyInspectorControlPatchesById(patches);
+  return true;
 }
 
 /**
@@ -99,7 +145,9 @@ export function applyColorToTarget(hex) {
     updatePanel(panelId, { [target.prop]: hex, modified: true });
   } else if (target.type === 'control') {
     // Control properties use AARRGGBB
-    if (Object.prototype.hasOwnProperty.call(target, '_inspectorStateName')) {
+    if (target._selection) {
+      updateSelectedInspectorProperty(target.path, hex, target._inspectorStateName);
+    } else if (Object.prototype.hasOwnProperty.call(target, '_inspectorStateName')) {
       updateInspectorControlProperty(target.controlId, target.path, hex, target._inspectorStateName);
     } else {
       updateControlProperty(target.controlId, target.path, hex);

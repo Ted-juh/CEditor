@@ -12,6 +12,7 @@
   import { deepClone } from '../utils/deepClone.js';
   import {
     SIDES, CORNERS,
+    cornerBorderSwitchProps,
     linkTogglePatch,
   } from '../utils/borderLinkCascade.js';
   import {
@@ -128,11 +129,13 @@
     if (visuallyOn) {
       if (linked || border.linked) {
         set(borderPropPath('enabled'), false);
+        setCornerBorders(false);
       } else {
         set(borderPropPath(`${side}.style`), 'none');
       }
     } else {
       if (!border.enabled) set(borderPropPath('enabled'), true);
+      if (linked || border.linked) setCornerBorders(true);
       if (!(linked || border.linked)) {
         const s = border[side];
         if (!s || s.style === 'none') {
@@ -148,6 +151,12 @@
         }
       }
     }
+  }
+
+  // A linked border is one thing, corners included: switched from a side, the corners follow
+  // (cornerBorderSwitchProps says why). An unlinked one keeps its corners' own switches.
+  function setCornerBorders(on) {
+    for (const prop of cornerBorderSwitchProps()) set(cornersPropPath(prop), on);
   }
 
   function toggleCornerBorder(key) {

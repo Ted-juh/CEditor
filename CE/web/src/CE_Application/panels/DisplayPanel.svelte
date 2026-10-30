@@ -40,7 +40,7 @@
   import SwatchGrid from '../components/SwatchGrid.svelte';
   import GradientTab from './GradientTab.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
-  import { colorTarget, applyColorToTarget, clearColorTarget, colorTargetRestoreValue } from '../stores/colorTarget.js';
+  import { colorTarget, applyColorToTarget, clearColorTarget, colorTargetRestoreValue, restoreColorTargetSelection } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { setPanelVisibility } from '../stores/panelVisibility.js';
@@ -868,6 +868,7 @@
       // script editor's Values sidebar restores the original characters of a script, which a
       // colour re-formed from them ("SteelBlue" as "#4682B4") is not.
       if (target.type === 'callback' && typeof target.cancel === 'function') target.cancel();
+      else if (restoreColorTargetSelection(target, colorTargetDirty)) { /* each control got its own back */ }
       else if (restoreValue != null) applyColorToTarget(restoreValue);
       colorTargetDirty = false;
       clearColorTarget();
