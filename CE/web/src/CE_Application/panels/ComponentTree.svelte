@@ -20,7 +20,8 @@
   // drawn at 13px with a heavier stroke because at 11px and 1.5 they were hard to find. Icons
   // elsewhere in the editor are fine as components — this is about a list with hundreds of rows,
   // not about lucide.
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
+  import { get } from 'svelte/store';
   import { activePanel, selectedComponentIds, selectComponent, keyObjectId } from '../stores/panels.js';
   import { applyControlPatchesById, renameControl, updateControlProperty, reparentControls, removeControl, duplicateControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
   import { bringToFront, bringForward, sendBackward, sendToBack } from '../stores/alignment.js';
@@ -31,11 +32,16 @@
     TREE_ROW_HEIGHT,
     controlTreeSignature,
     dragAutoScrollStep,
+    foldsForLevel,
+    foldsUnder,
     isTabPageRowId,
+    levelOfFolds,
     scrollTopForRow,
     tabPageGroups,
     tabPageRowId,
     treeArrowTarget,
+    treeFolds,
+    treeLevelCount,
     treeWindow,
     typeBadgeAddsInformation,
   } from '../utils/componentTreeView.js';
@@ -84,6 +90,51 @@
     if (next.has(id)) next.delete(id);
     else next.add(id);
     setCollapsed(next);
+  }
+
+  // --- Folding several levels at once ---
+  // One arrow at a time, the SH-201 panel's 32 sections took 32 clicks to fold and the GAIA's 70
+  // folds were worse. The levels in the header fold the whole tree to a depth; Alt+click on an
+  // arrow, or Expand/Collapse All Inside on the menu, opens or shuts a branch all the way down.
+  //
+  // Both need the shape of the tree, open or not, which `rows` cannot give: its walk stops at a
+  // folded row. The shape is walked again only when the signature moves, which a drag does not.
+  let treeSignature = $derived($activePanel ? controlTreeSignature($activePanel.controls) : '');
+  let folds = $derived.by(() => {
+    treeSignature;
+    return untrack(() => treeFolds(get(activePanel)?.controls ?? []));
+  });
+  let levelCount = $derived(treeLevelCount(folds));
+  let shownLevel = $derived(levelOfFolds(folds, collapsedIds));
+
+  function showLevels(level) {
+    setCollapsed(foldsForLevel(folds, level));
+  }
+
+  /** Open, or shut, each of `ids` and every fold under it. */
+  function setBranches(ids, open) {
+    const next = new Set(collapsedIds);
+    for (const id of ids) {
+      for (const fold of foldsUnder(folds, id)) {
+        if (open) next.delete(fold);
+        else next.add(fold);
+      }
+    }
+    setCollapsed(next);
+  }
+
+  /** Alt+click on an arrow: the branch follows the row, all the way down. */
+  function toggleFold(id, e) {
+    e.stopPropagation();
+    if (e.altKey) setBranches([id], collapsedIds.has(id));
+    else toggleCollapsed(id);
+  }
+
+  function levelTitle(level) {
+    if (filtering) return 'A filter shows every match: clear it to fold the tree';
+    if (level === 1) return 'Collapse all: show only the top rows';
+    if (level === levelCount) return 'Expand all';
+    return `Show ${level} levels and fold everything below them`;
   }
 
   // --- Filter ---
@@ -142,7 +193,7 @@
     const panelId = $activePanel.id;
 
     const query = filterText.trim().toLowerCase();
-    const signature = controlTreeSignature(controls);
+    const signature = treeSignature;
     if (
       panelId === cachedPanelId
       && signature === cachedSignature
@@ -527,6 +578,20 @@
 
   function ctxOrder(fn) { fn(); closeCtx(); }
 
+  // The containers the menu opens or shuts: the selection's, as the other items act on the
+  // selection, so ten sections selected fold in one go.
+  let ctxFoldIds = $derived.by(() => {
+    if (!ctxMenu) return [];
+    const ids = $selectedComponentIds.size > 0 ? [...$selectedComponentIds] : [ctxMenu.id];
+    const foldIds = new Set(folds.map((fold) => fold.id));
+    return ids.filter((id) => foldIds.has(id));
+  });
+
+  function ctxFold(open) {
+    setBranches(ctxFoldIds, open);
+    closeCtx();
+  }
+
   function ctxToggleVisible() {
     if (ctxMenu) toggleVisible(ctxMenu.id, ctxCore?.visible !== false);
     closeCtx();
@@ -766,6 +831,22 @@
     <span class="tree-count">{totalCount}</span>
   </div>
 
+  {#if levelCount > 1}
+    <div class="tree-levels" role="group" aria-label="Levels shown">
+      <span class="levels-label" title="Alt+click an arrow to open or shut everything inside it">Levels</span>
+      {#each Array.from({ length: levelCount }, (_, i) => i + 1) as level (level)}
+        <button
+          class="level-btn"
+          class:active={!filtering && shownLevel === level}
+          aria-pressed={!filtering && shownLevel === level}
+          disabled={filtering}
+          title={levelTitle(level)}
+          onclick={() => showLevels(level)}
+        >{level}</button>
+      {/each}
+    </div>
+  {/if}
+
   <div class="tree-filter">
     {@render search()}
     <input
@@ -835,8 +916,8 @@
                 class="collapse-toggle"
                 tabindex="-1"
                 aria-label={expanded ? 'Collapse page' : 'Expand page'}
-                title={expanded ? 'Collapse' : 'Expand'}
-                onclick={(e) => { e.stopPropagation(); toggleCollapsed(row.id); }}
+                title={expanded ? 'Collapse (Alt+click: everything inside)' : 'Expand (Alt+click: everything inside)'}
+                onclick={(e) => toggleFold(row.id, e)}
               >
                 {#if expanded}
                   {@render chevronDown()}
@@ -887,8 +968,8 @@
                   class="collapse-toggle"
                   tabindex="-1"
                   aria-label={collapsedIds.has(id) ? `Expand ${core?.name ?? 'container'}` : `Collapse ${core?.name ?? 'container'}`}
-                  title={collapsedIds.has(id) ? 'Expand' : 'Collapse'}
-                  onclick={(e) => { e.stopPropagation(); toggleCollapsed(id); }}
+                  title={collapsedIds.has(id) ? 'Expand (Alt+click: everything inside)' : 'Collapse (Alt+click: everything inside)'}
+                  onclick={(e) => toggleFold(id, e)}
                 >
                   {#if collapsedIds.has(id) && !filtering}
                     {@render chevronRight()}
@@ -990,6 +1071,11 @@
     <button class="ctx-item" role="menuitem" onclick={ctxGroup}>Group into Container<span class="ctx-shortcut">Ctrl+G</span></button>
     {#if ctxSingle && ctxIsContainer}
       <button class="ctx-item" role="menuitem" onclick={ctxUngroup}>Ungroup<span class="ctx-shortcut">Ctrl+Shift+G</span></button>
+    {/if}
+    {#if ctxFoldIds.length > 0}
+      <div class="ctx-separator"></div>
+      <button class="ctx-item" role="menuitem" onclick={() => ctxFold(true)}>Expand All Inside<span class="ctx-shortcut">Alt+click arrow</span></button>
+      <button class="ctx-item" role="menuitem" onclick={() => ctxFold(false)}>Collapse All Inside<span class="ctx-shortcut">Alt+click arrow</span></button>
     {/if}
     <div class="ctx-separator"></div>
     <button class="ctx-item" role="menuitem" onclick={() => ctxOrder(bringToFront)}>Bring to Front</button>
@@ -1102,6 +1188,41 @@
     padding: 1px 6px;
     border-radius: 8px;
   }
+
+  .tree-levels {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 3px 8px;
+    border-bottom: 1px solid #2A2A2A;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+  }
+
+  .levels-label {
+    font-size: 10px;
+    color: #666;
+    margin-right: 4px;
+    cursor: default;
+  }
+
+  .level-btn {
+    min-width: 20px;
+    height: 18px;
+    padding: 0 4px;
+    background: transparent;
+    border: 1px solid #333;
+    border-radius: 3px;
+    color: #999;
+    font-size: 10px;
+    font-family: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  .level-btn:hover:not(:disabled) { color: #DDD; border-color: #555; }
+  .level-btn.active { color: #FFF; background: #2F4F6F; border-color: #5B9BD5; }
+  .level-btn:disabled { opacity: 0.4; cursor: default; }
 
   .tree-filter {
     display: flex;

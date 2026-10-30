@@ -269,3 +269,66 @@ export function treeArrowTarget({ rows, index, key, expanded = () => true }) {
       return null;
   }
 }
+
+/**
+ * Every row of the tree that folds, open or not: each container, and each page group of a Tab
+ * Container, with the depth it is drawn at and the folds above it.
+ *
+ * The tree's own walk stops at a folded row, so it cannot say what is under one. Folding several
+ * levels at once needs the whole shape, and this is it, walked the way the tree walks it: a Tab
+ * Container's children sit under its pages, one level deeper than its page rows.
+ */
+export function treeFolds(controls) {
+  const out = [];
+  const visit = (list, depth, above) => {
+    for (const control of list ?? []) {
+      if (!isContainerControl(control)) continue;
+      const id = getControlId(control);
+      out.push({ id, depth, above });
+      const inside = [...above, id];
+      const children = getChildControls(control);
+      const groups = tabPageGroups(control, children);
+      if (!groups) {
+        visit(children, depth + 1, inside);
+        continue;
+      }
+      for (const group of groups) {
+        const pageRow = tabPageRowId(id, group.pageId);
+        out.push({ id: pageRow, depth: depth + 1, above: inside });
+        visit(group.children, depth + 2, [...inside, pageRow]);
+      }
+    }
+  };
+  visit(controls, 0, []);
+  return out;
+}
+
+/** How many levels deep the tree goes when everything is open. A tree with no folds has one. */
+export function treeLevelCount(folds) {
+  return (folds ?? []).reduce((levels, fold) => Math.max(levels, fold.depth + 2), 1);
+}
+
+/**
+ * The folded set that shows `level` levels of the tree: the rows at the top are level 1, so every
+ * fold drawn at level `level` or deeper is shut and every one above it is open.
+ */
+export function foldsForLevel(folds, level) {
+  return new Set((folds ?? []).filter((fold) => fold.depth + 1 >= level).map((fold) => fold.id));
+}
+
+/**
+ * The level the tree shows exactly, or null when it shows none: some branches open further than
+ * others. Ids in `collapsed` that are no longer folds (deleted controls) do not count.
+ */
+export function levelOfFolds(folds, collapsed) {
+  const levels = treeLevelCount(folds);
+  for (let level = 1; level <= levels; level++) {
+    if ((folds ?? []).every((fold) => collapsed.has(fold.id) === fold.depth + 1 >= level)) return level;
+  }
+  return null;
+}
+
+/** A fold and every fold under it, so a branch opens or shuts all the way down. */
+export function foldsUnder(folds, id) {
+  return (folds ?? []).filter((fold) => fold.id === id || fold.above.includes(id)).map((fold) => fold.id);
+}

@@ -14,11 +14,16 @@ import {
   TREE_ROW_HEIGHT,
   controlTreeSignature,
   dragAutoScrollStep,
+  foldsForLevel,
+  foldsUnder,
   isTabPageRowId,
+  levelOfFolds,
   scrollTopForRow,
   tabPageGroups,
   tabPageRowId,
   treeArrowTarget,
+  treeFolds,
+  treeLevelCount,
   treeWindow,
   typeBadgeAddsInformation,
 } from '../src/CE_Application/utils/componentTreeView.js';
@@ -290,4 +295,82 @@ test('the tree signature sees a page change', () => {
   assert.notEqual(controlTreeSignature(withChild(tabContainer(pages, 0), moved)), base, 'moving a child between pages');
   assert.notEqual(controlTreeSignature(withChild(tabContainer(pages, 1), child)), base, 'switching the showing page');
   assert.notEqual(controlTreeSignature(withChild(tabContainer([pages[0], { id: 'p2', label: 'Renamed' }], 0), child)), base, 'renaming a page');
+});
+
+// --- Folding several levels at once ------------------------------------------------------------
+//
+// The tree folded one arrow at a time: 32 clicks to see the SH-201 panel's sections without the
+// 400 controls in them. The levels in its header and Alt+click on an arrow fold many at once, from
+// the whole shape of the tree, which the row walk cannot see past a folded row.
+
+function container(id, children = []) {
+  const control = createControl('Container', { Core: { id, name: id } });
+  control._children.Children = { _children: Object.fromEntries(children.map((child) => [child._children.Core.id, child])) };
+  return control;
+}
+
+const knob = (id) => createControl('Knob', { Core: { id, name: id } });
+
+/** Plates holding sections holding knobs, as on the SH-201 panel, and a knob at the top. */
+function platePanel() {
+  return [
+    container('upper', [container('osc', [knob('wave')]), container('filter', [knob('cutoff')])]),
+    container('lower', [container('lowOsc', [knob('lowWave')])]),
+    knob('master'),
+  ];
+}
+
+test('every container is a fold, at the depth the tree draws it, folded or not', () => {
+  const folds = treeFolds(platePanel());
+  const byId = Object.fromEntries(folds.map((fold) => [fold.id, [fold.depth, fold.above]]));
+  assert.deepEqual(byId, {
+    upper: [0, []],
+    osc: [1, ['upper']],
+    filter: [1, ['upper']],
+    lower: [0, []],
+    lowOsc: [1, ['lower']],
+  });
+  assert.equal(treeLevelCount(folds), 3, 'plates, sections, knobs');
+  assert.equal(treeLevelCount(treeFolds([knob('a'), knob('b')])), 1, 'nothing to fold is one level');
+});
+
+test('a level folds everything at or below it and opens everything above', () => {
+  const folds = treeFolds(platePanel());
+  assert.deepEqual([...foldsForLevel(folds, 1)].sort(), ['filter', 'lowOsc', 'lower', 'osc', 'upper'], 'level 1 is collapse all');
+  assert.deepEqual([...foldsForLevel(folds, 2)].sort(), ['filter', 'lowOsc', 'osc'], 'level 2 shows the sections, shut');
+  assert.deepEqual([...foldsForLevel(folds, 3)], [], 'the last level is expand all');
+});
+
+test('the level shown is recognised, and a mixed tree shows none', () => {
+  const folds = treeFolds(platePanel());
+  for (const level of [1, 2, 3]) assert.equal(levelOfFolds(folds, foldsForLevel(folds, level)), level);
+  assert.equal(levelOfFolds(folds, new Set(['osc'])), null, 'one section shut, the others open');
+  // A deleted container's id can linger in the folded set; it is not part of the tree any more.
+  assert.equal(levelOfFolds(folds, new Set(['gone'])), 3);
+});
+
+test('a branch is the fold and every fold under it, and nothing beside it', () => {
+  const folds = treeFolds(platePanel());
+  assert.deepEqual(foldsUnder(folds, 'upper').sort(), ['filter', 'osc', 'upper']);
+  assert.deepEqual(foldsUnder(folds, 'osc'), ['osc']);
+  assert.deepEqual(foldsUnder(folds, 'master'), [], 'a knob folds nothing');
+});
+
+test('a tab container folds at its pages too, one level above the children on them', () => {
+  const pages = [{ id: 'p1', label: 'One' }, { id: 'p2', label: 'Two' }];
+  const tabs = tabContainer(pages, 0);
+  const inner = container('inner', [knob('k')]);
+  inner._children.Core.tabPageId = 'p2';
+  tabs._children.Children = { _children: { inner } };
+  const folds = treeFolds([tabs]);
+  const p2 = tabPageRowId('tabs', 'p2');
+  assert.deepEqual(folds.map((fold) => [fold.id, fold.depth]), [
+    ['tabs', 0],
+    [tabPageRowId('tabs', 'p1'), 1],
+    [p2, 1],
+    ['inner', 2],
+  ]);
+  assert.equal(treeLevelCount(folds), 4);
+  assert.deepEqual(foldsUnder(folds, 'tabs').sort(), ['tabs', 'inner', tabPageRowId('tabs', 'p1'), p2].sort());
+  assert.deepEqual(foldsUnder(folds, p2).sort(), ['inner', p2].sort());
 });

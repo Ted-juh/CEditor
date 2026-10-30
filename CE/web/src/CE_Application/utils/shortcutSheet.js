@@ -26,7 +26,7 @@ import { EDITOR_SHORTCUTS } from './editorShortcuts.js';
  * components (F2 in the tree, Escape in this overlay). They are listed by
  * hand and each one was checked against its handler when it was written —
  * TabBar.svelte handleMiddleClick, CanvasControl.svelte handleDoubleClick,
- * EditorCanvas.svelte trackMeasure, ComponentTree.svelte's F2 — but they are
+ * EditorCanvas.svelte trackMeasure, ComponentTree.svelte's F2 and toggleFold — but they are
  * the part of this panel that can still drift, so check them if you move one.
  */
 export const POINTER_GESTURES = [
@@ -61,6 +61,7 @@ export const POINTER_GESTURES = [
   { section: 'Guides', keys: 'Right-click guide', description: 'Remove guide' },
   { section: 'Tree', keys: 'F2', description: 'Rename row' },
   { section: 'Tree', keys: 'Double Click', description: 'Rename row' },
+  { section: 'Tree', keys: 'Alt+Click arrow', description: 'Open or shut everything inside' },
 ];
 
 // Reading order, not table order: what you do to the document before what you

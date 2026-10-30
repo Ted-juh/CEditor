@@ -208,6 +208,12 @@ orange, the properties panel shows its settings, and alignment can line the othe
 The component tree on the right is often the easiest way to select a control that is hidden under
 others. Click a row to select it; **Ctrl+click** adds; **Shift+click** selects a range.
 
+The arrow in front of a group opens or shuts it. To fold many at once, use the **Levels** buttons
+at the top of the tree: **1** shows only the top rows, the last number opens everything, and the
+ones between show that many levels with everything below them shut. **Alt+click** an arrow to open
+or shut that group and every group inside it; **Expand All Inside** and **Collapse All Inside** on
+the tree's right-click menu do the same for every selected group.
+
 ### Moving, resizing and turning
 
 - **Drag** a control to move it. Hold **Shift** to keep to a straight line, **Alt** to leave a copy
@@ -1347,6 +1353,7 @@ while you are typing in a text field; the File and tab shortcuts, F1 and F5 work
 |---|---|
 | F2 | Rename row |
 | Double Click | Rename row |
+| Alt+Click arrow | Open or shut everything inside |
 
 ### Panels
 

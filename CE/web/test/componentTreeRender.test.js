@@ -110,7 +110,11 @@ test('the row derivation is guarded by the tree signature', () => {
   // this proves the component is the thing asking it, and short-circuits on the answer.
   const derivation = treeSource.slice(treeSource.indexOf('let rows = $derived.by('), treeSource.indexOf('let totalCount'));
 
-  assert.match(derivation, /controlTreeSignature\(controls\)/,
+  // The signature is a derived of its own, shared with the folds (one pass per store write, not
+  // two); the rows read it.
+  assert.match(treeSource, /let treeSignature = \$derived\(\$activePanel \? controlTreeSignature\(\$activePanel\.controls\)/,
+    'the tree signature is no longer taken from the panel\'s controls');
+  assert.match(derivation, /const signature = treeSignature;/,
     'the rows derivation no longer asks whether anything the tree draws has changed');
   assert.match(derivation, /return cachedRows;/,
     'the rows derivation no longer returns the previous array by identity — Svelte will rebuild every row');
@@ -175,4 +179,48 @@ test('a tab container lists its children under its pages', () => {
   // Page rows sit one level under the container; its controls one level under the page.
   assert.match(html, /aria-level="2"[^>]*aria-label="Page Arpeggiator/);
   assert.match(html, /data-tree-id="a"[^>]*aria-level="3"|aria-level="3"[\s\S]{0,300}data-tree-id="a"|data-tree-id="a"[\s\S]{0,300}aria-level="3"/);
+});
+
+// --- Folding several levels at once ------------------------------------------------------------
+
+function plates() {
+  const container = (id, children) => {
+    const control = createControl('Container', { Core: { id, name: id, zIndex: 0 } });
+    control._children.Children = { _children: Object.fromEntries(children.map((child) => [child._children.Core.id, child])) };
+    return control;
+  };
+  return [
+    container('upper', [container('osc', [createControl('Knob', { Core: { id: 'wave', name: 'wave' } })])]),
+    container('lower', [container('filter', [createControl('Knob', { Core: { id: 'cutoff', name: 'cutoff' } })])]),
+  ];
+}
+
+test('a nested tree offers one button per level, and says which one it shows', () => {
+  panelOf(plates());
+  const html = renderTree();
+  const buttons = [...html.matchAll(/<button[^>]*class="level-btn[^"]*"[^>]*>(\d+)<\/button>/g)].map((m) => m[1]);
+  assert.deepEqual(buttons, ['1', '2', '3'], 'plates, sections and knobs are three levels');
+  assert.match(html, /title="Collapse all: show only the top rows"[^>]*>1</);
+  assert.match(html, /title="Expand all"[^>]*>3</);
+  // Everything starts open, so the tree is showing all three.
+  assert.match(html, /class="level-btn[^"]* active"[^>]*aria-pressed="true"[^>]*>3</);
+  assert.equal([...html.matchAll(/aria-pressed="true"/g)].length, 1, 'one level at a time');
+});
+
+test('a flat panel has no levels to offer', () => {
+  panelOf(labels(3));
+  assert.doesNotMatch(renderTree(), /class="level-btn/);
+});
+
+test('the levels and the branch folds are wired to the fold helpers', () => {
+  // The shape is walked again only when the signature moves, so a drag does not re-walk it.
+  assert.match(treeSource, /let folds = \$derived\.by\(\(\) => \{\s*treeSignature;\s*return untrack\(/,
+    'the folds are no longer guarded by the tree signature');
+  assert.match(treeSource, /function showLevels\(level\) \{\s*setCollapsed\(foldsForLevel\(folds, level\)\);/);
+  assert.match(treeSource, /function toggleFold\(id, e\) \{[\s\S]{0,120}if \(e\.altKey\) setBranches\(\[id\], collapsedIds\.has\(id\)\);/,
+    'Alt+click on an arrow no longer folds the whole branch');
+  assert.equal([...treeSource.matchAll(/onclick=\{\(e\) => toggleFold\((row\.id|id), e\)\}/g)].length, 2,
+    'both arrows, the container\'s and the page\'s, must fold a branch on Alt+click');
+  assert.match(treeSource, /onclick=\{\(\) => ctxFold\(true\)\}>Expand All Inside/);
+  assert.match(treeSource, /onclick=\{\(\) => ctxFold\(false\)\}>Collapse All Inside/);
 });
