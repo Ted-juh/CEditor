@@ -305,6 +305,8 @@
     isCustomMouseDirectionReversed,
     normalizeCustomChannelValue,
     resolveCustomHitZoneAtPoint,
+    behaviorTakesInput,
+    channelForBehaviorInput,
     resolveCustomInteractionPatch,
     seedCustomValues,
     snapCustomChannelValue,
@@ -7376,7 +7378,7 @@
 
   function adjustCustomMainValue(control, direction = 1) {
     const channelName = customMainChannelName(control);
-    const channel = getCustomValueChannels(control)?.[channelName] ?? null;
+    const channel = channelForBehaviorInput(getCustomValueChannels(control)?.[channelName] ?? null, customMainBehaviorModule(control));
     if (!channel) return;
     const currentValues = customSessionValues(control);
     const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
@@ -7404,7 +7406,7 @@
 
   function setCustomMainValue(control, value) {
     const channelName = customMainChannelName(control);
-    const channel = getCustomValueChannels(control)?.[channelName] ?? null;
+    const channel = channelForBehaviorInput(getCustomValueChannels(control)?.[channelName] ?? null, customMainBehaviorModule(control));
     if (!channel) return;
     const nextValue = snapCustomChannelValue(channel, value);
     patchControlSession(getControlId(control), {
@@ -7424,6 +7426,9 @@
     const resolvedPreview = resolvedPreviewFor(control);
     const hitZoneEntry = defaultCustomActivationHitZone(resolvedPreview?.control ?? control)
       ?? defaultCustomActivationHitZone(control);
+    // Keyboard off on the behaviour Enter and Space would press.
+    const behavior = getCustomBehaviors(control)?.[hitZoneEntry?.zone?.targetBehavior] ?? customMainBehaviorModule(control);
+    if (!behaviorTakesInput(behavior, 'keyboard')) return;
     const rect = event?.currentTarget?.getBoundingClientRect?.();
     patchCustomInteraction(control, hitZoneEntry, {
       ...event,
@@ -7926,6 +7931,8 @@
         });
         return;
       }
+      // Wheel off (the default): the wheel is the page's, and scrolls it.
+      if (!behaviorTakesInput(customMainBehaviorModule(control), 'wheel')) return;
       event.preventDefault();
       event.stopPropagation();
       const baseDirection = event.deltaY < 0 ? 1 : -1;
@@ -8521,6 +8528,14 @@
         ?? customHitZoneFromEventTarget(control, event);
       pointerCustomStartValues = { ...(sessionFor(control)?.customValues ?? {}) };
       pointerCustomDragState = {};
+      // Pointer off on the behaviour pressed (Component Designer › Behaviors): the press is the
+      // control's, and drives nothing. The release still ends it.
+      const pressedBehavior = getCustomBehaviors(control)?.[pointerCustomHitZone?.zone?.targetBehavior] ?? customMainBehaviorModule(control);
+      if (!behaviorTakesInput(pressedBehavior, 'pointer')) {
+        pointerCustomHitZone = null;
+        addPressListeners();
+        return;
+      }
       // Panel knobs inside: a press moves "DOM focus" to the knob pressed and clears its focus flag.
       const knobFocus = hasSliderControlParts(control)
         ? sliderControlPressFocusPatch(sessionFor(control), sliderControlForZone(control, pointerCustomHitZone?.zone) ? pointerCustomHitZone.name : '')
@@ -9138,6 +9153,7 @@
 
     if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) {
       if (isCustomComponent(control)) {
+        if (!behaviorTakesInput(customMainBehaviorModule(control), 'keyboard')) return;
         event.preventDefault();
         event.currentTarget?.focus?.();
         patchControlSession(controlId, {

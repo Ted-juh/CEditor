@@ -770,6 +770,13 @@ The way that works today is:
    local package**. The component is now in your library.
 6. Press **Back to Panel**.
 
+A behaviour is what turns the mouse, the keys or the wheel into a value. Each has four switches,
+under **Interaction** in its entry (Interact tab, **Advanced**, **Behaviors (flat list)**):
+**Pointer** (drag and click), **Keyboard** (arrow keys, Home and End), **Wheel** and **Snap** (values
+land on the channel's steps). They apply on the panel, in the designer's Preview and in an exported
+plug-in. A new slider or dial starts with Wheel on, a button, toggle or pad with it off; turn it
+off on a control that should leave the wheel to scrolling the page.
+
 You can also turn existing artwork into a component: select some backgrounds, images, shapes,
 labels, knobs or sliders and choose **Edit → Create Component from Selection...**. CEditor saves
 them as a component in your library and puts a linked copy in their place. Each label's text becomes

@@ -421,6 +421,13 @@ copy said "Not in this library" until the library file was sent and imported too
 carries each version a copy was placed from, and opening it adds the ones your library lacks. One
 you already have under the same name and version, with another design, is kept.
 
+**A custom component's Pointer, Keyboard, Wheel and Snap switches work.** Every behaviour in the
+Component Designer has them, and nothing read them: a knob with Wheel off turned on the wheel on the
+panel, in the designer's Preview and in an exported plug-in. They apply in all three now. A new
+slider or dial starts with Wheel on, a button, toggle or pad with it off, and the GAIA, AN1x and
+SH-201 panels say Wheel on, so they turn as before. A component you made earlier with Wheel off
+stops taking the wheel: turn the switch on (Interact tab, Advanced, Behaviors) if it should.
+
 ## What you get
 
 - **A simulated device, for a panel without its synth.** Choose **Simulated device** as a device's

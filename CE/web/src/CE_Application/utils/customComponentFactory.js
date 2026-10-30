@@ -441,6 +441,15 @@ export function createArpPatternChannel() {
   });
 }
 
+/**
+ * The behaviour types that take the wheel unless their Wheel switch is turned off: the ones the
+ * Behaviors editor's own templates start with Wheel on (Slider, Dial, Scroll, Filmstrip). Buttons,
+ * toggles, XY pads and keyboards start with it off. Until the switch was read (2026-10-30) every
+ * behaviour here started off and turned on the wheel anyway; the built-in sliders and dials keep
+ * turning. A saved file's behaviours are read against documentEntries' baseline, not against this.
+ */
+const WHEEL_BY_DEFAULT = new Set(['slider', 'dial', 'scroll', 'filmstrip-control']);
+
 export function createBehaviorModule(name, {
   type = 'slider',
   valueChannel = 'mainValue',
@@ -464,7 +473,7 @@ export function createBehaviorModule(name, {
     interaction: {
       pointer: true,
       keyboard: true,
-      wheel: false,
+      wheel: WHEEL_BY_DEFAULT.has(String(type).toLowerCase()),
       snap: true,
       ...interaction,
     },

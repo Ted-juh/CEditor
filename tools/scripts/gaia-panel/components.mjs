@@ -294,6 +294,9 @@ const CAP_LINE = 'FFB8C1C8';
  * The cap travels by binding the value channel to its Layout.y. Top of travel is a small y and
  * bottom is a large one, so the range is written high-to-low — a fader at zero sits at the bottom.
  */
+// Every value control here takes the wheel (interaction.wheel). The behaviour's Wheel switch is off
+// by default, and until 2026-10-30 nothing read it, so these turned on the wheel with it off; now
+// that it is read, it says so, and the GAIA, AN1x and SH-201 panels keep turning as they did.
 export function gaiaFader({ width = 30, height = 108, ticks = 11, legacySkin = false } = {}) {
   const slotX = Math.round(width / 2) - 4;
   const capH = 13;
@@ -344,7 +347,7 @@ export function gaiaFader({ width = 30, height = 108, ticks = 11, legacySkin = f
       capBottomRib: rect('capBottomRib', { x: 5, y: travelBottom + 10, width: width - 10, height: 1 }, '55101518', { zIndex: 7 }),
       }),
     },
-    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'linear', role: 'slider', dragMode: 'vertical' }),
+    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'linear', role: 'slider', dragMode: 'vertical', interaction: { wheel: true } }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
     bindings: {
       capY: binding('capY', 'channel.value.normalized', 'Parts.cap.Layout.y', { outputMin: travelBottom, outputMax: travelTop, round: true }),
@@ -445,7 +448,7 @@ export function gaiaKnob({ size = 54, ticks = 11, numeric = false, zeroLabel = '
         pivotY: ((r - 12) / (r - 15)) * 100,
       }),
     },
-    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'circular', role: 'knob', dragMode: 'vertical' }),
+    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'circular', role: 'knob', dragMode: 'vertical', interaction: { wheel: true } }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: numeric
       ? { x: 0, y: 0, width: size, height: size, unit: 'px' }
       : { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
@@ -575,7 +578,7 @@ export function gaiaLeds({ options, width = 96, rowHeight = 15, legacySkin = fal
       step: 1,
       defaultValue: values[0],
     }),
-    behavior: createBehaviorModule('drive', { type: 'selector', valueChannel: 'value', geometry: 'vertical', role: 'selector' }),
+    behavior: createBehaviorModule('drive', { type: 'selector', valueChannel: 'value', geometry: 'vertical', role: 'selector', interaction: { wheel: true } }),
     hitZones,
     bindings,
   });
@@ -666,7 +669,7 @@ export function stepCell({ width = 92, height = 40, colour = 'FF52B788', accent 
       bar: rect('bar', { x: inset, y: floor - 2, width: barW, height: 2 }, `55${colour.slice(2)}`, { zIndex: 1, radius: 2 }),
       cap: rect('cap', { x: inset, y: floor - 2, width: barW, height: 2 }, colour, { zIndex: 2, radius: 1 }),
     },
-    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'linear', role: 'slider', dragMode: 'vertical' }),
+    behavior: createBehaviorModule('drive', { valueChannel: 'value', geometry: 'linear', role: 'slider', dragMode: 'vertical', interaction: { wheel: true } }),
     hitZone: createHitZone('grab', { targetBehavior: 'drive', targetValueChannel: 'value', action: 'setValue', bounds: { x: 0, y: 0, width: 100, height: 100, unit: 'percent' } }),
     bindings: {
       barY: binding('barY', 'channel.value.normalized', 'Parts.bar.Layout.y', { outputMin: floor - 2, outputMax: inset, round: true }),

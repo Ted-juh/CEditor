@@ -219,6 +219,19 @@ function customChannelNormalizedBounds(channelName, channel, values, channels) {
   };
 }
 
+/** The channels only behaviours with Snap off set (a channel any Snap-on behaviour also sets stays snapped). */
+function channelsSetWithoutSnap(control) {
+  const free = new Set();
+  const snapped = new Set();
+  for (const behavior of Object.values(getCustomBehaviors(control) ?? {})) {
+    if (!behavior || behavior.enabled === false) continue;
+    const names = [behavior.valueChannel, ...(Array.isArray(behavior.valueChannels) ? behavior.valueChannels : [])].filter(Boolean);
+    for (const name of names) (behavior.interaction?.snap === false ? free : snapped).add(name);
+  }
+  for (const name of snapped) free.delete(name);
+  return free;
+}
+
 export function constrainCustomValues(control, values = {}, options = {}) {
   const channels = getCustomValueChannels(control);
   let nextValues = {
@@ -226,9 +239,13 @@ export function constrainCustomValues(control, values = {}, options = {}) {
     ...(values ?? {}),
   };
   const primaryChannelName = String(options?.primaryChannelName ?? '').trim();
+  // A channel set by a behaviour with Snap off is kept in range, not snapped back onto its steps:
+  // here, at a drag's end, and when the preview is drawn, or the drag's value is drawn snapped.
+  const unsnapped = new Set([...channelsSetWithoutSnap(control), ...(options?.unsnapped instanceof Set ? options.unsnapped : [])]);
+  const constraintChannel = (name, channel) => (unsnapped.has(name) ? channelForBehaviorInput(channel, { interaction: { snap: false } }) : channel);
 
   if (primaryChannelName && channels?.[primaryChannelName]) {
-    const channel = channels[primaryChannelName];
+    const channel = constraintChannel(primaryChannelName, channels[primaryChannelName]);
     const type = String(channel?.type ?? 'float').trim().toLowerCase();
     if (type === 'array') {
       nextValues = { ...nextValues, [primaryChannelName]: arrayChannelItems(channel, nextValues[primaryChannelName]) };
@@ -245,8 +262,9 @@ export function constrainCustomValues(control, values = {}, options = {}) {
 
   for (let pass = 0; pass < 3; pass += 1) {
     let changed = false;
-    for (const [name, channel] of Object.entries(channels)) {
+    for (const [name, ownChannel] of Object.entries(channels)) {
       if (name === primaryChannelName) continue;
+      const channel = constraintChannel(name, ownChannel);
       const type = String(channel?.type ?? 'float').trim().toLowerCase();
       if (type === 'enum' || type === 'bool' || type === 'boolean') continue;
       if (type === 'array') {
@@ -334,6 +352,27 @@ function angleInCircularSweep(angle, definition = null) {
     ? normalizeDegrees(startAngle - angle)
     : normalizeDegrees(angle - startAngle);
   return delta <= sweepAngle;
+}
+
+/**
+ * A behaviour's input switches: Component Designer › Behaviors › Pointer, Keyboard, Wheel and Snap.
+ *
+ * They were drawn and saved, and read by nothing: a knob with Wheel off turned on the wheel on the
+ * panel, in the designer's Preview and in an exported plug-in, and switching Pointer, Keyboard or
+ * Snap off changed nothing either. Pointer, Keyboard and Snap are on unless switched off and Wheel is
+ * off unless switched on, as the switches show them. Input that no behaviour handles is taken as it
+ * always was.
+ */
+export function behaviorTakesInput(behaviorModule, input) {
+  if (!behaviorModule) return true;
+  const interaction = behaviorModule.interaction ?? {};
+  return input === 'wheel' ? interaction.wheel === true : interaction[input] !== false;
+}
+
+/** The channel as a behaviour's input sets it: with Snap off, values are not snapped to its step. */
+export function channelForBehaviorInput(channel, behaviorModule) {
+  if (!channel || behaviorModule?.interaction?.snap !== false) return channel;
+  return { ...channel, snap: { ...(channel.snap ?? {}), enabled: false } };
 }
 
 export function snapCustomChannelValue(channel, rawValue) {
@@ -998,7 +1037,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
       normalized = xy.x;
       const secondaryChannelName = resolveSecondaryChannelName(hitZone, behaviorModule, channelName);
       if (secondaryChannelName && channels?.[secondaryChannelName]) {
-        nextValues[secondaryChannelName] = denormalizeCustomChannelValue(channels[secondaryChannelName], xy.y);
+        nextValues[secondaryChannelName] = denormalizeCustomChannelValue(channelForBehaviorInput(channels[secondaryChannelName], behaviorModule), xy.y);
       }
     } else {
       normalized = resolveCustomNormalizedFromPoint(behaviorModule, point.rect, point.clientX, point.clientY, {
@@ -1009,12 +1048,15 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         coarse: point.coarse === true,
       });
     }
-    nextValue = denormalizeCustomChannelValue(channel, normalized);
+    nextValue = denormalizeCustomChannelValue(channelForBehaviorInput(channel, behaviorModule), normalized);
   }
   nextValues[channelName] = nextValue;
-  const constrainedValues = constrainCustomValues(control, nextValues, { primaryChannelName: channelName });
+  const unsnapped = behaviorModule?.interaction?.snap === false
+    ? new Set([channelName, resolveSecondaryChannelName(hitZone, behaviorModule, channelName)].filter(Boolean))
+    : null;
+  const constrainedValues = constrainCustomValues(control, nextValues, { primaryChannelName: channelName, unsnapped });
   const linked = applyCustomLinks(control, constrainedValues);
-  const linkedValues = syncCustomArpeggiatorValues(control, constrainCustomValues(control, linked.values, { primaryChannelName: channelName }));
+  const linkedValues = syncCustomArpeggiatorValues(control, constrainCustomValues(control, linked.values, { primaryChannelName: channelName, unsnapped }));
   const mainChannel = channels?.mainValue ?? channel;
   const mainTouched = channelName === 'mainValue'
     || linked.targets.has('mainValue')

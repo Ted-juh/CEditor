@@ -72,6 +72,8 @@
   import {
     denormalizeCustomChannelValue,
     getCustomBehaviors,
+    behaviorTakesInput,
+    channelForBehaviorInput,
     getCustomValueChannels,
     isCustomMouseDirectionReversed,
     normalizeCustomChannelValue,
@@ -640,10 +642,12 @@
       });
       return;
     }
-    const { channelName, channel, behaviorModule } = customChannelForHitZone(pointerCustomHitZone);
+    const { channelName, channel: zoneChannel, behaviorModule } = customChannelForHitZone(pointerCustomHitZone);
+    // Snap off on the behaviour: the drag sets values between the channel's steps.
+    const channel = channelForBehaviorInput(zoneChannel, behaviorModule);
     if (!channel) return;
     const secondaryChannelName = pointerCustomHitZone?.zone?.targetValueChannelY ?? pointerCustomHitZone?.zone?.targetYValueChannel ?? '';
-    const secondaryChannel = customChannels?.[secondaryChannelName] ?? null;
+    const secondaryChannel = channelForBehaviorInput(customChannels?.[secondaryChannelName] ?? null, behaviorModule);
     const behaviorType = String(behaviorModule?.type ?? '').trim().toLowerCase();
     const behaviorGeometry = String(behaviorModule?.geometry ?? '').trim().toLowerCase();
     if (secondaryChannel && (behaviorType.includes('xy') || behaviorGeometry === 'xy' || behaviorGeometry === 'grid')) {
@@ -689,7 +693,7 @@
 
   function adjustCustomMainValue(direction = 1) {
     const channelName = customMainChannelName();
-    const channel = customChannels?.[channelName] ?? null;
+    const channel = channelForBehaviorInput(customChannels?.[channelName] ?? null, customMainBehaviorModule());
     if (!channel) return;
     const currentValues = customSessionValues();
     const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
@@ -1381,6 +1385,8 @@
     if (isReadOnly) return;
     if (isCustomComponent) {
       if (isDisabled) return;
+      // Wheel off (the default) on the behaviour: as on the panel, the wheel is not the component's.
+      if (!behaviorTakesInput(customMainBehaviorModule(), 'wheel')) return;
       event.preventDefault();
       event.stopPropagation();
       const baseDirection = event.deltaY < 0 ? 1 : -1;
@@ -1464,6 +1470,13 @@
       const rect = hitboxElement?.getBoundingClientRect?.();
       pointerCustomHitZone = resolveCustomHitZoneAtPoint(resolvedControl ?? control, rect, event.clientX, event.clientY, customSessionValues());
       pointerCustomStartValues = { ...customSessionValues() };
+      // Pointer off on the behaviour pressed: as on the panel, the press drives nothing.
+      if (!behaviorTakesInput(customBehaviors?.[pointerCustomHitZone?.zone?.targetBehavior] ?? customMainBehaviorModule(), 'pointer')) {
+        pointerCustomHitZone = null;
+        window.addEventListener('pointerup', handleWindowPointerUp);
+        window.addEventListener('pointercancel', cancelPointerInteraction);
+        return;
+      }
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
       if (isDragAction) {
@@ -1687,10 +1700,11 @@
       lastInputMode = 'keyboard';
       keyboardFocusActive = true;
       if (['ArrowLeft', 'ArrowDown', 'ArrowRight', 'ArrowUp', 'Home', 'End'].includes(event.key)) {
+        if (!behaviorTakesInput(customMainBehaviorModule(), 'keyboard')) return;
         event.preventDefault();
         if (event.key === 'Home') {
           const channelName = customMainChannelName();
-          const channel = customChannels?.[channelName] ?? null;
+          const channel = channelForBehaviorInput(customChannels?.[channelName] ?? null, customMainBehaviorModule());
           if (channel) {
             const nextValue = snapCustomChannelValue(channel, channel?.min ?? 0);
             patchSession({
@@ -1706,7 +1720,7 @@
         }
         if (event.key === 'End') {
           const channelName = customMainChannelName();
-          const channel = customChannels?.[channelName] ?? null;
+          const channel = channelForBehaviorInput(customChannels?.[channelName] ?? null, customMainBehaviorModule());
           if (channel) {
             const nextValue = snapCustomChannelValue(channel, channel?.max ?? 1);
             patchSession({

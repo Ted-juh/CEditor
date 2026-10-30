@@ -27,7 +27,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "92dbef44",
+      "fingerprint": "f4401fd3",
       "summary": {
         "parts": 16,
         "materializedParts": 16,
@@ -6037,7 +6037,7 @@
                 "interaction": {
                   "pointer": true,
                   "keyboard": true,
-                  "wheel": false,
+                  "wheel": true,
                   "snap": true
                 }
               }
@@ -6291,7 +6291,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "89555f41",
+      "fingerprint": "85f96e28",
       "summary": {
         "parts": 26,
         "materializedParts": 26,
@@ -15345,7 +15345,7 @@
                 "interaction": {
                   "pointer": true,
                   "keyboard": true,
-                  "wheel": false,
+                  "wheel": true,
                   "snap": true
                 }
               }
@@ -15656,7 +15656,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "c2e8d454",
+      "fingerprint": "11665e23",
       "summary": {
         "parts": 7,
         "materializedParts": 7,
@@ -18558,7 +18558,7 @@
                 "interaction": {
                   "pointer": true,
                   "keyboard": true,
-                  "wheel": false,
+                  "wheel": true,
                   "snap": true
                 }
               }
