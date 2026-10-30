@@ -3,8 +3,12 @@
 
 #if JUCE_WINDOWS
  #include <winsock2.h>
+ #include <ws2tcpip.h>
 #else
  #include <sys/socket.h>
+ #include <netdb.h>
+ #include <netinet/in.h>
+ #include <arpa/inet.h>
 #endif
 
 namespace ceditor::osc
@@ -31,6 +35,28 @@ void notReusable (juce::DatagramSocket& socket)
     int off = 0;
     setsockopt (handle, SOL_SOCKET, SO_REUSEADDR, &off, sizeof (off));
    #endif
+}
+
+/** Where a datagram for `host` goes, as an IPv4 address.
+
+    JUCE's DatagramSocket is an IPv4 socket, and it writes to the first address getaddrinfo gives a
+    name, whatever its family. Windows gives ::1 first for "localhost", so every send to "localhost"
+    failed there, and so would any name that resolves to IPv6 first. The listener is bound to
+    127.0.0.1, so this computer's IPv6 loopback means it too. A name with no IPv4 address is left as
+    it is, and its sends are counted as failed, as before. */
+juce::String ipv4For (const juce::String& host)
+{
+    if (host.trim() == "::1") return "127.0.0.1";
+    addrinfo hints {};
+    hints.ai_family = AF_INET;
+    hints.ai_socktype = SOCK_DGRAM;
+    addrinfo* found = nullptr;
+    if (getaddrinfo (host.toRawUTF8(), nullptr, &hints, &found) != 0 || found == nullptr) return host;
+    char text[INET_ADDRSTRLEN] = {};
+    const auto* address = reinterpret_cast<const sockaddr_in*> (found->ai_addr);
+    const bool named = inet_ntop (AF_INET, &address->sin_addr, text, sizeof (text)) != nullptr;
+    freeaddrinfo (found);
+    return named ? juce::String (text) : host;
 }
 
 juce::var endpoint (const juce::String& host, int port)
@@ -123,7 +149,10 @@ struct OscService::Sender final : juce::Thread
                 if (! queue.empty()) { item = std::move (queue.front()); queue.pop_front(); busy = true; }
             }
             if (item.port == 0) { wake.wait (100); continue; }
-            if (socket.write (item.host, item.port, item.packet.getData(), (int) item.packet.getSize()) > 0) ++sentCount;
+            // Resolved here, on this thread, since a name can take a lookup; once per name, as JUCE's own
+            // write keeps the last address it resolved.
+            if (item.host != lastHost) { lastHost = item.host; lastAddress = ipv4For (item.host); }
+            if (socket.write (lastAddress, item.port, item.packet.getData(), (int) item.packet.getSize()) > 0) ++sentCount;
             else ++failedCount;
             const std::scoped_lock lock (queueLock);
             busy = false;
@@ -131,6 +160,7 @@ struct OscService::Sender final : juce::Thread
     }
 
     struct Item { juce::String host; int port = 0; juce::MemoryBlock packet; };
+    juce::String lastHost, lastAddress;
     std::mutex queueLock;
     std::deque<Item> queue;
     bool busy = false;

@@ -183,6 +183,17 @@ int main()
         check ((bool) bundled["ok"] && got.size() == 2 && got[0]["address"].toString() == "/a" && got[1]["address"].toString() == "/b",
                "a bundle to a named target arrives as its messages, in order");
 
+        // The check above failed on Windows: there "localhost" resolves to ::1 first, and JUCE's
+        // datagram socket is IPv4, so every send to "localhost" failed. This machine may resolve it
+        // to 127.0.0.1 only, so the IPv6 loopback is asked for by number: the same path, anywhere.
+        service.command (juce::JSON::parse ("{\"op\":\"send\",\"to\":\"::1:" + juce::String (port)
+                                            + "\",\"address\":\"/six\",\"args\":[],\"types\":\"\"}"));
+        service.waitUntilSentForTesting();
+        got.clear();
+        for (int i = 0; i < 100 && got.isEmpty(); ++i) { juce::Thread::sleep (5); service.deliverNowForTesting(); }
+        check (got.size() == 1 && got[0]["address"].toString() == "/six",
+               "a send to this computer's IPv6 loopback arrives at the IPv4 listener");
+
         // The network: nobody to ask is a no, and not remembered.
         auto net = service.command (juce::JSON::parse ("{\"op\":\"listen\",\"port\":" + juce::String (port) + ",\"network\":true,\"panel\":\"p1\"}"));
         check (! (bool) net["ok"] && ! (bool) service.command (juce::JSON::parse ("{\"op\":\"status\"}"))["listening"],
