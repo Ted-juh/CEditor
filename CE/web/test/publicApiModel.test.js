@@ -147,6 +147,17 @@ test('all three maps come back as one list, tagged by direction', () => {
   assert.deepEqual(rows.map((row) => row.name), ['a', 'b', 'c']);
 });
 
+test('an input or output that names no type has its channel\'s; one that names a type keeps it', () => {
+  // A library copy sets its channel to int; the entries it got from the package say no type, so
+  // the contract reads int too rather than the float every untyped entry used to show.
+  const control = component({
+    inputs: { a: { channel: 'mainValue' }, b: { channel: 'mainValue', type: 'float' } },
+    outputs: { c: { channel: 'mainValue' } },
+  });
+  control._children.ValueChannels._children.mainValue.type = 'int';
+  assert.deepEqual(readContract(control).map((row) => [row.name, row.type]), [['a', 'int'], ['b', 'float'], ['c', 'int']]);
+});
+
 test('an input and a property of the same name stay separable', () => {
   const control = component({
     inputs: { size: { channel: 'mainValue', type: 'float' } },

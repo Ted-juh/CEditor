@@ -548,7 +548,7 @@
         "Core": {"name":"qa07_starter_macroRings_verdict","id":"qa07_starter_macroRings_verdict","controlType":"Label"},
         "Transform": {"x":220,"y":86,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"3 rings + 3 value channels + 3 hit zones + public API\n88% ready — 7/8 steps\nvalid · 7 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"3 rings + 3 value channels + 3 hit zones + public API\n88% ready — 7/8 steps\nvalid · 1 warning\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -616,7 +616,7 @@
         "Core": {"name":"qa07_starter_circularTickSlider_verdict","id":"qa07_starter_circularTickSlider_verdict","controlType":"Label"},
         "Transform": {"x":208,"y":346,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"circular slider + radial ticks + pointer + public API\n88% ready — 7/8 steps\nvalid · 2 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"circular slider + radial ticks + pointer + public API\n88% ready — 7/8 steps\nvalid · no issues\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -683,7 +683,7 @@
         "Core": {"name":"qa07_starter_circularLedRing_verdict","id":"qa07_starter_circularLedRing_verdict","controlType":"Label"},
         "Transform": {"x":220,"y":594,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"LED generator + circular drag zone + 0-127 value + public API\n88% ready — 7/8 steps\nvalid · 2 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"LED generator + circular drag zone + 0-127 value + public API\n88% ready — 7/8 steps\nvalid · no issues\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -751,7 +751,7 @@
         "Core": {"name":"qa07_starter_dualSliderSwitch_verdict","id":"qa07_starter_dualSliderSwitch_verdict","controlType":"Label"},
         "Transform": {"x":272,"y":854,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"2 sliders + mode button + switch link + public API\n88% ready — 7/8 steps\nvalid · 7 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"2 sliders + mode button + switch link + public API\n88% ready — 7/8 steps\nvalid · 1 warning\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -809,7 +809,7 @@
         "Core": {"name":"qa07_starter_tripleValueSlider_verdict","id":"qa07_starter_tripleValueSlider_verdict","controlType":"Label"},
         "Transform": {"x":910,"y":854,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"3 handles + range values + linked rules + public API\n88% ready — 7/8 steps\nvalid · 7 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"3 handles + range values + linked rules + public API\n88% ready — 7/8 steps\nvalid · 1 warning\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -937,7 +937,7 @@
         "Core": {"name":"qa07_starter_xyGridPad_verdict","id":"qa07_starter_xyGridPad_verdict","controlType":"Label"},
         "Transform": {"x":236,"y":1242,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"grid generator + X/Y channels + cell hit zones + cursor\n88% ready — 7/8 steps\nvalid · 7 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"grid generator + X/Y channels + cell hit zones + cursor\n88% ready — 7/8 steps\nvalid · 1 warning\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -1002,7 +1002,7 @@
         "Core": {"name":"qa07_starter_scrollPianoBar_verdict","id":"qa07_starter_scrollPianoBar_verdict","controlType":"Label"},
         "Transform": {"x":352,"y":1518,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"piano generator + note output + scroll channel + velocity\n88% ready — 7/8 steps\nvalid · 7 warnings\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"piano generator + note output + scroll channel + velocity\n88% ready — 7/8 steps\nvalid · 1 warning\nopen: Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -1068,7 +1068,7 @@
         "Core": {"name":"qa07_starter_filmstripKnob_verdict","id":"qa07_starter_filmstripKnob_verdict","controlType":"Label"},
         "Transform": {"x":184,"y":1696,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"filmstrip asset + frame generator + dial hit zone + public API\n100% ready — 8/8 steps\nvalid · 4 warnings\nevery step done","_children":{"Font":{"size":10}}},
+        "Text": {"content":"filmstrip asset + frame generator + dial hit zone + public API\n100% ready — 8/8 steps\nvalid · 2 warnings\nevery step done","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -1132,7 +1132,7 @@
         "Core": {"name":"qa07_starter_segmentLevelMeter_verdict","id":"qa07_starter_segmentLevelMeter_verdict","controlType":"Label"},
         "Transform": {"x":272,"y":1914,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"LED generator + level input + live fill binding + public API\n75% ready — 6/8 steps\nvalid · 3 warnings\nopen: Interaction, Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"LED generator + level input + live fill binding + public API\n75% ready — 6/8 steps\nvalid · 1 warning\nopen: Interaction, Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"
@@ -1238,7 +1238,7 @@
         "Core": {"name":"qa07_starter_valueReadout_verdict","id":"qa07_starter_valueReadout_verdict","controlType":"Label"},
         "Transform": {"x":28,"y":2044,"width":330,"height":66},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"readout text + value input + format binding + public API\n75% ready — 6/8 steps\nvalid · 4 warnings\nopen: Interaction, Packaged Assets","_children":{"Font":{"size":10}}},
+        "Text": {"content":"readout text + value input + format binding + public API\n75% ready — 6/8 steps\nvalid · 2 warnings\nopen: Interaction, Packaged Assets","_children":{"Font":{"size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":5}
       },
       "_type": "Control"

@@ -144,25 +144,6 @@ function publish(control, { ranges = false } = {}) {
   return control;
 }
 
-/**
- * Every published input and output says its channel's type and default value. The LED switch's
- * said float over an int channel, and none said a default; the arpeggio grid's come from the GAIA
- * grid, which says no defaults either.
- */
-function completeContract(control) {
-  const channels = control._children.ValueChannels?._children ?? {};
-  const published = control._children.PublishedProperties ?? {};
-  for (const group of ['inputs', 'outputs']) {
-    for (const entry of Object.values(published[group] ?? {})) {
-      const channel = channels[entry.channel];
-      if (!channel) continue;
-      entry.type = channel.type ?? entry.type;
-      if (!('defaultValue' in entry)) entry.defaultValue = channel.defaultValue ?? channel.currentValue ?? channel.min ?? 0;
-    }
-  }
-  return control;
-}
-
 /** The two-lamp switch: OFF and ON, the way a parameter with one button and a lamp reads. */
 function ledSwitch() {
   const control = gaiaLeds({ options: [{ label: 'OFF', value: 0 }, { label: 'ON', value: 1 }], width: 64, rowHeight: 15, legacySkin: true });
@@ -266,7 +247,7 @@ function buildPackages(versions) {
   const packages = {};
   for (const [key, spec] of Object.entries(COMPONENTS)) {
     const version = versions[key] ?? '1.0.0';
-    const control = completeContract(spec.versions[version]());
+    const control = spec.versions[version]();
     control._children.Core.name = spec.name;
     // createControl stamps a time-based id; a fixed one keeps the library file byte-identical
     // between runs. A placed copy gets an id of its own either way.

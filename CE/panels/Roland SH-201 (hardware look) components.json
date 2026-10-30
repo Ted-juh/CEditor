@@ -27,7 +27,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "ca9f084a",
+      "fingerprint": "c3080352",
       "summary": {
         "parts": 16,
         "materializedParts": 16,
@@ -361,8 +361,7 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value",
-            "defaultValue": 0
+            "channel": "value"
           }
         ],
         "outputs": [
@@ -370,8 +369,7 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value",
-            "defaultValue": 0
+            "channel": "value"
           }
         ],
         "properties": [
@@ -463,18 +461,14 @@
           "value": {
             "channel": "value",
             "label": "Value",
-            "enabled": true,
-            "type": "float",
-            "defaultValue": 0
+            "enabled": true
           }
         },
         "outputs": {
           "value": {
             "channel": "value",
             "label": "Value",
-            "enabled": true,
-            "type": "float",
-            "defaultValue": 0
+            "enabled": true
           }
         },
         "editableProperties": {
@@ -6138,18 +6132,14 @@
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "enabled": true,
-                "type": "float",
-                "defaultValue": 0
+                "enabled": true
               }
             },
             "outputs": {
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "enabled": true,
-                "type": "float",
-                "defaultValue": 0
+                "enabled": true
               }
             },
             "editableProperties": {
@@ -6291,7 +6281,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "85f96e28",
+      "fingerprint": "f99a3b40",
       "summary": {
         "parts": 26,
         "materializedParts": 26,
@@ -6651,8 +6641,7 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value",
-            "defaultValue": 0
+            "channel": "value"
           }
         ],
         "outputs": [
@@ -6660,8 +6649,7 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value",
-            "defaultValue": 0
+            "channel": "value"
           }
         ],
         "properties": [
@@ -6753,18 +6741,14 @@
           "value": {
             "channel": "value",
             "label": "Value",
-            "enabled": true,
-            "type": "float",
-            "defaultValue": 0
+            "enabled": true
           }
         },
         "outputs": {
           "value": {
             "channel": "value",
             "label": "Value",
-            "enabled": true,
-            "type": "float",
-            "defaultValue": 0
+            "enabled": true
           }
         },
         "editableProperties": {
@@ -15503,18 +15487,14 @@
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "enabled": true,
-                "type": "float",
-                "defaultValue": 0
+                "enabled": true
               }
             },
             "outputs": {
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "enabled": true,
-                "type": "float",
-                "defaultValue": 0
+                "enabled": true
               }
             },
             "editableProperties": {
@@ -15656,7 +15636,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "11665e23",
+      "fingerprint": "434033b1",
       "summary": {
         "parts": 7,
         "materializedParts": 7,
@@ -15873,8 +15853,7 @@
             "name": "value",
             "label": "Value",
             "type": "int",
-            "channel": "value",
-            "defaultValue": 0
+            "channel": "value"
           }
         ],
         "outputs": [
@@ -15882,8 +15861,7 @@
             "name": "value",
             "label": "Value",
             "type": "int",
-            "channel": "value",
-            "defaultValue": 0
+            "channel": "value"
           }
         ],
         "properties": [],
@@ -15919,18 +15897,14 @@
           "value": {
             "channel": "value",
             "label": "Value",
-            "enabled": true,
-            "type": "int",
-            "defaultValue": 0
+            "enabled": true
           }
         },
         "outputs": {
           "value": {
             "channel": "value",
             "label": "Value",
-            "enabled": true,
-            "type": "int",
-            "defaultValue": 0
+            "enabled": true
           }
         },
         "editableProperties": {}
@@ -18768,18 +18742,14 @@
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "enabled": true,
-                "type": "int",
-                "defaultValue": 0
+                "enabled": true
               }
             },
             "outputs": {
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "enabled": true,
-                "type": "int",
-                "defaultValue": 0
+                "enabled": true
               }
             },
             "editableProperties": {}
@@ -18870,7 +18840,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "348484f3",
+      "fingerprint": "d1decd24",
       "summary": {
         "parts": 1,
         "materializedParts": 133,
@@ -19232,15 +19202,13 @@
             "name": "currentStep",
             "label": "Current Step",
             "type": "int",
-            "channel": "arpCurrentStep",
-            "defaultValue": 0
+            "channel": "arpCurrentStep"
           },
           {
             "name": "endStep",
             "label": "Loop End Step",
             "type": "int",
-            "channel": "arpEndStep",
-            "defaultValue": 32
+            "channel": "arpEndStep"
           }
         ],
         "outputs": [
@@ -19248,29 +19216,25 @@
             "name": "gate",
             "label": "Gate",
             "type": "bool",
-            "channel": "arpGate",
-            "defaultValue": 0
+            "channel": "arpGate"
           },
           {
             "name": "note",
             "label": "Note",
             "type": "int",
-            "channel": "arpNote",
-            "defaultValue": 0
+            "channel": "arpNote"
           },
           {
             "name": "velocity",
             "label": "Velocity",
             "type": "int",
-            "channel": "arpVelocity",
-            "defaultValue": 0
+            "channel": "arpVelocity"
           },
           {
             "name": "pattern",
             "label": "Pattern",
             "type": "array",
-            "channel": "arpPattern",
-            "defaultValue": 0
+            "channel": "arpPattern"
           }
         ],
         "properties": [],
@@ -19306,40 +19270,34 @@
           "currentStep": {
             "channel": "arpCurrentStep",
             "label": "Current Step",
-            "type": "int",
-            "defaultValue": 0
+            "type": "int"
           },
           "endStep": {
             "channel": "arpEndStep",
             "label": "Loop End Step",
-            "type": "int",
-            "defaultValue": 32
+            "type": "int"
           }
         },
         "outputs": {
           "gate": {
             "channel": "arpGate",
             "label": "Gate",
-            "type": "bool",
-            "defaultValue": 0
+            "type": "bool"
           },
           "note": {
             "channel": "arpNote",
             "label": "Note",
-            "type": "int",
-            "defaultValue": 0
+            "type": "int"
           },
           "velocity": {
             "channel": "arpVelocity",
             "label": "Velocity",
-            "type": "int",
-            "defaultValue": 0
+            "type": "int"
           },
           "pattern": {
             "channel": "arpPattern",
             "label": "Pattern",
-            "type": "array",
-            "defaultValue": 0
+            "type": "array"
           }
         },
         "editableProperties": {}
@@ -20466,40 +20424,34 @@
               "currentStep": {
                 "channel": "arpCurrentStep",
                 "label": "Current Step",
-                "type": "int",
-                "defaultValue": 0
+                "type": "int"
               },
               "endStep": {
                 "channel": "arpEndStep",
                 "label": "Loop End Step",
-                "type": "int",
-                "defaultValue": 32
+                "type": "int"
               }
             },
             "outputs": {
               "gate": {
                 "channel": "arpGate",
                 "label": "Gate",
-                "type": "bool",
-                "defaultValue": 0
+                "type": "bool"
               },
               "note": {
                 "channel": "arpNote",
                 "label": "Note",
-                "type": "int",
-                "defaultValue": 0
+                "type": "int"
               },
               "velocity": {
                 "channel": "arpVelocity",
                 "label": "Velocity",
-                "type": "int",
-                "defaultValue": 0
+                "type": "int"
               },
               "pattern": {
                 "channel": "arpPattern",
                 "label": "Pattern",
-                "type": "array",
-                "defaultValue": 0
+                "type": "array"
               }
             },
             "editableProperties": {}

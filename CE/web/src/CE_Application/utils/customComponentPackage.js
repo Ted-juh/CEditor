@@ -266,21 +266,21 @@ function definedEntryPairs(entry, keys) {
   );
 }
 
-function compactPublicInputEntry(name, entry) {
+function compactPublicInputEntry(name, entry, channel = null) {
   return {
     name,
     label: String(entry?.label ?? name).trim() || name,
-    type: String(entry?.type ?? 'float').trim() || 'float',
+    type: String(entry?.type ?? channel?.type ?? 'float').trim() || 'float',
     channel: String(entry?.channel ?? '').trim(),
     ...definedEntryPairs(entry, ['min', 'max', 'step', 'defaultValue', 'values']),
   };
 }
 
-function compactPublicOutputEntry(name, entry) {
+function compactPublicOutputEntry(name, entry, channel = null) {
   return {
     name,
     label: String(entry?.label ?? name).trim() || name,
-    type: String(entry?.type ?? 'float').trim() || 'float',
+    type: String(entry?.type ?? channel?.type ?? 'float').trim() || 'float',
     channel: String(entry?.channel ?? '').trim(),
     ...definedEntryPairs(entry, ['min', 'max', 'step', 'defaultValue', 'values']),
   };
@@ -359,6 +359,11 @@ export function splitPackageWarnings(warnings = []) {
   return { forUser, forAuthor };
 }
 
+/**
+ * What a published entry leaves unsaid, it says through its channel: the type, the range and the
+ * default value. A copy that sets its channel to int 28..100 publishes int 28..100 without an edit
+ * to its contract, and the contract does not report the package's float 0..1 as a fault of the copy.
+ */
 function publishedEntryWarnings(kind, name, entry, channel = null) {
   const warnings = [];
   const type = String(entry?.type ?? channel?.type ?? 'float').trim().toLowerCase();
@@ -382,8 +387,8 @@ function publishedEntryWarnings(kind, name, entry, channel = null) {
     } else if (min > max) {
       warnings.push(`${label} min is greater than max.`);
     }
-    if (hasOwnValue(entry, 'defaultValue')) {
-      const defaultValue = Number(entry.defaultValue);
+    if (hasOwnValue(entry, 'defaultValue') || hasOwnValue(channel, 'defaultValue')) {
+      const defaultValue = Number(hasOwnValue(entry, 'defaultValue') ? entry.defaultValue : channel.defaultValue);
       if (Number.isFinite(defaultValue) && hasMin && hasMax && (defaultValue < Math.min(min, max) || defaultValue > Math.max(min, max))) {
         warnings.push(`${label} default value is outside its public range.`);
       }
@@ -409,8 +414,9 @@ function publishedEntryWarnings(kind, name, entry, channel = null) {
 
 export function summarizeCustomComponentPublicApi(control) {
   const published = control?._children?.PublishedProperties ?? {};
-  const inputs = enabledEntries(published.inputs ?? {}).map(([name, entry]) => compactPublicInputEntry(name, entry));
-  const outputs = enabledEntries(published.outputs ?? {}).map(([name, entry]) => compactPublicOutputEntry(name, entry));
+  const channels = control?._children?.ValueChannels?._children ?? {};
+  const inputs = enabledEntries(published.inputs ?? {}).map(([name, entry]) => compactPublicInputEntry(name, entry, channels[entry?.channel]));
+  const outputs = enabledEntries(published.outputs ?? {}).map(([name, entry]) => compactPublicOutputEntry(name, entry, channels[entry?.channel]));
   const properties = enabledEntries(published.editableProperties ?? {}).map(([name, entry]) => compactEditablePropertyEntry(name, entry));
   return {
     inputs,

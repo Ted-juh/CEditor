@@ -87,19 +87,21 @@ export function targetOf(entry, kind) {
 /** Every entry of every kind, as one list. */
 export function readContract(control) {
   const published = control?._children?.PublishedProperties ?? null;
+  const channels = control?._children?.ValueChannels?._children ?? {};
   const rows = [];
   for (const kind of API_KINDS) {
     const map = published?.[API_MAP_BY_KIND[kind]] ?? {};
     for (const name of Object.keys(map)) {
       const entry = map[name];
       if (!entry || typeof entry !== 'object') continue;
-      rows.push(describeRow(kind, name, entry));
+      rows.push(describeRow(kind, name, entry, kind === 'property' ? null : channels[entry.channel]));
     }
   }
   return rows;
 }
 
-export function describeRow(kind, name, entry) {
+/** An input or output that names no type of its own has its channel's (`channel`, when there is one). */
+export function describeRow(kind, name, entry, channel = null) {
   const target = targetOf(entry, kind);
   return {
     key: rowKey(kind, name),
@@ -108,7 +110,7 @@ export function describeRow(kind, name, entry) {
     entry,
     label: String(entry?.label ?? name),
     enabled: entry?.enabled !== false,
-    type: String(entry?.type ?? 'float').trim().toLowerCase() || 'float',
+    type: String(entry?.type ?? channel?.type ?? 'float').trim().toLowerCase() || 'float',
     target: target.value,
     targetField: target.field,
     min: entry?.min,

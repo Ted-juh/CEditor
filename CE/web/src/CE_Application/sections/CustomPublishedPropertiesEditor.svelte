@@ -487,7 +487,7 @@
           <strong>Inputs</strong>
           {#if enabledInputEntries.length}
             {#each enabledInputEntries as [name, entry]}
-              <span>{name} &gt; {entry.channel || 'none'} ({entry.type ?? 'float'})</span>
+              <span>{name} &gt; {entry.channel || 'none'} ({entry.type ?? channelType(entry.channel)})</span>
             {/each}
           {:else}
             <span class="muted">No inputs published</span>
@@ -497,7 +497,7 @@
           <strong>Outputs</strong>
           {#if enabledOutputEntries.length}
             {#each enabledOutputEntries as [name, entry]}
-              <span>{entry.channel || 'none'} &gt; {name} ({entry.type ?? 'float'})</span>
+              <span>{entry.channel || 'none'} &gt; {name} ({entry.type ?? channelType(entry.channel)})</span>
             {/each}
           {:else}
             <span class="muted">No outputs published</span>

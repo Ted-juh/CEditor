@@ -133,7 +133,7 @@ await ev(() => window.__api.select('level'));
 await page.waitForTimeout(250);
 const warnings = await ev(() => window.__api.warnings());
 check('a package warning sits on the row it names', () => {
-  // The validator says: Published output "level" has no package default value. In the panel that
+  // The validator says: Published output "level" default value is outside its public range. In the panel that
   // is a sentence in a list of eight, matched to its row by reading the quoted name.
   assert.ok(warnings.length >= 1, `warnings on level: ${warnings.join(' | ')}`);
   assert.ok(warnings.every((text) => text.includes('level')), `should all be about this row: ${warnings.join(' | ')}`);

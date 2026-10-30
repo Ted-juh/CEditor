@@ -31,7 +31,8 @@ control._children.PublishedProperties = {
     muted: { enabled: false, label: 'Muted', channel: 'noSuchChannel', type: 'float' },
   },
   outputs: {
-    level: { enabled: true, label: 'Level', channel: 'mainValue', type: 'float' },
+    // A default outside its channel's 0..1, which the validator reports on this row.
+    level: { enabled: true, label: 'Level', channel: 'mainValue', type: 'float', defaultValue: 5 },
   },
   editableProperties: {
     caption: { enabled: true, label: 'Caption', path: 'Parts.label.Text.content', type: 'text', defaultValue: 'INIT' },

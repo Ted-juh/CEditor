@@ -28,7 +28,7 @@ import { fileURLToPath } from 'node:url';
 import { deserializePanel } from '../src/CE_Application/stores/panelModel.js';
 import { flatControls, getChildControls } from '../src/CE_Application/utils/containment.js';
 import {
-  normalizeCustomComponentLibraryEnvelope, customComponentPackageId,
+  normalizeCustomComponentLibraryEnvelope, customComponentPackageId, validateCustomComponentPackage,
 } from '../src/CE_Application/utils/customComponentPackage.js';
 import { diffCustomComponentAgainstSource } from '../src/CE_Application/utils/customComponentSourceLink.js';
 import { render } from 'svelte/server';
@@ -199,6 +199,16 @@ for (const look of [draft, hardware]) {
     for (const envelope of library.packages) {
       const { issues = [], warnings = [] } = envelope.validation ?? {};
       assert.deepEqual([...issues, ...warnings], [], `${envelope.metadata.name} ${envelope.metadata.version}`);
+    }
+  });
+
+  test(`${file}: a placed copy's Publish › Contract has nothing to report`, () => {
+    // A copy sets its own channel (Coarse Tune: int 28..100, default 64). Its published input and
+    // output say no type or default of their own, so they are the channel's; when the generator froze
+    // the package's float 0 on them, each copy showed four warnings it could do nothing about.
+    for (const control of all.filter(isCopy)) {
+      const { issues, warnings } = validateCustomComponentPackage(control);
+      assert.deepEqual([...issues, ...warnings], [], control._children.Core.name);
     }
   });
 
