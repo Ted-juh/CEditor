@@ -1,5 +1,6 @@
 <script>
   import { onDestroy } from 'svelte';
+  import { onSurfaceZoomRequest } from '../stores/componentWorkspace.js';
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
   import Copy from 'lucide-svelte/icons/copy';
@@ -123,6 +124,7 @@
     smartSnapTargets,
     snapGuides as snapGuidesBase,
     clampSurfaceZoom,
+    surfaceWheelZoom,
     clampZoomIncrement,
     clampSnapSize,
     snapToGrid,
@@ -1922,17 +1924,11 @@
     if (!(event.ctrlKey || event.metaKey) || !surfaceScrollEl) return;
     event.preventDefault();
     const rect = surfaceScrollEl.getBoundingClientRect();
-    const pointerX = event.clientX - rect.left + surfaceScrollEl.scrollLeft;
-    const pointerY = event.clientY - rect.top + surfaceScrollEl.scrollTop;
-    const before = surfaceZoom;
-    const factor = Math.exp(-event.deltaY * 0.0015);
-    setZoom(before * factor);
-    const ratio = surfaceZoom / before;
-    if (ratio !== 1) {
-      // Keep the cursor's content point stationary after the scale change.
-      surfaceScrollEl.scrollLeft += (pointerX * ratio) - pointerX;
-      surfaceScrollEl.scrollTop += (pointerY * ratio) - pointerY;
-    }
+    const { scrollLeft, scrollTop } = surfaceScrollEl;
+    const next = surfaceWheelZoom({ zoom: surfaceZoom, deltaY: event.deltaY, pointerX: event.clientX - rect.left + scrollLeft, pointerY: event.clientY - rect.top + scrollTop, scrollLeft, scrollTop });
+    surfaceZoom = next.zoom;
+    surfaceScrollEl.scrollLeft = next.scrollLeft;
+    surfaceScrollEl.scrollTop = next.scrollTop;
   }
 
   // Bottom zoom bar helpers (percent-based, like the Panel Designer's ZoomBar).
@@ -1970,6 +1966,9 @@
   function setSnapSize(value) {
     snapSize = clampSnapSize(numberOr(value, 10));
   }
+
+  // Ctrl+plus, minus and 0 (App.svelte takes them wherever focus is while the designer is open).
+  onDestroy(onSurfaceZoomRequest({ 'zoom-in': () => zoomStep(surfaceZoomIncrement), 'zoom-out': () => zoomStep(-surfaceZoomIncrement), 'fit-to-window': () => fitArtboardToView() }));
 
   function fitArtboardToView() {
     if (!surfaceScrollEl) {

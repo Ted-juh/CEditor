@@ -1374,6 +1374,10 @@
   }
 
   function handleWheel(event) {
+    // Ctrl+scroll is zoom: in the Component Designer's Preview it went to the component, turned
+    // its value and was stopped there, so the designer's zoom never saw it and only empty surface
+    // zoomed. It passes through now; a plain scroll still drives the component.
+    if (event.ctrlKey || event.metaKey) return;
     if (isReadOnly) return;
     if (isCustomComponent) {
       if (isDisabled) return;

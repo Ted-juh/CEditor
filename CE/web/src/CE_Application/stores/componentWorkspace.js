@@ -23,6 +23,30 @@ export const activeComponentControl = derived(
   ($activeComponentDocument) => $activeComponentDocument?.control ?? null
 );
 
+/**
+ * Ctrl+plus, minus and 0 while the Component Designer is open. App.svelte takes those keys wherever
+ * focus is; on the panel they zoom the canvas, and here they ask the designer's surface, which had
+ * no keyboard zoom at all. `n` counts the requests, so the same key twice zooms twice.
+ */
+export const surfaceZoomRequest = writable({ n: 0, command: null });
+
+export function requestSurfaceZoom(command) {
+  surfaceZoomRequest.update(({ n }) => ({ n: n + 1, command }));
+}
+
+/**
+ * The designer's side: `actions[command]()` for each request from now on. A request made before the
+ * designer existed is not its to carry out. Returns the unsubscribe.
+ */
+export function onSurfaceZoomRequest(actions) {
+  let last = get(surfaceZoomRequest).n;
+  return surfaceZoomRequest.subscribe(({ n, command }) => {
+    if (n === last) return;
+    last = n;
+    actions[command]?.();
+  });
+}
+
 export function openComponentSurfaceWorkspace() {
   componentWorkspaceMode.set('surface');
 }

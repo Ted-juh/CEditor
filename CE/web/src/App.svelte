@@ -53,7 +53,7 @@
   import { customComponentLibrary } from './CE_Application/stores/customComponentLibrary.js';
   import { installDocumentationWindowEvents, openDocumentation } from './CE_Application/stores/documentation.js';
   import { aboutSignal, documentationSignal, requestFitToWindow, requestZoomStep, requestZoomToSelection } from './CE_Application/stores/editorCommands.js';
-  import { componentWorkspaceMode } from './CE_Application/stores/componentWorkspace.js';
+  import { componentWorkspaceMode, requestSurfaceZoom } from './CE_Application/stores/componentWorkspace.js';
   import { colorTarget } from './CE_Application/stores/colorTarget.js';
   import { gradientTarget } from './CE_Application/stores/gradientTarget.js';
   import { displayTabRequest } from './CE_Application/stores/displayTab.js';
@@ -139,12 +139,11 @@
     // Ctrl+plus, Ctrl+minus and Ctrl+0 are the canvas's zoom wherever focus is: in the dock, the
     // properties panel or a text field they used to reach the browser engine, which zoomed the
     // whole interface instead. The canvas wrapper takes them itself when it has focus
-    // (defaultPrevented). The Component Designer's surface is not the canvas; there they only
-    // stay away from the engine.
+    // (defaultPrevented). While the Component Designer is open they zoom its surface instead.
     const zoomCommand = e.defaultPrevented ? null : canvasZoomCommand(e);
     if (zoomCommand) {
       e.preventDefault();
-      if ($componentWorkspaceMode === 'surface') return;
+      if ($componentWorkspaceMode === 'surface') { requestSurfaceZoom(zoomCommand); return; }
       if (zoomCommand === 'zoom-in') requestZoomStep(1);
       else if (zoomCommand === 'zoom-out') requestZoomStep(-1);
       else requestFitToWindow();

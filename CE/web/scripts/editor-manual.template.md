@@ -245,9 +245,10 @@ Zoom with **Ctrl++** and **Ctrl+-**, or **Ctrl+scroll wheel** to zoom where the 
 fits the whole panel in the window. The scroll wheel scrolls; **Shift+wheel** scrolls sideways. Hold
 **Space** and drag, or drag with the middle mouse button, to move around.
 
-The zoom keys zoom the canvas wherever you are, even while typing in a field. **Ctrl+scroll wheel**
-zooms only the canvas, the Viewer and the Component Designer, whichever is under the pointer;
-anywhere else it does nothing. The size of the whole window's contents, menus and panels included, is
+The zoom keys zoom the canvas wherever you are, even while typing in a field, and the Component
+Designer's surface while it is open. **Ctrl+scroll wheel** zooms only the canvas, the Viewer and the
+Component Designer, whichever is under the pointer, also over a component in the designer's Preview,
+where a plain scroll drives it; anywhere else it does nothing. The size of the whole window's contents, menus and panels included, is
 **Settings → General → Interface Size**, and the canvas's zoom works on top of it.
 
 ### Copying, duplicating and deleting

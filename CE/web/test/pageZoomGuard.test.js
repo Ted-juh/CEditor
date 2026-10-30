@@ -80,3 +80,50 @@ test('the app installs the guard, takes the zoom keys wherever focus is, and sen
   const bridge = src('CE_Application/bridge/bridge.js');
   assert.match(bridge, /emitEvent\('setInterfaceZoom', \{ factor: Number\(percent\) \/ 100 \}\)/);
 });
+
+test('in the Component Designer the zoom keys zoom its surface, and Ctrl+scroll over a component in Preview zooms too', async () => {
+  // The designer had no keyboard zoom, and in its Preview the component took every scroll over it,
+  // Ctrl+scroll included, so only the empty surface around it zoomed.
+  const { surfaceZoomRequest, requestSurfaceZoom } = await import('../src/CE_Application/stores/componentWorkspace.js');
+  const { get } = await import('svelte/store');
+  const before = get(surfaceZoomRequest).n;
+  requestSurfaceZoom('zoom-in');
+  requestSurfaceZoom('zoom-in');
+  assert.deepEqual(get(surfaceZoomRequest), { n: before + 2, command: 'zoom-in' }, 'the same key twice is two requests');
+
+  const app = src('App.svelte');
+  assert.match(app, /if \(\$componentWorkspaceMode === 'surface'\) \{ requestSurfaceZoom\(zoomCommand\); return; \}/);
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(designer, /onDestroy\(onSurfaceZoomRequest\(\{ 'zoom-in': \(\) => zoomStep\(surfaceZoomIncrement\), 'zoom-out': \(\) => zoomStep\(-surfaceZoomIncrement\), 'fit-to-window': \(\) => fitArtboardToView\(\) \}\)\);/);
+  const testSurface = src('CE_Application/components/InteractiveTestSurface.svelte');
+  assert.match(testSurface, /function handleWheel\(event\) \{[\s\S]{0,400}if \(event\.ctrlKey \|\| event\.metaKey\) return;\s*if \(isReadOnly\) return;/,
+    'Ctrl+scroll over a component in Preview is taken by the component again');
+});
+
+test('the designer hears only the zoom requests made while it is open', async () => {
+  const { requestSurfaceZoom, onSurfaceZoomRequest } = await import('../src/CE_Application/stores/componentWorkspace.js');
+  requestSurfaceZoom('zoom-in'); // before the designer opened
+  const heard = [];
+  const off = onSurfaceZoomRequest({ 'zoom-in': () => heard.push('in'), 'fit-to-window': () => heard.push('fit') });
+  assert.deepEqual(heard, [], 'an earlier request zoomed a designer that was not open for it');
+  requestSurfaceZoom('fit-to-window');
+  requestSurfaceZoom('zoom-out'); // no action given for it: nothing, and no error
+  requestSurfaceZoom('zoom-in');
+  off();
+  requestSurfaceZoom('zoom-in');
+  assert.deepEqual(heard, ['fit', 'in']);
+});
+
+test('Ctrl+scroll on the design surface keeps the point under the cursor where it was', async () => {
+  const { surfaceWheelZoom, SURFACE_ZOOM_MAX } = await import('../src/CE_Application/utils/customDesignSurfaceGeometry.js');
+  const at = { zoom: 2, deltaY: -100, pointerX: 300, pointerY: 120, scrollLeft: 40, scrollTop: 10 };
+  const next = surfaceWheelZoom(at);
+  assert.ok(next.zoom > at.zoom, 'scrolling up zooms in');
+  // The content point under the cursor, in the design's own units, before and after.
+  const cursorX = at.pointerX - at.scrollLeft;
+  const cursorY = at.pointerY - at.scrollTop;
+  assert.ok(Math.abs((next.scrollLeft + cursorX) / next.zoom - at.pointerX / at.zoom) < 1e-9);
+  assert.ok(Math.abs((next.scrollTop + cursorY) / next.zoom - at.pointerY / at.zoom) < 1e-9);
+  const top = surfaceWheelZoom({ ...at, zoom: SURFACE_ZOOM_MAX });
+  assert.deepEqual(top, { zoom: SURFACE_ZOOM_MAX, scrollLeft: at.scrollLeft, scrollTop: at.scrollTop }, 'at the limit nothing moves');
+});

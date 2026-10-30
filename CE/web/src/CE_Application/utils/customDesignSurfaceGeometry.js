@@ -393,6 +393,17 @@ export function clampSurfaceZoom(value) {
   return Math.max(SURFACE_ZOOM_MIN, Math.min(SURFACE_ZOOM_MAX, n));
 }
 
+/**
+ * Ctrl+scroll on the design surface: the zoom it lands on, and the scroll that keeps the content
+ * point under the cursor where it was. `pointerX`/`pointerY` are the cursor in the scroll area's
+ * content (client position less the area's left/top, plus its scroll).
+ */
+export function surfaceWheelZoom({ zoom, deltaY, pointerX, pointerY, scrollLeft, scrollTop }) {
+  const next = clampSurfaceZoom(zoom * Math.exp(-deltaY * 0.0015));
+  const ratio = next / zoom;
+  return { zoom: next, scrollLeft: scrollLeft + pointerX * ratio - pointerX, scrollTop: scrollTop + pointerY * ratio - pointerY };
+}
+
 /** Clamp the zoom step (in percentage points) a +/- press or a wheel notch applies. */
 export function clampZoomIncrement(value) {
   const n = parseInt(value, 10);
