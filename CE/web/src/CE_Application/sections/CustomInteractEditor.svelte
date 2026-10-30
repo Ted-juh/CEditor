@@ -12,6 +12,11 @@
   import { numberOr } from '../utils/primitives.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
+  import FlagStrip from '../properties/FlagStrip.svelte';
+  import MousePointer from 'lucide-svelte/icons/mouse-pointer';
+  import Keyboard from 'lucide-svelte/icons/keyboard';
+  import Mouse from 'lucide-svelte/icons/mouse';
+  import Magnet from 'lucide-svelte/icons/magnet';
   import CustomValueChannelsEditor from './CustomValueChannelsEditor.svelte';
   import CustomBehaviorsEditor from './CustomBehaviorsEditor.svelte';
   import CustomHitZonesEditor from './CustomHitZonesEditor.svelte';
@@ -117,6 +122,19 @@
     updateControlProperty(core.id, `Behaviors.${name}.${field}`, value);
   }
 
+  // The four input switches, read as behaviorTakesInput reads them (Pointer, Keyboard and Snap on
+  // unless switched off, Wheel off unless on). They were only in Advanced › Behaviors; a component
+  // that should leave the wheel to the page is a Simple question.
+  function inputFlags(behavior) {
+    const interaction = behavior?.interaction ?? {};
+    return [
+      { key: 'pointer', title: 'Pointer — drag and click', on: interaction.pointer !== false, icon: MousePointer },
+      { key: 'keyboard', title: 'Keyboard — arrow keys, Home and End', on: interaction.keyboard !== false, icon: Keyboard },
+      { key: 'wheel', title: 'Wheel — the scroll wheel turns it', on: interaction.wheel === true, icon: Mouse },
+      { key: 'snap', title: 'Snap — values land on the channel\'s steps', on: interaction.snap !== false, icon: Magnet },
+    ];
+  }
+
   function setZoneField(name, field, value) {
     if (!core?.id) return;
     updateControlProperty(core.id, `HitZones.${name}.${field}`, value);
@@ -219,6 +237,9 @@
                       {#each DRAG_MODES as option (option)}<option value={option}>{option}</option>{/each}
                     </select>
                   </label>
+                  <div class="ro-field input-flags"><em>Input</em>
+                    <FlagStrip flags={inputFlags(behavior)} ontoggle={(key, next) => setBehaviorField(behaviorName, `interaction.${key}`, next)} />
+                  </div>
                 </div>
               {/if}
             {/each}
@@ -478,6 +499,10 @@
     align-items: center;
     gap: 4px;
     min-width: 0;
+  }
+
+  .field-row .input-flags {
+    width: 136px;
   }
 
   .field-row label em,

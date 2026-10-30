@@ -779,9 +779,9 @@ a step to undo. **Simple** and **Advanced**, at the foot of the properties panel
 the component's workings the properties panel shows.
 
 A behaviour is what turns the mouse, the keys or the wheel into a value. Each has four switches,
-under **Interaction** in its entry (Interact tab, **Advanced**, **Behaviors (flat list)**):
-**Pointer** (drag and click), **Keyboard** (arrow keys, Home and End), **Wheel** and **Snap** (values
-land on the channel's steps). They apply on the panel, in the designer's Preview and in an exported
+the **Input** chips beside it on the Interact tab (and under **Interaction** in **Advanced**,
+**Behaviors (flat list)**): **Pointer** (drag and click), **Keyboard** (arrow keys, Home and End),
+**Wheel** and **Snap** (values land on the channel's steps). They apply on the panel, in the designer's Preview and in an exported
 plug-in. A new slider or dial starts with Wheel on, a button, toggle or pad with it off; turn it
 off on a control that should leave the wheel to scrolling the page.
 

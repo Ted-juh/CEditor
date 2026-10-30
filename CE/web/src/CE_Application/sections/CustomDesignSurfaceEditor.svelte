@@ -3,27 +3,18 @@
   import { onSurfaceZoomRequest } from '../stores/componentWorkspace.js';
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
-  import BringToFront from 'lucide-svelte/icons/bring-to-front';
-  import ClipboardPaste from 'lucide-svelte/icons/clipboard-paste';
-  import Copy from 'lucide-svelte/icons/copy';
-  import CopyPlus from 'lucide-svelte/icons/copy-plus';
-  import SendToBack from 'lucide-svelte/icons/send-to-back';
   import SquaresUnite from 'lucide-svelte/icons/squares-unite';
   import SquaresSubtract from 'lucide-svelte/icons/squares-subtract';
   import SquaresIntersect from 'lucide-svelte/icons/squares-intersect';
   import SquaresExclude from 'lucide-svelte/icons/squares-exclude';
   import Eye from 'lucide-svelte/icons/eye';
   import EyeOff from 'lucide-svelte/icons/eye-off';
-  import Lock from 'lucide-svelte/icons/lock';
   import Maximize from 'lucide-svelte/icons/maximize';
   import PanelBottom from 'lucide-svelte/icons/panel-bottom';
   import PanelLeft from 'lucide-svelte/icons/panel-left';
   import PanelRight from 'lucide-svelte/icons/panel-right';
   import Ruler from 'lucide-svelte/icons/ruler';
   import Scissors from 'lucide-svelte/icons/scissors';
-  import Trash2 from 'lucide-svelte/icons/trash-2';
-  import Unlock from 'lucide-svelte/icons/unlock';
-  import Zap from 'lucide-svelte/icons/zap';
   import DisplayPanel from '../panels/DisplayPanel.svelte';
   import { applyControlPatch, getSection, removeControlNode, updateControlProperty } from '../stores/controls.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
@@ -87,6 +78,7 @@
   import { arcHandleStyle, arcPointerAngle, drawnCentre, followDrawn, moveSnapped, pivotPlacement, screenBounds } from '../utils/surfaceTransforms.js';
   import { partTransform } from '../utils/bezierPath.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
+  import SurfaceQuickbar from './SurfaceQuickbar.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
   import SurfaceLookBar from './SurfaceLookBar.svelte';
@@ -274,7 +266,8 @@
   }
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
-  let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom});`);
+  // --surface-unzoom keeps the layer and zone name labels at their own size on screen at any zoom.
+  let artboardStyle = $derived(`width:${artboardWidth}px; height:${artboardHeight}px; transform:scale(${surfaceZoom}); --surface-unzoom:${1 / surfaceZoom};`);
   let surfaceGridStyle = $derived(`--surface-grid-size:${Math.max(4, snapSize * surfaceZoom)}px;`);
   let showBounds = $derived(preview?.showBounds !== false);
   let showHitZones = $derived(preview?.showHitZones === true);
@@ -1961,6 +1954,16 @@
   function setSnapSize(value) {
     snapSize = clampSnapSize(numberOr(value, 10));
   }
+
+  // A component opens fitted to the surface, as a new one from a starter already did. It opened at
+  // 100%, so a 50×50 knob was a speck in the middle of the grid, in Edit and in Preview alike.
+  let fittedComponentId = null;
+  $effect(() => {
+    const id = core?.id;
+    if (!id || !surfaceScrollEl || id === fittedComponentId) return;
+    fittedComponentId = id;
+    requestAnimationFrame(fitArtboardToView);
+  });
 
   // Ctrl+plus, minus and 0 (App.svelte takes them wherever focus is while the designer is open).
   onDestroy(onSurfaceZoomRequest({ 'zoom-in': () => zoomStep(surfaceZoomIncrement), 'zoom-out': () => zoomStep(-surfaceZoomIncrement), 'fit-to-window': () => fitArtboardToView(), 'zoom-reset': () => setZoom(1), 'zoom-set': (percent) => setZoom(percent / 100) }));
@@ -3657,6 +3660,7 @@
                   session={livePreviewSession ?? createInteractionPreviewSession(control)}
                   onpatchsession={patchLivePreviewSession}
                   compact={true}
+                  {showHitZones}
                 />
               </div>
             {/if}
@@ -3938,61 +3942,15 @@
           </div>
         </div>
         {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
-          <div
-            class="selection-quickbar"
-            class:zone-tools={activeSelectionKind === 'hitZone'}
-            role="toolbar"
-            tabindex="-1"
-            aria-label={activeSelectionKind === 'hitZone' ? 'Selected hit zone quick actions' : 'Selected layer quick actions'}
+          <SurfaceQuickbar
+            kind={activeSelectionKind === 'hitZone' ? 'hitZone' : 'layer'}
+            {canManageLayer} canCopy={selectedLayerNames.length > 0} canPaste={hasPartClipboard()}
+            locked={selectedAuthoredPart?.locked === true} interactiveLabel={activeInteractiveMeta.label} canRemoveZone={!!selectedAuthoredZone}
+            onduplicate={duplicateSelectedLayer} oncopy={copySelectedLayers} onpaste={pasteClipboardLayers}
+            onmove={moveSelectedLayer} onextreme={moveSelectedLayerToExtreme} onmakeinteractive={makeSelectedLayerInteractive}
+            ontogglelock={toggleSelectedLock} onremove={removeSelectedLayer} onremovezone={removeSelectedHitZone}
             onmousedown={stopSelectionAction}
-          >
-            <span class="quickbar-label">{activeSelectionKind === 'hitZone' ? 'Zone' : 'Layer'}</span>
-            {#if activeSelectionKind === 'layer'}
-              <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
-                <CopyPlus size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={copySelectedLayers} disabled={!selectedLayerNames.length} title="Copy layers (Ctrl+C)">
-                <Copy size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={pasteClipboardLayers} disabled={!hasPartClipboard()} title="Paste layers (Ctrl+V)">
-                <ClipboardPaste size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
-                <ArrowUp size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
-                <BringToFront size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={() => moveSelectedLayer(-1)} disabled={!canManageLayer} title="Send backward">
-                <ArrowDown size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
-                <SendToBack size={13} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                onclick={makeSelectedLayerInteractive}
-                disabled={!canManageLayer}
-                title={`Make interactive: ${activeInteractiveMeta.label} — scaffold a wired channel + behavior + grab zone on this layer`}
-              >
-                <Zap size={13} aria-hidden="true" />
-              </button>
-              <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title={selectedAuthoredPart?.locked === true ? 'Unlock layer' : 'Lock layer'}>
-                {#if selectedAuthoredPart?.locked === true}
-                  <Unlock size={13} aria-hidden="true" />
-                {:else}
-                  <Lock size={13} aria-hidden="true" />
-                {/if}
-              </button>
-              <button type="button" class="danger" onclick={removeSelectedLayer} disabled={!canManageLayer} title="Delete layer">
-                <Trash2 size={13} aria-hidden="true" />
-              </button>
-            {:else}
-              <button type="button" class="danger" onclick={removeSelectedHitZone} disabled={!selectedAuthoredZone} title="Delete hit zone">
-                <Trash2 size={13} aria-hidden="true" />
-              </button>
-            {/if}
-          </div>
+          />
         {/if}
       </div>
       </div>
@@ -4034,6 +3992,7 @@
                 session={livePreviewSession ?? createInteractionPreviewSession(control)}
                 onpatchsession={patchLivePreviewSession}
                 compact={true}
+                showHitZones={false}
               />
               <button
                 type="button"
@@ -4957,9 +4916,9 @@
     position: absolute;
     display: none;
     left: -1px;
-    top: -6px;
+    top: 0;
     z-index: 12;
-    max-width: min(180px, max(120px, 100%));
+    max-width: 180px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -4974,7 +4933,10 @@
     line-height: 1.1;
     opacity: 0;
     pointer-events: none;
-    transform: translateY(calc(-100% - 6px));
+    /* Drawn inside the zoomed artboard, so scaled back to a constant size, about the part's corner
+       (at 500% the label was five times its size and ran off the top of the surface). */
+    transform-origin: left top;
+    transform: scale(var(--surface-unzoom, 1)) translateY(calc(-100% - 12px));
     transition:
       opacity 90ms ease,
       transform 90ms ease;
@@ -4990,7 +4952,7 @@
   .hit-zone.selected > .selection-label,
   .hit-zone.pulse > .selection-label {
     opacity: 1;
-    transform: translateY(calc(-100% - 8px));
+    transform: scale(var(--surface-unzoom, 1)) translateY(calc(-100% - 14px));
   }
 
   .part-bound.arp-muted > .selection-label {
@@ -4999,7 +4961,7 @@
 
   .part-bound.generated:not(.generated-labels-hidden) > .selection-label {
     opacity: 1;
-    transform: translateY(calc(-100% - 8px));
+    transform: scale(var(--surface-unzoom, 1)) translateY(calc(-100% - 14px));
   }
 
   .part-bound > .resize-handle,
@@ -5166,15 +5128,18 @@
     white-space: nowrap;
   }
 
+  /* Above the artboard at its own size, whatever the zoom (see .selection-label). */
   .surface-name-tray {
     position: absolute;
     left: 0;
-    top: -36px;
+    top: 0;
     z-index: 2620;
     display: flex;
     align-items: center;
     gap: 5px;
-    max-width: max(240px, 100%);
+    max-width: 240px;
+    transform-origin: left top;
+    transform: scale(var(--surface-unzoom, 1)) translateY(calc(-100% - 8px));
     overflow: hidden;
     padding: 5px 6px;
     border: 1px solid rgba(125, 196, 243, 0.34);
@@ -5219,80 +5184,6 @@
     background: rgba(12, 18, 24, 0.96);
     outline: 2px solid rgba(91, 155, 213, 0.24);
     text-align: center;
-  }
-
-  /* Top right: the tool strip is centred along the bottom, and on a narrow canvas this bar sat on it. */
-  .selection-quickbar {
-    position: absolute;
-    right: 16px;
-    bottom: auto;
-    left: auto;
-    top: 10px;
-    z-index: 2420;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    width: max-content;
-    max-width: calc(100% - 32px);
-    height: 31px;
-    margin: 0;
-    padding: 3px 5px;
-    border: 1px solid rgba(91, 155, 213, 0.62);
-    border-radius: 4px;
-    background: rgba(13, 18, 23, 0.94);
-    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.36);
-  }
-
-  .selection-quickbar.zone-tools {
-    border-color: rgba(229, 160, 41, 0.64);
-  }
-
-  .quickbar-label {
-    max-width: 72px;
-    overflow: hidden;
-    padding: 0 7px 0 4px;
-    border-right: 1px solid rgba(255, 255, 255, 0.11);
-    color: #9EB2BE;
-    font-size: 10px;
-    font-weight: 900;
-    line-height: 1;
-    text-overflow: ellipsis;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-
-  .selection-quickbar button {
-    display: grid;
-    place-items: center;
-    width: 23px;
-    height: 23px;
-    padding: 0;
-    border: 1px solid transparent;
-    border-radius: 3px;
-    background: transparent;
-    color: #DDEEFF;
-    cursor: pointer;
-  }
-
-  .selection-quickbar button:hover:not(:disabled) {
-    border-color: rgba(125, 196, 243, 0.6);
-    background: rgba(91, 155, 213, 0.2);
-  }
-
-  .selection-quickbar.zone-tools button:hover:not(:disabled) {
-    border-color: rgba(229, 160, 41, 0.62);
-    background: rgba(229, 160, 41, 0.16);
-  }
-
-  .selection-quickbar button.danger:hover:not(:disabled) {
-    border-color: rgba(214, 90, 90, 0.74);
-    background: rgba(75, 32, 32, 0.8);
-    color: #FFE8E8;
-  }
-
-  .selection-quickbar button:disabled {
-    cursor: not-allowed;
-    opacity: 0.42;
   }
 
   .draw-preview {
@@ -5673,14 +5564,6 @@
   .arc-handle {
     border-color: #DAFFFA;
     background: var(--surface-accent, #14B8A6);
-  }
-
-  .selection-quickbar {
-    height: 31px;
-    padding: 3px 5px;
-    border-color: #34444F;
-    background: rgba(20, 27, 33, 0.96);
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38);
   }
 
   .surface-dock {

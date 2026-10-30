@@ -950,8 +950,8 @@
               {#if $componentDesignerStatus?.kind}
                 <div class="component-workspace-status" aria-label="Component designer status">
                   <span title={`Canvas size: ${$componentDesignerStatus.artboard}`}>Canvas <strong>{$componentDesignerStatus.artboard}</strong></span>
-                  <span title={`${$componentDesignerStatus.layerCount} layers`}><strong>{$componentDesignerStatus.layerCount}</strong> layers</span>
-                  <span title={`${$componentDesignerStatus.zoneCount} hit zones`}><strong>{$componentDesignerStatus.zoneCount}</strong> hit zones</span>
+                  <span><strong>{$componentDesignerStatus.layerCount}</strong> {$componentDesignerStatus.layerCount === 1 ? 'layer' : 'layers'}</span>
+                  <span><strong>{$componentDesignerStatus.zoneCount}</strong> {$componentDesignerStatus.zoneCount === 1 ? 'hit zone' : 'hit zones'}</span>
                   {#if $componentDesignerStatus.lockedNote}
                     <span class="warn"><strong>{$componentDesignerStatus.lockedNote}</strong></span>
                   {/if}

@@ -97,6 +97,9 @@
     session = null,
     onpatchsession = null,
     compact = false,
+    // A custom component's hit zones drawn over it, named. The designer's Preview passes its Zones
+    // toggle (off in Preview) so the component looks as it does on the panel.
+    showHitZones = true,
   } = $props();
 
   const MAX_PREVIEW_SCALE = 2.75;
@@ -1901,7 +1904,7 @@
             onpreviewvaluefieldfocus={handleRangeFieldFocus}
             onpreviewvaluefieldblur={handleRangeFieldBlur}
           />
-          {#if isCustomComponent && customHitZoneOverlayEntries.length}
+          {#if showHitZones && isCustomComponent && customHitZoneOverlayEntries.length}
             <div class="custom-zone-overlay" aria-hidden="true">
               {#each customHitZoneOverlayEntries as entry (entry.id)}
                 <span

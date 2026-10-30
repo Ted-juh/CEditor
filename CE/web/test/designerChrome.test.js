@@ -13,9 +13,10 @@ test('the properties panel offers to open the designer only when it is not open'
 });
 
 test('the layer quick bar says what its buttons do with icons, not letters, and stays off the tool strip', () => {
-  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
-  const bar = designer.match(/<div\s+class="selection-quickbar"[\s\S]*?\n {10}<\/div>/)?.[0] ?? '';
-  assert.ok(bar, 'the quick bar is still in the designer');
+  const source = src('CE_Application/sections/SurfaceQuickbar.svelte');
+  const bar = source.match(/<div\s+class="selection-quickbar"[\s\S]*?\n<\/div>/)?.[0] ?? '';
+  assert.ok(bar, 'the quick bar has its markup');
+  assert.match(src('CE_Application/sections/CustomDesignSurfaceEditor.svelte'), /<SurfaceQuickbar\b/, 'and the designer draws it');
   // C, P, F and B were Copy, Paste, Bring to front and Send to back.
   assert.doesNotMatch(bar, />\s*[CPFB]\s*</, 'no single-letter buttons');
   for (const icon of ['CopyPlus', 'Copy', 'ClipboardPaste', 'BringToFront', 'SendToBack']) {
@@ -23,7 +24,51 @@ test('the layer quick bar says what its buttons do with icons, not letters, and 
   }
   // The tool strip is centred along the bottom of the canvas; on a narrow canvas the bar, at the
   // bottom right, covered half of it.
-  const style = designer.match(/\.selection-quickbar \{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  const style = source.match(/\.selection-quickbar \{[\s\S]*?\n {2}\}/)?.[0] ?? '';
   assert.match(style, /top: 10px;/);
   assert.match(style, /bottom: auto;/);
+});
+
+test('the header counts say "1 hit zone" and "1 layer"', () => {
+  const canvas = src('CE_Application/editor/EditorCanvas.svelte');
+  assert.match(canvas, /\{\$componentDesignerStatus\.zoneCount === 1 \? 'hit zone' : 'hit zones'\}/);
+  assert.match(canvas, /\{\$componentDesignerStatus\.layerCount === 1 \? 'layer' : 'layers'\}/);
+});
+
+test('the designer\'s Preview draws no hit-zone names over the component unless Zones is on', () => {
+  // The knob in Preview carried a "grab" label; Preview is meant to look like the panel.
+  const surface = src('CE_Application/components/InteractiveTestSurface.svelte');
+  assert.match(surface, /\{#if showHitZones && isCustomComponent && customHitZoneOverlayEntries\.length\}/);
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  const uses = designer.match(/<InteractiveTestSurface[\s\S]*?\/>/g) ?? [];
+  assert.equal(uses.length, 2);
+  assert.match(uses[0], /\{showHitZones\}/, 'the stage follows the Zones toggle, which Preview turns off');
+  assert.match(uses[1], /showHitZones=\{false\}/, 'the dock\'s live preview never draws them');
+});
+
+test('a component opens fitted to the surface, and the names above it stay their size at any zoom', () => {
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(designer, /if \(!id \|\| !surfaceScrollEl \|\| id === fittedComponentId\) return;\s*fittedComponentId = id;\s*requestAnimationFrame\(fitArtboardToView\);/);
+  assert.match(designer, /--surface-unzoom:\$\{1 \/ surfaceZoom\};/);
+  const tray = designer.slice(designer.indexOf('  .surface-name-tray {')).match(/\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(tray, /transform: scale\(var\(--surface-unzoom, 1\)\) translateY\(calc\(-100% - 8px\)\);/, 'the name tray');
+  assert.match(designer, /transform: scale\(var\(--surface-unzoom, 1\)\) translateY\(calc\(-100% - 12px\)\);/, 'the layer and zone labels');
+});
+
+test('the Simple Interact card has each behaviour\'s Pointer, Keyboard, Wheel and Snap', () => {
+  const interact = src('CE_Application/sections/CustomInteractEditor.svelte');
+  assert.match(interact, /<FlagStrip flags=\{inputFlags\(behavior\)\} ontoggle=\{\(key, next\) => setBehaviorField\(behaviorName, `interaction\.\$\{key\}`, next\)\} \/>/);
+  // Read as behaviorTakesInput reads them: Wheel off unless on, the rest on unless off.
+  assert.match(interact, /on: interaction\.wheel === true/);
+  for (const key of ['pointer', 'keyboard', 'snap']) assert.match(interact, new RegExp(`on: interaction\\.${key} !== false`));
+});
+
+test('a library copy\'s Contract says the contract is its package\'s, and suggests colours before ticks', () => {
+  const contract = src('CE_Application/sections/CustomPublishedPropertiesEditor.svelte');
+  assert.match(contract, /\{#if sourcePackage\}\s*<!--[\s\S]*?-->\s*<div class="copy-contract-note" role="note">/);
+  assert.match(contract, /its contract is the package's\. A change here is a design edit of this copy/);
+  // Sections live under _children; part.Background found none, so no colour was ever suggested.
+  assert.match(contract, /const sections = part\?\._children \?\? part \?\? \{\};/);
+  assert.match(contract, /if \(runParts\.has\(name\)\) continue;/);
+  assert.match(contract, /const SUGGESTION_ORDER = \{ Colour: 0, Text: 1, Visible: 2, Opacity: 3 \};/);
 });

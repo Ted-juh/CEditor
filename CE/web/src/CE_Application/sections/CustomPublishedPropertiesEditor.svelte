@@ -23,6 +23,7 @@
   let parts = $derived(getSection(control, 'Parts'));
   let designer = $derived(getSection(control, 'Designer'));
   let published = $derived(getSection(control, 'PublishedProperties'));
+  let sourcePackage = $derived(designer?.sourcePackage ?? null);
   let api = $derived(getSection(control, 'ExternalAPI'));
   let channelNames = $derived(Object.keys(channels?._children ?? {}));
   let partNames = $derived(Object.keys(parts?._children ?? {}));
@@ -107,6 +108,20 @@
     return [...new Set([...PROPERTY_PATHS, ...dynamic])];
   }
 
+  // Colour and text first, then visibility and opacity; numbered runs (tick0…tick10) left out. A
+  // knob's twelve suggestions were "tick0 Visible, tick0 Opacity, tick1 Visible…" before its face
+  // colour, and one property publishes one part, so a run is never what a copy wants to change.
+  const SUGGESTION_ORDER = { Colour: 0, Text: 1, Visible: 2, Opacity: 3 };
+
+  function numberedRunParts(names) {
+    const runs = new Map();
+    for (const name of names) {
+      const match = /^(.*?)\d+$/.exec(name);
+      if (match) runs.set(match[1], [...(runs.get(match[1]) ?? []), name]);
+    }
+    return new Set([...runs.values()].filter((run) => run.length >= 3).flat());
+  }
+
   function createPropertySuggestions() {
     const publishedPaths = new Set(
       Object.values(published?.editableProperties ?? {})
@@ -114,10 +129,15 @@
         .filter(Boolean)
     );
     const suggestions = [];
+    const runParts = numberedRunParts(Object.keys(parts?._children ?? {}));
     for (const [name, part] of Object.entries(parts?._children ?? {})) {
+      if (runParts.has(name)) continue;
       const lowerName = name.toLowerCase();
-      const hasBackground = part?.Background || lowerName.includes('background') || lowerName.includes('track') || lowerName.includes('handle') || lowerName.includes('fill');
-      const hasText = part?.Text || lowerName.includes('label') || lowerName.includes('text');
+      // A part keeps its sections under _children, as every control does; reading part.Background
+      // found none, so no part was offered its colour unless its name said "fill" or "track".
+      const sections = part?._children ?? part ?? {};
+      const hasBackground = sections.Background || lowerName.includes('background') || lowerName.includes('track') || lowerName.includes('handle') || lowerName.includes('fill');
+      const hasText = sections.Text || lowerName.includes('label') || lowerName.includes('text');
       const entries = [
         { suffix: 'Visible', path: `Parts.${name}.visible`, type: 'bool', label: `${name} Visible` },
         { suffix: 'Opacity', path: `Parts.${name}.Transform.opacity`, type: 'float', label: `${name} Opacity` },
@@ -133,7 +153,11 @@
         });
       }
     }
-    return suggestions.slice(0, 12);
+    return suggestions
+      .map((suggestion, index) => ({ suggestion, index }))
+      .sort((a, b) => (SUGGESTION_ORDER[a.suggestion.suffix] - SUGGESTION_ORDER[b.suggestion.suffix]) || (a.index - b.index))
+      .map(({ suggestion }) => suggestion)
+      .slice(0, 12);
   }
 
   function createContractStatus() {
@@ -442,6 +466,16 @@
 {/snippet}
 
 {#if published}
+  {#if sourcePackage}
+    <!-- A placed copy's contract is its package's. Without this the tab read as the copy's own to
+         polish, warnings and all, and nothing said that a change here is a design edit. -->
+    <div class="copy-contract-note" role="note">
+      This is a copy of <strong>{sourcePackage.name ?? 'a library package'}{sourcePackage.version ? ` ${sourcePackage.version}` : ''}</strong>
+      from the library, and its contract is the package's. A change here is a design edit of this copy:
+      on the panel, the copy's <strong>Properties</strong> tab (Source) shows it, and can save it to the
+      library as a new version or put the package's back.
+    </div>
+  {/if}
   <PropertySection title="Public API" icon={Share2} tools={openApiTab}>
     <PropertyCell label="Name" span={2} hint="Addressable name for external links and future scripts.">
       <input class="val" type="text" value={api?.addressableName ?? ''} onchange={(event) => set('ExternalAPI.addressableName', event.target.value)} />
@@ -843,6 +877,19 @@
   .validation-list span { min-width: 0; color: #AAA; line-height: 1.35; }
   .validation-list em { color: #888; font-style: normal; font-size: 11px; padding: 0 2px; }
   .preset-grid,
+  .copy-contract-note {
+    margin: 0 0 8px;
+    padding: 8px 10px;
+    border: 1px solid rgba(125, 196, 243, 0.3);
+    border-radius: 4px;
+    background: rgba(91, 155, 213, 0.08);
+    color: #C8D6E0;
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .copy-contract-note strong { color: #DDEEFF; }
+
   .suggestion-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
   .suggestion-grid { max-height: 174px; overflow: auto; }
   .preset-btn,

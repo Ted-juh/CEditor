@@ -426,7 +426,8 @@ Component Designer has them, and nothing read them: a knob with Wheel off turned
 panel, in the designer's Preview and in an exported plug-in. They apply in all three now. A new
 slider or dial starts with Wheel on, a button, toggle or pad with it off, and the GAIA, AN1x and
 SH-201 panels say Wheel on, so they turn as before. A component you made earlier with Wheel off
-stops taking the wheel: turn the switch on (Interact tab, Advanced, Behaviors) if it should.
+stops taking the wheel: turn on its Wheel chip (Interact tab, Input, beside the behaviour) if it
+should.
 
 ## What you get
 
