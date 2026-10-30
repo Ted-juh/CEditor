@@ -27,7 +27,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "a90f3ca7",
+      "fingerprint": "0379038d",
       "summary": {
         "parts": 16,
         "materializedParts": 16,
@@ -131,19 +131,7 @@
         "validation": {
           "ok": true,
           "issues": [],
-          "warnings": [
-            "Published input \"value\" has no package default value.",
-            "Published output \"value\" has no package default value.",
-            "Editable property \"minimum\" has no complete public min/max range.",
-            "Editable property \"minimum\" has no package default value.",
-            "Editable property \"maximum\" has no complete public min/max range.",
-            "Editable property \"maximum\" has no package default value.",
-            "Editable property \"step\" has no complete public min/max range.",
-            "Editable property \"step\" has no package default value.",
-            "Editable property \"valueType\" has no public enum values.",
-            "Editable property \"valueType\" has no package default value.",
-            "Editable property \"readout\" has no package default value."
-          ]
+          "warnings": []
         }
       },
       "thumbnail": {
@@ -373,7 +361,8 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value"
+            "channel": "value",
+            "defaultValue": 0
           }
         ],
         "outputs": [
@@ -381,7 +370,8 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value"
+            "channel": "value",
+            "defaultValue": 0
           }
         ],
         "properties": [
@@ -390,35 +380,55 @@
             "label": "Minimum",
             "type": "number",
             "path": "ValueChannels.value.min",
-            "part": ""
+            "part": "",
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 0
           },
           {
             "name": "maximum",
             "label": "Maximum",
             "type": "number",
             "path": "ValueChannels.value.max",
-            "part": ""
+            "part": "",
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 1
           },
           {
             "name": "step",
             "label": "Step",
             "type": "number",
             "path": "ValueChannels.value.step",
-            "part": ""
+            "part": "",
+            "min": 0.001,
+            "max": 100,
+            "defaultValue": 0.001
           },
           {
             "name": "valueType",
             "label": "Value type",
             "type": "enum",
             "path": "ValueChannels.value.type",
-            "part": ""
+            "part": "",
+            "defaultValue": "float",
+            "values": [
+              "float",
+              "int"
+            ]
           },
           {
             "name": "readout",
             "label": "Readout (display range, unit)",
             "type": "object",
             "path": "ValueChannels.value.format",
-            "part": ""
+            "part": "",
+            "defaultValue": {
+              "precision": 2,
+              "prefix": "",
+              "suffix": "",
+              "unit": ""
+            }
           }
         ],
         "counts": {
@@ -445,19 +455,7 @@
       "validation": {
         "ok": true,
         "issues": [],
-        "warnings": [
-          "Published input \"value\" has no package default value.",
-          "Published output \"value\" has no package default value.",
-          "Editable property \"minimum\" has no complete public min/max range.",
-          "Editable property \"minimum\" has no package default value.",
-          "Editable property \"maximum\" has no complete public min/max range.",
-          "Editable property \"maximum\" has no package default value.",
-          "Editable property \"step\" has no complete public min/max range.",
-          "Editable property \"step\" has no package default value.",
-          "Editable property \"valueType\" has no public enum values.",
-          "Editable property \"valueType\" has no package default value.",
-          "Editable property \"readout\" has no package default value."
-        ]
+        "warnings": []
       },
       "publicApi": {
         "_type": "PublishedProperties",
@@ -465,16 +463,18 @@
           "value": {
             "channel": "value",
             "label": "Value",
+            "enabled": true,
             "type": "float",
-            "enabled": true
+            "defaultValue": 0
           }
         },
         "outputs": {
           "value": {
             "channel": "value",
             "label": "Value",
+            "enabled": true,
             "type": "float",
-            "enabled": true
+            "defaultValue": 0
           }
         },
         "editableProperties": {
@@ -482,31 +482,51 @@
             "path": "ValueChannels.value.min",
             "label": "Minimum",
             "type": "number",
-            "enabled": true
+            "enabled": true,
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 0
           },
           "maximum": {
             "path": "ValueChannels.value.max",
             "label": "Maximum",
             "type": "number",
-            "enabled": true
+            "enabled": true,
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 1
           },
           "step": {
             "path": "ValueChannels.value.step",
             "label": "Step",
             "type": "number",
-            "enabled": true
+            "enabled": true,
+            "min": 0.001,
+            "max": 100,
+            "defaultValue": 0.001
           },
           "valueType": {
             "path": "ValueChannels.value.type",
             "label": "Value type",
             "type": "enum",
-            "enabled": true
+            "enabled": true,
+            "values": [
+              "float",
+              "int"
+            ],
+            "defaultValue": "float"
           },
           "readout": {
             "path": "ValueChannels.value.format",
             "label": "Readout (display range, unit)",
             "type": "object",
-            "enabled": true
+            "enabled": true,
+            "defaultValue": {
+              "precision": 2,
+              "prefix": "",
+              "suffix": "",
+              "unit": ""
+            }
           }
         }
       },
@@ -6118,16 +6138,18 @@
               "value": {
                 "channel": "value",
                 "label": "Value",
+                "enabled": true,
                 "type": "float",
-                "enabled": true
+                "defaultValue": 0
               }
             },
             "outputs": {
               "value": {
                 "channel": "value",
                 "label": "Value",
+                "enabled": true,
                 "type": "float",
-                "enabled": true
+                "defaultValue": 0
               }
             },
             "editableProperties": {
@@ -6135,31 +6157,51 @@
                 "path": "ValueChannels.value.min",
                 "label": "Minimum",
                 "type": "number",
-                "enabled": true
+                "enabled": true,
+                "min": 0,
+                "max": 2024,
+                "defaultValue": 0
               },
               "maximum": {
                 "path": "ValueChannels.value.max",
                 "label": "Maximum",
                 "type": "number",
-                "enabled": true
+                "enabled": true,
+                "min": 0,
+                "max": 2024,
+                "defaultValue": 1
               },
               "step": {
                 "path": "ValueChannels.value.step",
                 "label": "Step",
                 "type": "number",
-                "enabled": true
+                "enabled": true,
+                "min": 0.001,
+                "max": 100,
+                "defaultValue": 0.001
               },
               "valueType": {
                 "path": "ValueChannels.value.type",
                 "label": "Value type",
                 "type": "enum",
-                "enabled": true
+                "enabled": true,
+                "values": [
+                  "float",
+                  "int"
+                ],
+                "defaultValue": "float"
               },
               "readout": {
                 "path": "ValueChannels.value.format",
                 "label": "Readout (display range, unit)",
                 "type": "object",
-                "enabled": true
+                "enabled": true,
+                "defaultValue": {
+                  "precision": 2,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                }
               }
             }
           },
@@ -6249,7 +6291,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "561d9833",
+      "fingerprint": "89555f41",
       "summary": {
         "parts": 26,
         "materializedParts": 26,
@@ -6353,19 +6395,7 @@
         "validation": {
           "ok": true,
           "issues": [],
-          "warnings": [
-            "Published input \"value\" has no package default value.",
-            "Published output \"value\" has no package default value.",
-            "Editable property \"minimum\" has no complete public min/max range.",
-            "Editable property \"minimum\" has no package default value.",
-            "Editable property \"maximum\" has no complete public min/max range.",
-            "Editable property \"maximum\" has no package default value.",
-            "Editable property \"step\" has no complete public min/max range.",
-            "Editable property \"step\" has no package default value.",
-            "Editable property \"valueType\" has no public enum values.",
-            "Editable property \"valueType\" has no package default value.",
-            "Editable property \"readout\" has no package default value."
-          ]
+          "warnings": []
         }
       },
       "thumbnail": {
@@ -6621,7 +6651,8 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value"
+            "channel": "value",
+            "defaultValue": 0
           }
         ],
         "outputs": [
@@ -6629,7 +6660,8 @@
             "name": "value",
             "label": "Value",
             "type": "float",
-            "channel": "value"
+            "channel": "value",
+            "defaultValue": 0
           }
         ],
         "properties": [
@@ -6638,35 +6670,55 @@
             "label": "Minimum",
             "type": "number",
             "path": "ValueChannels.value.min",
-            "part": ""
+            "part": "",
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 0
           },
           {
             "name": "maximum",
             "label": "Maximum",
             "type": "number",
             "path": "ValueChannels.value.max",
-            "part": ""
+            "part": "",
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 1
           },
           {
             "name": "step",
             "label": "Step",
             "type": "number",
             "path": "ValueChannels.value.step",
-            "part": ""
+            "part": "",
+            "min": 0.001,
+            "max": 100,
+            "defaultValue": 0.001
           },
           {
             "name": "valueType",
             "label": "Value type",
             "type": "enum",
             "path": "ValueChannels.value.type",
-            "part": ""
+            "part": "",
+            "defaultValue": "float",
+            "values": [
+              "float",
+              "int"
+            ]
           },
           {
             "name": "readout",
             "label": "Readout (display range, unit)",
             "type": "object",
             "path": "ValueChannels.value.format",
-            "part": ""
+            "part": "",
+            "defaultValue": {
+              "precision": 2,
+              "prefix": "",
+              "suffix": "",
+              "unit": ""
+            }
           }
         ],
         "counts": {
@@ -6693,19 +6745,7 @@
       "validation": {
         "ok": true,
         "issues": [],
-        "warnings": [
-          "Published input \"value\" has no package default value.",
-          "Published output \"value\" has no package default value.",
-          "Editable property \"minimum\" has no complete public min/max range.",
-          "Editable property \"minimum\" has no package default value.",
-          "Editable property \"maximum\" has no complete public min/max range.",
-          "Editable property \"maximum\" has no package default value.",
-          "Editable property \"step\" has no complete public min/max range.",
-          "Editable property \"step\" has no package default value.",
-          "Editable property \"valueType\" has no public enum values.",
-          "Editable property \"valueType\" has no package default value.",
-          "Editable property \"readout\" has no package default value."
-        ]
+        "warnings": []
       },
       "publicApi": {
         "_type": "PublishedProperties",
@@ -6713,16 +6753,18 @@
           "value": {
             "channel": "value",
             "label": "Value",
+            "enabled": true,
             "type": "float",
-            "enabled": true
+            "defaultValue": 0
           }
         },
         "outputs": {
           "value": {
             "channel": "value",
             "label": "Value",
+            "enabled": true,
             "type": "float",
-            "enabled": true
+            "defaultValue": 0
           }
         },
         "editableProperties": {
@@ -6730,31 +6772,51 @@
             "path": "ValueChannels.value.min",
             "label": "Minimum",
             "type": "number",
-            "enabled": true
+            "enabled": true,
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 0
           },
           "maximum": {
             "path": "ValueChannels.value.max",
             "label": "Maximum",
             "type": "number",
-            "enabled": true
+            "enabled": true,
+            "min": 0,
+            "max": 2024,
+            "defaultValue": 1
           },
           "step": {
             "path": "ValueChannels.value.step",
             "label": "Step",
             "type": "number",
-            "enabled": true
+            "enabled": true,
+            "min": 0.001,
+            "max": 100,
+            "defaultValue": 0.001
           },
           "valueType": {
             "path": "ValueChannels.value.type",
             "label": "Value type",
             "type": "enum",
-            "enabled": true
+            "enabled": true,
+            "values": [
+              "float",
+              "int"
+            ],
+            "defaultValue": "float"
           },
           "readout": {
             "path": "ValueChannels.value.format",
             "label": "Readout (display range, unit)",
             "type": "object",
-            "enabled": true
+            "enabled": true,
+            "defaultValue": {
+              "precision": 2,
+              "prefix": "",
+              "suffix": "",
+              "unit": ""
+            }
           }
         }
       },
@@ -15441,16 +15503,18 @@
               "value": {
                 "channel": "value",
                 "label": "Value",
+                "enabled": true,
                 "type": "float",
-                "enabled": true
+                "defaultValue": 0
               }
             },
             "outputs": {
               "value": {
                 "channel": "value",
                 "label": "Value",
+                "enabled": true,
                 "type": "float",
-                "enabled": true
+                "defaultValue": 0
               }
             },
             "editableProperties": {
@@ -15458,31 +15522,51 @@
                 "path": "ValueChannels.value.min",
                 "label": "Minimum",
                 "type": "number",
-                "enabled": true
+                "enabled": true,
+                "min": 0,
+                "max": 2024,
+                "defaultValue": 0
               },
               "maximum": {
                 "path": "ValueChannels.value.max",
                 "label": "Maximum",
                 "type": "number",
-                "enabled": true
+                "enabled": true,
+                "min": 0,
+                "max": 2024,
+                "defaultValue": 1
               },
               "step": {
                 "path": "ValueChannels.value.step",
                 "label": "Step",
                 "type": "number",
-                "enabled": true
+                "enabled": true,
+                "min": 0.001,
+                "max": 100,
+                "defaultValue": 0.001
               },
               "valueType": {
                 "path": "ValueChannels.value.type",
                 "label": "Value type",
                 "type": "enum",
-                "enabled": true
+                "enabled": true,
+                "values": [
+                  "float",
+                  "int"
+                ],
+                "defaultValue": "float"
               },
               "readout": {
                 "path": "ValueChannels.value.format",
                 "label": "Readout (display range, unit)",
                 "type": "object",
-                "enabled": true
+                "enabled": true,
+                "defaultValue": {
+                  "precision": 2,
+                  "prefix": "",
+                  "suffix": "",
+                  "unit": ""
+                }
               }
             }
           },
@@ -15572,7 +15656,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "ea8b1d6c",
+      "fingerprint": "c2e8d454",
       "summary": {
         "parts": 7,
         "materializedParts": 7,
@@ -15676,12 +15760,7 @@
         "validation": {
           "ok": true,
           "issues": [],
-          "warnings": [
-            "Published input \"value\" type \"float\" differs from channel type \"int\".",
-            "Published input \"value\" has no package default value.",
-            "Published output \"value\" type \"float\" differs from channel type \"int\".",
-            "Published output \"value\" has no package default value."
-          ]
+          "warnings": []
         }
       },
       "thumbnail": {
@@ -15793,16 +15872,18 @@
           {
             "name": "value",
             "label": "Value",
-            "type": "float",
-            "channel": "value"
+            "type": "int",
+            "channel": "value",
+            "defaultValue": 0
           }
         ],
         "outputs": [
           {
             "name": "value",
             "label": "Value",
-            "type": "float",
-            "channel": "value"
+            "type": "int",
+            "channel": "value",
+            "defaultValue": 0
           }
         ],
         "properties": [],
@@ -15830,12 +15911,7 @@
       "validation": {
         "ok": true,
         "issues": [],
-        "warnings": [
-          "Published input \"value\" type \"float\" differs from channel type \"int\".",
-          "Published input \"value\" has no package default value.",
-          "Published output \"value\" type \"float\" differs from channel type \"int\".",
-          "Published output \"value\" has no package default value."
-        ]
+        "warnings": []
       },
       "publicApi": {
         "_type": "PublishedProperties",
@@ -15843,16 +15919,18 @@
           "value": {
             "channel": "value",
             "label": "Value",
-            "type": "float",
-            "enabled": true
+            "enabled": true,
+            "type": "int",
+            "defaultValue": 0
           }
         },
         "outputs": {
           "value": {
             "channel": "value",
             "label": "Value",
-            "type": "float",
-            "enabled": true
+            "enabled": true,
+            "type": "int",
+            "defaultValue": 0
           }
         },
         "editableProperties": {}
@@ -18690,16 +18768,18 @@
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "type": "float",
-                "enabled": true
+                "enabled": true,
+                "type": "int",
+                "defaultValue": 0
               }
             },
             "outputs": {
               "value": {
                 "channel": "value",
                 "label": "Value",
-                "type": "float",
-                "enabled": true
+                "enabled": true,
+                "type": "int",
+                "defaultValue": 0
               }
             },
             "editableProperties": {}
@@ -18790,7 +18870,7 @@
         "license": "AGPL-3.0",
         "homepage": ""
       },
-      "fingerprint": "d1decd24",
+      "fingerprint": "348484f3",
       "summary": {
         "parts": 1,
         "materializedParts": 133,
@@ -18894,12 +18974,7 @@
         "validation": {
           "ok": true,
           "issues": [],
-          "warnings": [
-            "Published input \"currentStep\" has no package default value.",
-            "Published input \"endStep\" has no package default value.",
-            "Published output \"note\" has no package default value.",
-            "Published output \"velocity\" has no package default value."
-          ]
+          "warnings": []
         }
       },
       "thumbnail": {
@@ -19157,13 +19232,15 @@
             "name": "currentStep",
             "label": "Current Step",
             "type": "int",
-            "channel": "arpCurrentStep"
+            "channel": "arpCurrentStep",
+            "defaultValue": 0
           },
           {
             "name": "endStep",
             "label": "Loop End Step",
             "type": "int",
-            "channel": "arpEndStep"
+            "channel": "arpEndStep",
+            "defaultValue": 32
           }
         ],
         "outputs": [
@@ -19171,25 +19248,29 @@
             "name": "gate",
             "label": "Gate",
             "type": "bool",
-            "channel": "arpGate"
+            "channel": "arpGate",
+            "defaultValue": 0
           },
           {
             "name": "note",
             "label": "Note",
             "type": "int",
-            "channel": "arpNote"
+            "channel": "arpNote",
+            "defaultValue": 0
           },
           {
             "name": "velocity",
             "label": "Velocity",
             "type": "int",
-            "channel": "arpVelocity"
+            "channel": "arpVelocity",
+            "defaultValue": 0
           },
           {
             "name": "pattern",
             "label": "Pattern",
             "type": "array",
-            "channel": "arpPattern"
+            "channel": "arpPattern",
+            "defaultValue": 0
           }
         ],
         "properties": [],
@@ -19217,12 +19298,7 @@
       "validation": {
         "ok": true,
         "issues": [],
-        "warnings": [
-          "Published input \"currentStep\" has no package default value.",
-          "Published input \"endStep\" has no package default value.",
-          "Published output \"note\" has no package default value.",
-          "Published output \"velocity\" has no package default value."
-        ]
+        "warnings": []
       },
       "publicApi": {
         "_type": "PublishedProperties",
@@ -19230,34 +19306,40 @@
           "currentStep": {
             "channel": "arpCurrentStep",
             "label": "Current Step",
-            "type": "int"
+            "type": "int",
+            "defaultValue": 0
           },
           "endStep": {
             "channel": "arpEndStep",
             "label": "Loop End Step",
-            "type": "int"
+            "type": "int",
+            "defaultValue": 32
           }
         },
         "outputs": {
           "gate": {
             "channel": "arpGate",
             "label": "Gate",
-            "type": "bool"
+            "type": "bool",
+            "defaultValue": 0
           },
           "note": {
             "channel": "arpNote",
             "label": "Note",
-            "type": "int"
+            "type": "int",
+            "defaultValue": 0
           },
           "velocity": {
             "channel": "arpVelocity",
             "label": "Velocity",
-            "type": "int"
+            "type": "int",
+            "defaultValue": 0
           },
           "pattern": {
             "channel": "arpPattern",
             "label": "Pattern",
-            "type": "array"
+            "type": "array",
+            "defaultValue": 0
           }
         },
         "editableProperties": {}
@@ -20384,34 +20466,40 @@
               "currentStep": {
                 "channel": "arpCurrentStep",
                 "label": "Current Step",
-                "type": "int"
+                "type": "int",
+                "defaultValue": 0
               },
               "endStep": {
                 "channel": "arpEndStep",
                 "label": "Loop End Step",
-                "type": "int"
+                "type": "int",
+                "defaultValue": 32
               }
             },
             "outputs": {
               "gate": {
                 "channel": "arpGate",
                 "label": "Gate",
-                "type": "bool"
+                "type": "bool",
+                "defaultValue": 0
               },
               "note": {
                 "channel": "arpNote",
                 "label": "Note",
-                "type": "int"
+                "type": "int",
+                "defaultValue": 0
               },
               "velocity": {
                 "channel": "arpVelocity",
                 "label": "Velocity",
-                "type": "int"
+                "type": "int",
+                "defaultValue": 0
               },
               "pattern": {
                 "channel": "arpPattern",
                 "label": "Pattern",
-                "type": "array"
+                "type": "array",
+                "defaultValue": 0
               }
             },
             "editableProperties": {}

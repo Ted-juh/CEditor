@@ -192,6 +192,16 @@ for (const look of [draft, hardware]) {
     }
   });
 
+  test(`${file}: every package in the library validates with nothing to fix, for its author or anyone importing it`, () => {
+    // Each carried notes for its author (the knob and fader eleven: no defaults, ranges or choices on
+    // what they publish), which Package & Library listed under every import. The generator gives
+    // every published input, output and property its default, range and choices now.
+    for (const envelope of library.packages) {
+      const { issues = [], warnings = [] } = envelope.validation ?? {};
+      assert.deepEqual([...issues, ...warnings], [], `${envelope.metadata.name} ${envelope.metadata.version}`);
+    }
+  });
+
   test(`${file}: a copy reads and sends its parameter's whole range, and reads it as the synth does`, () => {
     for (const control of bound.filter((c) => isCopy(c) && c._children.DeviceBindings.bindings[0].port === 'value')) {
       const parameter = parameters.get(parameterOf(control));

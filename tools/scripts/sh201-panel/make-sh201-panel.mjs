@@ -108,27 +108,58 @@ function label(text, { x, y, w, h = 14 }, { size = 9, colour = SKIN.caption, bol
 
 /* ------------------------------------------------------------------ the three library components */
 
+/** The span of every SH-201 parameter's raw values: where a copy's Minimum and Maximum can go. */
+const PARAMETER_SPAN = (() => {
+  const ranges = (JSON.parse(readFileSync(PROFILE, 'utf8')).parameters ?? []).map((p) => p.range).filter(Boolean);
+  return { min: Math.min(...ranges.map((r) => r.min)), max: Math.max(...ranges.map((r) => r.max)) };
+})();
+
 /**
  * What a copy may set without editing the component: its range, step, type, readout and label —
  * the things that differ between a knob bound to Coarse Tune and one bound to Cutoff. Published, so
  * the Source card counts them as this copy's settings rather than as design edits, and an update
  * from the library keeps them (utils/customComponentSourceLink.js).
+ *
+ * Each says its default (the component's own channel), and the numbers their range and the type
+ * its choices: Publish › Contract asks that of a package, and without them every package here
+ * carried eleven notes for its author.
  */
-const RANGE_PROPERTIES = {
-  minimum: { path: 'ValueChannels.value.min', label: 'Minimum', type: 'number', enabled: true },
-  maximum: { path: 'ValueChannels.value.max', label: 'Maximum', type: 'number', enabled: true },
-  step: { path: 'ValueChannels.value.step', label: 'Step', type: 'number', enabled: true },
-  valueType: { path: 'ValueChannels.value.type', label: 'Value type', type: 'enum', enabled: true },
-  readout: { path: 'ValueChannels.value.format', label: 'Readout (display range, unit)', type: 'object', enabled: true },
-};
+function rangeProperties(channel) {
+  return {
+    minimum: { path: 'ValueChannels.value.min', label: 'Minimum', type: 'number', enabled: true, min: PARAMETER_SPAN.min, max: PARAMETER_SPAN.max, defaultValue: channel.min },
+    maximum: { path: 'ValueChannels.value.max', label: 'Maximum', type: 'number', enabled: true, min: PARAMETER_SPAN.min, max: PARAMETER_SPAN.max, defaultValue: channel.max },
+    step: { path: 'ValueChannels.value.step', label: 'Step', type: 'number', enabled: true, min: 0.001, max: 100, defaultValue: channel.step },
+    valueType: { path: 'ValueChannels.value.type', label: 'Value type', type: 'enum', enabled: true, values: ['float', 'int'], defaultValue: channel.type },
+    readout: { path: 'ValueChannels.value.format', label: 'Readout (display range, unit)', type: 'object', enabled: true, defaultValue: { ...channel.format } },
+  };
+}
 
-function publish(control, { editable = {} } = {}) {
+function publish(control, { ranges = false } = {}) {
   control._children.PublishedProperties = {
     _type: 'PublishedProperties',
-    inputs: { value: { channel: 'value', label: 'Value', type: 'float', enabled: true } },
-    outputs: { value: { channel: 'value', label: 'Value', type: 'float', enabled: true } },
-    editableProperties: editable,
+    inputs: { value: { channel: 'value', label: 'Value', enabled: true } },
+    outputs: { value: { channel: 'value', label: 'Value', enabled: true } },
+    editableProperties: ranges ? rangeProperties(control._children.ValueChannels._children.value) : {},
   };
+  return control;
+}
+
+/**
+ * Every published input and output says its channel's type and default value. The LED switch's
+ * said float over an int channel, and none said a default; the arpeggio grid's come from the GAIA
+ * grid, which says no defaults either.
+ */
+function completeContract(control) {
+  const channels = control._children.ValueChannels?._children ?? {};
+  const published = control._children.PublishedProperties ?? {};
+  for (const group of ['inputs', 'outputs']) {
+    for (const entry of Object.values(published[group] ?? {})) {
+      const channel = channels[entry.channel];
+      if (!channel) continue;
+      entry.type = channel.type ?? entry.type;
+      if (!('defaultValue' in entry)) entry.defaultValue = channel.defaultValue ?? channel.currentValue ?? channel.min ?? 0;
+    }
+  }
   return control;
 }
 
@@ -209,14 +240,14 @@ const COMPONENTS = {
     name: 'SH-201 Knob',
     description: 'A rotary control for one SH-201 parameter. Its range, default and readout are set per copy.',
     versions: {
-      '1.0.0': () => publish(gaiaKnob({ size: SKIN.knob }), { editable: RANGE_PROPERTIES }),
-      '1.1.0': () => publish(hardwareKnob(), { editable: RANGE_PROPERTIES }),
+      '1.0.0': () => publish(gaiaKnob({ size: SKIN.knob }), { ranges: true }),
+      '1.1.0': () => publish(hardwareKnob(), { ranges: true }),
     },
   },
   fader: {
     name: 'SH-201 Fader',
     description: 'A slider for an envelope stage or a level. Its range, default and readout are set per copy.',
-    versions: { '1.0.0': () => publish(gaiaFader({ width: SKIN.faderW, height: SKIN.faderH, legacySkin: true }), { editable: RANGE_PROPERTIES }) },
+    versions: { '1.0.0': () => publish(gaiaFader({ width: SKIN.faderW, height: SKIN.faderH, legacySkin: true }), { ranges: true }) },
   },
   switch: {
     name: 'SH-201 LED Switch',
@@ -235,7 +266,7 @@ function buildPackages(versions) {
   const packages = {};
   for (const [key, spec] of Object.entries(COMPONENTS)) {
     const version = versions[key] ?? '1.0.0';
-    const control = spec.versions[version]();
+    const control = completeContract(spec.versions[version]());
     control._children.Core.name = spec.name;
     // createControl stamps a time-based id; a fixed one keeps the library file byte-identical
     // between runs. A placed copy gets an id of its own either way.
