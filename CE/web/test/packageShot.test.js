@@ -54,3 +54,23 @@ test('Package & Library and the Insert panel draw it, and the schematic is gone 
     assert.ok(!/thumbnailPartStyle|thumbnail\?\.parts/.test(source), `${name} still draws the schematic`);
   }
 });
+
+test('the ten counts are one line, or two even lines of five, across the whole detail', () => {
+  // A fixed 7 columns (4 for the Manifest) put the last of the ten counts on a line of their own,
+  // and in the detail they had the summary's column only, half the width.
+  const library = src('sections/CustomPackageLibrary.svelte');
+  const css = library.slice(library.indexOf('<style>'));
+  assert.match(css, /\.manifest-wrap \{\s*container-type: inline-size;/);
+  assert.match(css, /\.manifest-grid \{\s*display: grid;\s*grid-template-columns: repeat\(10, minmax\(0, 1fr\)\);/);
+  assert.match(css, /@container \(max-width: 499px\) \{\s*\.manifest-grid \{\s*grid-template-columns: repeat\(5, minmax\(0, 1fr\)\);/);
+  assert.match(css, /\.library-detail-main > \.manifest-wrap \{\s*grid-column: 1 \/ -1;/);
+  assert.ok(!/repeat\(7, minmax/.test(css), 'the seven-column compact grid is back');
+  assert.equal([...library.matchAll(/<div class="manifest-wrap">\s*<div class="manifest-grid/g)].length, 3,
+    'every count grid sits in the container its query measures');
+});
+
+test('the drawing does not size its own box, so a narrower panel can shrink it', () => {
+  const shot = readFileSync(join(here, '..', 'src', 'CE_Application', 'components', 'library', 'PackageShot.svelte'), 'utf8');
+  assert.match(shot, /<span class="fit">\s*<EffectPreview/);
+  assert.match(shot, /\.fit \{\s*position: absolute;\s*inset: 0;/);
+});

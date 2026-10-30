@@ -575,10 +575,12 @@
     {/if}
     {#if $creatorMode === 'advanced'}
     <PropertyCell label="Manifest" span={4} hint="What will be saved into the reusable custom component package.">
-      <div class="manifest-grid">
-        {#each packageSummaryItems as [label, value]}
-          <span><strong>{value}</strong><em>{label}</em></span>
-        {/each}
+      <div class="manifest-wrap">
+        <div class="manifest-grid">
+          {#each packageSummaryItems as [label, value]}
+            <span><strong>{value}</strong><em>{label}</em></span>
+          {/each}
+        </div>
       </div>
     </PropertyCell>
     {/if}
@@ -715,10 +717,12 @@
               <small>{selectedLibraryEntry.fingerprint ?? ''}</small>
             </div>
             <PackageShot component={selectedLibraryEntry.component} height={120} maxScale={3} label={selectedLibraryEntry.name} />
-            <div class="manifest-grid compact">
-              {#each selectedLibrarySummaryItems as [label, value]}
-                <span><strong>{value}</strong><em>{label}</em></span>
-              {/each}
+            <div class="manifest-wrap">
+              <div class="manifest-grid compact">
+                {#each selectedLibrarySummaryItems as [label, value]}
+                  <span><strong>{value}</strong><em>{label}</em></span>
+                {/each}
+              </div>
             </div>
           </div>
           {#if selectedLibrarySurfaceItems.length}
@@ -811,10 +815,12 @@
                 <small>{importPreview.envelope.fingerprint ?? ''}</small>
               </div>
               <PackageShot component={importPreview.envelope.component} height={120} maxScale={3} label={importPreview.envelope.metadata.name} />
-              <div class="manifest-grid compact">
-                {#each importSummaryItems as [label, value]}
-                  <span><strong>{value}</strong><em>{label}</em></span>
-                {/each}
+              <div class="manifest-wrap">
+                <div class="manifest-grid compact">
+                  {#each importSummaryItems as [label, value]}
+                    <span><strong>{value}</strong><em>{label}</em></span>
+                  {/each}
+                </div>
               </div>
             </div>
             {#if importPreview.envelopes.length > 1 || importPreview.rejected}
@@ -992,11 +998,27 @@
     font-size: 9px;
   }
 
+  /* The ten counts (Parts to Props) in one row of ten when there is room, and two rows of five when
+     there is not. They were a fixed 4 columns (7 in the compact form), so the last few always
+     wrapped onto a line of their own. The wrapper is what the query measures: a container query
+     styles what is inside the container, not the container. */
+  .manifest-wrap {
+    container-type: inline-size;
+    width: 100%;
+    min-width: 0;
+  }
+
   .manifest-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(10, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
+  }
+
+  @container (max-width: 499px) {
+    .manifest-grid {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+    }
   }
 
   .manifest-grid span {
@@ -1022,10 +1044,6 @@
     color: #93A6B3;
     font-size: 9px;
     font-style: normal;
-  }
-
-  .manifest-grid.compact {
-    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
   .manifest-grid.compact span {
@@ -1170,6 +1188,12 @@
     grid-template-columns: minmax(180px, 0.9fr) minmax(0, 1.1fr);
     gap: 7px;
     align-items: stretch;
+  }
+
+  /* Under the summary and the picture, across both: in the summary's column alone it had half the
+     width it needed. */
+  .library-detail-main > .manifest-wrap {
+    grid-column: 1 / -1;
   }
 
   .library-detail-edit {

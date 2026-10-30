@@ -26,12 +26,17 @@
   {#if !component}
     <i class="none">no component</i>
   {:else if boxWidth > 0}
-    <EffectPreview control={component} {boxWidth} boxHeight={Math.max(1, height - 2)} padding={3} {maxScale} {label} />
+    <!-- Out of the layout: the drawing is sized from the box, so it must not also size the box, or a
+         panel made narrower could never shrink it. -->
+    <span class="fit">
+      <EffectPreview control={component} {boxWidth} boxHeight={Math.max(1, height - 2)} padding={3} {maxScale} {label} />
+    </span>
   {/if}
 </span>
 
 <style>
   .package-shot {
+    position: relative;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -41,6 +46,15 @@
     background: #0C0F12;
     overflow: hidden;
     box-sizing: border-box;
+  }
+
+  .fit {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
   }
 
   .none {
