@@ -89,12 +89,12 @@ test('in the Component Designer the zoom keys zoom its surface, and Ctrl+scroll 
   const before = get(surfaceZoomRequest).n;
   requestSurfaceZoom('zoom-in');
   requestSurfaceZoom('zoom-in');
-  assert.deepEqual(get(surfaceZoomRequest), { n: before + 2, command: 'zoom-in' }, 'the same key twice is two requests');
+  assert.deepEqual(get(surfaceZoomRequest), { n: before + 2, command: 'zoom-in', value: undefined }, 'the same key twice is two requests');
 
   const app = src('App.svelte');
   assert.match(app, /if \(\$componentWorkspaceMode === 'surface'\) \{ requestSurfaceZoom\(zoomCommand\); return; \}/);
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
-  assert.match(designer, /onDestroy\(onSurfaceZoomRequest\(\{ 'zoom-in': \(\) => zoomStep\(surfaceZoomIncrement\), 'zoom-out': \(\) => zoomStep\(-surfaceZoomIncrement\), 'fit-to-window': \(\) => fitArtboardToView\(\) \}\)\);/);
+  assert.match(designer, /onDestroy\(onSurfaceZoomRequest\(\{ 'zoom-in': \(\) => zoomStep\(surfaceZoomIncrement\), 'zoom-out': \(\) => zoomStep\(-surfaceZoomIncrement\), 'fit-to-window': \(\) => fitArtboardToView\(\), 'zoom-reset': \(\) => setZoom\(1\), 'zoom-set': \(percent\) => setZoom\(percent \/ 100\) \}\)\);/);
   const testSurface = src('CE_Application/components/InteractiveTestSurface.svelte');
   assert.match(testSurface, /function handleWheel\(event\) \{[\s\S]{0,400}if \(event\.ctrlKey \|\| event\.metaKey\) return;\s*if \(isReadOnly\) return;/,
     'Ctrl+scroll over a component in Preview is taken by the component again');
@@ -112,6 +112,30 @@ test('the designer hears only the zoom requests made while it is open', async ()
   off();
   requestSurfaceZoom('zoom-in');
   assert.deepEqual(heard, ['fit', 'in']);
+});
+
+test('in the designer the status bar shows and drives the surface\'s grid, snap and zoom, not the hidden panel\'s', async () => {
+  // It read "grid off · snap off" beside the designer's own Snap switched on, and its − and +
+  // zoomed the panel behind the designer.
+  const { requestSurfaceZoom, onSurfaceZoomRequest } = await import('../src/CE_Application/stores/componentWorkspace.js');
+  const heard = [];
+  const off = onSurfaceZoomRequest({ 'zoom-reset': () => heard.push('reset'), 'zoom-set': (percent) => heard.push(percent) });
+  requestSurfaceZoom('zoom-set', 250);
+  requestSurfaceZoom('zoom-reset');
+  off();
+  assert.deepEqual(heard, [250, 'reset'], 'a typed percentage reaches the designer');
+
+  const bar = src('CE_Application/layout/StatusBar.svelte');
+  assert.match(bar, /let designer = \$derived\(\$componentDesignerStatus\?\.kind \? \$componentDesignerStatus : null\);/);
+  assert.match(bar, /grid \{designer\.snapSize\} · snap \{designer\.snapEnabled \? 'on' : 'off'\}/);
+  assert.match(bar, /if \(designer\) requestSurfaceZoom\(direction > 0 \? 'zoom-in' : 'zoom-out'\);/);
+  assert.match(bar, /if \(designer\) requestSurfaceZoom\('zoom-set', num\);/);
+  assert.match(bar, /designer \? requestSurfaceZoom\('zoom-reset'\) : editorZoom\.set\(100\)/);
+  assert.match(bar, /designer \? requestSurfaceZoom\('fit-to-window'\) : requestFitToWindow\(\)/);
+  assert.match(bar, /\{zoomPercent\}%/);
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(designer, /controlId: core\?\.id \?\? '', fill: selectedFill\?\.colour \?\? '', zoom: surfaceZoom, snapEnabled, snapSize: numberOr\(snapSize, 10\),/,
+    'the designer reports its own zoom and snap');
 });
 
 test('Ctrl+scroll on the design surface keeps the point under the cursor where it was', async () => {

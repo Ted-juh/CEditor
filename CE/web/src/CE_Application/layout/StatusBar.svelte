@@ -19,6 +19,8 @@
   import { appVersion } from '../buildInfo.js';
   import { activePanel, activeEditorTab, editorZoom, selectedComponentIds, keyObjectId } from '../stores/panels.js';
   import { requestFitToWindow, requestZoomStep } from '../stores/editorCommands.js';
+  import { componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { requestSurfaceZoom } from '../stores/componentWorkspace.js';
   import { showRulers, showGuides, showDistances } from '../stores/editorView.js';
   import { flatControls } from '../utils/containment.js';
   import { midiDestinations, deviceRoleMappings, midiInputs } from '../stores/deviceProfiles.js';
@@ -37,19 +39,32 @@
   // Zoom/view controls only make sense with a panel canvas on screen.
   let canvasActive = $derived(!!panel && ($activeEditorTab?.type ?? 'panel') === 'panel');
 
+  // While the Component Designer is open the canvas on screen is its surface, so grid, snap and
+  // zoom here are the surface's. They used to stay the panel's: "grid off · snap off" beside the
+  // designer's own Snap switched on, and − and + zooming the panel hidden behind it.
+  let designer = $derived($componentDesignerStatus?.kind ? $componentDesignerStatus : null);
+  let zoomPercent = $derived(designer ? Math.round((designer.zoom ?? 1) * 100) : $editorZoom);
+
+  function zoomBy(direction) {
+    if (designer) requestSurfaceZoom(direction > 0 ? 'zoom-in' : 'zoom-out');
+    else requestZoomStep(direction);
+  }
+
   // Zoom % — double-click to type an exact value (moved here from the old ZoomBar).
   let isEditingZoom = $state(false);
   let zoomEditValue = $state('100');
 
   function startZoomEdit() {
-    zoomEditValue = String($editorZoom);
+    zoomEditValue = String(zoomPercent);
     isEditingZoom = true;
   }
 
   function commitZoomEdit() {
     isEditingZoom = false;
     const num = parseInt(zoomEditValue, 10);
-    if (!isNaN(num)) editorZoom.set(Math.max(10, Math.min(400, num)));
+    if (isNaN(num)) return;
+    if (designer) requestSurfaceZoom('zoom-set', num);
+    else editorZoom.set(Math.max(10, Math.min(400, num)));
   }
 
   function handleZoomKeydown(e) {
@@ -102,16 +117,23 @@
   {/if}
   {#if panel}
     <span class="status-item dim mono">{panel.width}×{panel.height}{panel.modified ? ' •' : ''}</span>
-    <span class="status-item dim">grid {panel.gridEnabled ? 'on' : 'off'} · snap {panel.snapToGrid ? 'on' : 'off'}</span>
+    {#if designer}
+      <span class="status-item dim" title="The Component Designer's grid and snap">grid {designer.snapSize} · snap {designer.snapEnabled ? 'on' : 'off'}</span>
+    {:else}
+      <span class="status-item dim">grid {panel.gridEnabled ? 'on' : 'off'} · snap {panel.snapToGrid ? 'on' : 'off'}</span>
+    {/if}
   {/if}
   {#if canvasActive}
+    {#if !designer}
+      <!-- The panel canvas's overlays; the designer's surface has its own (Rulers, Bounds, Zones). -->
+      <span class="bar-group">
+        <button class="bar-btn" class:on={$showRulers} title="Toggle rulers" onclick={() => showRulers.update((v) => !v)}><Ruler size={11} strokeWidth={1.6} /></button>
+        <button class="bar-btn" class:on={$showGuides} title="Toggle guide lines" onclick={() => showGuides.update((v) => !v)}><Columns3 size={11} strokeWidth={1.6} /></button>
+        <button class="bar-btn" class:on={$showDistances} title="Toggle distance labels" onclick={() => showDistances.update((v) => !v)}><MoveHorizontal size={11} strokeWidth={1.6} /></button>
+      </span>
+    {/if}
     <span class="bar-group">
-      <button class="bar-btn" class:on={$showRulers} title="Toggle rulers" onclick={() => showRulers.update((v) => !v)}><Ruler size={11} strokeWidth={1.6} /></button>
-      <button class="bar-btn" class:on={$showGuides} title="Toggle guide lines" onclick={() => showGuides.update((v) => !v)}><Columns3 size={11} strokeWidth={1.6} /></button>
-      <button class="bar-btn" class:on={$showDistances} title="Toggle distance labels" onclick={() => showDistances.update((v) => !v)}><MoveHorizontal size={11} strokeWidth={1.6} /></button>
-    </span>
-    <span class="bar-group">
-      <button class="bar-btn" title="Zoom out" onclick={() => requestZoomStep(-1)}>−</button>
+      <button class="bar-btn" title="Zoom out" onclick={() => zoomBy(-1)}>−</button>
       {#if isEditingZoom}
         <!-- svelte-ignore a11y_autofocus -->
         <input
@@ -124,11 +146,11 @@
         />
       {:else}
         <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <span class="status-item mono zoom-value" ondblclick={startZoomEdit} title="Double-click to type a value">{$editorZoom}%</span>
+        <span class="status-item mono zoom-value" ondblclick={startZoomEdit} title="Double-click to type a value">{zoomPercent}%</span>
       {/if}
-      <button class="bar-btn" title="Zoom in" onclick={() => requestZoomStep(1)}>+</button>
-      <button class="bar-btn" title="Reset to 100%" onclick={() => editorZoom.set(100)}>⊡</button>
-      <button class="bar-btn" title="Fit to window (Ctrl+0)" onclick={() => requestFitToWindow()}><Maximize size={11} strokeWidth={1.6} /></button>
+      <button class="bar-btn" title="Zoom in" onclick={() => zoomBy(1)}>+</button>
+      <button class="bar-btn" title="Reset to 100%" onclick={() => (designer ? requestSurfaceZoom('zoom-reset') : editorZoom.set(100))}>⊡</button>
+      <button class="bar-btn" title="Fit to window (Ctrl+0)" onclick={() => (designer ? requestSurfaceZoom('fit-to-window') : requestFitToWindow())}><Maximize size={11} strokeWidth={1.6} /></button>
     </span>
   {/if}
   <span class="status-item dim">CEditor v{appVersion}</span>

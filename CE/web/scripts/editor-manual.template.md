@@ -770,6 +770,11 @@ The way that works today is:
    local package**. The component is now in your library.
 6. Press **Back to Panel**.
 
+While the designer is open, the dock's **Colors** tool colours the fill of the layer selected on its
+surface (several selected layers take the colour together; with none selected it changes nothing),
+and the status bar's grid, snap and zoom are the designer's. Selecting layers and switching between
+**Preview** and **Edit** are not edits: they do not mark the panel as changed or add a step to undo.
+
 A behaviour is what turns the mouse, the keys or the wheel into a value. Each has four switches,
 under **Interaction** in its entry (Interact tab, **Advanced**, **Behaviors (flat list)**):
 **Pointer** (drag and click), **Keyboard** (arrow keys, Home and End), **Wheel** and **Snap** (values

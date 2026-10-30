@@ -28,22 +28,24 @@ export const activeComponentControl = derived(
  * focus is; on the panel they zoom the canvas, and here they ask the designer's surface, which had
  * no keyboard zoom at all. `n` counts the requests, so the same key twice zooms twice.
  */
-export const surfaceZoomRequest = writable({ n: 0, command: null });
+export const surfaceZoomRequest = writable({ n: 0, command: null, value: undefined });
 
-export function requestSurfaceZoom(command) {
-  surfaceZoomRequest.update(({ n }) => ({ n: n + 1, command }));
+export function requestSurfaceZoom(command, value) {
+  surfaceZoomRequest.update(({ n }) => ({ n: n + 1, command, value }));
 }
 
 /**
- * The designer's side: `actions[command]()` for each request from now on. A request made before the
- * designer existed is not its to carry out. Returns the unsubscribe.
+ * The designer's side: `actions[command](value)` for each request from now on. A request made
+ * before the designer existed is not its to carry out. Returns the unsubscribe. The status bar's
+ * zoom cluster asks here too while the designer is open, with 'zoom-reset' and 'zoom-set' (a
+ * percentage) beside the keys' three.
  */
 export function onSurfaceZoomRequest(actions) {
   let last = get(surfaceZoomRequest).n;
-  return surfaceZoomRequest.subscribe(({ n, command }) => {
+  return surfaceZoomRequest.subscribe(({ n, command, value }) => {
     if (n === last) return;
     last = n;
-    actions[command]?.();
+    actions[command]?.(value);
   });
 }
 

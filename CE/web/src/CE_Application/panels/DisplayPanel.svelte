@@ -42,6 +42,8 @@
   import { activePanel, updatePanel } from '../stores/panels.js';
   import { colorTarget, applyColorToTarget, clearColorTarget, colorTargetRestoreValue, restoreColorTargetSelection } from '../stores/colorTarget.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
+  import { componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { designerFillTarget, followDesignerFill } from '../stores/designerColourTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { setPanelVisibility } from '../stores/panelVisibility.js';
   import { editorTarget, tabForEditorTarget } from '../stores/editorTarget.js';
@@ -319,11 +321,22 @@
         editingGradientStopDestination = null;
       }
       commitNotepadPick();
-      handleTabClick(impliedDockTab({ colorTarget: t, lastTab: activeTab }));
+      // Selecting a layer in the designer arms its fill without taking the dock off its tab.
+      if (!t._designerFill) handleTabClick(impliedDockTab({ colorTarget: t, lastTab: activeTab }));
       colorTargetDirty = false;
       userPickedColor = t._initialColor;
       userPickedAlpha = t._initialAlpha ?? 1;
     });
+  });
+
+  // In the Component Designer the panel is out of sight, so the Colors tab edits the fill of the
+  // layers selected on its surface instead (stores/designerColourTarget.js). Reading $colorTarget
+  // re-arms it when the dock lets go of a target.
+  let designerOpen = $derived(Boolean($componentDesignerStatus?.kind));
+  let designerFill = $derived(designerFillTarget($componentDesignerStatus));
+  $effect(() => {
+    void $colorTarget;
+    followDesignerFill(designerFill, $componentDesignerStatus?.fill);
   });
   // Drag quantisation for the colour bands. 0 = smooth (no design tool ships
   // a snapping colour picker by default); persisted so a chosen step sticks.
@@ -573,6 +586,10 @@
       return;
     }
 
+    // In the designer with no layer selected there is nothing to colour: the panel behind it is
+    // not what the author is looking at.
+    if (designerOpen) return;
+
     // Default — write to panel bgColour. Full AARRGGBB, matching how the
     // panel stores it — the old 6-char write silently dropped the alpha and
     // left the stored format flip-flopping between the two write paths.
@@ -602,9 +619,9 @@
       gradientTargetDirty = true;
       return;
     }
-    // Default: write to panel bgGradient
+    // Default: write to panel bgGradient — not from the designer, where the panel is out of sight.
     const panel = $activePanel;
-    if (panel) {
+    if (panel && !designerOpen) {
       updatePanel(panel.id, { bgGradient: newGradient, modified: true });
     }
   }
@@ -634,9 +651,9 @@
       gradientTargetDirty = true;
       return;
     }
-    // Default: persist to panel store
+    // Default: persist to panel store (not from the designer, as above)
     const panel = $activePanel;
-    if (panel) {
+    if (panel && !designerOpen) {
       updatePanel(panel.id, { bgGradient: currentGradient, modified: true });
     }
   }
@@ -810,11 +827,12 @@
   let colorContextLabel = $derived.by(() => {
     if (editingGradientStop !== null) return `Gradient stop ${editingGradientStop + 1}`;
     if (pickingNotepadColor) return 'Notepad text colour';
-    return describeTarget($colorTarget) ?? 'Panel background';
+    return describeTarget($colorTarget) ?? (designerOpen ? 'No layer selected' : 'Panel background');
   });
   let colorContextActive = $derived(editingGradientStop !== null || pickingNotepadColor || !!$colorTarget);
 
-  let gradientContextLabel = $derived(describeTarget($gradientTarget) ?? 'Panel background gradient');
+  let gradientContextLabel = $derived(describeTarget($gradientTarget)
+    ?? (designerOpen ? 'No layer gradient open: use a layer\'s Gradient button' : 'Panel background gradient'));
   let gradientContextActive = $derived(!!$gradientTarget);
 
   function handleColorDone() {

@@ -60,7 +60,7 @@
   import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
-  import { componentDesignerPreviewRequest, componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { componentDesignerPreviewRequest, componentDesignerStatus, resetComponentDesignerStatus } from '../stores/componentDesignerStatus.js';
   import { creatorMode } from '../stores/creatorMode.js';
   import {
     ENVELOPE_SHAPE_PRESETS,
@@ -610,6 +610,9 @@
       warning: activeSelectionKind === 'layer' && selectedPart && !selectedPartEditable
         ? 'Generated part'
         : '',
+      // For the dock (the selected layers' fill) and the status bar (this surface's zoom and snap).
+      controlId: core?.id ?? '', fill: selectedFill?.colour ?? '', zoom: surfaceZoom, snapEnabled, snapSize: numberOr(snapSize, 10),
+      layers: activeSelectionKind === 'layer' ? selectedLayerNames.filter((name) => isEditablePart(authoredParts?._children?.[name])) : [],
     });
   });
 
@@ -661,18 +664,7 @@
     drawDraft = null;
     surfacePan = null;
     resizingDisplayDock = false;
-    componentDesignerStatus.set({
-      kind: '',
-      tool: '',
-      layer: '',
-      zone: '',
-      warning: '',
-      artboard: '',
-      layerCount: 0,
-      zoneCount: 0,
-      lockedNote: '',
-      previewMode: 'edit',
-    });
+    resetComponentDesignerStatus();
   });
   let activeShapeTool = $derived(SHAPE_TOOLS.find((tool) => tool.id === lastShapeTool) ?? SHAPE_TOOLS[0]);
   let shapeToolActive = $derived(SHAPE_TOOL_IDS.has(activeTool));
@@ -1968,7 +1960,7 @@
   }
 
   // Ctrl+plus, minus and 0 (App.svelte takes them wherever focus is while the designer is open).
-  onDestroy(onSurfaceZoomRequest({ 'zoom-in': () => zoomStep(surfaceZoomIncrement), 'zoom-out': () => zoomStep(-surfaceZoomIncrement), 'fit-to-window': () => fitArtboardToView() }));
+  onDestroy(onSurfaceZoomRequest({ 'zoom-in': () => zoomStep(surfaceZoomIncrement), 'zoom-out': () => zoomStep(-surfaceZoomIncrement), 'fit-to-window': () => fitArtboardToView(), 'zoom-reset': () => setZoom(1), 'zoom-set': (percent) => setZoom(percent / 100) }));
 
   function fitArtboardToView() {
     if (!surfaceScrollEl) {
