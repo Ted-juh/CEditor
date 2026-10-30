@@ -1,8 +1,7 @@
 /**
  * componentLibraryModel.js — the pure half of the Library tab.
  *
- * No Svelte, no DOM: filtering, sorting and the thumbnail-loss report over the saved-component
- * library. `docs/design/library-tab-design.md` has the argument.
+ * No Svelte, no DOM: filtering and sorting over the saved-component library. `docs/design/library-tab-design.md` has the argument.
  *
  * THIS IS NOT A SPACE CANDIDATE, and the design record says so. Measured, `CustomPackageLibrary` is
  * 459px empty and 647px with packages in it, and it STOPS THERE — the card grid is capped at 282px
@@ -26,13 +25,16 @@
  * go too). Fourteen of twenty-two, missing from both ends. The entry carries `envelope.component`,
  * the whole control, so the real renderer can draw it — which is the argument `EffectPreview`
  * already records for effects.
+ *
+ * That picture is drawn nowhere now (2026-10-30): Package & Library and the Insert panel draw the
+ * real renderer too, through PackageShot.svelte, and the "14 of 22 parts" report that warned about
+ * it went with it. The envelope still carries the schematic; nothing reads it but the part count.
  */
 
 const numberOr = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 
-/** The caps the shipped code applies, named so the loss report can quote them. */
+/** How many parts the envelope's schematic keeps (createCustomComponentThumbnail). */
 export const ENVELOPE_PART_CAP = 18;
-export const CARD_PART_CAP = 14;
 
 /** How the grid can be ordered. `recent` is the store's own order, most recently saved first. */
 export const LIBRARY_SORTS = [
@@ -78,31 +80,6 @@ export function describeEntry(entry, index = 0) {
 
 export function describeLibrary(entries) {
   return (Array.isArray(entries) ? entries : []).map((entry, index) => describeEntry(entry, index));
-}
-
-/**
- * How much of a component its saved picture actually shows.
- *
- * `null` when nothing is lost. The two caps are applied in different files and neither says
- * anything when it bites, so the report names both and what fell off which end.
- */
-export function thumbnailLoss(row) {
-  const total = Math.max(0, Math.round(numberOr(row?.parts, 0)));
-  if (!total) return null;
-  const kept = Math.min(total, ENVELOPE_PART_CAP);
-  const drawn = Math.min(kept, CARD_PART_CAP);
-  if (drawn >= total) return null;
-  return {
-    total,
-    kept,
-    drawn,
-    // The envelope sorts by z-index ascending and keeps the LAST 18, so what it throws away is the
-    // bottom of the stack — the background before anything else.
-    lostFromBottom: total - kept,
-    // The card then takes the first 14 of what survived, which is the top of the stack.
-    lostFromTop: kept - drawn,
-    message: `${drawn} of ${total} parts`,
-  };
 }
 
 /** Case- and diacritic-insensitive enough for a search box over names, tags and authors. */

@@ -9,12 +9,10 @@ import assert from 'node:assert/strict';
 
 import {
   ENVELOPE_PART_CAP,
-  CARD_PART_CAP,
   LIBRARY_SORTS,
   LIBRARY_SORT_KEYS,
   describeEntry,
   describeLibrary,
-  thumbnailLoss,
   filterLibrary,
   sortLibrary,
   libraryTags,
@@ -63,35 +61,6 @@ test('the shipped thumbnail drops the bottom of the stack first', () => {
   assert.equal(thumb.parts.length, ENVELOPE_PART_CAP);
   assert.deepEqual(thumb.parts.map((p) => p.name).slice(0, 2), ['part4', 'part5']);
   assert.equal(thumb.parts.at(-1).name, 'part21');
-});
-
-test('and the card then drops the top of what survived', () => {
-  const thumb = createCustomComponentThumbnail(componentWithParts(22));
-  const drawn = thumb.parts.slice(0, CARD_PART_CAP);
-  assert.equal(drawn.length, 14);
-  assert.equal(drawn.at(-1).name, 'part17', 'parts 18-21 are never drawn');
-});
-
-test('thumbnailLoss names both ends and the totals', () => {
-  const loss = thumbnailLoss(describeEntry(entry({ summary: { parts: 22 } })));
-  assert.equal(loss.total, 22);
-  assert.equal(loss.kept, 18);
-  assert.equal(loss.drawn, 14);
-  assert.equal(loss.lostFromBottom, 4);
-  assert.equal(loss.lostFromTop, 4);
-  assert.match(loss.message, /14 of 22/);
-});
-
-test('a component small enough to draw whole loses nothing', () => {
-  assert.equal(thumbnailLoss(describeEntry(entry({ summary: { parts: 5 } }))), null);
-  assert.equal(thumbnailLoss(describeEntry(entry({ summary: { parts: 14 } }))), null);
-  assert.equal(thumbnailLoss(describeEntry(entry({ summary: { parts: 0 } }))), null);
-});
-
-test('between the two caps only the card cap bites', () => {
-  const loss = thumbnailLoss(describeEntry(entry({ summary: { parts: 16 } })));
-  assert.equal(loss.lostFromBottom, 0);
-  assert.equal(loss.lostFromTop, 2);
 });
 
 // --- Reading an entry -------------------------------------------------------

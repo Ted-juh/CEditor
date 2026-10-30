@@ -12,11 +12,15 @@
    * Cards are draggable with the payload `EditorCanvas` already reads
    * (`application/x-ceditor-insert`, `{kind:'package', id}`), so drag-to-place works here for the
    * same reason it works from the Insert panel — no new drop path.
+   *
+   * Each card used to add "panel shows 14 of 22 parts" when Package & Library's schematic left
+   * parts out. Package & Library and the Insert panel draw the real renderer too now
+   * (PackageShot.svelte), so there is no other picture left to warn about.
    */
   import Pin from 'lucide-svelte/icons/pin';
   import TriangleAlert from 'lucide-svelte/icons/triangle-alert';
   import EffectPreview from '../effects/EffectPreview.svelte';
-  import { thumbnailLoss, relativeTime } from '../../utils/componentLibraryModel.js';
+  import { relativeTime } from '../../utils/componentLibraryModel.js';
 
   let {
     rows = [],
@@ -36,7 +40,6 @@
 
 <div class="grid" role="listbox" tabindex="-1" aria-label="Saved components">
   {#each rows as row (row.id)}
-    {@const loss = thumbnailLoss(row)}
     <div
       class="card"
       class:sel={row.id === selectedId}
@@ -72,12 +75,6 @@
         {#if row.useCount}· used {row.useCount}×{/if}
         {#if relativeTime(row.savedAt)}· {relativeTime(row.savedAt)}{/if}
       </span>
-
-      {#if loss}
-        <span class="loss" title={`The panel's own thumbnail draws ${loss.message} — ${loss.lostFromBottom} from the bottom of the stack and ${loss.lostFromTop} from the top. This one is the real renderer.`}>
-          panel shows {loss.message}
-        </span>
-      {/if}
 
       <button
         type="button"
@@ -162,14 +159,6 @@
 
   /* Says what the panel's own picture of this component leaves out. Not a warning about the
      component — a note about the other surface. */
-  .loss {
-    font: 400 7.5px/1.3 'IBM Plex Mono', ui-monospace, monospace;
-    color: #8A7340;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
   .pin {
     position: absolute;
     top: 7px;

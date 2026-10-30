@@ -14,7 +14,7 @@
   import Plus from 'lucide-svelte/icons/plus';
   import Replace from 'lucide-svelte/icons/replace';
   import Trash2 from 'lucide-svelte/icons/trash-2';
-  import { relativeTime, thumbnailLoss } from '../../utils/componentLibraryModel.js';
+  import { relativeTime } from '../../utils/componentLibraryModel.js';
 
   let {
     row = null,
@@ -26,7 +26,6 @@
     onremove = () => {},
   } = $props();
 
-  let loss = $derived(row ? thumbnailLoss(row) : null);
   let confirmRemoveId = $state('');
 
   $effect(() => {
@@ -78,14 +77,6 @@
         <b>{row.issues.length} {row.issues.length === 1 ? 'issue' : 'issues'} in this package.</b>
         {#each row.issues.slice(0, 3) as issue (issue)}<span>{issue}</span>{/each}
         {#if row.issues.length > 3}<span>…and {row.issues.length - 3} more.</span>{/if}
-      </div>
-    {/if}
-
-    {#if loss}
-      <div class="note">
-        The properties panel's own thumbnail of this package draws <b>{loss.message}</b> —
-        {loss.lostFromBottom} missing from the bottom of the layer stack and {loss.lostFromTop} from
-        the top. The picture above is the real renderer.
       </div>
     {/if}
 
@@ -182,16 +173,6 @@
   .bad b { display: block; color: #F0B0A8; font-weight: 600; }
   .bad span { display: block; }
 
-  .note {
-    margin-top: 8px;
-    border: 1px solid #333B42;
-    background: #12171A;
-    border-radius: 4px;
-    padding: 6px 8px;
-    font: 400 9px/1.5 'IBM Plex Sans', system-ui, sans-serif;
-    color: #8A949C;
-  }
-  .note b { color: #C3D0DA; font-weight: 600; }
 
   .acts { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 7px; }
   .acts button {

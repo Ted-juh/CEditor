@@ -1,5 +1,6 @@
 <script>
   import CustomSourceLinkCard from './CustomSourceLinkCard.svelte';
+  import PackageShot from '../components/library/PackageShot.svelte';
   import { onDestroy } from 'svelte';
   import { getSection, applyControlPatch } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -283,30 +284,6 @@
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return 'not saved';
     return date.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' });
-  }
-
-  function thumbnailPartStyle(part) {
-    const kind = String(part?.kind ?? '').toLowerCase();
-    const isRoundOutline = kind.includes('ring') || kind.includes('arc');
-    const radius = kind.includes('circle') || isRoundOutline
-      ? 999
-      : (part?.radius ?? 3);
-    const background = isRoundOutline
-      ? 'transparent'
-      : (part?.colour ?? '#5B9BD5');
-    const border = isRoundOutline
-      ? `2px solid ${part?.colour ?? '#5B9BD5'}`
-      : '1px solid rgba(255,255,255,0.18)';
-    return [
-      `left:${part?.x ?? 0}%`,
-      `top:${part?.y ?? 0}%`,
-      `width:${Math.max(1, part?.width ?? 10)}%`,
-      `height:${Math.max(1, part?.height ?? 10)}%`,
-      `background:${background}`,
-      `border:${border}`,
-      `border-radius:${radius}px`,
-      `transform:rotate(${part?.rotation ?? 0}deg)`,
-    ].join(';');
   }
 
   function parseImportPreview(text) {
@@ -690,11 +667,7 @@
               <strong>{entry.name}</strong>
               <em>{entry.version ?? '1.0.0'}</em>
             </span>
-            <span class="library-thumb" style={`aspect-ratio:${entry.thumbnail?.aspectRatio ?? 2}`}>
-              {#each (entry.thumbnail?.parts ?? []).slice(0, 14) as part}
-                <i class:text={!!part.text} style={thumbnailPartStyle(part)}>{part.text}</i>
-              {/each}
-            </span>
+            <PackageShot component={entry.component} height={64} label={entry.name} />
             <span class="library-card-meta">{entry.author || 'unknown author'} · {entry.category || 'custom'} · {formatSavedAt(entry.savedAt)}</span>
             <span class="library-card-tags">
               {#each capabilityLabels(entry).slice(0, 4) as label}
@@ -741,11 +714,7 @@
               <em>{selectedLibraryEntry.validation?.ok === false ? `${selectedLibraryEntry.validation.issues.length} issue(s)` : 'valid package'}</em>
               <small>{selectedLibraryEntry.fingerprint ?? ''}</small>
             </div>
-            <div class="library-thumb large" style={`aspect-ratio:${selectedLibraryEntry.thumbnail?.aspectRatio ?? 2}`}>
-              {#each (selectedLibraryEntry.thumbnail?.parts ?? []).slice(0, 18) as part}
-                <i class:text={!!part.text} style={thumbnailPartStyle(part)}>{part.text}</i>
-              {/each}
-            </div>
+            <PackageShot component={selectedLibraryEntry.component} height={120} maxScale={3} label={selectedLibraryEntry.name} />
             <div class="manifest-grid compact">
               {#each selectedLibrarySummaryItems as [label, value]}
                 <span><strong>{value}</strong><em>{label}</em></span>
@@ -841,11 +810,7 @@
                 <em>{importPreview.envelope.validation?.ok === false ? `${importPreview.envelope.validation.issues.length} issue(s)` : 'valid package'}</em>
                 <small>{importPreview.envelope.fingerprint ?? ''}</small>
               </div>
-              <div class="library-thumb large" style={`aspect-ratio:${importPreview.envelope.thumbnail?.aspectRatio ?? 2}`}>
-                {#each (importPreview.envelope.thumbnail?.parts ?? []).slice(0, 18) as part}
-                  <i class:text={!!part.text} style={thumbnailPartStyle(part)}>{part.text}</i>
-                {/each}
-              </div>
+              <PackageShot component={importPreview.envelope.component} height={120} maxScale={3} label={importPreview.envelope.metadata.name} />
               <div class="manifest-grid compact">
                 {#each importSummaryItems as [label, value]}
                   <span><strong>{value}</strong><em>{label}</em></span>
@@ -1141,44 +1106,6 @@
   .library-card-meta {
     color: #8EA2B0;
     font-size: 10px;
-  }
-
-  .library-thumb {
-    position: relative;
-    width: 100%;
-    min-height: 42px;
-    max-height: 72px;
-    border: 1px solid #303A42;
-    border-radius: 5px;
-    background:
-      linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-      linear-gradient(180deg, rgba(255,255,255,0.035) 1px, transparent 1px),
-      #101418;
-    background-size: 14px 14px;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-
-  .library-thumb.large {
-    min-height: 74px;
-    max-height: 120px;
-  }
-
-  .library-thumb i {
-    position: absolute;
-    display: block;
-    box-sizing: border-box;
-    overflow: hidden;
-  }
-
-  .library-thumb i.text {
-    color: #F2F6FA;
-    font-size: 7px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    white-space: nowrap;
   }
 
   .library-card-tags,

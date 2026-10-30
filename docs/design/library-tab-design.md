@@ -100,6 +100,9 @@ labelled with the name of the component it will overwrite.
    is what you will get, and a 22-part component is 22 parts.
 2. **The card says what the other picture leaves out.** "panel shows 14 of 22" is a note about the
    properties panel, not about the component — the kind of thing a second renderer normally hides.
+   *Gone since 2026-10-30:* Package & Library and the Insert panel draw the real renderer too
+   (`PackageShot.svelte`), after the owner found its schematic squashed and unlike the component, so
+   there is no other picture left to report on.
 3. **Both ways to use a package, named for what they do.** Placing a copy has never been available
    from this data; replacing has been the only option and has never said whose sections it takes.
 
@@ -111,7 +114,7 @@ Same rule as the other five.
 
 | Piece | File |
 |---|---|
-| The model — descriptors, search, sort with the pin rule, the thumbnail-loss report | `utils/componentLibraryModel.js` |
+| The model — descriptors, search, sort with the pin rule | `utils/componentLibraryModel.js` |
 | The tab | `components/LibraryTab.svelte` |
 | Columns | `components/library/LibraryGrid · LibraryDetail` |
 | Registration | `panels/DisplayPanel.svelte`, `utils/displayDock.js` |

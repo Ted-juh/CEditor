@@ -65,7 +65,6 @@ window.__lib = {
   /** Each card mounts the real renderer; this counts what it actually drew. */
   shotInk: () => [...document.querySelectorAll('.card .shot')].map((s) => (s.querySelector('.effect-preview')?.innerHTML ?? '').length),
   shotControls: () => document.querySelectorAll('.card .shot .effect-preview').length,
-  lossNotes: () => [...document.querySelectorAll('.card .loss')].map(textOf),
 
   search: (value) => {
     const input = document.querySelector('.search input');

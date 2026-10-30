@@ -1,5 +1,6 @@
 <script>
   import Container from 'lucide-svelte/icons/container';
+  import PackageShot from '../components/library/PackageShot.svelte';
   import Library from 'lucide-svelte/icons/library';
   import Pin from 'lucide-svelte/icons/pin';
   import Plus from 'lucide-svelte/icons/plus';
@@ -184,24 +185,6 @@
   function toggleCustomLibrary() {
     customLibraryOpen = !customLibraryOpen;
     if (customLibraryOpen) closeFlyout(true);
-  }
-
-  function thumbnailPartStyle(part) {
-    const kind = String(part?.kind ?? '').toLowerCase();
-    const isRoundOutline = kind.includes('ring') || kind.includes('arc');
-    const radius = kind.includes('circle') || isRoundOutline ? 999 : (part?.radius ?? 3);
-    const background = isRoundOutline ? 'transparent' : (part?.colour ?? '#5B9BD5');
-    const border = isRoundOutline ? `2px solid ${part?.colour ?? '#5B9BD5'}` : '1px solid rgba(255,255,255,0.18)';
-    return [
-      `left:${part?.x ?? 0}%`,
-      `top:${part?.y ?? 0}%`,
-      `width:${Math.max(1, part?.width ?? 10)}%`,
-      `height:${Math.max(1, part?.height ?? 10)}%`,
-      `background:${background}`,
-      `border:${border}`,
-      `border-radius:${radius}px`,
-      `transform:rotate(${part?.rotation ?? 0}deg)`,
-    ].join(';');
   }
 
   function selectLibraryEntry(entry) {
@@ -422,11 +405,7 @@
             title={`Select ${entry.name}`}
             onclick={() => selectLibraryEntry(entry)}
           >
-            <span class="entry-thumb" style={`aspect-ratio:${entry.thumbnail?.aspectRatio ?? 2}`}>
-              {#each (entry.thumbnail?.parts ?? []).slice(0, 10) as part}
-                <i style={thumbnailPartStyle(part)}></i>
-              {/each}
-            </span>
+            <PackageShot component={entry.component} width={48} height={32} />
             <span class="entry-main">
               <span class="entry-title">{entry.name}</span>
               <span class="entry-meta">
@@ -767,24 +746,6 @@
     color: #DDD;
     cursor: pointer;
     text-align: left;
-  }
-
-  .entry-thumb {
-    position: relative;
-    flex: 0 0 48px;
-    width: 48px;
-    min-height: 28px;
-    border: 1px solid #333F48;
-    border-radius: 4px;
-    background: #101418;
-    overflow: hidden;
-    box-sizing: border-box;
-  }
-
-  .entry-thumb i {
-    position: absolute;
-    display: block;
-    box-sizing: border-box;
   }
 
   .library-entry:hover:not(:disabled) {

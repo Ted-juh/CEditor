@@ -64,13 +64,6 @@ check('each card is the real renderer, not a stack of coloured rectangles', () =
   assert.ok(ink.every((value) => value > 100), `previews drew: ${ink.join(', ')}`);
 });
 
-const losses = await ev(() => window.__lib.lossNotes());
-check('and a card says what the panel\'s own picture of it leaves out', () => {
-  // Only the 22-part component loses anything: 18 survive the envelope, 14 reach the card.
-  assert.equal(losses.length, 1, `loss notes: ${losses.join(' | ')}`);
-  assert.match(losses[0], /14 of 22/);
-});
-
 // --- Placing ----------------------------------------------------------------------------------
 
 const before = await ev(() => window.__lib.panelControls());
