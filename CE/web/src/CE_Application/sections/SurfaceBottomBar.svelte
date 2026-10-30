@@ -16,7 +16,6 @@
   import Ruler from 'lucide-svelte/icons/ruler';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
-  import { creatorMode } from '../stores/creatorMode.js';
 
   let {
     // Snapping and overlays
@@ -54,10 +53,8 @@
 
   <div class="surface-options-strip" aria-label="Surface view + zoom options">
     <div class="surface-toolbar-left">
-    <div class="zone-mode-control creator-mode" role="radiogroup" aria-label="Creator mode" title="Simple hides the raw graph editors; Advanced shows them">
-      <button type="button" role="radio" aria-checked={$creatorMode === 'simple'} class:active={$creatorMode === 'simple'} onclick={() => creatorMode.set('simple')}>Simple</button>
-      <button type="button" role="radio" aria-checked={$creatorMode === 'advanced'} class:active={$creatorMode === 'advanced'} onclick={() => creatorMode.set('advanced')}>Adv</button>
-    </div>
+    <!-- Simple/Advanced is not here: it decides what the properties panel shows, and the switch at
+         the foot of that panel is the one (this strip had a second). -->
     <PropertyToggle compact label="Snap" value={snapEnabled} onchange={(next) => setSnapEnabled(next)} />
     <label class="snap-size">
       <span>Grid</span>

@@ -3,7 +3,11 @@
   import { onSurfaceZoomRequest } from '../stores/componentWorkspace.js';
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
+  import BringToFront from 'lucide-svelte/icons/bring-to-front';
+  import ClipboardPaste from 'lucide-svelte/icons/clipboard-paste';
   import Copy from 'lucide-svelte/icons/copy';
+  import CopyPlus from 'lucide-svelte/icons/copy-plus';
+  import SendToBack from 'lucide-svelte/icons/send-to-back';
   import SquaresUnite from 'lucide-svelte/icons/squares-unite';
   import SquaresSubtract from 'lucide-svelte/icons/squares-subtract';
   import SquaresIntersect from 'lucide-svelte/icons/squares-intersect';
@@ -61,7 +65,6 @@
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
   import { componentDesignerPreviewRequest, componentDesignerStatus, resetComponentDesignerStatus } from '../stores/componentDesignerStatus.js';
-  import { creatorMode } from '../stores/creatorMode.js';
   import {
     ENVELOPE_SHAPE_PRESETS,
     RENDERER_COLOR_PRESETS,
@@ -3946,25 +3949,25 @@
             <span class="quickbar-label">{activeSelectionKind === 'hitZone' ? 'Zone' : 'Layer'}</span>
             {#if activeSelectionKind === 'layer'}
               <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate layer">
+                <CopyPlus size={13} aria-hidden="true" />
+              </button>
+              <button type="button" onclick={copySelectedLayers} disabled={!selectedLayerNames.length} title="Copy layers (Ctrl+C)">
                 <Copy size={13} aria-hidden="true" />
               </button>
-              <button type="button" class="quick-text" onclick={copySelectedLayers} disabled={!selectedLayerNames.length} title="Copy layers (Ctrl+C)">
-                C
-              </button>
-              <button type="button" class="quick-text" onclick={pasteClipboardLayers} disabled={!hasPartClipboard()} title="Paste layers (Ctrl+V)">
-                P
+              <button type="button" onclick={pasteClipboardLayers} disabled={!hasPartClipboard()} title="Paste layers (Ctrl+V)">
+                <ClipboardPaste size={13} aria-hidden="true" />
               </button>
               <button type="button" onclick={() => moveSelectedLayer(1)} disabled={!canManageLayer} title="Bring forward">
                 <ArrowUp size={13} aria-hidden="true" />
               </button>
-              <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
-                F
+              <button type="button" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
+                <BringToFront size={13} aria-hidden="true" />
               </button>
               <button type="button" onclick={() => moveSelectedLayer(-1)} disabled={!canManageLayer} title="Send backward">
                 <ArrowDown size={13} aria-hidden="true" />
               </button>
-              <button type="button" class="quick-text" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
-                B
+              <button type="button" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
+                <SendToBack size={13} aria-hidden="true" />
               </button>
               <button
                 type="button"
@@ -5218,12 +5221,13 @@
     text-align: center;
   }
 
+  /* Top right: the tool strip is centred along the bottom, and on a narrow canvas this bar sat on it. */
   .selection-quickbar {
     position: absolute;
     right: 16px;
-    bottom: 14px;
+    bottom: auto;
     left: auto;
-    top: auto;
+    top: 10px;
     z-index: 2420;
     display: inline-flex;
     align-items: center;
@@ -5268,11 +5272,6 @@
     background: transparent;
     color: #DDEEFF;
     cursor: pointer;
-  }
-
-  .selection-quickbar button.quick-text {
-    font-size: 10px;
-    font-weight: 900;
   }
 
   .selection-quickbar button:hover:not(:disabled) {

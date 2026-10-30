@@ -208,7 +208,15 @@ test('an action opens the implied dock tab and clears stale colour and gradient 
 test('preview is reachable from the icon rail, which is never hidden', () => {
   assert.match(source.iconPanel, /preview-section/);
   assert.match(source.iconPanel, /togglePreviewMode\(\)/);
-  assert.match(source.iconPanel, /<span class="btn-label">\{\$previewModeEnabled \? 'Stop' : 'Preview'\}<\/span>/);
+  assert.match(source.iconPanel, /<span class="btn-label">\{previewOn \? 'Stop' : 'Preview'\}<\/span>/);
+});
+
+test('in the Component Designer the rail\'s Preview is the designer\'s Preview and Edit', () => {
+  // It was greyed out there, saying "Open a panel to preview it" with a panel open behind it.
+  assert.match(source.iconPanel, /if \(designerOpen\) requestComponentDesignerPreview\(designerPreviewing \? 'edit' : 'preview'\);/);
+  assert.match(source.iconPanel, /disabled=\{!canPreview && !designerOpen\}/);
+  assert.match(source.iconPanel, /'Preview runs on the panel canvas: go back to the panel to use it'/,
+    'elsewhere, with a panel open, it says why it is off');
 });
 
 test('the preview button does not depend on the panel toggles the app disables below 920px', () => {

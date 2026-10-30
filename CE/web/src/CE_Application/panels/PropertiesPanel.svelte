@@ -636,14 +636,17 @@
             >Advanced</button>
           </div>
         </div>
-        <button
-          type="button"
-          class="component-designer-entry"
-          data-testid="properties-component-designer-launch"
-          onclick={handleOpenComponentDesigner}
-        >
-          Open Component Designer
-        </button>
+        <!-- Not while the designer is open: it is the designer already, and Back to Panel leaves it. -->
+        {#if $componentWorkspaceMode !== 'surface'}
+          <button
+            type="button"
+            class="component-designer-entry"
+            data-testid="properties-component-designer-launch"
+            onclick={handleOpenComponentDesigner}
+          >
+            Open Component Designer
+          </button>
+        {/if}
       </div>
     {/if}
   {:else}

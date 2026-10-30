@@ -772,8 +772,11 @@ The way that works today is:
 
 While the designer is open, the dock's **Colors** tool colours the fill of the layer selected on its
 surface (several selected layers take the colour together; with none selected it changes nothing),
-and the status bar's grid, snap and zoom are the designer's. Selecting layers and switching between
-**Preview** and **Edit** are not edits: they do not mark the panel as changed or add a step to undo.
+and the status bar's grid, snap and zoom are the designer's. **Preview** on the icon rail switches the
+designer between **Preview** and **Edit**, as the buttons in its header do. Selecting layers and
+switching between **Preview** and **Edit** are not edits: they do not mark the panel as changed or add
+a step to undo. **Simple** and **Advanced**, at the foot of the properties panel, decide how much of
+the component's workings the properties panel shows.
 
 A behaviour is what turns the mouse, the keys or the wheel into a value. Each has four switches,
 under **Interaction** in its entry (Interact tab, **Advanced**, **Behaviors (flat list)**):

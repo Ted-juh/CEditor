@@ -308,7 +308,9 @@ test('setlist capture evaluates the panel snapshot once', () => {
 
 test('surface mode groups expose their selected radio state', () => {
   const source = src('CE_Application/sections/SurfaceBottomBar.svelte');
-  assert.match(source, /role="radio" aria-checked=\{\$creatorMode === 'simple'\}/);
+  // Simple/Advanced has one switch, at the foot of the properties panel; the strip had a second.
+  assert.doesNotMatch(source, /creatorMode/);
+  assert.match(src('CE_Application/panels/PropertiesPanel.svelte'), /role="radio"\s+aria-checked=\{\$creatorMode === 'simple'\}/);
   assert.match(source, /role="radiogroup" aria-label="Zone display mode"/);
   assert.match(source, /role="radio" aria-checked=\{zoneDisplayMode === 'all'\}/);
 });

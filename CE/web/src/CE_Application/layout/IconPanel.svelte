@@ -14,6 +14,7 @@
   import { activePanel } from '../stores/panels.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
+  import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import InsertFlyout from './InsertFlyout.svelte';
   import { INSERT_CATEGORIES } from '../models/insertCatalog.js';
   import { CATEGORY_ICONS, FALLBACK_TYPE_ICON } from '../models/insertCatalogIcons.js';
@@ -42,6 +43,21 @@
   } = $props();
 
   let canPreview = $derived(previewEnabled && !!$activePanel);
+  // In the Component Designer this is the designer's own Preview and Edit, as its header has them.
+  // It was greyed out there, saying "Open a panel to preview it" with a panel open behind it.
+  let designerOpen = $derived(Boolean($componentDesignerStatus?.kind));
+  let designerPreviewing = $derived(designerOpen && $componentDesignerStatus.previewMode === 'preview');
+  let previewOn = $derived(designerOpen ? designerPreviewing : canPreview && $previewModeEnabled);
+  let previewTitle = $derived.by(() => {
+    if (designerOpen) return designerPreviewing ? 'Back to editing the component' : 'Preview the component: use it as it works on the panel';
+    if (canPreview) return $previewModeEnabled ? 'Leave preview mode (F5)' : 'Preview the panel — interact with it as the end user (F5)';
+    return $activePanel ? 'Preview runs on the panel canvas: go back to the panel to use it' : 'Open a panel to preview it';
+  });
+
+  function togglePreview() {
+    if (designerOpen) requestComponentDesignerPreview(designerPreviewing ? 'edit' : 'preview');
+    else togglePreviewMode();
+  }
   let displayToggleOn = $derived(displayToggleEnabled ?? togglesEnabled);
 
   // Insertion needs an open panel AND a workspace whose canvas is that
@@ -298,20 +314,18 @@
   <div class="rail-section preview-section">
     <button
       class="icon-btn rail-toggle"
-      class:active={canPreview && $previewModeEnabled}
-      title={canPreview
-        ? ($previewModeEnabled ? 'Leave preview mode (F5)' : 'Preview the panel — interact with it as the end user (F5)')
-        : 'Open a panel to preview it'}
-      aria-pressed={canPreview && $previewModeEnabled}
-      disabled={!canPreview}
-      onclick={() => togglePreviewMode()}
+      class:active={previewOn}
+      title={previewTitle}
+      aria-pressed={previewOn}
+      disabled={!canPreview && !designerOpen}
+      onclick={togglePreview}
     >
-      {#if $previewModeEnabled}
+      {#if previewOn}
         <Square size={16} strokeWidth={1.6} />
       {:else}
         <Play size={16} strokeWidth={1.6} />
       {/if}
-      <span class="btn-label">{$previewModeEnabled ? 'Stop' : 'Preview'}</span>
+      <span class="btn-label">{previewOn ? 'Stop' : 'Preview'}</span>
     </button>
   </div>
 
