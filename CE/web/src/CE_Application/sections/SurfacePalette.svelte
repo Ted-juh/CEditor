@@ -1,39 +1,28 @@
 <script>
   /**
-   * The Shapes palette down the left of the design surface: draw tools, value-control kits, pen,
-   * fill, gradient, stroke, path operations, corner radius, and the three panel toggles at its
-   * foot.
+   * The Shapes palette down the left of the design surface: the draw tools, value-control kits and
+   * pens, and the three panel toggles at its foot.
+   *
+   * It drew and styled. Its Fill, Gradient, Stroke, Corner and Pen "Size" (the stroke width again)
+   * edited the selected layer only, and were greyed out without one, so they set nothing for the
+   * next shape. The look bar along the top edits all of them, the dock's Colors and Gradient tabs
+   * are the full editors, and "Path Operations" (duplicate, front, back, lock) was the layer quick
+   * bar again. A layer was styled in three places; it is styled in the look bar and the dock now,
+   * and this palette is for drawing.
    *
    * Third of the §5 decomposition. Everything it draws with that another region also draws with —
    * the tool glyphs, the mini swatch buttons, the NumberCell wrapper — is defined once in the
    * parent under `.surface-shell :global(...)`; only the palette's own rules came with it.
    */
-  import Copy from 'lucide-svelte/icons/copy';
-  import ArrowUp from 'lucide-svelte/icons/arrow-up';
-  import ArrowDown from 'lucide-svelte/icons/arrow-down';
-  import Lock from 'lucide-svelte/icons/lock';
-  import Unlock from 'lucide-svelte/icons/lock-open';
   import PanelLeft from 'lucide-svelte/icons/panel-left';
   import PanelRight from 'lucide-svelte/icons/panel-right';
   import PanelBottom from 'lucide-svelte/icons/panel-bottom';
-  import NumberCell from '../properties/NumberCell.svelte';
   import { clipPathForKind } from '../utils/shapeGeometry.js';
-  import { gradientToCSS } from '../utils/gradientCSS.js';
-  import { numberOr } from '../utils/primitives.js';
-  import { swatchCss } from '../utils/customDesignSurfaceHelpers.js';
 
   let {
     activeTool = 'select',
     shapeTools = [],
     vectorShapeTools = [],
-    // The selected layer, as the palette needs to see it
-    selectedAuthoredPart = null,
-    selectedBackground = null,
-    selectedFill = null,
-    selectedBorder = null,
-    selectedCorners = null,
-    canPaintLayer = false,
-    canManageLayer = false,
     // Panel visibility, owned by the parent because the grid template reads it too
     paletteCollapsed = false, setPaletteCollapsed = () => {},
     dockHidden = false, setDockHidden = () => {},
@@ -46,13 +35,6 @@
     addArpeggiatorKit = () => {},
     addHitZoneAtCenter = () => {},
     addLayerAtCenter = () => {},
-    setLayerProperty = () => {},
-    openLayerColour = () => {},
-    openLayerGradient = () => {},
-    toggleFillGradient = () => {},
-    duplicateSelectedLayer = () => {},
-    moveSelectedLayerToExtreme = () => {},
-    toggleSelectedLock = () => {},
   } = $props();
 </script>
 
@@ -60,7 +42,7 @@
       <div class="palette-scroll">
       <div class="palette-header">
         <strong>Shapes</strong>
-        <span>Draw and style</span>
+        <span>Draw</span>
       </div>
 
       <section class="palette-group">
@@ -142,130 +124,8 @@
             <span class="brush-preview bold"></span>
           </button>
         </div>
-        <label class="palette-stepper">
-          <span>Size</span>
-          <span class="nc-wrap">
-            <NumberCell
-              min={1}
-              max={24}
-              value={Math.round(numberOr(selectedBorder?.thickness, 1))}
-              defaultValue={1}
-              disabled={!canPaintLayer}
-              onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
-            />
-          </span>
-          <strong>px</strong>
-        </label>
       </section>
 
-      <section class="palette-group">
-        <span>Fill</span>
-        <label class="palette-swatch-row">
-          <button type="button" class="mini-swatch-btn"
-            disabled={!canPaintLayer || !selectedBackground}
-            style={swatchCss(selectedFill?.colour)}
-            onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
-            title="Pick fill colour"
-          ></button>
-          <code>{selectedFill?.colour ? `#${String(selectedFill.colour).slice(-6)}` : '#14B8A6'}</code>
-          <span class="swatch-num" title="Layer opacity (lower = more transparent)">
-            <span class="nc-wrap">
-              <NumberCell
-                min={0}
-                max={100}
-                value={Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}
-                defaultValue={100}
-                disabled={!canPaintLayer || !selectedBackground}
-                onchange={(value) => setLayerProperty('opacity', Math.max(0, Math.min(1, value / 100)))}
-              />
-            </span>%
-          </span>
-        </label>
-      </section>
-
-      <section class="palette-group">
-        <span>Gradient</span>
-        <div class="palette-grid compact">
-          <button type="button"
-            class:active={selectedFill?.gradientEnabled}
-            disabled={!canPaintLayer || !selectedBackground}
-            onclick={toggleFillGradient}
-            title={selectedFill?.gradientEnabled ? 'Disable gradient fill' : 'Enable gradient fill'}
-          >G</button>
-          {#if selectedFill?.gradientEnabled && selectedFill?.gradient}
-            <button type="button" class="mini-gradient-btn wide"
-              disabled={!canPaintLayer}
-              style="background:{gradientToCSS(selectedFill?.gradient, 'rectangle')}"
-              onclick={openLayerGradient}
-              title="Edit gradient"
-            ></button>
-          {/if}
-        </div>
-      </section>
-
-      <section class="palette-group">
-        <span>Stroke</span>
-        <label class="palette-swatch-row">
-            <button type="button" class="mini-swatch-btn"
-              disabled={!canPaintLayer || !selectedBackground}
-              style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
-              onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
-              title="Pick stroke colour"
-            ></button>
-          <code>{selectedBorder?.colour ? `#${String(selectedBorder.colour).slice(-6)}` : '#FFFFFF'}</code>
-          <span class="swatch-num" title="Stroke thickness">
-            <span class="nc-wrap">
-              <NumberCell
-                min={0}
-                max={999}
-                value={Math.round(numberOr(selectedBorder?.thickness, 1))}
-                defaultValue={1}
-                disabled={!canPaintLayer || !selectedBackground}
-                onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
-              />
-            </span>px
-          </span>
-        </label>
-      </section>
-
-      <section class="palette-group">
-        <span>Path Operations</span>
-        <div class="palette-grid compact">
-          <button type="button" onclick={duplicateSelectedLayer} disabled={!canManageLayer} title="Duplicate">
-            <Copy size={14} aria-hidden="true" />
-          </button>
-          <button type="button" onclick={() => moveSelectedLayerToExtreme('front')} disabled={!canManageLayer} title="Bring to front">
-            <ArrowUp size={14} aria-hidden="true" />
-          </button>
-          <button type="button" onclick={() => moveSelectedLayerToExtreme('back')} disabled={!canManageLayer} title="Send to back">
-            <ArrowDown size={14} aria-hidden="true" />
-          </button>
-          <button type="button" onclick={toggleSelectedLock} disabled={!canManageLayer} title="Toggle lock">
-            {#if selectedAuthoredPart?.locked === true}
-              <Unlock size={14} aria-hidden="true" />
-            {:else}
-              <Lock size={14} aria-hidden="true" />
-            {/if}
-          </button>
-        </div>
-      </section>
-
-      <section class="palette-group">
-        <span>Corner</span>
-        <label class="palette-corner">
-          <span class="nc-wrap">
-            <NumberCell
-              min={0}
-              max={999}
-              value={numberOr(selectedCorners?.radius, 0)}
-              defaultValue={0}
-              disabled={!canPaintLayer || !selectedBackground}
-              onchange={(value) => setLayerProperty('Background.Corners.radius', value)}
-            />
-          </span>
-          <strong>radius</strong>
-        </label>
-      </section>
       </div>
       <div class="palette-toggles" aria-label="Panel toggles">
         <button type="button" class:active={!paletteCollapsed} title={paletteCollapsed ? 'Expand the Shapes palette' : 'Collapse the Shapes palette'} onclick={() => setPaletteCollapsed(!paletteCollapsed)}>
@@ -282,17 +142,6 @@
 
 <style>
   .palette-panel { grid-area: palette; }
-
-  /* Compact editable numeric field (e.g. stroke thickness) in a swatch row. */
-  .swatch-num {
-    display: inline-flex;
-    align-items: center;
-    gap: 2px;
-    color: #DFEAF0;
-    font-size: 10px;
-    font-weight: 800;
-    white-space: nowrap;
-  }
 
   .palette-panel {
     min-width: 0;
@@ -395,7 +244,6 @@
     gap: 7px;
   }
 
-  .palette-grid.compact,
   .palette-grid.brush-grid {
     grid-template-columns: repeat(4, 1fr);
   }
@@ -537,26 +385,4 @@
     background: #8FA4B0;
   }
 
-  .palette-stepper,
-  .palette-swatch-row,
-  .palette-corner {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
-    align-items: center;
-    gap: 8px;
-    min-height: 30px;
-    color: #9FB2BF;
-    font-size: 10px;
-    font-weight: 800;
-  }
-
-  .palette-swatch-row code,
-  .palette-stepper strong,
-  .palette-corner strong {
-    min-width: 0;
-    color: #DFEAF0;
-    font: inherit;
-    font-size: 10px;
-    white-space: nowrap;
-  }
 </style>

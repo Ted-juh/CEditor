@@ -85,3 +85,28 @@ test('the layer list is one line a row and folds a numbered run of five or more'
   const rowRule = layers.match(/\/\* One line a row[^*]*\*\/\s*\.list-row \{[^}]*\}/)?.[0] ?? '';
   assert.match(rowRule, /min-height: 34px;/);
 });
+
+test('the Shapes palette draws; a layer is styled in the look bar and the dock, not in the palette as well', () => {
+  const palette = src('CE_Application/sections/SurfacePalette.svelte');
+  const groups = [...palette.matchAll(/<section class="palette-group">\s*<span>([^<]+)<\/span>/g)].map((m) => m[1]);
+  assert.deepEqual(groups, ['Basic', 'Lines &amp; Polygons', 'Value Controls', 'Pen']);
+  for (const gone of ['setLayerProperty', 'openLayerColour', 'openLayerGradient', 'toggleFillGradient', 'duplicateSelectedLayer', 'palette-stepper']) {
+    assert.ok(!palette.includes(gone), `${gone} is not the palette's any more`);
+  }
+  // Everything it styled, the look bar styles.
+  const lookBar = src('CE_Application/sections/SurfaceLookBar.svelte');
+  for (const path of ['Background.Fill.colour', 'Background.Border.colour', 'Background.Border.thickness', 'Background.Corners.radius']) {
+    assert.ok(lookBar.includes(path), path);
+  }
+  assert.match(lookBar, /setLayerProperty\('opacity'/);
+  assert.match(lookBar, /onclick=\{toggleFillGradient\}/);
+});
+
+test('selection handles keep their size at any zoom', () => {
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  const rule = (selector) => designer.slice(designer.indexOf(`  ${selector} {`)).match(/\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(rule('.part-bound > .resize-handle,\n  .hit-zone > .resize-handle'), /transform: scale\(var\(--surface-unzoom, 1\)\);/);
+  // Its own rule, the one that places it 30px above the part (it also opens a shared one earlier).
+  assert.match(designer, /\.part-bound > \.rotate-handle \{\s*left: calc\(50% - 5px\);\s*top: -30px;[\s\S]{0,160}transform-origin: 5px 30px;\s*transform: scale\(var\(--surface-unzoom, 1\)\);/);
+  assert.match(rule('.part-bound > .arc-handle'), /transform: scale\(var\(--surface-unzoom, 1\)\);/);
+});

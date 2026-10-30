@@ -770,6 +770,11 @@ The way that works today is:
    local package**. The component is now in your library.
 6. Press **Back to Panel**.
 
+The **Shapes** palette down the left is for drawing. A selected layer is styled in the bar along the
+top of the designer (**Fill**, **Gradient**, **Stroke** and its width **W**, corner radius **R**,
+**Opacity**, and for text its colour, size and words) and in the dock's **Colors** and **Gradient**
+tools.
+
 While the designer is open, the dock's **Colors** tool colours the fill of the layer selected on its
 surface (several selected layers take the colour together; with none selected it changes nothing),
 and the status bar's grid, snap and zoom are the designer's. **Preview** on the icon rail switches the

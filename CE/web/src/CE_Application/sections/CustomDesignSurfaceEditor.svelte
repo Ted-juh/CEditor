@@ -3557,16 +3557,12 @@
         {activeTool}
         shapeTools={SHAPE_TOOLS}
         vectorShapeTools={VECTOR_SHAPE_TOOLS}
-        {selectedAuthoredPart} {selectedBackground} {selectedFill} {selectedBorder} {selectedCorners}
-        {canPaintLayer} {canManageLayer}
         {paletteCollapsed} setPaletteCollapsed={(v) => { paletteCollapsed = v; }}
         {dockHidden} setDockHidden={(v) => { dockHidden = v; }}
         {displayDockHidden} setDisplayDockHidden={(v) => { displayDockHidden = v; }}
         {setActiveTool}
         {addDialKit} {addHorizontalScaleKit} {addVerticalScaleKit} {addArpeggiatorKit}
         {addHitZoneAtCenter} {addLayerAtCenter}
-        {setLayerProperty} {openLayerColour} {openLayerGradient} {toggleFillGradient}
-        {duplicateSelectedLayer} {moveSelectedLayerToExtreme} {toggleSelectedLock}
       />
 
       <div class="surface-viewport" class:rulers-hidden={!surfaceShowRulers}>
@@ -4975,6 +4971,9 @@
     pointer-events: auto;
   }
 
+  /* Handles are drawn inside the zoomed artboard, like the labels: each is scaled back about its own
+     centre, which sits on the part's edge, so it stays 8px however far the surface is zoomed in. At
+     the 500% a small component opens at, they were 40px blocks over the artwork. */
   .part-bound > .resize-handle,
   .hit-zone > .resize-handle {
     width: 8px;
@@ -4982,6 +4981,7 @@
     background: var(--surface-accent, #14B8A6);
     border: 1px solid #FFF;
     box-shadow: 0 1px 5px rgba(0, 0, 0, 0.45);
+    transform: scale(var(--surface-unzoom, 1));
   }
 
   .part-bound > .resize-handle::after,
@@ -5009,6 +5009,9 @@
     top: -30px;
     width: 10px;
     height: 10px;
+    /* Scaled back about the foot of its stem, the middle of the part's top edge. */
+    transform-origin: 5px 30px;
+    transform: scale(var(--surface-unzoom, 1));
     border-radius: 999px;
     background: #E5A029;
     border: 1px solid #FFF;
@@ -5031,6 +5034,7 @@
     z-index: 2;
     width: 12px;
     height: 12px;
+    transform: scale(var(--surface-unzoom, 1));
     border: 1px solid #FFF;
     border-radius: 999px;
     background: #E5C06B;
