@@ -39,5 +39,8 @@ part knob*, *Move or resize part label*, *Edit states*.
 
 - History keeps the last **50 steps per document**. Each open panel and component has its own.
 - **Background images are not part of undo**, as before.
+- **Looking is not a step.** In the Component Designer, selecting a layer, hit zone or channel and
+  switching between Preview and Edit do not add a step or the unsaved-changes dot. Undo keeps the
+  selection you had when you made the change it takes back.
 - A step is listed once it is committed: when you let go of a drag, or about half a second after
   you stop typing.

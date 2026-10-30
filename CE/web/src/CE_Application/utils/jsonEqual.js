@@ -16,8 +16,12 @@
  * reordering one is a real edit), keys whose value is undefined or a function are skipped as
  * JSON skips them, undefined or a function inside an array reads as null, and a non-finite number
  * reads as null.
+ *
+ * `normalize`, when given, maps each object to the one to compare in its place before its keys
+ * are read (history passes designerViewState's withoutDesignerView, so what the Component Designer
+ * was showing does not count as a difference).
  */
-export function jsonEqual(a, b) {
+export function jsonEqual(a, b, normalize = null) {
   if (a === b) return true;
   const ta = jsonType(a);
   const tb = jsonType(b);
@@ -29,15 +33,20 @@ export function jsonEqual(a, b) {
   }
   if (ta === 'array') {
     if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) if (!jsonEqual(a[i], b[i])) return false;
+    for (let i = 0; i < a.length; i++) if (!jsonEqual(a[i], b[i], normalize)) return false;
     return true;
+  }
+  if (normalize) {
+    a = normalize(a);
+    b = normalize(b);
+    if (a === b) return true;
   }
   const ka = serializedKeys(a);
   const kb = serializedKeys(b);
   if (ka.length !== kb.length) return false;
   for (let i = 0; i < ka.length; i++) {
     if (ka[i] !== kb[i]) return false;
-    if (!jsonEqual(a[ka[i]], b[kb[i]])) return false;
+    if (!jsonEqual(a[ka[i]], b[kb[i]], normalize)) return false;
   }
   return true;
 }

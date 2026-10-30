@@ -121,7 +121,9 @@ export function closeComponentDocument(id) {
   return nextId;
 }
 
-export function mutateComponentDocumentControl(controlId, mutator) {
+/** `view`: the mutation changes only what the designer shows (utils/designerViewState.js), so the
+ *  document's modified flag stays as it was. */
+export function mutateComponentDocumentControl(controlId, mutator, { view = false } = {}) {
   if (!controlId || typeof mutator !== 'function') return false;
   let changed = false;
   componentDocuments.update((documents) => documents.map((document) => {
@@ -133,7 +135,7 @@ export function mutateComponentDocumentControl(controlId, mutator) {
     return {
       ...document,
       name: nextControl?._children?.Core?.name ?? document.name,
-      modified: true,
+      modified: view ? document.modified : true,
       control: nextControl,
     };
   }));

@@ -1,6 +1,7 @@
 import { get, writable } from 'svelte/store';
 import { deepClone } from '../utils/deepClone.js';
 import { jsonEqual } from '../utils/jsonEqual.js';
+import { withoutDesignerView } from '../utils/designerViewState.js';
 import { cachedHistoryStepLabel } from '../utils/historyLabels.js';
 import { panels, resolvedActivePanelId, activeEditorTab, selectedComponentIds } from './panels.js';
 import {
@@ -371,8 +372,10 @@ function sameSnapshot(a, b, context) {
   if (context?.registered) return JSON.stringify(a) === JSON.stringify(b);
   if (chromeOf(a) !== chromeOf(b)) return false;
 
+  // What the Component Designer was showing (its selection, Preview or Edit) is not part of the
+  // comparison: see utils/designerViewState.js.
   if (a.control || b.control) {
-    return jsonEqual(a.control, b.control);
+    return jsonEqual(a.control, b.control, withoutDesignerView);
   }
 
   const left = a.controls ?? [];
@@ -380,7 +383,7 @@ function sameSnapshot(a, b, context) {
   if (left.length !== right.length) return false;
   for (let i = 0; i < left.length; i++) {
     if (left[i] === right[i]) continue;
-    if (!jsonEqual(left[i], right[i])) return false;
+    if (!jsonEqual(left[i], right[i], withoutDesignerView)) return false;
   }
   return true;
 }
@@ -647,7 +650,12 @@ function commitSnapshot(context, snapshotOverride, selectionOverride) {
   // Skip if identical to last snapshot, or if there is no committed baseline
   // yet. A baseline from a different context can't be diffed against — it
   // becomes the new baseline instead of a bogus undo entry.
-  if (baselineKey === contextKey(context) && sameSnapshot(snapshot, lastSnapshot, context)) return;
+  if (baselineKey === contextKey(context) && sameSnapshot(snapshot, lastSnapshot, context)) {
+    // The same document, perhaps seen differently (a layer clicked in the Component Designer). No
+    // undo step; the baseline takes the new view, so undoing the next edit keeps it.
+    lastSnapshot = snapshot;
+    return;
+  }
   const saveRename = isSaveRename(context, snapshot);
   if (saveRename) {
     // Every step in this document's history now belongs to the renamed file, so undoing past the

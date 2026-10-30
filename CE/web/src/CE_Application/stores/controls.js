@@ -30,6 +30,7 @@ import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, patchPanelCo
 import { mutateComponentDocumentControl } from './componentWorkspace.js';
 import { targetLayerName } from './panelLayerActions.js';
 import { withSetPins } from '../models/controlSetFamilies.js';
+import { isDesignerViewPatch } from '../utils/designerViewState.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -667,6 +668,9 @@ export function updateInspectorControlProperty(
 export function applyControlPatchesById(patchesByControlId, targetPanelId = get(resolvedActivePanelId), { pin = false } = {}) {
   const panelId = targetPanelId;
   if (!patchesByControlId || patchesByControlId.size === 0) return;
+  // What the Component Designer is showing (utils/designerViewState.js) is kept on the control but
+  // is not an edit: a write of that and nothing else leaves the document's modified flag alone.
+  const viewOnly = [...patchesByControlId.values()].every(isDesignerViewPatch);
 
   if (panelId == null) {
     for (const [controlId, patch] of patchesByControlId.entries()) {
@@ -675,9 +679,9 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
         for (const [path, value] of Object.entries(patch)) {
           applyResolvedValue(draft, path, value);
         }
-        if (pin) pinDraftForSets(draft, patch);
+        if (pin && !viewOnly) pinDraftForSets(draft, patch);
         return true;
-      });
+      }, { view: viewOnly });
     }
     return;
   }
@@ -688,16 +692,22 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
   );
 
   panels.update((list) => {
+    const wasModified = list.find((panel) => panel.id === panelId)?.modified;
     // Drag, group resize, nudge and align all land here. Copying only what each path passes
     // through, instead of deepCloning every control touched, is what keeps a select-all nudge from
     // copying (and undo history from keeping) the whole panel.
     let nextList = patchPanelControlsInList(list, panelId, (control) => {
       const patch = patchesByControlId.get(control?._children?.Core?.id) ?? null;
-      return pin ? pinForSets(control, patch) : patch;
+      return pin && !viewOnly ? pinForSets(control, patch) : patch;
     });
 
     if (shouldNormalize) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
+    }
+    if (viewOnly) {
+      nextList = updatePanelInList(nextList, panelId, (panel) => (
+        panel.modified === wasModified ? panel : { ...panel, modified: wasModified }
+      ));
     }
 
     return nextList;
