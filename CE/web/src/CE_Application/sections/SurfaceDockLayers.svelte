@@ -9,6 +9,7 @@
    * a 98-argument function signature, which is not the improvement the review is asking for. Its
    * two tab groups are the real seams — this is one of them, at 35.
    */
+  import { untrack } from 'svelte';
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
   import Eye from 'lucide-svelte/icons/eye';
@@ -93,6 +94,59 @@
   );
 
   /**
+   * Numbered runs fold into one row.
+   *
+   * The SH-201 knob listed tick0 to tick10 as eleven full rows, two-thirds of its list. Five or more
+   * adjacent layers named the same but for a trailing number (ticks, LED segments, keys) show as one
+   * row, "tick0–tick10 · 11 layers", folded until opened. A run is open while one of its layers
+   * is selected, so a layer picked on the canvas is in the list; a click on the run's row folds or
+   * opens it until a layer in it is next selected. A filter shows every match. Fewer than five stay
+   * as they are: three rectangles someone drew are not a run.
+   */
+  const RUN_MIN = 5;
+  let runOpenState = $state(new Map());
+  const runPrefix = (name) => /^(.*?)\d+$/.exec(name)?.[1] ?? null;
+  let partRows = $derived.by(() => {
+    const rows = [];
+    for (let i = 0; i < shownParts.length;) {
+      const prefix = filtering ? null : runPrefix(shownParts[i][0]);
+      let end = i + 1;
+      if (prefix !== null) while (end < shownParts.length && runPrefix(shownParts[end][0]) === prefix) end += 1;
+      if (prefix !== null && end - i >= RUN_MIN) {
+        const entries = shownParts.slice(i, end);
+        rows.push({ id: `run:${entries[0][0]}`, entries, first: entries[0][0], last: entries.at(-1)[0] });
+      } else {
+        rows.push({ id: shownParts[i][0], entry: shownParts[i] });
+        end = i + 1;
+      }
+      i = end;
+    }
+    return rows;
+  });
+
+  function toggleRun(id, open) {
+    runOpenState = new Map(runOpenState).set(id, !open);
+  }
+
+  // A layer newly selected inside a run takes back the last click on it.
+  const selectedInRun = new Map();
+  $effect(() => {
+    const changed = [];
+    for (const row of partRows) {
+      if (!row.entries) continue;
+      const key = row.entries.filter(([member]) => isLayerSelected(member)).map(([member]) => member).join(',');
+      if (key && key !== selectedInRun.get(row.id)) changed.push(row.id);
+      selectedInRun.set(row.id, key);
+    }
+    if (!changed.length) return;
+    untrack(() => {
+      const next = new Map(runOpenState);
+      for (const id of changed) next.delete(id);
+      runOpenState = next;
+    });
+  });
+
+  /**
    * Inline rename.
    *
    * Renaming was inspector-only, which means: select the row, look away from the list, find the
@@ -116,9 +170,10 @@
   }
 </script>
 
-{#snippet partRow(name, part, depth)}
+{#snippet partRow(name, part, depth, inRun = false)}
     <div
       class="list-row"
+      class:run-member={inRun}
       class:boolean-operand={depth > 0}
       style={depth > 0 ? `--operand-depth:${depth}` : undefined}
       class:selected={isLayerSelected(name)}
@@ -173,7 +228,10 @@
         </span>
         <span class="row-text">
           <strong>{name}</strong>
-          <em>{part?.visible === false ? 'hidden · ' : ''}{part?.locked === true || part?.meta?.locked === true ? 'locked · ' : ''}{layerKindLabel(part)}</em>
+          <!-- The kind is the badge's to say; the second line only for what the badge does not. -->
+          {#if part?.visible === false || part?.locked === true || part?.meta?.locked === true}
+            <em>{[part?.visible === false ? 'hidden' : '', part?.locked === true || part?.meta?.locked === true ? 'locked' : ''].filter(Boolean).join(' · ')}</em>
+          {/if}
         </span>
         <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
       </button>
@@ -326,8 +384,27 @@
       </div>
     </div>
   {/each}
-  {#each shownParts as [name, part] (name)}
-    {@render partRow(name, part, 0)}
+  {#each partRows as row (row.id)}
+    {#if row.entries}
+      {@const open = runOpenState.has(row.id) ? runOpenState.get(row.id) : row.entries.some(([member]) => isLayerSelected(member))}
+      <div class="list-row run-row" class:collapsed={!open} role="group" aria-label={`${row.first} to ${row.last}, ${row.entries.length} layers`}>
+        <button type="button" class="row-main" aria-expanded={open} onclick={() => toggleRun(row.id, open)} title={open ? 'Fold these layers' : 'Show these layers'}>
+          <span class="layer-thumb run-thumb" aria-hidden="true"><span>{row.entries.length}</span></span>
+          <span class="row-text">
+            <strong>{row.first}–{row.last}</strong>
+            <em>{row.entries.length} layers</em>
+          </span>
+          <span class="row-badge gen-group">{open ? '-' : '+'}</span>
+        </button>
+      </div>
+      {#if open}
+        {#each row.entries as [name, part] (name)}
+          {@render partRow(name, part, 0, true)}
+        {/each}
+      {/if}
+    {:else}
+      {@render partRow(row.entry[0], row.entry[1], 0)}
+    {/if}
   {/each}
   </div>
   <div class="list-header secondary">
@@ -509,11 +586,11 @@
 
   .row-main {
     display: grid;
-    grid-template-columns: 46px minmax(0, 1fr) auto;
+    grid-template-columns: 32px minmax(0, 1fr) auto;
     align-items: center;
-    gap: 9px;
+    gap: 8px;
     min-width: 0;
-    padding: 6px 8px;
+    padding: 3px 8px;
     border: 0;
     background: transparent;
     color: inherit;
@@ -524,8 +601,8 @@
 
   .layer-thumb {
     position: relative;
-    width: 42px;
-    height: 30px;
+    width: 30px;
+    height: 22px;
     overflow: hidden;
     border: 1px solid #31404A;
     border-radius: 4px;
@@ -775,9 +852,22 @@
     color: #F0FFFC;
   }
 
+  /* One line a row: 54px rows let sixteen layers fill the column. */
   .list-row {
-    min-height: 54px;
+    min-height: 34px;
     border-bottom-color: #222D35;
+  }
+
+  .list-row.run-member .row-main {
+    padding-left: 22px;
+  }
+
+  .run-thumb {
+    display: grid;
+    place-items: center;
+    color: #9EB2BE;
+    font-size: 10px;
+    font-weight: 800;
   }
 
   .list-row:hover {

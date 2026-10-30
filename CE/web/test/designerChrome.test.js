@@ -72,3 +72,16 @@ test('a library copy\'s Contract says the contract is its package\'s, and sugges
   assert.match(contract, /if \(runParts\.has\(name\)\) continue;/);
   assert.match(contract, /const SUGGESTION_ORDER = \{ Colour: 0, Text: 1, Visible: 2, Opacity: 3 \};/);
 });
+
+test('the layer list is one line a row and folds a numbered run of five or more', () => {
+  const layers = src('CE_Application/sections/SurfaceDockLayers.svelte');
+  assert.match(layers, /const RUN_MIN = 5;/);
+  assert.match(layers, /const runPrefix = \(name\) => \/\^\(\.\*\?\)\\d\+\$\/\.exec\(name\)\?\.\[1\] \?\? null;/);
+  // Open while a layer in it is selected; a click decides until one is next selected.
+  assert.match(layers, /\{@const open = runOpenState\.has\(row\.id\) \? runOpenState\.get\(row\.id\) : row\.entries\.some\(\(\[member\]\) => isLayerSelected\(member\)\)\}/);
+  assert.match(layers, /if \(key && key !== selectedInRun\.get\(row\.id\)\) changed\.push\(row\.id\);/);
+  // A filter lists every match, run or not.
+  assert.match(layers, /const prefix = filtering \? null : runPrefix\(shownParts\[i\]\[0\]\);/);
+  const rowRule = layers.match(/\/\* One line a row[^*]*\*\/\s*\.list-row \{[^}]*\}/)?.[0] ?? '';
+  assert.match(rowRule, /min-height: 34px;/);
+});

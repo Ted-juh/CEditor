@@ -776,7 +776,9 @@ and the status bar's grid, snap and zoom are the designer's. **Preview** on the 
 designer between **Preview** and **Edit**, as the buttons in its header do. Selecting layers and
 switching between **Preview** and **Edit** are not edits: they do not mark the panel as changed or add
 a step to undo. **Simple** and **Advanced**, at the foot of the properties panel, decide how much of
-the component's workings the properties panel shows.
+the component's workings the properties panel shows. In the **Layers** list, five or more layers named
+the same but for a number (tick0 to tick10) fold into one row; click it to open it. It opens by
+itself when you select one of them on the canvas.
 
 A behaviour is what turns the mouse, the keys or the wheel into a value. Each has four switches,
 the **Input** chips beside it on the Interact tab (and under **Interaction** in **Advanced**,
