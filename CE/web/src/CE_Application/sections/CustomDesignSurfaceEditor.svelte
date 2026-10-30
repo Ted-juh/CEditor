@@ -1968,18 +1968,25 @@
   // Ctrl+plus, minus and 0 (App.svelte takes them wherever focus is while the designer is open).
   onDestroy(onSurfaceZoomRequest({ 'zoom-in': () => zoomStep(surfaceZoomIncrement), 'zoom-out': () => zoomStep(-surfaceZoomIncrement), 'fit-to-window': () => fitArtboardToView(), 'zoom-reset': () => setZoom(1), 'zoom-set': (percent) => setZoom(percent / 100) }));
 
+  // Fit into the canvas less what floats over its edges: room along the top for the selection's
+  // name tray and the bars anchored above a selection, and the tool strip along the bottom. A flat
+  // 48px margin let a fitted component run under the strip, and a click near its edge landed on it.
   function fitArtboardToView() {
     if (!surfaceScrollEl) {
       setZoom(1);
       return;
     }
+    const strip = surfaceScrollEl.closest('.surface-shell')?.querySelector('.tool-strip')?.getBoundingClientRect().height ?? 0;
+    const top = 56;
+    const bottom = Math.max(48, strip + 16);
     const widthFit = (surfaceScrollEl.clientWidth - 96) / Math.max(1, artboardWidth);
-    const heightFit = (surfaceScrollEl.clientHeight - 96) / Math.max(1, artboardHeight);
+    const heightFit = (surfaceScrollEl.clientHeight - top - bottom) / Math.max(1, artboardHeight);
     setZoom(Math.min(5, Math.max(0.25, Math.min(widthFit, heightFit))));
     requestAnimationFrame(() => {
       if (!surfaceScrollEl) return;
       surfaceScrollEl.scrollLeft = Math.max(0, (surfaceScrollEl.scrollWidth - surfaceScrollEl.clientWidth) / 2);
-      surfaceScrollEl.scrollTop = Math.max(0, (surfaceScrollEl.scrollHeight - surfaceScrollEl.clientHeight) / 2);
+      // Centred in the band between the bars, not in the whole canvas.
+      surfaceScrollEl.scrollTop = Math.max(0, (surfaceScrollEl.scrollHeight - surfaceScrollEl.clientHeight) / 2 - (top - bottom) / 2);
     });
   }
 
@@ -3521,7 +3528,38 @@
       {componentScriptsEnabled} {componentScriptList}
       {setLayerProperty} {openLayerColour} {openLayerGradient} {toggleFillGradient}
       {openComponentScripts}
-    />
+    >
+      <!-- In the look bar, not over the canvas: see SurfaceLookBar. -->
+      {#snippet notice()}
+        {#if !readinessNudgeDismissed && readinessNudgeSteps.length}
+          <div class="readiness-nudge" role="status">
+            <strong>Not reusable yet:</strong>
+            {#each readinessNudgeSteps as step (step.id)}
+              <span class={`nudge-step ${step.severity}`}>
+                {step.label} — {step.detail}
+                {#if step.fix}
+                  <button type="button" class="nudge-fix" title={step.fix.label} onclick={() => applyReadinessFix(step)}>Fix</button>
+                {/if}
+              </span>
+            {/each}
+            <button type="button" onclick={() => { readinessNudgeDismissed = true; }} title="Dismiss">×</button>
+          </div>
+        {/if}
+      {/snippet}
+      {#snippet actions()}
+        {#if activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
+          <SurfaceQuickbar
+            kind={activeSelectionKind === 'hitZone' ? 'hitZone' : 'layer'}
+            {canManageLayer} canCopy={selectedLayerNames.length > 0} canPaste={hasPartClipboard()}
+            locked={selectedAuthoredPart?.locked === true} interactiveLabel={activeInteractiveMeta.label} canRemoveZone={!!selectedAuthoredZone}
+            onduplicate={duplicateSelectedLayer} oncopy={copySelectedLayers} onpaste={pasteClipboardLayers}
+            onmove={moveSelectedLayer} onextreme={moveSelectedLayerToExtreme} onmakeinteractive={makeSelectedLayerInteractive}
+            ontogglelock={toggleSelectedLock} onremove={removeSelectedLayer} onremovezone={removeSelectedHitZone}
+            onmousedown={stopSelectionAction}
+          />
+        {/if}
+      {/snippet}
+    </SurfaceLookBar>
     {/if}
 
     <!--
@@ -3602,20 +3640,6 @@
         >
         {#if drawNotice}
           <div class="draw-notice">{drawNotice}</div>
-        {/if}
-        {#if !designerPreviewing && !readinessNudgeDismissed && readinessNudgeSteps.length}
-          <div class="readiness-nudge" role="status">
-            <strong>Not reusable yet:</strong>
-            {#each readinessNudgeSteps as step (step.id)}
-              <span class={`nudge-step ${step.severity}`}>
-                {step.label} — {step.detail}
-                {#if step.fix}
-                  <button type="button" class="nudge-fix" title={step.fix.label} onclick={() => applyReadinessFix(step)}>Fix</button>
-                {/if}
-              </span>
-            {/each}
-            <button type="button" onclick={() => { readinessNudgeDismissed = true; }} title="Dismiss">×</button>
-          </div>
         {/if}
         <div class="surface-pad">
           <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -3937,17 +3961,6 @@
             {/if}
           </div>
         </div>
-        {#if !designerPreviewing && activeSelectionFrame && ((activeSelectionKind === 'layer' && selectedPart) || (activeSelectionKind === 'hitZone' && selectedZone))}
-          <SurfaceQuickbar
-            kind={activeSelectionKind === 'hitZone' ? 'hitZone' : 'layer'}
-            {canManageLayer} canCopy={selectedLayerNames.length > 0} canPaste={hasPartClipboard()}
-            locked={selectedAuthoredPart?.locked === true} interactiveLabel={activeInteractiveMeta.label} canRemoveZone={!!selectedAuthoredZone}
-            onduplicate={duplicateSelectedLayer} oncopy={copySelectedLayers} onpaste={pasteClipboardLayers}
-            onmove={moveSelectedLayer} onextreme={moveSelectedLayerToExtreme} onmakeinteractive={makeSelectedLayerInteractive}
-            ontogglelock={toggleSelectedLock} onremove={removeSelectedLayer} onremovezone={removeSelectedHitZone}
-            onmousedown={stopSelectionAction}
-          />
-        {/if}
       </div>
       </div>
 
@@ -4692,23 +4705,17 @@
   }
 
   .readiness-nudge {
-    position: absolute;
-    left: 50%;
-    bottom: 12px;
-    z-index: 2590;
-    transform: translateX(-50%);
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: 6px;
-    max-width: calc(100% - 48px);
+    max-width: 100%;
     padding: 5px 8px;
     border: 1px solid rgba(120, 130, 150, 0.4);
     border-radius: 6px;
     background: rgba(28, 30, 38, 0.95);
     color: rgba(222, 228, 238, 0.9);
     font-size: 10px;
-    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
   }
 
   .readiness-nudge strong {

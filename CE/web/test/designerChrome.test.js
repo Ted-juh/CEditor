@@ -22,11 +22,17 @@ test('the layer quick bar says what its buttons do with icons, not letters, and 
   for (const icon of ['CopyPlus', 'Copy', 'ClipboardPaste', 'BringToFront', 'SendToBack']) {
     assert.match(bar, new RegExp(`<${icon} size=\\{13\\}`), icon);
   }
-  // The tool strip is centred along the bottom of the canvas; on a narrow canvas the bar, at the
-  // bottom right, covered half of it.
+  // It floated over the canvas: at the bottom right it covered the tool strip, at the top the
+  // selection's name and the alignment bar above a selection. It is drawn in the look bar now.
   const style = source.match(/\.selection-quickbar \{[\s\S]*?\n {2}\}/)?.[0] ?? '';
-  assert.match(style, /top: 10px;/);
-  assert.match(style, /bottom: auto;/);
+  assert.doesNotMatch(style, /position: absolute/);
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(designer, /\{#snippet actions\(\)\}\s*\{#if activeSelectionFrame[^}]*\}\s*<SurfaceQuickbar/);
+  assert.match(designer, /\{#snippet notice\(\)\}\s*\{#if !readinessNudgeDismissed && readinessNudgeSteps\.length\}\s*<div class="readiness-nudge"/);
+  const lookBar = src('CE_Application/sections/SurfaceLookBar.svelte');
+  assert.match(lookBar, /<div class="lookbar-middle">\s*\{@render notice\?\.\(\)\}\s*\{@render actions\?\.\(\)\}/);
+  // Nothing of the two is placed over the canvas any more.
+  assert.doesNotMatch(designer, /\.readiness-nudge \{[^}]*position: absolute/);
 });
 
 test('the header counts say "1 hit zone" and "1 layer"', () => {
@@ -49,6 +55,9 @@ test('the designer\'s Preview draws no hit-zone names over the component unless 
 test('a component opens fitted to the surface, and the names above it stay their size at any zoom', () => {
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
   assert.match(designer, /if \(!id \|\| !surfaceScrollEl \|\| id === fittedComponentId\) return;\s*fittedComponentId = id;\s*requestAnimationFrame\(fitArtboardToView\);/);
+  // The fit keeps clear of the tool strip along the bottom and leaves room above for the name tray.
+  assert.match(designer, /const bottom = Math\.max\(48, strip \+ 16\);/);
+  assert.match(designer, /const heightFit = \(surfaceScrollEl\.clientHeight - top - bottom\) \/ Math\.max\(1, artboardHeight\);/);
   assert.match(designer, /--surface-unzoom:\$\{1 \/ surfaceZoom\};/);
   const tray = designer.slice(designer.indexOf('  .surface-name-tray {')).match(/\{[\s\S]*?\n {2}\}/)?.[0] ?? '';
   assert.match(tray, /transform: scale\(var\(--surface-unzoom, 1\)\) translateY\(calc\(-100% - 8px\)\);/, 'the name tray');

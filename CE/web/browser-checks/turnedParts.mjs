@@ -76,6 +76,11 @@ try {
   await kit.settle(600);
   await page.locator('[data-testid="component-designer-launch"]').click();
   await kit.settle(2500);
+  // The designer opens a component fitted to the canvas. The numbers below are screen pixels on the
+  // grid, chosen at 100%, so the check puts it there first, the way an author does: the status bar's
+  // Reset to 100%.
+  await page.locator('.status-bar button[title="Reset to 100%"]').click();
+  await kit.settle(400);
   const selectRow = async (name) => {
     await page.locator('.list-row button.row-main', { has: page.locator('strong', { hasText: new RegExp(`^${name}$`) }) }).first().click();
     await kit.settle(500);

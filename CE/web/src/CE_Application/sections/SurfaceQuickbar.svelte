@@ -1,13 +1,14 @@
 <script>
   /**
-   * The quick actions for the selected layer or hit zone, floating at the top right of the design
-   * surface: duplicate, copy, paste, the four stacking moves, Make Interactive, lock and delete for
-   * a layer; delete for a hit zone.
+   * The quick actions for the selected layer or hit zone: duplicate, copy, paste, the four stacking
+   * moves, Make Interactive, lock and delete for a layer; delete for a hit zone. Drawn in the look
+   * bar across the top of the designer (SurfaceLookBar's `actions`), beside the layer's style.
    *
-   * Lifted out of CustomDesignSurfaceEditor when that file reached its size limit, and in the same
-   * change it moved: it sat at the bottom right, and on a narrow canvas covered half of the tool
-   * strip centred along the bottom. Four of its buttons were the letters C, P, F and B; every button
-   * is an icon with its name in the tooltip now.
+   * Lifted out of CustomDesignSurfaceEditor when that file reached its size limit. It floated over
+   * the canvas: at the bottom right it covered half of the tool strip on a narrow canvas; at the top
+   * it covered the selection's name and, once a component opened fitted, the alignment bar above a
+   * selection. In the look bar it covers nothing. Four of its buttons were the letters C, P, F and
+   * B; every button is an icon with its name in the tooltip now.
    *
    * A view: the parent owns the selection and every action, and passes them in.
    */
@@ -101,26 +102,18 @@
 </div>
 
 <style>
-  /* Top right: the tool strip is centred along the bottom, and on a narrow canvas this bar sat on it. */
   .selection-quickbar {
-    position: absolute;
-    right: 16px;
-    bottom: auto;
-    left: auto;
-    top: 10px;
-    z-index: 2420;
     display: inline-flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: 4px;
     width: max-content;
-    max-width: calc(100% - 32px);
-    height: 31px;
-    margin: 0;
+    max-width: 100%;
+    min-height: 31px;
     padding: 3px 5px;
     border: 1px solid #34444F;
     border-radius: 4px;
     background: rgba(20, 27, 33, 0.96);
-    box-shadow: 0 14px 32px rgba(0, 0, 0, 0.38);
   }
 
   .selection-quickbar.zone-tools {

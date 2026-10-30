@@ -64,6 +64,11 @@ const openDesigner = async (id) => {
   await kit.page.locator('[data-testid="component-designer-launch"]').waitFor({ state: 'visible', timeout: 15000 });
   await kit.page.locator('[data-testid="component-designer-launch"]').click();
   await kit.settle(2500);
+  // The designer opens a component fitted to the canvas. The numbers below are screen pixels on the
+  // grid, chosen at 100%, so the check puts it there first, the way an author does: the status bar's
+  // Reset to 100%.
+  await kit.page.locator('.status-bar button[title="Reset to 100%"]').click();
+  await kit.settle(400);
 };
 
 try {

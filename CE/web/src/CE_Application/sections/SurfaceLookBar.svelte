@@ -3,6 +3,12 @@
    * The look bar across the top of the design surface: the selected layer's fill, stroke, corner
    * radius and text styling, plus the Scripts affordance.
    *
+   * Between the two, what the designer passes in: `notice` (its readiness note) and `actions` (the
+   * selected layer's quick bar). Both floated over the canvas, and once a component opened fitted to
+   * it, each covered something anchored to the selection: the note a shape's own toolbar, the quick
+   * bar the alignment bar with its Combine buttons. Up here they cover nothing; the bar wraps when
+   * the window is narrow.
+   *
    * Fourth of the §5 decomposition. Small prop list for its size, because the bar reads one thing
    * — the selected layer — and writes through one function.
    */
@@ -31,6 +37,8 @@
     openLayerGradient = () => {},
     toggleFillGradient = () => {},
     openComponentScripts = () => {},
+    notice = null,
+    actions = null,
   } = $props();
 </script>
 
@@ -168,6 +176,12 @@
     {:else}
       <div class="lookbar-empty">Select a layer to edit its look</div>
     {/if}
+    {#if notice || actions}
+      <div class="lookbar-middle">
+        {@render notice?.()}
+        {@render actions?.()}
+      </div>
+    {/if}
     <div class="lookbar-scripts" aria-label="Component scripts">
       <div class="lb-s-row">
         <span class="lb-s-chip">SCRIPTS</span>
@@ -188,6 +202,15 @@
 <style>
   .surface-lookbar { grid-area: lookbar; }
 
+  .lookbar-middle {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    margin-right: auto;
+  }
+
   .paint-strip {
     display: flex;
     align-items: center;
@@ -203,9 +226,10 @@
   /* Top Look bar: quick-actions toolbar (left) + Scripts (right). */
   .surface-lookbar {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
+    gap: 6px 14px;
     min-height: 50px;
     padding: 0 10px;
     background: linear-gradient(180deg, #172027, #11181F);
