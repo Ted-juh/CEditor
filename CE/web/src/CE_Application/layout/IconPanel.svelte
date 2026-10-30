@@ -211,7 +211,8 @@
     const hasMax = item?.max !== undefined && item?.max !== '';
     if (Array.isArray(item?.values) && item.values.length) return item.values.slice(0, 4).join(', ');
     if (hasMin || hasMax) return `${hasMin ? item.min : '...'}-${hasMax ? item.max : '...'}`;
-    if (item?.defaultValue !== undefined && item.defaultValue !== '') return `default ${item.defaultValue}`;
+    // An object default (a readout's range and unit) has no short form; it printed as "[object Object]".
+    if (item?.defaultValue !== undefined && item.defaultValue !== '' && typeof item.defaultValue !== 'object') return `default ${item.defaultValue}`;
     return item?.channel || item?.path || '';
   }
 </script>

@@ -17,6 +17,7 @@
     normalizeCustomComponentEnvelope,
     customComponentPackageProvenance,
     missingCustomComponentFonts,
+    splitPackageWarnings,
     summarizeCustomComponent,
     validateCustomComponentPackage,
   } from '../utils/customComponentPackage.js';
@@ -90,9 +91,12 @@
       .flatMap((envelope) => missingCustomComponentFonts(envelope?.component, $availableFonts ?? [])),
   )].map((family) => `Warning: the font "${family}" is not installed here, so text using it will fall back to a substitute.`));
 
+  // What the person importing needs to know stays in view; the notes for the package's author (how
+  // complete its published contract is) fold into one line. splitPackageWarnings says which is which.
+  let importWarnings = $derived(splitPackageWarnings(importPreview.envelope?.validation?.warnings ?? []));
   let importIssueList = $derived([
     ...(importPreview.envelope?.validation?.issues ?? []),
-    ...(importPreview.envelope?.validation?.warnings ?? []).map((warning) => `Warning: ${warning}`),
+    ...importWarnings.forUser.map((warning) => `Warning: ${warning}`),
     ...importFontWarnings,
   ]);
   let libraryStatus = $state('');
@@ -105,9 +109,10 @@
   let selectedLibrarySummaryItems = $derived(summaryItems(selectedLibraryEntry?.summary));
   let selectedLibrarySurfaceItems = $derived(publicSurfaceItems(selectedLibraryEntry?.publicApiSummary ?? selectedLibraryEntry?.publicApi));
   let selectedLibraryAssetItems = $derived(assetManifestItems(selectedLibraryEntry?.assetManifest));
+  let selectedLibraryWarnings = $derived(splitPackageWarnings(selectedLibraryEntry?.validation?.warnings ?? []));
   let selectedLibraryIssueList = $derived([
     ...(selectedLibraryEntry?.validation?.issues ?? []),
-    ...(selectedLibraryEntry?.validation?.warnings ?? []).map((warning) => `Warning: ${warning}`),
+    ...selectedLibraryWarnings.forUser.map((warning) => `Warning: ${warning}`),
   ]);
   let currentSourcePackage = $derived(designer?.sourcePackage ?? null);
   let importSurfaceItems = $derived(publicSurfaceItems(importPreview.envelope?.publicApiSummary ?? importPreview.envelope?.publicApi));
@@ -185,7 +190,9 @@
     const hasMax = entry?.max !== undefined && entry?.max !== '';
     if (Array.isArray(entry?.values) && entry.values.length) return entry.values.slice(0, 4).join(', ');
     if (hasMin || hasMax) return `${hasMin ? entry.min : '...'}-${hasMax ? entry.max : '...'}`;
-    if (entry?.defaultValue !== undefined && entry.defaultValue !== '') return `default ${entry.defaultValue}`;
+    // A default that is a group of settings (a readout's range and unit) has no short form; it printed
+    // as "[object Object]".
+    if (entry?.defaultValue !== undefined && entry.defaultValue !== '' && typeof entry.defaultValue !== 'object') return `default ${entry.defaultValue}`;
     return '';
   }
 
@@ -764,8 +771,10 @@
               {#each selectedLibraryIssueList.slice(0, 5) as issue}
                 <span>{issue}</span>
               {/each}
+              {#if selectedLibraryIssueList.length > 5}<em class="more-issues">…and {selectedLibraryIssueList.length - 5} more</em>{/if}
             </div>
           {/if}
+          {@render authorNotes(selectedLibraryWarnings.forAuthor)}
         </div>
       </PropertyCell>
       <PropertyCell label="Load" span={1} hint="Apply the selected saved component snapshot to this custom component while preserving ID and transform.">
@@ -863,8 +872,10 @@
                 {#each importIssueList.slice(0, 6) as issue}
                   <span>{issue}</span>
                 {/each}
+                {#if importIssueList.length > 6}<em class="more-issues">…and {importIssueList.length - 6} more</em>{/if}
               </div>
             {/if}
+            {@render authorNotes(importWarnings.forAuthor)}
           {:else}
             <strong>Import rejected</strong>
             <span>{importPreview.error}</span>
@@ -880,6 +891,21 @@
   </PropertySection>
 
 {/if}
+
+{#snippet authorNotes(notes)}
+  {#if notes.length}
+    <details class="author-notes">
+      <summary title="How complete the package's published contract is: defaults, ranges and choices for what it publishes. They do not stop the import or change how the component works; Publish › Contract lists them for the author.">
+        {notes.length} {notes.length === 1 ? 'note' : 'notes'} for the package's author
+      </summary>
+      <div class="library-issues notes">
+        {#each notes as note}
+          <span>{note}</span>
+        {/each}
+      </div>
+    </details>
+  {/if}
+{/snippet}
 
 <style>
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
@@ -1328,6 +1354,35 @@
   .library-issues {
     display: grid;
     gap: 4px;
+  }
+
+  .more-issues {
+    color: #9A8A70;
+    font-size: 10px;
+    font-style: normal;
+    padding: 0 2px;
+  }
+
+  .author-notes summary {
+    cursor: pointer;
+    color: #7F95A5;
+    font-size: 10px;
+    padding: 2px 0;
+    user-select: none;
+  }
+
+  .author-notes summary:hover {
+    color: #B8CBD8;
+  }
+
+  .author-notes .library-issues {
+    margin-top: 4px;
+  }
+
+  .library-issues.notes span {
+    border-color: #33404A;
+    background: #10161A;
+    color: #9FB4C2;
   }
 
   .library-issues span {

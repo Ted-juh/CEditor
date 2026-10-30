@@ -102,7 +102,9 @@
     const hasMin = endpoint.min !== undefined && endpoint.min !== '';
     const hasMax = endpoint.max !== undefined && endpoint.max !== '';
     const range = hasMin || hasMax ? `${hasMin ? endpoint.min : '...'}-${hasMax ? endpoint.max : '...'}` : '';
-    const fallback = endpoint.defaultValue !== undefined && endpoint.defaultValue !== '' ? `default ${endpoint.defaultValue}` : '';
+    // An object default (a readout's range and unit) has no short form; it printed as "[object Object]".
+    const fallback = endpoint.defaultValue !== undefined && endpoint.defaultValue !== '' && typeof endpoint.defaultValue !== 'object'
+      ? `default ${endpoint.defaultValue}` : '';
     return [type, values || range || fallback].filter(Boolean).join(' ');
   }
 

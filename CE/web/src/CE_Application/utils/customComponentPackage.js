@@ -326,6 +326,39 @@ function embeddedSourceByteEstimate(value) {
   return source.length;
 }
 
+/**
+ * Which of a package's warnings are notes for its author rather than news for whoever imports it.
+ *
+ * The author notes say how complete the published contract is: a published input, output or
+ * editable property without a default value, a min/max range or a list of choices, or with a type
+ * other than its channel's; an image without its size recorded. They are what Publish › Contract
+ * lists for the author to polish. They do not stop an import or change how the component works,
+ * and the person importing can do nothing about them; Package & Library listed them under every
+ * incoming package all the same (the SH-201 Knob's eleven), and the warnings that do matter to that
+ * person — a newer package format, a missing font, a link to nothing, an image with no picture —
+ * were lost among them.
+ *
+ * Matched on the messages this file writes (publishedEntryWarnings, the editable-property default,
+ * the image metadata), so a package saved before this existed is read the same way.
+ */
+const AUTHOR_NOTE_PATTERNS = [
+  /^(Published input|Published output|Editable property) "[^"]*" /,
+  /^Image "[^"]*" has no captured width\/height metadata\.$/,
+];
+
+export function isAuthorNote(warning) {
+  const text = String(warning ?? '');
+  return AUTHOR_NOTE_PATTERNS.some((pattern) => pattern.test(text));
+}
+
+/** A package's warnings split by who they are for: `forUser` and `forAuthor`, each in order. */
+export function splitPackageWarnings(warnings = []) {
+  const forUser = [];
+  const forAuthor = [];
+  for (const warning of warnings ?? []) (isAuthorNote(warning) ? forAuthor : forUser).push(warning);
+  return { forUser, forAuthor };
+}
+
 function publishedEntryWarnings(kind, name, entry, channel = null) {
   const warnings = [];
   const type = String(entry?.type ?? channel?.type ?? 'float').trim().toLowerCase();
