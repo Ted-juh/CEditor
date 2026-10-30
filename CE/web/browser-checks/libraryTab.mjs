@@ -2,8 +2,7 @@
  * The Library tab, driven in Chromium. Run with the rest: `npm run test:browser`.
  *
  * What it checks, in order of how badly it would hurt:
- *   - each card is the REAL renderer, not the panel's fourteen coloured rectangles
- *   - a card says what the panel's own picture of that package leaves out
+ *   - each card is the REAL renderer, not fourteen coloured rectangles
  *   - placing adds a component to the panel, which the library section cannot do at all
  *   - replacing overwrites the selected component and says whose sections it is about to take
  *   - a card carries the drag payload the canvas already reads
