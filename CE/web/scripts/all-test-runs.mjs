@@ -1,5 +1,11 @@
-// test-everything.mjs — `npm run test:everything`: the three test runs CI makes of the web side, one
+// all-test-runs.mjs — `npm run test:everything`: the three test runs CI makes of the web side, one
 // after the other, in a single command.
+//
+// It was test-everything.mjs, a name `node --test` takes for a test file (its default patterns
+// include test-*.mjs anywhere outside node_modules). So `npm test` ran this script instead of the
+// suite: the suite inside it was skipped as a recursive run, the browser checks and the
+// component-behaviour harness ran in its place, and CI's web-tests job timed out with not one node
+// test run. test/testDiscovery.test.js keeps any other file outside test/ from looking like one.
 //
 //   test:all                 the node suite and the script-export validation (CI's web-tests job)
 //   test:browser             the browser checks over the built bundle (CI's browser-checks job)
