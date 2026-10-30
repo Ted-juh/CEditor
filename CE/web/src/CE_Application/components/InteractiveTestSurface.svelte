@@ -1858,10 +1858,14 @@
           onkeydown={handleKeyDown}
           onkeyup={handleKeyUp}
         >
+          <!-- A control is handed over as already resolved only when the caller resolved it with the
+               session (the Interaction Preview tab, the Animation stage). The Component Designer
+               passes the bare component: handed over as resolved, the renderer never applied the
+               session to it, and a dragged knob kept its pointer where it was. -->
           <CanvasControl
             control={previewControl}
             sourceControl={control}
-            resolvedControlOverride={previewControl}
+            resolvedControlOverride={resolvedControl ? previewControl : null}
             interactionRuntimeOverride={resolvedRuntime}
             scale={1}
             renderIdNamespace={previewRenderIdNamespace}
