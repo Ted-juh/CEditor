@@ -110,3 +110,34 @@ test('selection handles keep their size at any zoom', () => {
   assert.match(designer, /\.part-bound > \.rotate-handle \{\s*left: calc\(50% - 5px\);\s*top: -30px;[\s\S]{0,160}transform-origin: 5px 30px;\s*transform: scale\(var\(--surface-unzoom, 1\)\);/);
   assert.match(rule('.part-bound > .arc-handle'), /transform: scale\(var\(--surface-unzoom, 1\)\);/);
 });
+
+test('a layer thumbnail keeps the part\'s shape: the artboard is fitted whole and centred, not stretched', async () => {
+  const { thumbPlacement, layerThumbPartStyle, zoneThumbPartStyle, LAYER_THUMB_ASPECT } =
+    await import('../src/CE_Application/utils/customDesignSurfaceHelpers.js');
+  // The box is 30 × 22 with a 1px border, sized border-box: 28 × 20 inside, where the percentages land.
+  const layers = src('CE_Application/sections/SurfaceDockLayers.svelte');
+  assert.match(layers, /\.layer-thumb \{\s*position: relative;\s*width: 30px;\s*height: 22px;/);
+  assert.equal(LAYER_THUMB_ASPECT, 28 / 20);
+  const px = (place, boxW = 28, boxH = 20) => [place.width * boxW / 100, place.height * boxH / 100];
+
+  // The SH-201 knob: a 50 × 50 artboard, its face a 28 × 28 circle at 11, 11. Round, not an oval.
+  const face = thumbPlacement({ left: 11, top: 11, width: 28, height: 28 }, 50, 50);
+  const [w, h] = px(face);
+  assert.ok(Math.abs(w - h) < 1e-9, `face drawn ${w} × ${h}`);
+  assert.ok(Math.abs(face.left + face.width / 2 - 50) < 1e-9, 'the square artboard sits in the middle of the wider box');
+  assert.equal(face.top, 22);
+
+  // A wide artboard fills the width and is centred top to bottom; its own shape is kept too.
+  const wide = thumbPlacement({ left: 0, top: 0, width: 200, height: 50 }, 200, 50);
+  assert.equal(wide.width, 100);
+  const [ww, wh] = px(wide);
+  assert.ok(Math.abs(ww / wh - 4) < 1e-9, 'a 4:1 part stays 4:1');
+  assert.ok(Math.abs(wide.top - (100 - wide.height) / 2) < 1e-9);
+
+  for (const style of [layerThumbPartStyle({ left: 11, top: 11, width: 28, height: 28 }, {}, 50, 50),
+    zoneThumbPartStyle({ left: 11, top: 11, width: 28, height: 28 }, {}, 50, 50)]) {
+    const width = Number(/width:([\d.]+)%/.exec(style)[1]);
+    const height = Number(/height:([\d.]+)%/.exec(style)[1]);
+    assert.ok(Math.abs(width * 28 - height * 20) < 1e-6, style);
+  }
+});

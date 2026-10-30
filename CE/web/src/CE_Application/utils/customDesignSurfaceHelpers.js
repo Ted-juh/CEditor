@@ -203,11 +203,38 @@ export function layerKindClass(part) {
   return 'rect';
 }
 
+/**
+ * The shape of the Layers list's thumbnail box: `.layer-thumb` in SurfaceDockLayers.svelte is 30 × 22
+ * with a 1px border, and the app sizes boxes border-box, so a part's percentages are of the 28 × 20
+ * inside it. A part is placed in it with the whole artboard fitted at one scale and centred. It was placed by
+ * its share of the artboard's width across the box's width and of its height down the box's height,
+ * so an artboard of any other shape was stretched to the box: the SH-201 knob's round face and rim
+ * drew as wide ovals.
+ */
+export const LAYER_THUMB_ASPECT = 28 / 20;
+
+/** A frame's place in the thumbnail box, in percent of the box, the artboard fitted and centred. */
+export function thumbPlacement(frame, artboardWidth, artboardHeight, boxAspect = LAYER_THUMB_ASPECT) {
+  const aw = Math.max(1, artboardWidth);
+  const ah = Math.max(1, artboardHeight);
+  const aspect = aw / ah;
+  // The share of the box's width and height the fitted artboard covers.
+  const fx = aspect >= boxAspect ? 1 : aspect / boxAspect;
+  const fy = aspect >= boxAspect ? boxAspect / aspect : 1;
+  return {
+    left: ((1 - fx) / 2 + (frame.left / aw) * fx) * 100,
+    top: ((1 - fy) / 2 + (frame.top / ah) * fy) * 100,
+    width: (frame.width / aw) * fx * 100,
+    height: (frame.height / ah) * fy * 100,
+  };
+}
+
 export function layerThumbPartStyle(frame, part, artboardWidth, artboardHeight) {
-  const left = clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100);
-  const top = clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100);
-  const width = clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 6, 110);
-  const height = clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 6, 110);
+  const place = thumbPlacement(frame, artboardWidth, artboardHeight);
+  const left = clampNumber(place.left, -8, 100);
+  const top = clampNumber(place.top, -8, 100);
+  const width = clampNumber(place.width, 6, 110);
+  const height = clampNumber(place.height, 6, 110);
   const radius = ['circle', 'ellipse', 'ring'].includes(layerKind(part))
     ? 999
     : Math.min(999, Math.max(2, partCornerRadius(part) / 3));
@@ -227,11 +254,12 @@ export function layerThumbPartStyle(frame, part, artboardWidth, artboardHeight) 
 
 export function zoneThumbPartStyle(frame, zone, artboardWidth, artboardHeight) {
   const shape = String(zone?.shape ?? 'rectangle');
+  const place = thumbPlacement(frame, artboardWidth, artboardHeight);
   return [
-    `left:${clampNumber((frame.left / Math.max(1, artboardWidth)) * 100, -8, 100)}%`,
-    `top:${clampNumber((frame.top / Math.max(1, artboardHeight)) * 100, -8, 100)}%`,
-    `width:${clampNumber((frame.width / Math.max(1, artboardWidth)) * 100, 8, 110)}%`,
-    `height:${clampNumber((frame.height / Math.max(1, artboardHeight)) * 100, 8, 110)}%`,
+    `left:${clampNumber(place.left, -8, 100)}%`,
+    `top:${clampNumber(place.top, -8, 100)}%`,
+    `width:${clampNumber(place.width, 8, 110)}%`,
+    `height:${clampNumber(place.height, 8, 110)}%`,
     `border-radius:${['circle', 'ellipse', 'ring'].includes(shape) ? '999px' : '5px'}`,
   ].join(';');
 }
