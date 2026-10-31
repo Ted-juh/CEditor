@@ -247,3 +247,27 @@ test("the designer's header keeps the component's name on a narrow designer", ()
   assert.match(canvas, /@container \(max-width: 900px\) \{\s*\.component-workspace-title span \{ display: none; \}/);
   assert.match(canvas, /\.component-workspace-header button,\s*\.component-workspace-launch \{\s*white-space: nowrap;/);
 });
+
+test('with nothing to colour in the designer, the Colors tab says how to give it something', () => {
+  // The picker colours nothing then (applyColor returns), and a full picker sat there doing nothing.
+  const dock = src('CE_Application/panels/DisplayPanel.svelte');
+  assert.match(dock, /let colorsIdle = \$derived\(designerOpen && !\$colorTarget && editingGradientStop === null && !pickingNotepadColor\);/);
+  assert.match(dock, /\{#if colorsIdle\}\s*<p class="colors-idle">Select a layer on the canvas and its fill opens here\./);
+});
+
+test("a layer's look is styled in the look bar, and the inspector beside the canvas does not copy it", () => {
+  const inspector = src('CE_Application/sections/SurfaceDockInspector.svelte');
+  const display = inspector.slice(inspector.indexOf("{:else if inspectorTab === 'display'}"), inspector.indexOf("{:else if inspectorTab === 'behavior'}"));
+  assert.ok(display, 'the Display tab is there');
+  assert.doesNotMatch(display, /Paint<\/div>|openLayerColour|'Background\.Corners\.radius'|'Text\.Font\.size'|'Text\.content'/, 'no second copy of the look bar');
+  assert.match(display, /in the bar above the canvas/);
+  assert.match(display, /\{#if selectedIsArc\}/, 'what only an arc has stays');
+  const bar = src('CE_Application/sections/SurfaceLookBar.svelte');
+  for (const label of ['Fill', 'Stroke', 'Opacity', 'Content']) assert.match(bar, new RegExp(`<span>${label}</span>`), label);
+});
+
+test('in the designer the properties panel says it edits the whole component', () => {
+  const panel = src('CE_Application/panels/PropertiesPanel.svelte');
+  assert.match(panel, /let componentOwnerName = \$derived\(\$componentWorkspaceMode === 'surface' \? `Component: \$\{componentName\}` : componentName\);/);
+  assert.match(panel, /ownerName=\{componentOwnerName\}/);
+});

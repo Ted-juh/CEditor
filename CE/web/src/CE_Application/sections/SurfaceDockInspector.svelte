@@ -20,7 +20,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import { normalizeRotation } from '../utils/transformMath.js';
   import { numberOr } from '../utils/primitives.js';
-  import { numericInputValue, swatchCss, valueControlStyleLabel } from '../utils/customDesignSurfaceHelpers.js';
+  import { swatchCss, valueControlStyleLabel } from '../utils/customDesignSurfaceHelpers.js';
 
   let {
     inspectorTab = 'object',
@@ -36,17 +36,9 @@
     selectedZone = null,
     selectedZoneEditable = false,
     selectedKitEntry = null,
-    selectedBackground = null,
-    selectedFill = null,
-    selectedBorder = null,
-    selectedCorners = null,
-    selectedText = null,
-    selectedTextFill = null,
-    selectedTextFont = null,
     selectedIsArc = false,
     selectedArcMeta = null,
     selectedArcPivotTarget = null,
-    canPaintLayer = false,
     canManageLayer = false,
     // Document
     parts = null,
@@ -72,7 +64,6 @@
     setPreviewFlag = () => {},
     setZoneDisplayMode = () => {},
     alignSelection = () => {},
-    openLayerColour = () => {},
     openArcColour = () => {},
     renameSelectedLayer = () => {},
     duplicateSelectedLayer = () => {},
@@ -355,50 +346,10 @@
   {/if}
 {:else if inspectorTab === 'display'}
   {#if activeSelectionKind === 'layer' && selectedPart}
-    <div class="dock-section">
-      <div class="dock-section-title">Paint</div>
-      {#if selectedBackground}
-        <div class="paint-grid">
-          <label>
-            <span>Fill</span>
-            <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedFill?.colour)} onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)} title="Pick fill colour"></button>
-          </label>
-          <label>
-            <span>Stroke</span>
-            <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedBorder?.colour, 'FFFFFF')} onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)} title="Pick stroke colour"></button>
-          </label>
-          <label>
-            <span>Stroke W</span>
-            <NumberCell min={0} max={32} step={1} value={numberOr(selectedBorder?.thickness, 0)} defaultValue={0} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Background.Border.thickness', value)} />
-          </label>
-          <label>
-            <span>Radius</span>
-            <NumberCell min={0} max={999} step={1} value={numberOr(selectedCorners?.radius, 0)} defaultValue={0} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Background.Corners.radius', value)} />
-          </label>
-        </div>
-      {/if}
-      {#if selectedText}
-        <label class="dock-field wide">
-          <span>Text</span>
-          <input type="text" value={selectedText?.content ?? ''} disabled={!canPaintLayer} oninput={(event) => setLayerProperty('Text.content', event.currentTarget.value)} />
-        </label>
-        <div class="paint-grid">
-          <label>
-            <span>Text Color</span>
-            <button type="button" class="mini-swatch-btn" disabled={!canPaintLayer} style={swatchCss(selectedTextFill?.colour, 'FFFFFF')} onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)} title="Pick text colour"></button>
-          </label>
-          <label>
-            <span>Size</span>
-            <NumberCell min={6} max={144} step={1} value={numberOr(selectedTextFont?.size, 12)} defaultValue={12} disabled={!canPaintLayer} onchange={(value) => setLayerProperty('Text.Font.size', value)} />
-          </label>
-        </div>
-      {/if}
-      <label class="dock-field wide">
-        <span>Opacity</span>
-        <input type="range" min="0" max="1" step="0.01" value={numberOr(selectedAuthoredPart?.opacity, 1)} disabled={!canPaintLayer} oninput={(event) => setLayerProperty('opacity', numericInputValue(event, 1))} />
-        <strong>{Math.round(numberOr(selectedAuthoredPart?.opacity, 1) * 100)}%</strong>
-      </label>
-    </div>
+    <!-- A layer's fill, gradient, stroke, corners, text and opacity are styled in one place, the
+         look bar above the canvas (SurfaceLookBar). This tab had a second copy of every one of them;
+         what only an arc has stays here. -->
+    <div class="dock-note">Fill, stroke, corners, text and opacity are in the bar above the canvas.</div>
 
     {#if selectedIsArc}
       <div class="dock-section">
@@ -578,8 +529,7 @@
   }
 
   .dock-field,
-  .dock-number-grid label,
-  .paint-grid label {
+  .dock-number-grid label {
     display: grid;
     gap: 4px;
     color: #AFC5D8;
@@ -617,16 +567,6 @@
     padding: var(--dk-field-padding, 0 7px);
   }
 
-
-  .dock-field input[type='range'] {
-    width: 100%;
-    accent-color: var(--surface-accent, #14B8A6);
-  }
-
-  .dock-field strong {
-    color: #E8EEF5;
-    font-size: 10px;
-  }
 
   .dock-button-grid,
   .align-grid {
@@ -705,8 +645,7 @@
     opacity: 0.45;
   }
 
-  .dock-number-grid,
-  .paint-grid {
+  .dock-number-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 7px;
@@ -784,7 +723,4 @@
     background: #0D1419;
   }
 
-  .dock-field input[type='range'] {
-    accent-color: var(--surface-accent, #14B8A6);
-  }
 </style>

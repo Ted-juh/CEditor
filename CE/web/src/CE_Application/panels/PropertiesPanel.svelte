@@ -115,7 +115,11 @@
       clearPropertyFilter();
     }
   });
-  let ownerName = $derived(contextMode === 'panel' ? panelName : componentName);
+  // In the Component Designer this panel edits the whole component (its frame, its interaction, its
+  // publishing) while a layer is edited beside the canvas, and the bare name beside each tab title
+  // did not say which of the two it was.
+  let componentOwnerName = $derived($componentWorkspaceMode === 'surface' ? `Component: ${componentName}` : componentName);
+  let ownerName = $derived(contextMode === 'panel' ? panelName : componentOwnerName);
   let selectedIsCustomComponent = $derived(
     String(getSection($selectedControl, 'Core')?.controlType ?? '') === 'CustomComponent'
   );
@@ -557,7 +561,7 @@
               stateTargetKey={activeStateTarget}
               stateTargetBadge={stateTargetBadge}
               stateTargetTooltip={stateTargetTooltip}
-              ownerName={componentName}
+              ownerName={componentOwnerName}
               {collapsedCards}
               ontogglecollapse={toggleCollapse}
             />

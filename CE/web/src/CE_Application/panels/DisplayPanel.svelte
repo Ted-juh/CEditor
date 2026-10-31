@@ -830,6 +830,10 @@
     if (pickingNotepadColor) return 'Notepad text colour';
     return describeTarget($colorTarget) ?? (designerOpen ? 'No layer selected' : 'Panel background');
   });
+  // In the designer with nothing selected the picker colours nothing (applyColor returns), so the tab
+  // says how to give it something instead of drawing a full picker that does nothing.
+  let colorsIdle = $derived(designerOpen && !$colorTarget && editingGradientStop === null && !pickingNotepadColor);
+
   // A layer selected in the designer only names what the picker will edit: selecting is not an edit,
   // so its Cancel and Done appear once a colour has changed. They were there from the moment the
   // designer opened, which (with a layer selected on open) read as an edit nobody had started.
@@ -1046,6 +1050,9 @@
             <button class="context-done" onclick={handleColorDone}>Done</button>
           {/if}
         </div>
+        {#if colorsIdle}
+          <p class="colors-idle">Select a layer on the canvas and its fill opens here. A stroke or text colour opens from its swatch in the bar above the canvas.</p>
+        {:else}
         <div class="colors-layout">
           <div class="colors-preview" class:split={editingGradientStop !== null || pickingNotepadColor}>
             <ColorChooser
@@ -1110,6 +1117,7 @@
             />
           </div>
         </div>
+        {/if}
       </div>
     {:else if activeTab === 'gradient'}
       <div class="tab-pane">
@@ -1270,6 +1278,15 @@
 </div>
 
 <style>
+  .colors-idle {
+    margin: 0;
+    padding: 14px 16px;
+    max-width: 46ch;
+    color: #8FA3AF;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+
   .display-panel {
     display: flex;
     flex-direction: column;

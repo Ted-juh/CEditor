@@ -4085,17 +4085,15 @@
               {activeSelectionKind} {activeSelectionName} {activeSelectionFrame} {multiSelectionActive}
               {selectedLayer} {selectedPart} {selectedAuthoredPart} {selectedPartEditable}
               {selectedZone} {selectedZoneEditable} {selectedKitEntry}
-              {selectedBackground} {selectedFill} {selectedBorder} {selectedCorners}
-              {selectedText} {selectedTextFill} {selectedTextFont}
               {selectedIsArc} {selectedArcMeta} {selectedArcPivotTarget}
-              {canPaintLayer} {canManageLayer}
+              {canManageLayer}
               {parts} {states} {behaviorEntries} {valueChannelEntries} {artboardWidth} {artboardHeight}
               {showBounds} {showGeneratedLabels} {showHitZones} {zoneDisplayMode}
               {setLayerProperty} {setLayerLayoutProperty} {setHitZoneProperty}
               {setArcMetaProperty} {setSelectedPivotToArcCenter}
               {setSelectionFramePosition} {setSelectionFrameSize} {setArtboardSize}
               {setPreviewFlag} {setZoneDisplayMode} {alignSelection}
-              {openLayerColour} {openArcColour} {renameSelectedLayer}
+              {openArcColour} {renameSelectedLayer}
               {duplicateSelectedLayer} {moveSelectedLayerToExtreme}
               {toggleSelectedLock} {toggleSelectedVisibility}
               {removeSelectedLayer} {removeSelectedKit} {convertSelectedValueControl}
