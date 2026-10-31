@@ -45,7 +45,8 @@ try {
   });
 
   const tip = await kit.page.locator('.props-toolbar button[aria-label="Undo"]').getAttribute('title').catch(() => null);
-  check('and so does the toolbar\'s Undo tooltip', () => assert.equal(tip, 'Undo Rename Drive to Overdrive'));
+  // The step, then the shortcut, which the designer's header pair used to give and the toolbar now does.
+  check('and so does the toolbar\'s Undo tooltip', () => assert.equal(tip, 'Undo Rename Drive to Overdrive (Ctrl+Z)'));
 
   await openEdit();
   await kit.page.locator('#menu-Edit .dropdown-item', { hasText: 'History...' }).click();

@@ -760,7 +760,7 @@ The way that works today is:
    rail).
 2. Select it and press **Component Designer** on the canvas (or **Open Component Designer** at the
    foot of the properties panel). The canvas turns into the designer for that component.
-3. Draw the component with the tools on the left: **Select** (V), **Shape**, **Text** (T), **Hit Zone**
+3. Draw the component with the tools along the bottom of the canvas: **Select** (V), **Shape**, **Text** (T), **Hit Zone**
    (H) for the parts that react to the mouse, and **Interactive** (I) for ready-wired knobs, sliders
    and buttons. **Starters** gives you a beginning to work from. Press **?** for the designer's
    shortcuts.
@@ -774,6 +774,13 @@ The **Shapes** palette down the left is for drawing. A selected layer is styled 
 top of the designer (**Fill**, **Gradient**, **Stroke** and its width **W**, corner radius **R**,
 **Opacity**, and for text its colour, size and words) and in the dock's **Colors** and **Gradient**
 tools.
+
+The strip under the canvas has **Snap**, **Grid** and **Smart** for snapping, **View** and **?** for
+the shortcuts. **View** lists what the canvas shows (**Measure**, **Bounds**, **Generated names**,
+**Hit zones** and which of them are drawn, **Rulers**) and the **Zoom step**, how far the status
+bar's **−** and **+** zoom. On a narrow window the strip takes a second row rather than hide
+anything. **Starters** replaces the component with a ready-made one, and its first entry, **Blank
+canvas**, clears it. Both ask first when there is a layer to lose, and undo takes either back.
 
 While the designer is open, the dock's **Colors** tool colours the fill of the layer selected on its
 surface (several selected layers take the colour together; with none selected it changes nothing),

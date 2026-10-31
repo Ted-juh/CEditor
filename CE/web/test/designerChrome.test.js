@@ -291,9 +291,9 @@ test("zoom is the status bar's; the strip under the canvas keeps what only it ha
   // Bounds and Zones scrolled out of sight.
   const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
   assert.doesNotMatch(strip, /title="Zoom out"|title="Zoom in"|title="Fit to window"|title="Reset to 100%"|szb-zoom-value/);
-  assert.match(strip, />Zoom step<\/span>/);
-  assert.match(strip, /title="Toggle rulers"/);
-  for (const label of ['Snap', 'Smart', 'Measure', 'Bounds', 'Zones']) assert.match(strip, new RegExp(`label="${label}"`), label);
+  assert.match(strip, /<span>Zoom step<\/span>/);
+  assert.match(strip, /label="Rulers"/);
+  for (const label of ['Snap', 'Smart', 'Measure', 'Bounds', 'Hit zones']) assert.match(strip, new RegExp(`label="${label}"`), label);
   const bar = src('CE_Application/layout/StatusBar.svelte');
   for (const title of ['Zoom out', 'Zoom in', 'Reset to 100%']) assert.match(bar, new RegExp(`title="${title}"`), title);
   assert.doesNotMatch(src('CE_Application/sections/CustomDesignSurfaceEditor.svelte'), /zoomEditing|commitZoomEdit/);
@@ -301,12 +301,60 @@ test("zoom is the status bar's; the strip under the canvas keeps what only it ha
 
 test("the Dial, the scales and the arpeggiator are added from the palette, not from the strip as well", () => {
   // The strip had Dial, H Scale, V Scale and Arp Kit, the same four functions as the palette's
-  // Value Controls, and they too pushed the toggles out of sight. Blank stays: no starter is blank.
+  // Value Controls, and they too pushed the toggles out of sight.
   const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
   assert.doesNotMatch(strip, /addDialKit|addHorizontalScaleKit|addVerticalScaleKit|addArpeggiatorKit/);
-  assert.match(strip, /onclick=\{resetToBlankCanvas\}/);
   const palette = src('CE_Application/sections/SurfacePalette.svelte');
   for (const kit of ['addDialKit', 'addHorizontalScaleKit', 'addVerticalScaleKit', 'addArpeggiatorKit']) {
     assert.match(palette, new RegExp(`onclick=\\{${kit}\\}`), kit);
   }
+});
+
+test('the options strip holds snapping, View and ?, and wraps rather than hiding anything', () => {
+  // It is as wide as the canvas column (300 pixels at 1366) and scrolled sideways: at 1366
+  // everything after Snap was out of sight. What the canvas shows, and the zoom step, are in the
+  // View list, and the strip takes a second row when even that does not fit.
+  const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
+  const markup = strip.slice(strip.indexOf('</script>'), strip.indexOf('<style>'));
+  const list = markup.slice(markup.indexOf('<div class="view-list"'), markup.indexOf('{/if}', markup.indexOf('<div class="view-list"')));
+  for (const label of ['Measure', 'Bounds', 'Generated names', 'Hit zones', 'Rulers']) {
+    assert.match(list, new RegExp(`label="${label}"`), `${label} is in the View list`);
+  }
+  assert.match(list, /aria-label="Which hit zones are drawn"/);
+  assert.match(list, /<span>Zoom step<\/span>/);
+  const outside = markup.replace(list, '');
+  for (const label of ['Snap', 'Smart']) assert.match(outside, new RegExp(`label="${label}"`), `${label} stays on the strip`);
+  assert.match(outside, />View ▾<\/button>/);
+  assert.match(outside, /title="Shortcuts &amp; glossary \(\?\)">\?<\/button>/);
+  const css = strip.slice(strip.indexOf('<style>'));
+  assert.match(css, /\.surface-options-strip \{[^}]*flex-wrap: wrap;/);
+  assert.doesNotMatch(css, /overflow-x: auto/, 'nothing scrolls out of sight');
+  // The list closes on a click anywhere else and on Escape, and Escape stops there: the designer's
+  // own Escape would also drop the selection.
+  assert.match(strip, /if \(!viewHost\?\.contains\(event\.target\)\) viewOpen = false;/);
+  assert.match(strip, /event\.key !== 'Escape'\) return;\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*viewOpen = false;/);
+  assert.match(strip, /document\.addEventListener\('keydown', onKey\);/, 'bubbling, so a field in the list keeps its own Escape');
+});
+
+test('Blank canvas is the first entry of the Starters menu, and a starter asks before it replaces anything', () => {
+  const tools = src('CE_Application/sections/SurfaceToolStrip.svelte');
+  const menu = tools.slice(tools.indexOf('aria-label="Starter components"'));
+  assert.ok(menu.indexOf('Blank canvas') > 0 && menu.indexOf('Blank canvas') < menu.indexOf('{#each CUSTOM_COMPONENT_STARTERS'),
+    'first: the list is taller than the menu, and its end is out of sight');
+  assert.match(menu, /class="danger" title="Clear this component to an empty canvas" onclick=\{blankCanvasFromFlyout\}/);
+  assert.doesNotMatch(src('CE_Application/sections/SurfaceBottomBar.svelte'), /resetToBlankCanvas|>Blank</);
+  const surface = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(surface, /function blankCanvasFromFlyout\(event\) \{\s*event\?\.stopPropagation\?\.\(\);\s*starterFlyoutOpen = false;\s*resetToBlankCanvas\(\);/);
+  // resetToBlankCanvas asked first; a starter, which replaces far more, did not.
+  const apply = surface.slice(surface.indexOf('function applyStarterFromFlyout'), surface.indexOf('function blankCanvasFromFlyout'));
+  assert.ok(apply.indexOf('confirmDestructive(') > 0 && apply.indexOf('confirmDestructive(') < apply.indexOf('applyControlPatch('));
+});
+
+test("the tool strip's menus close on a click anywhere else and on Escape", () => {
+  // Starters, Assistant and Make Interactive stayed open until their own button was pressed again;
+  // Escape closed only the Shape menu.
+  const surface = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(surface, /let toolFlyoutOpen = \$derived\(shapeFlyoutOpen \|\| interactiveFlyoutOpen \|\| starterFlyoutOpen \|\| assistantFlyoutOpen\);/);
+  assert.match(surface, /if \(!event\.target\?\.closest\?\.\('\.tool-flyout-host'\)\) close\(\);/);
+  assert.match(surface, /document\.addEventListener\('pointerdown', onDown, true\);\s*document\.addEventListener\('keydown', onKey\);/);
 });

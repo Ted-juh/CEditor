@@ -27,7 +27,7 @@ const read = (rel) => readFileSync(resolve(APP, rel), 'utf8');
 const EXTRACTED = [
   'SurfaceLookBar',     // the look bar across the top
   'SurfacePalette',     // the Shapes palette down the left
-  'SurfaceBottomBar',   // snapping/view options and the zoom cluster
+  'SurfaceBottomBar',   // the options strip: snapping, the View list, ?
   'SurfaceToolStrip',   // the floating tool strip over the canvas
   'SurfaceDockLayers',    // the dock's Layers tab
   'SurfaceDockInspector', // the dock's Object / Display / Behavior / States tabs

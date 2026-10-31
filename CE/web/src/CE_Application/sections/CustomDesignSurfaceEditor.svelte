@@ -379,6 +379,25 @@
   let interactiveFlyoutOpen = $state(false);
   let starterFlyoutOpen = $state(false);
   let assistantFlyoutOpen = $state(false);
+  // A click anywhere but a tool strip menu (or its button) closes them, and so does Escape, which
+  // stops there rather than also dropping the selection. Neither did: Starters, Assistant and
+  // Make Interactive stayed open until their own button was pressed again. On the document and
+  // bubbling, so a field that handles its own Escape still gets it first.
+  let toolFlyoutOpen = $derived(shapeFlyoutOpen || interactiveFlyoutOpen || starterFlyoutOpen || assistantFlyoutOpen);
+  $effect(() => {
+    if (!toolFlyoutOpen) return;
+    const close = () => {
+      shapeFlyoutOpen = false;
+      interactiveFlyoutOpen = false;
+      starterFlyoutOpen = false;
+      assistantFlyoutOpen = false;
+    };
+    const onDown = (event) => { if (!event.target?.closest?.('.tool-flyout-host')) close(); };
+    const onKey = (event) => { if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); } };
+    document.addEventListener('pointerdown', onDown, true);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('pointerdown', onDown, true); document.removeEventListener('keydown', onKey); };
+  });
   let interactiveArchetype = $state('dial');
   let drawDraft = $state(null);
   let drawNotice = $state('');
@@ -791,11 +810,25 @@
     interactiveFlyoutOpen = false;
   }
 
+  // A starter replaces nearly all of the component (createCustomComponentStarterPatch): its name,
+  // size, layers, channels, behaviours, bindings and hit zones. Blank canvas, in the same menu,
+  // asked before it cleared anything and the starters did not; both ask now, when there is a
+  // layer to lose. Undo covers both.
   function applyStarterFromFlyout(event, starter) {
     event?.stopPropagation?.();
     starterFlyoutOpen = false;
     if (!core?.id || !starter) return;
+    const partCount = Object.keys(authoredParts?._children ?? {}).length;
+    if (partCount > 0 && !confirmDestructive(
+      `Load the ${starter.label} starter? It replaces this component: its name, size, ${partCount} layer${partCount === 1 ? '' : 's'}, value channels, behaviours, bindings and hit zones.`
+    )) return;
     applyControlPatch(core.id, createCustomComponentStarterPatch(starter.id));
+  }
+
+  function blankCanvasFromFlyout(event) {
+    event?.stopPropagation?.();
+    starterFlyoutOpen = false;
+    resetToBlankCanvas();
   }
 
   function applyRecipeFromFlyout(event, recipe) {
@@ -1403,8 +1436,9 @@
    * Replace everything on the canvas with an empty one.
    *
    * The 2026-07-12 review filed the placement rather than the action: a destructive reset sat in
-   * the middle of the insert buttons, one slot from "Dial". It has moved to the end of the strip
-   * and wears the danger colour, and it asks first when there is anything to lose. Undo does cover
+   * the middle of the insert buttons, one slot from "Dial". It is the first entry of the Starters
+   * menu now (a blank canvas is where a start can begin), in the danger colour, and it asks first
+   * when there is anything to lose. Undo does cover
    * it — the component workspace has its own history context — but a one-click wipe of the whole
    * canvas should not rely on the user knowing that.
    */
@@ -3433,10 +3467,6 @@
         cancelDraw();
         return;
       }
-      if (shapeFlyoutOpen) {
-        shapeFlyoutOpen = false;
-        return;
-      }
       if (activeTool !== 'select') {
         setActiveTool('select');
         return;
@@ -3602,7 +3632,6 @@
       {zoneDisplayMode} {setZoneDisplayMode}
       {arpeggiatorEnabled} {arpStepCount} {setArpStepCount} {arpSelectedBlock}
       {shiftArpOctave} {removeSelectedArpBlock}
-      {resetToBlankCanvas}
       {helpOverlayOpen} setHelpOverlayOpen={(v) => { helpOverlayOpen = v; }}
       {surfaceZoomIncrement} {setZoomIncrement}
       {surfaceShowRulers} setSurfaceShowRulers={(v) => { surfaceShowRulers = v; }}
@@ -4101,6 +4130,7 @@
       {selectInteractiveArchetype}
       {toggleStarterFlyout}
       {applyStarterFromFlyout}
+      {blankCanvasFromFlyout}
       {toggleAssistantFlyout}
       {applyRecipeFromFlyout}
     />

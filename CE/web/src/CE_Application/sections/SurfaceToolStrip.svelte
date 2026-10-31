@@ -8,7 +8,7 @@
    * Interactive tool among them — happened because the surface editor is too large to edit
    * without rewriting a region. This strip is one of those regions.
    *
-   * Explicit props rather than a context object: nineteen is a readable number, and the compiler
+   * Explicit props rather than a context object: twenty is a readable number, and the compiler
    * checks every one. A prop the parent forgets to pass is a build error, which is the check that
    * makes an extraction of this size safe to do at all.
    *
@@ -25,7 +25,7 @@
     shapeToolActive = false,
     activeInteractiveMeta = { id: 'dial', label: 'Dial' },
     interactiveArchetype = 'dial',
-    // Flyout state stays with the parent: a click anywhere on the surface closes them all.
+    // Flyout state stays with the parent, which closes them all on a click anywhere else or Escape.
     shapeFlyoutOpen = false,
     interactiveFlyoutOpen = false,
     starterFlyoutOpen = false,
@@ -38,6 +38,7 @@
     selectInteractiveArchetype = () => {},
     toggleStarterFlyout = () => {},
     applyStarterFromFlyout = () => {},
+    blankCanvasFromFlyout = () => {},
     toggleAssistantFlyout = () => {},
     applyRecipeFromFlyout = () => {},
   } = $props();
@@ -148,6 +149,15 @@
       </button>
       {#if starterFlyoutOpen}
         <div class="tool-flyout rich" use:floating={{ anchor: 'parent', placement: 'top-start', fallbackPlacements: ['bottom-start'] }} role="menu" aria-label="Starter components">
+          <!-- First, not last: the list is taller than the menu and scrolls, and the end of it is out
+               of sight. In the danger colour, and it asks before it clears anything. -->
+          <button type="button" role="menuitem" class="danger" title="Clear this component to an empty canvas" onclick={blankCanvasFromFlyout}>
+            <span class="rich-copy">
+              <span>Blank canvas</span>
+              <small>Clears every layer, hit zone, generator and binding</small>
+            </span>
+          </button>
+          <div class="flyout-separator" role="separator"></div>
           {#each CUSTOM_COMPONENT_STARTERS as starter (starter.id)}
             <button type="button" role="menuitem" title={starter.summary} onclick={(event) => applyStarterFromFlyout(event, starter)}>
               <span class="rich-copy">
@@ -331,6 +341,16 @@
     background: transparent;
     color: #CBD7E0;
     text-align: left;
+  }
+
+  .tool-flyout button.danger span:not(.tool-icon) {
+    color: #FFD4D4;
+  }
+
+  .flyout-separator {
+    height: 1px;
+    margin: 4px 2px;
+    background: #2D3A44;
   }
 
   .tool-flyout button:hover,

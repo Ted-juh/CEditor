@@ -194,6 +194,96 @@ try {
       partsAfterRedo: redone.length, widthAfterRedo: redoneWidth });
 
   // ===============================================================================================
+  // THE STRIP UNDER THE CANVAS, AND STARTERS — what is on screen, and what asks before it replaces.
+  // ===============================================================================================
+  // The strip is as wide as the canvas column (about 490 pixels here) and used to scroll sideways
+  // with most of its toggles out of sight. They are in a View list now, and the strip wraps.
+  await kit.page.locator('.tool-strip button[title="Select (V)"]').click();
+  await kit.settle(300);
+  const board = await kit.page.locator('.artboard').boundingBox();
+  await kit.page.mouse.click(board.x + 115, board.y + 75); // the middle of the 150 x 70 part at (40, 40)
+  await kit.settle(500);
+  const selectedParts = () => kit.page.evaluate(() => document.querySelectorAll('.artboard .part-bound.selected').length);
+  const box = (sel) => kit.page.evaluate((s) => {
+    const el = document.querySelector(s);
+    if (!el) return null;
+    const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+  }, sel);
+  const strip = await box('.surface-options-strip');
+  led.check(D, 'the strip under the canvas shows all it holds',
+    'every control on it lies inside it and it is one row: at 1700 wide it was a sideways scroll with Generated names, Zones, ? and Blank out of sight, and a control out of sight is one nobody finds',
+    { allInside: true, oneRow: true },
+    await kit.page.evaluate(() => {
+      const strip = document.querySelector('.surface-options-strip');
+      const r = strip.getBoundingClientRect();
+      return {
+        allInside: [...strip.children].every((el) => { const b = el.getBoundingClientRect(); return b.right <= r.right + 1 && b.bottom <= r.bottom + 1; }),
+        oneRow: r.height <= 34,
+      };
+    }));
+
+  const viewButton = kit.page.locator('.surface-options-strip button', { hasText: 'View' });
+  const viewList = '[aria-label="View options"]';
+  const selectedBefore = await selectedParts();
+  await viewButton.click();
+  await kit.settle(400);
+  const listBox = await box(viewList);
+  const buttonBox = await box('.view-host > button');
+  const boundsBefore = await kit.read(dial, 'Designer.preview.showBounds');
+  await kit.page.locator(`${viewList} button`, { hasText: 'Bounds' }).click();
+  await kit.settle(400);
+  const boundsAfter = await kit.read(dial, 'Designer.preview.showBounds');
+  const openAfterSwitch = !!(await box(viewList));
+  await kit.page.locator(`${viewList} button`, { hasText: 'Bounds' }).click();
+  await kit.settle(300);
+  led.check(D, 'View opens what the canvas shows, and its switches work',
+    'the list opens above its button, over the canvas; Bounds in it changes the document`s Designer.preview.showBounds; and the list stays open for the next switch',
+    { opensAbove: true, boundsFlipped: true, stillOpen: true },
+    { opensAbove: !!listBox && !!buttonBox && listBox.bottom <= buttonBox.top + 1, boundsFlipped: boundsBefore !== boundsAfter, stillOpen: openAfterSwitch });
+
+  await kit.page.keyboard.press('Escape');
+  await kit.settle(400);
+  const closedByEscape = !(await box(viewList));
+  const selectedAfterEscape = await selectedParts();
+  await viewButton.click();
+  await kit.settle(300);
+  const title = await box('.component-workspace-title');
+  await kit.page.mouse.click(title.left + 10, (title.top + title.bottom) / 2);
+  await kit.settle(400);
+  led.check(D, 'Escape closes the View list and keeps the selection, and so does a click elsewhere',
+    'Escape stops at the list: the designer`s own Escape would also drop the selected part, which is not what closing a list should do',
+    { selected: true, closedByEscape: true, selectionKept: true, closedByClickElsewhere: true },
+    { selected: selectedBefore > 0, closedByEscape, selectionKept: selectedAfterEscape === selectedBefore, closedByClickElsewhere: !(await box(viewList)) });
+
+  const startersButton = kit.page.locator('.tool-strip button[title^="Starters"]');
+  const startersMenu = '[aria-label="Starter components"]';
+  await startersButton.click();
+  await kit.settle(400);
+  const firstEntry = await kit.page.evaluate((m) => document.querySelector(`${m} [role="menuitem"]`)?.textContent.replace(/\s+/g, ' ').trim() ?? '', startersMenu);
+  await kit.page.keyboard.press('Escape');
+  await kit.settle(300);
+  const startersClosedByEscape = !(await box(startersMenu));
+  const partsBeforeStarters = (await parts(dial)).length;
+  const asked = [];
+  const answerNo = (dialog) => { asked.push(dialog.message()); dialog.dismiss(); };
+  kit.page.on('dialog', answerNo);
+  await startersButton.click();
+  await kit.settle(300);
+  await kit.page.locator(`${startersMenu} [role="menuitem"]`).nth(1).click();
+  await kit.settle(700);
+  await startersButton.click();
+  await kit.settle(300);
+  await kit.page.locator(`${startersMenu} [role="menuitem"]`, { hasText: 'Blank canvas' }).click();
+  await kit.settle(700);
+  kit.page.off('dialog', answerNo);
+  led.check(D, 'Starters begins with Blank canvas, and both a starter and Blank canvas ask before they replace anything',
+    'Blank canvas is first (the list is taller than the menu and scrolls, so its end is out of sight); Escape closes the menu; a starter replaces the name, the size, every layer and more, and asked nothing; answered No, both leave the component as it was',
+    { first: 'Blank canvas', closedByEscape: true, asked: 2, name: 'Dial', parts: partsBeforeStarters },
+    { first: firstEntry.slice(0, 'Blank canvas'.length), closedByEscape: startersClosedByEscape, asked: asked.length,
+      name: await kit.read(dial, 'Core.name'), parts: (await parts(dial)).length });
+
+  // ===============================================================================================
   // CARRY — the part survives leaving the surface.
   // ===============================================================================================
   const beforeLeaving = (await parts(dial)).length;
