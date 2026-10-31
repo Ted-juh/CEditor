@@ -96,7 +96,15 @@ async function rectsFor(ids, componentId = null) {
 }
 
 const at = (r, fx, fy) => ({ x: r.x + r.w * fx, y: r.y + r.h * fy });
-const shot = (r) => kit.page.screenshot({ clip: { x: Math.round(r.x) - 2, y: Math.round(r.y) - 2, width: Math.round(r.w) + 4, height: Math.round(r.h) + 4 } });
+// The editor's "Preview · <name>" badge floats over the canvas and names whatever was inspected last
+// (a knob's caption on the panel, the component after conversion), so its edge reached into the GAIA
+// cluster's picture at two different widths. It is the editor's, not what either draws, so it is
+// hidden in the page before each picture. Not with the screenshot's own `style` option: that restyles
+// the page at the moment of capture, and the knob's arc then came out three pixels different.
+const shot = async (r) => {
+  await kit.page.evaluate(() => { for (const el of document.querySelectorAll('.editor-state-badge')) el.style.visibility = 'hidden'; });
+  return kit.page.screenshot({ clip: { x: Math.round(r.x) - 2, y: Math.round(r.y) - 2, width: Math.round(r.w) + 4, height: Math.round(r.h) + 4 } });
+};
 
 async function gesture(path) {
   const m = kit.page.mouse;
@@ -106,6 +114,21 @@ async function gesture(path) {
   for (const p of path.slice(1)) await m.move(p.x, p.y, { steps: 6 });
   await m.up();
   await kit.settle(150);
+}
+
+/**
+ * Nothing selected before the pictures are taken. The bar above the canvas follows the selection
+ * (152px for a selected slider, 90px for a selected component), so the panel and the component were
+ * photographed at different heights on screen, and the browser anti-aliases a curve differently at a
+ * different place: a few pixels of every arc's edge differed with the drawing identical. Unselected,
+ * both are drawn where the other was.
+ */
+async function deselect() {
+  await kit.page.evaluate(async () => {
+    const { selectedComponentIds } = await import('/src/CE_Application/stores/panels.js');
+    selectedComponentIds.set(new Set());
+  });
+  await kit.settle(300);
 }
 
 /** The same sequence on either panel; returns the pictures taken on the way. */
@@ -204,6 +227,7 @@ try {
   await kit.preview(true);
   await kit.settle(600);
   await kit.forgetSent();
+  await deselect();
   const beforeShots = await perform(await rectsFor(plain));
   const ccOf = async () => (await kit.sent()).filter((m) => m.status === 0xB0 && m.channel === 2 && m.data1 === 71).map((m) => m.data2);
   const sentBefore = await ccOf();
@@ -238,6 +262,7 @@ try {
   await kit.preview(true);
   await kit.settle(600);
   await kit.forgetSent();
+  await deselect();
   const afterShots = await perform(await rectsFor(ids, made.id));
   const sentAfter = await ccOf();
   const session = await kit.session(made.id);
@@ -369,6 +394,7 @@ try {
   await kit.settle(600);
   await kit.preview(true);
   await kit.settle(900);
+  await deselect();
   const gaiaBeforeShots = await clusterGestures(await clusterRects(gaiaA, null));
   const gaiaBefore = [];
   for (const knob of gaiaA.knobs) {
@@ -385,6 +411,7 @@ try {
   });
   await kit.preview(true);
   await kit.settle(900);
+  await deselect();
   const gaiaAfterShots = await clusterGestures(await clusterRects(gaiaB, gaiaB.made.id));
   const gaiaSession = await kit.session(gaiaB.made.id);
   const channelOf = await kit.page.evaluate(async (id) => {

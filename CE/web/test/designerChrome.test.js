@@ -150,3 +150,19 @@ test('a layer thumbnail keeps the part\'s shape: the artboard is fitted whole an
     assert.ok(Math.abs(width * 28 - height * 20) < 1e-6, style);
   }
 });
+
+test('a knob carried by a component is drawn and timed the way the panel draws and times it', () => {
+  const part = src('CE_Application/editor/InteractivePartRenderer.svelte');
+  const canvas = src('CE_Application/editor/CanvasControl.svelte');
+  // The panel draws a knob with a form through ControlAnatomy and every other one through
+  // SliderFamilyRenderer; the part used SliderFamilyRenderer for both, so a converted knob with a form
+  // came out smaller with a larger readout.
+  assert.match(canvas, /let hasAnatomy = \$derived\(!!anatomyForm\(core\?\.controlType, core\?\.controlForm\)\);/);
+  assert.match(part, /let sliderAnatomy = \$derived\(sliderResolved\s*\? anatomyForm\(sliderResolved\.control\?\._children\?\.Core\?\.controlType, sliderResolved\.control\?\._children\?\.Core\?\.controlForm\)/);
+  assert.match(part, /\{#if sliderResolved && sliderAnatomy\}\s*<ControlAnatomy/);
+  // Its transitions go through the same tracker CanvasControl runs, not the runtime's whole catalogue.
+  assert.match(canvas, /transitionTracker\.next\(interactionRuntime, \{ reducedMotion: \$systemReducedMotion \}\)/);
+  assert.match(part, /sliderTracker\.next\(sliderResolved\.runtime, \{ reducedMotion: \$systemReducedMotion \}\)/);
+  assert.match(part, /partTransitions=\{sliderTransitions\?\.partTransitions \?\? null\}/);
+  assert.doesNotMatch(part, /partTransitions=\{sliderResolved\.runtime\?\.transitions\?\.partTransitions/);
+});

@@ -49,12 +49,16 @@
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
+  import ControlAnatomy from './ControlAnatomy.svelte';
+  import { anatomyForm } from '../models/controlAnatomy.js';
   import { resolveInteractiveControl } from '../utils/interactionRuntime.js';
   import { isSliderControlPart, sliderControlSession } from '../utils/sliderControlPart.js';
   import { booleanShapeFor, booleanShapeRevision, compoundShapeFor } from '../utils/booleanGroups.js';
   import { outlineInsetDepths } from '../utils/outlineBorder.js';
   import { outlineShadows } from '../utils/outlineShadows.js';
-  import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
+  import { transitionDeclaration, colourTransitionVar, rootTransitionDeclaration } from '../utils/transitionCss.js';
+  import { createTransitionTracker } from '../utils/transitionSelection.js';
+  import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
 
   let {
@@ -133,6 +137,21 @@
   let sliderResolved = $derived(sliderControl?.control
     ? resolveInteractiveControl(sliderControl.control, sliderControlSession(sliderControl))
     : null);
+  // The knob's transitions as the panel times them: CanvasControl runs every control's runtime
+  // through a tracker that picks which transitions apply at each change of state, and this part
+  // passed the runtime's whole catalogue instead. A converted knob's colours then snapped where the
+  // panel knob's eased (knobsFromSelection caught it three pixels into a fade).
+  const sliderTracker = createTransitionTracker();
+  let sliderTransitions = $derived(sliderResolved?.runtime
+    ? sliderTracker.next(sliderResolved.runtime, { reducedMotion: $systemReducedMotion })
+    : null);
+  // A knob or slider with a form (Core.controlForm, often the control set's) is drawn by
+  // ControlAnatomy on the panel, not by SliderFamilyRenderer; CanvasControl picks between them the
+  // same way. The part always used SliderFamilyRenderer, so a converted knob with a form came out a
+  // different knob: smaller, with a larger readout.
+  let sliderAnatomy = $derived(sliderResolved
+    ? anatomyForm(sliderResolved.control?._children?.Core?.controlType, sliderResolved.control?._children?.Core?.controlForm)
+    : '');
   // What the part draws, worked out once per part. These were fourteen deriveds of their own, each
   // a node in the reactive graph with its dependency and reader lists, for every part of every
   // control on a panel; GAIA's custom components carry five or six parts each. See partShape.
@@ -235,7 +254,10 @@
       `z-index:${numberOr(part?.zIndex, 0)}`,
       `overflow:${part?.clipChildren === true || editableInput ? 'hidden' : 'visible'}`,
       transforms.length ? `transform:${transforms.join(' ')}; transform-origin:${numberOr(layout?.pivotX, 50)}% ${numberOr(layout?.pivotY, 50)}%` : '',
-      buildTransitionStyle(transitionBucket),
+      // A knob part times itself as the panel knob's root does, unless the component gives it a timing.
+      !transitionBucket && sliderTransitions
+        ? `${rootTransitionDeclaration(sliderTransitions.rootTransitions)} ${colourTransitionVar(sliderTransitions.rootTransitions?.get?.('colour') ?? null)}`.trim()
+        : buildTransitionStyle(transitionBucket),
       // Keyframe animations on this part (the control's player decides which are playing). A fill
       // absorbed onto this element is painted here, so its colour channel plays here too; the rest
       // travel to the layers inside as custom properties.
@@ -722,13 +744,21 @@
       </svg>
     {/if}
 
-    {#if sliderResolved}
+    {#if sliderResolved && sliderAnatomy}
+      <ControlAnatomy
+        control={sliderResolved.control}
+        runtime={sliderResolved.runtime}
+        width={frame.width}
+        height={frame.height}
+        label={String(sliderResolved.control?._children?.Text?.content ?? '')}
+      />
+    {:else if sliderResolved}
       <SliderFamilyRenderer
         control={sliderResolved.control}
         runtime={sliderResolved.runtime}
         width={frame.width}
         height={frame.height}
-        partTransitions={sliderResolved.runtime?.transitions?.partTransitions ?? null}
+        partTransitions={sliderTransitions?.partTransitions ?? null}
         {debug}
       />
     {/if}
