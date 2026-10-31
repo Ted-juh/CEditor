@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import { onSurfaceZoomRequest } from '../stores/componentWorkspace.js';
   import ArrowDown from 'lucide-svelte/icons/arrow-down';
   import ArrowUp from 'lucide-svelte/icons/arrow-up';
@@ -1962,7 +1962,35 @@
     const id = core?.id;
     if (!id || !surfaceScrollEl || id === fittedComponentId) return;
     fittedComponentId = id;
+    // And with nothing selected. A new component carried a layer to start on (the factory's
+    // `background`, a converted knob's first part), so the designer opened with a layer selected
+    // and the Colors tab already editing its fill.
+    untrack(clearSurfaceSelection);
     requestAnimationFrame(fitArtboardToView);
+  });
+
+  // Preview has the canvas to itself — no palette, no dock — so it fits the component to that, and
+  // going back to Edit puts back the zoom and scroll Edit had. It kept the Edit zoom, and a fitted
+  // component filled a fifth of the space Preview had just made for it.
+  let lastPreviewing = null;
+  let editView = null;
+  $effect(() => {
+    const previewing = designerPreviewing;
+    if (!surfaceScrollEl) return;
+    if (lastPreviewing === null || previewing === lastPreviewing) { lastPreviewing = previewing; return; }
+    lastPreviewing = previewing;
+    untrack(() => {
+      if (previewing) {
+        editView = { zoom: surfaceZoom, left: surfaceScrollEl.scrollLeft, top: surfaceScrollEl.scrollTop };
+        requestAnimationFrame(fitArtboardToView);
+        return;
+      }
+      const back = editView;
+      editView = null;
+      if (!back) { requestAnimationFrame(fitArtboardToView); return; }
+      setZoom(back.zoom);
+      requestAnimationFrame(() => { if (surfaceScrollEl) { surfaceScrollEl.scrollLeft = back.left; surfaceScrollEl.scrollTop = back.top; } });
+    });
   });
 
   // Ctrl+plus, minus and 0 (App.svelte takes them wherever focus is while the designer is open).
@@ -3532,11 +3560,11 @@
       <!-- In the look bar, not over the canvas: see SurfaceLookBar. -->
       {#snippet notice()}
         {#if !readinessNudgeDismissed && readinessNudgeSteps.length}
-          <div class="readiness-nudge" role="status">
+          <div class="readiness-nudge" role="status" title={readinessNudgeSteps.map((step) => `${step.label} — ${step.detail}`).join('\n')}>
             <strong>Not reusable yet:</strong>
             {#each readinessNudgeSteps as step (step.id)}
               <span class={`nudge-step ${step.severity}`}>
-                {step.label} — {step.detail}
+                <span class="nudge-text">{step.label} — {step.detail}</span>
                 {#if step.fix}
                   <button type="button" class="nudge-fix" title={step.fix.label} onclick={() => applyReadinessFix(step)}>Fix</button>
                 {/if}
@@ -4198,7 +4226,11 @@
     --dk-field-border: #3B4650;
     --dk-field-fg: #E8EEF5;
     display: grid;
-    grid-template-columns: var(--palette-w, 220px) minmax(420px, 1fr) var(--dock-w, clamp(340px, 25vw, 430px));
+    /* Shares of the designer's own width, not of the window: the inspector beside it takes some
+       600px of the window, so a dock at 25vw and a canvas of at least 420px came to more than the
+       designer had (1065px of 1044 at 1700 wide) and the dock's right edge went under the inspector.
+       The canvas takes what is left, with no minimum that could push the others out. */
+    grid-template-columns: var(--palette-w, clamp(150px, 20%, 220px)) minmax(0, 1fr) var(--dock-w, clamp(260px, 33%, 430px));
     grid-template-rows: auto minmax(0, 1fr) auto auto auto;
     grid-template-areas:
       "lookbar lookbar  lookbar"
@@ -4704,12 +4736,15 @@
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34);
   }
 
+  /* One line in the look bar: the steps shorten, and the whole of each is the notice's tooltip. */
   .readiness-nudge {
     display: flex;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     gap: 6px;
+    min-width: 0;
     max-width: 100%;
+    overflow: hidden;
     padding: 5px 8px;
     border: 1px solid rgba(120, 130, 150, 0.4);
     border-radius: 6px;
@@ -4723,8 +4758,12 @@
     font-size: 10px;
   }
 
+  .readiness-nudge strong { flex-shrink: 0; white-space: nowrap; }
+  .readiness-nudge .nudge-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .readiness-nudge .nudge-step {
     display: inline-flex;
+    flex: 0 1 auto;
+    min-width: 0;
     align-items: center;
     gap: 6px;
     padding: 2px 6px;
@@ -5638,11 +5677,6 @@
   }
 
   @media (max-width: 1380px) {
-    .surface-shell {
-      --palette-w: 176px;
-      --dock-w: 330px;
-    }
-
     .palette-panel {
       padding-left: 10px;
       padding-right: 10px;
@@ -5656,7 +5690,6 @@
   @media (max-width: 920px) {
     .surface-shell {
       --palette-w: 0px;
-      --dock-w: 318px;
     }
 
     .palette-panel {

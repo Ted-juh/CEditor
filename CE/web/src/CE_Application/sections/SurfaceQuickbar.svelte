@@ -104,11 +104,11 @@
 <style>
   .selection-quickbar {
     display: inline-flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    flex-shrink: 0;
     align-items: center;
     gap: 4px;
     width: max-content;
-    max-width: 100%;
     min-height: 31px;
     padding: 3px 5px;
     border: 1px solid #34444F;

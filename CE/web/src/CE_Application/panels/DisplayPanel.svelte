@@ -310,7 +310,8 @@
   // --- Color target: switch to Colors tab and set color when a swatch activates a target ---
   // Plain variable (not $state) so it doesn't become a reactive dependency of the effect.
   const colorTargetGuard = { current: null };
-  let colorTargetDirty = false;
+  // State, so the bar can show Cancel and Done once a colour has changed (colorContextActive).
+  let colorTargetDirty = $state(false);
   $effect(() => {
     syncExternalTarget($colorTarget, colorTargetGuard, (t) => !!t._initialColor, (t) => {
       // A property swatch can be opened while a stop or notepad colour is
@@ -829,7 +830,11 @@
     if (pickingNotepadColor) return 'Notepad text colour';
     return describeTarget($colorTarget) ?? (designerOpen ? 'No layer selected' : 'Panel background');
   });
-  let colorContextActive = $derived(editingGradientStop !== null || pickingNotepadColor || !!$colorTarget);
+  // A layer selected in the designer only names what the picker will edit: selecting is not an edit,
+  // so its Cancel and Done appear once a colour has changed. They were there from the moment the
+  // designer opened, which (with a layer selected on open) read as an edit nobody had started.
+  let colorContextActive = $derived(editingGradientStop !== null || pickingNotepadColor
+    || (!!$colorTarget && (!$colorTarget._designerFill || colorTargetDirty)));
 
   let gradientContextLabel = $derived(describeTarget($gradientTarget)
     ?? (designerOpen ? 'No layer gradient open: use a layer\'s Gradient button' : 'Panel background gradient'));

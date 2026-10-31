@@ -10,6 +10,7 @@
   import Cable from 'lucide-svelte/icons/cable';
   import Pencil from 'lucide-svelte/icons/pencil';
   import ArrowRightLeft from 'lucide-svelte/icons/arrow-right-left';
+  import { bindingSourceGroups, choiceGroups, defaultBindingSource, MAP_MODES, OUTPUT_UNITS } from '../utils/bindingSourceOptions.js';
 
   let { control = null } = $props();
 
@@ -23,7 +24,15 @@
   let parseError = $state('');
 
   let bindingNames = $derived(Object.keys(bindings?._children ?? {}));
-  let selectedBinding = $derived(bindings?._children?.[selectedBindingName] ?? null);
+  // The binding on screen: the one chosen, else the first. Derived rather than left to the effect
+  // below, so the first drawing already shows a binding.
+  let shownName = $derived(bindingNames.includes(selectedBindingName) ? selectedBindingName : (bindingNames[0] ?? ''));
+  let selectedBinding = $derived(bindings?._children?.[shownName] ?? null);
+  // A binding's source, mode or unit that the lists do not hold is offered as it is: a select whose
+  // value is not among its options shows blank (utils/bindingSourceOptions.js).
+  let sourceGroups = $derived(bindingSourceGroups(control, selectedBinding?.source ?? 'value.normalized'));
+  let modeGroups = $derived(choiceGroups(MAP_MODES, selectedBinding?.mapMode ?? 'range'));
+  let unitGroups = $derived(choiceGroups(OUTPUT_UNITS, selectedBinding?.outputUnit ?? 'percent'));
 
   $effect(() => {
     if (!bindingNames.length) {
@@ -41,8 +50,8 @@
   });
 
   function setBindingProp(prop, value) {
-    if (!core?.id || !selectedBindingName) return;
-    updateControlProperty(core.id, `Bindings.${selectedBindingName}.${prop}`, value);
+    if (!core?.id || !shownName) return;
+    updateControlProperty(core.id, `Bindings.${shownName}.${prop}`, value);
   }
 
   function addBinding() {
@@ -52,7 +61,7 @@
       _type: 'Binding',
       name,
       enabled: true,
-      source: 'value.normalized',
+      source: defaultBindingSource(control),
       mapMode: 'range',
       target: '',
       outputUnit: 'percent',
@@ -72,16 +81,16 @@
   }
 
   function removeBinding() {
-    if (!core?.id || !selectedBindingName) return;
-    removeControlNode(core.id, `Bindings.${selectedBindingName}`);
+    if (!core?.id || !shownName) return;
+    removeControlNode(core.id, `Bindings.${shownName}`);
     selectedBindingName = '';
   }
 
   function commitEnumMap() {
-    if (!core?.id || !selectedBindingName) return;
+    if (!core?.id || !shownName) return;
     try {
       const parsed = JSON.parse(enumMapDraft || '{}');
-      updateControlProperty(core.id, `Bindings.${selectedBindingName}.enumMap`, parsed);
+      updateControlProperty(core.id, `Bindings.${shownName}.enumMap`, parsed);
       parseError = '';
     } catch (error) {
       parseError = error?.message ?? 'Invalid JSON';
@@ -89,30 +98,27 @@
   }
 
   function dumpBindingDebug() {
-    if (!selectedBindingName || !selectedBinding) return;
+    if (!shownName || !selectedBinding) return;
     setDebugDock({
       title: 'Binding Debug',
-      source: `${core?.id ?? ''}:${selectedBindingName}`,
+      source: `${core?.id ?? ''}:${shownName}`,
       text: JSON.stringify(selectedBinding, null, 2),
     });
   }
 
-  const SOURCE_OPTIONS = [
-    'value.raw',
-    'value.normalized',
-    'value.display',
-    'value.bool',
-    'value.enum',
-    'state.hover',
-    'state.pressed',
-    'state.focused',
-    'state.dragging',
-    'state.disabled',
-    'state.checked',
-  ];
-  const MAP_MODE_OPTIONS = ['range', 'boolean', 'enum', 'direct'];
-  const UNIT_OPTIONS = ['percent', 'px', 'deg', 'unitless'];
 </script>
+
+{#snippet choices(groups)}
+  {#each groups as group (group.label)}
+    {#if group.label}
+      <optgroup label={group.label}>
+        {#each group.options as entry (entry.value)}<option value={entry.value} title={entry.value}>{entry.label}</option>{/each}
+      </optgroup>
+    {:else}
+      {#each group.options as entry (entry.value)}<option value={entry.value}>{entry.label}</option>{/each}
+    {/if}
+  {/each}
+{/snippet}
 
 {#if multiEdit}
   <div class="placeholder">Binding tree editing is single-selection only right now.</div>
@@ -125,14 +131,14 @@
       <button class="action-btn" onclick={addBinding}>Add</button>
     </PropertyCell>
     <PropertyCell label="Bindings" span={3} hint="Select the binding to edit.">
-      <select class="val" bind:value={selectedBindingName}>
+      <select class="val" value={shownName} onchange={(e) => { selectedBindingName = e.target.value; }}>
         {#each bindingNames as name}
           <option value={name}>{name}</option>
         {/each}
       </select>
     </PropertyCell>
     <PropertyCell label="" span={1} hint="Remove the selected binding." compact>
-      <button class="action-btn danger" onclick={removeBinding} disabled={!selectedBindingName}>Remove</button>
+      <button class="action-btn danger" onclick={removeBinding} disabled={!shownName}>Remove</button>
     </PropertyCell>
   </PropertySection>
 
@@ -145,24 +151,18 @@
       {/snippet}
       {#if selectedBinding.enabled !== false}
       <PropertyCell label="Source" span={2} hint="Runtime signal used as the input for this mapping.">
-        <select class="val" value={selectedBinding.source ?? 'value.normalized'} onchange={(e) => setBindingProp('source', e.target.value)}>
-          {#each SOURCE_OPTIONS as option}
-            <option value={option}>{option}</option>
-          {/each}
+        <select class="val" value={selectedBinding.source ?? 'value.normalized'} title={selectedBinding.source ?? 'value.normalized'} onchange={(e) => setBindingProp('source', e.target.value)}>
+          {@render choices(sourceGroups)}
         </select>
       </PropertyCell>
       <PropertyCell label="Mode" span={1} hint="Mapping strategy used to convert input to output.">
         <select class="val" value={selectedBinding.mapMode ?? 'range'} onchange={(e) => setBindingProp('mapMode', e.target.value)}>
-          {#each MAP_MODE_OPTIONS as option}
-            <option value={option}>{option}</option>
-          {/each}
+          {@render choices(modeGroups)}
         </select>
       </PropertyCell>
       <PropertyCell label="Unit" span={1} hint="Display/runtime unit expected by the target property.">
         <select class="val" value={selectedBinding.outputUnit ?? 'percent'} onchange={(e) => setBindingProp('outputUnit', e.target.value)}>
-          {#each UNIT_OPTIONS as option}
-            <option value={option}>{option}</option>
-          {/each}
+          {@render choices(unitGroups)}
         </select>
       </PropertyCell>
       <PropertyCell label="Target" span={4} hint="Control or part path that receives the resolved output value.">
@@ -217,6 +217,27 @@
             <span class="error">{parseError}</span>
             <button class="action-btn" onclick={dumpBindingDebug}>Debug</button>
           </div>
+        </PropertyCell>
+      </PropertySection>
+    {:else if selectedBinding.mapMode === 'format'}
+      <!-- The source as text: (value x multiplier + offset) to a number of decimals, between a
+           prefix and a suffix. These were the factory value labels' settings, and a format binding
+           used to fall through to "Direct Map" with none of them on screen. -->
+      <PropertySection title="Text" icon={ArrowRightLeft}>
+        <PropertyCell label="Prefix" span={2} hint="Written before the number.">
+          <input class="val" type="text" value={selectedBinding.prefix ?? ''} onchange={(e) => setBindingProp('prefix', e.target.value)} />
+        </PropertyCell>
+        <PropertyCell label="Suffix" span={2} hint="Written after the number.">
+          <input class="val" type="text" value={selectedBinding.suffix ?? ''} onchange={(e) => setBindingProp('suffix', e.target.value)} />
+        </PropertyCell>
+        <PropertyCell label="Times" span={1} compact hint="The source is multiplied by this before it is written.">
+          <NumberCell label="Times" value={selectedBinding.multiplier ?? 1} step={0.01} defaultValue={1} onchange={(value) => setBindingProp('multiplier', value)} />
+        </PropertyCell>
+        <PropertyCell label="Plus" span={1} compact hint="Added after the multiplication.">
+          <NumberCell label="Plus" value={selectedBinding.offset ?? 0} step={0.01} defaultValue={0} onchange={(value) => setBindingProp('offset', value)} />
+        </PropertyCell>
+        <PropertyCell label="Decimals" span={1} compact hint="Digits after the decimal point, 0 to 8.">
+          <NumberCell label="Decimals" value={selectedBinding.precision ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(value) => setBindingProp('precision', value)} />
         </PropertyCell>
       </PropertySection>
     {:else}

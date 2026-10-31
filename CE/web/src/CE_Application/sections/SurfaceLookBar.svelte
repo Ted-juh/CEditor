@@ -204,7 +204,7 @@
 
   .lookbar-middle {
     display: flex;
-    flex-wrap: wrap;
+    flex: 0 1 auto;
     align-items: center;
     gap: 8px;
     min-width: 0;
@@ -223,10 +223,13 @@
     overflow-x: auto;
   }
 
-  /* Top Look bar: quick-actions toolbar (left) + Scripts (right). */
+  /* Top Look bar: the layer's style (left), the notice and quick bar, Scripts (right). One row at
+     one height: wrapping put Scripts on a second row whenever a layer was selected beside the
+     notice, and the canvas below dropped 34px under the pointer. When it is short of room the
+     notice shortens and the style controls scroll; the quick bar and Scripts keep their size. */
   .surface-lookbar {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: center;
     justify-content: space-between;
     gap: 6px 14px;
@@ -239,7 +242,7 @@
 
   .surface-lookbar .paint-strip {
     flex: 1;
-    min-width: 0;
+    min-width: 120px;
     background: transparent;
     border-bottom: none;
     padding: 6px 0;

@@ -54,7 +54,7 @@ test('the designer\'s Preview draws no hit-zone names over the component unless 
 
 test('a component opens fitted to the surface, and the names above it stay their size at any zoom', () => {
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
-  assert.match(designer, /if \(!id \|\| !surfaceScrollEl \|\| id === fittedComponentId\) return;\s*fittedComponentId = id;\s*requestAnimationFrame\(fitArtboardToView\);/);
+  assert.match(designer, /if \(!id \|\| !surfaceScrollEl \|\| id === fittedComponentId\) return;\s*fittedComponentId = id;[\s\S]{0,400}?untrack\(clearSurfaceSelection\);\s*requestAnimationFrame\(fitArtboardToView\);/);
   // The fit keeps clear of the tool strip along the bottom and leaves room above for the name tray.
   assert.match(designer, /const bottom = Math\.max\(48, strip \+ 16\);/);
   assert.match(designer, /const heightFit = \(surfaceScrollEl\.clientHeight - top - bottom\) \/ Math\.max\(1, artboardHeight\);/);
@@ -165,4 +165,46 @@ test('a knob carried by a component is drawn and timed the way the panel draws a
   assert.match(part, /sliderTracker\.next\(sliderResolved\.runtime, \{ reducedMotion: \$systemReducedMotion \}\)/);
   assert.match(part, /partTransitions=\{sliderTransitions\?\.partTransitions \?\? null\}/);
   assert.doesNotMatch(part, /partTransitions=\{sliderResolved\.runtime\?\.transitions\?\.partTransitions/);
+});
+
+test('the designer opens with nothing selected, and selecting a layer is not a colour edit', () => {
+  // A new component carried a layer to start on, so the designer opened with one selected and the
+  // Colors tab showing Cancel and Done over an edit nobody had started.
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  const onOpen = designer.match(/let fittedComponentId = null;[\s\S]*?\n {2}\}\);/)?.[0] ?? '';
+  assert.match(onOpen, /untrack\(clearSurfaceSelection\);/);
+  const dock = src('CE_Application/panels/DisplayPanel.svelte');
+  assert.match(dock, /let colorTargetDirty = \$state\(false\);/);
+  assert.match(dock, /\(!!\$colorTarget && \(!\$colorTarget\._designerFill \|\| colorTargetDirty\)\)/);
+});
+
+test('Preview fits the component to the canvas it has, and Edit gets its own view back', () => {
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  const effect = designer.match(/let editView = null;\s*\$effect\(\(\) => \{[\s\S]*?\n {2}\}\);/)?.[0] ?? '';
+  assert.ok(effect, 'the preview effect is there');
+  assert.match(effect, /const previewing = designerPreviewing;/);
+  assert.match(effect, /editView = \{ zoom: surfaceZoom, left: surfaceScrollEl\.scrollLeft, top: surfaceScrollEl\.scrollTop \};\s*requestAnimationFrame\(fitArtboardToView\);/);
+  assert.match(effect, /setZoom\(back\.zoom\);/);
+});
+
+test("the designer's columns are shares of its own width, so the dock is never under the inspector", () => {
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  const shell = designer.match(/\n {2}\.surface-shell \{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(shell, /grid-template-columns: var\(--palette-w, clamp\(150px, 20%, 220px\)\) minmax\(0, 1fr\) var\(--dock-w, clamp\(260px, 33%, 430px\)\);/);
+  assert.doesNotMatch(designer, /--dock-w: \d+px;/, 'no window-width rule fixes the dock');
+  assert.doesNotMatch(designer, /\b\d+vw\b.*grid-template-columns|grid-template-columns[^;]*\bvw\b/);
+});
+
+test('the look bar is one row at one height, so selecting a layer does not move the canvas', () => {
+  // It wrapped: with a layer selected beside the "Not reusable yet" notice, Scripts went to a second
+  // row and the canvas dropped 34px under the pointer.
+  const bar = src('CE_Application/sections/SurfaceLookBar.svelte');
+  const rule = (name) => bar.match(new RegExp(`\\n {2}${name.replace('.', '\\.')} \\{\\n[\\s\\S]*?\\n {2}\\}`))?.[0] ?? '';
+  assert.match(rule('.surface-lookbar'), /flex-wrap: nowrap;/);
+  assert.doesNotMatch(rule('.lookbar-middle'), /flex-wrap: wrap/);
+  const quick = src('CE_Application/sections/SurfaceQuickbar.svelte').match(/\.selection-quickbar \{[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(quick, /flex-wrap: nowrap;\s*flex-shrink: 0;/);
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(designer, /\.readiness-nudge \{[\s\S]*?flex-wrap: nowrap;[\s\S]*?overflow: hidden;/);
+  assert.match(designer, /<span class="nudge-text">\{step\.label\} — \{step\.detail\}<\/span>/);
 });
