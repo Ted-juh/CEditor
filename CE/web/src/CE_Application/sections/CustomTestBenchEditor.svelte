@@ -1,4 +1,5 @@
 <script>
+  import { propertyPathWords, stateConditionWords } from '../utils/authorWords.js';
   import { applyControlPatch, getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -110,7 +111,8 @@
       componentPatchCount,
       patches: partPatches.map(([partName, patch]) => ({
         partName,
-        properties: Object.keys(patch ?? {}).slice(0, 4).join(', '),
+        // In words: the chips read "Cutoff · meta.sliderControl.hover".
+        properties: Object.keys(patch ?? {}).slice(0, 4).map(propertyPathWords).join(', '),
         count: Object.keys(patch ?? {}).length,
       })).slice(0, 4),
     };
@@ -514,12 +516,9 @@
     applyHitZoneProbe(name, zone);
   }
 
+  // In words (authorWords.js): it read "hoveredCustomHitZone: CutoffZone".
   function stateConditionSummary(state) {
-    const entries = Object.entries(state?.when ?? {});
-    if (!entries.length) return 'manual';
-    return entries
-      .map(([key, value]) => Array.isArray(value) ? `${key}: ${value.join('|')}` : `${key}: ${String(value)}`)
-      .join(' · ');
+    return stateConditionWords(state?.when);
   }
 
   function stateMatchesPreview(name, state, currentPreview) {
@@ -731,7 +730,7 @@
             <div class="state-head">
               <strong>{state.name}</strong>
               <span>{state.group}</span>
-              <em>{state.when}</em>
+              <em title={state.when}>{state.when}</em>
               <button class="sample-btn" type="button" onclick={() => previewState(state.name)}>Preview</button>
               <button class="sample-btn" type="button" onclick={() => focusState(state.name)}>Edit</button>
             </div>

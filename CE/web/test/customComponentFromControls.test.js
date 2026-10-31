@@ -51,7 +51,7 @@ test('artwork becomes one component, with the selection\'s bounds and the panel\
   assert.deepEqual(plan.bounds, { x: 20, y: 20, width: 200, height: 100 });
   const parts = plan.component._children.Parts._children;
   const order = Object.values(parts).sort((a, b) => a.zIndex - b.zIndex).map((part) => part.name);
-  assert.deepEqual(order, ['plate', 'legend_plate', 'legend', 'star'], 'plate under the label under the star');
+  assert.deepEqual(order, ['plate', 'legend_background', 'legend', 'star'], 'plate under the label under the star');
   assert.equal(plan.component._children.Core.name, 'Plate');
   assert.deepEqual([plan.component._children.Transform.width, plan.component._children.Transform.height], [200, 100]);
   assert.deepEqual(Object.keys(plan.component._children.ValueChannels._children), [], 'artwork has no value');

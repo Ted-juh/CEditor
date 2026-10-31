@@ -11,6 +11,7 @@
   import Pencil from 'lucide-svelte/icons/pencil';
   import ArrowRightLeft from 'lucide-svelte/icons/arrow-right-left';
   import { bindingSourceGroups, choiceGroups, defaultBindingSource, MAP_MODES, OUTPUT_UNITS } from '../utils/bindingSourceOptions.js';
+  import { targetPathWords } from '../utils/authorWords.js';
 
   let { control = null } = $props();
 
@@ -166,7 +167,14 @@
         </select>
       </PropertyCell>
       <PropertyCell label="Target" span={4} hint="Control or part path that receives the resolved output value.">
-        <input class="val" type="text" value={selectedBinding.target ?? ''} onchange={(e) => setBindingProp('target', e.target.value)} />
+        <!-- What the path reaches, in words, over the path that edits it: the field alone read
+             Parts.Cutoff.meta.sliderControl.value. -->
+        <div class="target-cell">
+          {#if String(selectedBinding.target ?? '').trim()}
+            <div class="target-words" data-testid="binding-target-words">{targetPathWords(selectedBinding.target)}</div>
+          {/if}
+          <input class="val" type="text" value={selectedBinding.target ?? ''} onchange={(e) => setBindingProp('target', e.target.value)} />
+        </div>
       </PropertyCell>
       {/if}
     </PropertySection>
@@ -254,6 +262,19 @@
   .placeholder {
     padding: 16px;
     color: #666;
+    font-size: 11px;
+  }
+
+  /* The words over the path, each the cell's full width. */
+  .target-cell {
+    display: grid;
+    gap: 4px;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .target-words {
+    color: #DDD;
     font-size: 11px;
   }
 

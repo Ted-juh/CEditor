@@ -10,7 +10,7 @@ import {
 // The two Core fields that describe a control in words: a hover tooltip and a screen-reader label.
 // Both shipped in the model and in the Core tab with nothing reading them — the element carried no
 // `title` at all, and the surface's generated "<name> preview" was written straight over whatever
-// the author had typed into the A11y box.
+// the author had typed into the Screen reader box (then labelled A11y).
 
 const core = (patch) => ({ _children: { Core: { name: 'Cutoff', ...patch } } });
 

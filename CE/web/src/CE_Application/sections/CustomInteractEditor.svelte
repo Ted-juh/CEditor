@@ -10,6 +10,7 @@
   import { buildInteractivePatch } from '../utils/customComponentScaffold.js';
   import { listInteractiveArchetypes } from '../utils/customComponentFactory.js';
   import { numberOr } from '../utils/primitives.js';
+  import { behaviorTypeWord, capitalised, carriedControlWord, channelTypeWord, isCarriedControlBehavior } from '../utils/authorWords.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
@@ -33,6 +34,7 @@
   let channels = $derived(getSection(control, 'ValueChannels'));
   let behaviors = $derived(getSection(control, 'Behaviors'));
   let hitZones = $derived(getSection(control, 'HitZones'));
+  let parts = $derived(getSection(control, 'Parts')?._children ?? {});
   let derivation = $derived(deriveInteractClusters(control));
   let clusters = $derived(derivation.clusters);
   let orphans = $derived(derivation.orphans);
@@ -194,8 +196,9 @@
       <button type="button" class="cluster-head" onclick={() => toggleCluster(cluster)}>
         <strong>{cluster.label}</strong>
         <span>
-          {cluster.channels.length > 1 ? `${cluster.channels.length} channels` : (channelOf(cluster.channels[0])?.type ?? 'float')}
-          · {cluster.behaviors.map((name) => behaviorOf(name)?.type ?? 'behavior').join(' + ')}
+          <!-- In words: it read "float · slidercontrol" for a knob. -->
+          {cluster.channels.length > 1 ? `${cluster.channels.length} channels` : channelTypeWord(channelOf(cluster.channels[0])?.type)}
+          · {cluster.behaviors.map((name) => behaviorTypeWord(behaviorOf(name), parts)).join(' + ')}
           · {cluster.zones.length} grab area{cluster.zones.length === 1 ? '' : 's'}
         </span>
         <em>{isOpen(cluster) ? '−' : '+'}</em>
@@ -226,17 +229,24 @@
               {#if behavior}
                 <div class="field-row">
                   <span class="field-name">{behaviorName}</span>
-                  <div class="ro-field"><em>Type</em><span class="readout">{behavior.type ?? 'behavior'}</span></div>
-                  <label><em>Geometry</em>
-                    <select value={behavior.geometry ?? 'linear'} onchange={(event) => setBehaviorField(behaviorName, 'geometry', event.currentTarget.value)}>
-                      {#each GEOMETRY_OPTIONS as option (option)}<option value={option}>{option}</option>{/each}
-                    </select>
-                  </label>
-                  <label><em>Drag</em>
-                    <select value={behavior.dragMode ?? 'auto'} onchange={(event) => setBehaviorField(behaviorName, 'dragMode', event.currentTarget.value)}>
-                      {#each DRAG_MODES as option (option)}<option value={option}>{option}</option>{/each}
-                    </select>
-                  </label>
+                  <div class="ro-field"><em>Type</em><span class="readout">{capitalised(behaviorTypeWord(behavior, parts))}</span></div>
+                  {#if isCarriedControlBehavior(behavior)}
+                    <!-- A knob or slider converted from the panel is dragged by its own maths, from its
+                         own settings (customComponentInteraction.js, before geometry is read), so
+                         Geometry and Drag changed nothing: a knob read "Geometry linear". -->
+                    <div class="ro-field"><em>Drag</em><span class="readout">as the {carriedControlWord(parts?.[behavior.part])} did on the panel</span></div>
+                  {:else}
+                    <label><em>Geometry</em>
+                      <select value={behavior.geometry ?? 'linear'} onchange={(event) => setBehaviorField(behaviorName, 'geometry', event.currentTarget.value)}>
+                        {#each GEOMETRY_OPTIONS as option (option)}<option value={option}>{option}</option>{/each}
+                      </select>
+                    </label>
+                    <label><em>Drag</em>
+                      <select value={behavior.dragMode ?? 'auto'} onchange={(event) => setBehaviorField(behaviorName, 'dragMode', event.currentTarget.value)}>
+                        {#each DRAG_MODES as option (option)}<option value={option}>{option}</option>{/each}
+                      </select>
+                    </label>
+                  {/if}
                   <div class="ro-field input-flags"><em>Input</em>
                     <FlagStrip flags={inputFlags(behavior)} ontoggle={(key, next) => setBehaviorField(behaviorName, `interaction.${key}`, next)} />
                   </div>

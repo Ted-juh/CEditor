@@ -1,5 +1,6 @@
 <script>
   import { getSection, updateControlProperty, removeControlNode, applyControlPatch } from '../stores/controls.js';
+  import { channelTypeWord, targetPathWords } from '../utils/authorWords.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
   import { validateCustomComponentPackage } from '../utils/customComponentPackage.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -230,6 +231,16 @@
 
   function channelType(channelName) {
     return channels?._children?.[channelName]?.type ?? 'float';
+  }
+
+  // A contract line in words. It read "Cutoff > Cutoff (float)": the published name, the channel
+  // and the type, with the name and the channel the same nearly always. The arrow is the direction
+  // the value goes, and stays only when the two names differ.
+  function routeLine(from, to, type) {
+    const source = from || 'none';
+    const target = to || 'none';
+    const route = source === target ? source : `${source} → ${target}`;
+    return type ? `${route} · ${channelTypeWord(type)}` : route;
   }
 
   function channelLabel(channelName, fallback = channelName) {
@@ -521,7 +532,7 @@
           <strong>Inputs</strong>
           {#if enabledInputEntries.length}
             {#each enabledInputEntries as [name, entry]}
-              <span>{name} &gt; {entry.channel || 'none'} ({entry.type ?? channelType(entry.channel)})</span>
+              <span>{routeLine(name, entry.channel, entry.type ?? channelType(entry.channel))}</span>
             {/each}
           {:else}
             <span class="muted">No inputs published</span>
@@ -531,7 +542,7 @@
           <strong>Outputs</strong>
           {#if enabledOutputEntries.length}
             {#each enabledOutputEntries as [name, entry]}
-              <span>{entry.channel || 'none'} &gt; {name} ({entry.type ?? channelType(entry.channel)})</span>
+              <span>{routeLine(entry.channel, name, entry.type ?? channelType(entry.channel))}</span>
             {/each}
           {:else}
             <span class="muted">No outputs published</span>
@@ -541,7 +552,7 @@
           <strong>Properties</strong>
           {#if enabledPropertyEntries.length}
             {#each enabledPropertyEntries as [name, entry]}
-              <span>{name} &gt; {entry.path || 'missing path'}</span>
+              <span title={entry.path || ''}>{entry.path ? routeLine(name, targetPathWords(entry.path), '') : `${name} → missing path`}</span>
             {/each}
           {:else}
             <span class="muted">No editable properties</span>

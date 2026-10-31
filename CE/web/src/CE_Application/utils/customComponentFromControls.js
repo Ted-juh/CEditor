@@ -441,7 +441,8 @@ function partsFor(control, resolved, rect, zIndex, taken) {
     // by that much: the centre stays put, and text clips where the label's would.
     const parts = [];
     if (drawsBackground(resolved._children.Background)) {
-      parts.push(createPartNode(uniquePartName(`${name}_plate`, taken), {
+      // Named `<name>_background`: an author reads the layer list, and "plate" is this file's word.
+      parts.push(createPartNode(uniquePartName(`${name}_background`, taken), {
         ...common, role: 'background', kind: 'rectangle', sections: { Background: deepClone(resolved._children.Background) },
       }));
     }
@@ -476,7 +477,7 @@ function partsFor(control, resolved, rect, zIndex, taken) {
   if (type === 'Shape') {
     const parts = [];
     if (drawsBackground(resolved._children.Background)) {
-      parts.push(createPartNode(uniquePartName(`${name}_plate`, taken), {
+      parts.push(createPartNode(uniquePartName(`${name}_background`, taken), {
         ...common, role: 'background', kind: 'rectangle', sections: { Background: deepClone(resolved._children.Background) },
       }));
     }

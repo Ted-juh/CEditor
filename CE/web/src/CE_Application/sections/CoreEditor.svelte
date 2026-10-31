@@ -10,6 +10,7 @@
    */
   import { getSection, renameControl, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
+  import { controlTypeLabel } from '../utils/authorWords.js';
   import { BUILT_IN_CONTROL_SETS } from '../models/controlSets.js';
   import { anatomyOptions } from '../models/controlAnatomy.js';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -99,7 +100,8 @@
     {/if}
 
     <PropertyCell label="Type" span={2} hint="The component type. Set when the component is created and not editable here.">
-      <span class="readout">{core.controlType}</span>
+      <!-- As the Insert menu names it: it read "CustomComponent". -->
+      <span class="readout" title={core.controlType}>{controlTypeLabel(core.controlType)}</span>
     </PropertyCell>
     <PropertyCell label="Layer" span={2} hint="Free-text layer name, for organising the component tree.">
       <PropertyText value={core.layer} onfocus={selectAll} commit={(v) => set('layer', v)} />
@@ -109,7 +111,8 @@
       <PropertyText value={core.tooltip ?? ''} onfocus={selectAll} commit={(v) => set('tooltip', v)} />
     </PropertyCell>
 
-    <PropertyCell label="A11y" span={4} hint="Screen-reader label, when the visible text is not descriptive enough.">
+    <!-- "A11y" was the developers' abbreviation for accessibility. -->
+    <PropertyCell label="Screen reader" span={4} hint="What a screen reader says for this control, when the visible text is not descriptive enough.">
       <PropertyText value={core.screenReaderText ?? ''} onfocus={selectAll} commit={(v) => set('screenReaderText', v)} />
     </PropertyCell>
 

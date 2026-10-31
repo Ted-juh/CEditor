@@ -186,7 +186,7 @@
       role="group"
       aria-label={`${name} layer controls`}
       draggable="true"
-      title={`${name}: ${part?.kind ?? part?.role ?? 'part'}`}
+      title={`${name}: ${layerKindLabel(part)}`}
       ondragstart={(event) => beginLayerDrag(name, event)}
       ondragend={() => { draggingLayerName = ''; }}
       ondragover={(event) => event.preventDefault()}

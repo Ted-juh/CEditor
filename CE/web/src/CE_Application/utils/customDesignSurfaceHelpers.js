@@ -4,6 +4,8 @@
 import { numberOr } from './primitives.js';
 import { isPolygonKind, clipPathForKind } from './shapeGeometry.js';
 import { clampNumber } from './customDesignSurfaceGeometry.js';
+import { capitalised, carriedControlWord, identifierWords } from './authorWords.js';
+import { SLIDER_CONTROL_KIND } from './sliderControlPart.js';
 
 export function isEditablePart(part) {
   if (!part) return false;
@@ -178,6 +180,9 @@ export function layerKindLabel(part) {
     const operation = String(part?.meta?.boolean?.operation ?? 'unite');
     return operation[0].toUpperCase() + operation.slice(1);
   }
+  // A knob or slider converted from the panel is what it was there. Its kind, `slidercontrol`, was
+  // the badge, cut to "SLIDERC…".
+  if (kind === SLIDER_CONTROL_KIND) return capitalised(carriedControlWord(part));
   const labels = {
     roundedRectangle: 'Rounded',
     rectangle: 'Rect',
@@ -191,7 +196,7 @@ export function layerKindLabel(part) {
     viewport: 'View',
     path: 'Path',
   };
-  return labels[kind] ?? kind;
+  return labels[kind] ?? capitalised(identifierWords(kind));
 }
 
 export function layerKindClass(part) {
