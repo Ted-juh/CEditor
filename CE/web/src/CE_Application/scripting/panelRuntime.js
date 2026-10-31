@@ -11356,7 +11356,14 @@ export function ensurePanelExecutionApproved(extraScript = null, forExport = fal
   const allowed = !request.hasCode || (isExecutionApproved(request.key, request.fingerprint)
     && (!nativeRequired || isNativeExecutionApproved(request.key, request.fingerprint)));
   if (!allowed) pendingApprovalScript = extraScript;
-  scriptExecutionStatus.set({ blocked: !allowed, name: request.name, hasNative: request.hasNative, nativeRequired });
+  // Written only when it changes. Every event dispatch asks this, and a new object every time
+  // notified the banner on every one of them — a write of reactive state from wherever the event
+  // was raised, which Svelte refuses inside a derivation (state_unsafe_mutation).
+  const status = get(scriptExecutionStatus);
+  if (status.blocked !== !allowed || status.name !== request.name || status.hasNative !== request.hasNative
+    || status.nativeRequired !== nativeRequired) {
+    scriptExecutionStatus.set({ blocked: !allowed, name: request.name, hasNative: request.hasNative, nativeRequired });
+  }
   return allowed;
 }
 

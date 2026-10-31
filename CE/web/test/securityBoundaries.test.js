@@ -77,3 +77,20 @@ test('inbound MIDI does not execute imported code; approval is session-local and
   assert.equal(ensurePanelExecutionApproved(null, true), false, 'compiled export needs native approval');
   panels.set([]); activePanelId.set(null);
 });
+
+test('the execution status is written only when it changes, so asking from a drawing writes nothing', () => {
+  // Every event dispatch asks ensurePanelExecutionApproved, and a Harmoniser raises its onVoiced
+  // while it is being drawn. A new status object on every ask notified the banner each time — a
+  // write of reactive state inside a derivation, which Svelte refuses (state_unsafe_mutation), and
+  // the refusal, thrown inside the note-input listener, stopped every key after the first.
+  const panel = { id: 'quiet-panel', name: 'Quiet', controls: [], scripts: [] };
+  panels.set([panel]); activePanelId.set(panel.id); activeEditorTab.set({ type: 'panel', id: panel.id });
+  assert.equal(ensurePanelExecutionApproved(), true);
+  let writes = -1;   // a subscription hears the current value once at once
+  const stop = scriptExecutionStatus.subscribe(() => { writes += 1; });
+  for (let i = 0; i < 5; i += 1) assert.equal(ensurePanelExecutionApproved(), true);
+  stop();
+  assert.equal(writes, 0, 'an unchanged status notifies nobody');
+  assert.deepEqual(get(scriptExecutionStatus), { blocked: false, name: 'Quiet', hasNative: false, nativeRequired: false });
+  panels.set([]); activePanelId.set(null);
+});

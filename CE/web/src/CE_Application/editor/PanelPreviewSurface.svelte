@@ -3117,17 +3117,21 @@
   // the launch throws the ball again from it (the Kinetic Modulator's review,
   // docs/design/api-descriptions-handoff.md).
   const kineticStoredLaunch = {};   // { [id]: the stored launch last seen, as JSON }
+  /** Throw the ball again from a launch that changed; true when it did. Plain maps, so it is safe
+   *  where the ball is drawn (applyKineticValueSource) as well as in the effect below. */
+  function rethrowOnNewLaunch(c) {
+    const id = getControlId(c);
+    const seen = JSON.stringify(kineticConfig(c).initial ?? null);
+    const changed = kineticStoredLaunch[id] !== undefined && kineticStoredLaunch[id] !== seen;
+    if (changed) {
+      kineticStateMap[id] = { ...kineticInitial({ ...c, _children: { ...c._children, Kinetic: { ...kineticConfig(c), __state: undefined } } }), bounced: false };
+    }
+    kineticStoredLaunch[id] = seen;
+    return changed;
+  }
   $effect(() => {
     for (const c of kineticControls()) {
-      const id = getControlId(c);
-      const seen = JSON.stringify(kineticConfig(c).initial ?? null);
-      if (kineticStoredLaunch[id] !== undefined && kineticStoredLaunch[id] !== seen) {
-        untrack(() => {
-          kineticStateMap[id] = { ...kineticInitial({ ...c, _children: { ...c._children, Kinetic: { ...kineticConfig(c), __state: undefined } } }), bounced: false };
-          if (kineticConfig(c).running !== false) ensureKineticTicker();
-        });
-      }
-      kineticStoredLaunch[id] = seen;
+      if (untrack(() => rethrowOnNewLaunch(c)) && kineticConfig(c).running !== false) untrack(() => ensureKineticTicker());
     }
   });
   function kineticControlWith(control, state, trail, extra) {
@@ -3195,6 +3199,10 @@
     const k = base?._children?.Kinetic;
     if (!k) return resolved;
     const id = getControlId(control);
+    // Here as well as in the effect: the effect runs after this has drawn, and a STOPPED ball has
+    // nothing to draw it again, so a new launch was not shown until the ball was started — it sat
+    // where the factory launch (a new Kinetic runs) had left it, then jumped.
+    rethrowOnNewLaunch(control);
     if (k.running !== false || (kineticDrag && kineticDrag.id === id)) { ensureKineticTicker(); void orbitClock; }
     const next = { ...k, __state: kineticStateMap[id] ?? kineticInitial(control), __trail: kineticTrailMap[id] ?? [] };
     if (kineticDrag && kineticDrag.id === id) next.__drag = true;
@@ -4800,14 +4808,19 @@
     runHarmSends(control, r.sends);
   }
   /** The voices a reconcile produced for a played note, if any. Raised from the two places that
-   *  run harmony sends, so a pressed key and a mouse-held one report alike. */
+   *  run harmony sends, so a pressed key and a mouse-held one report alike — and after the drawing
+   *  (afterDraw), because a key arriving on the input is reconciled while the Harmoniser is drawn.
+   *  Raised there, the dispatch wrote the runtime's execution status inside the derivation, Svelte
+   *  threw state_unsafe_mutation from inside the note-input listener, and the input stopped: the
+   *  first key played its chord and no key after it played anything, the note-off included. */
   function raiseHarmVoiced(control, sends, played) {
     const ons = sends.filter((m) => m.kind === 'on');
     if (!ons.length || played === null || played === undefined) return;
-    raiseComponent(control, 'onVoiced', {
+    const payload = {
       note: played, velocity: ons[0].velocity, out: ons.map((m) => m.note),
       channel: ons[0].channel, zones: [],
-    });
+    };
+    afterDraw(() => raiseComponent(control, 'onVoiced', payload));
   }
   // Consume the live held-note state, the same reconcile the Zone Splitter does.
   function pumpHarmInput(control, force = false) {
