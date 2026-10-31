@@ -12,7 +12,8 @@
 import assert from 'node:assert/strict';
 import { boot, Ledger } from './behaviourKit.mjs';
 
-const kit = await boot();
+// On plain Graphite: these rows measure the instruments' own drawing, which a set dresses (see boot).
+const kit = await boot({ controlSet: 'graphite' });
 const led = new Ledger('inbound/transport');
 const r3 = (v) => (typeof v === 'number' ? Math.round(v * 1000) / 1000 : v);
 const hx = (n) => n.toString(16).padStart(2, '0').toUpperCase();

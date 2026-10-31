@@ -30,7 +30,21 @@ import { join } from 'node:path';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 
-export async function boot({ width = 1700, height = 1000 } = {}) {
+/**
+ * `controlSet` names the set every panel this kit opens starts on ('' keeps the user's default).
+ *
+ * A check that measures an instrument's own drawing passes 'graphite'. Since 9480d740 a new panel
+ * starts on Graphite Studio, and a set dresses its instruments: a Meter or a step grid in one of the
+ * set's forms, an LCD as the set's kind of screen (no backlight and no ghost cells on a black one), a
+ * palette colour taken as that voice of the set. All by design, and none of it what a check that
+ * finds the step head by Graphite's yellow or the level by `.meter-clip` is measuring. Plain
+ * Graphite is the factory drawing those checks describe; how a set dresses an instrument is checked
+ * where sets are (setSwatches, anatomyForms, macroSetKnob).
+ *
+ * CE_KIT_CONTINUE=1 in the environment records a failed row and goes on rather than stopping at it,
+ * printing each as it happens: one run lists every row a change broke, not just the first.
+ */
+export async function boot({ width = 1700, height = 1000, controlSet = '' } = {}) {
   const server = process.env.CE_BEHAVIOUR_URL ? null : await createServer({
     root, configFile: join(root, 'vite.config.js'),
     server: { host: '127.0.0.1', port: 0, strictPort: false },
@@ -62,24 +76,28 @@ export async function boot({ width = 1700, height = 1000 } = {}) {
     noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push({ ...e, at: performance.now() }); });
   });
 
-  const kit = new Kit(page, failures);
+  const kit = new Kit(page, failures, controlSet);
   kit.close = async () => { await browser.close(); if (server) await server.close(); };
   return kit;
 }
 
 class Kit {
-  constructor(page, failures) { this.page = page; this.failures = failures; }
+  constructor(page, failures, controlSet = '') { this.page = page; this.failures = failures; this.controlSet = controlSet; }
 
   settle(ms = 110) { return this.page.waitForTimeout(ms); }
 
   /** A panel of its own. Isolation is not tidiness: clocks, the note funnel and the fan-out bus are
    *  all panel-wide, so a control left running three checks ago is indistinguishable from the one
-   *  under test. */
+   *  under test. On the kit's control set when it has one (see boot). */
   async fresh() {
-    await this.page.evaluate(async () => {
+    await this.page.evaluate(async (set) => {
+      if (set) {
+        const { defaultControlSetId } = await window.__ceImport('/src/CE_Application/stores/runtimePreferences.js');
+        defaultControlSetId.set(set);
+      }
       const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       addPanel();
-    });
+    }, this.controlSet);
     await this.settle();
   }
 
@@ -552,6 +570,12 @@ export class Ledger {
   /** Assert-and-record in one move: the row cannot exist without the assertion having run. */
   check(type, property, promise, expected, measured, compare = (a, b) => JSON.stringify(a) === JSON.stringify(b)) {
     if (compare(expected, measured)) return this.ok(type, property, promise, expected, measured);
+    if (process.env.CE_KIT_CONTINUE) {
+      this.rows.push({ type, property, promise, expected, measured, status: 'FAILED' });
+      this.failures.push(`${type}.${property}: expected ${JSON.stringify(expected)}, measured ${JSON.stringify(measured)}`);
+      console.log(`FAILED ${this.failures.at(-1)}`);
+      return false;
+    }
     const error = new Error(`${type}.${property} — ${promise}\n  expected: ${JSON.stringify(expected)}\n  measured: ${JSON.stringify(measured)}`);
     error.ledgerRow = { type, property, expected, measured };
     throw error;

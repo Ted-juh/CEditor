@@ -292,7 +292,11 @@ try {
   // =============================================================================================
   await kit.fresh();
   {
-    const sid = await slider(110, { 'Behavior.showTicks': false });
+    // The end labels switched on by the author, as the section above does. A set's slider design
+    // (title and value above the track, no min/max) applies wherever a slider still has the factory
+    // value, Graphite's included; a value the author writes is theirs (Core.setOverrides). Left at
+    // the factory value here, there were no end labels to measure, and every row below read null.
+    const sid = await slider(110, { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': true });
     await kit.preview(true);
     await kit.settle(600);
     const readoutY = async () => (await readoutOf(sid))?.y ?? null;

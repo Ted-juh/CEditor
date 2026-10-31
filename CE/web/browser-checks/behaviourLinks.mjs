@@ -254,14 +254,14 @@ try {
     await kit.preview(true);
     await kit.settle(250);
     /**
-     * A BALL THAT HAS NOT BEEN THROWN YET, which is the only way to set a starting state.
+     * A NEW BALL FOR EACH SCENARIO, so none starts with another's speed or trail.
      *
      * `kineticInitial` reads `cfg.__state` before `cfg.initial`, and `__state` is injected from
-     * `kineticStateMap[id]` — a module map inside the surface that the document cannot reach. So
-     * writing `Kinetic.initial` on a control that has already run changes nothing at all: the ball
-     * carries on from wherever it was. Every scenario below therefore starts a new control, which
-     * has no entry in that map. The same shape as the Recorder's live take, and it cost a row there
-     * too before it was understood here.
+     * `kineticStateMap[id]` — a map inside the surface that the document cannot reach. Writing
+     * `Kinetic.initial` once changed nothing on a ball that had run; since f7799bd1 a new launch
+     * throws the ball again from it. A new control is still the cleanest start: a new Kinetic runs
+     * from the factory launch until its patch stops it, and nothing of that is left once the patch's
+     * own launch has been written.
      */
     const freshKinetic = async (patch = {}) => {
       await kit.page.evaluate(async (id) => {
@@ -302,9 +302,12 @@ try {
 
     // --- gravity: which way it falls ------------------------------------------------------------------
     {
+      // Launched HIGH: the Kinetic's y is measured up from the floor (kineticToPx draws 1 - y), so
+      // 0.8 is near the top. It was 0.2, read as near the top, which is just above the floor: a ball
+      // under gravity had a few pixels to fall, bounced, and ended wherever the bounce left it.
       const meanFall = async (g) => {
         await freshKinetic({ 'Kinetic.gravity': g,
-          'Kinetic.initial': { x: 0.5, y: 0.2, vx: 0.05, vy: 0 } });
+          'Kinetic.initial': { x: 0.5, y: 0.8, vx: 0.05, vy: 0 } });
         await kit.set(kid, { 'Kinetic.running': true });
         const path = await track(1100);
         await kit.set(kid, { 'Kinetic.running': false });

@@ -14,7 +14,8 @@ import { boot, Ledger } from './behaviourKit.mjs';
 // against a count. arpLayout is plain maths with no Svelte or DOM in it, so node imports it directly.
 import { euclid } from '../src/CE_Application/utils/arpLayout.js';
 
-const kit = await boot();
+// On plain Graphite: these rows measure the instruments' own drawing, which a set dresses (see boot).
+const kit = await boot({ controlSet: 'graphite' });
 const led = new Ledger('notes');
 const hx = (n) => n.toString(16).padStart(2, '0').toUpperCase();
 /** Deliver bytes where a device would; the surface's listener is already running in preview. */

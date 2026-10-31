@@ -35,7 +35,8 @@
 import assert from 'node:assert/strict';
 import { boot, Ledger } from './behaviourKit.mjs';
 
-const kit = await boot();
+// On plain Graphite: these rows measure the instruments' own drawing, which a set dresses (see boot).
+const kit = await boot({ controlSet: 'graphite' });
 const led = new Ledger('screens');
 const D = 'Display';
 const P = 'Pixel';
