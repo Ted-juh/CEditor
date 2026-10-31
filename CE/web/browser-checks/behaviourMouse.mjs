@@ -329,11 +329,11 @@ try {
     const ringed = await kit.make('Knob', { 'Transform.x': 260, 'Transform.y': 110,
       'Transform.width': 90, 'Transform.height': 90, 'Core.name': 'Ringed',
       'Mouse.focusOutline': true });
-    // A CUSTOM COMPONENT for the ordering rows, and the reason is the Tab Index cell's own hint:
-    // "controls with a role of their own keep the order the surface assigns". A slider is given
-    // role="slider" and tab index 0 by the preview surface, which knows about roles and handle
-    // counts and outranks the section for everything except -1. A custom component has no such
-    // role, so the author's number is the one that reaches the element.
+    // A CUSTOM COMPONENT and a SLIDER for the ordering rows: one with no role of its own and one
+    // the surface hands role="slider". The surface used to outrank the section for the slider and
+    // put index zero on it whatever the author typed; since `resolveSurfaceTabIndex` (24 October)
+    // an authored focus rule wins, and every type that offers the tab ships one, so the author's
+    // number reaches both. The slider keeps its role either way.
     const ordered = await kit.make('CustomComponent', { 'Transform.x': 60, 'Transform.y': 180,
       'Transform.width': 170, 'Transform.height': 80, 'Core.name': 'Ordered',
       'Mouse.tabIndex': 7 });
@@ -354,12 +354,12 @@ try {
       })());
     led.check(M, 'tabIndex', 'an explicit index is honoured as authored, so a panel can declare its own order rather than taking the DOM’s',
       '7', await attrOf(ordered, 'tabindex'));
-    led.check(M, 'tabIndex (a control with a role of its own keeps the surface’s order)',
-      'a slider is handed role="slider" and index zero by the surface, which knows about roles and handle counts — so an authored seven does not reach it, exactly as the cell’s hint says',
-      { tabindex: '0', role: 'slider' },
+    led.check(M, 'tabIndex (a control with a role of its own takes the authored order too)',
+      'a slider keeps the role="slider" the surface gives it and takes the authored seven as its index — an author who numbers the controls gets that order on a slider as on anything else',
+      { tabindex: '7', role: 'slider' },
       { tabindex: await attrOf(roled, 'tabindex'), role: await attrOf(roled, 'role') });
-    led.check(M, 'tabIndex (-1 is the one the section always wins)',
-      'and minus one reaches it even so, because "keep this out of the tab order" is checked before the surface’s own index is consulted — reachable by click, skipped by Tab',
+    led.check(M, 'tabIndex (-1 takes it out of the tab order)',
+      'and minus one reaches it too — reachable by click, skipped by Tab',
       '-1', await (async () => {
         await kit.set(roled, { 'Mouse.tabIndex': -1 });
         await kit.settle(300);
@@ -558,8 +558,8 @@ try {
     await kit.preview(true);
     await kit.settle(650);
     led.check(M, 'save/reopen (the pointer half)',
-      'a reopened control asks for the same cursor and is clipped to the same shape, and still carries the order it was authored with — a slider renders the surface’s own index rather than that four, as it did before the file was written, so what the reopen has to preserve is the number in the document',
-      { cursor: 'grab', clipped: true, stored: 4, rendered: '0' },
+      'a reopened control asks for the same cursor and is clipped to the same shape, and still carries the order it was authored with — the four in the document and the four on the element, as before the file was written',
+      { cursor: 'grab', clipped: true, stored: 4, rendered: '4' },
       { cursor: await styleOf(again, 'cursor'),
         clipped: /ellipse/i.test(String(await styleOf(again, 'clip-path'))),
         stored: await kit.read(again, 'Mouse.tabIndex'),
