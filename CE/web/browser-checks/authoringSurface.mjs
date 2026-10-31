@@ -287,16 +287,18 @@ try {
   // took the room Copy and Del needed: both were cut off by the card's 160-pixel edge.
   await kit.page.locator('.add-state').click();
   await kit.settle(600);
-  led.check(D, 'a state card shows Edit, Copy and Del, and no lettered conditions',
-    'the new state`s card has its three actions inside it, and none of the H, P and D it had; the conditions are in the States editor that Edit opens, by name',
-    { actions: ['Edit', 'Copy', 'Del'], allInside: true },
+  led.check(D, 'a state card shows its name, and Edit, Copy and Del, and no lettered conditions',
+    'the new state`s card has its name in full and its three actions inside it, and none of the H, P and D it had; the conditions are in the States editor that Edit opens, by name. The name had 23 pixels of the card beside a count and a badge',
+    { nameShown: true, actions: ['Edit', 'Copy', 'Del'], allInside: true },
     await kit.page.evaluate(() => {
       const card = [...document.querySelectorAll('.state-card')].pop();
       const r = card.getBoundingClientRect();
+      const name = card.querySelector('.state-copy strong');
       const buttons = [...card.querySelectorAll('.state-actions button')];
       return {
+        nameShown: name.getBoundingClientRect().width > 0 && name.scrollWidth <= name.clientWidth + 1,
         actions: buttons.map((b) => b.textContent.trim()),
-        allInside: buttons.every((b) => { const br = b.getBoundingClientRect(); return br.left >= r.left - 0.5 && br.right <= r.right + 0.5; }),
+        allInside: [...card.querySelectorAll('.state-actions > *')].every((b) => { const br = b.getBoundingClientRect(); return br.left >= r.left - 0.5 && br.right <= r.right + 0.5; }),
       };
     }));
 

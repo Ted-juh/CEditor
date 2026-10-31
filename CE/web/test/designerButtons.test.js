@@ -28,12 +28,20 @@ test('a state card has Edit, Copy and Del, and no lettered conditions', () => {
   assert.match(card, /title="Delete state">\s*Del/);
   // From the card's left edge, not indented under the thumbnail: Del did not fit in what was left.
   assert.match(card, /\.state-actions \{[^}]*padding: 0 7px 6px;/);
+  // The name has the top row: the count is at the end of the actions, and the condition is in the
+  // card's tooltip. Beside the name they left it 23 pixels ("Cu…"), and with the condition in
+  // words, none.
+  assert.match(card, /\.state-main \{[^}]*grid-template-columns: 48px minmax\(0, 1fr\);/);
+  assert.doesNotMatch(card, /state-trigger-badge|state-count-trigger/);
+  const actions = card.slice(card.indexOf('<div class="state-actions"'), card.indexOf('</div>', card.indexOf('<div class="state-actions"')));
+  assert.match(actions, /\{#if entry\.base\}<span class="state-count">BASE<\/span>\{\/if\}/);
+  assert.match(card, /When: \$\{stateTriggerLabel\(entry\.state, entry\.base\)\}\\n\$\{statePatchCount\(entry\.state\)\} patch/);
   // The conditions are in the States editor, by name.
   assert.match(src('sections/StatesEditor.svelte'), /\{ key: 'hover', label: 'Hover' \}/);
   assert.doesNotMatch(src('sections/CustomDesignSurfaceEditor.svelte'), /setFilmstripStateWhen/);
 });
 
-test('the card\'s badge says the condition, and "No trigger" only when there is none', () => {
+test('the card\'s condition is said in words, and "No trigger" only when there is none', () => {
   assert.equal(stateTriggerLabel({ when: { hoveredCustomHitZone: 'CutoffZone' } }), 'pointer over CutoffZone');
   assert.equal(stateTriggerLabel({ when: { activeCustomHitZone: 'CutoffZone', dragging: true } }), 'CutoffZone pressed, dragging');
   assert.equal(stateTriggerLabel({ when: { focusedCustomHitZones: 'CutoffZone' } }), 'CutoffZone focused');

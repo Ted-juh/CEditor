@@ -50,7 +50,7 @@
         class:active={activeStateName === entry.name}
         class:base={entry.base}
         style={stateCardStyle(entry.name, entry.index)}
-        title={stateDescription(entry.name, entry.state, entry.base)}
+        title={entry.base ? stateDescription(entry.name, entry.state, entry.base) : `${stateDescription(entry.name, entry.state, entry.base)}\nWhen: ${stateTriggerLabel(entry.state, entry.base)}\n${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}
       >
         <button
           type="button"
@@ -72,12 +72,6 @@
             <strong>{stateLabel(entry.name, entry.state, entry.base)}</strong>
             <em>{stateDescription(entry.name, entry.state, entry.base)}</em>
           </span>
-          <div class="state-count-trigger">
-            <span class="state-count">{entry.base ? 'BASE' : `${statePatchCount(entry.state)} patch${statePatchCount(entry.state) === 1 ? '' : 'es'}`}</span>
-            {#if !entry.base}
-              <span class="state-trigger-badge" class:no-trigger={!Object.values(entry.state?.when ?? {}).some(Boolean) && !String(entry.state?.rule ?? '').trim()}>{stateTriggerLabel(entry.state, entry.base)}</span>
-            {/if}
-          </div>
         </button>
         <div class="state-actions" aria-label={`${entry.name} state actions`}>
           <!-- No H, P and D here. They were the hover, pressed and disabled conditions, in letters, and
@@ -94,6 +88,10 @@
               Del
             </button>
           {/if}
+          <!-- The condition and the count are in the card's tooltip: beside the name they took its
+               room, and a 160-pixel card showed "Cu…" of "CutoffHover", or nothing; at the end of this
+               row "0 patches" pushed it past the card's edge. -->
+          {#if entry.base}<span class="state-count">BASE</span>{/if}
         </div>
       </div>
     {/each}
@@ -136,29 +134,6 @@
     cursor: pointer;
     font: inherit;
     text-align: left;
-  }
-
-  .state-count-trigger {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 2px;
-    font-size: 9px;
-  }
-
-  .state-trigger-badge {
-    padding: 1px 5px;
-    border: 1px solid rgba(255,255,255,0.12);
-    border-radius: 3px;
-    background: rgba(255,255,255,0.06);
-    color: #8FEDE3;
-    font-size: 9px;
-    white-space: nowrap;
-  }
-
-  .state-trigger-badge.no-trigger {
-    color: #6B7A86;
-    border-color: rgba(255,255,255,0.06);
   }
 
   .state-title {
@@ -242,7 +217,7 @@
 
   .state-main {
     display: grid;
-    grid-template-columns: 48px minmax(0, 1fr) auto;
+    grid-template-columns: 48px minmax(0, 1fr);
     align-items: center;
     gap: 8px;
     min-width: 0;
@@ -284,7 +259,8 @@
   }
 
   .state-count {
-    align-self: start;
+    margin-left: auto;
+    white-space: nowrap;
     padding: 2px 5px;
     border: 1px solid color-mix(in srgb, var(--state-accent) 34%, #2E3B45);
     border-radius: 999px;
