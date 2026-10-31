@@ -116,7 +116,7 @@
                   onchange={() => set('focusable', !focusable)} />
     {/snippet}
     {#if focusable}
-      <PropertyCell label="Tab Index" span={1} compact hint="Position in the tab order. -1 means reachable by click but skipped by Tab; 0 means natural order. Controls with a role of their own keep the order the surface assigns.">
+      <PropertyCell label="Tab Index" span={1} compact hint="Position in the tab order. -1 means reachable by click but skipped by Tab; 0 means natural order.">
         <NumberCell label="Tab" min={-1} max={999} step={1} value={resolveTabIndex(m)} onchange={(v) => set('tabIndex', clampInt(v, -1, 999, -1))} />
       </PropertyCell>
       <PropertyCell label="Focus Ring" span={1} hint="Draw a ring when focus arrives by keyboard. Clicking never draws it, which is what a plugin UI wants.">
