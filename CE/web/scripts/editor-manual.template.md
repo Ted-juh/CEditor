@@ -771,7 +771,7 @@ The way that works today is:
 6. Press **Back to Panel**.
 
 The **Shapes** palette down the left is for drawing. A selected layer is styled in the bar along the
-top of the designer (**Fill**, **Gradient**, **Stroke** and its width **W**, corner radius **R**,
+top of the designer (**Fill**, **Gradient**, **Stroke** with its width beside it, **Corners** for the corner radius,
 **Opacity**, and for text its colour, size and words) and in the dock's **Colors** and **Gradient**
 tools.
 

@@ -94,8 +94,9 @@
               title="Pick stroke colour"
             ></button>
         </label>
-        <label class="paint-number">
-          <span>W</span>
+        <!-- The stroke's width, beside its colour and with no letter of its own: it read "W", which is
+             the layer's width everywhere else in the designer. -->
+        <label class="paint-number stroke-width" title="Stroke width, in pixels">
           <span class="nc-wrap">
             <NumberCell
               min={0}
@@ -104,12 +105,13 @@
               value={numberOr(selectedBorder?.thickness, 0)}
               defaultValue={0}
               disabled={!canPaintLayer}
+              ariaLabel="Stroke width"
               onchange={(value) => setLayerProperty('Background.Border.thickness', value)}
             />
           </span>
         </label>
-        <label class="paint-number">
-          <span>R</span>
+        <label class="paint-number" title="Corner radius, in pixels">
+          <span>Corners</span>
           <span class="nc-wrap">
             <NumberCell
               min={0}

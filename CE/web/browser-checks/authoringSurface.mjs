@@ -283,6 +283,23 @@ try {
     { first: firstEntry.slice(0, 'Blank canvas'.length), closedByEscape: startersClosedByEscape, asked: asked.length,
       name: await kit.read(dial, 'Core.name'), parts: (await parts(dial)).length });
 
+  // A state card had H, P and D (the hover, pressed and disabled conditions, in letters) and they
+  // took the room Copy and Del needed: both were cut off by the card's 160-pixel edge.
+  await kit.page.locator('.add-state').click();
+  await kit.settle(600);
+  led.check(D, 'a state card shows Edit, Copy and Del, and no lettered conditions',
+    'the new state`s card has its three actions inside it, and none of the H, P and D it had; the conditions are in the States editor that Edit opens, by name',
+    { actions: ['Edit', 'Copy', 'Del'], allInside: true },
+    await kit.page.evaluate(() => {
+      const card = [...document.querySelectorAll('.state-card')].pop();
+      const r = card.getBoundingClientRect();
+      const buttons = [...card.querySelectorAll('.state-actions button')];
+      return {
+        actions: buttons.map((b) => b.textContent.trim()),
+        allInside: buttons.every((b) => { const br = b.getBoundingClientRect(); return br.left >= r.left - 0.5 && br.right <= r.right + 0.5; }),
+      };
+    }));
+
   // ===============================================================================================
   // CARRY — the part survives leaving the surface.
   // ===============================================================================================

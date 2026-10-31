@@ -4,7 +4,7 @@
 import { numberOr } from './primitives.js';
 import { isPolygonKind, clipPathForKind } from './shapeGeometry.js';
 import { clampNumber } from './customDesignSurfaceGeometry.js';
-import { capitalised, carriedControlWord, identifierWords } from './authorWords.js';
+import { capitalised, carriedControlWord, identifierWords, stateConditionWords } from './authorWords.js';
 import { SLIDER_CONTROL_KIND } from './sliderControlPart.js';
 
 export function isEditablePart(part) {
@@ -141,6 +141,11 @@ export function statePreviewStageStyle(entry, artboardWidth, artboardHeight) {
 export function stateTriggerLabel(state, base = false) {
   if (base) return '';
   const when = state?.when ?? {};
+  // A condition that names a zone or a value is said in words. A converted knob's hover state is
+  // `hoveredCustomHitZone: CutoffZone`, and this read "No trigger" for it.
+  const set = Object.entries(when).filter(([, value]) => value !== false && value != null && value !== ''
+    && !(Array.isArray(value) && !value.length));
+  if (set.some(([, value]) => typeof value !== 'boolean')) return stateConditionWords(Object.fromEntries(set));
   if (when.hover) return 'Hover';
   if (when.pressed) return 'Pressed';
   if (when.disabled) return 'Disabled';

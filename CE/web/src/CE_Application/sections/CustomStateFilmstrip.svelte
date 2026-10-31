@@ -22,7 +22,6 @@
     onToggleCollapsed = () => {},
     selectStateCard = () => {},
     onEditState = () => {},
-    setFilmstripStateWhen = () => {},
     duplicateStateCard = () => {},
     removeStateCard = () => {},
     addQuickState = () => {},
@@ -81,17 +80,9 @@
           </div>
         </button>
         <div class="state-actions" aria-label={`${entry.name} state actions`}>
-          {#if !entry.base}
-            <div class="when-toggles">
-              {#each [['hover','H'],['pressed','P'],['disabled','D']] as [flag, label] (flag)}
-                <button type="button"
-                  class:active={entry.state?.when?.[flag] === true}
-                  onclick={(e) => { e.stopPropagation(); setFilmstripStateWhen(entry.name, flag, !(entry.state?.when?.[flag] === true)); }}
-                  title={flag}
-                >{label}</button>
-              {/each}
-            </div>
-          {/if}
+          <!-- No H, P and D here. They were the hover, pressed and disabled conditions, in letters, and
+               they took the room Copy and Del needed: both were cut off by the card's edge. Edit opens
+               the States editor, which has the three by name, with the rule beside them. -->
           <button type="button" onclick={(event) => { event.stopPropagation(); onEditState(entry.name); }} title="Edit state">
             Edit
           </button>
@@ -168,31 +159,6 @@
   .state-trigger-badge.no-trigger {
     color: #6B7A86;
     border-color: rgba(255,255,255,0.06);
-  }
-
-  .when-toggles {
-    display: flex;
-    gap: 2px;
-  }
-
-  .when-toggles button {
-    width: 18px;
-    height: 18px;
-    padding: 0;
-    border: 1px solid #2E3B45;
-    border-radius: 3px;
-    background: #1A242D;
-    color: #6B7A86;
-    font-size: 9px;
-    font-weight: 800;
-    cursor: pointer;
-    line-height: 1;
-  }
-
-  .when-toggles button.active {
-    border-color: #14B8A6;
-    background: rgba(20, 184, 166, 0.22);
-    color: #8FEDE3;
   }
 
   .state-title {
@@ -329,11 +295,13 @@
     white-space: nowrap;
   }
 
+  /* From the card's left edge: indented under the thumbnail it had 96 of the card's 160 pixels, and
+     Del did not fit in them. */
   .state-actions {
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 0 7px 6px 57px;
+    padding: 0 7px 6px;
   }
 
   .state-actions button {

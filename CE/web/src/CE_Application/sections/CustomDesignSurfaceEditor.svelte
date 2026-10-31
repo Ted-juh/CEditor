@@ -1155,11 +1155,6 @@
     selectStateCard(name);
   }
 
-  function setFilmstripStateWhen(stateName, flag, value) {
-    if (!core?.id || !stateName || stateName === 'base') return;
-    updateControlProperty(core.id, `States.${stateName}.when.${flag}`, value);
-  }
-
   function duplicateStateCard(name, state, event = null) {
     event?.stopPropagation?.();
     if (!core?.id) return;
@@ -4153,7 +4148,6 @@
       onToggleCollapsed={() => { filmstripCollapsedChoice = !filmstripCollapsed; }}
       {selectStateCard}
       onEditState={(name) => { selectStateCard(name); if (core?.id) applyControlPatch(core.id, { 'Designer.focusSection': 'react', 'Designer.focusReactPane': 'states' }); }}
-      {setFilmstripStateWhen}
       {duplicateStateCard}
       {removeStateCard}
       {addQuickState}

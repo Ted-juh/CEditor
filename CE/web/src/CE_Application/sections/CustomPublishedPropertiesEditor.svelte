@@ -7,10 +7,7 @@
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
-  import FlagStrip from '../properties/FlagStrip.svelte';
   import OpenInDock from '../properties/OpenInDock.svelte';
-  import ArrowRightToLine from 'lucide-svelte/icons/arrow-right-to-line';
-  import ArrowRightFromLine from 'lucide-svelte/icons/arrow-right-from-line';
   import Share2 from 'lucide-svelte/icons/share-2';
   import Eye from 'lucide-svelte/icons/eye';
   import LogIn from 'lucide-svelte/icons/log-in';
@@ -498,17 +495,22 @@
         <option value="allInternals">All internals — every value channel</option>
       </select>
     </PropertyCell>
-    <PropertyCell label="External" span={2} hint="Accept external input links, emit external output links. Hover a chip for its name.">
-      <FlagStrip
-        flags={[
-          { key: 'inputs', title: 'Inputs — allow other components to drive published inputs', on: api?.acceptsExternalLinks !== false, icon: ArrowRightToLine },
-          { key: 'outputs', title: 'Outputs — allow this component to drive other components', on: api?.emitsExternalLinks !== false, icon: ArrowRightFromLine },
-        ]}
-        ontoggle={(key) => {
-          if (key === 'inputs') set('ExternalAPI.acceptsExternalLinks', !(api?.acceptsExternalLinks !== false));
-          else if (key === 'outputs') set('ExternalAPI.emitsExternalLinks', !(api?.emitsExternalLinks !== false));
-        }}
-      />
+    <!-- Two switches by name. They were two arrow icons, told apart only by their tooltips. -->
+    <PropertyCell label="External links" span={2} hint="Inputs: other components may drive this one's published inputs. Outputs: this one may drive other components.">
+      <div class="external-links">
+        <PropertyToggle
+          label="Inputs"
+          title="Allow other components to drive this component's published inputs"
+          value={api?.acceptsExternalLinks !== false}
+          onchange={(next) => set('ExternalAPI.acceptsExternalLinks', next)}
+        />
+        <PropertyToggle
+          label="Outputs"
+          title="Allow this component to drive other components"
+          value={api?.emitsExternalLinks !== false}
+          onchange={(next) => set('ExternalAPI.emitsExternalLinks', next)}
+        />
+      </div>
     </PropertyCell>
   </PropertySection>
 
@@ -913,4 +915,11 @@
   .suggestion-btn strong { color: #E0E0E0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .preset-btn span,
   .suggestion-btn span { color: #999; line-height: 1.3; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .external-links {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    width: 100%;
+  }
 </style>
