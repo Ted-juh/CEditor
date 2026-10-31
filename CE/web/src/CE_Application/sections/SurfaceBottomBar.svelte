@@ -1,18 +1,19 @@
 <script>
   /**
-   * The options strip under the canvas: snapping and view toggles on the left, the zoom cluster on
-   * the right.
+   * The options strip under the canvas: snapping and view toggles on the left, the zoom step and
+   * the rulers on the right. Zoom itself (−, the value, +, 100%, Fit) is the status bar's, which the
+   * designer drives (StatusBar.svelte), and the Dial, scales and arpeggiator are added from the
+   * palette's Value Controls. This strip had a second copy of both, and they took the room the
+   * toggles needed: at 1700 pixels wide everything after Bounds had scrolled out of sight.
    *
    * Second of the §5 decomposition. The prop list is long because this strip is a control panel —
    * every toggle on it owns a different piece of surface state — but long and checked beats short
    * and implicit: Svelte fails the build on a prop the parent forgets, which is the safety net
    * that makes moving 700 lines of a working editor a reasonable thing to do.
    *
-   * `zoomEditValue` is `$bindable` because the zoom field is a text input the parent reads back on
-   * commit; everything else that writes goes through a named setter, so the parent keeps ownership
-   * of its own state and this file stays a view.
+   * Everything that writes goes through a named setter, so the parent keeps ownership of its own
+   * state and this file stays a view.
    */
-  import Maximize from 'lucide-svelte/icons/maximize';
   import Ruler from 'lucide-svelte/icons/ruler';
   import NumberCell from '../properties/NumberCell.svelte';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
@@ -34,19 +35,10 @@
     arpSelectedBlock = null,
     shiftArpOctave = () => {},
     removeSelectedArpBlock = () => {},
-    // Kit shortcuts
     resetToBlankCanvas = () => {},
-    addDialKit = () => {},
-    addHorizontalScaleKit = () => {},
-    addVerticalScaleKit = () => {},
-    addArpeggiatorKit = () => {},
     helpOverlayOpen = false, setHelpOverlayOpen = () => {},
-    // Zoom
-    surfaceZoom = 1, setZoom = () => {}, zoomStep = () => {},
+    // The zoom step (the status bar's − and + use it) and the rulers
     surfaceZoomIncrement = 10, setZoomIncrement = () => {},
-    zoomEditing = false, zoomEditValue = $bindable(''),
-    startZoomEdit = () => {}, commitZoomEdit = () => {}, zoomEditKeydown = () => {},
-    fitArtboardToView = () => {},
     surfaceShowRulers = true, setSurfaceShowRulers = () => {},
   } = $props();
 </script>
@@ -98,31 +90,15 @@
       </div>
       <button type="button" class="surface-command danger" onclick={removeSelectedArpBlock} disabled={!arpSelectedBlock} title="Delete selected note block">Delete note</button>
     {/if}
-    <button type="button" class="surface-command accent" onclick={addDialKit} title="Add a circular value control">Dial</button>
-    <button type="button" class="surface-command accent" onclick={addHorizontalScaleKit} title="Add a horizontal value scale with ticks">H Scale</button>
-    <button type="button" class="surface-command accent" onclick={addVerticalScaleKit} title="Add a vertical value scale with ticks">V Scale</button>
-    <button type="button" class="surface-command accent" onclick={addArpeggiatorKit} title="Add a graphical arpeggiator step editor">Arp Kit</button>
     <button type="button" class="surface-command" class:accent={helpOverlayOpen} onclick={() => setHelpOverlayOpen(!helpOverlayOpen)} title="Shortcuts &amp; glossary (?)">?</button>
     <!-- Last, and in the danger colour. It used to sit between "Delete note" and "Dial", which put
          a whole-canvas wipe one slot from the button people press most. -->
     <button type="button" class="surface-command danger" onclick={resetToBlankCanvas} title="Clear this component to a blank drawing canvas">Blank</button>
     </div>
 
-    <div class="surface-zoombar" aria-label="Zoom controls">
-      <button type="button" class="szb-btn" onclick={() => zoomStep(-surfaceZoomIncrement)} title="Zoom out">−</button>
-      {#if zoomEditing}
-        <!-- svelte-ignore a11y_autofocus -->
-        <input class="szb-zoom-input" type="text" bind:value={zoomEditValue} onblur={commitZoomEdit} onkeydown={zoomEditKeydown} onfocus={(event) => event.target.select()} autofocus />
-      {:else}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <span class="szb-zoom-value" ondblclick={startZoomEdit} title="Double-click to type a value">{Math.round(surfaceZoom * 100)}%</span>
-      {/if}
-      <button type="button" class="szb-btn" onclick={() => zoomStep(surfaceZoomIncrement)} title="Zoom in">+</button>
-      <span class="szb-inc-label">Dec/Inc</span>
+    <div class="surface-zoombar" aria-label="Zoom step and rulers">
+      <span class="szb-inc-label" title="How far − and + in the status bar zoom, in percent">Zoom step</span>
       <span class="szb-inc-input nc-wrap"><NumberCell value={surfaceZoomIncrement} onchange={(value) => setZoomIncrement(value)} min={1} max={100} /></span>
-      <div class="szb-divider"></div>
-      <button type="button" class="szb-btn icon" onclick={() => setZoom(1)} title="Reset to 100%">⊡</button>
-      <button type="button" class="szb-btn icon" onclick={fitArtboardToView} title="Fit to window"><Maximize size={12} strokeWidth={1.6} /></button>
       <div class="szb-divider"></div>
       <button type="button" class="szb-btn icon" class:toggle-on={surfaceShowRulers} onclick={() => setSurfaceShowRulers(!surfaceShowRulers)} title="Toggle rulers"><Ruler size={12} strokeWidth={1.6} /></button>
     </div>
@@ -273,33 +249,6 @@
     color: var(--surface-accent, #14B8A6);
     border-color: rgba(20, 184, 166, 0.5);
     background: rgba(20, 184, 166, 0.14);
-  }
-
-  .szb-zoom-value {
-    min-width: 38px;
-    text-align: center;
-    color: #B9C8D4;
-    font-size: 11px;
-    cursor: text;
-    padding: 1px 3px;
-    border-radius: 3px;
-  }
-
-  .szb-zoom-value:hover {
-    background: #1C2831;
-    color: #EAF5FF;
-  }
-
-  .szb-zoom-input {
-    width: 42px;
-    background: #0D1419;
-    border: 1px solid var(--surface-accent, #14B8A6);
-    border-radius: 3px;
-    color: #E8EEF5;
-    font-size: 11px;
-    text-align: center;
-    padding: 1px 3px;
-    outline: none;
   }
 
   .szb-inc-label {

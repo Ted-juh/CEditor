@@ -271,3 +271,42 @@ test('in the designer the properties panel says it edits the whole component', (
   assert.match(panel, /let componentOwnerName = \$derived\(\$componentWorkspaceMode === 'surface' \? `Component: \$\{componentName\}` : componentName\);/);
   assert.match(panel, /ownerName=\{componentOwnerName\}/);
 });
+
+test('undo and redo are on screen once in the designer', () => {
+  // The properties panel's toolbar has them, and in the designer that panel is always shown.
+  const canvas = src('CE_Application/editor/EditorCanvas.svelte');
+  const header = canvas.match(/<header class="component-workspace-header">[\s\S]*?<\/header>/)?.[0] ?? '';
+  assert.ok(header, 'the designer header is there');
+  assert.doesNotMatch(header, /aria-label="Undo"|aria-label="Redo"/);
+  const toolbar = src('CE_Application/panels/PropertiesToolbar.svelte');
+  assert.match(toolbar, /aria-label="Undo" onclick=\{undo\}/);
+  // The header's pair gave the shortcut; the pair that stays gives it too.
+  assert.match(toolbar, /title=\{`\$\{undoTip\} \(Ctrl\+Z\)`\} aria-label="Undo"/);
+  assert.match(toolbar, /title=\{`\$\{redoTip\} \(Ctrl\+Y\)`\} aria-label="Redo"/);
+  assert.match(src('CE_Application/utils/workspaceChrome.js'), /showPropertiesPanel: workspaceKind === 'component'\s*\? true/);
+});
+
+test("zoom is the status bar's; the strip under the canvas keeps what only it has", () => {
+  // It had a second −, value, +, 100% and Fit, which took the room its toggles needed: Measure,
+  // Bounds and Zones scrolled out of sight.
+  const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
+  assert.doesNotMatch(strip, /title="Zoom out"|title="Zoom in"|title="Fit to window"|title="Reset to 100%"|szb-zoom-value/);
+  assert.match(strip, />Zoom step<\/span>/);
+  assert.match(strip, /title="Toggle rulers"/);
+  for (const label of ['Snap', 'Smart', 'Measure', 'Bounds', 'Zones']) assert.match(strip, new RegExp(`label="${label}"`), label);
+  const bar = src('CE_Application/layout/StatusBar.svelte');
+  for (const title of ['Zoom out', 'Zoom in', 'Reset to 100%']) assert.match(bar, new RegExp(`title="${title}"`), title);
+  assert.doesNotMatch(src('CE_Application/sections/CustomDesignSurfaceEditor.svelte'), /zoomEditing|commitZoomEdit/);
+});
+
+test("the Dial, the scales and the arpeggiator are added from the palette, not from the strip as well", () => {
+  // The strip had Dial, H Scale, V Scale and Arp Kit, the same four functions as the palette's
+  // Value Controls, and they too pushed the toggles out of sight. Blank stays: no starter is blank.
+  const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
+  assert.doesNotMatch(strip, /addDialKit|addHorizontalScaleKit|addVerticalScaleKit|addArpeggiatorKit/);
+  assert.match(strip, /onclick=\{resetToBlankCanvas\}/);
+  const palette = src('CE_Application/sections/SurfacePalette.svelte');
+  for (const kit of ['addDialKit', 'addHorizontalScaleKit', 'addVerticalScaleKit', 'addArpeggiatorKit']) {
+    assert.match(palette, new RegExp(`onclick=\\{${kit}\\}`), kit);
+  }
+});

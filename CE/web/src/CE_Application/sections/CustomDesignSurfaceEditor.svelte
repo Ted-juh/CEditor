@@ -407,10 +407,8 @@
   let paletteCollapsed = $state(false);
   let dockHidden = $state(false);
   let displayDockHidden = $state(false);
-  // Bottom zoom bar (mirrors the Panel Designer's ZoomBar, wired to surfaceZoom).
+  // The zoom step: how far the status bar's − and + (and Ctrl+plus and minus) zoom, in percent.
   let surfaceZoomIncrement = $state(10);
-  let zoomEditing = $state(false);
-  let zoomEditValue = $state('100');
   let surfaceShowRulers = $state(true);
   // Scripts section in the top Look bar (a custom component can carry scripts).
   let componentScripts = $derived(getSection(control, 'Scripts'));
@@ -1925,25 +1923,8 @@
     surfaceScrollEl.scrollTop = next.scrollTop;
   }
 
-  // Bottom zoom bar helpers (percent-based, like the Panel Designer's ZoomBar).
   function zoomStep(deltaPercent) {
     setZoom(surfaceZoom + deltaPercent / 100);
-  }
-
-  function startZoomEdit() {
-    zoomEditValue = String(Math.round(surfaceZoom * 100));
-    zoomEditing = true;
-  }
-
-  function commitZoomEdit() {
-    zoomEditing = false;
-    const pct = parseInt(zoomEditValue, 10);
-    if (!isNaN(pct)) setZoom(pct / 100);
-  }
-
-  function zoomEditKeydown(event) {
-    if (event.key === 'Enter') commitZoomEdit();
-    else if (event.key === 'Escape') zoomEditing = false;
   }
 
   function setZoomIncrement(value) {
@@ -3621,11 +3602,9 @@
       {zoneDisplayMode} {setZoneDisplayMode}
       {arpeggiatorEnabled} {arpStepCount} {setArpStepCount} {arpSelectedBlock}
       {shiftArpOctave} {removeSelectedArpBlock}
-      {resetToBlankCanvas} {addDialKit} {addHorizontalScaleKit} {addVerticalScaleKit} {addArpeggiatorKit}
+      {resetToBlankCanvas}
       {helpOverlayOpen} setHelpOverlayOpen={(v) => { helpOverlayOpen = v; }}
-      {surfaceZoom} {setZoom} {zoomStep} {surfaceZoomIncrement} {setZoomIncrement}
-      {zoomEditing} bind:zoomEditValue {startZoomEdit} {commitZoomEdit} {zoomEditKeydown}
-      {fitArtboardToView}
+      {surfaceZoomIncrement} {setZoomIncrement}
       {surfaceShowRulers} setSurfaceShowRulers={(v) => { surfaceShowRulers = v; }}
     />
 

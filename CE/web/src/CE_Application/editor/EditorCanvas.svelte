@@ -55,12 +55,10 @@
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
-  import { undo, redo, undoAvailable, redoAvailable, flushHistory, undoLabel, redoLabel, historyVersion } from '../stores/history.js';
+  import { flushHistory } from '../stores/history.js';
 
   // The four keys whose autorepeat is one undo step (see handleEditorKeyUp).
   const ARROW_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown']);
-  import Undo2 from 'lucide-svelte/icons/undo-2';
-  import Redo2 from 'lucide-svelte/icons/redo-2';
   import { componentDesignerStatus, requestComponentDesignerPreview } from '../stores/componentDesignerStatus.js';
   import { createScriptWorkspaceDocument, scriptDocuments, updateScriptDocument, getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { createScreenDocument } from '../stores/screenBuilder.js';
@@ -833,10 +831,6 @@
     if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
   }
 
-
-  // Name the step each button would take back or put back. Re-read only when a stack changes.
-  let undoTip = $derived.by(() => { void $historyVersion; const step = $undoAvailable ? undoLabel() : ''; return step ? `Undo ${step}` : 'Undo'; });
-  let redoTip = $derived.by(() => { void $historyVersion; const step = $redoAvailable ? redoLabel() : ''; return step ? `Redo ${step}` : 'Redo'; });
 </script>
 
 <!-- The canvas annotation layer: everything the editor DRAWS OVER the panel
@@ -928,25 +922,9 @@
               <span>Component Designer</span>
               <strong>{selectedCustomComponentName}</strong>
             </div>
+            <!-- No undo and redo here: the properties panel's toolbar has them, and in the designer
+                 that panel is always on screen (utils/workspaceChrome.js), so this was a second pair. -->
             <div class="component-workspace-actions">
-              <button
-                type="button"
-                class="icon-btn"
-                class:active={$undoAvailable}
-                disabled={!$undoAvailable}
-                title={`${undoTip} (Ctrl+Z)`}
-                aria-label="Undo"
-                onclick={undo}
-              ><Undo2 size={14} strokeWidth={2} /></button>
-              <button
-                type="button"
-                class="icon-btn"
-                class:active={$redoAvailable}
-                disabled={!$redoAvailable}
-                title={`${redoTip} (Ctrl+Y)`}
-                aria-label="Redo"
-                onclick={redo}
-              ><Redo2 size={14} strokeWidth={2} /></button>
               {#if $componentDesignerStatus?.kind}
                 <div class="component-workspace-status" aria-label="Component designer status">
                   <span title={`Canvas size: ${$componentDesignerStatus.artboard}`}>Canvas <strong>{$componentDesignerStatus.artboard}</strong></span>
@@ -1423,21 +1401,6 @@
     font-weight: 700;
     padding: 0 8px;
     cursor: pointer;
-  }
-
-  .component-workspace-header button.icon-btn {
-    width: 24px;
-    padding: 0;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    color: #8BB8D4;
-  }
-
-  .component-workspace-header button.icon-btn:disabled {
-    color: #2F404B;
-    cursor: default;
-    pointer-events: none;
   }
 
   .component-workspace-header button:hover,

@@ -75,10 +75,10 @@
 </script>
 
 <div class="props-toolbar">
-  <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title={undoTip} aria-label="Undo" onclick={undo}>
+  <button class="toolbar-btn" class:active={$undoAvailable} disabled={!$undoAvailable} title={`${undoTip} (Ctrl+Z)`} aria-label="Undo" onclick={undo}>
     <Undo2 size={18} strokeWidth={1.5} />
   </button>
-  <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title={redoTip} aria-label="Redo" onclick={redo}>
+  <button class="toolbar-btn" class:active={$redoAvailable} disabled={!$redoAvailable} title={`${redoTip} (Ctrl+Y)`} aria-label="Redo" onclick={redo}>
     <Redo2 size={18} strokeWidth={1.5} />
   </button>
 
