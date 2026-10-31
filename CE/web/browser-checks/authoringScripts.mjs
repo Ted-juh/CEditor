@@ -40,7 +40,7 @@ const S = 'ScriptEditor';
 
 /** The scripts in the Behavior Designer's workspace store. */
 const storedScripts = () => kit.page.evaluate(async () => {
-  const { scriptDocuments } = await import('/src/CE_Application/stores/scriptWorkspace.js');
+  const { scriptDocuments } = await window.__ceImport('/src/CE_Application/stores/scriptWorkspace.js');
   const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
   return (get(scriptDocuments) ?? []).flatMap((d) => (d.scripts ?? []).map((s) => ({
     id: s.id, event: s.event, language: s.language, enabled: s.enabled !== false,
@@ -49,8 +49,8 @@ const storedScripts = () => kit.page.evaluate(async () => {
 });
 
 const embeddedScripts = () => kit.page.evaluate(async () => {
-  const { panels, activeEditorTab } = await import('/src/CE_Application/stores/panels.js');
-  const { scriptDocuments } = await import('/src/CE_Application/stores/scriptWorkspace.js');
+  const { panels, activeEditorTab } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+  const { scriptDocuments } = await window.__ceImport('/src/CE_Application/stores/scriptWorkspace.js');
   const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
   const document = get(scriptDocuments).find((entry) => entry.id === get(activeEditorTab)?.id);
   return get(panels).find((panel) => String(panel.id) === String(document?.panelId))?.scripts ?? [];
@@ -128,6 +128,18 @@ try {
     window.__scriptSaveEvents = [];
     window.__JUCE__ = { backend: { emitEvent: (name, payload) => window.__scriptSaveEvents.push({ name, payload }) } };
   });
+  // Typed code pauses the panel's scripts, and the banner that says so used to float over the
+  // bottom of the window, over this footer: Save file could not be pressed until the code was
+  // trusted. It sits in the layout now, above the status bar, and covers nothing.
+  led.check(S, 'the paused-scripts banner covers nothing',
+    'with the banner showing, the point at the middle of Save file is Save file, so an author can save code they have not yet chosen to run',
+    { bannerShowing: true, saveReachable: true },
+    await kit.page.evaluate(() => {
+      const save = [...document.querySelectorAll('.bd-app .stagefoot button')].find((b) => b.textContent.trim() === 'Save file');
+      const r = save?.getBoundingClientRect();
+      return { bannerShowing: !!document.querySelector('aside.script-trust'),
+        saveReachable: !!r && document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2) === save };
+    }));
   await kit.page.getByRole('button', { name: 'Save file' }).click();
   const savedPanel = await kit.page.evaluate(() => {
     const event = window.__scriptSaveEvents.find((entry) => entry.name === 'savePanelAs' || entry.name === 'savePanel');
@@ -140,6 +152,18 @@ try {
   // ===============================================================================================
   // RUN — the assertion the rest of the suite exists to reach.
   // ===============================================================================================
+  // A panel's scripts are paused until someone enables them (the trust banner, 38eb1910), and an
+  // edit to the code pauses them again; Run on a paused panel runs nothing. So the author does what
+  // the banner asks, as they would here: enable this panel's scripts for the session. Enabling
+  // hardens the page, which is why the helpers above load modules through the kit's __ceImport.
+  const banner = kit.page.locator('aside.script-trust');
+  const pausedAfterTyping = await banner.isVisible();
+  await banner.getByRole('button', { name: 'Enable scripts for this session' }).click();
+  await kit.settle(500);
+  led.check(S, 'typed code waits to be trusted',
+    'code the author has just typed is paused like any other: the banner says so, and enabling it for the session is one press that takes the banner away',
+    { pausedAfterTyping: true, bannerGone: true },
+    { pausedAfterTyping, bannerGone: !(await banner.isVisible()) });
   await kit.page.locator('.bd-app button[title="Run this script now against the live panel"]').click();
   await kit.settle(1400);
   const afterRun = await kit.read(cutoff, 'Behavior.defaultCurrentValue');

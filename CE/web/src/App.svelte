@@ -495,6 +495,11 @@
       </div>
     {/if}
 
+    <!-- "Scripts are paused": a row of its own, empty unless the panel's scripts wait for trust. -->
+    <div class="trust-area">
+      <ScriptTrustBanner />
+    </div>
+
     <div class="statusbar-area">
       <StatusBar />
     </div>
@@ -503,7 +508,6 @@
   <!-- ce.ui.notify() toasts. Mounted once at the root, and fixed-position, so a message survives
        whatever tab or panel is on screen when the script raises it. -->
   <ScriptNotifications />
-  <ScriptTrustBanner />
 
   <!-- ce.ui.dialog() modals. Root-mounted for the same reason, and above everything: a question
        that can be scrolled out of view is a script left waiting for an answer. -->
@@ -526,10 +530,11 @@
     height: 100vh;
     display: grid;
     grid-template-columns: var(--icon-width) 1fr var(--resize-width) var(--props-width);
-    grid-template-rows: 28px 1fr 24px;
+    grid-template-rows: 28px 1fr auto 24px;
     grid-template-areas:
       "icon    menu    menu    menu"
       "icon    center  resize  props"
+      "trust   trust   trust   trust"
       "status  status  status  status";
     overflow: hidden;
     background: #1E1E1E;
@@ -540,6 +545,7 @@
   .icon-panel-area { grid-area: icon; min-height: 0; background: #252525; }
   .center-area     { grid-area: center; display: flex; flex-direction: column; overflow: hidden; }
   .properties-area { grid-area: props; overflow: hidden; }
+  .trust-area      { grid-area: trust; min-width: 0; }
   .statusbar-area  { grid-area: status; }
 
   .editor-top-row {

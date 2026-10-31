@@ -219,7 +219,7 @@ await ev(() => window.__fly.hover(4));
 await settle();
 const categoryBox = await ev(() => window.__fly.flyoutBox());
 check('every flyout fills the editor band — 28px under the menu bar, 24px above the status bar', () => {
-  // App.svelte's shell is `grid-template-rows: 28px 1fr 24px`.
+  // App.svelte's shell: a 28px menu row on top, a 24px status row at the bottom.
   assert.deepEqual(searchBox, { top: 28, bottom: 24, left: 48 }, JSON.stringify(searchBox));
 });
 

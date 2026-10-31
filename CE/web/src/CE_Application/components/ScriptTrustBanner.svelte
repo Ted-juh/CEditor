@@ -19,9 +19,11 @@
 {/if}
 
 <style>
-  .script-trust { position: fixed; bottom: 34px; left: 20px; right: 20px; z-index: 900;
-    display: flex; align-items: center; gap: 14px; padding: 12px 16px; border: 1px solid #d4ac55;
-    border-radius: 6px; background: #30291d; color: #fff2d2; font: 13px/1.4 sans-serif; }
+  /* A row of the window's layout (App.svelte's `trust` row, above the status bar), not a layer over
+     it. Floating over the bottom of the window it covered whatever was there: the Behavior
+     Designer's footer, with Save file, so typed code could not be saved until it was trusted. */
+  .script-trust { display: flex; align-items: center; gap: 14px; padding: 8px 16px;
+    border-top: 1px solid #d4ac55; background: #30291d; color: #fff2d2; font: 13px/1.4 sans-serif; }
   span { flex: 1; } button { flex-shrink: 0; padding: 8px 12px; cursor: pointer; }
   label { display: block; margin-top: 6px; } button:disabled { opacity: 0.5; cursor: default; }
 </style>

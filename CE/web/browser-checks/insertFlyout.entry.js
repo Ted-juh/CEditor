@@ -87,7 +87,7 @@ window.__fly = {
   headCount: () => textOf(document.querySelector('.insert-flyout .fly-head s')),
   packageItems: () => [...document.querySelectorAll('.insert-flyout .fly-item.package span')].map(textOf),
 
-  /** The editor band: App.svelte's shell is `28px 1fr 24px`. */
+  /** The editor band: App.svelte's shell has a 28px menu row on top and a 24px status row at the bottom. */
   flyoutBox: () => {
     const el = document.querySelector('.insert-flyout');
     if (!el) return null;
