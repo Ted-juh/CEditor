@@ -1511,7 +1511,16 @@ export const COMPONENT_TYPES = {
 
 let nextControlId = Date.now();
 
-/** Deep-merge overrides into a section clone, including _children. */
+/**
+ * Deep-merge overrides into a section clone, including _children.
+ *
+ * A value is CLONED in, as a new child and the section defaults already were. It was assigned, so
+ * every new control of a type held the same object as the type's defaults for each one its
+ * `defaultOverrides` set: 55 of them across the types, among them a button's choice list
+ * (`Value.rows`), `States.priority` and a Custom Component's published properties. A change made
+ * in place to one of them was a change to every new control of that type, and to the pristine a
+ * saved control is a difference from.
+ */
 function applyOverrides(section, overrides) {
   if (!overrides) return section;
   for (const [key, value] of Object.entries(overrides)) {
@@ -1525,7 +1534,7 @@ function applyOverrides(section, overrides) {
         }
       }
     } else {
-      section[key] = value;
+      section[key] = deepClone(value);
     }
   }
   return section;
