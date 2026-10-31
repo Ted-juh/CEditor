@@ -2,7 +2,8 @@
 // A fix is offered only when it is mechanically safe — scaffolding a missing
 // piece with the same defaults the factory/starters use. Steps that encode
 // design intent (motion rules, assets) or need diagnosis (package validity)
-// stay navigate-only.
+// stay navigate-only, with one exception: a published property whose target
+// is gone has nothing to edit, and removing it is safe (and undoable).
 import {
   createBackground,
   createBehaviorModule,
@@ -10,6 +11,7 @@ import {
   createPartNode,
   createValueChannel,
 } from './customComponentFactory.js';
+import { editablePropertiesWithMissingTargets } from './customComponentPackage.js';
 
 function sectionChildren(control, section) {
   return control?._children?.[section]?._children ?? {};
@@ -159,12 +161,30 @@ function fixProperties(control) {
   };
 }
 
+// Package validity's one mechanical case (customComponentPackage.js): every new component used to
+// carry a published "label" for a layer it never had. Any other issue still needs a person, and
+// stays listed after this one is gone.
+function fixValidPackage(control) {
+  const names = editablePropertiesWithMissingTargets(control);
+  if (!names.length) return null;
+  const editable = control._children.PublishedProperties.editableProperties;
+  const kept = Object.fromEntries(Object.entries(editable).filter(([name]) => !names.includes(name)));
+  const list = names.map((name) => `"${name}"`).join(', ');
+  return {
+    label: names.length === 1
+      ? `Remove the published property ${list}: what it edits is gone`
+      : `Remove the published properties ${list}: what they edit is gone`,
+    patch: { 'PublishedProperties.editableProperties': kept },
+  };
+}
+
 const FIXERS = {
   visuals: fixVisuals,
   values: fixValues,
   interaction: fixInteraction,
   publicApi: fixPublicApi,
   properties: fixProperties,
+  validPackage: fixValidPackage,
 };
 
 /**

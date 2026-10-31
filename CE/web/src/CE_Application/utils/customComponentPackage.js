@@ -132,6 +132,40 @@ function editablePropertyPathIssue(path, sections) {
   return '';
 }
 
+/**
+ * The published editable properties whose target is gone: a layer, a value channel or an asset that
+ * is not there. Each is a blocking issue (validateCustomComponentPackage), and it is the one kind a
+ * Fix can mend without a person: there is nothing for the property to edit.
+ *
+ * Every new Custom Component had one. The type's defaults publish "label" for `Parts.label`, from
+ * when a new component came with a label layer; it comes with none now, so a component stayed "Not
+ * reusable yet" after its author drew it, over a property they never made. The defaults cannot drop
+ * it (a saved component is a difference from them, so older files would lose theirs); a new one is
+ * created without it (stores/controls.js addControl, stores/componentWorkspace.js), and the
+ * readiness Fix removes it from the ones that have it.
+ */
+export function editablePropertiesWithMissingTargets(control) {
+  const sections = control?._children ?? {};
+  return Object.entries(sections.PublishedProperties?.editableProperties ?? {})
+    .filter(([, entry]) => entry?.enabled !== false
+      && editablePropertyPathIssue(entry?.path, sections).startsWith('targets missing '))
+    .map(([name]) => name);
+}
+
+/**
+ * A new component's own copy, without the published properties whose target it does not have. The
+ * map is replaced, not edited, so nothing it might share (the type's defaults) is touched.
+ */
+export function dropEditablePropertiesWithMissingTargets(control) {
+  const names = editablePropertiesWithMissingTargets(control);
+  if (!names.length) return names;
+  const published = control._children.PublishedProperties;
+  published.editableProperties = Object.fromEntries(
+    Object.entries(published.editableProperties).filter(([name]) => !names.includes(name)),
+  );
+  return names;
+}
+
 function referencedCustomChannels(source) {
   const text = String(source ?? '').trim();
   if (!text) return [];

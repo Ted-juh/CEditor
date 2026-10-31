@@ -23,7 +23,7 @@ import {
   selectionRoots,
   uniqueCopyName,
 } from '../utils/containment.js';
-import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
+import { dropEditablePropertiesWithMissingTargets, instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, patchPanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
@@ -322,6 +322,10 @@ export function addControl(type, overrides = {}, { at = null } = {}) {
 
   const control = createControlFromType(type, overrides);
   const id = control._children.Core.id;
+  // A new Custom Component does not start with a published property for a layer it does not have
+  // (customComponentPackage.js). Here and not in createControl: that is also the pristine a saved
+  // control is a difference from, and changing it would change what older files read back as.
+  if (type === 'CustomComponent') dropEditablePropertiesWithMissingTargets(control);
 
   let parentId = null;
   if (panel && !overrides.Transform && control._children.Transform) {

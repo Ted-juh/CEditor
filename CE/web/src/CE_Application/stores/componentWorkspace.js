@@ -3,7 +3,7 @@ import { createControl } from '../models/componentTypes.js';
 import { applyPatchObject } from './controlTreeUtils.js';
 import { createCustomComponentStarterPatch } from '../utils/customComponentFactory.js';
 import { migrateCustomComponentPlan } from '../utils/customComponentMigrations.js';
-import { instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
+import { dropEditablePropertiesWithMissingTargets, instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { customComponentLibrary } from './customComponentLibrary.js';
 
 import { deepClone } from '../utils/deepClone.js';
@@ -68,6 +68,8 @@ export function createComponentDocument({ starterId = 'starter.blankCanvas', nam
 
   if (!sourceControl?._children) {
     applyPatchObject(control, createCustomComponentStarterPatch(starterId));
+    // As addControl does for one inserted on a panel (customComponentPackage.js).
+    dropEditablePropertiesWithMissingTargets(control);
   }
 
   control._children.Core.id = sourceControl?._children?.Core?.id || control._children.Core.id || uniqueComponentDocumentId();

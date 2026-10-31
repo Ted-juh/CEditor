@@ -256,10 +256,15 @@
   // Inline readiness nudge: open required/recommended steps, dismissible. Steps that can be
   // scaffolded mechanically carry their fix inline, so the nudge is actionable rather than
   // just a scolding — readinessAutoFix returns null for anything needing a human decision.
+  const EMPTY_COMPONENT_HINT = 'Nothing drawn yet: pick a shape on the left and drag on the canvas, or start from Starters.';
   let readinessNudgeDismissed = $state(false);
+  let readiness = $derived(control ? analyzeCustomComponentReadiness(control) : null);
+  // Nothing drawn yet: what to do first, not why it is not reusable. A new component opened on a red
+  // "Not reusable yet: Visual Layers — 0 authored/runtime layer(s)".
+  let componentEmpty = $derived(!!readiness?.steps.some((step) => step.id === 'visuals' && !step.done));
   let readinessNudgeSteps = $derived.by(() => {
-    if (!control) return [];
-    return analyzeCustomComponentReadiness(control).steps
+    if (!readiness || componentEmpty) return [];
+    return readiness.steps
       .filter((step) => !step.done && ['required', 'recommended'].includes(step.severity))
       .map((step) => ({ ...step, fix: readinessAutoFix(control, step.id) }));
   });
@@ -3580,7 +3585,9 @@
     >
       <!-- In the look bar, not over the canvas: see SurfaceLookBar. -->
       {#snippet notice()}
-        {#if !readinessNudgeDismissed && readinessNudgeSteps.length}
+        {#if componentEmpty}
+          <div class="readiness-nudge empty-start" role="status" title={EMPTY_COMPONENT_HINT}><span class="nudge-text">{EMPTY_COMPONENT_HINT}</span></div>
+        {:else if !readinessNudgeDismissed && readinessNudgeSteps.length}
           <div class="readiness-nudge" role="status" title={readinessNudgeSteps.map((step) => `${step.label} — ${step.detail}`).join('\n')}>
             <strong>Not reusable yet:</strong>
             {#each readinessNudgeSteps as step (step.id)}
@@ -4778,6 +4785,7 @@
   }
 
   .readiness-nudge strong { flex-shrink: 0; white-space: nowrap; }
+  .readiness-nudge.empty-start { color: rgba(200, 212, 226, 0.85); }
   .readiness-nudge .nudge-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .readiness-nudge .nudge-step {
     display: inline-flex;

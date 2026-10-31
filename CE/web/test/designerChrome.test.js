@@ -28,7 +28,8 @@ test('the layer quick bar says what its buttons do with icons, not letters, and 
   assert.doesNotMatch(style, /position: absolute/);
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
   assert.match(designer, /\{#snippet actions\(\)\}\s*\{#if activeSelectionFrame[^}]*\}\s*<SurfaceQuickbar/);
-  assert.match(designer, /\{#snippet notice\(\)\}\s*\{#if !readinessNudgeDismissed && readinessNudgeSteps\.length\}\s*<div class="readiness-nudge"/);
+  // The notice snippet: the empty component's hint (newCustomComponent.test.js), else the readiness steps.
+  assert.match(designer, /\{#snippet notice\(\)\}\s*\{#if componentEmpty\}\s*<div class="readiness-nudge empty-start"[\s\S]*?\{:else if !readinessNudgeDismissed && readinessNudgeSteps\.length\}\s*<div class="readiness-nudge"/);
   const lookBar = src('CE_Application/sections/SurfaceLookBar.svelte');
   assert.match(lookBar, /<div class="lookbar-middle">\s*\{@render notice\?\.\(\)\}\s*\{@render actions\?\.\(\)\}/);
   // Nothing of the two is placed over the canvas any more.

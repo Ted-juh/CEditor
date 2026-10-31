@@ -150,6 +150,11 @@
     return behaviors?._children?.[name] ?? null;
   }
 
+  // The behaviour a hit zone drawn on the canvas is wired to (makeDrawnHitZone in the designer).
+  function drawnZoneDrives(cluster) {
+    return cluster.behaviors.includes(designer?.selectedBehavior || 'mainSlider');
+  }
+
   function zoneOf(name) {
     return hitZones?._children?.[name] ?? null;
   }
@@ -273,7 +278,9 @@
                 {#if entry.shared}<span class="tag shared">shared</span>{/if}
               </div>
             {:else}
-              <div class="empty-note">No grab areas — this control cannot receive input yet.</div>
+              <!-- What is missing and, for the value a drawn hit zone is wired to, how to add it: a new
+                   component greeted its author with two of "this control cannot receive input yet". -->
+              <div class="empty-note">No grab area yet, so nothing on the canvas moves this value.{#if drawnZoneDrives(cluster)}{' '}A hit zone you draw with the Hit Zone tool (H) drives it.{/if}</div>
             {/each}
           </div>
         </div>

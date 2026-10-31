@@ -100,5 +100,7 @@ test('properties fix exposes a text part when one exists', () => {
 test('design-intent steps have no auto-fix', () => {
   assert.equal(readinessAutoFix(bareControl(), 'motion'), null);
   assert.equal(readinessAutoFix(bareControl(), 'assets'), null);
+  // Package validity has one: removing a published property whose target is gone, and only when
+  // there is one (newCustomComponent.test.js). This control has none.
   assert.equal(readinessAutoFix(bareControl(), 'validPackage'), null);
 });
