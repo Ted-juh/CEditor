@@ -54,7 +54,7 @@ test('the designer\'s Preview draws no hit-zone names over the component unless 
 
 test('a component opens fitted to the surface, and the names above it stay their size at any zoom', () => {
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
-  assert.match(designer, /if \(!id \|\| !surfaceScrollEl \|\| id === fittedComponentId\) return;\s*fittedComponentId = id;[\s\S]{0,400}?untrack\(clearSurfaceSelection\);\s*requestAnimationFrame\(fitArtboardToView\);/);
+  assert.match(designer, /if \(!id \|\| !surfaceScrollEl \|\| !shellHeight \|\| id === fittedComponentId\) return;\s*fittedComponentId = id;[\s\S]{0,400}?untrack\(clearSurfaceSelection\);\s*requestAnimationFrame\(fitArtboardToView\);/);
   // The fit keeps clear of the tool strip along the bottom and leaves room above for the name tray.
   assert.match(designer, /const bottom = Math\.max\(48, strip \+ 16\);/);
   assert.match(designer, /const heightFit = \(surfaceScrollEl\.clientHeight - top - bottom\) \/ Math\.max\(1, artboardHeight\);/);
@@ -207,4 +207,43 @@ test('the look bar is one row at one height, so selecting a layer does not move 
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
   assert.match(designer, /\.readiness-nudge \{[\s\S]*?flex-wrap: nowrap;[\s\S]*?overflow: hidden;/);
   assert.match(designer, /<span class="nudge-text">\{step\.label\} — \{step\.detail\}<\/span>/);
+});
+
+test("the colour dock takes a share of the designer's height, and never leaves the canvas without room", async () => {
+  // On a 1366×768 laptop it was 340px of a 648px designer, and the canvas had 138.
+  const { displayDockHeightFor, statesStartFolded, DESIGNER_CANVAS_KEEP, DISPLAY_DOCK_MIN } = await import('../src/CE_Application/utils/customDesignSurfaceHelpers.js');
+  assert.equal(displayDockHeightFor(0, 648), 233, 'a laptop gets about a third');
+  assert.equal(displayDockHeightFor(0, 960), 340, 'a full-HD window keeps the 340 it always had');
+  assert.equal(displayDockHeightFor(0, 0), 340, 'before the designer is measured');
+  assert.equal(displayDockHeightFor(400, 960), 400, 'a height the author dragged is kept');
+  assert.equal(displayDockHeightFor(500, 648), 648 - DESIGNER_CANVAS_KEEP, 'but not over the canvas');
+  assert.equal(displayDockHeightFor(0, 300), DISPLAY_DOCK_MIN);
+  assert.equal(statesStartFolded(648), true);
+  assert.equal(statesStartFolded(960), false);
+  assert.equal(statesStartFolded(0), false, 'not before it is measured');
+
+  const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
+  assert.match(designer, /let displayDockHeight = \$derived\(displayDockHeightFor\(displayDockChosen, shellHeight\)\);/);
+  assert.match(designer, /let filmstripCollapsed = \$derived\(filmstripCollapsedChoice \?\? statesStartFolded\(shellHeight\)\);/);
+  assert.match(designer, /bind:clientHeight=\{shellHeight\}/);
+  assert.match(designer, /ondblclick=\{\(\) => \{ displayDockChosen = 0; removeStoredValue\('ce\.surface\.displayDockHeight'\); \}\}/, 'a double-click goes back to the share');
+});
+
+test('the tool strip is one row, with smaller buttons on a narrow designer', () => {
+  const strip = src('CE_Application/sections/SurfaceToolStrip.svelte');
+  const rule = strip.match(/\n {2}\.tool-strip \{\n[\s\S]*?\n {2}\}/)?.[0] ?? '';
+  assert.match(rule, /flex-wrap: nowrap;/);
+  // After the rule that sizes the buttons, or it loses to it.
+  const sizes = strip.indexOf('.tool-flyout-host > button {');
+  const narrow = strip.indexOf('@container (max-width: 900px)');
+  assert.ok(sizes > 0 && narrow > sizes, 'the narrow sizes come after the normal ones');
+  assert.match(strip.slice(narrow), /\.tool-strip > button,\s*\.tool-flyout-host > button \{ width: 30px; height: 30px; \}/);
+  assert.match(src('CE_Application/sections/CustomDesignSurfaceEditor.svelte'), /\.surface-shell \{[\s\S]*?container-type: inline-size;/);
+});
+
+test("the designer's header keeps the component's name on a narrow designer", () => {
+  const canvas = src('CE_Application/editor/EditorCanvas.svelte');
+  assert.match(canvas, /\.component-workspace \{[\s\S]*?container-type: inline-size;/);
+  assert.match(canvas, /@container \(max-width: 900px\) \{\s*\.component-workspace-title span \{ display: none; \}/);
+  assert.match(canvas, /\.component-workspace-header button,\s*\.component-workspace-launch \{\s*white-space: nowrap;/);
 });

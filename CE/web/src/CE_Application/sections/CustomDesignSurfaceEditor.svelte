@@ -88,7 +88,7 @@
   import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
   import { numberOr } from '../utils/primitives.js';
   import { confirmDestructive } from '../utils/confirmDiscard.js';
-  import { readStoredNumber, writeStoredNumber } from '../utils/localStorageState.js';
+  import { readStoredNumber, removeStoredValue, writeStoredNumber } from '../utils/localStorageState.js';
   import {
     angleFromCenter,
     computeResizedRect,
@@ -163,6 +163,10 @@
     uniqueNodeName,
     valueControlStyleLabel,
     zoneThumbPartStyle as zoneThumbPartStyleBase,
+    DISPLAY_DOCK_MAX,
+    DISPLAY_DOCK_MIN,
+    displayDockHeightFor,
+    statesStartFolded,
   } from '../utils/customDesignSurfaceHelpers.js';
 
   let { control = null } = $props();
@@ -391,7 +395,9 @@
   let surfacePan = $state(null);
   let inlineTextEditLayer = $state('');
   let inspectorTab = $state('object');
-  let filmstripCollapsed = $state(false);
+  // Folded on a short designer until the author opens or folds it themselves.
+  let filmstripCollapsedChoice = $state(null);
+  let filmstripCollapsed = $derived(filmstripCollapsedChoice ?? statesStartFolded(shellHeight));
   let contactSheetOpen = $state(false);
   let penTool = $state(null);
   // The one selected path part, when the Select tool is out: the Pen shows its points for editing.
@@ -1960,7 +1966,8 @@
   let fittedComponentId = null;
   $effect(() => {
     const id = core?.id;
-    if (!id || !surfaceScrollEl || id === fittedComponentId) return;
+    // After the designer's height is known: the dock and the states strip take their share from it.
+    if (!id || !surfaceScrollEl || !shellHeight || id === fittedComponentId) return;
     fittedComponentId = id;
     // And with nothing selected. A new component carried a layer to start on (the factory's
     // `background`, a converted knob's first part), so the designer opened with a layer selected
@@ -3104,10 +3111,12 @@
   // Tier 2 of the 2026-07-12 review, and §3's note on the dock: "Fixed 340px, not resizable, and
   // the only place colours/gradients/align actually get edited". A gradient with a dozen stops and
   // a 340px box is a scroll; a solid colour and the same box is wasted canvas. It is a drag now,
-  // remembered across sessions because a height you set once you meant.
-  const DISPLAY_DOCK_MIN = 160;
-  const DISPLAY_DOCK_MAX = 720;
-  let displayDockHeight = $state(readStoredNumber('ce.surface.displayDockHeight', 340));
+  // remembered across sessions because a height you set once you meant. Until one is set (0) it is
+  // a share of the designer's height, and never so tall the canvas has no room: see
+  // displayDockHeightFor in customDesignSurfaceHelpers.js.
+  let displayDockChosen = $state(readStoredNumber('ce.surface.displayDockHeight', 0));
+  let shellHeight = $state(0);
+  let displayDockHeight = $derived(displayDockHeightFor(displayDockChosen, shellHeight));
   let resizingDisplayDock = $state(false);
   let displayDockMoveHandler = null;
   let displayDockEndHandler = null;
@@ -3123,7 +3132,7 @@
     // Dragging the divider UP grows the dock, because the dock is below it.
     displayDockMoveHandler = (moveEvent) => {
       const next = startHeight + (startY - moveEvent.clientY);
-      displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, Math.round(next)));
+      displayDockChosen = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, Math.round(next)));
     };
     displayDockEndHandler = () => {
       resizingDisplayDock = false;
@@ -3132,7 +3141,7 @@
       window.removeEventListener('blur', displayDockEndHandler);
       displayDockMoveHandler = null;
       displayDockEndHandler = null;
-      writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
+      writeStoredNumber('ce.surface.displayDockHeight', displayDockChosen);
     };
     window.addEventListener('mousemove', displayDockMoveHandler);
     window.addEventListener('mouseup', displayDockEndHandler);
@@ -3547,6 +3556,7 @@
     aria-label="Custom component design surface"
     tabindex="0"
     bind:this={surfaceShellEl}
+    bind:clientHeight={shellHeight}
   >
     {#if !designerPreviewing}
     <SurfaceLookBar
@@ -4126,7 +4136,7 @@
       {artboardWidth}
       {artboardHeight}
       {filmstripCollapsed}
-      onToggleCollapsed={() => { filmstripCollapsed = !filmstripCollapsed; }}
+      onToggleCollapsed={() => { filmstripCollapsedChoice = !filmstripCollapsed; }}
       {selectStateCard}
       onEditState={(name) => { selectStateCard(name); if (core?.id) applyControlPatch(core.id, { 'Designer.focusSection': 'react', 'Designer.focusReactPane': 'states' }); }}
       {setFilmstripStateWhen}
@@ -4172,13 +4182,13 @@
           aria-orientation="horizontal"
           tabindex="0"
           onmousedown={beginDisplayDockResize}
-          ondblclick={() => { displayDockHeight = 340; writeStoredNumber('ce.surface.displayDockHeight', 340); }}
+          ondblclick={() => { displayDockChosen = 0; removeStoredValue('ce.surface.displayDockHeight'); }}
           onkeydown={(event) => {
             if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
             event.preventDefault();
             const delta = event.key === 'ArrowUp' ? 16 : -16;
-            displayDockHeight = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, displayDockHeight + delta));
-            writeStoredNumber('ce.surface.displayDockHeight', displayDockHeight);
+            displayDockChosen = Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, displayDockHeight + delta));
+            writeStoredNumber('ce.surface.displayDockHeight', displayDockChosen);
           }}
         ></div>
         <DisplayPanel />
@@ -4226,6 +4236,8 @@
     --dk-field-border: #3B4650;
     --dk-field-fg: #E8EEF5;
     display: grid;
+    /* The tool strip sizes its buttons by this width (SurfaceToolStrip's container query). */
+    container-type: inline-size;
     /* Shares of the designer's own width, not of the window: the inspector beside it takes some
        600px of the window, so a dock at 25vw and a canvas of at least 420px came to more than the
        designer had (1065px of 1044 at 1700 wide) and the dock's right edge went under the inspector.

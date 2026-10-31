@@ -384,3 +384,39 @@ export function drawPreviewClip(tool) {
   if (isPolygonKind(tool)) return clipPathForKind(tool);
   return 'none';
 }
+
+// --- The designer's height, shared out ---------------------------------------------------------
+//
+// The display dock under the canvas (colours, gradient, effects) was 340px whatever the window,
+// and the states strip 86px: on a 1366×768 laptop that left the canvas 138px of a 648px designer,
+// with the tool strip over most of it. The dock's default is now a share of the designer's height
+// (the same 340 from about 950px up), a height the author dragged is kept but never so tall that the
+// canvas goes under DESIGNER_CANVAS_KEEP, and the states strip starts folded when the designer is
+// short.
+
+export const DISPLAY_DOCK_MIN = 160;
+export const DISPLAY_DOCK_MAX = 720;
+export const DISPLAY_DOCK_DEFAULT = 340;
+const DISPLAY_DOCK_SHARE = 0.36;
+// The look bar, the zoom row and the states strip (about 170px) and 160px of canvas.
+export const DESIGNER_CANVAS_KEEP = 330;
+// Below this the states strip starts folded.
+export const SHORT_DESIGNER_HEIGHT = 720;
+
+/**
+ * The display dock's height: `chosen` is the height the author dragged (0 for none), `designer`
+ * the designer's height in pixels (0 before it is measured).
+ */
+export function displayDockHeightFor(chosen, designer) {
+  const measured = Number(designer) > 0;
+  const wanted = Number(chosen) > 0
+    ? Number(chosen)
+    : (measured ? Math.min(DISPLAY_DOCK_DEFAULT, Math.round(designer * DISPLAY_DOCK_SHARE)) : DISPLAY_DOCK_DEFAULT);
+  const room = measured ? designer - DESIGNER_CANVAS_KEEP : DISPLAY_DOCK_MAX;
+  return Math.max(DISPLAY_DOCK_MIN, Math.min(DISPLAY_DOCK_MAX, wanted, room));
+}
+
+/** Whether the states strip starts folded: on a short designer, until the author says otherwise. */
+export function statesStartFolded(designer) {
+  return Number(designer) > 0 && designer < SHORT_DESIGNER_HEIGHT;
+}

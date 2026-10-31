@@ -190,11 +190,13 @@
   /* The floating tool-strip overlaps the bottom of the canvas cell. */
   .tool-strip { grid-area: canvas; align-self: end; }
 
+  /* One row, always: wrapped, it was two rows of buttons over a laptop's 140px of canvas. On a
+     narrow designer the buttons are smaller instead (the query container is the designer, .surface-shell). */
   .tool-strip {
     display: flex;
     flex-direction: row;
     align-items: center;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     overflow-x: auto;
     justify-content: center;
     gap: 5px;
@@ -404,5 +406,12 @@
   .tool-flyout {
     border-color: #31434F;
     background: #111A21;
+  }
+
+  /* A narrow designer: smaller buttons, still one row (see .tool-strip). Last, after the sizes above. */
+  @container (max-width: 900px) {
+    .tool-strip { gap: 3px; padding: 5px 4px; }
+    .tool-strip > button,
+    .tool-flyout-host > button { width: 30px; height: 30px; }
   }
 </style>

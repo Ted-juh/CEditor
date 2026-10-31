@@ -1307,6 +1307,8 @@
     z-index: 140;
     display: flex;
     flex-direction: column;
+    /* The header below trims itself by the designer's width, not the window's. */
+    container-type: inline-size;
     min-width: 0;
     min-height: 0;
     background: #0D1318;
@@ -1411,6 +1413,7 @@
 
   .component-workspace-header button,
   .component-workspace-launch {
+    white-space: nowrap;
     height: 24px;
     border: 1px solid #2F404B;
     border-radius: 4px;
@@ -1730,6 +1733,16 @@
     border-color: #5B9BD5;
     background: #26384B;
     color: #FFF;
+  }
+
+  /* A narrow designer (a laptop, with the inspector beside it): the header keeps the component's
+     name and drops the crumbs before it, and the canvas, layer and hit-zone counts, which the dock
+     shows too; a warning stays. Cut short, they read "Component Designer F…", "2 lay…" and
+     "Back to" over "Panel". */
+  @container (max-width: 900px) {
+    .component-workspace-title span { display: none; }
+    .component-workspace-status span:not(.warn) { display: none; }
+    .component-workspace-status:not(:has(.warn)) { display: none; }
   }
 
   @media (max-width: 980px) {
