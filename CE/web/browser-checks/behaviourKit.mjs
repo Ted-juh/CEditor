@@ -44,6 +44,12 @@ export async function boot({ width = 1700, height = 1000 } = {}) {
   const page = await browser.newPage({ viewport: { width, height } });
   const failures = [];
   page.on('pageerror', (error) => failures.push(String(error).split('\n')[0]));
+  // The app's modules, for page.evaluate, through a loader made before anything runs. Enabling a
+  // panel's scripts hardens the page (the script sandbox's lockdown), and page.evaluate goes through
+  // the page's eval, which then refuses any source containing an import expression: every helper
+  // here that loaded a store with import() failed from that moment. The loader was made beforehand,
+  // so it keeps working, and a helper's source names __ceImport, not import.
+  await page.addInitScript(() => { window.__ceImport = (path) => import(path); });
 
   await page.goto(url, { waitUntil: 'networkidle' });
   await page.waitForSelector('.app', { timeout: 60000 });
@@ -51,7 +57,7 @@ export async function boot({ width = 1700, height = 1000 } = {}) {
 
   // One tap on every note the panel plays, installed before anything is inserted.
   await page.evaluate(async () => {
-    const { noteOutputEvents } = await import('/src/CE_Application/stores/noteOutput.js');
+    const { noteOutputEvents } = await window.__ceImport('/src/CE_Application/stores/noteOutput.js');
     window.__notes = [];
     noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push({ ...e, at: performance.now() }); });
   });
@@ -71,7 +77,7 @@ class Kit {
    *  under test. */
   async fresh() {
     await this.page.evaluate(async () => {
-      const { addPanel } = await import('/src/CE_Application/stores/panels.js');
+      const { addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       addPanel();
     });
     await this.settle();
@@ -79,7 +85,7 @@ class Kit {
 
   async preview(on) {
     await this.page.evaluate(async (on) => {
-      const { setPreviewModeEnabled } = await import('/src/CE_Application/stores/interactionPreview.js');
+      const { setPreviewModeEnabled } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
       setPreviewModeEnabled(on);
     }, on);
     await this.settle();
@@ -88,8 +94,8 @@ class Kit {
   /** Insert a control and apply a property patch. Returns its id. */
   async make(type, patch = {}) {
     const id = await this.page.evaluate(async ({ type }) => {
-      const { panels } = await import('/src/CE_Application/stores/panels.js');
-      const { addControl } = await import('/src/CE_Application/stores/controls.js');
+      const { panels } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+      const { addControl } = await window.__ceImport('/src/CE_Application/stores/controls.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
         const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
@@ -107,7 +113,7 @@ class Kit {
 
   async set(id, patch) {
     await this.page.evaluate(async ({ id, patch }) => {
-      const { updateControlProperty } = await import('/src/CE_Application/stores/controls.js');
+      const { updateControlProperty } = await window.__ceImport('/src/CE_Application/stores/controls.js');
       for (const [path, value] of Object.entries(patch)) updateControlProperty(id, path, value);
     }, { id, patch });
     await this.settle();
@@ -115,7 +121,7 @@ class Kit {
 
   read(id, path) {
     return this.page.evaluate(async ({ id, path }) => {
-      const { panels } = await import('/src/CE_Application/stores/panels.js');
+      const { panels } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
         const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
@@ -123,7 +129,7 @@ class Kit {
       // hold controls with the SAME id — and a search across all panels returns the one that is not
       // on screen. Reading the old copy while dragging the new one reports a working control as
       // broken, which is exactly what it did before this line existed.
-      const { activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const { activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       const live = get(panels).find((p) => p.id === get(activePanelId));
       const pool = live ? flat(live.controls ?? []) : [];
       const c = pool.find((x) => x._children.Core.id === id)
@@ -183,7 +189,7 @@ class Kit {
           cls: String(n.getAttribute('class') ?? '').split(/\s+/).filter((c) => c && !c.startsWith('s-')).join(' '),
           text: (n.childElementCount === 0 ? (n.textContent ?? '').trim() : ''),
           x: r1(b.x - host.x), y: r1(b.y - host.y), w: r1(b.width), h: r1(b.height),
-          bg: cs.backgroundColor, colour: cs.color, opacity: cs.opacity,
+          bg: cs.backgroundColor, colour: cs.color, opacity: cs.opacity, visibility: cs.visibility,
           font: r1(parseFloat(cs.fontSize) || 0), shadow: cs.boxShadow,
         };
       });
@@ -268,8 +274,8 @@ class Kit {
   /** The fan-out values this control currently offers a device parameter. */
   ports(id) {
     return this.page.evaluate(async ({ id }) => {
-      const { controlPortValues } = await import('/src/CE_Application/utils/controlPortValues.js');
-      const { panels } = await import('/src/CE_Application/stores/panels.js');
+      const { controlPortValues } = await window.__ceImport('/src/CE_Application/utils/controlPortValues.js');
+      const { panels } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
         const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
@@ -277,7 +283,7 @@ class Kit {
       // hold controls with the SAME id — and a search across all panels returns the one that is not
       // on screen. Reading the old copy while dragging the new one reports a working control as
       // broken, which is exactly what it did before this line existed.
-      const { activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const { activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       const live = get(panels).find((p) => p.id === get(activePanelId));
       const pool = live ? flat(live.controls ?? []) : [];
       const c = pool.find((x) => x._children.Core.id === id)
@@ -288,7 +294,7 @@ class Kit {
 
   session(id) {
     return this.page.evaluate(async (id) => {
-      const { panelPreviewSessions } = await import('/src/CE_Application/stores/interactionPreview.js');
+      const { panelPreviewSessions } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       return get(panelPreviewSessions)?.[id] ?? null;
     }, id);
@@ -422,8 +428,8 @@ class Kit {
    */
   async reopen(id) {
     const payload = await this.page.evaluate(async ({ id }) => {
-      const { serializePanel } = await import('/src/CE_Application/stores/panelModel.js');
-      const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
+      const { serializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
+      const { panels, activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
         const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };
@@ -437,7 +443,7 @@ class Kit {
     if (!payload) throw new Error('reopen: the control is not on the active panel');
 
     const wasPreview = await this.page.evaluate(async () => {
-      const { previewModeEnabled } = await import('/src/CE_Application/stores/interactionPreview.js');
+      const { previewModeEnabled } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
       let v; previewModeEnabled.subscribe((x) => { v = x; })();
       return v === true;
     });
@@ -448,14 +454,14 @@ class Kit {
     await this.settle(200);
     // The note tap lives on `window`, so it goes with the old page and has to be put back.
     await this.page.evaluate(async () => {
-      const { noteOutputEvents } = await import('/src/CE_Application/stores/noteOutput.js');
+      const { noteOutputEvents } = await window.__ceImport('/src/CE_Application/stores/noteOutput.js');
       window.__notes = [];
       noteOutputEvents.subscribe((v) => { for (const e of v.events ?? []) window.__notes.push({ ...e, at: performance.now() }); });
     });
 
     const newId = await this.page.evaluate(async ({ payload }) => {
-      const { deserializePanel } = await import('/src/CE_Application/stores/panelModel.js');
-      const { panels, addPanel } = await import('/src/CE_Application/stores/panels.js');
+      const { deserializePanel } = await window.__ceImport('/src/CE_Application/stores/panelModel.js');
+      const { panels, addPanel } = await window.__ceImport('/src/CE_Application/stores/panels.js');
       const get = (s) => { let v; s.subscribe((x) => { v = x; })(); return v; };
       const flat = (cs, out = []) => { for (const c of cs ?? []) { out.push(c);
         const kids = c?._children?.Children?._children; if (kids) flat(Object.values(kids), out); } return out; };

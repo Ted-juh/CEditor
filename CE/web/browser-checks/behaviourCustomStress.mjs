@@ -50,10 +50,10 @@ const visual = (id, probe) => kit.page.evaluate(({ id, probe }) => {
 async function zonePoint(id, wanted) {
   const box = await kit.box(id);
   const normalized = await kit.page.evaluate(async ({ id, wanted }) => {
-    const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
-    const { panelPreviewSessions } = await import('/src/CE_Application/stores/interactionPreview.js');
-    const { resolveCustomHitZoneAtPoint } = await import('/src/CE_Application/utils/customComponentInteraction.js');
-    const { resolveInteractiveControl } = await import('/src/CE_Application/utils/interactionRuntime.js');
+    const { panels, activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { panelPreviewSessions } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
+    const { resolveCustomHitZoneAtPoint } = await window.__ceImport('/src/CE_Application/utils/customComponentInteraction.js');
+    const { resolveInteractiveControl } = await window.__ceImport('/src/CE_Application/utils/interactionRuntime.js');
     const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
     const panel = get(panels).find((candidate) => candidate.id === get(activePanelId));
     const control = panel.controls.find((candidate) => candidate._children.Core.id === id);
@@ -92,10 +92,10 @@ async function colourComplexity(id) {
 
 async function runtimeSnapshot() {
   return kit.page.evaluate(async () => {
-    const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
-    const { scriptTrace } = await import('/src/CE_Application/stores/scriptConsole.js');
+    const { panels, activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { scriptTrace } = await window.__ceImport('/src/CE_Application/stores/scriptConsole.js');
     const { listPanelCustomApiEndpoints, listPanelCustomRouteLinks }
-      = await import('/src/CE_Application/utils/panelCustomComponentLinks.js');
+      = await window.__ceImport('/src/CE_Application/utils/panelCustomComponentLinks.js');
     const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
     const panel = get(panels).find((candidate) => candidate.id === get(activePanelId));
     const routes = listPanelCustomRouteLinks(panel?.controls ?? []);
@@ -105,26 +105,33 @@ async function runtimeSnapshot() {
       scripts: (panel?.scripts ?? []).map((script) => `${script.language}:${script.event}`).sort(),
       endpoints: listPanelCustomApiEndpoints(panel?.controls ?? []).length,
       routes: routes.map((route) => ({ name: route.name, broken: route.broken, blocked: route.blocked })),
-      trace: get(scriptTrace).map((entry) => ({ level: entry.level, scriptId: entry.scriptId, message: entry.message })),
+      trace: get(scriptTrace).map((entry) => ({ level: entry.kind, scriptId: entry.scriptId, message: entry.message })),
     };
   });
 }
 
 async function clearTrace() {
   await kit.page.evaluate(async () => {
-    const { clearScriptTrace } = await import('/src/CE_Application/stores/scriptConsole.js');
+    const { clearScriptTrace } = await window.__ceImport('/src/CE_Application/stores/scriptConsole.js');
     clearScriptTrace();
   });
 }
 
 async function activateFixtureScripts() {
   await kit.page.evaluate(async () => {
-    const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
-    const { setLiveScripts } = await import('/src/CE_Application/scripting/panelRuntime.js');
+    const { panels, activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { setLiveScripts } = await window.__ceImport('/src/CE_Application/scripting/panelRuntime.js');
     const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
     const panel = get(panels).find((candidate) => candidate.id === get(activePanelId));
     setLiveScripts(panel?.scripts ?? [], panel?.id ?? null);
   });
+  // A panel's scripts are paused until the person running the editor enables them: the editor never
+  // takes a document's word that its code is trusted. Without this the JavaScript and Lua legs below
+  // never ran and the trace stayed empty. Enabled the way a person does, with the banner's button.
+  const enable = kit.page.getByRole('button', { name: 'Enable scripts for this session' });
+  await enable.waitFor({ state: 'visible', timeout: 5000 });
+  await enable.click();
+  await kit.settle(300);
 }
 
 async function driveXy(targetXFraction) {
@@ -144,7 +151,7 @@ try {
   await kit.page.waitForFunction(() => window.__ceCustomComponentStressTest?.componentCount === 14,
     null, { timeout: 60000 });
   await kit.page.evaluate(async () => {
-    const { requestFitToWindow } = await import('/src/CE_Application/stores/editorCommands.js');
+    const { requestFitToWindow } = await window.__ceImport('/src/CE_Application/stores/editorCommands.js');
     requestFitToWindow();
   });
   await kit.settle(700);
@@ -196,9 +203,9 @@ try {
   const locked = await sessionValues(ids.range);
   const lockText = await visual(ids.range, { text: '^(EDIT|LOCK)$' });
   const lockedZoneResult = await kit.page.evaluate(async ({ id }) => {
-    const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
-    const { panelPreviewSessions } = await import('/src/CE_Application/stores/interactionPreview.js');
-    const { resolveCustomHitZoneAtPoint } = await import('/src/CE_Application/utils/customComponentInteraction.js');
+    const { panels, activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { panelPreviewSessions } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
+    const { resolveCustomHitZoneAtPoint } = await window.__ceImport('/src/CE_Application/utils/customComponentInteraction.js');
     const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
     const panel = get(panels).find((candidate) => candidate.id === get(activePanelId));
     const control = panel.controls.find((candidate) => candidate._children.Core.id === id);
@@ -222,10 +229,10 @@ try {
   // Generated selectors: one piano zone per key and one matrix zone per cell must be materially
   // present, and pointer input must land on numeric channel values inside the authored ranges.
   const generated = await kit.page.evaluate(async ({ keyboard, matrix }) => {
-    const { panels, activePanelId } = await import('/src/CE_Application/stores/panels.js');
-    const { getCustomHitZones } = await import('/src/CE_Application/utils/customComponentInteraction.js');
-    const { resolveInteractiveControl } = await import('/src/CE_Application/utils/interactionRuntime.js');
-    const { panelPreviewSessions } = await import('/src/CE_Application/stores/interactionPreview.js');
+    const { panels, activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');
+    const { getCustomHitZones } = await window.__ceImport('/src/CE_Application/utils/customComponentInteraction.js');
+    const { resolveInteractiveControl } = await window.__ceImport('/src/CE_Application/utils/interactionRuntime.js');
+    const { panelPreviewSessions } = await window.__ceImport('/src/CE_Application/stores/interactionPreview.js');
     const get = (store) => { let value; store.subscribe((next) => { value = next; })(); return value; };
     const panel = get(panels).find((candidate) => candidate.id === get(activePanelId));
     const byId = new Map(panel.controls.map((control) => [control._children.Core.id, control]));

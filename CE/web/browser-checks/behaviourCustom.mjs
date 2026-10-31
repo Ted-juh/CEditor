@@ -366,24 +366,42 @@ try {
   // The Tab Group's whole point is that a value channel swaps the visible page through rule-driven
   // states, and the channel moving is NOT that promise — the previous pass exercised the enum and
   // stopped there, which is the gap this closes. Each page carries its own text, so "which page is
-  // showing" is a question the DOM can answer exactly: a hidden part is not rendered at all.
+  // showing" is a question the DOM can answer exactly: a hidden part is either not rendered or, when
+  // it fades, kept with visibility hidden.
   await kit.fresh();
   await kit.preview(true);
   {
     const V = 'States/variants';
     const id = await makeStarter('starter.tabGroup');
-    const pagesShowing = async () => (await kit.dom(id, '.interactive-part-text'))
-      .map((d) => d.text).filter((t) => /^PAGE /.test(t));
+    // Visible, not merely present: the pages fade (the starter's pageFade), and a part that fades
+    // is kept in the page once hidden, invisible and out of the pointer's way, so it can fade back.
+    const pagesOf = async (controlId) => (await kit.dom(controlId, '.interactive-part-text'))
+      .filter((d) => d.visibility !== 'hidden').map((d) => d.text).filter((t) => /^PAGE /.test(t));
+    const pagesShowing = () => pagesOf(id);
+    // The outgoing page fades for the starter's pageFade duration (180ms); it is still visible until
+    // the fade ends, so a look sooner than that sees two pages, rightly.
+    const fadeMs = await kit.page.evaluate(async (id) => {
+      const { panels } = await import('/src/CE_Application/stores/panels.js');
+      const { findControlById } = await import('/src/CE_Application/utils/containment.js');
+      let list = [];
+      panels.subscribe((v) => { list = v; })();
+      for (const panel of list) {
+        const control = findControlById(panel.controls ?? [], id);
+        if (control) return Number(control._children.Animations?._children?.pageFade?.duration) || 0;
+      }
+      return 0;
+    }, id);
+    const afterFade = () => kit.settle(Math.max(160, fadeMs + 120));
     const setTab = (value) => kit.page.evaluate(async ({ id, value }) => {
       const { updatePanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
       updatePanelPreviewSession(id, { customValues: { tab: value } });
     }, { id, value });
 
-    led.check(V, 'default state', 'the component opens on page one and the other two are not rendered at all',
+    led.check(V, 'default state', 'the component opens on page one and the other two are not visible',
       ['PAGE ONE'], await pagesShowing());
     for (const [value, want] of [['two', 'PAGE TWO'], ['three', 'PAGE THREE'], ['one', 'PAGE ONE']]) {
       await setTab(value);
-      await kit.settle(160);
+      await afterFade();
       led.check(V, `rule tab == '${value}'`, 'exactly that page is visible and the others are gone',
         [want], await pagesShowing());
     }
@@ -401,7 +419,7 @@ try {
     const pageCounts = [];
     for (const [, at] of tabZones) {
       await kit.click(at);
-      await kit.settle(160);
+      await afterFade();
       const showing = await pagesShowing();
       pageCounts.push(showing.length);
       const tab = (await values(id)).tab;
@@ -436,7 +454,7 @@ try {
 
     // …and the rule still drives the page after a save and reopen.
     await setTab('two');
-    await kit.settle(160);
+    await afterFade();
     const again = await kit.reopen(id);
     // A FRESH SESSION, deliberately. Reopening preserves control ids and the preview session is
     // keyed by id, so the reopened copy inherits the live state of the one it was saved from —
@@ -446,8 +464,8 @@ try {
       const { resetPanelPreviewSession } = await import('/src/CE_Application/stores/interactionPreview.js');
       resetPanelPreviewSession(id);
     }, { id: again });
-    await kit.settle(200);
-    const reopenedPages = (await kit.dom(again, '.interactive-part-text')).map((d) => d.text).filter((t) => /^PAGE /.test(t));
+    await afterFade();
+    const reopenedPages = await pagesOf(again);
     led.check(V, 'save/reopen (state rules still apply)', 'opened fresh, a saved component starts on its default page',
       ['PAGE ONE'], reopenedPages);
     const zones2 = await locateZones(again);
@@ -455,8 +473,8 @@ try {
     let swapped = null;
     for (const [, at] of tab2) {
       await kit.click(at);
-      await kit.settle(160);
-      const showing = (await kit.dom(again, '.interactive-part-text')).map((d) => d.text).filter((t) => /^PAGE /.test(t));
+      await afterFade();
+      const showing = await pagesOf(again);
       if (showing.length === 1 && showing[0] !== 'PAGE ONE') { swapped = showing[0]; break; }
     }
     led.check(V, 'save/reopen (tabs still swap pages)', 'and pressing a tab still swaps the page after the round trip',
