@@ -54,6 +54,7 @@
   import { selectedScopedEditingControl, stateEditScope } from '../stores/stateEditScope.js';
   import { panelPreviewDebugEnabled, previewModeEnabled, previewInspectedControlId, previewInspection, setPreviewInspectedControlId, syncPanelPreviewSessions } from '../stores/interactionPreview.js';
   import { activeComponentControl, closeComponentWorkspace, componentWorkspaceMode, createComponentDocument, openComponentSurfaceWorkspace } from '../stores/componentWorkspace.js';
+  import { openComponentExport } from '../stores/componentExport.js';
   import { flushHistory } from '../stores/history.js';
 
   // The four keys whose autorepeat is one undo step (see handleEditorKeyUp).
@@ -949,6 +950,11 @@
               >
                 Edit
               </button>
+              <!-- The one way out: to the library and/or a file (layout/ComponentExportDialog.svelte).
+                   A component open on its own had no way to be saved at all. -->
+              <button type="button" class="export" onclick={openComponentExport} title="Export to your component library and/or a file (Ctrl+S on a component open on its own)" data-testid="component-export-launch">
+                Export…
+              </button>
               {#if $activeEditorTab?.type === 'panel'}
                 <button type="button" onclick={closeComponentWorkspace}>Back to Panel</button>
               {/if}
@@ -1392,6 +1398,12 @@
     font-weight: 700;
     padding: 0 8px;
     cursor: pointer;
+  }
+
+  .component-workspace-header button.export {
+    border-color: #0B6EB5;
+    background: #094771;
+    color: #FFF;
   }
 
   .component-workspace-header button:hover,

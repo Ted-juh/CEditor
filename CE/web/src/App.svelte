@@ -25,6 +25,10 @@
   import TabBar from './CE_Application/editor/TabBar.svelte';
   import { initPanelBridge, panels, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
+  import ComponentExportDialog from './CE_Application/layout/ComponentExportDialog.svelte';
+  import { openComponentExport } from './CE_Application/stores/componentExport.js';
+  import { importComponentFile, mayBeComponentFile } from './CE_Application/stores/componentImport.js';
+  import { notify } from './CE_Application/stores/scriptUi.js';
   import { MIN_PROPERTIES_PANEL_WIDTH, DEFAULT_PROPERTIES_PANEL_WIDTH, clampPropertiesPanelWidth } from './CE_Application/utils/propertiesPanelWidth.js';
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
@@ -109,7 +113,31 @@
   }
 
   function saveActiveTab({ saveAs = false } = {}) {
+    // A component open on its own is saved by exporting it: Ctrl+S opens the Export window.
+    if (get(activeEditorTab)?.type === 'component') { openComponentExport(); return; }
     saveActiveEditorDocument({ saveAs });
+  }
+
+  // A file dragged over the window from the desktop. Nothing else takes one here (the canvas takes
+  // the insert flyout's drags, Settings its icon and font files, and those say so first); without
+  // this the WebView would open a dropped file in place of the program. A component file goes into
+  // the library and opens in the Component Designer (stores/componentImport.js).
+  const draggingFiles = (e) => [...(e.dataTransfer?.types ?? [])].includes('Files');
+  function handleWindowDragOver(e) {
+    if (e.defaultPrevented || !draggingFiles(e)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }
+  function handleWindowDrop(e) {
+    if (e.defaultPrevented || !draggingFiles(e)) return;
+    e.preventDefault();
+    const files = [...(e.dataTransfer?.files ?? [])];
+    const components = files.filter(mayBeComponentFile);
+    if (!components.length) {
+      notify('Drop a component file (.ceditor-component.json) here to import it.', { kind: 'warn' });
+      return;
+    }
+    for (const file of components) importComponentFile(file);
   }
 
   function handleGlobalKeyDown(e) {
@@ -413,7 +441,7 @@
 
 </script>
 
-<svelte:window onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} onresize={handleWindowResize} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} />
+<svelte:window onkeydown={handleGlobalKeyDown} onkeyup={handleGlobalKeyUp} onresize={handleWindowResize} onbeforeunload={handleBeforeUnload} oncontextmenu={(e) => e.preventDefault()} ondragover={handleWindowDragOver} ondrop={handleWindowDrop} />
 
 {#if isBehaviorDebug}
   <BehaviorDesigner controls={behaviorSampleControls} initialScripts={behaviorSampleScripts} />
@@ -523,6 +551,7 @@
   <ScriptDialog />
 
   <NewPanelDialog />
+  <ComponentExportDialog />
   <HistoryWindow />
 
   {#if showShortcuts}

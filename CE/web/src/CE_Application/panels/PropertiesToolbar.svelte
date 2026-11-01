@@ -82,6 +82,9 @@
     <Redo2 size={18} strokeWidth={1.5} />
   </button>
 
+  <!-- A component open on its own has no panel to save, lock, preview or grid; it has Undo, Redo and
+       the search. -->
+  {#if panel}
   <div class="toolbar-divider"></div>
 
   <button class="toolbar-btn" class:active={panel.modified} title="Save panel" aria-label="Save panel"
@@ -123,6 +126,7 @@
     onclick={() => updatePanel(panel.id, { snapToGrid: !panel.snapToGrid })}>
     <Magnet size={18} strokeWidth={1.5} />
   </button>
+  {/if}
 
   {#if searching}
     <div class="toolbar-search">

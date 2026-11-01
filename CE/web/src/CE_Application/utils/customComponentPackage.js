@@ -166,6 +166,28 @@ export function dropEditablePropertiesWithMissingTargets(control) {
   return names;
 }
 
+/**
+ * Variants are hidden (the owner's call, when custom components were simplified to import, change,
+ * choose what the panel may change, export): a new component does not offer the panel a "Variant"
+ * setting for a choice it has no variants to make. One with variants of its own keeps it, and they
+ * still apply. Replaces the map, as above. Returns the names dropped.
+ */
+export function dropVariantSettingWithoutVariants(control) {
+  const sections = control?._children;
+  const editable = sections?.PublishedProperties?.editableProperties;
+  if (!editable) return [];
+  const variants = Object.values(sections.Variants?._children ?? {}).filter((variant) => variant?.enabled !== false);
+  if (variants.length > 1) return [];
+  const names = Object.entries(editable)
+    .filter(([, entry]) => ['Designer.activeVariant', 'Variants.active'].includes(String(entry?.path ?? '')))
+    .map(([name]) => name);
+  if (!names.length) return names;
+  sections.PublishedProperties.editableProperties = Object.fromEntries(
+    Object.entries(editable).filter(([name]) => !names.includes(name)),
+  );
+  return names;
+}
+
 function referencedCustomChannels(source) {
   const text = String(source ?? '').trim();
   if (!text) return [];
@@ -551,7 +573,11 @@ export function analyzeCustomComponentReadiness(control) {
     readinessStep('interaction', 'Interaction', (summary.behaviors ?? 0) > 0 || runtimeSurface > 0, `${summary.behaviors ?? 0} behavior(s), ${runtimeSurface} hit surface(s)`, 'movement', 'recommended'),
     readinessStep('motion', 'Motion Rules', motionRules > 0, `${summary.bindings ?? 0} binding(s), ${summary.animations ?? 0} animation(s), ${summary.links ?? 0} link(s)`, 'movement', 'optional'),
     readinessStep('publicApi', 'Panel API', publicApiCount > 0, `${summary.publicInputs ?? 0} input(s), ${summary.publicOutputs ?? 0} output(s)`, 'links', 'recommended'),
-    readinessStep('properties', 'Editable Properties', (summary.editableProperties ?? 0) > 0, `${summary.editableProperties ?? 0} published property control(s)`, 'states', 'recommended'),
+    // Optional: a component with no settings is a whole one (the panel changes its value, its look
+    // stays as drawn), and the Export window says so as a note. It was "recommended" while every new
+    // component offered a Variant setting that satisfied it; with Variants hidden that setting is
+    // gone, and the designer would have nagged every new component for it.
+    readinessStep('properties', 'Editable Properties', (summary.editableProperties ?? 0) > 0, `${summary.editableProperties ?? 0} published property control(s)`, 'states', 'optional'),
     readinessStep('assets', 'Packaged Assets', (summary.images ?? 0) + (summary.filmstrips ?? 0) > 0, `${summary.images ?? 0} image(s), ${summary.filmstrips ?? 0} filmstrip(s)`, 'assets', 'optional'),
     readinessStep('validPackage', 'Package Validity', validation.ok, describeBlockingIssues(validation.issues), 'overview', 'required'),
   ];
@@ -642,6 +668,8 @@ export function normalizeCustomComponentMetadata(control, metadata = {}) {
     tags: [...new Set(tags.map((tag) => String(tag ?? '').trim()).filter(Boolean))],
     license: String(metadata.license ?? designer.license ?? '').trim(),
     homepage: String(metadata.homepage ?? designer.homepage ?? '').trim(),
+    // "What changed" from the Export window: what a copy's update notice can quote.
+    changes: String(metadata.changes ?? '').trim(),
   };
 }
 

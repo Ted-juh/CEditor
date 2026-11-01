@@ -5,17 +5,14 @@
   // API, Variants, and Designer-tab Library homes.
   import BookMarked from 'lucide-svelte/icons/book-marked';
   import Cable from 'lucide-svelte/icons/cable';
-  import Rows3 from 'lucide-svelte/icons/rows-3';
   import { getSection, updateControlProperty } from '../stores/controls.js';
   import CustomPublishedPropertiesEditor from './CustomPublishedPropertiesEditor.svelte';
-  import CustomVariantsEditor from './CustomVariantsEditor.svelte';
   import CustomPackageLibrary from './CustomPackageLibrary.svelte';
 
   let { control = null } = $props();
 
   const MODES = [
     { id: 'contract', label: 'Contract', icon: Cable, hint: 'Define what this component publishes to its host — inputs, outputs, and editable properties.' },
-    { id: 'variants', label: 'Variants', icon: Rows3, hint: 'Named preset patches consumers can pick per instance. The active-variant picker lives on the instance Properties tab.' },
     { id: 'package', label: 'Package & Library', icon: BookMarked, hint: 'Package metadata, validation, export/import, and the local component library.' },
   ];
 
@@ -52,12 +49,10 @@
   </div>
   <p class="publish-mode-hint">{modeMeta.hint}</p>
 
-  <!-- CSS display switching keeps all three editors alive in the DOM. -->
+  <!-- CSS display switching keeps both editors alive in the DOM. Variants had a page here; they are
+       hidden now (old components keep theirs, and they still apply). -->
   <div style:display={mode === 'contract' ? 'block' : 'none'}>
     <CustomPublishedPropertiesEditor {control} />
-  </div>
-  <div style:display={mode === 'variants' ? 'block' : 'none'}>
-    <CustomVariantsEditor {control} showActivePicker={false} />
   </div>
   <div style:display={mode === 'package' ? 'block' : 'none'}>
     <CustomPackageLibrary {control} />

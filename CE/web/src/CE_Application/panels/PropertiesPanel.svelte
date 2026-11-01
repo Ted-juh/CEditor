@@ -53,7 +53,7 @@
   import { propertyHint } from '../stores/propertyHint.js';
   import { clearPropertyFilter } from '../stores/propertyFilter.js';
   import { creatorMode, CREATOR_SIMPLE_HIDDEN_TABS } from '../stores/creatorMode.js';
-  import { selectedControl, selectedControls, hasSection, getSection, updateControlProperty } from '../stores/controls.js';
+  import { selectedControl, selectedControls, hasSection, getSection, updateControlProperty, standaloneComponentControl } from '../stores/controls.js';
   import { previewModeEnabled, togglePreviewMode } from '../stores/interactionPreview.js';
   import PropertiesToolbar from './PropertiesToolbar.svelte';
   import DockSearchHits from '../properties/DockSearchHits.svelte';
@@ -99,7 +99,11 @@
   let { width = DEFAULT_PROPERTIES_PANEL_WIDTH } = $props();
   let clampedWidth = $derived(clampPropertiesPanelWidth(width));
 
-  let contextMode = $derived($selectedComponentId != null ? 'component' : 'panel');
+  // A component open on its own (stores/controls.js standaloneComponentControl) has no panel and is
+  // not in the panel selection, and this panel said "No panel open" for it: none of the designer's
+  // tabs, so nothing to make it interactive or to publish it with. It is the component edited here.
+  let standaloneComponent = $derived(!!$standaloneComponentControl);
+  let contextMode = $derived($selectedComponentId != null || standaloneComponent ? 'component' : 'panel');
 
   // Owner names for header overlays
   let panelName = $derived($activePanel?.name ?? 'Panel');
@@ -485,7 +489,7 @@
 </script>
 
 <div class="properties-panel property-theme" style="width: {clampedWidth}px;">
-  {#if $activePanel}
+  {#if $activePanel || standaloneComponent}
     <!-- Toolbar area — aligns with editor tab bar (34px) -->
     <PropertiesToolbar
       panel={$activePanel}

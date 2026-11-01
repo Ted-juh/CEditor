@@ -763,21 +763,35 @@ inputs, outputs and settings, so that every copy on a panel can carry, say, its 
 
 ### Making one
 
-The way that works today is:
+Import one or start one, change it, choose what a panel may change about it, and export it:
 
-1. Insert a **Custom Component** (Insert → Values & Sliders → Custom Component, or from the icon
-   rail).
-2. Select it and press **Component Designer** on the canvas (or **Open Component Designer** at the
-   foot of the properties panel). The canvas turns into the designer for that component.
-3. Draw the component with the tools along the bottom of the canvas: **Select** (V), **Shape**, **Text** (T), **Hit Zone**
-   (H) for the parts that react to the mouse, and **Interactive** (I) for ready-wired knobs, sliders
-   and buttons. **Starters** gives you a beginning to work from. Press **?** for the designer's
-   shortcuts.
-4. On the properties panel's **Publish** tab, **Contract** sets what the component offers to the
-   panel: its inputs, outputs and editable properties. **Variants** are named looks a copy can pick.
-5. Still on **Publish**, open **Package & Library**, fill in **Name** and **Version**, and press **Save
-   local package**. The component is now in your library.
-6. Press **Back to Panel**.
+1. Start from one of these:
+   - **File → New Custom Component** opens an empty component in a tab of its own.
+   - **File → Import Component...** (or a component file dropped on the window) brings in a
+     `.ceditor-component.json` file, puts it in your library and opens it.
+   - **File → Open Component from Library...** opens one you saved before.
+   - On a panel: insert a **Custom Component** (Insert → Values & Sliders → Custom Component, or
+     from the icon rail), select it and press **Component Designer** on the canvas (or **Open
+     Component Designer** at the foot of the properties panel).
+2. Draw the component with the tools along the bottom of the canvas: **Select** (V), **Shape**,
+   **Text** (T), **Hit Zone** (H) for the parts that react to the mouse, and **Interactive** (I) for
+   ready-wired knobs, sliders and buttons. **Starters** gives you a beginning to work from. Press
+   **?** for the designer's shortcuts. The properties panel works for the component as it does for
+   a control on a panel, in its own tab too.
+3. On the properties panel's **Publish** tab, **Contract** sets what the component offers to the
+   panel: its inputs, outputs and the settings a panel may change on each copy.
+4. Press **Export...** in the designer's header (or Ctrl+S in a component's own tab). Give it a
+   **Name** and a **Version** (it suggests the next one after what your library holds under that
+   name) and, if you like, a line on **What changed**. Under **Save to**, tick **My component
+   library**, **A file** (a `.ceditor-component.json` to keep or give to someone), or both, and
+   press **Export**.
+5. On a panel, press **Back to Panel**. A component exported from a panel stays there as a linked
+   copy of what you saved.
+
+The Export window checks three things: that the component draws something, that something on it (a
+hit zone) changes its value, and that every setting a panel may change points at something that
+still exists. A warning never stops the export; a display, for one, rightly has no hit zone. A
+setting that points at nothing has a **Remove** button beside it.
 
 The **Shapes** palette down the left is for drawing. It opens folded, two narrow columns of its
 tools, so the artboard has the room; point at a tool for its name and key. The first of the three
@@ -819,9 +833,8 @@ labels, knobs or sliders and choose **Edit → Create Component from Selection..
 them as a component in your library and puts a linked copy in their place. Each label's text becomes
 a setting, so every copy can have its own.
 
-> **Not finished yet:** **File → New Custom Component** and **File → Open Saved Custom Component**
-> open a component in a tab of its own, but from that tab there is currently no way to save it to
-> the library. Use the route above.
+> **Not finished yet:** **Variants**, named looks a copy could pick, are hidden while custom
+> components are being made simpler. A component made with variants keeps the look it shows.
 
 ### Using saved components
 
@@ -838,9 +851,10 @@ can edit.
 
 ### Sharing a component
 
-Your library lives inside CEditor, not as files on disk. To give a component to someone else, use
-**Package file** (one component) or **Library file** (all of them) under **Package & Library**; on the
-other computer, paste or load that file in the **Import** box of the same section.
+Your library lives inside CEditor, not as files on disk. To give a component to someone else, export
+it with **A file** ticked. On the other computer, use **File → Import Component...** or drop the file
+on the window. To give all of them at once, use **Library file** under **Publish → Package &
+Library**; importing that file adds every component in it to the library.
 
 ## 11. Saving and sharing
 
@@ -1091,14 +1105,15 @@ CEditor is a beta. Things to know before you rely on it:
 | **Update Panel from Photoshop Artwork...** | | The same update from a Photoshop file. |
 | **Open Recent** | | Recently used panels, components, device profiles and script workspaces. |
 | **New Custom Component** | | Opens an empty custom component in its own tab. |
-| **Open Saved Custom Component** | | Opens a component from your library in its own tab. |
+| **Import Component...** | | Brings in a `.ceditor-component.json` (or library) file and opens a single component. Dropping the file on the window does the same. |
+| **Open Component from Library...** | | Opens a component from your library in its own tab. |
 | **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |
 | **Open Device Profile** | | Opens a loaded device profile in the designer. |
 | **Import Device Profile...** | | Loads a device profile from a file. |
 | **Discover Device (MIDI-CI)...** | | Starts a new profile by asking a connected MIDI 2.0 device to describe itself. |
 | **New Script Workspace** | | Opens the scripts of the active panel in the Behavior Designer. |
 | **Open Script Workspace** | | Opens a saved script workspace file. |
-| **Save** | Ctrl+S | Saves the panel (or the script workspace in front). |
+| **Save** | Ctrl+S | Saves the panel (or the script workspace in front); with a component's own tab in front, opens **Export**. |
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
 | **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts, icons and library components inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |

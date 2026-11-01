@@ -36,6 +36,8 @@
     showTreePanel, togglePanelVisibility, toggleCanvasFocus,
   } from '../stores/panelVisibility.js';
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
+  import { openComponentExport } from '../stores/componentExport.js';
+  import { importComponentFromFile } from '../stores/componentImport.js';
   import { requestAbout, requestDocumentation } from '../stores/editorCommands.js';
   import { runUpdateCheck } from '../stores/updateChannel.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
@@ -54,7 +56,12 @@
   // and "Toggle Grid" never said which way it would toggle.
   const hasPanel = () => !!get(activePanel);
   const hasSelection = () => get(selectedComponentIds).size > 0;
-  const canSave = () => get(activeEditorTab)?.type === 'script' || hasPanel();
+  // A component open on its own is saved by exporting it (stores/componentExport.js): Save opens Export.
+  const canSave = () => ['script', 'component'].includes(get(activeEditorTab)?.type) || hasPanel();
+  const saveFromMenu = (options = {}) => {
+    if (get(activeEditorTab)?.type === 'component') openComponentExport();
+    else saveActiveEditorDocument(options);
+  };
 
   // Duplicate / Delete / Group / Ungroup / Arrange all grey out through one table
   // (utils/editMenuAvailability.js), so the menu and its tests cannot disagree about when a
@@ -172,7 +179,10 @@
       { type: 'submenu', label: 'Open Recent', enabled: () => recentGroups.length > 0, items: recentSubmenuItems },
       { type: 'separator' },
       { label: 'New Custom Component', action: () => newCustomComponent() },
-      { label: 'Open Saved Custom Component', action: () => openSavedCustomComponent() },
+      // A component file into the library, opened to change (stores/componentImport.js). It could
+      // only come in from a paste box inside another component's Publish tab.
+      { label: 'Import Component...', action: () => importComponentFromFile() },
+      { label: 'Open Component from Library...', action: () => openSavedCustomComponent() },
       { type: 'separator' },
       { label: 'New Device Profile', action: () => newDeviceProfile() },
       { label: 'Open Device Profile', action: () => openDeviceProfile() },
@@ -182,12 +192,8 @@
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
       { type: 'separator' },
-      { label: 'Save',       shortcut: 'Ctrl+S', enabled: canSave, action: () => {
-        saveActiveEditorDocument();
-      } },
-      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', enabled: canSave, action: () => {
-        saveActiveEditorDocument({ saveAs: true });
-      } },
+      { label: 'Save',       shortcut: 'Ctrl+S', enabled: canSave, action: () => saveFromMenu() },
+      { label: 'Save As...', shortcut: 'Ctrl+Shift+S', enabled: canSave, action: () => saveFromMenu({ saveAs: true }) },
       { type: 'separator' },
       // Sharing is a separate command from Save, and has to be: a .cepanel points at its images
       // by absolute path, so the file that is correct to keep is the file that arrives blank on

@@ -3,7 +3,7 @@ import { createControl } from '../models/componentTypes.js';
 import { applyPatchObject } from './controlTreeUtils.js';
 import { createCustomComponentStarterPatch } from '../utils/customComponentFactory.js';
 import { migrateCustomComponentPlan } from '../utils/customComponentMigrations.js';
-import { dropEditablePropertiesWithMissingTargets, instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
+import { dropEditablePropertiesWithMissingTargets, dropVariantSettingWithoutVariants, instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { customComponentLibrary } from './customComponentLibrary.js';
 
 import { deepClone } from '../utils/deepClone.js';
@@ -70,6 +70,7 @@ export function createComponentDocument({ starterId = 'starter.blankCanvas', nam
     applyPatchObject(control, createCustomComponentStarterPatch(starterId));
     // As addControl does for one inserted on a panel (customComponentPackage.js).
     dropEditablePropertiesWithMissingTargets(control);
+    dropVariantSettingWithoutVariants(control);
   }
 
   control._children.Core.id = sourceControl?._children?.Core?.id || control._children.Core.id || uniqueComponentDocumentId();
@@ -123,6 +124,13 @@ export function closeComponentDocument(id) {
   activeComponentDocumentId.set(nextId);
   if (!remaining.length) closeComponentWorkspace();
   return nextId;
+}
+
+/** After an export: the document's work is kept, so closing it no longer asks. */
+export function markComponentDocumentSaved(controlId) {
+  componentDocuments.update((documents) => documents.map((document) => (
+    document.control?._children?.Core?.id === controlId ? { ...document, modified: false } : document
+  )));
 }
 
 /** `view`: the mutation changes only what the designer shows (utils/designerViewState.js), so the

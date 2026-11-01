@@ -1,5 +1,5 @@
 import { derived, get } from 'svelte/store';
-import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId } from './panels.js';
+import { panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, keyObjectId, activeEditorTab } from './panels.js';
 import { createControl as createControlFromType, getSection, hasSection } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { sanitizeControlName } from '../utils/controlNames.js';
@@ -23,11 +23,11 @@ import {
   selectionRoots,
   uniqueCopyName,
 } from '../utils/containment.js';
-import { dropEditablePropertiesWithMissingTargets, instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
+import { dropEditablePropertiesWithMissingTargets, dropVariantSettingWithoutVariants, instantiateCustomComponentPackageControl } from '../utils/customComponentPackage.js';
 import { isExclusiveSelectBehavior, normalizeExclusiveSelectDefaults } from '../utils/selectGroupUtils.js';
 import { deleteNestedValue, setNestedValue, valueAtPath } from './controlTreeUtils.js';
 import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, patchPanelControlsInList, updatePanelInList } from './panelDocumentHelpers.js';
-import { mutateComponentDocumentControl } from './componentWorkspace.js';
+import { activeComponentControl, mutateComponentDocumentControl } from './componentWorkspace.js';
 import { targetLayerName } from './panelLayerActions.js';
 import { withSetPins } from '../models/controlSetFamilies.js';
 import { isDesignerViewPatch } from '../utils/designerViewState.js';
@@ -37,12 +37,31 @@ export { getSection, hasSection };
 export { applyPatchObject } from './controlTreeUtils.js';
 
 /**
+ * A custom component open on its own: File › New Custom Component, opened from the library, or
+ * imported from a file. It is a document of the component workspace (stores/componentWorkspace.js),
+ * not a control on a panel, so the panel selection never named it, and with its tab in front the
+ * properties panel said "No panel open": no Interact, React, Assets, Publish or Test Bench, and no
+ * way to save it. With its tab in front it is the selection, and the writes below go to it.
+ */
+export const standaloneComponentControl = derived(
+  [activeEditorTab, activeComponentControl],
+  ([$tab, $control]) => ($tab?.type === 'component' ? $control ?? null : null),
+);
+
+/** The standalone component's id while its tab is in front and no panel is; otherwise null. */
+function standaloneComponentId() {
+  if (get(resolvedActivePanelId) != null) return null;
+  return get(standaloneComponentControl)?._children?.Core?.id ?? null;
+}
+
+/**
  * The currently selected control object (derived).
  * null when no component is selected (panel mode).
  */
 export const selectedControl = derived(
-  [panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, keyObjectId],
-  ([$panels, $resolvedActivePanelId, $selectedComponentId, $ids, $keyId]) => {
+  [panels, resolvedActivePanelId, selectedComponentId, selectedComponentIds, keyObjectId, standaloneComponentControl],
+  ([$panels, $resolvedActivePanelId, $selectedComponentId, $ids, $keyId, $standalone]) => {
+    if ($standalone) return $standalone;
     // In multi-select, show the key object (orange); in single-select, show the one selected
     const targetId = $ids.size > 1 && $keyId ? $keyId : $selectedComponentId;
     if (targetId == null) return null;
@@ -56,8 +75,9 @@ export const selectedControl = derived(
  * All currently selected control objects (derived).
  */
 export const selectedControls = derived(
-  [panels, resolvedActivePanelId, selectedComponentIds],
-  ([$panels, $resolvedActivePanelId, $ids]) => {
+  [panels, resolvedActivePanelId, selectedComponentIds, standaloneComponentControl],
+  ([$panels, $resolvedActivePanelId, $ids, $standalone]) => {
+    if ($standalone) return [$standalone];
     if ($ids.size === 0) return [];
     const panel = $panels.find(p => p.id === $resolvedActivePanelId);
     if (!panel) return [];
@@ -206,6 +226,15 @@ function normalizeExclusiveSelectionInList(list, panelId, preferredControlIds = 
  */
 export function updateSelectedProperty(path, value) {
   const panelId = get(resolvedActivePanelId);
+  const standaloneId = standaloneComponentId();
+  if (standaloneId) {
+    mutateComponentDocumentControl(standaloneId, (draft) => {
+      applyResolvedValue(draft, path, value);
+      pinDraftForSets(draft, { [path]: value });
+      return true;
+    });
+    return;
+  }
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0) return;
 
@@ -226,6 +255,11 @@ export function updateSelectedProperty(path, value) {
 
 export function updateSelectedInspectorProperty(path, value, stateName = inspectorStateNameForPath(path)) {
   const panelId = get(resolvedActivePanelId);
+  const standaloneId = standaloneComponentId();
+  if (standaloneId) {
+    mutateComponentDocumentControl(standaloneId, (draft) => applyInspectorResolvedValue(draft, path, value, stateName));
+    return;
+  }
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0) return;
 
@@ -237,6 +271,17 @@ export function updateSelectedInspectorProperty(path, value, stateName = inspect
 /** Apply distinct inspector patches to selected controls in one document update. */
 export function applyInspectorControlPatchesById(patchesByControlId) {
   const panelId = get(resolvedActivePanelId);
+  const standaloneId = standaloneComponentId();
+  if (standaloneId && patchesByControlId?.has(standaloneId)) {
+    mutateComponentDocumentControl(standaloneId, (draft) => {
+      let changed = false;
+      for (const [path, value] of Object.entries(patchesByControlId.get(standaloneId) ?? {})) {
+        changed = applyInspectorResolvedValue(draft, path, value) || changed;
+      }
+      return changed;
+    });
+    return;
+  }
   if (panelId == null || !patchesByControlId?.size) return;
   const selectedIds = get(selectedComponentIds);
   panels.update((list) => mutatePanelControlsInList(
@@ -325,7 +370,7 @@ export function addControl(type, overrides = {}, { at = null } = {}) {
   // A new Custom Component does not start with a published property for a layer it does not have
   // (customComponentPackage.js). Here and not in createControl: that is also the pristine a saved
   // control is a difference from, and changing it would change what older files read back as.
-  if (type === 'CustomComponent') dropEditablePropertiesWithMissingTargets(control);
+  if (type === 'CustomComponent') { dropEditablePropertiesWithMissingTargets(control); dropVariantSettingWithoutVariants(control); }
 
   let parentId = null;
   if (panel && !overrides.Transform && control._children.Transform) {

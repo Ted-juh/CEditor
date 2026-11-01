@@ -41,7 +41,9 @@ test('the type\'s defaults still carry "label": a saved component is a differenc
 
 test('a component inserted on a panel has no published property for a layer it does not have', () => {
   const live = inserted();
-  assert.deepEqual(Object.keys(live()._children.PublishedProperties.editableProperties), ['variant']);
+  // Nor a "Variant" setting: Variants are hidden, and it has none to choose between
+  // (componentExportImport.test.js).
+  assert.deepEqual(Object.keys(live()._children.PublishedProperties.editableProperties), []);
   assert.deepEqual(Object.keys(live()._children.ValueChannels._children), ['mainValue', 'mode'],
     'its value model is kept: a hit zone drawn in the designer drives mainValue');
 });
@@ -63,7 +65,7 @@ test('saved and opened again, the property stays gone', () => {
   const reopened = deserializePanel(text, null, 'T');
   const component = (reopened.controls ?? []).find((control) => control._children?.Core?.controlType === 'CustomComponent');
   assert.ok(component, 'the component is in the reopened panel');
-  assert.deepEqual(Object.keys(component._children.PublishedProperties.editableProperties), ['variant']);
+  assert.deepEqual(Object.keys(component._children.PublishedProperties.editableProperties), []);
   assert.deepEqual(validateCustomComponentPackage(component).issues, []);
 });
 
