@@ -71,3 +71,13 @@ test('External links are two switches by name, Inputs and Outputs', () => {
   assert.match(cell, /role="switch" aria-checked="false"[^>]*>\s*Outputs/);
   assert.doesNotMatch(src('sections/CustomPublishedPropertiesEditor.svelte'), /ArrowRightToLine|ArrowRightFromLine|FlagStrip/);
 });
+
+test('the inspector\'s tab rail names each tab under its icon, and keeps the title the checks find it by', async () => {
+  const { default: TabIconBar } = await import('../src/CE_Application/panels/TabIconBar.svelte');
+  const { default: Cpu } = await import('lucide-svelte/icons/cpu');
+  const html = render(TabIconBar, { props: { tabs: [{ id: 'core', icon: Cpu, label: 'Core' }, { id: 'test', icon: Cpu, label: 'Test Bench' }], isActive: (id) => id === 'core' } }).body;
+  assert.match(html, /title="Core"[\s\S]*?<span class="tab-label[^"]*">Core<\/span>/);
+  assert.match(html, /title="Test Bench"[\s\S]*?<span class="tab-label[^"]*">Test Bench<\/span>/);
+  const css = src('panels/TabIconBar.svelte');
+  assert.match(css, /\.icon-tabs \{[^}]*width: 64px;/);
+});

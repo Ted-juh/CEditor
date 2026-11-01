@@ -8,6 +8,10 @@
    *   onclick    — (id, event) => void
    *   titlePrefix — optional prefix prepended to each button's title
    *                 (the split view uses "Panel: " on the panel half)
+   *
+   * Each icon has its name under it. The rail was icons only, 36 pixels wide, with the names in
+   * tooltips, so finding a tab meant hovering the rail; it is 64 now, and the inspector beside it 28
+   * narrower.
    */
   let {
     tabs = [],
@@ -59,7 +63,8 @@
       onclick={(e) => onclick?.(tab.id, e)}
       onkeydown={(e) => handleTabKeydown(tab.id, e)}
     >
-      <tab.icon size={20} strokeWidth={1.5} />
+      <tab.icon size={18} strokeWidth={1.5} />
+      <span class="tab-label">{tab.label}</span>
     </button>
     {#if tab.id === 'states' && showStateRail && stateTargets.length > 0}
       <div class="state-rail" aria-label="State editing targets">
@@ -87,7 +92,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 36px;
+    width: 64px;
     flex-shrink: 0;
     background: #222;
     border-right: 1px solid #1A1A1A;
@@ -96,11 +101,15 @@
   }
 
   .tab-icon {
-    width: 30px;
-    height: 30px;
+    width: 60px;
+    min-height: 40px;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 2px;
+    padding: 3px 1px;
+    font-family: inherit;
     background: none;
     border: none;
     color: #777;
@@ -117,6 +126,15 @@
   .tab-icon.active {
     background: #094771;
     color: #FFF;
+  }
+
+  /* Two lines at most: "Test Bench", "Content Layout". */
+  .tab-label {
+    max-width: 58px;
+    font-size: 9px;
+    line-height: 10px;
+    text-align: center;
+    overflow-wrap: anywhere;
   }
 
   .tab-spacer {
