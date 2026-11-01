@@ -1,4 +1,7 @@
 <script>
+  // What App puts in the row between the menus and the build stamp: the document tabs (item 4 of
+  // the editor-space list). Outside role="menubar", which may hold menu items and nothing else.
+  let { children } = $props();
   import { get } from 'svelte/store';
   import { closeActiveEditorTab, openSettingsTab, openInstrumentHostTab, activeEditorTab, saveActiveEditorDocument, openPanelFromFile, openStandaloneDeviceProfileTab, selectedComponentIds, setActiveEditorTab, buildActivePanelVst3, activePanel, editorZoom, updatePanel } from '../stores/panels.js';
   import { undoAvailable, redoAvailable } from '../stores/history.js';
@@ -19,7 +22,7 @@
   import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
-  import { buildInfo, buildLabel } from '../buildInfo.js';
+  import { buildInfo } from '../buildInfo.js';
   import { createPerfDebugTimer } from '../utils/perfDebug.js';
   import { isTextEntryTarget } from '../utils/textEntry.js';
   import {
@@ -581,6 +584,7 @@
 <!-- A real menubar, not a <nav>: role="menubar" carries one tab stop, roving focus and
      aria-expanded per menu. The icon rail (layout/IconPanel.svelte) already models the
      button/drawer half of this; a menu bar owes the arrow keys and access keys as well. -->
+<div class="menubar-row">
 <div class="menubar" role="menubar" aria-label="Main menu">
   {#each menuNames as name, barIndex}
     {@const mnemonic = barMnemonics[barIndex]}
@@ -708,22 +712,46 @@
     />
   {/if}
 
-  <span class="build-stamp" title="Build {buildInfo.sha} · {buildInfo.branch} · {buildInfo.time}">
-    build {buildLabel}
-  </span>
+</div>
+
+{#if children}
+  <div class="menubar-middle">{@render children()}</div>
+{/if}
+
+<!-- The commit alone: the row is the tabs' now, and the branch and time are in the tooltip. -->
+<span class="build-stamp" title="Build {buildInfo.sha} · {buildInfo.branch} · {buildInfo.time}">
+  build {buildInfo.sha}
+</span>
 </div>
 
 <style>
-  .menubar {
+  .menubar-row {
     display: flex;
-    align-items: center;
+    align-items: stretch;
     height: 100%;
     background: #2D2D2D;
     border-bottom: 1px solid #1A1A1A;
+    position: relative;
+    z-index: 100;
+  }
+
+  .menubar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    height: 100%;
     padding: 0 4px 0 0;
     gap: 1px;
     position: relative;
-    z-index: 100;
+  }
+
+  /* The document tabs: the room between the menus and the stamp, and no more. */
+  .menubar-middle {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    margin-left: 8px;
+    border-left: 1px solid #3A3A3A;
   }
 
   .menu-wrapper {
@@ -864,6 +892,8 @@
 
   /* Always-visible build stamp, pushed to the far right of the menu bar. */
   .build-stamp {
+    flex: 0 0 auto;
+    align-self: center;
     margin-left: auto;
     padding: 0 10px;
     color: #6A6A6A;

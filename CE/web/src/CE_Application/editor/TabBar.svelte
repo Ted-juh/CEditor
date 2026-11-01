@@ -538,12 +538,15 @@
 {/if}
 
 <style>
+  /* In the menu bar's row (App.svelte), on its background: the tabs stand on the row's bottom
+     edge and New / Open sit in its middle. */
   .tab-bar {
+    flex: 1 1 auto;
+    min-width: 0;
     display: flex;
     align-items: end;
     height: 100%;
-    background: #1A1A1A;
-    border-bottom: 1px solid #1A1A1A;
+    background: transparent;
     padding: 0 4px;
     gap: 1px;
     /* The strip inside scrolls; the bar itself must not, or the New/Open group scrolls away
@@ -702,8 +705,8 @@
     align-items: center;
     gap: 4px;
     margin-left: auto;
-    margin-bottom: 3px;
-    padding: 3px;
+    align-self: center;
+    padding: 1px;
     border: 1px solid #3A3A3A;
     border-radius: 6px;
     background: #171717;

@@ -5,7 +5,7 @@
   let menuBarHeight = $state(28);
   let contextBarElement = $state();
   let contextBarHeight = $state(0);
-  let canvasTopInset = $state(34);
+  let canvasTopInset = $state(0);
   const iconPanelTop = $derived(menuBarHeight + (contextBarElement ? contextBarHeight : 0) + canvasTopInset);
   import { dragScrub } from './CE_Application/scrub/dragScrubAction';
   import MenuBar from './CE_Application/layout/MenuBar.svelte';
@@ -22,6 +22,7 @@
   import ContextBar from './CE_Application/layout/ContextBar.svelte';
   import CutoutDebugPage from './CE_Application/debug/CutoutDebugPage.svelte';
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
+  import TabBar from './CE_Application/editor/TabBar.svelte';
   import { initPanelBridge, panels, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
   import { MIN_PROPERTIES_PANEL_WIDTH, DEFAULT_PROPERTIES_PANEL_WIDTH, clampPropertiesPanelWidth } from './CE_Application/utils/propertiesPanelWidth.js';
@@ -428,8 +429,12 @@
     class:workspace-swap-b={workspaceSwapClass === 'b'}
     style="--icon-width: {workspaceChrome.iconWidth + 'px'}; --props-width: {effectiveShowPropertiesPanel ? propertiesPanelWidth + 'px' : '0px'}; --resize-width: {effectiveShowPropertiesPanel ? '8px' : '0px'}"
   >
+    <!-- The document tabs share the menu bar's row (item 4 of the editor-space list): they had a
+         row of their own under the context bar, 36 pixels the canvas has now, and only the canvas
+         column's width, which at 1366 x 768 with the tree and properties panel open showed one
+         and a half of four tabs between scroll arrows. -->
     <div class="menubar-area" bind:offsetHeight={menuBarHeight}>
-      <MenuBar />
+      <MenuBar><TabBar /></MenuBar>
     </div>
 
     <div class="icon-panel-area" style:padding-top={`${iconPanelTop}px`}>

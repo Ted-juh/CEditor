@@ -1,11 +1,11 @@
 <script>
-  let { topInset = $bindable(34) } = $props();
-  let tabBarHeight = $state(34);
+  let { topInset = $bindable(0) } = $props();
   let rulerCorner = $state();
   let rulerHeight = $state(0);
 
-  // Keep the shell's insert rail below the tabs and any visible horizontal ruler.
-  $effect(() => { topInset = tabBarHeight + (rulerCorner ? rulerHeight : 0); });
+  // Keep the shell's insert rail below any visible horizontal ruler. The document tabs that also
+  // sat above the canvas are in the menu bar's row now (App.svelte).
+  $effect(() => { topInset = rulerCorner ? rulerHeight : 0; });
 
   import { panels, activePanel, activeEditorTab, activePanelDesignerSplit, editorZoom, editorZoomIncrement, selectedComponentId, selectedComponentIds, selectComponent, clearSelection, setPanelDesignerSplitSize, openPanelFromFile, openStandaloneDeviceProfileTab, setActiveEditorTab, updatePanel, saveActiveEditorDocument } from '../stores/panels.js';
   import { addControl, addCustomComponentPackage, getSection, removeControl, duplicateControl, updateControlProperty, selectedControl, groupSelectionIntoContainer, ungroupContainer } from '../stores/controls.js';
@@ -28,7 +28,6 @@
   import { createZoomController } from '../utils/zoomController.js';
   import { trackViewportMetrics } from '../utils/viewportMetrics.js';
   import { fileCache, loadFile } from '../stores/fileCache.js';
-  import TabBar from './TabBar.svelte';
   import PanelSurface from './PanelSurface.svelte';
   import PanelPreviewSurface from './PanelPreviewSurface.svelte';
   import CanvasContextMenu from './CanvasContextMenu.svelte';
@@ -908,10 +907,6 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div class="editor-wrapper" onkeydown={handleEditorKeyDown} onkeyup={handleEditorKeyUp} tabindex="-1" class:panning={pan.isPanning || pan.spaceHeld}>
-  <div class="tab-bar-area" bind:offsetHeight={tabBarHeight}>
-    <TabBar />
-  </div>
-
   <div class="canvas-area">
     {#key `${$activeEditorTab?.type ?? 'panel'}:${$activeEditorTab?.id ?? 'none'}:${canvasPanel?.id ?? 'none'}`}
       {#if componentSurfaceWorkspaceActive}
@@ -1194,10 +1189,6 @@
   .editor-wrapper.panning,
   .editor-wrapper.panning * {
     cursor: grab !important;
-  }
-
-  .tab-bar-area {
-    flex: 0 0 34px;
   }
 
   .canvas-area {

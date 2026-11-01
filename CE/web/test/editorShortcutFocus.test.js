@@ -24,7 +24,7 @@ test('canvas shortcuts stay on the canvas and component tree', () => {
   assert.equal(isEditorShortcutFocus(focused('DIV', ['.tree-list'])), false);
   assert.equal(isEditorShortcutFocus(focused('BUTTON', ['.tree-list']), global), false);
   assert.equal(isEditorShortcutFocus(focused('DIV', ['.studio-rail']), global), false);
-  assert.equal(isEditorShortcutFocus(focused('DIV', ['.tab-bar-area']), global), false);
+  assert.equal(isEditorShortcutFocus(focused('DIV', ['.tab-bar']), global), false);
 });
 
 test('focused surface buttons keep editing shortcuts but retain native activation and tabbing', () => {

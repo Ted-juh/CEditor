@@ -71,8 +71,8 @@ If you would rather follow along step by step for a first panel, read
 
 The CEditor window has these parts:
 
-- **The menu bar** along the top: File, Edit, View, Insert, Build, Window and Help. The
-  [Menus](#menus) reference lists every item.
+- **The menu bar** along the top: File, Edit, View, Insert, Build, Window and Help, then the tabs
+  (below). The [Menus](#menus) reference lists every item.
 - **The icon rail** down the left edge. Its buttons insert new controls, switch **Preview** on and
   off (F5), and show or hide the dock, the component tree and the properties panel.
 - **The context bar** across the top of the canvas. It shows the name and type of the selected
@@ -81,9 +81,9 @@ The CEditor window has these parts:
   **Scripts**, how many scripts it has. It is one row; on a narrow window it wraps onto a second or
   third, and only the open section keeps its name — the others show their icon, and their name when
   you point at them.
-- **The tab bar** under the context bar. Every open document has a tab: panels, device profiles,
-  custom components, script workspaces, the Settings page and the HoSTage host. **+ New** and
-  **Open** at its right end start or open documents.
+- **The tabs**, in the menu bar's row after **Help**. Every open document has a tab: panels,
+  device profiles, custom components, script workspaces, the Settings page and the HoSTage host.
+  **+ New** and **Open** at the right end of the row start or open documents.
 - **The canvas** in the middle, where you build the panel. Rulers run along the top and left edge.
 - **The component tree** to the right of the canvas: every control on the panel as a list, with
   buttons to hide and lock controls.
