@@ -77,8 +77,8 @@
     tabAllowedForAudience,
     tabAudience,
   } from '../utils/propertiesTabAudience.js';
+  import { DEFAULT_PROPERTIES_PANEL_WIDTH, clampPropertiesPanelWidth } from '../utils/propertiesPanelWidth.js';
 
-  const MIN_PROPERTIES_PANEL_WIDTH = 600;
   const PREVIEW_INFO_TEXT = 'Preview is active. The canvas is running panel behavior; debug inspection is optional.';
 
   function readStoredUiState() {
@@ -96,8 +96,8 @@
 
   const storedUiState = readStoredUiState();
 
-  let { width = MIN_PROPERTIES_PANEL_WIDTH } = $props();
-  let clampedWidth = $derived(Math.max(width, MIN_PROPERTIES_PANEL_WIDTH));
+  let { width = DEFAULT_PROPERTIES_PANEL_WIDTH } = $props();
+  let clampedWidth = $derived(clampPropertiesPanelWidth(width));
 
   let contextMode = $derived($selectedComponentId != null ? 'component' : 'panel');
 
@@ -682,7 +682,7 @@
     display: flex;
     flex-direction: column;
     height: 100%;
-    min-width: 600px;
+    min-width: 420px; /* MIN_PROPERTIES_PANEL_WIDTH */
     background: #1E1E1E;
     border-left: 1px solid #1A1A1A;
   }

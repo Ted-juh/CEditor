@@ -922,4 +922,10 @@
     gap: 4px;
     width: 100%;
   }
+
+  /* A narrow properties panel (utils/propertiesPanelWidth.js): Inputs, Outputs and Properties one
+     above the other. Three abreast at 420 cut every entry ("mainValue · …"). */
+  @container properties-tab (max-width: 460px) {
+    .contract-board { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>

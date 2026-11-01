@@ -96,9 +96,11 @@ The CEditor window has these parts:
   the selection, the panel size, grid and snap, ruler and guide toggles, and the zoom.
 
 You can drag the borders between the canvas, the tree, the properties panel and the dock to resize
-them. CEditor remembers the sizes, and which parts were showing, for next time. In a window
-narrower than 920 pixels the tree, the dock and the properties panel are hidden to make room for
-the canvas.
+them. CEditor remembers the sizes, and which parts were showing, for next time. The properties
+panel opens 600 pixels wide and goes down to 420, which on a laptop screen gives the canvas about a
+third more room; narrower than about 525, its tabs put two fields in a row instead of four, so
+every value stays readable. In a window narrower than 920 pixels the tree, the dock and the
+properties panel are hidden to make room for the canvas.
 
 ### Documents and workspaces
 
@@ -319,7 +321,7 @@ steps of each document. Changing the panel's background image cannot be undone.
 ### The properties panel
 
 Every setting of the selected control is in the properties panel on the right. Its tabs run down its
-left edge as icons — point at one to see its name. Which tabs a control has depends on what it is; the
+left edge, each an icon with its name under it. Which tabs a control has depends on what it is; the
 common ones are **Core** (name, look, visible, enabled), **Transform** (position and size),
 **Background**, **Border**, **Text**, **Effects**, **Icon**, **Behavior** (range and value), **States**
 and **Device** (what it is bound to).

@@ -24,6 +24,7 @@
   import BehaviorDesigner from './CE_Application/editor/BehaviorDesigner.svelte';
   import { initPanelBridge, panels, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
+  import { MIN_PROPERTIES_PANEL_WIDTH, DEFAULT_PROPERTIES_PANEL_WIDTH, clampPropertiesPanelWidth } from './CE_Application/utils/propertiesPanelWidth.js';
   import { duplicateControl, groupSelectionIntoContainer, removeControl, ungroupContainer, updateControlProperty } from './CE_Application/stores/controls.js';
   import { copySelection, cutSelection, pasteSelection, selectAll } from './CE_Application/stores/clipboard.js';
   import { deleteSelectedGuide } from './CE_Application/stores/guides.js';
@@ -194,7 +195,9 @@
     }
   }
 
-  const MIN_PROPERTIES_PANEL_WIDTH = 600;
+  // The panel can be dragged down to 420 and opens at 600; why, and what its tabs do when narrow,
+  // is in utils/propertiesPanelWidth.js.
+
   // The three panel-visibility flags used to live here as `$state` locals, which
   // is why nothing outside App.svelte could read them and the View/Window menu
   // could neither tick a box nor flip one (D6). They are a store now — see
@@ -206,7 +209,7 @@
     displayPanelHeightUserSized: 'ce.ui.displayPanelHeightUserSized',
   };
 
-  let propertiesPanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.propertiesPanelWidth, MIN_PROPERTIES_PANEL_WIDTH));
+  let propertiesPanelWidth = $state(clampPropertiesPanelWidth(readStoredNumber(UI_STORAGE_KEYS.propertiesPanelWidth, DEFAULT_PROPERTIES_PANEL_WIDTH)));
   let isResizingProps = $state(false);
   let treePanelWidth = $state(readStoredNumber(UI_STORAGE_KEYS.treePanelWidth, 200));
   let isResizingTree = $state(false);

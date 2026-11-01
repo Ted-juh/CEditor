@@ -67,6 +67,12 @@
   .property-cell.span-2 { grid-column: span 2; }
   .property-cell.span-3 { grid-column: span 3; }
   .property-cell.span-4 { grid-column: span 4; }
+  /* In the two columns of a narrow properties panel (PropertySection), three- and four-wide fields
+     take the row; spanning four of two would add columns past the panel's edge. */
+  @container properties-tab (max-width: 460px) {
+    .property-cell.span-3,
+    .property-cell.span-4 { grid-column: 1 / -1; }
+  }
 
   .property-cell.filtered-out { display: none; }
 

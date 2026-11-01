@@ -139,6 +139,10 @@
     flex: 1;
     min-height: 0;
     overflow-y: auto;
+    /* The tabs lay themselves out by this width, not the window's: under 460 pixels (a panel
+       dragged below about 525) property grids go to two columns and the rows with fixed column
+       minimums stack. See utils/propertiesPanelWidth.js. */
+    container: properties-tab / inline-size;
   }
 
   .card-header {

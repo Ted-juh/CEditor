@@ -1568,4 +1568,43 @@
     padding: 3px 6px;
     font-size: 9px;
   }
+
+  /* A narrow properties panel (utils/propertiesPanelWidth.js). These rows have column minimums that
+     add up to more than its 355 pixels at 420 (the channel row 302 and gaps, the state row 342, the
+     generator row 455), so Reset, Edit and Detach ran past the edge and the tab scrolled sideways.
+     Each takes two lines instead: the name and its buttons, then the rest. */
+  @container properties-tab (max-width: 460px) {
+    .rig-row {
+      grid-template-columns: minmax(0, 1fr) auto 54px;
+      grid-template-areas: "name note reset" "control control control";
+    }
+    .rig-row > .rig-name { grid-area: name; }
+    .rig-row > .rig-note { grid-area: note; }
+    .rig-row > .rig-control { grid-area: control; }
+    .rig-row > .mini-btn { grid-area: reset; }
+
+    .state-head {
+      grid-template-columns: minmax(0, 1fr) 58px 44px;
+      grid-template-areas: "name preview edit" "group when when";
+    }
+    .state-head > strong { grid-area: name; }
+    .state-head > span { grid-area: group; }
+    .state-head > em { grid-area: when; }
+    .state-head > button:nth-of-type(1) { grid-area: preview; }
+    .state-head > button:nth-of-type(2) { grid-area: edit; }
+
+    .generated-source-row {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 64px 54px;
+      grid-template-areas: "name name generator detach" "parts zones samples samples";
+    }
+    .generated-source-row > strong { grid-area: name; }
+    .generated-source-row > span:nth-of-type(1) { grid-area: parts; }
+    .generated-source-row > span:nth-of-type(2) { grid-area: zones; }
+    .generated-source-row > em { grid-area: samples; }
+    .generated-source-row > button:nth-of-type(1) { grid-area: generator; }
+    .generated-source-row > button:nth-of-type(2) { grid-area: detach; }
+
+    /* Two zone groups side by side left each one's three sample buttons too little room. */
+    .probe-groups { grid-template-columns: minmax(0, 1fr); }
+  }
 </style>
