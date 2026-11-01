@@ -779,12 +779,16 @@ The way that works today is:
    local package**. The component is now in your library.
 6. Press **Back to Panel**.
 
-The **Shapes** palette down the left is for drawing. A selected layer is styled in the bar along the
-top of the designer (**Fill**, **Gradient**, **Stroke** with its width beside it, **Corners** for the corner radius,
-**Opacity**, and for text its colour, size and words) and in the dock's **Colors** and **Gradient**
-tools. Beside them are the layer's own buttons (duplicate, copy, paste, order, make interactive,
-lock, delete). On a narrower window those are under one **Layer** button, and on a laptop-sized one
-the style controls have a row of their own, so all of them stay in sight.
+The **Shapes** palette down the left is for drawing. It opens folded, two narrow columns of its
+tools, so the artboard has the room; point at a tool for its name and key. The first of the three
+buttons at its foot unfolds it with the group names, and it stays the way you leave it.
+
+A selected layer is styled in the bar along the top of the designer (**Fill**, **Gradient**,
+**Stroke** with its width beside it, **Corners** for the corner radius, **Opacity**, and for text
+its colour, size and words) and in the dock's **Colors** and **Gradient** tools. Beside them are
+the layer's own buttons (duplicate, copy, paste, order, make interactive, lock, delete). On a
+narrower window those are under one **Layer** button, and on a laptop-sized one the style controls
+have a row of their own, so all of them stay in sight.
 
 The strip under the canvas has **Snap**, **Grid** and **Smart** for snapping, **View** and **?** for
 the shortcuts. **View** lists what the canvas shows (**Measure**, **Bounds**, **Generated names**,

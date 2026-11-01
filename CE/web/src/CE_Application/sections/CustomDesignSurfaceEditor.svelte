@@ -88,7 +88,7 @@
   import SurfaceHelpOverlay from './SurfaceHelpOverlay.svelte';
   import { numberOr } from '../utils/primitives.js';
   import { confirmDestructive } from '../utils/confirmDiscard.js';
-  import { readStoredNumber, removeStoredValue, writeStoredNumber } from '../utils/localStorageState.js';
+  import { readStoredBool, readStoredNumber, removeStoredValue, writeStoredJson, writeStoredNumber } from '../utils/localStorageState.js';
   import {
     angleFromCenter,
     computeResizedRect,
@@ -428,7 +428,15 @@
   let penEditPart = $derived(activeTool === 'select' && selectedLayerNames.length === 1 && (isPathPart(selectedPart) || hasCompoundPath(selectedPart))
     ? { name: selectedLayer, part: selectedPart } : null);
   // Pane visibility toggles (mirrors the normal editor's bottom-left icons).
-  let paletteCollapsed = $state(false);
+  // The palette opens folded (item 7 of the editor-space list): two columns of its 28 tools, 84
+  // pixels, every one in sight at 1366 x 768 and named by its tooltip, and the artboard 66 pixels
+  // wider there (280 to 346), 136 at 1920. Unfolded by its button, it stays so next time.
+  const PALETTE_FOLDED_KEY = 'ce.ui.designerPaletteFolded';
+  let paletteCollapsed = $state(readStoredBool(PALETTE_FOLDED_KEY, true));
+  function setPaletteFolded(value) {
+    paletteCollapsed = value === true;
+    writeStoredJson(PALETTE_FOLDED_KEY, paletteCollapsed);
+  }
   let dockHidden = $state(false);
   let displayDockHidden = $state(false);
   // The zoom step: how far the status bar's − and + (and Ctrl+plus and minus) zoom, in percent.
@@ -439,7 +447,7 @@
   let componentScriptList = $derived(Array.isArray(componentScripts?.scripts) ? componentScripts.scripts : []);
   let componentScriptsEnabled = $derived(componentScripts?.enabled !== false);
   let surfaceGridCols = $derived(
-    `${paletteCollapsed ? '--palette-w:46px;' : ''}${dockHidden ? '--dock-w:0px;' : ''}`
+    `${paletteCollapsed ? '--palette-w:84px;' : ''}${dockHidden ? '--dock-w:0px;' : ''}`
   );
   let rulerViewWidth = $state(0);
   let rulerViewHeight = $state(0);
@@ -3643,7 +3651,7 @@
         {activeTool}
         shapeTools={SHAPE_TOOLS}
         vectorShapeTools={VECTOR_SHAPE_TOOLS}
-        {paletteCollapsed} setPaletteCollapsed={(v) => { paletteCollapsed = v; }}
+        {paletteCollapsed} setPaletteCollapsed={setPaletteFolded}
         {dockHidden} setDockHidden={(v) => { dockHidden = v; }}
         {displayDockHidden} setDisplayDockHidden={(v) => { displayDockHidden = v; }}
         {setActiveTool}
@@ -5551,8 +5559,8 @@
      It used to be `display: none` on the whole scroll, so collapsing the palette left a 46px
      column containing the three pane toggles and nothing else — the 2026-07-12 review's Tier 2
      item, and a collapse that removes the feature rather than compacting it. The draw tools stay;
-     what goes is everything that needs width to be legible: the group captions, and the rows
-     built around a field or a hex readout rather than a button.
+     what goes is what needs width to be legible: the heading and the group captions. (The rows
+     built around a field or a hex readout, which it hid too, are in the look bar now.)
 
      These reach into SurfacePalette, so they are :global — the state class lives on the shell and
      the elements belong to the child. */
@@ -5561,30 +5569,42 @@
   }
 
   .surface-shell.palette-collapsed :global(.palette-header),
-  .surface-shell.palette-collapsed :global(.palette-group > span),
-  .surface-shell.palette-collapsed :global(.palette-stepper),
-  .surface-shell.palette-collapsed :global(.palette-swatch-row),
-  .surface-shell.palette-collapsed :global(.palette-corner) {
+  .surface-shell.palette-collapsed :global(.palette-group > span) {
     display: none;
   }
 
-  .surface-shell.palette-collapsed :global(.palette-group) {
+  /* Two columns, not one. One column of 28 tools was 1,125 pixels tall: in a 1366 x 768 window
+     the Value Controls and the Pen were below the edge, the half of the palette a fold must not
+     lose. Two columns of 29-pixel buttons fit there and at 1920 without scrolling. More specific
+     than SurfacePalette's own rules, which they override. */
+  .surface-shell.palette-collapsed :global(.palette-scroll .palette-group) {
     gap: 0;
-    padding: 2px 0;
+    padding: 0 0 4px;
+    margin-bottom: 4px;
   }
 
-  .surface-shell.palette-collapsed :global(.palette-grid) {
-    grid-template-columns: 1fr;
-    padding: 0 6px;
+  .surface-shell.palette-collapsed :global(.palette-scroll .palette-grid) {
+    grid-template-columns: 1fr 1fr;
+    gap: 2px;
+    padding: 0 5px;
   }
 
-  .surface-shell.palette-collapsed .palette-toggles {
-    flex-direction: column;
-    padding: 8px 4px;
+  .surface-shell.palette-collapsed :global(.palette-scroll .palette-grid button) {
+    height: 29px;
   }
-  .surface-shell :global(.palette-corner .nc-wrap),
-  .surface-shell :global(.palette-stepper .nc-wrap) {
-    width: 60px;
+
+  /* The three pane toggles stay a row, narrowed to the column. This rule was scoped to this
+     component, where .palette-toggles is not, so it never applied and the folded column cut the
+     row off. */
+  .surface-shell.palette-collapsed :global(.palette-panel .palette-toggles) {
+    gap: 2px;
+    padding: 6px 0;
+  }
+
+  .surface-shell.palette-collapsed :global(.palette-panel .palette-toggles button) {
+    width: 24px;
+    min-width: 0;
+    padding: 0;
   }
 
   .surface-scroll {
