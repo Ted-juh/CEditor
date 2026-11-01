@@ -14,6 +14,7 @@
  */
 import assert from 'node:assert/strict';
 import { boot } from './behaviourKit.mjs';
+import { MIN_PROPERTIES_PANEL_WIDTH } from '../src/CE_Application/utils/propertiesPanelWidth.js';
 
 const kit = await boot({ width: 1600, height: 900 });
 const page = kit.page;
@@ -51,7 +52,8 @@ try {
     assert.ok(w2 > w1 + 16, `Ctrl takes a bigger step, as on every scrub: ${w1} → ${w2}`);
     assert.ok(Math.abs(drawn - w2) < 2, `the panel is drawn that wide: ${drawn} vs ${w2}`);
     assert.ok(max > w2, `End goes to the maximum: ${max}`);
-    assert.equal(min, 600, 'Home goes to the minimum');
+    // The floor is the app's own number (420 since the panel may be narrower than 600), not a copy.
+    assert.equal(min, MIN_PROPERTIES_PANEL_WIDTH, 'Home goes to the minimum');
   });
 
   // --- Tabs -----------------------------------------------------------------------------------------
