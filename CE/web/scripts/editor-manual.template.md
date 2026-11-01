@@ -75,9 +75,12 @@ The CEditor window has these parts:
   [Menus](#menus) reference lists every item.
 - **The icon rail** down the left edge. Its buttons insert new controls, switch **Preview** on and
   off (F5), and show or hide the dock, the component tree and the properties panel.
-- **The context bar** across the top of the canvas. It shows the name of the selected control and
-  quick settings for it: text, fill, border, size and position, effects, icon. On the right it shows
-  what the control is bound to (**Device**) and how many scripts it has (**Scripts**).
+- **The context bar** across the top of the canvas. It shows the name and type of the selected
+  control, quick settings for it (text, fill, border, position and size, effects, icon), the state
+  your changes go to (**State**), and two buttons: **Device**, what the control is bound to, and
+  **Scripts**, how many scripts it has. It is one row; on a narrow window it wraps onto a second or
+  third, and only the open section keeps its name — the others show their icon, and their name when
+  you point at them.
 - **The tab bar** under the context bar. Every open document has a tab: panels, device profiles,
   custom components, script workspaces, the Settings page and the HoSTage host. **+ New** and
   **Open** at its right end start or open documents.
@@ -223,8 +226,8 @@ the tree's right-click menu do the same for every selected group.
 - Drag one of the eight **handles** to resize. **Shift** keeps the proportions; **Alt** resizes around the
   centre.
 - To turn a control, drag just **outside a corner**. **Shift** turns it in steps of 15°.
-- For exact numbers, use the **Box** section of the context bar or the **Transform** tab of the
-  properties panel.
+- For exact numbers, use the **Box** section of the context bar (X, Y, W, H) or the **Transform** tab
+  of the properties panel, which also has the rotation and the opacity.
 - **Double-click** a control with text to type the text straight onto the canvas. **Enter** finishes,
   **Esc** cancels.
 - Hold **Alt** and point at another control to see the distance to it.
@@ -512,8 +515,8 @@ properties panel (the cable icon). There are four ways to make a binding:
 - **From the Device tool.** Open the dock's **Device** tool and choose the synth's profile. Select the
   control on the canvas, then click the parameter in the list. The control takes on the parameter's
   range and settings.
-- **With Bind….** For an unbound control, the **Device** zone of the context bar shows **Bind…**, which
-  lists the parameters of the device to choose from.
+- **From the context bar.** For an unbound control, the context bar's **Device** button reads
+  **Unbound**. Click it for a list of the device's parameters to choose from.
 - **By MIDI learn.** Open the dock's **MIDI** tool. Turn a knob on the synth: it appears at the top as a
   chip. Drag the chip onto the control on the canvas.
 - **By hand.** Press **Add** on the **Device** tab. Choose **Kind**: **Device parameter** (and enter the
@@ -523,7 +526,7 @@ properties panel (the cable icon). There are four ways to make a binding:
 
 **Dry Run** prepares the message but does not send it — useful to check what would be sent. Bindings
 made with **Add** or from the Device tool start with Dry Run **on**; switch it off to send. Bindings
-made with **Bind…** or MIDI learn start with it off.
+made from the context bar or by MIDI learn start with it off.
 
 **Binding status**, at the top of the Device tab, always says the next thing to do — "Dry Run is on",
 "Output is Preview Only", "Edit mode. Turn on Preview…" — until it says **Ready to send**. **Last
@@ -585,7 +588,7 @@ the panel to the synth, or both, all the time. **Scan presets** asks the synth f
 
 ### The Device Profile Designer
 
-Open it with **Designer** in the Device tool, **DPD** in the context bar's Device zone, or **File → Open
+Open it with **Designer** in the Device tool, **DPD** under the context bar's **Device** button, or **File → Open
 Device Profile**. Its screens are listed on the left:
 
 - **Overview** — what the profile is based on, and how complete it is.
@@ -670,6 +673,9 @@ have states. Edit them on the **States** tab of the properties panel (one contro
    `valueNormalized >= 0.5` in the top half of the range, whatever the range is.
 4. **Overrides** lists what the state changes, with buttons to clear them.
 
+The **State** list in the context bar does what **Edit <state>** and **Edit Base** do: it shows which
+state your changes go to, and switches it. A dot after a name means that state changes something.
+
 Add your own state by typing a name in **New** and pressing **Add**. When several states are active
 at once, the stronger one wins: pressed beats hover, and disabled beats everything.
 
@@ -705,8 +711,8 @@ A new transition changes nothing until you add something under **What it eases**
 
 When the ordinary settings are not enough — one knob moving three others, a display showing the
 name of the patch, a light blinking on a timer — you can attach a script. Scripts are written in the
-**Behavior Designer**, which opens in a **Script Workspace** tab: press **Script Editor** in the
-**Scripts** zone of the context bar, or choose **File → New Script Workspace**.
+**Behavior Designer**, which opens in a **Script Workspace** tab: press the **Scripts** button in the
+context bar, or choose **File → New Script Workspace**.
 
 The [scripting manual](scripting-manual.md) explains scripting from the beginning; start with
 [Scripting: getting started](scripting-getting-started.md).

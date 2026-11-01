@@ -37,9 +37,10 @@ With the knob selected, open **Device Bindings** in Properties. There are two wa
   Raw bindings send the control's value directly. For a standard 7-bit CC, set the knob's
   **Behavior** minimum to **0**, maximum to **127**, and value type to **integer**.
 
-The top toolbar also offers **Bind…** for the current profile. After choosing a parameter there,
-the knob adopts its range and value type, with Dry Run off. Its **Properties** button opens
-Device Bindings directly.
+The bar above the canvas also has a **Device** button. On an unbound knob it reads **Device
+Unbound**; click it for the current profile's parameters. After choosing one, the knob adopts its
+range and value type, with Dry Run off. Click the button again to see the binding: its
+**Properties** button opens Device Bindings directly.
 
 You can also click **MIDI learn**, move a control on your instrument, and drag its learned chip
 onto the on-screen knob. **Last received** shows the latest controller number, channel and value

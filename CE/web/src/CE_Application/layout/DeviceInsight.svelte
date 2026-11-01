@@ -1,13 +1,15 @@
 <script>
   /**
-   * Device insight zone — right side of the top Look bar (two rows tall).
+   * Device button in the bar above the canvas (ContextBar): "Device Unbound ▾", or the bound
+   * parameter with its compatibility mark.
    *
-   * Row 1: profile › parameter (type) + compatibility badge.
-   * Row 2: the literal hardware address (Roland DT1/RQ1 hex, or CC#) when resolvable,
-   *        plus jump buttons → Properties (Device Bindings) and DPD (the profile).
-   * Unbound bindable controls get a quick Bind… picker instead.
+   * It was a block two rows tall that kept its width, beside a bar that then ran under it. The
+   * details are one click away now, in a panel under the button: profile › parameter, type,
+   * range, the literal hardware address (Roland DT1/RQ1 hex, or CC#) when resolvable, the live
+   * value, and the jumps to Properties (Device Bindings) and the DPD (the profile). The tooltip
+   * says the same in a line. Unbound, the button opens the Bind… list straight away.
    *
-   * Device bindings are single-selection only, so the zone hides on multi-select.
+   * Device bindings are single-selection only, so the button hides on multi-select.
    */
   import { floating } from '../utils/floatingUi.js';
   import { selectedControl, getSection, updateControlProperty } from '../stores/controls.js';
@@ -112,6 +114,45 @@
     pickerOpen = !pickerOpen;
   }
 
+  let detailsOpen = $state(false);
+  let detailsAnchor = $state(null);
+  function openDetails(event) {
+    detailsAnchor = event?.currentTarget ?? null;
+    detailsOpen = !detailsOpen;
+  }
+
+  // Another control selected: what was open was about the last one. By the id, not the control,
+  // so an edit to this one (a rebind, a new value) leaves the panel open and up to date.
+  let controlId = $derived(core?.id ?? null);
+  $effect(() => {
+    void controlId;
+    pickerOpen = false;
+    detailsOpen = false;
+  });
+
+  // Escape closes, and stops there: the canvas would otherwise take it as "clear the selection".
+  $effect(() => {
+    if (!pickerOpen && !detailsOpen) return undefined;
+    const onKey = (event) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      event.stopPropagation();
+      pickerOpen = false;
+      detailsOpen = false;
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
+
+  let unboundTitle = $derived(`Not bound to a device parameter${acceptsText ? `. Accepts ${acceptsText}` : ''}. Click to bind one.`);
+  let boundTitle = $derived([
+    `${profileName || 'Device'} › ${primary?.parameterId ?? ''}`,
+    [paramType, rangeText].filter(Boolean).join(', '),
+    address ? `address ${address}` : '',
+    liveValue !== undefined && liveValue !== null && liveValue !== '' ? `now ${liveValue}` : '',
+    String(compatibility?.warning ?? '').replace(/\.$/, ''),
+  ].filter(Boolean).join(' · ') + '. Click for the binding, Properties and DPD.');
+
   function bindTo(param) {
     if (!core?.id || !param) return;
     const port = getPreferredPort(control, param.type) ?? ports[0];
@@ -146,10 +187,27 @@
 
 {#if bindable && !multiSelect}
   <div class="device-wrap">
-    <div class="device-zone">
-      {#if primary && primary.parameterId}
+    {#if primary && primary.parameterId}
+      <button class="dev-chip-btn" title={boundTitle} aria-haspopup="dialog" aria-expanded={detailsOpen} onclick={openDetails}>
+        <span class="dev-chip">Device</span>
+        <span class="dev-param">{primary.parameterId}</span>
+        {#if badgeGlyph}<span class={['dev-badge', compatibility?.status]}>{badgeGlyph}</span>{/if}
+        {#if bindings.length > 1}<span class="dev-more">+{bindings.length - 1}</span>{/if}
+        <span class="dev-caret" aria-hidden="true">▾</span>
+      </button>
+    {:else}
+      <button class="dev-chip-btn dev-bind-btn" title={unboundTitle} aria-haspopup="dialog" aria-expanded={pickerOpen} onclick={openPicker}>
+        <span class="dev-chip">Device</span>
+        <span class="dev-unbound">Unbound</span>
+        <span class="dev-caret" aria-hidden="true">▾</span>
+      </button>
+    {/if}
+
+    {#if detailsOpen && primary?.parameterId}
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="dev-picker-backdrop" onmousedown={() => (detailsOpen = false)}></div>
+      <div class="dev-details" role="dialog" aria-label="Device binding" use:floating={{ anchor: detailsAnchor, placement: 'bottom-end', offset: 6, fallbackPlacements: ['top-end', 'bottom-start', 'top-start'] }}>
         <div class="dev-row">
-          <span class="dev-chip">DEVICE</span>
           <span class="dev-profile" title={`Profile: ${profileName}`}>{profileName || '—'}</span>
           <span class="dev-sep">›</span>
           <span class="dev-param" title={`Parameter: ${primary.parameterId}`}>{primary.parameterId}</span>
@@ -158,9 +216,10 @@
           {#if badgeGlyph}
             <span class={['dev-badge', compatibility?.status]} title={compatibility?.warning || compatibility?.status}>{badgeGlyph}</span>
           {/if}
-          {#if bindings.length > 1}<span class="dev-more" title={`${bindings.length} bindings`}>+{bindings.length - 1}</span>{/if}
         </div>
-        <div class="dev-row dev-row-2">
+        {#if compatibility?.warning}<div class="dev-note">{compatibility.warning}</div>{/if}
+        {#if bindings.length > 1}<div class="dev-note">{bindings.length} bindings; this is the first. Properties lists them all.</div>{/if}
+        <div class="dev-row">
           {#if address}
             <span class="dev-addr" title="Hardware address (from the device profile)">{address}</span>
           {:else if address !== undefined}
@@ -170,21 +229,12 @@
             <span class="dev-live" title="Live device value">= {liveValue}</span>
           {/if}
           <span class="dev-actions">
-            <button class="dev-jump" title="Edit this binding in Properties → Device Bindings" onclick={openInProperties}>Properties</button>
-            <button class="dev-jump" title="Open this profile in the Device Profile Designer" onclick={openInDpd}>DPD</button>
+            <button class="dev-jump" title="Edit this binding in Properties → Device Bindings" onclick={() => { detailsOpen = false; openInProperties(); }}>Properties</button>
+            <button class="dev-jump" title="Open this profile in the Device Profile Designer" onclick={() => { detailsOpen = false; openInDpd(); }}>DPD</button>
           </span>
         </div>
-      {:else}
-        <div class="dev-row">
-          <span class="dev-chip">DEVICE</span>
-          <span class="dev-unbound">Unbound</span>
-        </div>
-        <div class="dev-row dev-row-2">
-          {#if acceptsText}<span class="dev-accepts" title="Parameter types this control accepts">accepts {acceptsText}</span>{/if}
-          <button class="dev-bind-btn" onclick={openPicker}>Bind&hellip;</button>
-        </div>
-      {/if}
-    </div>
+      </div>
+    {/if}
 
     {#if pickerOpen}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -229,19 +279,48 @@
     display: flex;
     align-items: center;
     min-width: 0;
-    margin-left: 14px;
-    padding-left: 14px;
-    border-left: 1px solid #565656;
   }
 
-  .device-zone {
+  .dev-chip-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    height: 22px;
+    max-width: 240px;
+    padding: 0 8px;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    background: #1E1E1E;
+    color: #DDD;
+    font-family: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
+  }
+  .dev-chip-btn:hover,
+  .dev-chip-btn[aria-expanded='true'] { border-color: #5B9BD5; background: #1B3147; color: #FFF; }
+  .dev-chip-btn .dev-param { max-width: 140px; }
+  .dev-caret { flex: 0 0 auto; color: #8F8F8F; font-size: 10px; }
+
+  .dev-details {
+    z-index: 1401;
     display: flex;
     flex-direction: column;
-    align-items: stretch;
-    gap: 3px;
-    max-width: 400px;
-    min-width: 0;
+    gap: 6px;
+    min-width: 240px;
+    max-width: 380px;
+    padding: 8px 10px;
+    background: #232323;
+    border: 1px solid #3A3A3A;
+    border-radius: 6px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     font-size: 11px;
+  }
+
+  .dev-note {
+    color: #B9A27A;
+    font-size: 10px;
+    line-height: 1.35;
   }
 
   .dev-actions {
@@ -287,8 +366,7 @@
     font-weight: 700;
   }
 
-  .dev-range,
-  .dev-accepts {
+  .dev-range {
     flex: 0 0 auto;
     color: #8A8A8A;
     font-size: 10px;
@@ -313,8 +391,7 @@
 
   .dev-unbound {
     flex: 0 0 auto;
-    color: #C9A06A;
-    font-weight: 700;
+    color: #DDD;
   }
 
   .dev-badge {
@@ -348,21 +425,6 @@
     cursor: pointer;
   }
   .dev-jump:hover { background: #444; color: #DDD; }
-
-  .dev-bind-btn {
-    flex: 0 0 auto;
-    height: 20px;
-    padding: 0 8px;
-    border-radius: 3px;
-    border: 1px solid #335371;
-    background: #142538;
-    color: #DCEBFA;
-    font-size: 10px;
-    font-weight: 700;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .dev-bind-btn:hover { border-color: #5B9BD5; background: #1B3147; color: #FFF; }
 
   .dev-picker-backdrop {
     position: fixed;

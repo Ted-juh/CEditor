@@ -41,6 +41,15 @@ export async function load(url, context, nextLoad) {
     const spec = url.slice('ce-asset:'.length).replace(ASSET_QUERY, '');
     return { format: 'module', shortCircuit: true, source: `export default ${JSON.stringify(spec)};` };
   }
+  // Vite imports JSON without an attribute (`import map from './x.json'`); Node refuses that unless
+  // the import says `with { type: 'json' }`. So a module like utils/deviceAddress.js, and every
+  // component that reaches it (the Device button in the bar above the canvas), could not be
+  // imported by a test. Loaded as a module whose default export is the parsed file, which is what
+  // Vite hands the source. An import that does carry the attribute goes to Node as before.
+  if (url.startsWith('file:') && url.endsWith('.json') && context.importAttributes?.type !== 'json') {
+    const source = await readFile(fileURLToPath(url), 'utf8');
+    return { format: 'module', shortCircuit: true, source: `export default ${JSON.stringify(JSON.parse(source))};` };
+  }
   if (url.endsWith('.ts')) {
     const filename = fileURLToPath(url);
     const source = await readFile(filename, 'utf8');

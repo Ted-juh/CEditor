@@ -6,9 +6,18 @@
    * canvas gets ~80px back and there is one place to look for "controls
    * about the selection".
    *
-   *   Row 1 — what it is: name + type, behavior subtype, appearance facet tabs
-   *   Row 2 — the details: the active facet's quick controls, then state /
-   *            input / value-row groups when the control has behavior.
+   * One row that wraps: name and type, the appearance facet tabs, the Device and
+   * Scripts buttons, the active facet's quick controls, the state your edits go
+   * to, and the value-row count. It was two fixed rows beside a two-row Device
+   * block and a two-row Scripts block, which kept their width: at 1366 x 768 the
+   * canvas column is 502 pixels wide, the rows had about 140 of it, and X Y W H
+   * ran under the Device block. The bar was 229 pixels tall for a knob and 459
+   * for a button. Now it is 60 and 86 there, and one row (34) at 1920 for a knob.
+   *
+   * What it holds is what an author changes again and again while laying out a
+   * panel. The rest is one tab away, in the properties panel: rotation and
+   * opacity (Transform), Wheel and Reverse (Mouse), Keys and the button subtype
+   * (Behavior). The type is said once, in words.
    *
    * Every control writes the same dot-paths the PropertiesPanel uses, so this
    * is a faster door into the same model, not a separate one. Colours edit
@@ -38,6 +47,7 @@
   import { fontChoices, availableIcons } from '../stores/appSettings.js';
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { activeFacet, setFacet, APPEARANCE_FACET_ORDER } from '../stores/editorFacet.js';
+  import { controlTypeLabel } from '../utils/authorWords.js';
   import DeviceInsight from './DeviceInsight.svelte';
   import ScriptInsight from './ScriptInsight.svelte';
   import DisplayToolbar from '../components/DisplayToolbar.svelte';
@@ -71,17 +81,7 @@
   let controlType = $derived(String(core?.controlType ?? ''));
 
   // --- Behavior groups (from the old FunctionBar) ---
-  const SUBTYPE_OPTIONS = {
-    momentary: ['action', 'repeating', 'press_to_talk'],
-    toggle: ['toggle', 'sticky'],
-    cyclic: ['cycle', 'tri_state'],
-    timed: ['hold_to_confirm', 'double_click'],
-    one_shot: ['single_use'],
-  };
-
   let buttonType = $derived(String(behavior?.family === 'range' ? (behavior.role ?? 'range') : behavior?.buttonType ?? inferButtonType(controlType)));
-  let subtypeOptions = $derived(SUBTYPE_OPTIONS[buttonType] ?? null);
-  let showSubtypeSelector = $derived(!!behavior && !!subtypeOptions);
   let rowCount = $derived(Array.isArray(valueSection?.rows) ? valueSection.rows.length : 0);
 
   let showStateToolbar = $derived(
@@ -90,9 +90,6 @@
   );
   let showSegmentToolbar = $derived(buttonType === 'radio' && Array.isArray(valueSection?.rows) && valueSection.rows.length > 0);
   let showStateGroup = $derived(showStateToolbar || showSegmentToolbar);
-  let showInputGroup = $derived(
-    !!behavior && (hasBehaviorPath('wheelEnabled') || hasBehaviorPath('reverseMouseDirection') || hasBehaviorPath('keyboardEnabled'))
-  );
 
   let componentDesignerActive = $derived(
     $componentWorkspaceMode === 'surface'
@@ -109,10 +106,6 @@
       case 'OneShotButton': return 'one_shot';
       default: return 'momentary';
     }
-  }
-
-  function hasBehaviorPath(path) {
-    return Object.prototype.hasOwnProperty.call(behavior ?? {}, path);
   }
 
   // --- Appearance facets (from the old AppearanceBar) ---
@@ -289,7 +282,7 @@
       <span class="empty-state">Select a component to edit it — or press <kbd>+</kbd> in the left rail to insert one.</span>
     </div>
   {:else}
-    <!-- Row 1 — what it is + which facet -->
+    <!-- One row that wraps: what it is, which facet, Device and Scripts, then the facet's fields. -->
     <div class="ctx-row">
       <input
         class="name-field"
@@ -308,17 +301,7 @@
         }}
       />
       {#if controlType}
-        <span class="type-badge" title="Control type">{multiSelect ? `${$selectedComponentIds.size} selected` : controlType}</span>
-      {/if}
-
-      {#if showSubtypeSelector}
-        <div class="divider"></div>
-        <span class="type-badge ghost" title="Button type">{buttonType}</span>
-        <select class="val-select" value={behavior?.subtype ?? subtypeOptions[0]} title="Behavior subtype" onchange={(event) => set('Behavior.subtype', event.target.value)}>
-          {#each subtypeOptions as option}
-            <option value={option}>{option}</option>
-          {/each}
-        </select>
+        <span class="type-badge" title="Control type">{multiSelect ? `${$selectedComponentIds.size} selected` : controlTypeLabel(controlType)}</span>
       {/if}
 
       {#if facets.length > 0}
@@ -326,10 +309,14 @@
         <div class="facet-tabs">
           {#each facets as facet (facet)}
             {@const meta = FACET_META[facet]}
+            <!-- On a narrow bar only the open facet keeps its name; the others are named by
+                 their tooltip and aria-label. -->
             <button
               class="facet-tab"
               class:active={facet === shownFacet}
               title={meta.label}
+              aria-label={meta.label}
+              aria-pressed={facet === shownFacet}
               onclick={() => setFacet(facet)}
             >
               <meta.icon size={12} strokeWidth={2} />
@@ -338,10 +325,12 @@
           {/each}
         </div>
       {/if}
-    </div>
 
-    <!-- Row 2 — the active facet's controls, then behavior groups -->
-    <div class="ctx-row">
+      <!-- Beside the name on a narrow bar, so they share its line; at the right end on a wide one. -->
+      <span class="ctx-ends">
+        <DeviceInsight />
+        <ScriptInsight />
+      </span>
       {#if shownFacet === 'text'}
       <div class="prop-group">
         <button
@@ -429,10 +418,6 @@
         <span class="number-field nc-wrap" title="Width"><NumberCell min={1} step={1} value={transform?.width ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.width', value, transform?.width ?? 0, 1)} /></span>
         <span class="mini-label">H</span>
         <span class="number-field nc-wrap" title="Height"><NumberCell min={1} step={1} value={transform?.height ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.height', value, transform?.height ?? 0, 1)} /></span>
-        <span class="mini-label">R</span>
-        <span class="number-field nc-wrap" title="Rotation (degrees)"><NumberCell step={1} value={transform?.rotation ?? 0} defaultValue={0} onchange={(value) => setNumber('Transform.rotation', value, transform?.rotation ?? 0)} /></span>
-        <span class="mini-label">O</span>
-        <span class="number-field opacity-field nc-wrap" title="Opacity"><NumberCell min={0} max={1} step={0.05} value={transform?.opacity ?? 1} defaultValue={1} onchange={(value) => setNumber('Transform.opacity', value, transform?.opacity ?? 1, 0, 1)} /></span>
       </div>
       {:else if shownFacet === 'effects'}
       <div class="prop-group toggle-group">
@@ -479,25 +464,8 @@
 
       {#if showStateGroup}
         <div class="divider"></div>
-        <span class="section-chip">State</span>
         <div class="toolbar-slot">
           <DisplayToolbar />
-        </div>
-      {/if}
-
-      {#if showInputGroup}
-        <div class="divider"></div>
-        <span class="section-chip">Input</span>
-        <div class="prop-group toggle-group">
-          {#if hasBehaviorPath('wheelEnabled')}
-            <button class="text-toggle" class:active={behavior?.wheelEnabled === true} title="Mouse wheel input" onclick={() => set('Behavior.wheelEnabled', !(behavior?.wheelEnabled === true))}>Wheel</button>
-          {/if}
-          {#if hasBehaviorPath('reverseMouseDirection')}
-            <button class="text-toggle" class:active={behavior?.reverseMouseDirection === true} title="Reverse mouse direction" onclick={() => set('Behavior.reverseMouseDirection', !(behavior?.reverseMouseDirection === true))}>Reverse</button>
-          {/if}
-          {#if hasBehaviorPath('keyboardEnabled')}
-            <button class="text-toggle" class:active={behavior?.keyboardEnabled !== false} title="Keyboard input" onclick={() => set('Behavior.keyboardEnabled', !(behavior?.keyboardEnabled !== false))}>Keys</button>
-          {/if}
         </div>
       {/if}
 
@@ -508,9 +476,6 @@
     </div>
   {/if}
   </div>
-
-  <DeviceInsight />
-  <ScriptInsight />
 </div>
 
 <style>
@@ -522,6 +487,9 @@
     padding: 4px 10px;
     background: #272727;
     font-size: 11px;
+    /* The rules below go by the bar's own width, which is the canvas column's: 502 pixels in a
+       1366 window with the tree and the properties panel open, 1056 in a 1920 one. */
+    container: ctxbar / inline-size;
   }
 
   .ctx-main {
@@ -536,9 +504,33 @@
   .ctx-row {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 4px 8px;
     min-height: 24px;
     flex-wrap: wrap;
+  }
+
+  .ctx-ends {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* With room for everything on one line, Device and Scripts go to its end. */
+  @container ctxbar (min-width: 900px) {
+    .ctx-ends {
+      order: 99;
+      margin-left: auto;
+    }
+  }
+
+  /* A narrow bar names only the open facet; the others keep their icon, tooltip and aria-label. */
+  @container ctxbar (max-width: 699px) {
+    .facet-tab:not(.active) span {
+      display: none;
+    }
+    .facet-tab:not(.active) {
+      padding: 0 6px;
+    }
   }
 
   .designer-state {
@@ -601,17 +593,9 @@
     border-color: #5B9BD5;
   }
 
-  .section-chip {
-    flex: 0 0 auto;
-    color: #8F8F8F;
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-  }
-
   .name-field {
     height: 22px;
-    width: 130px;
+    width: 110px;
     background: #1E1E1E;
     color: #DDD;
     border: 1px solid #3A3A3A;
@@ -630,7 +614,6 @@
     opacity: 0.5;
   }
 
-  .val-select,
   .font-select {
     height: 22px;
     background: #1E1E1E;
@@ -641,9 +624,6 @@
     font-family: inherit;
     padding: 0 6px;
     outline: none;
-  }
-
-  .font-select {
     max-width: 130px;
   }
 
@@ -661,10 +641,6 @@
     white-space: nowrap;
   }
 
-  .type-badge.ghost {
-    color: #8F8F8F;
-  }
-
   /* Width-preserving wrappers around NumberCell — the cell's flex:1 fills
      the wrapper instead of the whole row. */
   .nc-wrap {
@@ -672,7 +648,7 @@
     flex: 0 0 auto;
   }
 
-  .number-field { width: 56px; }
+  .number-field { width: 52px; }  /* "-120" and "1920" fit; "-1200" did not at the old 56 either */
   .size-field { width: 50px; }
   .opacity-field { width: 50px; }
 

@@ -33,7 +33,8 @@ try {
   await page.getByLabel('MIDI output', { exact: true }).waitFor();
   // Toolbar binding must configure the control, not merely claim metadata adoption.
   await page.evaluate(() => window.__workflow.prepareToolbar());
-  await page.locator('.insight').getByRole('button', { name: 'Bind…', exact: true }).click();
+  // The Device button: "Device Unbound" opens the parameter list.
+  await page.locator('.insight').getByRole('button', { name: 'Device Unbound', exact: true }).click();
   await page.locator('.dev-picker-item').filter({ hasText: 'cutoff' }).click();
   const adopted = await page.evaluate(() => window.__workflow.control()._children);
   assert.equal(adopted.Behavior.min, 0);
@@ -44,6 +45,10 @@ try {
   // The address line reads a device runtime, loaded the first time one is asked of it
   // (deviceAddress.js). This profile is no DPD's, so each runtime is asked in turn: the generic CC
   // one has a cutoff, GAIA a filter.cutoff, and a parameter none has says the DPD holds it.
+  // The line is in the panel the bound Device button opens; it stays open across the rebinds below,
+  // which change the binding and not the control.
+  await page.locator('.insight .dev-chip-btn').click();
+  await page.locator('.dev-details').waitFor();
   const address = (wanted) => page.waitForFunction((source) => new RegExp(source)
     .test(document.querySelector('.insight .dev-addr')?.textContent.trim() ?? ''), wanted.source);
   await address(/^CC 74$/);
@@ -51,6 +56,8 @@ try {
   await address(/^DT1 10 00 01 [0-9A-F]{2}$/);
   await page.evaluate(() => window.__workflow.bind({ parameterId: 'no.such.parameter' }));
   await address(/^addr → DPD$/);
+  await page.keyboard.press('Escape');
+  await page.locator('.dev-details').waitFor({ state: 'detached' });
 
   // These controls previously only changed the dropdown stores, leaving the backend untouched.
   await page.getByLabel('MIDI output', { exact: true }).selectOption('test-output');

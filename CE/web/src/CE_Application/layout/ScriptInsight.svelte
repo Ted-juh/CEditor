@@ -1,10 +1,12 @@
 <script>
   /**
-   * Scripts / Logic zone — right of the Device zone on the top Look bar.
+   * Scripts button — beside the Device button in the bar above the canvas (ContextBar).
    *
-   * Mirrors the Device zone's pattern: appears only when the selected control
-   * actually has a Scripts section (interactive controls do; static Labels don't),
-   * shows a glanceable summary, and offers a jump to where scripts are edited.
+   * Appears only when the selected control actually has a Scripts section
+   * (interactive controls do; static Labels don't), says how many scripts it has
+   * ("Scripts none", "Scripts 2 on"), and opens the Script Editor. It was a block
+   * two rows tall; the hint it carried ("no logic attached", "2 enabled") is the
+   * tooltip now.
    *
    * Scripts are authored in the Behavior Designer, in the script document bound to
    * this control's panel — that is the only script editor. Count the source scripts
@@ -35,6 +37,10 @@
   let enabled = $derived(enabledCount > 0);
   let visible = $derived(!!scripts && !multiSelect);
 
+  let title = $derived(count > 0
+    ? `${count} script${count === 1 ? '' : 's'}, ${enabledCount} enabled. Open the Script Editor.`
+    : 'No logic attached. Open the Script Editor.');
+
   function openScripts() {
     // Open the script editor bound to THIS component's panel — so Paths shows that panel's controls.
     const panel = get(activePanel);
@@ -46,57 +52,41 @@
 
 {#if visible}
   <div class="script-wrap">
-    <div class="script-zone">
-      <div class="s-row">
-        <span class="s-chip">SCRIPTS</span>
-        {#if count > 0}
-          <span class="s-count">{count} script{count === 1 ? '' : 's'}</span>
-          <span class={['s-badge', enabled ? 'on' : 'off']} title={enabled ? 'Scripts enabled' : 'Scripts disabled'}>{enabled ? 'on' : 'off'}</span>
-        {:else}
-          <span class="s-none">none</span>
-        {/if}
-      </div>
-      <div class="s-row s-row-2">
-        {#if count > 0}
-          <span class="s-hint">{enabledCount} enabled</span>
-        {:else}
-          <span class="s-hint">no logic attached</span>
-        {/if}
-        <span class="s-actions">
-          <button class="s-jump" title="Open the Script Editor" onclick={openScripts}>Script Editor</button>
-        </span>
-      </div>
-    </div>
+    <button class="s-jump" {title} onclick={openScripts}>
+      <span class="s-chip">Scripts</span>
+      {#if count > 0}
+        <span class="s-count">{count}</span>
+        <span class={['s-badge', enabled ? 'on' : 'off']}>{enabled ? 'on' : 'off'}</span>
+      {:else}
+        <span class="s-none">none</span>
+      {/if}
+    </button>
   </div>
 {/if}
 
 <style>
   .script-wrap {
-    position: relative;
     display: flex;
     align-items: center;
     min-width: 0;
-    margin-left: 14px;
-    padding-left: 14px;
-    border-left: 1px solid #565656;
   }
 
-  .script-zone {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 3px;
-    max-width: 240px;
-    min-width: 0;
-    font-size: 11px;
-  }
-
-  .s-row {
-    display: flex;
+  .s-jump {
+    display: inline-flex;
     align-items: center;
     gap: 5px;
-    min-width: 0;
+    height: 22px;
+    padding: 0 8px;
+    border: 1px solid #3A3A3A;
+    border-radius: 3px;
+    background: #1E1E1E;
+    color: #DDD;
+    font-family: inherit;
+    font-size: 11px;
+    white-space: nowrap;
+    cursor: pointer;
   }
+  .s-jump:hover { border-color: #5B9BD5; background: #1B3147; color: #FFF; }
 
   .s-chip {
     flex: 0 0 auto;
@@ -108,19 +98,15 @@
   .s-count {
     color: #E6E6E6;
     font-weight: 600;
-    white-space: nowrap;
   }
 
-  .s-none,
-  .s-hint {
-    color: #8A8A8A;
-    font-size: 10px;
-    white-space: nowrap;
+  .s-none {
+    color: #DDD;
   }
 
   .s-badge {
     flex: 0 0 auto;
-    padding: 1px 5px;
+    padding: 0 4px;
     border-radius: 3px;
     border: 1px solid #3A3A3A;
     background: #1A1A1A;
@@ -129,26 +115,4 @@
   }
   .s-badge.on { color: #6FCF97; }
   .s-badge.off { color: #888; }
-
-  .s-actions {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    gap: 5px;
-  }
-
-  .s-jump {
-    flex: 0 0 auto;
-    height: 22px;
-    padding: 0 8px;
-    border-radius: 3px;
-    border: 1px solid #444;
-    background: #333;
-    color: #999;
-    font-size: 10px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-  }
-  .s-jump:hover { background: #444; color: #DDD; }
 </style>
