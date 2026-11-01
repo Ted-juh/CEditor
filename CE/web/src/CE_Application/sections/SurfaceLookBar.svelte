@@ -401,4 +401,30 @@
     text-align: right;
     color: #E8EEF5;
   }
+
+  /* A narrow designer (1366 wide, about 710 pixels of it): the style controls have a row of their
+     own, under the quick bar and Scripts. In one row they had 152 of the 611 pixels they need, and
+     only Fill was in sight. Two rows always at this width, layer selected or not, at one height
+     (the empty line is as tall as the controls), so selecting a layer does not move the canvas: the
+     reason the bar is one row otherwise. */
+  @container (max-width: 939px) {
+    .surface-lookbar {
+      flex-wrap: wrap;
+      row-gap: 0;
+      padding-bottom: 4px;
+    }
+
+    .surface-lookbar .paint-strip,
+    .surface-lookbar .lookbar-empty {
+      flex: 1 1 100%;
+      order: 3;
+      box-sizing: border-box;
+      height: 40px;
+    }
+
+    .surface-lookbar .lookbar-empty {
+      display: flex;
+      align-items: center;
+    }
+  }
 </style>

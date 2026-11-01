@@ -256,6 +256,23 @@ try {
     { selected: true, closedByEscape: true, selectionKept: true, closedByClickElsewhere: true },
     { selected: selectedBefore > 0, closedByEscape, selectionKept: selectedAfterEscape === selectedBefore, closedByClickElsewhere: !(await box(viewList)) });
 
+  // The look bar at this width (1700): the ten layer buttons took the room the style needed, and
+  // Opacity was out of sight. They fold into "Layer ▾" here; at 1366 the style has a row of its own.
+  const lookBar = await kit.page.evaluate(() => {
+    const strip = document.querySelector('.surface-lookbar .paint-strip');
+    const shown = (sel) => { const el = document.querySelector(sel); return !!el && getComputedStyle(el).display !== 'none' && el.getBoundingClientRect().width > 0; };
+    return { styleInSight: !!strip && strip.scrollWidth <= strip.clientWidth, folded: shown('.quickbar-fold') && !shown('.quickbar-buttons button') };
+  });
+  await kit.page.locator('.quickbar-fold .fold-button').click();
+  await kit.settle(400);
+  const menuItems = await kit.page.locator('.fold-menu [role="menuitem"]').count();
+  await kit.page.keyboard.press('Escape');
+  await kit.settle(300);
+  led.check(D, 'the look bar shows a layer`s whole style, with its actions under Layer',
+    'with a layer selected, every style control is in sight; the ten layer buttons are one Layer menu with the ten actions by name; Escape closes it and the layer stays selected',
+    { styleInSight: true, folded: true, menuItems: 10, closedByEscape: true, stillSelected: true },
+    { ...lookBar, menuItems, closedByEscape: !(await kit.page.locator('.fold-menu').count()), stillSelected: (await selectedParts()) > 0 });
+
   const startersButton = kit.page.locator('.tool-strip button[title^="Starters"]');
   const startersMenu = '[aria-label="Starter components"]';
   await startersButton.click();

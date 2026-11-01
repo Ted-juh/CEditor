@@ -359,3 +359,27 @@ test("the tool strip's menus close on a click anywhere else and on Escape", () =
   assert.match(surface, /if \(!event\.target\?\.closest\?\.\('\.tool-flyout-host'\)\) close\(\);/);
   assert.match(surface, /document\.addEventListener\('pointerdown', onDown, true\);\s*document\.addEventListener\('keydown', onKey\);/);
 });
+
+test('the look bar keeps a layer\'s style in sight at every width, and never changes height on a selection', () => {
+  // At 1366 wide the style controls had 152 of the 611 pixels they need, and only Fill was in sight;
+  // at 1700, Opacity was not. Narrow: they get a row of their own, at one height with or without a
+  // layer selected. Middling: the ten layer buttons fold into "Layer ▾". Wide: nothing changes.
+  const bar = src('CE_Application/sections/SurfaceLookBar.svelte');
+  const narrow = bar.slice(bar.indexOf('@container (max-width: 939px)'));
+  assert.match(narrow, /\.surface-lookbar \{\s*flex-wrap: wrap;/);
+  assert.match(narrow, /\.surface-lookbar \.paint-strip,\s*\.surface-lookbar \.lookbar-empty \{[^}]*order: 3;[^}]*height: 40px;/);
+  const quick = src('CE_Application/sections/SurfaceQuickbar.svelte');
+  const middling = quick.slice(quick.indexOf('@container (min-width: 940px) and (max-width: 1199px)'));
+  assert.match(middling, /\.quickbar-buttons \{\s*display: none;/);
+  assert.match(middling, /\.quickbar-fold \{\s*display: inline-flex;/);
+  assert.match(quick, /\.quickbar-fold \{\s*display: none;/, 'folded only in that range');
+  // The menu holds the ten actions the buttons do, by name, with the buttons' own handlers.
+  for (const [label, run] of [['Duplicate layer', 'onduplicate'], ['Copy layers', 'oncopy'], ['Paste layers', 'onpaste'],
+    ['Bring forward', '\\(\\) => onmove\\(1\\)'], ['Bring to front', "\\(\\) => onextreme\\('front'\\)"], ['Send backward', '\\(\\) => onmove\\(-1\\)'],
+    ['Send to back', "\\(\\) => onextreme\\('back'\\)"], ['Delete layer', 'onremove']]) {
+    assert.match(quick, new RegExp(`label: '${label}'[^}]*run: ${run},`), label);
+  }
+  assert.match(quick, /label: `Make interactive: \$\{interactiveLabel\}`[^}]*run: onmakeinteractive,/);
+  assert.match(quick, /label: locked \? 'Unlock layer' : 'Lock layer'[^}]*run: ontogglelock,/);
+  assert.match(quick, /event\.key !== 'Escape'\) return;\s*event\.preventDefault\(\);\s*event\.stopPropagation\(\);\s*foldOpen = false;/);
+});
