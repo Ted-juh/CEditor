@@ -169,6 +169,24 @@ export function stateConditionWords(when) {
   return words.join(', ');
 }
 
+// What a hit zone does to its channel, as a verb: "drags Cutoff", not "dragValue".
+const HIT_ZONE_ACTION_WORDS = {
+  dragvalue: 'drags',
+  setvalue: 'sets',
+  cyclevalue: 'cycles',
+  togglevalue: 'toggles',
+  selectvalue: 'selects',
+  cellvalue: 'sets a cell of',
+  notevalue: 'plays a note on',
+  setitemvalue: 'sets an item of',
+  press: 'presses',
+};
+
+export function hitZoneActionWord(action) {
+  const name = String(action ?? '').trim();
+  return HIT_ZONE_ACTION_WORDS[name.toLowerCase()] ?? identifierWords(name);
+}
+
 const TYPE_LABELS = new Map(
   INSERT_CATEGORIES.flatMap((category) => category.items ?? [])
     // "Harmoniser (one finger, full chord)" is the Insert menu's description; the type is the name.

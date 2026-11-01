@@ -1,5 +1,5 @@
 <script>
-  import { propertyPathWords, stateConditionWords } from '../utils/authorWords.js';
+  import { hitZoneActionWord, identifierWords, propertyPathWords, stateConditionWords } from '../utils/authorWords.js';
   import { applyControlPatch, getSection, updateControlProperty } from '../stores/controls.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -489,6 +489,15 @@
     });
   }
 
+  // Where a value sits in its range, when that says something the value does not: for a 0 to 1
+  // channel it is the value again.
+  function rangePosition(definition, normalized) {
+    const min = Number(definition?.min ?? 0);
+    const max = Number(definition?.max ?? 1);
+    if (!Number.isFinite(normalized) || (min === 0 && max === 1)) return '';
+    return `${Math.round(normalized * 1000) / 10}%`;
+  }
+
   function payloadSummary(zone) {
     const payload = zone?.payload ?? {};
     const parts = [];
@@ -502,7 +511,7 @@
     if (payload.xNormalized !== undefined || payload.yNormalized !== undefined) {
       parts.push(`xy ${Number(payload.xNormalized ?? 0).toFixed(2)},${Number(payload.yNormalized ?? 0).toFixed(2)}`);
     }
-    return parts.length ? parts.join(' · ') : 'no payload';
+    return parts.join(' · ');
   }
 
   function applyHitZoneProbe(name, zone) {
@@ -614,7 +623,7 @@
           <div class="rig-row" class:linked={channel.linked}>
             <div class="rig-name">
               <strong>{channel.label}</strong>
-              <span>{channel.name}</span>
+              {#if channel.name !== channel.label}<span>{channel.name}</span>{/if}
             </div>
             <div class="rig-control">
               {#if type === 'bool'}
@@ -667,8 +676,13 @@
                 />
               {/if}
             </div>
-            <em>{String(linkedDefaults.values?.[channel.name] ?? seededValues?.[channel.name])}</em>
-            <small>{channel.normalized.toFixed(3)}</small>
+            <!-- The value once, in the field. It read "0.5 0.5 0.500": the field, the same value as
+                 text, and its position 0 to 1. The note has only what the field does not say: the
+                 value a link drives it to, and where it sits in a range that is not 0 to 1. -->
+            <span class="rig-note" title={[channel.linked ? `A link drives it to ${String(linkedDefaults.values?.[channel.name])}` : '', rangePosition(definition, channel.normalized) ? `${rangePosition(definition, channel.normalized)} of its range` : ''].filter(Boolean).join('. ')}>
+              {#if channel.linked}<em>link: {String(linkedDefaults.values?.[channel.name])}</em>{/if}
+              <small>{rangePosition(definition, channel.normalized)}</small>
+            </span>
             <button class="mini-btn" type="button" onclick={() => resetChannelTestValue(channel.name)} disabled={preview.channelValues?.[channel.name] === undefined}>Reset</button>
           </div>
         {/each}
@@ -679,13 +693,14 @@
 
   <PropertySection title="Hit Zones" icon={SquareDashed}>
     <PropertyCell label="Triggers" span={4} hint="Fire authored or generated hit zones directly into the channel rig.">
+      <div class="probe-stack">
       <div class="probe-groups">
         {#each probeGroups as group (group.source)}
           <div class="probe-group" class:generated={group.generated}>
             <div class="probe-group-head">
               <strong>{group.source}</strong>
               <span>{group.entries.length} zone{group.entries.length === 1 ? '' : 's'}</span>
-              <em>{group.kinds}</em>
+              <em>{group.kinds.split(', ').map(identifierWords).join(', ')}</em>
             </div>
             {#if group.generated}
               <div class="probe-group-actions">
@@ -710,14 +725,18 @@
       </div>
       <div class="probe-list">
         {#each probeHitZoneEntries.slice(0, 12) as [name, zone] (name)}
-          <button class="probe-card" class:generated={zone?.generated === true} type="button" onclick={() => applyHitZoneProbe(name, zone)}>
+          {@const does = `${hitZoneActionWord(zone?.action)} ${zone?.targetValueChannel || 'nothing'}${zone?.targetValueChannelY ? ` and ${zone.targetValueChannelY}` : ''}`}
+          {@const note = hitZoneRuntimeNote(zone) || payloadSummary(zone)}
+          <!-- What the zone does in words ("drags Cutoff", not "dragValue" over "Cutoff"), and its
+               payload only when it has one: every card said "no payload". -->
+          <button class="probe-card" class:generated={zone?.generated === true} type="button" title={`${name}: ${does}${note ? ` · ${note}` : ''}`} onclick={() => applyHitZoneProbe(name, zone)}>
             <strong>{name}</strong>
-            <span>{zone?.action ?? '-'}</span>
-            <em>{zone?.targetValueChannel || '-'}{zone?.targetValueChannelY ? ` / ${zone.targetValueChannelY}` : ''}</em>
-            <small>{hitZoneRuntimeNote(zone) || payloadSummary(zone)}</small>
+            <em>{does}</em>
+            {#if note}<small>{note}</small>{/if}
           </button>
         {/each}
         {#if probeHitZoneEntries.length > 12}<div class="empty-row">+{probeHitZoneEntries.length - 12} more zones in the group samples</div>{/if}
+      </div>
       </div>
     </PropertyCell>
   </PropertySection>
@@ -901,7 +920,7 @@
   }
   .rig-row {
     display: grid;
-    grid-template-columns: minmax(82px, 1fr) minmax(118px, 1.2fr) minmax(52px, 0.55fr) 48px 54px;
+    grid-template-columns: minmax(82px, 1fr) minmax(118px, 1.2fr) minmax(48px, 0.6fr) 54px;
     gap: 7px;
     align-items: center;
     min-height: 34px;
@@ -1346,9 +1365,22 @@
     border-color: #4B3E2C;
     background: #1D1A16;
   }
+  /* The groups above the cards, each the cell's width: the cards sat beside the group card. */
+  .probe-stack {
+    display: grid;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .rig-note {
+    display: grid;
+    min-width: 0;
+    text-align: right;
+  }
+
   .probe-list {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 6px;
     width: 100%;
   }
@@ -1378,7 +1410,6 @@
     color: #FFF;
   }
   .probe-card strong,
-  .probe-card span,
   .probe-card em,
   .probe-card small {
     min-width: 0;

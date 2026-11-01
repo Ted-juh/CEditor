@@ -17,7 +17,7 @@ import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { planComponentFromSelection } from '../src/CE_Application/utils/customComponentFromControls.js';
 import { layerKindLabel } from '../src/CE_Application/utils/customDesignSurfaceHelpers.js';
 import {
-  behaviorTypeWord, channelTypeWord, controlTypeLabel, propertyPathWords, stateConditionWords, targetPathWords,
+  behaviorTypeWord, channelTypeWord, controlTypeLabel, hitZoneActionWord, propertyPathWords, stateConditionWords, targetPathWords,
 } from '../src/CE_Application/utils/authorWords.js';
 import CustomInteractEditor from '../src/CE_Application/sections/CustomInteractEditor.svelte';
 import BindingsEditor from '../src/CE_Application/sections/BindingsEditor.svelte';
@@ -111,4 +111,22 @@ test('the Core tab names the type as the Insert menu does, and the screen-reader
   assert.match(body, /Screen reader/);
   assert.match(readFileSync(new URL('../src/CE_Application/sections/CoreEditor.svelte', import.meta.url), 'utf8'),
     /set\('screenReaderText', v\)/, 'it edits the same field');
+});
+
+test('the Test Bench shows each value once, and its zones say what they do, with room to say it', () => {
+  // A channel row read "Cutoff Cutoff 0.5 0.5 0.500": the label and the name, the field, the value
+  // as text, and its position 0 to 1. A zone card read "CutoffZone dragValue Cutoff no payload",
+  // in a quarter of half the cell.
+  const component = filter();
+  component._children.ValueChannels._children.cutoff.max = 100;
+  const html = render(CustomTestBenchEditor, { props: { control: component } }).body;
+  const rows = [...html.matchAll(/<div class="rig-row[\s\S]*?Reset<\/button>/g)].map((m) => text(m[0]).trim());
+  assert.deepEqual(rows, ['cutoff 0.5% Reset', 'reso Reset'],
+    'the name once, the value in its field only, and the position where the range is not 0 to 1');
+  const cards = [...html.matchAll(/<button class="probe-card[\s\S]*?<\/button>/g)].map((m) => text(m[0]).trim());
+  assert.deepEqual(cards, ['cutoffZone drags cutoff', 'resoZone drags reso']);
+  assert.doesNotMatch(text(html), /no payload|dragValue/);
+  assert.match(html, /<div class="probe-stack[^"]*">\s*<div class="probe-groups/, 'the cards are under the groups, not beside them');
+  assert.equal(hitZoneActionWord('setValue'), 'sets');
+  assert.equal(hitZoneActionWord('arpeggiatorSelect'), 'arpeggiator select', 'one with no verb of its own is words');
 });
