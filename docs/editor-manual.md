@@ -99,8 +99,9 @@ You can drag the borders between the canvas, the tree, the properties panel and 
 them. CEditor remembers the sizes, and which parts were showing, for next time. The properties
 panel opens 600 pixels wide and goes down to 420, which on a laptop screen gives the canvas about a
 third more room; narrower than about 525, its tabs put two fields in a row instead of four, so
-every value stays readable. In a window narrower than 920 pixels the tree, the dock and the
-properties panel are hidden to make room for the canvas.
+every value stays readable. **Ctrl+\\** (**Window → Canvas Only**) hides the tree, the properties
+panel and the dock at once, and pressed again brings back the ones it hid. In a window narrower
+than 920 pixels the tree, the dock and the properties panel are hidden to make room for the canvas.
 
 ### Documents and workspaces
 
@@ -1149,6 +1150,7 @@ an open panel the items are greyed out.
 | **Component Tree** | Ctrl+Shift+E | Shows or hides the component tree. |
 | **Properties Panel** | Ctrl+Shift+D | Shows or hides the properties panel. |
 | **Display Panel** | Ctrl+J | Shows or hides the dock. |
+| **Canvas Only** | Ctrl+\ | Hides the tree, the properties panel and the dock at once; again brings back the ones it hid. |
 | **Close Tab** | Ctrl+W | Closes the tab in front. |
 
 ### Help
@@ -1408,6 +1410,7 @@ while you are typing in a text field; the File and tab shortcuts, F1 and F5 work
 | Ctrl+J | Show / hide the display dock |
 | Ctrl+Shift+E | Show / hide the component tree |
 | Ctrl+Shift+D | Show / hide the properties panel |
+| Ctrl+\ | Hide the dock, tree and properties panel / bring them back |
 
 ---
 

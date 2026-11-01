@@ -153,6 +153,15 @@ export const GLOBAL_SHORTCUTS = [
     keys: 'Ctrl+Shift+D', description: 'Show / hide the properties panel',
     match: (e) => modOf(e) && e.shiftKey && !e.altKey && lowerOf(e) === 'd',
   },
+  // The three at once (stores/panelVisibility.js toggleCanvasFocus): the canvas gets the window,
+  // and the same chord brings back exactly the ones it hid. Ctrl+\ because nothing here had it;
+  // F11 is the browser's full screen and Tab moves between fields. The key code as well as the
+  // character, so a layout that types something else on that key still has it.
+  {
+    id: 'toggle-canvas-focus', scope: 'document', section: 'Panels',
+    keys: 'Ctrl+\\', description: 'Hide the dock, tree and properties panel / bring them back',
+    match: (e) => modOf(e) && !e.shiftKey && !e.altKey && (e.key === '\\' || e.code === 'Backslash'),
+  },
   // --- Tabs. Application chords: Ctrl+Tab in a script editor must move to the
   // next document, not indent a line, and Ctrl+digit types nothing anywhere,
   // so neither can collide with the user's hands being in a text field. They

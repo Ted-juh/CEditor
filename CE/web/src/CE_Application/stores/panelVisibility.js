@@ -1,5 +1,5 @@
 import { derived, get, writable } from 'svelte/store';
-import { readStoredBool, writeStoredJson } from '../utils/localStorageState.js';
+import { readStoredBool, readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
 
 /**
  * panelVisibility.js — the three dock toggles, out of App.svelte and into a store.
@@ -94,4 +94,44 @@ export function setPanelVisibility(which, value) {
 
 export function togglePanelVisibility(which) {
   liveStore(which)?.update((value) => !value);
+}
+
+/** Where Ctrl+\ keeps the panels it hid, so a reload in between does not lose them. */
+export const CANVAS_FOCUS_STORAGE_KEY = 'ce.ui.canvasFocusRestore';
+const FOCUS_PANELS = ['tree', 'properties', 'display'];
+
+// Which ones Ctrl+\ hid: held here, and stored so a reload in between does not lose them.
+let canvasFocusHidden = (() => {
+  const stored = readStoredJson(CANVAS_FOCUS_STORAGE_KEY, []);
+  return Array.isArray(stored) ? FOCUS_PANELS.filter((which) => stored.includes(which)) : [];
+})();
+
+function rememberHidden(list) {
+  canvasFocusHidden = list;
+  writeStoredJson(CANVAS_FOCUS_STORAGE_KEY, list);
+}
+
+/**
+ * Ctrl+\: the whole window for the canvas, and back (item 3 of the editor-space list).
+ *
+ * Each of the three had a chord of its own (Ctrl+Shift+E, Ctrl+Shift+D, Ctrl+J), so clearing the
+ * canvas took three and putting it back three more, and the author had to remember which had been
+ * open. With any of them open, this hides them all and remembers which; with none open, it brings
+ * back the ones it hid, exactly those. If it hid none (they were closed one by one, or never
+ * opened), it brings back what a new install shows: the tree and the properties panel.
+ *
+ * 'display' is the dock of the workspace in front, as everywhere here: hidden from the script
+ * workspace, the script dock comes back, and the panel editor's keeps its own switch.
+ */
+export function toggleCanvasFocus() {
+  const open = FOCUS_PANELS.filter((which) => isPanelVisible(which));
+  if (open.length > 0) {
+    rememberHidden(open);
+    for (const which of open) setPanelVisibility(which, false);
+    return { hidden: open, shown: [] };
+  }
+  const shown = canvasFocusHidden.length > 0 ? canvasFocusHidden : FOCUS_PANELS.filter((which) => DEFAULTS[which]);
+  for (const which of shown) setPanelVisibility(which, true);
+  rememberHidden([]);
+  return { hidden: [], shown };
 }

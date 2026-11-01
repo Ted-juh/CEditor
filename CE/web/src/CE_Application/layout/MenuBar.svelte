@@ -30,7 +30,7 @@
   import { openComponentLibraryEntry, openDeviceProfileEntry, openRecentFile } from '../stores/recentFileActions.js';
   import {
     PANEL_VISIBILITY_ITEMS, displayPanelVisible, showPropertiesPanel,
-    showTreePanel, togglePanelVisibility,
+    showTreePanel, togglePanelVisibility, toggleCanvasFocus,
   } from '../stores/panelVisibility.js';
   import { GLOBAL_SHORTCUTS } from '../utils/globalShortcuts.js';
   import { requestAbout, requestDocumentation } from '../stores/editorCommands.js';
@@ -290,6 +290,10 @@
         checked: () => visibilityFlags[item.id] === true,
         action: () => togglePanelVisibility(item.id),
       })),
+      // The three at once, and back: Ctrl+\ (toggleCanvasFocus).
+      { label: 'Canvas Only', shortcut: GLOBAL_SHORTCUTS.find((b) => b.id === 'toggle-canvas-focus')?.keys,
+        checked: () => !visibilityFlags.tree && !visibilityFlags.properties && !visibilityFlags.display,
+        action: () => toggleCanvasFocus() },
       { type: 'separator' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
     ],

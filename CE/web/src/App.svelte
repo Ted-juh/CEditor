@@ -61,7 +61,7 @@
   import { readStoredBool, readStoredNumber, writeStoredJson } from './CE_Application/utils/localStorageState.js';
   import {
     displayPanelVisible, displayPanelWorkspace, setPanelVisibility, showDisplayPanel, showDisplayPanelInScript,
-    showPropertiesPanel, showTreePanel, togglePanelVisibility,
+    showPropertiesPanel, showTreePanel, togglePanelVisibility, toggleCanvasFocus,
   } from './CE_Application/stores/panelVisibility.js';
   import { clampDockHeight, maxDisplayDockHeight, resolveDockHeight } from './CE_Application/utils/displayDock.js';
   import { advanceWorkspaceSwap, workspaceSwapPhase } from './CE_Application/utils/chromeMotion.js';
@@ -130,6 +130,7 @@
         case 'toggle-display-panel': togglePanelVisibility('display'); break;
         case 'toggle-tree-panel': togglePanelVisibility('tree'); break;
         case 'toggle-properties-panel': togglePanelVisibility('properties'); break;
+        case 'toggle-canvas-focus': toggleCanvasFocus(); break;
         case 'zoom-to-selection': requestZoomToSelection(); break;
         case 'undo': undo(); break;
         case 'redo': redo(); break;
