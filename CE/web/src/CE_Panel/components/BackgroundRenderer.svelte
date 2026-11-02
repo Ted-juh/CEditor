@@ -129,7 +129,10 @@
         }
       );
     }
-    return fillCornerCSS;
+    // Through a constant: the compiler moves the comment above fillCornerCSS's declaration in after
+    // a bare `return fillCornerCSS`, and in the server build that return then returned nothing.
+    const shape = fillCornerCSS;
+    return shape;
   }
 
   $effect(() => {

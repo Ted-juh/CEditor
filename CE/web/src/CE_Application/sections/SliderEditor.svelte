@@ -144,6 +144,34 @@
     ];
   }
 
+  // The presets. Each used to write its own width and height, so going from Single to Bipolar on
+  // the same slider resized it; now a preset keeps the slider's size, and only a change between
+  // linear and circular takes the preset's (a 220 x 48 strip is no shape for a dial).
+  const LINEAR_PRESETS = [
+    { label: 'Single', geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 220, height: 48 },
+    { label: 'Bipolar', geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 240, height: 56, bipolar: true },
+    { label: 'Range', geometry: 'linear', valueMode: 'range', direction: 'ltr', width: 240, height: 56 },
+    { label: 'Band', geometry: 'linear', valueMode: 'band', direction: 'ltr', width: 260, height: 64 },
+  ];
+  const CIRCULAR_PRESETS = [
+    { label: 'Single', geometry: 'circular', valueMode: 'single', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 180, height: 180 },
+    { label: 'Bipolar', geometry: 'circular', valueMode: 'single', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 200, height: 200, bipolar: true },
+    { label: 'Range', geometry: 'circular', valueMode: 'range', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 200, height: 200 },
+    { label: 'Band', geometry: 'circular', valueMode: 'band', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 220, height: 220 },
+  ];
+
+  /** Bipolar is what the Bipolar presets write: the fill grows from the centre of a range below zero. */
+  let isBipolar = $derived(String(behavior?.fillOrigin ?? '') === 'center' && numberOr(behavior?.min, 0) < 0);
+
+  /** The preset the slider is set as now, so its button shows as chosen. */
+  function presetMatches(preset) {
+    // Through a constant: the compiler moves a nearby declaration's comment in after a `return`, and a
+    // `return` followed by a line break returns nothing (it did, and no button was shown chosen).
+    const matches = geometry === preset.geometry && valueMode === preset.valueMode
+      && isBipolar === (preset.bipolar === true);
+    return matches;
+  }
+
   function applyPreset(preset) {
     const min = preset.bipolar === true ? -1 : numberOr(behavior?.min, 0);
     const max = preset.bipolar === true ? 1 : numberOr(behavior?.max, 1);
@@ -173,9 +201,11 @@
       'Behavior.defaultCurrentValue': preset.bipolar === true ? center : midpoint(min, max),
       'Behavior.defaultEndValue': min + ((max - min) * 0.75),
       Parts: createSliderSemanticParts(),
-      'Transform.width': preset.width,
-      'Transform.height': preset.height,
     };
+    if (preset.geometry !== geometry) {
+      basePatch['Transform.width'] = preset.width;
+      basePatch['Transform.height'] = preset.height;
+    }
     setPatch(basePatch);
   }
 
@@ -199,20 +229,18 @@
 
 {#if behavior}
   <PropertySection title="Slider Presets" icon={Bookmark}>
-    <PropertyCell label="Linear" span={4} hint="Insert a ready-made starting point and refresh the semantic slider style parts.">
+    <PropertyCell label="Linear" span={4} hint="Insert a ready-made starting point and refresh the semantic slider style parts. The slider keeps its size.">
       <div class="preset-grid">
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 220, height: 48 })}>Single</button>
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'single', direction: 'ltr', width: 240, height: 56, bipolar: true })}>Bipolar</button>
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'range', direction: 'ltr', width: 240, height: 56 })}>Range</button>
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'linear', valueMode: 'band', direction: 'ltr', width: 260, height: 64 })}>Band</button>
+        {#each LINEAR_PRESETS as preset (preset.label)}
+          <button class="preset-btn" class:active={presetMatches(preset)} aria-pressed={presetMatches(preset)} type="button" onclick={() => applyPreset(preset)}>{preset.label}</button>
+        {/each}
       </div>
     </PropertyCell>
-    <PropertyCell label="Circular" span={4} hint="Circular presets keep the same slider family and just change geometry/value mode defaults.">
+    <PropertyCell label="Circular" span={4} hint="Circular presets keep the same slider family and just change geometry/value mode defaults. Changing between linear and circular resizes it to fit.">
       <div class="preset-grid">
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'single', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 180, height: 180 })}>Single</button>
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'single', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 200, height: 200, bipolar: true })}>Bipolar</button>
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'range', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 200, height: 200 })}>Range</button>
-        <button class="preset-btn" type="button" onclick={() => applyPreset({ geometry: 'circular', valueMode: 'band', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 220, height: 220 })}>Band</button>
+        {#each CIRCULAR_PRESETS as preset (preset.label)}
+          <button class="preset-btn" class:active={presetMatches(preset)} aria-pressed={presetMatches(preset)} type="button" onclick={() => applyPreset(preset)}>{preset.label}</button>
+        {/each}
       </div>
     </PropertyCell>
     <PropertyCell label="Refresh Parts" span={4} hint="Rebuild the semantic ready-made slider style parts if they were removed or drifted too far.">
@@ -659,6 +687,12 @@
   .preset-btn:hover {
     border-color: #5B9BD5;
     background: #232323;
+  }
+
+  .preset-btn.active {
+    border-color: #5B9BD5;
+    background: #173449;
+    color: #EAF5FF;
   }
 
   .preset-btn.wide {
