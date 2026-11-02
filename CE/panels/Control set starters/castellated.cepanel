@@ -597,6 +597,9 @@
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"inner","offsetX":0,"offsetY":1,"blur":2,"spread":0,"colour":"40FFFFFF"},{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lampColour":"FFD7A868","lampOffColour":"FF24292B","lampBezelColour":"660F1012"},
+        "Parts": {
+          "_drawing": "1b62273a"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF4C5657"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF4C5657"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD7A868"}}}}}
       },
       "_type": "Control"
@@ -610,6 +613,9 @@
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"inner","offsetX":0,"offsetY":1,"blur":2,"spread":0,"colour":"40FFFFFF"},{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lamp":"window","lampSize":8,"lampColour":"FFFFA35C","lampOffColour":"FF24292B","lampBezelColour":"660F1012"},
         "Behavior": {"defaultValue":true},
+        "Parts": {
+          "_drawing": "1b62273a"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF4C5657"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF4C5657"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD7A868"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD7A868","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF4C5657","Background.Border.colour":"FFFFC26B","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
       "_type": "Control"
@@ -622,6 +628,9 @@
         "Text": {"content":"MODE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"inner","offsetX":0,"offsetY":1,"blur":2,"spread":0,"colour":"40FFFFFF"},{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]},"Bevel":{"enabled":true,"depth":120,"size":2,"softness":1,"shadowOpacity":70}}},
         "ContentLayout": {"lampColour":"FFD7A868","lampOffColour":"FF24292B","lampBezelColour":"660F1012"},
+        "Parts": {
+          "_drawing": "1b62273a"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF4C5657"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF4C5657"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD7A868"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD7A868","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF4C5657","Background.Border.colour":"FFFFC26B","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
       "_type": "Control"
@@ -794,6 +803,16 @@
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}}
+      }
+    },
+    "1b62273a": {
+      "_children": {
+        "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF24292B"}}}}},
+        "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF4C5657"}}}}},
+        "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD7A868"}}}}},
+        "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
       }
     }
   },

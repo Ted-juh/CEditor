@@ -15,6 +15,7 @@
   import { SLIDER_SEMANTIC_PARTS, hasSliderControlParts } from '../utils/sliderControlPart.js';
   import ControlAnatomy from './ControlAnatomy.svelte';
   import { anatomyForm } from '../models/controlAnatomy.js';
+  import { BUTTON_DEVICE_TYPES, buttonDeviceDrawn, isButtonDevicePart } from '../models/buttonDeviceParts.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import ParameterStatusEditor from './ParameterStatusEditor.svelte';
   import { parameterStatusDesignModel } from '../utils/parameterStatus.js';
@@ -302,7 +303,9 @@
 
   // --- Derived data from sections ---
   let core = $derived(getSection(control, 'Core'));
-  let hasAnatomy = $derived(!!anatomyForm(core?.controlType, core?.controlForm));
+  // A form draws the control, or, for a button or switch, its own parts (models/buttonDeviceParts.js),
+  // which the form frame lays out the same way, caption and all.
+  let hasAnatomy = $derived(!!anatomyForm(core?.controlType, core?.controlForm) || buttonDeviceDrawn(renderControl));
   let transform = $derived(getSection(control, 'Transform'));
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   // Which body renderer draws this control, if one does: '' for the many that are drawn from
@@ -497,10 +500,13 @@
     String(sourceBehavior?.family ?? behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(sourceBehavior?.role ?? behavior?.role ?? '').trim().toLowerCase() === 'slider'
   );
+  // A slider's and a button's own parts are drawn by their renderers, not as free parts.
   let visiblePartEntries = $derived.by(() => (
     isSliderControl
       ? renderPartEntries.filter(([partName]) => !SLIDER_SEMANTIC_PARTS.has(String(partName)))
-      : renderPartEntries
+      : BUTTON_DEVICE_TYPES.has(String(core?.controlType ?? ''))
+        ? renderPartEntries.filter(([partName]) => !isButtonDevicePart(partName))
+        : renderPartEntries
   ));
   // Parts that nothing can ever change are compiled to one SVG and drawn as a single element.
   // On the GAIA panel that is 2,821 of 3,295 parts: 12,025 surface DOM nodes become 5,509 and the

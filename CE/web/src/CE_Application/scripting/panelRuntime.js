@@ -7543,7 +7543,10 @@ const DEFINE_SPECS = {
     extra: ['shadow', 'glow', 'sheen', 'slot', 'inset', 'grooveColour', 'plateColour',
       'generated', 'detachedFromGenerator', 'locked',
       // A knob cap's and housing's outline (utils/knobOutlines.js).
-      'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns'],
+      'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
+      // A button's or a switch's device parts (models/buttonDeviceParts.js).
+      'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
+      'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize'],
   },
   ValueChannels: {
     // An array channel's size, items and itemFields come from its own maker.

@@ -8,8 +8,12 @@ and housing outlines (circle, polygon, rounded square, scallop, flutes, ring), a
 a tight fit added to the knob (`utils/knobOutlines.js`). The tight fit keeps the knob, housing
 and all, above a readout placed under it. The sets that used the forms name none any more. The
 Knob tab has a section per part, in drawing order: Housing, Track and Value Arc, Cap, Pointer
-(`sections/KnobPartsEditor.svelte`), every field with the override marks. Still drawn by code:
-the 48 direction forms, and every button, switch and meter form.
+(`sections/KnobPartsEditor.svelte`), every field with the override marks. The twelve base
+button forms and the twelve base switch forms are drawn with the control's own device parts
+(`models/buttonDeviceParts.js`: housing, guard, key, symbol, indicator, legend, each a shape in a
+box of the form frame, `utils/deviceShapes.js`, that moves, swings and lights when pressed or on;
+recipes in `models/buttonFormParts.js`). Their fields wait on the Button and Switch tab's mock-up.
+Still drawn by code: the 48 direction forms, and the meter forms.
 
 ## The principle
 

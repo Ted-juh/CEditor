@@ -417,23 +417,43 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1723706708828","controlSetId":"phosphor","controlForm":"pixelkey","formDivisions":24,"formFaceColour":"FF151815","formHousingColour":"FF1F241F","formInkColour":"FFF2F2F2","formLabelColour":"FFD6FFE3","formAccentColour":"FF39FF7A","id":"ctrl_1723706708828","controlType":"Button"},
+        "Core": {"name":"Button_1723706708828","controlSetId":"phosphor","id":"ctrl_1723706708828","controlType":"Button"},
         "Transform": {"x":576,"y":118,"width":124,"height":84},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"colour":"FF39FF7A"},"Corners":{"radius":2}}},
-        "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.7}}},
+        "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.7}}},
         "ContentLayout": {"lampColour":"FF39FF7A","lampOffColour":"FF1F241F","lampBezelColour":"662C312C"},
+        "Parts": {
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF1F241F"}}}}},
+            "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "key": {"visible":true,"travelY":3,"_children":{"Layout":{"x":20.63,"width":58.75},"Background":{"_children":{"Fill":{"colour":"FF1F241F"}}}}},
+            "symbol": {"visible":true,"opacity":0.18,"pattern":"grid","patternCount":5,"follows":"key","activeOpacity":1,"_children":{"Layout":{"x":28.13,"y":23.75,"width":45.63,"height":53.75},"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}}
+          }
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF1F241F"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF0F110F"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FF39FF7A"}}}}}
       },
       "_type": "Control"
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1723706708829","controlSetId":"phosphor","controlForm":"binary","formDivisions":24,"formFaceColour":"FF151815","formHousingColour":"FF1F241F","formInkColour":"FFF2F2F2","formLabelColour":"FFD6FFE3","formAccentColour":"FF39FF7A","id":"ctrl_1723706708829","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1723706708829","controlSetId":"phosphor","id":"ctrl_1723706708829","controlType":"ToggleButton"},
         "Transform": {"x":716,"y":118,"height":84},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"colour":"FF39FF7A"},"Corners":{"radius":2}}},
-        "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.7}}},
+        "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"JetBrains Mono","weight":"SemiBold","weightValue":600,"letterSpacing":0.7}}},
         "ContentLayout": {"lamp":"led","lampSize":7,"lampColour":"FF39FF7A","lampOffColour":"00000000","lampBezelColour":"662C312C"},
         "Behavior": {"defaultValue":true},
+        "Parts": {
+          "_children": {
+            "housing": {"visible":true,"shape":"pair","shapeDepth":10,"_children":{"Layout":{"x":12.5,"y":16.25,"width":75,"height":67.5},"Background":{"_children":{"Fill":{"colour":"FF1F241F"}}}}},
+            "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "key": {"visible":true,"pattern":"grid","patternCount":3,"travelX":41.25,"_children":{"Layout":{"x":18.13,"y":27.5,"width":21.25,"height":42.5},"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "symbol": {"visible":true,"opacity":0.15,"pattern":"grid","patternCount":3,"_children":{"Layout":{"x":18.13,"y":27.5,"width":21.25,"height":42.5},"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "indicator": {"visible":true,"opacity":0.15,"pattern":"grid","patternCount":3,"_children":{"Layout":{"x":59.38,"y":27.5,"width":21.25,"height":42.5},"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}}
+          }
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF1F241F"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF0F110F"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FF39FF7A"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FF39FF7A","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFCC8D1A","Background.Border.colour":"FFFFB020","Text.Fill.colour":"FF0B0D0B"}}}}}
       },
       "_type": "Control"
@@ -445,6 +465,16 @@
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"colour":"FF39FF7A"},"Corners":{"radius":2}}},
         "Text": {"content":"CYCLE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
         "ContentLayout": {"lampColour":"FF39FF7A","lampOffColour":"FF1F241F","lampBezelColour":"662C312C"},
+        "Parts": {
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF1F241F"}}}}},
+            "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF151815"}}}}},
+            "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}}
+          }
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF1F241F"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF0F110F"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FF39FF7A"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FF39FF7A","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFCC8D1A","Background.Border.colour":"FFFFB020","Text.Fill.colour":"FF0B0D0B"}}}}}
       },
       "_type": "Control"

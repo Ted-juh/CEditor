@@ -23,6 +23,10 @@ import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeCon
 import { applyControlSetChoices } from '../utils/controlSetApply.js';
 import { ownLookControl, resetToSetPatch } from '../models/controlSetOwnership.js';
 import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../models/knobFormParts.js';
+import { buttonFormFamily } from '../models/buttonFormParts.js';
+import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
+import { createControl } from '../models/componentTypes.js';
+import { readControlPath } from '../models/controlSetFamilies.js';
 import { applyControlPatchesById, replaceControlsById } from './controls.js';
 import { findControlById } from '../utils/containment.js';
 import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
@@ -163,22 +167,33 @@ export function resetControlLookToSet(ids, paths = null) {
 }
 
 /**
- * Draw `form` on the knobs `ids` with their own parts (models/knobFormParts.js) rather than by name:
- * what choosing a form that is parts now does, and Convert to Parts on a knob that names one. The
- * values are pinned, so the panel's set does not draw over those equal to a knob's factory values.
- * One store write, one undo step. Returns how many knobs changed.
+ * Draw `form` on the controls `ids` with their own parts (models/knobFormParts.js for a knob,
+ * models/buttonFormParts.js for a button or switch) rather than by name: what choosing a form that
+ * is parts now does, and Convert to Parts on a control that names one. The values are pinned, so
+ * the panel's set does not draw over those equal to a control's factory values; a button's parts
+ * the form does not use are turned off. One store write, one undo step. Returns how many changed.
  */
-export function applyKnobFormAsParts(ids, form) {
-  if (!KNOB_FORMS_AS_PARTS.includes(String(form ?? ''))) return 0;
+export function applyFormAsParts(ids, form) {
   const context = activePanelAndSet();
   if (!context) return 0;
-  const recipe = knobFormFamily(form, { ink: '{text.primary}', divisions: 12 });
   const patches = new Map();
   for (const id of ids ?? []) {
     const control = findControlById(context.panel.controls, id);
-    if (control?._children?.Core?.controlType !== 'Knob') continue;
+    const recipe = formAsPartsRecipe(control?._children?.Core?.controlType, form);
+    if (!recipe) continue;
+    const type = String(control._children.Core.controlType);
     const patch = { 'Core.controlForm': '', ...recipe.component };
+    if (BUTTON_DEVICE_TYPES.has(type)) {
+      for (const name of BUTTON_DEVICE_PARTS) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
+    }
+    // What a form shapes and moves, back to the factory's unless this form says: a switch made a
+    // lever and then a slide must not still swing, a knob made scalloped and then a disc must not
+    // keep its scallop.
+    const factory = createControl(type);
     for (const [part, values] of Object.entries(recipe.parts)) {
+      for (const key of FORM_PART_KEYS) {
+        if (!(key in values)) patch[`Parts.${part}.${key}`] = readControlPath(factory, `Parts.${part}.${key}`);
+      }
       for (const [path, value] of Object.entries(values)) patch[`Parts.${part}.${path}`] = value;
     }
     patches.set(id, patch);
@@ -186,3 +201,21 @@ export function applyKnobFormAsParts(ids, form) {
   applyControlPatchesById(patches, context.panel.id, { pin: true });
   return patches.size;
 }
+
+// The part properties a form decides beyond the ones every recipe writes: its outline or shape,
+// its pattern, its motion, its finish.
+const FORM_PART_KEYS = [
+  'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
+  'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
+  'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
+  'Background.Effects.Material.enabled',
+];
+
+/** The recipe that draws `form` on a control of `type` with its own parts, or null. */
+export function formAsPartsRecipe(type, form) {
+  if (type === 'Knob') return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12 }) : null;
+  return buttonFormFamily(type, form, { ink: '{text.primary}' });
+}
+
+/** The knob form as parts: applyFormAsParts, kept by its first name. */
+export const applyKnobFormAsParts = applyFormAsParts;

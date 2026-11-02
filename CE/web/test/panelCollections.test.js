@@ -477,7 +477,8 @@ test('patch refuses a part the control does not have, and a key that leads nowhe
     // Nothing applied is nothing written, and nothing claimed.
     assert.doesNotMatch(traced(), /^log:ce\.panel\.patch k\.Warn/m);
   });
-  withControl('Button', (api) => {
+  // A combobox has states and no parts. (A button has its device parts now: models/buttonDeviceParts.js.)
+  withControl('Combobox', (api) => {
     api.panelDefine('k', 'States', 'Warn', {});
     clearScriptTrace();
     assert.equal(api.panelPatch('k', 'Warn', { 'Transform.opacity': 10 }, 'cap'), 0);

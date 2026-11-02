@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ce2a52bd",
+  "fingerprint": "dc3420a4",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -206,20 +206,45 @@
               "colour": "77000000"
             }
           ],
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Effects.shadowEnabled": true,
           "Text.Effects.shadowStyle": "soft",
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF",
-          "Core.controlForm": "pixelkey",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Text.Effects.shadowColour": "99FFFFFF"
+        },
+        "parts": {
+          "key": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 20.63,
+            "Layout.y": 10,
+            "Layout.width": 58.75,
+            "Layout.height": 80,
+            "travelY": 3
+          },
+          "symbol": {
+            "visible": true,
+            "opacity": 0.18,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 28.13,
+            "Layout.y": 23.75,
+            "Layout.width": 45.63,
+            "Layout.height": 53.75,
+            "pattern": "grid",
+            "patternCount": 5,
+            "patternRows": 3,
+            "activeOpacity": 1,
+            "follows": "key"
+          }
         }
       },
       "MomentaryButton": {
@@ -271,20 +296,45 @@
               "colour": "77000000"
             }
           ],
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Effects.shadowEnabled": true,
           "Text.Effects.shadowStyle": "soft",
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF",
-          "Core.controlForm": "pixelkey",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Text.Effects.shadowColour": "99FFFFFF"
+        },
+        "parts": {
+          "key": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 20.63,
+            "Layout.y": 10,
+            "Layout.width": 58.75,
+            "Layout.height": 80,
+            "travelY": 3
+          },
+          "symbol": {
+            "visible": true,
+            "opacity": 0.18,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 28.13,
+            "Layout.y": 23.75,
+            "Layout.width": 45.63,
+            "Layout.height": 53.75,
+            "pattern": "grid",
+            "patternCount": 5,
+            "patternRows": 3,
+            "activeOpacity": 1,
+            "follows": "key"
+          }
         }
       },
       "ToggleButton": {
@@ -336,7 +386,7 @@
               "colour": "77000000"
             }
           ],
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Effects.shadowEnabled": true,
           "Text.Effects.shadowStyle": "soft",
           "Text.Effects.shadowOffsetX": 0,
@@ -361,14 +411,69 @@
               },
               "parts": {}
             }
+          }
+        },
+        "parts": {
+          "housing": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "shape": "pair",
+            "shapeDepth": 10,
+            "Layout.x": 12.5,
+            "Layout.y": 16.25,
+            "Layout.width": 75,
+            "Layout.height": 67.5
           },
-          "Core.controlForm": "binary",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "symbol": {
+            "visible": true,
+            "opacity": 0.15,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 18.13,
+            "Layout.y": 27.5,
+            "Layout.width": 21.25,
+            "Layout.height": 42.5,
+            "pattern": "grid",
+            "patternCount": 3,
+            "patternRows": 3
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 0.15,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 59.38,
+            "Layout.y": 27.5,
+            "Layout.width": 21.25,
+            "Layout.height": 42.5,
+            "pattern": "grid",
+            "patternCount": 3,
+            "patternRows": 3
+          },
+          "key": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 18.13,
+            "Layout.y": 27.5,
+            "Layout.width": 21.25,
+            "Layout.height": 42.5,
+            "pattern": "grid",
+            "patternCount": 3,
+            "patternRows": 3,
+            "travelX": 41.25
+          }
         }
       },
       "Combobox": {
@@ -716,20 +821,45 @@
               "colour": "77000000"
             }
           ],
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Effects.shadowEnabled": true,
           "Text.Effects.shadowStyle": "soft",
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF",
-          "Core.controlForm": "pixelkey",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Text.Effects.shadowColour": "99FFFFFF"
+        },
+        "parts": {
+          "key": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 20.63,
+            "Layout.y": 10,
+            "Layout.width": 58.75,
+            "Layout.height": 80,
+            "travelY": 3
+          },
+          "symbol": {
+            "visible": true,
+            "opacity": 0.18,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 28.13,
+            "Layout.y": 23.75,
+            "Layout.width": 45.63,
+            "Layout.height": 53.75,
+            "pattern": "grid",
+            "patternCount": 5,
+            "patternRows": 3,
+            "activeOpacity": 1,
+            "follows": "key"
+          }
         }
       },
       "OneShotButton": {
@@ -781,20 +911,45 @@
               "colour": "77000000"
             }
           ],
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Effects.shadowEnabled": true,
           "Text.Effects.shadowStyle": "soft",
           "Text.Effects.shadowOffsetX": 0,
           "Text.Effects.shadowOffsetY": 1,
           "Text.Effects.shadowBlur": 0,
-          "Text.Effects.shadowColour": "99FFFFFF",
-          "Core.controlForm": "pixelkey",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Text.Effects.shadowColour": "99FFFFFF"
+        },
+        "parts": {
+          "key": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 20.63,
+            "Layout.y": 10,
+            "Layout.width": 58.75,
+            "Layout.height": 80,
+            "travelY": 3
+          },
+          "symbol": {
+            "visible": true,
+            "opacity": 0.18,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 28.13,
+            "Layout.y": 23.75,
+            "Layout.width": 45.63,
+            "Layout.height": 53.75,
+            "pattern": "grid",
+            "patternCount": 5,
+            "patternRows": 3,
+            "activeOpacity": 1,
+            "follows": "key"
+          }
         }
       },
       "RadioButtonGroup": {

@@ -159,7 +159,8 @@ test('a knob carried by a component is drawn and timed the way the panel draws a
   // The panel draws a knob with a form through ControlAnatomy and every other one through
   // SliderFamilyRenderer; the part used SliderFamilyRenderer for both, so a converted knob with a form
   // came out smaller with a larger readout.
-  assert.match(canvas, /let hasAnatomy = \$derived\(!!anatomyForm\(core\?\.controlType, core\?\.controlForm\)\);/);
+  // (Or, for a button or switch, its own parts, which the form frame lays out: models/buttonDeviceParts.js.)
+  assert.match(canvas, /let hasAnatomy = \$derived\(!!anatomyForm\(core\?\.controlType, core\?\.controlForm\) \|\| buttonDeviceDrawn\(renderControl\)\);/);
   assert.match(part, /let sliderAnatomy = \$derived\(sliderResolved\s*\? anatomyForm\(sliderResolved\.control\?\._children\?\.Core\?\.controlType, sliderResolved\.control\?\._children\?\.Core\?\.controlForm\)/);
   assert.match(part, /\{#if sliderResolved && sliderAnatomy\}\s*<ControlAnatomy/);
   // Its transitions go through the same tracker CanvasControl runs, not the runtime's whole catalogue.

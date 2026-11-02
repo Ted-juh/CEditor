@@ -456,6 +456,9 @@
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Barlow","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"inner","offsetX":0,"offsetY":1,"blur":2,"spread":0,"colour":"40FFFFFF"},{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"},
+        "Parts": {
+          "_drawing": "20c54fc1"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFE9A86B"}}}}}
       },
       "_type": "Control"
@@ -469,6 +472,9 @@
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"inner","offsetX":0,"offsetY":1,"blur":2,"spread":0,"colour":"40FFFFFF"},{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lamp":"window","lampSize":8,"lampColour":"FFFFA35C","lampOffColour":"FF27252B","lampBezelColour":"660F1012"},
         "Behavior": {"defaultValue":true},
+        "Parts": {
+          "_drawing": "20c54fc1"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFE9A86B"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFE9A86B","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4","Background.Border.colour":"FFFFC26B","Text.Fill.colour":"FF202529"}}}}}
       },
       "_type": "Control"
@@ -481,6 +487,9 @@
         "Text": {"content":"CYCLE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"inner","offsetX":0,"offsetY":1,"blur":2,"spread":0,"colour":"40FFFFFF"},{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lampColour":"FFE9A86B","lampOffColour":"FF27252B","lampBezelColour":"660F1012"},
+        "Parts": {
+          "_drawing": "20c54fc1"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFE9A86B"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFE9A86B","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FFB7A6C4","Background.Border.colour":"FFFFC26B","Text.Fill.colour":"FF202529"}}}}}
       },
       "_type": "Control"
@@ -652,6 +661,16 @@
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}}
+      }
+    },
+    "20c54fc1": {
+      "_children": {
+        "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF27252B"}}}}},
+        "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFB7A6C4"}}}}},
+        "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFE9A86B"}}}}},
+        "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
       }
     }
   },

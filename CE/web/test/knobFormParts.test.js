@@ -109,6 +109,13 @@ test('choosing a converted form, or Convert to Parts, writes the parts in one st
     const drawn = resolveControlForSet(knob, getControlSet('tolex'));
     assert.equal(drawn._children.Parts._children.pointerCurrent.kind, 'line');
     assert.equal(drawn._children.Parts._children.bodyCap.visible, true);
+    // A form does not keep the last one's shape: scalloped, then a disc, is a round cap again.
+    applyKnobFormAsParts(['k1'], 'scallop');
+    assert.equal(get(panels)[0].controls[0]._children.Parts._children.bodyCap.outline, 'scallop');
+    applyKnobFormAsParts(['k1'], 'disc');
+    const disc = get(panels)[0].controls[0]._children.Parts._children.bodyCap;
+    assert.equal(disc.outline, undefined);
+    assert.equal(disc.turns, undefined);
   } finally {
     panels.set([]);
     activePanelId.set(null);

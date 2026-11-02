@@ -1,6 +1,7 @@
 import { ADDITIONAL_DIRECTIONS, additionalNumberFamily } from './additionalControlSets.js';
 import { setAnatomy } from './controlAnatomy.js';
 import { KNOB_FORMS_AS_PARTS, knobFormFamily } from './knobFormParts.js';
+import { buttonFormFamily } from './buttonFormParts.js';
 // Visual properties only. Musical values, routing, gestures and authored edits remain local.
 // Each row is a design direction, not a new name for a palette.
 export const STARTER_CONTROL_SETS = [
@@ -125,6 +126,15 @@ export function extendControlSet(set) {
     // A knob form that is parts now (models/knobFormParts.js): the set's knob family draws it with
     // the knob's own parts, every one of them editable, instead of naming the form.
     const form = setAnatomy(type, d.id);
+    // A button or switch form that is parts now (models/buttonFormParts.js): the same, with the
+    // control's device parts.
+    const deviceRecipe = type === 'Knob' ? null : buttonFormFamily(type, form, { ink: inkOn(set.tokens.surface) });
+    if (deviceRecipe) {
+      const parts = { ...(families[type]?.parts ?? {}) };
+      for (const [name, patch] of Object.entries(deviceRecipe.parts)) parts[name] = { ...(parts[name] ?? {}), ...patch };
+      families[type] = { ...families[type], component: { ...families[type]?.component, ...deviceRecipe.component }, parts };
+      continue;
+    }
     if (type === 'Knob' && KNOB_FORMS_AS_PARTS.includes(form)) {
       const recipe = knobFormFamily(form, { ink: inkOn(set.tokens.surface), divisions: ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12 });
       const parts = { ...(families.Knob?.parts ?? {}) };

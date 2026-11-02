@@ -15,8 +15,7 @@
   import { anatomyOptions } from '../models/controlAnatomy.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import ControlSetOverridesCard from './ControlSetOverridesCard.svelte';
-  import { applyKnobFormAsParts } from '../stores/controlSets.js';
-  import { KNOB_FORMS_AS_PARTS } from '../models/knobFormParts.js';
+  import { applyFormAsParts, formAsPartsRecipe } from '../stores/controlSets.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyText from '../properties/PropertyText.svelte';
   import PropertyButton from '../properties/PropertyButton.svelte';
@@ -33,9 +32,9 @@
   let core = $derived(getSection(control, 'Core'));
 
   // A knob form that is parts now (models/knobFormParts.js) is written as the knob's own parts.
-  let formIsParts = (form) => core?.controlType === 'Knob' && KNOB_FORMS_AS_PARTS.includes(String(form ?? ''));
+  let formIsParts = (form) => !!form && !!formAsPartsRecipe(core?.controlType, form);
   function chooseForm(form) {
-    if (formIsParts(form)) applyKnobFormAsParts($selectedComponentIds.size > 1 ? [...$selectedComponentIds] : [core.id], form);
+    if (formIsParts(form)) applyFormAsParts($selectedComponentIds.size > 1 ? [...$selectedComponentIds] : [core.id], form);
     else set('controlForm', form);
   }
 
@@ -166,7 +165,7 @@
       </PropertyCell>
       {#if formIsParts(core.controlForm)}
         <PropertyCell label="" span={4} compact hint="This form is now drawn with the knob's own parts, which can be edited on the Knob tab. Convert writes them onto this control.">
-          <PropertyButton label="Convert to Parts" title="Draw this form with the knob's own parts, editable on the Knob tab." onclick={() => chooseForm(core.controlForm)} />
+          <PropertyButton label="Convert to Parts" title={core?.controlType === 'Knob' ? "Draw this form with the knob's own parts, editable on the Knob tab." : "Draw this form with the control's own parts."} onclick={() => chooseForm(core.controlForm)} />
         </PropertyCell>
       {/if}
       <PropertyCell label="Size %" span={2} path="Core.formSize" hint="Size of the mechanism within its control bounds."><NumberCell value={core.formSize ?? 100} min={60} max={115} step={5} onchange={(v) => set('formSize', v)} /></PropertyCell>

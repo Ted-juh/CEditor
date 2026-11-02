@@ -1,3 +1,4 @@
+import { createButtonDeviceParts } from './buttonDeviceParts.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 export {
   METER_FAMILY, RIBBON_FAMILY, isMeterFamily, isRibbonFamily,
@@ -132,11 +133,14 @@ function createButtonType({
   portType = 'Button',
 } = {}) {
   return {
-    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'States', 'Value', 'DeviceBindings', 'Animations', 'Scripts'],
+    // Parts: the device a control set draws it as, a key in a housing or a lever on a pivot
+    // (models/buttonDeviceParts.js), every part hidden until it is turned on.
+    sections: ['Background', 'Text', 'Icon', 'Effects', 'ContentLayout', 'Behavior', 'Parts', 'States', 'Value', 'DeviceBindings', 'Animations', 'Scripts'],
     ports: getComponentPorts(portType),
     defaultOverrides: {
       Transform: { width, height },
       Text: { content: label },
+      Parts: createButtonDeviceParts(),
       Background: {
         _children: {
           Fill: { colour: '{surface}' },

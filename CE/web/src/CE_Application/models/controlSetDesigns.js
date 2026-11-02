@@ -422,7 +422,7 @@ export const EDITOR_PATHS = [
   /^Background\.Effects\.Material\.(enabled|kind|strength|shine|grain)$/,
   /^Effects\.Shadows\.items$/,
   /^Effects\.Bevel\.(enabled|style|size|softness|depth|angle|highlightOpacity|shadowOpacity)$/,
-  /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY)$/,
+  /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY|rotation)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
   /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit)$/,
@@ -435,6 +435,8 @@ export const EDITOR_PATHS = [
   /^(kind|grooveColour|plateColour|sheen|shadow|glow|slot|inset)$/,
   // A knob's cap and housing outline (utils/knobOutlines.js), the knob forms as parts.
   /^(outline|outlineCount|outlineDepth|outlineRotation|turns)$/,
+  // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
+  /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   /^Listbox\.(cardRows|rowHeight|selectionStyle|zebra|accentColour)$/,
   /^TabContainer\.(appearance|accentColour|stripColour|tabColour|activeTabColour|labelColour|activeLabelColour)$/,
   /^ScrollArea\.(scrollbarSize|trackColour|thumbColour)$/,

@@ -57,7 +57,7 @@ export const MODULE_COST = {
   "ce.mpe": { "javascript": 11422, "lua": 11831, "python": 11016, "webview": 0 },
   "ce.music": { "javascript": 23375, "lua": 23457, "python": 22153, "webview": 18519 },
   "ce.osc": { "javascript": 13156, "lua": 13878, "python": 11947, "webview": 0 },
-  "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 59777 },
+  "ce.panel": { "javascript": 1980, "lua": 1776, "python": 1772, "webview": 60060 },
   "ce.patch": { "javascript": 47644, "lua": 44902, "python": 43245, "webview": 0 },
   "ce.storage": { "javascript": 12089, "lua": 19734, "python": 15611, "webview": 24365 },
   "ce.text": { "javascript": 84, "lua": 84, "python": 84, "webview": 0 },

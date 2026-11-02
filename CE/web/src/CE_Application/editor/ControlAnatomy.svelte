@@ -2,10 +2,12 @@
   import PhysicalAnatomy from './PhysicalAnatomy.svelte';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import AdditionalAnatomy from './AdditionalAnatomy.svelte';
-  import { anatomyValue } from '../models/controlAnatomy.js';
+  import { anatomyForm, anatomyValue } from '../models/controlAnatomy.js';
   import { meterConfig, meterPosition } from '../utils/meterLayout.js';
   import { formatSliderNumericValue } from '../utils/sliderBehavior.js';
   import { buttonAnatomyLayout } from '../utils/anatomyLayout.js';
+  import ButtonDeviceParts from './ButtonDeviceParts.svelte';
+  import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
   let { control, runtime = null, width = 160, height = 160, checked = false, label = '' } = $props();
   const uid = $props.id();
   let core = $derived(control?._children?.Core ?? {});
@@ -13,6 +15,9 @@
   let knob = $derived(core.controlType === 'Knob');
   let meter = $derived(['Meter','ProgressBar'].includes(core.controlType));
   let toggle = $derived(core.controlType === 'ToggleButton');
+  // A button or switch drawn with its own parts (models/buttonDeviceParts.js): no form named, its
+  // key on. Its caption is its own text, in its own text colour.
+  let partsDrawn = $derived(!knob && !meter && !anatomyForm(core.controlType, form) && buttonDeviceDrawn(control));
   let signals = $derived(runtime?.signals ?? {});
   let value = $derived(anatomyValue(control, signals));
   let cfg = $derived(meterConfig(control));
@@ -28,7 +33,7 @@
   let face = $derived(css(core.formFaceColour, '#dedbd2'));
   let housing = $derived(css(core.formHousingColour, '#171a20'));
   let ink = $derived(css(core.formInkColour, '#20282c'));
-  let legend = $derived(css(core.formLabelColour, ink));
+  let legend = $derived(partsDrawn ? css(control?._children?.Text?._children?.Fill?.colour, ink) : css(core.formLabelColour, ink));
   let accent = $derived(css(core.formAccentColour, '#40bccc'));
   let vh = $derived(knob ? 170 : 100);
   // A button or switch in a box too small for the frame's caption is laid out in the box's own
@@ -50,7 +55,7 @@
   function polygon(n,r1,r2) { return Array.from({length:n*2},(_,i)=>{const q=point(i*180/n,i%2?r2:r1);return `${q.x},${q.y}`;}).join(' '); }
 </script>
 
-<svg class="anatomy" data-form={form} data-position={p} data-active={active} viewBox={lay ? `0 0 ${width} ${height}` : `0 0 160 ${vh}`} {width} {height} aria-hidden="true" style={`--face:${face};--ink:${ink};--accent:${accent};font-family:${captionFamily};`}>
+<svg class="anatomy" data-form={partsDrawn ? 'parts' : form} data-position={p} data-active={active} viewBox={lay ? `0 0 ${width} ${height}` : `0 0 160 ${vh}`} {width} {height} aria-hidden="true" style={`--face:${face};--ink:${ink};--accent:${accent};font-family:${captionFamily};`}>
   <defs>
     <linearGradient id={`${uid}-metal`} x2="0" y2="1"><stop stop-color="#fff" stop-opacity={.8*depth}/><stop offset=".42" stop-color={face}/><stop offset=".55" stop-color={face}/><stop offset="1" stop-color="#000" stop-opacity={.65*depth}/></linearGradient>
     <radialGradient id={`${uid}-dome`} cx=".32" cy=".25" r=".8"><stop stop-color="#fff" stop-opacity={.85*depth}/><stop offset=".45" stop-color={face}/><stop offset="1" stop-color="#000" stop-opacity={.6*depth}/></radialGradient>
@@ -137,8 +142,10 @@
     </g>
     {#if core.formShowValue!==false}<text x="80" y="98" text-anchor="middle" fill={legend} font-size="10">{core.formShowValue!==false ? readout : ""}</text>{/if}
   {:else}
-    <g transform={`translate(80 40) scale(${size}) translate(-80 -40)`}>
-    {#if toggle}
+    <g transform={partsDrawn ? undefined : `translate(80 40) scale(${size}) translate(-80 -40)`}>
+    {#if partsDrawn}
+      <ButtonDeviceParts parts={control?._children?.Parts?._children ?? {}} {active} uid={`${uid}-device`} />
+    {:else if toggle}
       {#if form==='slide'}
         <rect x="18" y="18" width="124" height="45" rx="22" fill={ink} opacity=".18"/><rect x={active?81:21} y="21" width="58" height="39" rx="19" fill={active?accent:face}/><text x={active?49:112} y="47" fill={ink} text-anchor="middle" font-size="12">{active?'ON':'OFF'}</text>
       {:else if form==='knife'}
@@ -181,7 +188,7 @@
       </g>
     {/if}
     </g>
-    {#if !lay}<text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle ? ` · ${active?'ON':'OFF'}` : ''}</text>{/if}
+    {#if !lay}<text x="80" y="96" text-anchor="middle" fill={legend} font-size="11" font-family="inherit">{label || (toggle ? 'SWITCH' : 'PRESS')}{toggle && !partsDrawn ? ` · ${active?'ON':'OFF'}` : ''}</text>{/if}
   {/if}
   </g>
   {#if lay?.caption}<text class="caption" x={lay.caption.x} y={lay.caption.y} text-anchor={lay.caption.anchor} fill={legend} font-size={lay.caption.size} font-family={captionFamily} font-weight={captionWeight} letter-spacing={captionSpacing}>{lay.caption.text}</text>{/if}

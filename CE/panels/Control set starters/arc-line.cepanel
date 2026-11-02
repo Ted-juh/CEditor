@@ -596,6 +596,9 @@
         "Background": {"_children":{"Fill":{"colour":"FF475C64"},"Border":{"colour":"66FFFFFF"}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
         "ContentLayout": {"lampColour":"FFAFD5D3","lampOffColour":"FF1B252A","lampBezelColour":"66FFFFFF"},
+        "Parts": {
+          "_drawing": "f5b61222"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF475C64"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF475C64"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFAFD5D3"}}}}}
       },
       "_type": "Control"
@@ -608,6 +611,9 @@
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
         "ContentLayout": {"lampColour":"FFAFD5D3","lampOffColour":"FF1B252A","lampBezelColour":"66FFFFFF"},
         "Behavior": {"defaultValue":true},
+        "Parts": {
+          "_drawing": "f5b61222"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF475C64"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF475C64"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFAFD5D3"}}},"Selected":{"patches":{"component":{"Background.Fill.colour":"FF475C64","Text.Fill.colour":"FFF7F4EC"}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF475C64","Background.Border.colour":"FFFFD166","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
       "_type": "Control"
@@ -620,6 +626,9 @@
         "Text": {"content":"MODE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
         "Effects": {"_children":{"Bevel":{"depth":120,"size":2,"softness":1,"shadowOpacity":70}}},
         "ContentLayout": {"lampColour":"FFAFD5D3","lampOffColour":"FF1B252A","lampBezelColour":"66FFFFFF"},
+        "Parts": {
+          "_drawing": "f5b61222"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF475C64"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF475C64"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFAFD5D3"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFAFD5D3","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF475C64","Background.Border.colour":"FFFFD166","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
       "_type": "Control"
@@ -786,6 +795,16 @@
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"DM Sans","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"DM Sans","letterSpacing":0.9}}}}},
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"DM Sans","letterSpacing":0.9}}}}}
+      }
+    },
+    "f5b61222": {
+      "_children": {
+        "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF1B252A"}}}}},
+        "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF475C64"}}}}},
+        "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFAFD5D3"}}}}},
+        "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
       }
     }
   },

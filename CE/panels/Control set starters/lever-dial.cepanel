@@ -597,6 +597,9 @@
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Allerta Stencil","letterSpacing":0.7},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"},
+        "Parts": {
+          "_drawing": "be8c9bc8"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF777564"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF777564"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD5B36D"}}}}}
       },
       "_type": "Control"
@@ -610,6 +613,9 @@
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
         "ContentLayout": {"lamp":"bat","lampSize":10,"lampColour":"FF777564","lampOffColour":"FF777564","lampBezelColour":"AA1D2118"},
         "Behavior": {"defaultValue":true},
+        "Parts": {
+          "_drawing": "be8c9bc8"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF777564"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF777564"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD5B36D"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD5B36D","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF777564","Background.Border.colour":"FFFFB020","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
       "_type": "Control"
@@ -622,6 +628,9 @@
         "Text": {"content":"MODE","_children":{"Fill":{"colour":"FFF2F2F2"},"Effects":{"shadowEnabled":true,"shadowOffsetX":0,"shadowBlur":0,"shadowColour":"99FFFFFF"}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]},"Bevel":{"enabled":true,"depth":120,"size":2,"softness":1,"shadowOpacity":70}}},
         "ContentLayout": {"lampColour":"FFD5B36D","lampOffColour":"FF34332D","lampBezelColour":"AA1D2118"},
+        "Parts": {
+          "_drawing": "be8c9bc8"
+        },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF777564"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF777564"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD5B36D"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD5B36D","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF777564","Background.Border.colour":"FFFFB020","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
       "_type": "Control"
@@ -794,6 +803,16 @@
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}},
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Barlow","letterSpacing":0.9}}}}}
+      }
+    },
+    "be8c9bc8": {
+      "_children": {
+        "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF34332D"}}}}},
+        "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF777564"}}}}},
+        "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+        "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD5B36D"}}}}},
+        "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
       }
     }
   },
