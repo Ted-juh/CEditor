@@ -35,5 +35,5 @@
 1x bg linear-gradient(180deg, #56616A 0%, #343B42 42%, #242A2F 58%, #171B1F 100%)
 1x border 1px solid #69737CFF
 1x radius 1px 1px 1px 1px
-1x radius 2px 2px 2px 2px
+3x radius 2px 2px 2px 2px
 1x radius 3px 3px 3px 3px
