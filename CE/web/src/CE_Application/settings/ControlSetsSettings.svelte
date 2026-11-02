@@ -19,7 +19,7 @@
     removeControlSetFromLibrary, updateControlSetInLibrary,
   } from '../stores/controlSetLibrary.js';
   import { generalSettings, updateGeneralSettings } from '../stores/appSettings.js';
-  import { activePanelId } from '../stores/panels.js';
+  import { activePanel, activePanelId } from '../stores/panels.js';
   import { setPanelControlSet } from '../stores/controlSets.js';
   import { deepClone } from '../utils/deepClone.js';
 
@@ -34,7 +34,10 @@
   ];
   const DESIGN_SOURCES = PHYSICAL_DIRECTIONS.map((entry) => getControlSet(entry.id)).filter(Boolean);
 
-  let selectedId = $state(untrack(() => $generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
+  // Opens on the set the panel in front uses: it opened on the default for new panels, so the
+  // Library always showed Graphite whatever the panel was drawn with.
+  let panelSetId = $derived(String($activePanel?.controlSet?.id ?? ''));
+  let selectedId = $state(untrack(() => String($activePanel?.controlSet?.id ?? '') || $generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
   let draft = $state(null);
   let loadedId = $state('');
   let fileInput = $state(null);
@@ -70,11 +73,17 @@
 
   let previewPanel = $derived.by(() => {
     if (!draft) return null;
-    const sourceId = BUILT_IN_CONTROL_SETS.some((set) => set.id === draft.id) ? draft.id : 'graphite';
-    const sample = createControlSetStarter(sourceId);
     // Normalised, so what the set derives from its colours (its sections, its instruments' face and
     // voices) follows the swatches while they are edited, not only after a save.
-    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [normalizeControlSetDefinition(draft) ?? draft] };
+    const set = normalizeControlSetDefinition(draft) ?? draft;
+    const isBuiltIn = (id) => BUILT_IN_CONTROL_SETS.some((entry) => entry.id === id);
+    // The sample's layout is a built-in's (the set's own, the one it was copied from, or Graphite);
+    // its controls are pinned to and drawn with THIS set. They were the stock Graphite Classic sample,
+    // pinned to Graphite Classic, so nothing chosen for one of your own sets (a family, a colour)
+    // ever showed in its preview.
+    const layoutId = isBuiltIn(draft.id) ? draft.id : (isBuiltIn(draft.basedOn) ? draft.basedOn : NEW_PANEL_CONTROL_SET_ID);
+    const sample = createControlSetStarter(layoutId, { set });
+    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [set] };
   });
 
   function choose(id) {
@@ -111,14 +120,36 @@
     status = 'Removed from your library.';
   }
 
-  function setToken(key, event) {
-    const old = String(draft?.tokens?.[key] ?? 'FFFFFFFF').replace('#', '');
-    const alpha = old.length === 8 ? old.slice(0, 2) : 'FF';
-    const value = `${alpha}${event.target.value.slice(1).toUpperCase()}`;
-    draft = { ...draft, tokens: { ...draft.tokens, [key]: value } };
-    // The panel's own fill reads `panel.colour` (utils/backgroundCSS.js), so the panel behind the
-    // labels follows the swatch too.
-    if (key === 'panel.surface') draft = { ...draft, panel: { ...(draft.panel ?? {}), colour: value } };
+  /**
+   * Every edit goes through here. A built-in set is protected, and its fields were disabled: the
+   * colours, the material and the families looked editable and did nothing. Now the first change to
+   * one makes your own copy, with the change in it, and the page goes on with the copy.
+   */
+  function edit(mutate) {
+    if (!draft) return;
+    const next = mutate(deepClone(draft));
+    if (!next) return;
+    if (isCustom) { draft = next; return; }
+    const builtInName = draft.name;
+    const copy = duplicateControlSet(next, `${builtInName} (mine)`);
+    if (!copy) return;
+    choose(copy.id);
+    status = `${builtInName} is built in, so your change went into your own copy, “${copy.name}”. Save set keeps later changes; Apply to panel uses it.`;
+  }
+
+  /** A colour typed as a code (#RRGGBB, RRGGBB or AARRGGBB): no colour picker pops up. */
+  function setToken(key, text) {
+    const clean = String(text ?? '').replace('#', '').trim();
+    if (!/^([0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(clean)) return;
+    edit((next) => {
+      const old = String(next?.tokens?.[key] ?? 'FFFFFFFF').replace('#', '');
+      const value = (clean.length === 8 ? clean : `${old.length === 8 ? old.slice(0, 2) : 'FF'}${clean}`).toUpperCase();
+      next.tokens = { ...next.tokens, [key]: value };
+      // The panel's own fill reads `panel.colour` (utils/backgroundCSS.js), so the panel behind the
+      // labels follows the swatch too.
+      if (key === 'panel.surface') next.panel = { ...(next.panel ?? {}), colour: value };
+      return next;
+    });
   }
 
   function colourValue(key) {
@@ -128,8 +159,11 @@
   }
 
   function setMaterial(patch) {
-    const current = draft?.panel?.material ?? { enabled: false, kind: 'blast', strength: 50, shine: 40, grain: 100, lampFollowsSet: true };
-    draft = { ...draft, panel: { ...(draft.panel ?? {}), material: { ...current, ...patch } } };
+    edit((next) => {
+      const current = next?.panel?.material ?? { enabled: false, kind: 'blast', strength: 50, shine: 40, grain: 100, lampFollowsSet: true };
+      next.panel = { ...(next.panel ?? {}), material: { ...current, ...patch } };
+      return next;
+    });
   }
 
   function setFamilySource(family, sourceId) {
@@ -137,13 +171,15 @@
     if (!source?.families?.[family]) return;
     // Recorded as the author's choice, so the set's own derived designs never overwrite it
     // (models/personalSetDesigns.js), and the record of what they last wrote no longer applies.
-    const { [family]: _, ...designed } = draft.designed ?? {};
-    draft = {
-      ...draft,
-      families: { ...(draft.families ?? {}), [family]: deepClone(source.families[family]) },
-      chosenFamilies: { ...(draft.chosenFamilies ?? {}), [family]: sourceId },
-      designed,
-    };
+    edit((next) => {
+      const { [family]: _, ...designed } = next.designed ?? {};
+      return {
+        ...next,
+        families: { ...(next.families ?? {}), [family]: deepClone(source.families[family]) },
+        chosenFamilies: { ...(next.chosenFamilies ?? {}), [family]: sourceId },
+        designed,
+      };
+    });
     familySources = { ...familySources, [family]: sourceId };
   }
 
@@ -212,11 +248,11 @@
       <div class="library-scroll">
         {#if $controlSetLibrary.length}
           <div class="library-group"><small>MY SETS</small><div class="library-row">
-            {#each $controlSetLibrary as set}<button class:active={selectedId === set.id} onclick={() => choose(set.id)}><b>{set.name}</b><span>Editable</span></button>{/each}
+            {#each $controlSetLibrary as set}<button class:active={selectedId === set.id} class:on-panel={panelSetId === set.id} onclick={() => choose(set.id)}><b>{set.name}</b><span>{panelSetId === set.id ? 'On this panel' : 'Editable'}</span></button>{/each}
           </div></div>
         {/if}
         <div class="library-group"><small>BUILT IN</small><div class="library-row">
-          {#each BUILT_IN_CONTROL_SETS as set}<button class:active={selectedId === set.id} onclick={() => choose(set.id)}><b>{set.name}</b><span>{set.description}</span></button>{/each}
+          {#each BUILT_IN_CONTROL_SETS as set}<button class:active={selectedId === set.id} class:on-panel={panelSetId === set.id} onclick={() => choose(set.id)}><b>{set.name}</b><span>{panelSetId === set.id ? 'On this panel' : set.description}</span></button>{/each}
         </div></div>
       </div>
     </aside>
@@ -224,7 +260,7 @@
     {#if draft && previewPanel}
       <div class="editor">
         <div class="editor-head">
-          <div><h2>{draft.name}</h2><p>{isCustom ? 'Personal set · edits can be saved and exported' : 'Built-in template · duplicate it to edit'}</p></div>
+          <div><h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">on this panel</span>{/if}</h2><p>{isCustom ? 'Personal set · edits can be saved and exported' : 'Built-in template · change anything and it becomes your own copy'}</p></div>
           <div class="actions">
             <button onclick={duplicateSelected}><Copy size={14} /> Duplicate</button>
             <button onclick={downloadSelected}><Download size={14} /> Export</button>
@@ -238,15 +274,16 @@
           <div class="fields">
             <section>
               <h3>Identity</h3>
-              <label><span>Name</span><input type="text" value={draft.name} disabled={!isCustom} oninput={(event) => draft = { ...draft, name: event.target.value }} /></label>
-              <label><span>Description</span><textarea rows="2" disabled={!isCustom} value={draft.description} oninput={(event) => draft = { ...draft, description: event.target.value }}></textarea></label>
+              <label><span>Name</span><input type="text" value={draft.name} onchange={(event) => edit((next) => ({ ...next, name: event.target.value }))} /></label>
+              <label><span>Description</span><textarea rows="2" value={draft.description} onchange={(event) => edit((next) => ({ ...next, description: event.target.value }))}></textarea></label>
             </section>
 
             <section>
               <h3>Shared colours</h3>
               <div class="colour-grid">
                 {#each COLOUR_ROLES as [key, label]}
-                  <label><input type="color" value={colourValue(key)} disabled={!isCustom} oninput={(event) => setToken(key, event)} /><span>{label}</span></label>
+                  <label><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span>
+                    <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
                 {/each}
               </div>
             </section>
@@ -254,10 +291,10 @@
             <section>
               <h3>Surface material</h3>
               <div class="material-row">
-                <label class="check"><input type="checkbox" checked={draft.panel?.material?.enabled === true} disabled={!isCustom} onchange={(event) => setMaterial({ enabled: event.target.checked })} /> Enabled</label>
-                <label><span>Finish</span><select disabled={!isCustom} value={draft.panel?.material?.kind ?? 'blast'} onchange={(event) => setMaterial({ kind: event.target.value })}>{#each MATERIAL_KINDS as kind}<option value={kind}>{kind}</option>{/each}</select></label>
-                <label><span>Depth</span><input type="range" min="0" max="150" value={draft.panel?.material?.strength ?? 50} disabled={!isCustom} oninput={(event) => setMaterial({ strength: Number(event.target.value) })} /></label>
-                <label><span>Shine</span><input type="range" min="0" max="150" value={draft.panel?.material?.shine ?? 40} disabled={!isCustom} oninput={(event) => setMaterial({ shine: Number(event.target.value) })} /></label>
+                <label class="check"><input type="checkbox" checked={draft.panel?.material?.enabled === true} onchange={(event) => setMaterial({ enabled: event.target.checked })} /> Enabled</label>
+                <label><span>Finish</span><select value={draft.panel?.material?.kind ?? 'blast'} onchange={(event) => setMaterial({ kind: event.target.value })}>{#each MATERIAL_KINDS as kind}<option value={kind}>{kind}</option>{/each}</select></label>
+                <label><span>Depth</span><input type="range" min="0" max="150" value={draft.panel?.material?.strength ?? 50} onchange={(event) => setMaterial({ strength: Number(event.target.value) })} /></label>
+                <label><span>Shine</span><input type="range" min="0" max="150" value={draft.panel?.material?.shine ?? 40} onchange={(event) => setMaterial({ shine: Number(event.target.value) })} /></label>
               </div>
             </section>
 
@@ -266,7 +303,7 @@
               <p>Mix mechanisms from the 36 synthesizer templates. The complete family definition is copied into your set.</p>
               <div class="family-grid">
                 {#each FAMILY_ROLES as [family, label]}
-                  <label><span>{label}</span><select disabled={!isCustom} value={familySources[family] ?? ''} onchange={(event) => setFamilySource(family, event.target.value)}>
+                  <label><span>{label}</span><select value={familySources[family] ?? ''} onchange={(event) => setFamilySource(family, event.target.value)}>
                     <option value="">Keep current design</option>
                     {#each DESIGN_SOURCES as source}<option value={source.id}>{source.name}</option>{/each}
                   </select></label>
@@ -310,7 +347,10 @@
   .fields h3 { font-size:12px; color:#eee; margin-bottom:10px; } .fields section > p { color:#858585; font-size:10px; margin:-5px 0 10px; }
   .fields section > label + label { margin-top:9px; } input:disabled,textarea:disabled,select:disabled { opacity:.55; }
   .colour-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; } .colour-grid label { flex-direction:row; align-items:center; padding:5px 7px; background:#242424; border-radius:6px; }
-  input[type='color'] { width:30px; height:24px; padding:1px; border:1px solid #555; border-radius:4px; background:#111; }
+  .colour-grid .swatch { width:22px; height:22px; flex:0 0 auto; border:1px solid #555; border-radius:4px; }
+  .colour-grid .role { flex:1; min-width:0; } .colour-grid .code { width:82px; flex:0 0 auto; padding:4px 6px; font-family:ui-monospace,monospace; font-size:11px; }
+  .on-panel { margin-left:8px; font-size:10px; font-weight:600; color:#8fd1a6; border:1px solid #3c5a46; border-radius:9px; padding:1px 7px; vertical-align:middle; }
+  .library-row button.on-panel span { color:#8fd1a6; }
   .material-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; align-items:end; } .check { flex-direction:row; align-items:center; padding-bottom:8px; }
   input[type='range'] { accent-color:#2486c5; width:100%; } .family-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .preview-card { border-top:1px solid #303030; background:#161616; padding:13px; } .preview-card header { display:flex; justify-content:space-between; font-size:11px; margin-bottom:10px; } .preview-card header span { color:#777; }

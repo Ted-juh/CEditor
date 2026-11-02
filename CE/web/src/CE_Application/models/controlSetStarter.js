@@ -13,15 +13,17 @@ import { labelTreatmentFor } from './labelDesigns.js';
 // control does — taken from a counter that starts at the clock, so no two starters opened from the
 // gallery share one. The starters that ship as files pass a fixed sequence instead, so a file is
 // the same on every export and a test can hold it to the code (scripts/export-control-set-starters.mjs).
-export function createControlSetStarter(setId, { materialize = true, nextId = null } = {}) {
-  const set = getControlSet(setId);
+// `set`: draw the sample with this set rather than the built-in `setId` names (whose layout it still
+// takes): the Settings page's preview of a set being edited, which is not registered anywhere yet.
+export function createControlSetStarter(setId, { materialize = true, nextId = null, set: setOverride = null } = {}) {
+  const set = setOverride ?? getControlSet(setId);
   if (!set) throw new Error(`Unknown control set: ${setId}`);
   const direction = starterDirection(setId);
   const controls = [];
   function place(type, x, y, width, height, extra = {}) {
     // Given a number, the id and the name createControl would have made from it.
     const n = nextId?.();
-    let c = createControl(type, { ...(n == null ? {} : { name: `${type}_${n}` }), Core: { ...(n == null ? {} : { id: `ctrl_${n}` }), controlSetId: setId, ...(setId === 'graphite' && setAnatomy(type, setId) ? { controlForm: setAnatomy(type, setId), formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
+    let c = createControl(type, { ...(n == null ? {} : { name: `${type}_${n}` }), Core: { ...(n == null ? {} : { id: `ctrl_${n}` }), controlSetId: setOverride?.id ?? setId, ...(setId === 'graphite' && setAnatomy(type, setId) ? { controlForm: setAnatomy(type, setId), formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
     if (materialize) c = resolveControlForSet(c, set);
     controls.push(c);
     return c;

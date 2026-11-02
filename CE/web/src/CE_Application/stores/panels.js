@@ -646,9 +646,13 @@ export function addPanel(panel = null) {
   return p;
 }
 
-/** Open the global Settings editor tab and activate it */
-export function openSettingsTab(section = 'general') {
-  settingsSection.set(String(section || 'general'));
+/**
+ * Open the global Settings editor tab and activate it, on `section` when one is named. Without one
+ * it stays on the section it was on: clicking its tab after visiting a panel called this with none,
+ * and it went back to General every time.
+ */
+export function openSettingsTab(section = '') {
+  if (section) settingsSection.set(String(section));
   settingsTabOpen.set(true);
   activeEditorTab.set({ type: 'settings', id: 'settings' });
   clearSelection();
