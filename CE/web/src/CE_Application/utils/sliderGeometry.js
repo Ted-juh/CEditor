@@ -49,7 +49,13 @@ export function resolveSliderNormalizedFromPoint(behavior = null, rect = null, c
     const delta = direction === 'ccw'
       ? counterClockwiseDelta(startAngle, angle)
       : clockwiseDelta(startAngle, angle);
-    return reverse(clamp(delta / Math.max(1, sweepAngle), 0, 1));
+    const sweep = Math.max(1, sweepAngle);
+    // Outside the sweep — the gap between the end and the start — the nearer end wins, as it does
+    // for a custom component's dial (customComponentInteraction.js). Measured from the start in
+    // the turning direction, a pointer just short of the start reads as nearly a full turn, so a
+    // plain clamp sent a knob dragged a little past its start straight to its end.
+    const normalized = delta <= sweep ? delta / sweep : ((delta - sweep) <= (360 - delta) ? 1 : 0);
+    return reverse(clamp(normalized, 0, 1));
   }
 
   const localX = clamp((clientX - rect.left) / Math.max(1, rect.width), 0, 1);
