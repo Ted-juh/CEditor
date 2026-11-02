@@ -70,6 +70,8 @@ function sameValue(left, right) {
   if (keys.length !== Object.keys(right).length) return false;
   return keys.every((key) => Object.hasOwn(right, key) && sameValue(left[key], right[key]));
 }
+/** Deep equality as the rule above uses it, for models/controlSetOwnership.js. */
+export const sameControlValue = sameValue;
 
 // A path step resolves through `_children` first, then a plain key — the convention every patch
 // map in this codebase uses (interactionRuntime's setTreeValueAtPath, presetPatches).

@@ -21,6 +21,9 @@ import { activePanel, panels, updatePanel } from './panels.js';
 import { controlSetLibrary, carryControlSetInDocument, documentControlSets } from './controlSetLibrary.js';
 import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
 import { applyControlSetChoices } from '../utils/controlSetApply.js';
+import { ownLookControl, resetToSetPatch } from '../models/controlSetOwnership.js';
+import { applyControlPatchesById, replaceControlsById } from './controls.js';
+import { findControlById } from '../utils/containment.js';
 import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
 
 export { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../models/controlSets.js';
@@ -111,4 +114,49 @@ export function applyControlSetWithChoices(panelId, setId, choices = {}) {
   for (const key of ['bgFollowsSet', 'surfaceMaterial']) if (!(key in patch)) patch[key] = undefined;
   updatePanel(panel.id, patch);
   return true;
+}
+
+// --- A look the set decides, made the control's own, and handed back (models/controlSetOwnership.js)
+
+function activePanelAndSet() {
+  const panel = get(activePanel);
+  if (!panel) return null;
+  const library = get(controlSetLibrary);
+  return { panel, library, set: controlSetForPanel(panel, library), sources: { document: panel.controlSets ?? [], library } };
+}
+
+/**
+ * Make the look their set draws the controls' own: a set switch no longer changes them. With
+ * `keepColourRoles` their colours still follow the set's colours. One store write, one undo step.
+ * Returns how many controls changed.
+ */
+export function makeControlLookOwn(ids, { keepColourRoles = false } = {}) {
+  const context = activePanelAndSet();
+  if (!context) return 0;
+  const replacements = new Map();
+  for (const id of ids ?? []) {
+    const control = findControlById(context.panel.controls, id);
+    if (!control?._children?.Core) continue;
+    replacements.set(id, ownLookControl(control, context.set, context.sources, { keepColourRoles, extraSets: context.library }));
+  }
+  replaceControlsById(replacements, context.panel.id);
+  return replacements.size;
+}
+
+/**
+ * Hand a look back to the set: `paths` of one control, or with no paths every property the set
+ * could decide, for each control. One store write, one undo step.
+ */
+export function resetControlLookToSet(ids, paths = null) {
+  const context = activePanelAndSet();
+  if (!context) return 0;
+  const patches = new Map();
+  for (const id of ids ?? []) {
+    const control = findControlById(context.panel.controls, id);
+    if (!control?._children?.Core) continue;
+    const patch = resetToSetPatch(control, paths, { extraSets: [context.set, ...context.library] });
+    if (Object.keys(patch).length) patches.set(id, patch);
+  }
+  applyControlPatchesById(patches, context.panel.id);
+  return patches.size;
 }
