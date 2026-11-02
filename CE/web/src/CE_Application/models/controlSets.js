@@ -378,6 +378,21 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   // And the displays and shapes, in the set's readout and its section language.
   .map(withDisplayDesign);
 
+// Sets that are no longer offered: the owner's call, "nothing to do with synths, fun but not
+// suitable for a panel". Each stays defined, so a panel or a control drawn with one opens looking as
+// it did (getControlSet still finds it, as Graphite Classic is kept for old documents); the pickers,
+// the Library, the default for new panels and the shipped starters offer OFFERED_CONTROL_SETS.
+export const RETIRED_CONTROL_SET_IDS = Object.freeze(['walnut', 'kiln', 'arcade', 'saddle', 'field', 'atlas', 'spool']);
+export function isRetiredControlSet(id) {
+  return RETIRED_CONTROL_SET_IDS.includes(String(id ?? ''));
+}
+export const OFFERED_CONTROL_SETS = BUILT_IN_CONTROL_SETS.filter((set) => !isRetiredControlSet(set.id));
+/** The offered built-ins, and `id` too when it names a retired one: a picker shows what is chosen. */
+export function offeredControlSetsWith(id) {
+  const retired = isRetiredControlSet(id) ? BUILT_IN_CONTROL_SETS.find((set) => set.id === id) : null;
+  return retired ? [...OFFERED_CONTROL_SETS, retired] : OFFERED_CONTROL_SETS;
+}
+
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
 // What a new panel starts on unless the user chose otherwise (Settings → Control Sets). Not the
 // base set: a document that names no set is a document from before this, and stays on Classic.

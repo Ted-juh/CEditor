@@ -1,4 +1,4 @@
-// Writes the sixty control-set starters that ship as files to CE/panels/Control set starters/, one
+// Writes the control-set starters that ship as files to CE/panels/Control set starters/, one
 // `<set id>.cepanel` each — the editable sample panels the installer puts beside the app.
 //
 //   node --import ./test/support/register-svelte.mjs scripts/export-control-set-starters.mjs          # write
@@ -21,10 +21,12 @@ import { fileURLToPath } from 'node:url';
 import { STARTER_CONTROL_SETS } from '../src/CE_Application/models/controlSetCoverage.js';
 import { createControlSetStarter } from '../src/CE_Application/models/controlSetStarter.js';
 import { serializePanel } from '../src/CE_Application/stores/panelModel.js';
+import { isRetiredControlSet } from '../src/CE_Application/models/controlSets.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const STARTERS_DIR = join(HERE, '../../panels/Control set starters');
-export const SHIPPED_STARTER_IDS = STARTER_CONTROL_SETS.map(({ id }) => id);
+// Not for a set that is no longer offered: its starter is not shipped (models/controlSets.js).
+export const SHIPPED_STARTER_IDS = STARTER_CONTROL_SETS.map(({ id }) => id).filter((id) => !isRetiredControlSet(id));
 
 const hashOf = (text) => createHash('sha256').update(text).digest('hex');
 

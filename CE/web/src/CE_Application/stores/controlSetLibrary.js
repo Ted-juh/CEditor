@@ -18,7 +18,7 @@
 import { derived, get } from 'svelte/store';
 import { activePanel, panels, updatePanel } from './panels.js';
 import { controlSetLibrary } from './controlSetLibraryStore.js';
-import { BUILT_IN_CONTROL_SETS, builtInControlSetId, normalizeControlSetDefinition, normalizeControlSetList } from '../models/controlSets.js';
+import { BUILT_IN_CONTROL_SETS, builtInControlSetId, normalizeControlSetDefinition, normalizeControlSetList, offeredControlSetsWith } from '../models/controlSets.js';
 import { createControlSetEnvelope, normalizeControlSetEnvelope } from '../models/controlSetPackage.js';
 import { deepClone } from '../utils/deepClone.js';
 
@@ -47,9 +47,11 @@ export function mergeControlSetLists(document, library, builtIn = BUILT_IN_CONTR
   return out;
 }
 
+// The built-ins offered, and the panel's own set when it is one no longer offered, so the panel's
+// Set still shows what it is on.
 export const availableControlSets = derived(
-  [documentControlSets, controlSetLibrary],
-  ([$document, $library]) => mergeControlSetLists($document, $library),
+  [documentControlSets, controlSetLibrary, activePanel],
+  ([$document, $library, $panel]) => mergeControlSetLists($document, $library, offeredControlSetsWith(String($panel?.controlSet?.id ?? ''))),
 );
 
 function stripOrigin(set) {

@@ -348,9 +348,18 @@ sets, the shape of the knobs and the finish of the buttons and the panel. Every 
 has not been given its own look follows the change. On a control's **Core** tab, **Control design**
 pins that one control to a different design, form and size.
 
-**Settings → Control Sets** lists the built-in sets and your own, and lets you choose the default for
-new panels. **Browse 36 templates** shows a gallery of synthesizer designs to apply or start from. To
-change a built-in set, **Duplicate** it first.
+**Settings → Control Sets** has three columns. On the left, the **Library**: each set shown by one of its
+controls, grouped (the panel's set, your own, the built-ins), searchable, with two rows of buttons above
+it: which control the cards show (Knobs, Sliders, Buttons, Switches, Meters, Pads) and which style
+(Modern, Metal, Vintage, Glow, Mechanical). In the middle, the chosen set's colours, surface material
+and control families; change anything in a built-in set and it becomes your own copy. On the right,
+the live preview, **Apply to** the panel, the default for new panels, **Browse the 36 templates** and
+**Import a set…**.
+
+Applying a set opens a window that asks what should change: the background colour, the surface
+material, each kind of control on the panel, or only the selected controls, and whether controls
+pinned to another set change too. What you leave unticked keeps the look it has. It is one undo step,
+and the panel's own **Set** asks the same.
 
 ### Colours
 

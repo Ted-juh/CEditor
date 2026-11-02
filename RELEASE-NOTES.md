@@ -421,6 +421,15 @@ copy said "Not in this library" until the library file was sent and imported too
 carries each version a copy was placed from, and opening it adds the ones your library lacks. One
 you already have under the same name and version, with another design, is kept.
 
+**Control sets: choose what a set changes, and find one without scrolling.** Applying a set
+restyled every control and the panel's background and material at once. A window now asks what
+should change: the background, the material, each kind of control on the panel, or only the
+selected controls. Settings → Control Sets is laid out in three columns, with the preview always in
+sight, and its Library shows each set by its knob, slider, button or switch, grouped and filtered by
+style. A built-in set can be changed: the first change makes it your own copy. Seven sets are no
+longer offered (Walnut, Kiln, Arcade, Saddle & Brass, Field, Atlas and Spool): a panel or a control
+that uses one keeps its look, and its starter panel is no longer installed.
+
 **A custom component's Pointer, Keyboard, Wheel and Snap switches work.** Every behaviour in the
 Component Designer has them, and nothing read them: a knob with Wheel off turned on the wheel on the
 panel, in the designer's Preview and in an exported plug-in. They apply in all three now. A new

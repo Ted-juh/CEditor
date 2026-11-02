@@ -11,7 +11,7 @@
   import { getSection, renameControl, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { controlTypeLabel } from '../utils/authorWords.js';
-  import { BUILT_IN_CONTROL_SETS } from '../models/controlSets.js';
+  import { offeredControlSetsWith } from '../models/controlSets.js';
   import { anatomyOptions } from '../models/controlAnatomy.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
@@ -139,7 +139,7 @@
     <PropertyCell label="Set" span={4} hint="Follow the panel, or pin a built-in design to this control so it keeps its look when copied to another panel. Your property edits take precedence.">
       <select class="val" value={core.controlSetId ?? ''} onchange={(e) => set('controlSetId', e.target.value)}>
         <option value="">Follow panel</option>
-        {#each BUILT_IN_CONTROL_SETS as design}<option value={design.id}>{design.name}</option>{/each}
+        {#each offeredControlSetsWith(core.controlSetId ?? '') as design (design.id)}<option value={design.id}>{design.name}</option>{/each}
       </select>
     </PropertyCell>
     {#if anatomyOptions(core.controlType).length}

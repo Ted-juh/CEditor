@@ -9,15 +9,16 @@
 // second row of buttons shows one style at a time (the owner: "family buttons for styles").
 
 import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
+import { isRetiredControlSet } from '../models/controlSets.js';
 
 /** The built-ins that are mechanisms rather than finishes. Listed: nothing in a set says so. */
-export const MECHANICAL_SET_IDS = ['atlas', 'kiln', 'arcade', 'spool', 'tessera', 'bellows', 'helix', 'iris', 'balance', 'satellite', 'fan', 'crown'];
+export const MECHANICAL_SET_IDS = ['tessera', 'bellows', 'helix', 'iris', 'balance', 'satellite', 'fan', 'crown'];
 
 /** The Library's styles, in the order of its buttons. */
 export const SET_STYLES = [['modern', 'Modern'], ['metal', 'Metal'], ['vintage', 'Vintage'], ['glow', 'Glow'], ['mechanical', 'Mechanical']];
 
 // Listed, as the mechanical ones are: nothing in a set says what it looks like. Every built-in is
-// here; a set of your own takes the style of the set it was copied from.
+// here (but those no longer offered); a set of your own takes the style of the set it was copied from.
 const STYLE_IDS = {
   // Clean, flat, rubber and digital.
   modern: ['graphite', 'graphite-studio', 'ember', 'soft', 'pop', 'carbon', 'atelier', 'blueprint',
@@ -28,7 +29,7 @@ const STYLE_IDS = {
     'hi-fi', 'flightdeck', 'chronograph', 'dual-scale', 'broadcast', 'compact-rack', 'turret-stack', 'concave-studio',
     'hex-drive', 'coin-edge', 'gimbal-ring'],
   // Wood, leather, bakelite, valves, cream caps and hammertone.
-  vintage: ['tolex', 'walnut', 'reel', 'valve', 'ladder', 'saddle', 'laboratory', 'field', 'receiver', 'ivory', 'ceramic',
+  vintage: ['tolex', 'reel', 'valve', 'ladder', 'laboratory', 'receiver', 'ivory', 'ceramic',
     'brassworks', 'bakelite', 'heritage', 'pinstripe', 'valve-console', 'chicken-head', 'lever-dial'],
   // Light, glass and the future.
   glow: ['neon', 'phosphor', 'chrome', 'frost', 'backlit', 'obsidian',
@@ -59,7 +60,8 @@ function matches(set, query, style = '') {
 export function groupControlSets({ librarySets = [], builtInSets = [], panelSetId = '', query = '', style = '' } = {}) {
   const all = [...librarySets, ...builtInSets];
   const onPanel = all.filter((set) => set.id === panelSetId && matches(set, query));
-  const fits = (set) => matches(set, query, style);
+  // A set no longer offered shows only as the panel's own.
+  const fits = (set) => !isRetiredControlSet(set.id) && matches(set, query, style);
   const mine = librarySets.filter(fits);
   const mechanical = builtInSets.filter((set) => MECHANICAL_SET_IDS.includes(set.id) && fits(set));
   const templates = builtInSets.filter((set) => TEMPLATE_ERA.has(set.id) && fits(set));

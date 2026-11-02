@@ -14,7 +14,7 @@
   import { SET_STYLES, groupControlSets } from '../utils/controlSetGroups.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, normalizeControlSetDefinition, resolveToken } from '../models/controlSets.js';
+  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, isRetiredControlSet, normalizeControlSetDefinition, offeredControlSetsWith, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -65,7 +65,10 @@
   onDestroy(() => { importGeneration += 1; });
   let allSets = $derived([
     ...$controlSetLibrary.map((set) => ({ ...set, origin: 'library' })),
-    ...BUILT_IN_CONTROL_SETS.filter((set) => !$controlSetLibrary.some((custom) => custom.id === set.id))
+    // The built-ins offered, and a retired one only where the panel or the default for new panels
+    // still uses it (models/controlSets.js RETIRED_CONTROL_SET_IDS).
+    ...[...new Map([...offeredControlSetsWith(panelSetId), ...offeredControlSetsWith($generalSettings.defaultControlSetId)].map((set) => [set.id, set])).values()]
+      .filter((set) => !$controlSetLibrary.some((custom) => custom.id === set.id))
       .map((set) => ({ ...set, origin: 'built-in' })),
   ]);
   // The default for new panels can be one of your own sets: createPanel carries it into the new
@@ -377,7 +380,7 @@
             {#if mySets.length}
               <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
             {/if}
-            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}{isRetiredControlSet(set.id) ? ' (no longer offered)' : ''}</option>{/each}</optgroup>
             {#if !allSets.some((set) => set.id === defaultSetId)}
               <option value={defaultSetId}>{defaultSetId} (not installed; new panels use {BASE_CONTROL_SET.name})</option>
             {/if}

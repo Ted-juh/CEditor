@@ -11,7 +11,9 @@ import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import { readFileSync } from 'node:fs';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { BUILT_IN_CONTROL_SETS, getControlSet } from '../src/CE_Application/models/controlSets.js';
+import { BUILT_IN_CONTROL_SETS, OFFERED_CONTROL_SETS, RETIRED_CONTROL_SET_IDS, getControlSet, offeredControlSetsWith } from '../src/CE_Application/models/controlSets.js';
+import { mergeControlSetLists } from '../src/CE_Application/stores/controlSetLibrary.js';
+import { SHIPPED_STARTER_IDS } from '../scripts/export-control-set-starters.mjs';
 import { applyControlSetChoices, controlFamily, panelSetSummary } from '../src/CE_Application/utils/controlSetApply.js';
 import { controlSetStyle, groupControlSets, MECHANICAL_SET_IDS, SET_STYLES } from '../src/CE_Application/utils/controlSetGroups.js';
 import { DEFAULT_PANEL_COLOUR, buildSolidStyle } from '../src/CE_Application/utils/backgroundCSS.js';
@@ -110,28 +112,49 @@ test('the Library is grouped: the panel\'s set, your own, materials, mechanisms,
   const mine = [{ id: 'my-set', name: 'My Set' }];
   const groups = groupControlSets({ librarySets: mine, builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'kiln' });
   assert.deepEqual(groups.map((group) => group.id), ['panel', 'mine', 'materials', 'mechanical', 'templates']);
-  assert.deepEqual(groups[0].sets.map((set) => set.id), ['kiln']);
+  assert.deepEqual(groups[0].sets.map((set) => set.id), ['kiln'], 'a set no longer offered still shows as the panel\'s own');
   const byId = Object.fromEntries(groups.map((group) => [group.id, group]));
   assert.deepEqual(byId.mechanical.sets.map((set) => set.id).sort(), [...MECHANICAL_SET_IDS].sort());
   assert.equal(byId.templates.sets.length, 36);
   assert.ok(byId.templates.eras.length > 1, 'the templates are sub-grouped by era');
-  assert.equal(byId.materials.sets.length + byId.mechanical.sets.length + byId.templates.sets.length, BUILT_IN_CONTROL_SETS.length, 'every built-in is somewhere');
+  assert.equal(byId.materials.sets.length + byId.mechanical.sets.length + byId.templates.sets.length, OFFERED_CONTROL_SETS.length, 'every offered built-in is somewhere, and only those');
   const found = groupControlSets({ librarySets: mine, builtInSets: BUILT_IN_CONTROL_SETS, query: 'tolex' });
   assert.deepEqual(found.flatMap((group) => group.sets.map((set) => set.id)), ['tolex']);
 });
 
-test('every built-in has a style, and a style keeps the Library to it', () => {
+test('every offered built-in has a style, and a style keeps the Library to it', () => {
   const counts = {};
-  for (const set of BUILT_IN_CONTROL_SETS) counts[controlSetStyle(set)] = (counts[controlSetStyle(set)] ?? 0) + 1;
+  for (const set of OFFERED_CONTROL_SETS) counts[controlSetStyle(set)] = (counts[controlSetStyle(set)] ?? 0) + 1;
   // Each listed by hand: an id misspelt in the list would fall to Modern and change these.
-  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 18, glow: 12, mechanical: 12 });
+  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 15, glow: 12, mechanical: 8 });
   assert.deepEqual(SET_STYLES.map(([id]) => id).sort(), Object.keys(counts).sort());
   assert.equal(controlSetStyle({ id: 'my-amp', basedOn: 'tolex' }), 'vintage', 'your own set takes the style it was copied from');
   const vintage = groupControlSets({ builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'neon', style: 'vintage' });
   const shown = vintage.filter((group) => group.id !== 'panel').flatMap((group) => group.sets);
-  assert.equal(shown.length, 18);
+  assert.equal(shown.length, 15);
   assert.ok(shown.every((set) => controlSetStyle(set) === 'vintage'));
   assert.deepEqual(vintage[0].sets.map((set) => set.id), ['neon'], 'the panel\'s own set stays in sight');
+});
+
+test('sets no longer offered: still drawn where they are used, offered nowhere', () => {
+  // The owner: Walnut, Kiln, Arcade, Saddle & Brass, Field, Atlas and Spool "have nothing to do with
+  // synths. Fun but not suitable for a panel."
+  assert.deepEqual([...RETIRED_CONTROL_SET_IDS].sort(), ['arcade', 'atlas', 'field', 'kiln', 'saddle', 'spool', 'walnut']);
+  for (const id of RETIRED_CONTROL_SET_IDS) {
+    assert.ok(getControlSet(id), `${id} still resolves, so a panel drawn with it looks as it did`);
+    assert.ok(!OFFERED_CONTROL_SETS.some((set) => set.id === id), `${id} is not offered`);
+    assert.ok(!SHIPPED_STARTER_IDS.includes(id), `${id} has no shipped starter`);
+  }
+  assert.equal(OFFERED_CONTROL_SETS.length, BUILT_IN_CONTROL_SETS.length - RETIRED_CONTROL_SET_IDS.length);
+  // A picker shows a retired set only where it is the one chosen.
+  assert.ok(offeredControlSetsWith('walnut').some((set) => set.id === 'walnut'));
+  assert.equal(offeredControlSetsWith('tolex'), OFFERED_CONTROL_SETS);
+  assert.ok(!mergeControlSetLists([], [], offeredControlSetsWith('')).some((set) => set.id === 'walnut'));
+  const core = source('sections/CoreEditor.svelte');
+  assert.match(core, /offeredControlSetsWith\(core\.controlSetId/);
+  assert.doesNotMatch(core, /BUILT_IN_CONTROL_SETS/);
+  const library = readFileSync(new URL('../src/CE_Application/stores/controlSetLibrary.js', import.meta.url), 'utf8');
+  assert.match(library, /mergeControlSetLists\(\$document, \$library, offeredControlSetsWith\(/);
 });
 
 test('every place a set is applied asks through the Apply window', () => {
