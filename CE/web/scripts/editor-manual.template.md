@@ -859,9 +859,21 @@ card, drag it onto the panel, or press **Place a copy**. **Open in Designer** op
 its own to change and export again, and **Save as file...** writes it as a `.ceditor-component.json`.
 The icon rail and the insert search list your saved components too.
 
-A placed copy stays linked to its package in the library. Its **Source** card offers **Update to
-<version>** when a newer version exists, **Reset to library**, **Update N copies on panel**, and
-**Detach** to cut the link.
+Select a placed copy and the properties panel opens on its **Component** tab (moving on to another
+copy keeps the tab you are on):
+
+- Its name and version, and where it came from: your library, or "made on this panel", with
+  **Export...** to put it in the library.
+- When the library has a newer version, a notice says so and quotes what changed (the line typed at
+  Export). **Update this copy** takes it, and **Update all N on this panel** updates every copy
+  that has no changes of its own. A copy's value and settings stay as you set them.
+- **Value**: where each value starts on this panel, and whether it is bound to a synth parameter
+  (click that to go to the **Device** tab).
+- **Settings**: what this copy can change, each with a reset arrow. A colour's swatch opens the
+  dock's **Colors** tool on it; an image has **Choose image...**.
+- **More**: the differences from the library, **Save to library as <version>...** for a copy changed
+  in its own designer, **Reset to library**, **Reset settings** and **Detach** (it stays as it is,
+  without library updates). Each of these asks first and says what it changes.
 
 The dock's **API** tool shows a placed component's inputs, outputs and properties as one table you
 can edit.

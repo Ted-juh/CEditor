@@ -90,8 +90,10 @@
     input.onchange = () => {
       const file = input.files?.[0];
       if (!file) return;
+      // The file is read after the click; a different component selected meanwhile must not get it.
+      const targetId = coreId;
       const reader = new FileReader();
-      reader.onload = () => setValue(row, String(reader.result ?? ''));
+      reader.onload = () => { if (coreId === targetId) setValue(row, String(reader.result ?? '')); };
       reader.readAsDataURL(file);
     };
     input.click();
@@ -258,10 +260,8 @@
   }
   .remove:hover { color: #F28B82; }
   .edit { display: flex; align-items: center; gap: 8px; margin-top: 6px; min-width: 0; }
-  .field, .code {
-    flex: 1; min-width: 0; height: 24px; box-sizing: border-box;
-    background: #1A1A1A; border: 1px solid #3A3A3A; border-radius: 3px; color: #DDD; font: inherit; font-size: 12px; padding: 0 7px;
-  }
+  /* The panel's field skin (properties/propertyTheme.css), as every .val in the properties panel. */
+  .field, .code { flex: 1; box-sizing: border-box; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .field.number { flex: 0 0 110px; }
   .code { flex: 0 0 92px; font-family: ui-monospace, monospace; font-size: 11.5px; }
   .swatch { width: 22px; height: 22px; flex: 0 0 auto; border-radius: 3px; border: 1px solid rgba(255, 255, 255, 0.25); padding: 0; }

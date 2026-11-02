@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy } from 'svelte';
+  import { onDestroy, untrack } from 'svelte';
   import '../properties/propertyTheme.css';
   import Paintbrush from 'lucide-svelte/icons/paintbrush';
   import Type from 'lucide-svelte/icons/type';
@@ -21,6 +21,7 @@
   import Rows3 from 'lucide-svelte/icons/rows-3';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
   import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
+  import ComponentIcon from 'lucide-svelte/icons/component';
   import Gauge from 'lucide-svelte/icons/gauge';
   import Spline from 'lucide-svelte/icons/spline';
   import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
@@ -192,6 +193,10 @@
 
   // All possible component-level tabs (filtered by which sections exist)
   const allComponentTabs = [
+    // A placed custom component's own tab, first: which component it is, a newer version in the
+    // library and what changed, its values and its settings (sections/CustomComponentTab.svelte).
+    // The id stays 'properties' — the audience rules and stored tab state name it so.
+    { id: 'properties', icon: ComponentIcon, label: 'Component', section: 'PublishedProperties', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'core',       icon: Box,           label: 'Core',       section: 'Core' },
     { id: 'transform',  icon: Move,          label: 'Transform',  section: 'Transform' },
     { id: 'background', icon: Paintbrush,    label: 'Background', section: 'Background' },
@@ -249,7 +254,6 @@
     { id: 'bindings',   icon: Link,          label: 'Bindings',   section: 'Bindings', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') !== 'CustomComponent' },
     { id: 'devicebindings', icon: Cable,     label: 'Device',     section: 'DeviceBindings' },
     { id: 'animations', icon: Play,          label: 'Animations', section: 'Animations', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') !== 'CustomComponent' },
-    { id: 'properties', icon: SlidersHorizontal, label: 'Properties', section: 'PublishedProperties', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'interact',   icon: Settings2,     label: 'Interact',   section: 'ValueChannels' },
     { id: 'react',      icon: Workflow,      label: 'React',      section: 'Links', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
@@ -388,6 +392,21 @@
       setActiveSingleTab(req.tabId);
     }
     propertiesTabRequest.set(null);
+  });
+
+  // Selecting a placed custom component from anything else opens its Component tab: which
+  // component it is, an update waiting, its value and settings. Moving from one copy to another
+  // keeps the tab, so binding several on the Device tab is not a click per copy.
+  let lastSelectionWasCopy = false;
+  $effect(() => {
+    const id = selectedControlId;
+    const isCopy = !!id && selectedIsCustomComponent && audienceContext === 'instance' && contextMode === 'component';
+    untrack(() => {
+      if (isCopy && !lastSelectionWasCopy && viewMode === 'single' && componentTabs.some((tab) => tab.id === 'properties')) {
+        setActiveSingleTab('properties');
+      }
+    });
+    lastSelectionWasCopy = isCopy;
   });
 
   $effect(() => {

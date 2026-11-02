@@ -81,7 +81,9 @@ const LAZY_COMPONENT_LOADERS = {
   // change on a copy. It replaced Publish's Contract and Package & Library pages when custom
   // components were simplified; the instance-facing half lives in the `properties` tab (Stage A).
   publish: () => import('../sections/CustomSettingsEditor.svelte'),
-  properties: () => import('../sections/CustomInstancePropertiesEditor.svelte'),
+  // A placed copy's Component tab (the id is still `properties`): which component it is, an update
+  // waiting and what changed, its values and its settings. It replaced the Properties tab.
+  properties: () => import('../sections/CustomComponentTab.svelte'),
   testbench: () => import('../sections/CustomTestBenchEditor.svelte'),
 };
 
