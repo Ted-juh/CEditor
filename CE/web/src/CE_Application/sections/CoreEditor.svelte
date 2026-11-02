@@ -15,6 +15,8 @@
   import { anatomyOptions } from '../models/controlAnatomy.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import ControlSetOverridesCard from './ControlSetOverridesCard.svelte';
+  import { applyKnobFormAsParts } from '../stores/controlSets.js';
+  import { KNOB_FORMS_AS_PARTS } from '../models/knobFormParts.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyText from '../properties/PropertyText.svelte';
   import PropertyButton from '../properties/PropertyButton.svelte';
@@ -29,6 +31,13 @@
   let { control = null } = $props();
 
   let core = $derived(getSection(control, 'Core'));
+
+  // A knob form that is parts now (models/knobFormParts.js) is written as the knob's own parts.
+  let formIsParts = (form) => core?.controlType === 'Knob' && KNOB_FORMS_AS_PARTS.includes(String(form ?? ''));
+  function chooseForm(form) {
+    if (formIsParts(form)) applyKnobFormAsParts($selectedComponentIds.size > 1 ? [...$selectedComponentIds] : [core.id], form);
+    else set('controlForm', form);
+  }
 
   function set(prop, value) {
     if (!core?.id) return;
@@ -150,11 +159,16 @@
     </PropertyCell>
     {#if anatomyOptions(core.controlType).length}
       <PropertyCell label="Form" span={4} path="Core.controlForm" hint="Changes the control's physical construction. Uses the existing control's value, input and MIDI behavior. Choose Original parts to use the Parts editor.">
-        <select class="val" value={core.controlForm ?? ''} onchange={(e) => set('controlForm', e.target.value)}>
+        <select class="val" value={core.controlForm ?? ''} onchange={(e) => chooseForm(e.target.value)}>
           <option value="">Follow set</option><option value="original">Original parts</option>
           {#each anatomyOptions(core.controlType) as [id, name]}<option value={id}>{name}</option>{/each}
         </select>
       </PropertyCell>
+      {#if formIsParts(core.controlForm)}
+        <PropertyCell label="" span={4} compact hint="This form is now drawn with the knob's own parts, which can be edited on the Knob tab. Convert writes them onto this control.">
+          <PropertyButton label="Convert to Parts" title="Draw this form with the knob's own parts, editable on the Knob tab." onclick={() => chooseForm(core.controlForm)} />
+        </PropertyCell>
+      {/if}
       <PropertyCell label="Size %" span={2} path="Core.formSize" hint="Size of the mechanism within its control bounds."><NumberCell value={core.formSize ?? 100} min={60} max={115} step={5} onchange={(v) => set('formSize', v)} /></PropertyCell>
       <PropertyCell label="Depth %" span={2} path="Core.formDepth" hint="Highlight and pressed travel strength."><NumberCell value={core.formDepth ?? 60} min={0} max={100} step={5} onchange={(v) => set('formDepth', v)} /></PropertyCell>
       <PropertyCell label="Divisions" span={2} path="Core.formDivisions" hint="Visual scale divisions. Does not quantize the value."><NumberCell value={core.formDivisions ?? 12} min={4} max={48} step={1} onchange={(v) => set('formDivisions', v)} /></PropertyCell>

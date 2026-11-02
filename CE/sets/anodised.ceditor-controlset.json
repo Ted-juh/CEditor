@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8a67d460",
+  "fingerprint": "006b6fde",
   "set": {
     "id": "anodised",
     "name": "Anodised",
@@ -83,53 +83,82 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
-          "Behavior.majorTickCount": 11,
-          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickCount": 9,
+          "Behavior.minorTickCount": 2,
           "Behavior.majorTickLength": 5,
-          "Core.controlForm": "vernier",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Behavior.tickPlacement": "outside",
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "tickMinor": {
-            "kind": "engraved"
+            "kind": "engraved",
+            "Layout.height": 2.5,
+            "Layout.width": 0.6,
+            "Background.Fill.colour": "{text.primary}"
           },
           "tickMajor": {
-            "Layout.width": 1.5,
+            "Layout.width": 1.2,
             "Layout.height": 5,
-            "kind": "engraved"
+            "kind": "engraved",
+            "Background.Fill.colour": "{text.primary}"
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 82,
-            "Layout.height": 82,
-            "Background.Fill.colour": "{control.body}",
+            "Layout.width": 55,
+            "Layout.height": 55,
+            "Background.Fill.colour": "{control.track}",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
+            "Background.Border.colour": "FF202020",
+            "Background.Border.thickness": 0.6,
             "Background.Effects.Material.enabled": true,
             "Background.Effects.Material.kind": "brushed",
             "Background.Effects.Material.strength": 80,
             "Background.Effects.Material.shine": 90,
-            "Background.Effects.Material.grain": 100
+            "Background.Effects.Material.grain": 100,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2.2,
-            "Layout.height": 88,
-            "Layout.offsetX": 30,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.enabled": false
+            "Layout.width": 4.7,
+            "Layout.height": 97,
+            "Layout.offsetX": 3,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 3
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 3
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 95,
+            "Layout.height": 95,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "FF202020",
+            "Background.Border.thickness": 1.8,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "brushed",
+            "Background.Effects.Material.strength": 70,
+            "Background.Effects.Material.shine": 60
           }
         }
       },

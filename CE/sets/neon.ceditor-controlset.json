@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "41f11bd9",
+  "fingerprint": "dc240e81",
   "set": {
     "id": "neon",
     "name": "Neon",
@@ -81,44 +81,68 @@
       "Knob": {
         "component": {
           "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.labelReadoutPlacement": "center",
           "Behavior.showTicks": false,
-          "Core.controlForm": "lens",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "bodyCap": {
             "visible": true,
-            "Layout.width": 77,
-            "Layout.height": 77,
-            "Background.Fill.colour": "{control.body}",
+            "Layout.width": 100,
+            "Layout.height": 100,
+            "Background.Fill.colour": "{control.track}",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
+            "Background.Border.colour": "{surface}",
+            "Background.Border.thickness": 2,
             "Background.Effects.Material.enabled": true,
             "Background.Effects.Material.kind": "glass",
             "Background.Effects.Material.strength": 60,
             "Background.Effects.Material.shine": 140,
-            "Background.Effects.Material.grain": 100
+            "Background.Effects.Material.grain": 100,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "pointerCurrent": {
             "kind": "line",
             "Layout.width": 3,
-            "Layout.height": 92,
-            "Layout.offsetX": 30,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.enabled": false
+            "Layout.height": 96,
+            "Layout.offsetX": 74,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 6
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 6
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{accent}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 117,
+            "Layout.height": 117,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "polygon",
+            "outlineCount": 8,
+            "outlineDepth": 0,
+            "outlineRotation": 22.5,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "FFF2F2F2",
+            "Background.Border.thickness": 0.6
           }
         }
       },

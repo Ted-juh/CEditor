@@ -180,12 +180,20 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   hasReadout = false,
   circularDiameter = 0,
   labelMetrics = {},
+  // `tight`: reserve room only for what the knob draws — the min/max labels when they are shown,
+  // the pointer it uses — not for every label and handle it might. Opt-in (Behavior.circularFit),
+  // so every knob that exists keeps its size; the knob forms rebuilt as parts ask for it, since
+  // their drawings filled the box (models/knobFormParts.js).
+  tight = false,
+  showsMinMax = true,
 } = {}) {
   const readoutSize = Math.max(0, numberOr(labelMetrics?.readoutSize, 12));
   const titleSize = Math.max(0, numberOr(labelMetrics?.titleSize, 11));
   const minMaxSize = Math.max(0, numberOr(labelMetrics?.minMaxSize, 11));
   const handleSize = Math.max(0, numberOr(labelMetrics?.handleSize, 11));
-  const labelAllowance = Math.max(minMaxSize, handleSize, titleSize, hasReadout ? readoutSize : 0);
+  const labelAllowance = tight
+    ? (showsMinMax ? minMaxSize : 0)
+    : Math.max(minMaxSize, handleSize, titleSize, hasReadout ? readoutSize : 0);
   const topInset = hasReadout ? Math.max(12, readoutSize * 0.5) : 0;
   // What actually sits outside the arc, measured rather than summed. The ticks and the pointer
   // both reach outward from the track, into the SAME ring, so the room they need is the larger of

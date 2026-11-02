@@ -1,11 +1,14 @@
 # Changeable control sets: what it takes
 
 Status: proposal, 2026-11-02; the owner's decisions are under Decisions. Built so far: the pin fix
-(Findings 8) and piece A: `models/controlSetOwnership.js`, the Control set card on Core › Control
-design (Clear Overrides, Detach from Set, Reattach to Set), and override marks with Revert on the
-fields that name their property (`PropertyCell` `path`): the form fields, fill and text colours, the
-font, and the slider's ticks and label placement. The other tabs' fields get a `path` as they are
-next touched.
+(Findings 8); piece A (`models/controlSetOwnership.js`, the Control set card, override marks and
+Revert on the fields that name their property); and the first part of piece B: eight of the twelve
+base knob forms (disc, drafting pointer, open glass ring, lens, console skirt, vernier, scalloped
+selector, segment encoder) are drawn with the knob's own parts (`models/knobFormParts.js`), with
+a housing plate, cap and housing outlines, a needle pointer and a tight fit added to the knob
+(`utils/knobOutlines.js`). The sets that used them name no form any more. Still drawn by code: the
+paper tab, the pebble, the roller and the tuning window, the 48 direction forms, and every button,
+switch and meter form. The Knob tab's fields for the new parts wait on their mock-up.
 
 ## The principle
 

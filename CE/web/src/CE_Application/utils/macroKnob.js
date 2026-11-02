@@ -93,8 +93,14 @@ function reinkForFace(knob, set) {
  */
 export function macroKnobHalo(knob, set) {
   if (!knob || !set) return null;
-  const core = resolveControlForSet(knob, set)._children.Core;
+  const drawn = resolveControlForSet(knob, set);
+  const core = drawn._children.Core;
   if (SELF_LIT_FORMS.has(core.controlForm) || NOT_ROUND_FORMS.has(core.controlForm)) return null;
+  // A form rebuilt as the knob's parts (models/knobFormParts.js) has no form name: a knob that
+  // reads its value in its centre (the lens, the encoder) or points with a needle (the drafting
+  // pointer) lights itself, as those forms did.
+  if (!core.controlForm && (drawn._children.Behavior?.labelReadoutPlacement === 'center'
+    || drawn._children.Parts?._children?.pointerCurrent?.kind === 'needle')) return null;
   const face = resolveToken('instrument.face', set);
   const body = core.controlForm ? core.formFaceColour
     : resolveControlForSet(knob, set)._children.Parts?._children?.bodyCap?._children?.Background?._children?.Fill?.colour;

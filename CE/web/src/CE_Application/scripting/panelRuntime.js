@@ -7541,7 +7541,9 @@ const DEFINE_SPECS = {
     // (editor/SliderFamilyRenderer.svelte), and the marks of a generated part and of one detached
     // from its generator (utils/customComponentMaterializer.js, the designer surface).
     extra: ['shadow', 'glow', 'sheen', 'slot', 'inset', 'grooveColour', 'plateColour',
-      'generated', 'detachedFromGenerator', 'locked'],
+      'generated', 'detachedFromGenerator', 'locked',
+      // A knob cap's and housing's outline (utils/knobOutlines.js).
+      'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns'],
   },
   ValueChannels: {
     // An array channel's size, items and itemFields come from its own maker.

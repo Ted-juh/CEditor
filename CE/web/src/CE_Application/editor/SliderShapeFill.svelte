@@ -74,6 +74,10 @@
         stroke-width={shape.strokeWidth}
         stroke-linecap={shape.lineCap ?? 'round'}
       />
+    {:else if shape.kind === 'filled-path'}
+      <!-- An outline filled: a knob's polygon, scallop or flutes, or a ring with its hole
+           (utils/knobOutlines.js). -->
+      <path d={shape.d} fill="white" fill-rule="evenodd" />
     {:else if shape.kind === 'circle'}
       <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill="white" />
     {:else if shape.kind === 'rect'}

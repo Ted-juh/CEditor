@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "598f89e6",
+  "fingerprint": "ce0e70fd",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -82,48 +82,82 @@
         "component": {
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
-          "Behavior.majorTickCount": 11,
-          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickCount": 9,
+          "Behavior.minorTickCount": 2,
           "Behavior.majorTickLength": 5,
-          "Core.controlForm": "vernier",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Behavior.showTicks": true,
+          "Behavior.tickPlacement": "outside",
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "tickMajor": {
             "kind": "engraved",
-            "Layout.width": 1.5,
-            "Layout.height": 5
+            "Layout.width": 1.2,
+            "Layout.height": 5,
+            "Background.Fill.colour": "{text.primary}"
           },
           "tickMinor": {
-            "kind": "engraved"
+            "kind": "engraved",
+            "Layout.height": 2.5,
+            "Layout.width": 0.6,
+            "Background.Fill.colour": "{text.primary}"
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 70,
-            "Layout.height": 70,
-            "Background.Border.thickness": 1.5,
+            "Layout.width": 55,
+            "Layout.height": 55,
+            "Background.Border.thickness": 0.6,
             "Background.Effects.Material.enabled": true,
             "Background.Effects.Material.kind": "blast",
             "Background.Effects.Material.strength": 100,
-            "Background.Effects.Material.shine": 100
+            "Background.Effects.Material.shine": 100,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "FF202020"
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2,
-            "Layout.height": 88,
-            "Background.Fill.colour": "{control.marker}",
-            "Background.Border.enabled": false
+            "Layout.width": 4.7,
+            "Layout.height": 97,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "Layout.offsetX": 3,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 95,
+            "Layout.height": 95,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "FF202020",
+            "Background.Border.thickness": 1.8,
+            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.kind": "brushed",
+            "Background.Effects.Material.strength": 70,
+            "Background.Effects.Material.shine": 60
           }
         }
       },

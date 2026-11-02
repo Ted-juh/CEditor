@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "aa5c7327",
+  "fingerprint": "2147ab53",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -81,18 +81,12 @@
       "Knob": {
         "component": {
           "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
-          "Behavior.showTicks": true,
+          "Behavior.labelReadoutPlacement": "center",
+          "Behavior.showTicks": false,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
           "Behavior.majorTickLength": 6,
-          "Core.controlForm": "lens",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "tickMinor": {
@@ -105,31 +99,61 @@
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 70,
-            "Layout.height": 70,
-            "Background.Fill.colour": "{control.body}",
+            "Layout.width": 100,
+            "Layout.height": 100,
+            "Background.Fill.colour": "{control.track}",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
+            "Background.Border.colour": "{surface}",
+            "Background.Border.thickness": 2,
             "Background.Effects.Material.enabled": true,
             "Background.Effects.Material.kind": "glass",
             "Background.Effects.Material.strength": 80,
             "Background.Effects.Material.shine": 160,
-            "Background.Effects.Material.grain": 100
+            "Background.Effects.Material.grain": 100,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2.5,
-            "Layout.height": 84,
-            "Layout.offsetX": 30,
-            "Background.Fill.colour": "{control.marker}",
-            "Background.Border.enabled": false
+            "Layout.width": 3,
+            "Layout.height": 96,
+            "Layout.offsetX": 74,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{accent}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 117,
+            "Layout.height": 117,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "polygon",
+            "outlineCount": 8,
+            "outlineDepth": 0,
+            "outlineRotation": 22.5,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "FFF2F2F2",
+            "Background.Border.thickness": 0.6
           }
         }
       },

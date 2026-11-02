@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "dddbe58a",
+  "fingerprint": "ce2a52bd",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -81,30 +81,29 @@
       "Knob": {
         "component": {
           "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
+          "Behavior.labelReadoutPlacement": "center",
           "Behavior.showTicks": true,
-          "Behavior.majorTickCount": 11,
+          "Behavior.majorTickCount": 24,
           "Behavior.minorTickCount": 0,
           "Behavior.majorTickLength": 5,
-          "Core.controlForm": "encoder",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Behavior.circularFit": "tight",
+          "Behavior.tickPlacement": "cross"
         },
         "parts": {
           "tickMinor": {
             "kind": "engraved"
           },
           "tickMajor": {
-            "Layout.width": 1.5,
-            "Layout.height": 5,
-            "kind": "engraved"
+            "Layout.width": 4,
+            "Layout.height": 9,
+            "kind": "engraved",
+            "opacity": 0.25,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false
           },
           "bodyCap": {
-            "visible": true,
+            "visible": false,
             "Layout.width": 82,
             "Layout.height": 82,
             "Background.Fill.colour": "{control.body}",
@@ -123,13 +122,38 @@
             "Layout.height": 92,
             "Layout.offsetX": 30,
             "Background.Fill.colour": "{control.cap}",
-            "Background.Border.enabled": false
+            "Background.Border.enabled": false,
+            "visible": false
           },
           "bodyTrackBase": {
-            "Layout.height": 3
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 3
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{accent}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 83,
+            "Layout.height": 83,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "polygon",
+            "outlineCount": 6,
+            "outlineDepth": 0,
+            "outlineRotation": 30,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{text.primary}",
+            "Background.Border.thickness": 0.6
           }
         }
       },

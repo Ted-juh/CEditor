@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6dd126ca",
+  "fingerprint": "bf40e212",
   "set": {
     "id": "field",
     "name": "Field",
@@ -83,53 +83,83 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
-          "Behavior.majorTickCount": 11,
-          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 2,
           "Behavior.majorTickLength": 6,
-          "Core.controlForm": "scallop",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.tickPlacement": "outside",
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "tickMinor": {
-            "kind": "engraved"
+            "kind": "engraved",
+            "Layout.height": 2.5,
+            "Layout.width": 0.6,
+            "Background.Fill.colour": "{text.primary}"
           },
           "tickMajor": {
-            "Layout.width": 1.3,
-            "Layout.height": 6,
-            "kind": "engraved"
+            "Layout.width": 1.2,
+            "Layout.height": 5,
+            "kind": "engraved",
+            "Background.Fill.colour": "{text.primary}"
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 72,
-            "Layout.height": 72,
-            "Background.Fill.colour": "{control.body}",
-            "Background.Border.enabled": true,
+            "Layout.width": 83,
+            "Layout.height": 83,
+            "Background.Fill.colour": "{surface}",
+            "Background.Border.enabled": false,
             "Background.Border.colour": "{control.cap.edge}",
             "Background.Border.thickness": 1,
             "Background.Effects.Material.enabled": true,
-            "Background.Effects.Material.kind": "rubber",
-            "Background.Effects.Material.strength": 60,
-            "Background.Effects.Material.shine": 20,
-            "Background.Effects.Material.grain": 100
+            "Background.Effects.Material.kind": "glass",
+            "Background.Effects.Material.strength": 30,
+            "Background.Effects.Material.shine": 70,
+            "Background.Effects.Material.grain": 100,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "scallop",
+            "outlineCount": 8,
+            "outlineDepth": 19,
+            "turns": true,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "pointerCurrent": {
-            "kind": "line",
-            "Layout.width": 3,
-            "Layout.height": 84,
+            "kind": "chicken",
+            "Layout.width": 8,
+            "Layout.height": 104,
             "Layout.offsetX": 30,
-            "Background.Fill.colour": "{control.marker}",
-            "Background.Border.enabled": false
+            "Background.Fill.colour": "FFF2F2F2",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 95,
+            "Layout.height": 95,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "scallop",
+            "outlineCount": 8,
+            "outlineDepth": 22,
+            "opacity": 1,
+            "Background.Fill.colour": "{control.track}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false
           }
         }
       },

@@ -2,6 +2,7 @@
   import { untrack } from 'svelte';
   import { resolveInteractionContext } from '../utils/interactionRuntime.js';
   import SliderShapeFill from './SliderShapeFill.svelte';
+  import { knobOutlinePath } from '../utils/knobOutlines.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
@@ -328,6 +329,26 @@
   // percentage of the track's diameter or in px, drawn only when the part is visible and the
   // geometry is circular. A set turns it on; a document that never heard of it keeps its arc.
   let bodyCapPart = $derived(parts?._children?.bodyCap ?? null);
+  // The knob's housing (utils/sliderEntityFactory.js `bodyHousing`): a plate under everything,
+  // sized as the cap is, a percentage of the track's radius.
+  let bodyHousingPart = $derived(parts?._children?.bodyHousing ?? null);
+  let bodyHousingRadius = $derived.by(() => {
+    if (geometry !== 'circular' || bodyHousingPart?.visible !== true) return 0;
+    const size = Math.max(0, numberOr(bodyHousingPart?._children?.Layout?.width, 100));
+    return String(bodyHousingPart?._children?.Layout?.widthUnit ?? 'percent') === 'px' ? size / 2 : circularMetrics.radius * (size / 100);
+  });
+  // The cap's and the housing's outline (utils/knobOutlines.js): a circle unless the part says
+  // otherwise, turned with the value when the part `turns`.
+  function outlineShapeFor(part, r) {
+    const kind = String(part?.outline ?? 'circle');
+    const turnDegrees = part?.turns === true ? sliderNormalizedToAngle(behavior, normalizedValues.current) + 90 : 0;
+    const d = kind === 'circle' ? '' : knobOutlinePath(kind, circularCenter.x, circularCenter.y, r, {
+      count: part?.outlineCount, depth: part?.outlineDepth, rotation: numberOr(part?.outlineRotation, 0) + turnDegrees,
+    });
+    return d
+      ? { kind: 'filled-path', d }
+      : { kind: 'circle', cx: circularCenter.x, cy: circularCenter.y, r };
+  }
   let bodyCapRadius = $derived.by(() => {
     if (geometry !== 'circular' || bodyCapPart?.visible !== true) return 0;
     const layout = bodyCapPart?._children?.Layout ?? {};
@@ -338,7 +359,7 @@
   // line / chicken-head drawn from the centre out along the value angle, over the cap.
   let pointerKind = $derived.by(() => {
     const kind = String(pointerCurrentPart?.kind ?? 'dot').toLowerCase();
-    return geometry === 'circular' && (kind === 'line' || kind === 'chicken' || kind === 'capdot') ? kind : 'dot';
+    return geometry === 'circular' && (kind === 'line' || kind === 'chicken' || kind === 'capdot' || kind === 'needle') ? kind : 'dot';
   });
   let pointerReach = $derived(bodyCapRadius > 0 ? bodyCapRadius : circularMetrics.radius * 0.7);
   // On a linear track a cap (current, start or end) can be the original dot, a fader cap
@@ -436,9 +457,19 @@
       const r0 = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30) / 100);
       return { line: { x1: cx + ux * r0, y1: cy + uy * r0, x2: cx + ux * tip, y2: cy + uy * tip, width: thick } };
     }
-    // A chicken-head: a blunt taper that starts behind the centre and reaches past the cap.
     const px = -uy;
     const py = ux;
+    if (kind === 'needle') {
+      // A drafting needle: a taper from its full width at the centre to a point, with a short
+      // tail behind the centre. Width is its base in px, height its reach as a % of the cap radius.
+      const half = thick / 2;
+      const tail = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 25) / 100);
+      const points = [[tip, 0], [0, half], [-tail, half * 0.3], [-tail, -half * 0.3], [0, -half]]
+        .map(([r, s]) => `${(cx + ux * r + px * s).toFixed(2)},${(cy + uy * r + py * s).toFixed(2)}`)
+        .join(' ');
+      return { polygon: { points, stroke: 1 } };
+    }
+    // A chicken-head: a blunt taper that starts behind the centre and reaches past the cap.
     const back = -pointerReach * 0.28;
     const halfBase = thick / 2;
     const halfTip = Math.max(1, thick * 0.22);
@@ -465,14 +496,21 @@
     return clamp((numberOr(behavior?.centerValue, min) - min) / span, 0, 1);
   });
   let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, showReadout, labelMetrics));
+  let circularFitTight = $derived(String(behavior?.circularFit ?? 'auto') === 'tight');
   let circularMetrics = $derived(resolveCircularTrackMetrics(width, height, {
     trackThickness,
-    pointerSize: maxPointerSize,
+    // Tight: the pointer it draws. A dot rides the arc and needs its size; a line, needle,
+    // chicken-head or dot on the cap stays inside it. Range handles only in a range.
+    pointerSize: circularFitTight
+      ? Math.max(pointerKind === 'dot' ? pointerCurrentSize : 0, valueMode === 'single' ? 0 : Math.max(pointerStartSize, pointerEndSize))
+      : maxPointerSize,
     majorTickLength,
     hasTicks: showTicks,
     hasReadout: showReadout,
     circularDiameter: behavior?.circularDiameter,
     labelMetrics,
+    tight: circularFitTight,
+    showsMinMax: behavior?.showMinMaxLabels !== false,
   }));
   let circularCenter = $derived({
     x: circularMetrics.centerX,
@@ -974,7 +1012,31 @@
         {@render linearCap(pointerEndPart, linearPointerPoint('end'), 'pointerEnd')}
       {/if}
     {:else}
-      {#if numberOr(behavior?.sweepAngle, 270) >= 359.5}
+      {#if bodyHousingRadius > 0}
+        {@const housingShape = outlineShapeFor(bodyHousingPart, bodyHousingRadius)}
+        <SliderShapeFill
+          background={bodyHousingPart?._children?.Background ?? null}
+          bounds={circleBounds(circularCenter.x, circularCenter.y, bodyHousingRadius)}
+          shape={housingShape}
+          maskId={maskIdFor('bodyHousing')}
+          svgWidth={width}
+          svgHeight={height}
+          opacity={numberOr(bodyHousingPart?.opacity, 1)}
+          style={pointerStyleFor('bodyHousing')}
+        />
+        {#if partBorderWidth(bodyHousingPart, 0) > 0}
+          {#if housingShape.kind === 'circle'}
+            <circle cx={housingShape.cx} cy={housingShape.cy} r={housingShape.r} fill="none" stroke={partBorderColour(bodyHousingPart, '#333333')} stroke-width={partBorderWidth(bodyHousingPart, 0)} opacity={numberOr(bodyHousingPart?.opacity, 1)} />
+          {:else}
+            <path d={housingShape.d} fill="none" stroke={partBorderColour(bodyHousingPart, '#333333')} stroke-width={partBorderWidth(bodyHousingPart, 0)} opacity={numberOr(bodyHousingPart?.opacity, 1)} />
+          {/if}
+        {/if}
+      {/if}
+      <!-- A hidden track is not drawn (it was drawn whatever its `visible` said); its thickness still
+           sets where the ticks start. -->
+      {#if trackBasePart?.visible === false}
+        <!-- hidden -->
+      {:else if numberOr(behavior?.sweepAngle, 270) >= 359.5}
         <SliderShapeFill
           background={trackBasePart?._children?.Background ?? null}
           bounds={circleBounds(circularMetrics.centerX, circularMetrics.centerY, circularMetrics.radius, trackThickness)}
@@ -1022,7 +1084,7 @@
         />
       {/if}
 
-      {#if fillPath}
+      {#if fillPath && (valueMode === 'single' ? trackFillPart : selectedRangePart)?.visible !== false}
         <SliderShapeFill
           background={(valueMode === 'single' ? trackFillPart : selectedRangePart)?._children?.Background ?? null}
           bounds={arcBounds(circularCenter, circularMetrics.radius, trackThickness)}
@@ -1054,25 +1116,30 @@
       {/if}
 
       {#if bodyCapRadius > 0}
+        {@const capShape = outlineShapeFor(bodyCapPart, bodyCapRadius)}
         <SliderShapeFill
           background={bodyCapPart?._children?.Background ?? null}
           bounds={circleBounds(circularCenter.x, circularCenter.y, bodyCapRadius)}
-          shape={{ kind: 'circle', cx: circularCenter.x, cy: circularCenter.y, r: bodyCapRadius }}
+          shape={capShape}
           maskId={maskIdFor('bodyCapCircle')}
           svgWidth={width}
           svgHeight={height}
           opacity={numberOr(bodyCapPart?.opacity, 1)}
           style={pointerStyleFor('bodyCap')}
         />
-        <circle
-          cx={circularCenter.x}
-          cy={circularCenter.y}
-          r={bodyCapRadius}
-          fill="none"
-          stroke={partBorderColour(bodyCapPart, '#333333')}
-          stroke-width={partBorderWidth(bodyCapPart, 1)}
-          opacity={numberOr(bodyCapPart?.opacity, 1)}
-        />
+        {#if capShape.kind === 'circle'}
+          <circle
+            cx={circularCenter.x}
+            cy={circularCenter.y}
+            r={bodyCapRadius}
+            fill="none"
+            stroke={partBorderColour(bodyCapPart, '#333333')}
+            stroke-width={partBorderWidth(bodyCapPart, 1)}
+            opacity={numberOr(bodyCapPart?.opacity, 1)}
+          />
+        {:else}
+          <path d={capShape.d} fill="none" stroke={partBorderColour(bodyCapPart, '#333333')} stroke-width={partBorderWidth(bodyCapPart, 1)} opacity={numberOr(bodyCapPart?.opacity, 1)} />
+        {/if}
       {/if}
 
       {#if valueMode !== 'single'}
@@ -1099,7 +1166,7 @@
         />
       {/if}
 
-      {#if (valueMode === 'single' || valueMode === 'band') && pointerKind !== 'dot'}
+      {#if (valueMode === 'single' || valueMode === 'band') && pointerKind !== 'dot' && pointerCurrentPart?.visible !== false}
         {@const radial = radialPointerShape(pointerKind)}
         {#if radial.dot}
           <circle data-pointer="current"
@@ -1133,7 +1200,7 @@
             style={pointerStyleFor('pointerCurrent', 'both')}
           />
         {/if}
-      {:else if valueMode === 'single' || valueMode === 'band'}
+      {:else if (valueMode === 'single' || valueMode === 'band') && pointerKind === 'dot'}
         {@const currentCircularPoint = circularPointerPoint('current')}
         <SliderShapeFill
           background={pointerCurrentPart?._children?.Background ?? null}

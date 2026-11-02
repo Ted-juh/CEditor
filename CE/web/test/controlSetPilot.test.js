@@ -126,7 +126,9 @@ test('the catalogue: seventy-nine built-in sets, each id once, every family patc
         }
       }
     }
-    if (set.families?.Knob?.parts?.bodyCap) {
+    // A cap the family names is on, unless the family's knob has none (the encoder, a knob form
+    // drawn as parts: models/knobFormParts.js).
+    if (set.families?.Knob?.parts?.bodyCap && set.families.Knob.parts.bodyCap.visible !== false) {
       assert.equal(part(resolveControlForSet(createControl('Knob'), set), 'bodyCap').visible, true, `${set.id}: the cap is on`);
     }
     if (set.panel?.material) assert.ok(MATERIAL_KINDS.includes(set.panel.material.kind), `${set.id}: a known panel finish`);
@@ -502,7 +504,10 @@ test('Machined lights the knob cap and the button face, and the build bakes both
   const built = JSON.parse(serializePanel(panel, { bakeControlSet: controlSetForPanel(panel), elide: false }));
   const [builtKnob, builtButton] = built.controls;
   assert.equal(part(builtKnob, 'bodyCap').visible, true);
-  assert.equal(part(builtKnob, 'bodyCap')._children.Background._children.Fill.colour, 'FFA2A7AE', 'a literal, not a reference');
+  // Machined's knob is the vernier, drawn as parts (models/knobFormParts.js): its cap is the dark
+  // turning centre, the set's track colour, baked as a literal.
+  assert.equal(part(builtKnob, 'bodyCap')._children.Background._children.Fill.colour, resolveToken('control.track', machined), 'a literal, not a reference');
+  assert.equal(part(builtKnob, 'bodyHousing').visible, true, 'on a bright housing');
   // The button is the aluminium design: a turned face (a gradient), a bevelled edge, baked as
   // literals like everything else.
   assert.equal(builtButton._children.Background._children.Fill.gradientEnabled, true);

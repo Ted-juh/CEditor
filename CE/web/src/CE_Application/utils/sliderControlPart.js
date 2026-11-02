@@ -38,7 +38,7 @@ export const SLIDER_CONTROL_KIND = 'slidercontrol';
  * as parts of their own. CanvasControl skips these; any other visible part it draws on top.
  */
 export const SLIDER_SEMANTIC_PARTS = new Set([
-  'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker', 'bodyCap',
+  'bodyHousing', 'bodyTrackBase', 'bodyTrackFill', 'bodySelectedRange', 'bodyCenterMarker', 'bodyCap',
   'pointerStart', 'pointerCurrent', 'pointerEnd',
   'tickMajor', 'tickMinor', 'tickAccent',
   'labelMin', 'labelMax', 'labelStart', 'labelCurrent', 'labelEnd', 'labelValue', 'labelTitle', 'labelUnit',

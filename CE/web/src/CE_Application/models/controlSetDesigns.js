@@ -425,7 +425,7 @@ export const EDITOR_PATHS = [
   /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
-  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement)$/,
+  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit)$/,
   /^Text\.Fill\.colour$/,
   /^Text\.Font\.(family|weight|weightValue|letterSpacing)$/,
   /^Text\.Effects\.(shadowEnabled|shadowStyle|shadowOffsetX|shadowOffsetY|shadowBlur|shadowColour|glowEnabled|glowSize|glowIntensity|glowColour)$/,
@@ -433,6 +433,8 @@ export const EDITOR_PATHS = [
   /^States\.Selected$/,
   // The part-level keys the Slider editor's Cap select, Cap Finish strip and tick style write.
   /^(kind|grooveColour|plateColour|sheen|shadow|glow|slot|inset)$/,
+  // A knob's cap and housing outline (utils/knobOutlines.js), the knob forms as parts.
+  /^(outline|outlineCount|outlineDepth|outlineRotation|turns)$/,
   /^Listbox\.(cardRows|rowHeight|selectionStyle|zebra|accentColour)$/,
   /^TabContainer\.(appearance|accentColour|stripColour|tabColour|activeTabColour|labelColour|activeLabelColour)$/,
   /^ScrollArea\.(scrollbarSize|trackColour|thumbColour)$/,

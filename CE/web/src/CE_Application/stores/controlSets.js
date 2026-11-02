@@ -22,6 +22,7 @@ import { controlSetLibrary, carryControlSetInDocument, documentControlSets } fro
 import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
 import { applyControlSetChoices } from '../utils/controlSetApply.js';
 import { ownLookControl, resetToSetPatch } from '../models/controlSetOwnership.js';
+import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../models/knobFormParts.js';
 import { applyControlPatchesById, replaceControlsById } from './controls.js';
 import { findControlById } from '../utils/containment.js';
 import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
@@ -158,5 +159,30 @@ export function resetControlLookToSet(ids, paths = null) {
     if (Object.keys(patch).length) patches.set(id, patch);
   }
   applyControlPatchesById(patches, context.panel.id);
+  return patches.size;
+}
+
+/**
+ * Draw `form` on the knobs `ids` with their own parts (models/knobFormParts.js) rather than by name:
+ * what choosing a form that is parts now does, and Convert to Parts on a knob that names one. The
+ * values are pinned, so the panel's set does not draw over those equal to a knob's factory values.
+ * One store write, one undo step. Returns how many knobs changed.
+ */
+export function applyKnobFormAsParts(ids, form) {
+  if (!KNOB_FORMS_AS_PARTS.includes(String(form ?? ''))) return 0;
+  const context = activePanelAndSet();
+  if (!context) return 0;
+  const recipe = knobFormFamily(form, { ink: '{text.primary}', divisions: 12 });
+  const patches = new Map();
+  for (const id of ids ?? []) {
+    const control = findControlById(context.panel.controls, id);
+    if (control?._children?.Core?.controlType !== 'Knob') continue;
+    const patch = { 'Core.controlForm': '', ...recipe.component };
+    for (const [part, values] of Object.entries(recipe.parts)) {
+      for (const [path, value] of Object.entries(values)) patch[`Parts.${part}.${path}`] = value;
+    }
+    patches.set(id, patch);
+  }
+  applyControlPatchesById(patches, context.panel.id, { pin: true });
   return patches.size;
 }

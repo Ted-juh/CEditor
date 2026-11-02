@@ -108,10 +108,18 @@ test('the designed Graphite is Graphite: its colours, lettering, lamp, buttons a
 
 test('it draws the knob and the meter Graphite\'s starter already drew with', () => {
   const starter = createControlSetStarter('graphite');
-  const starterForm = (type) => starter.controls.find((c) => c._children.Core.controlType === type)._children.Core.controlForm;
-  for (const type of ['Knob', 'Meter']) {
-    assert.ok(starterForm(type), `the starter draws a ${type} form`);
-    assert.equal(form(type, designed), starterForm(type), type);
+  const starterControl = (type) => starter.controls.find((c) => c._children.Core.controlType === type);
+  // The meter is still a form, the same one.
+  assert.ok(starterControl('Meter')._children.Core.controlForm, 'the starter draws a Meter form');
+  assert.equal(form('Meter', designed), starterControl('Meter')._children.Core.controlForm);
+  // The knob is Graphite's flat disc, drawn as the knob's parts in both (models/knobFormParts.js).
+  const knobPart = (control, name) => control._children.Parts._children[name];
+  const designedKnob = resolveControlForSet(createControl('Knob'), designed);
+  for (const knob of [starterControl('Knob'), designedKnob]) {
+    assert.equal(knob._children.Core.controlForm || '', '', 'no form');
+    assert.equal(knobPart(knob, 'bodyCap').visible, true, 'a disc');
+    assert.equal(knobPart(knob, 'pointerCurrent').kind, 'line', 'a bar for a pointer');
+    assert.equal(knobPart(knob, 'bodyTrackFill').visible, true, 'the value as an arc');
   }
 });
 

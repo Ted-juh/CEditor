@@ -85,6 +85,21 @@ export function createSliderSemanticParts() {
   return {
     _type: 'Parts',
     _children: {
+      // A knob's HOUSING — a plate under everything else: the skirt round a console knob, the
+      // octagon of a lens, the ring of an open glass halo. Off by default, like the cap below, so
+      // every knob that exists draws as it did. Width and height are a percentage of the track's
+      // radius, as the cap's are. Its `outline` and the cap's (circle, polygon, scallop, flutes,
+      // ring; utils/knobOutlines.js) are what the control forms drew in code
+      // (docs/design/changeable-control-sets.md, piece B). Circular geometry only.
+      bodyHousing: createPartNode('bodyHousing', {
+        role: 'bodyHousing',
+        zIndex: 0,
+        visible: false,
+        layout: { width: 100, height: 100, widthUnit: 'percent', heightUnit: 'percent' },
+        sections: {
+          Background: backgroundFill('{control.track}', { radius: 999 }),
+        },
+      }),
       bodyTrackBase: createPartNode('bodyTrackBase', {
         role: 'bodyTrackBase',
         zIndex: 0,
