@@ -36,6 +36,10 @@
     ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'],
     ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'], ['Label', 'Labels'],
   ];
+  // What the Library's cards show of each set: one kind of control at a time, chosen above them.
+  const CARD_FAMILIES = [
+    ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'], ['ToggleButton', 'Switches'], ['Meter', 'Meters'], ['DrumPads', 'Pads'],
+  ];
   const DESIGN_SOURCES = PHYSICAL_DIRECTIONS.map((entry) => getControlSet(entry.id)).filter(Boolean);
 
   // Opens on the set the panel uses: it opened on the default for new panels, so the Library always
@@ -54,6 +58,7 @@
   // The mechanisms fold away by default: twelve odd ones out, opened when wanted.
   let folded = $state(new Set(['mechanical']));
   let previewWidth = $state(376);
+  let cardFamily = $state('Knob');
   let importGeneration = 0;
 
   onDestroy(() => { importGeneration += 1; });
@@ -250,6 +255,11 @@
   <aside class="column library" aria-label="Control set library">
     <header><strong>Library</strong><button class="icon" title="New control set" aria-label="Create control set" onclick={createSet}><Plus size={15} /></button></header>
     <input class="search" type="search" placeholder="Search sets…" aria-label="Search control sets" bind:value={query} />
+    <div class="card-families" role="group" aria-label="What the cards show">
+      {#each CARD_FAMILIES as [family, label] (family)}
+        <button type="button" class:on={cardFamily === family} aria-pressed={cardFamily === family} data-card-family={family} onclick={() => cardFamily = family}>{label}</button>
+      {/each}
+    </div>
     <div class="scroll">
       {#each groups as group (group.id)}
         {@const open = query.trim() !== '' || !folded.has(group.id)}
@@ -263,12 +273,12 @@
               {#each group.eras as era (era.label)}
                 <div class="era">{era.label}</div>
                 <div class="cards">
-                  {#each era.sets as set (set.id)}<ControlSetCard {set} active={selectedId === set.id} onPanel={panelSetId === set.id} onselect={choose} />{/each}
+                  {#each era.sets as set (set.id)}<ControlSetCard {set} family={cardFamily} active={selectedId === set.id} onPanel={panelSetId === set.id} onselect={choose} />{/each}
                 </div>
               {/each}
             {:else}
               <div class="cards">
-                {#each group.sets as set (set.id)}<ControlSetCard {set} active={selectedId === set.id} onPanel={panelSetId === set.id} onselect={choose} />{/each}
+                {#each group.sets as set (set.id)}<ControlSetCard {set} family={cardFamily} active={selectedId === set.id} onPanel={panelSetId === set.id} onselect={choose} />{/each}
               </div>
             {/if}
           {/if}
@@ -399,6 +409,9 @@
   button.icon { padding:4px 6px; }
 
   .search { margin:8px 10px 4px; }
+  .card-families { display:flex; flex-wrap:wrap; gap:3px; padding:2px 10px 4px; }
+  .card-families button { flex:1 1 auto; padding:3px 5px; border-radius:11px; border-color:#3a3a3a; background:#202020; color:#bbb; font-size:10px; }
+  .card-families button.on { background:#094771; border-color:#0B6EB5; color:#fff; }
   .group-head { width:100%; justify-content:flex-start; gap:5px; padding:7px 10px 3px; border:none; border-radius:0; background:none; color:#6FA8C7; font-size:9.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
   .group-head[aria-expanded='false'] { color:#8a8a8a; }
   .group-head small { margin-left:auto; color:#777; font-weight:600; letter-spacing:0; }

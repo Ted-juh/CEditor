@@ -1,8 +1,9 @@
 <script>
   /**
-   * One set in the Library of Settings › Control Sets: its own knob, drawn by the canvas's renderer
-   * (EffectPreview) straight on the set's panel colour, and its name. The Library was a strip of
-   * names; a knob tells sets apart at a glance. With 79 built-ins, a card draws its knob only once it
+   * One set in the Library of Settings › Control Sets: one of its controls, drawn by the canvas's
+   * renderer (EffectPreview) straight on the set's panel colour, and its name. The Library was a
+   * strip of names; a control tells sets apart at a glance. Which control is the Library's choice
+   * (its family buttons: a knob, a slider, a button…). With 79 built-ins, a card draws only once it
    * has been scrolled into view.
    */
   import { onDestroy } from 'svelte';
@@ -12,7 +13,13 @@
   import { resolveToken } from '../models/controlSets.js';
   import { aarrggbbToHex } from '../utils/colourHex.js';
 
-  let { set = null, active = false, onPanel = false, onselect = () => {} } = $props();
+  let { set = null, family = 'Knob', active = false, onPanel = false, onselect = () => {} } = $props();
+
+  // The size each kind is drawn at (about what a set's starter panel gives it), and the room it gets
+  // on the card: every card is the same height, whatever it shows.
+  const DRAWN = {
+    Knob: [84, 84], Slider: [170, 56], Button: [116, 76], ToggleButton: [124, 76], Meter: [240, 72], DrumPads: [228, 206],
+  };
 
   let element = $state(null);
   let seen = $state(false);
@@ -31,7 +38,8 @@
   let knob = $derived.by(() => {
     if (!seen || !set) return null;
     try {
-      const control = createControl('Knob', { Core: { controlSetId: set.id }, Transform: { x: 0, y: 0, width: 84, height: 84 } });
+      const [width, height] = DRAWN[family] ?? DRAWN.Knob;
+      const control = createControl(DRAWN[family] ? family : 'Knob', { Core: { controlSetId: set.id }, Transform: { x: 0, y: 0, width, height } });
       return resolveControlForSet(control, set);
     } catch {
       return null;
@@ -43,7 +51,7 @@
 <button type="button" class="set-card" class:active bind:this={element} style:--card-panel={panelColour}
         title={set?.description ?? set?.name ?? ''} onclick={() => onselect(set?.id)} data-set-card={set?.id}>
   <span class="knob">
-    {#if knob}<EffectPreview control={knob} boxWidth={64} boxHeight={64} maxScale={1} />{/if}
+    {#if knob}<EffectPreview control={knob} boxWidth={88} boxHeight={64} maxScale={1} />{/if}
   </span>
   <b>{set?.name ?? ''}</b>
   {#if onPanel}<i>on panel</i>{/if}
@@ -57,7 +65,7 @@
   }
   .set-card:hover { border-color: #5b9bd5; }
   .set-card.active { border-color: #2a8fd6; box-shadow: 0 0 0 2px rgba(42, 143, 214, 0.45); }
-  .knob { width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; }
+  .knob { width: 88px; max-width: 100%; height: 64px; display: flex; align-items: center; justify-content: center; }
   b {
     max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
     font-size: 10.5px; font-weight: 600; padding: 1px 5px; border-radius: 3px;
