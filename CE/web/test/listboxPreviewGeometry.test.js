@@ -22,6 +22,6 @@ test('touch-encoder list rows use drawn geometry for scrolling and picking', () 
 test('native preview resolves Listbox geometry with the same control set as its renderer', () => {
   const source = readFileSync(new URL('../src/CE_Application/editor/PanelPreviewSurface.svelte', import.meta.url), 'utf8');
   const helper = source.slice(source.indexOf('function lbControl(control)'), source.indexOf('function handleListboxFilterInput'));
-  assert.match(helper, /resolveControlForSet\(resolvedPreviewFor\(control\)\?\.control \?\? control, controlSetForPanel\(panel\)\)/);
+  assert.match(helper, /resolveControlForSet\(resolvedPreviewFor\(control\)\?\.control \?\? control, controlSetForPanel\(panel\), panelSetSources\(\)\)/);
   assert.match(helper, /dependentControl\(drawn,/);
 });

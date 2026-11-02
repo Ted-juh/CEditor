@@ -196,8 +196,8 @@ export function familyPatchFor(set, controlType) {
  * the values written may still be references; run resolveControlTokens after (or use
  * resolveControlForSet, which does both).
  */
-export function resolveControlFamily(control, set) {
-  set = controlSetForControl(control, set);
+export function resolveControlFamily(control, set, sources = {}) {
+  set = controlSetForControl(control, set, sources);
   return withSetVoices(patchFamily(control, set), set);
 }
 
@@ -277,14 +277,20 @@ function withSetVoices(control, set) {
  * may write token references), then the colour tokens. This is what the canvas draws, what the
  * build bakes, and what a script reads.
  */
-export function resolveControlForSet(control, set) {
-  set = controlSetForControl(control, set);
+export function resolveControlForSet(control, set, sources = {}) {
+  set = controlSetForControl(control, set, sources);
   return resolveControlTokens(resolveControlFamily(control, set), set);
 }
 
-/** A built-in design pinned to an individual control survives copying into another panel. */
-export function controlSetForControl(control, panelSet) {
-  return getControlSet(control?._children?.Core?.controlSetId) ?? panelSet;
+/**
+ * The set a control is drawn with: the one pinned to it (Core.controlSetId), else the panel's. A
+ * pin is looked up where getControlSet looks, `sources` being the panel's own sets and the
+ * library: a control pinned to a set of your own (as the Apply window pins what is not to change)
+ * looked among the built-ins only, and took the panel's set after all. A built-in pin survives
+ * copying into another panel either way.
+ */
+export function controlSetForControl(control, panelSet, sources = {}) {
+  return getControlSet(control?._children?.Core?.controlSetId, sources) ?? panelSet;
 }
 
 /**
@@ -295,10 +301,11 @@ export function controlSetForControl(control, panelSet) {
  * references the control itself holds are left as they are — the colour fields already show those
  * with the token's name. Copy-on-write: a control the set says nothing about comes back as itself.
  */
-export function drawnForInspector(control, set) {
+export function drawnForInspector(control, set, sources = {}) {
+  set = controlSetForControl(control, set, sources);
   const drawn = resolveControlFamily(control, set);
   if (drawn === control) return control;
-  const family = familyPatchFor(controlSetForControl(control, set), control?._children?.Core?.controlType);
+  const family = familyPatchFor(set, control?._children?.Core?.controlType);
   const paths = [
     ...Object.keys(family?.component ?? {}),
     ...Object.entries(family?.parts ?? {}).flatMap(([part, patch]) => Object.keys(patch ?? {}).map((path) => `Parts.${part}.${path}`)),
@@ -307,7 +314,7 @@ export function drawnForInspector(control, set) {
   for (const path of paths) {
     const value = readControlPath(out, path);
     if (typeof value !== 'string' || !isTokenReference(value) || readControlPath(control, path) === value) continue;
-    out = writeControlPath(out, path, resolveColourValue(value, controlSetForControl(control, set)));
+    out = writeControlPath(out, path, resolveColourValue(value, set));
   }
   return out;
 }

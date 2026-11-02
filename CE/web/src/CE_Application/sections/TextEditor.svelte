@@ -24,7 +24,7 @@
   import { selectedComponentIds } from '../stores/panels.js';
   import { fontChoices, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
-  import { activeControlSet } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
   import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import AlignmentPicker from '../properties/AlignmentPicker.svelte';
@@ -162,7 +162,7 @@
   let textFillToken = $derived(tokenNameOf(textFill?.colour));
   // And where the set's family patch draws the lettering instead, show that: utils/setSwatchValue.js.
   let documentControl = $derived($selectedControls.find((c) => c?._children?.Core?.id === core?.id) ?? null);
-  let setTextFill = $derived(effectiveSwatchColour(documentControl, $activeControlSet, `${textPathPrefix}.Fill.colour`, textFill?.colour ?? 'FFFFFFFF'));
+  let setTextFill = $derived(effectiveSwatchColour(documentControl, $activeControlSet, `${textPathPrefix}.Fill.colour`, textFill?.colour ?? 'FFFFFFFF', $controlSetSources));
   let displayTextFillColour = $derived(setTextFill?.fromSet ? setTextFill.value.slice(-6) : resolveColourLiteral(textFill?.colour ?? 'FFFFFFFF', $activeControlSet, 'FFFFFFFF').slice(-6));
 
   $effect(() => {

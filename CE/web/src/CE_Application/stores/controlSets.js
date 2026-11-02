@@ -18,16 +18,22 @@
 
 import { derived, get, writable } from 'svelte/store';
 import { activePanel, panels, updatePanel } from './panels.js';
-import { controlSetLibrary, carryControlSetInDocument } from './controlSetLibrary.js';
+import { controlSetLibrary, carryControlSetInDocument, documentControlSets } from './controlSetLibrary.js';
 import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
 import { applyControlSetChoices } from '../utils/controlSetApply.js';
 import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
 
-export { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
+export { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../models/controlSets.js';
 
 export const activeControlSet = derived(
   [activePanel, controlSetLibrary],
   ([$panel, $library]) => controlSetForPanel($panel, $library),
+);
+
+/** Where a set pinned to one control of the active panel is found: its own sets, then the library. */
+export const controlSetSources = derived(
+  [documentControlSets, controlSetLibrary],
+  ([$document, $library]) => ({ document: $document, library: $library }),
 );
 
 /**

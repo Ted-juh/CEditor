@@ -14,14 +14,15 @@ import { controlSetForControl, readControlPath, resolveControlForSet } from '../
 
 const resolvedBySet = new WeakMap();
 
-function resolvedFor(control, set) {
+function resolvedFor(control, set, sources) {
   let bySet = resolvedBySet.get(control);
   if (!bySet) {
     bySet = new Map();
     resolvedBySet.set(control, bySet);
   }
-  const key = set ?? null;
-  if (!bySet.has(key)) bySet.set(key, resolveControlForSet(control, controlSetForControl(control, set)));
+  const drawnWith = controlSetForControl(control, set, sources);
+  const key = drawnWith ?? null;
+  if (!bySet.has(key)) bySet.set(key, resolveControlForSet(control, drawnWith));
   return bySet.get(key);
 }
 
@@ -36,11 +37,11 @@ const canonical = (value) => {
  * `shown` is the value the editor passed: when it is not the document's own value at that path
  * (the inspector is showing a state's value), it is left alone. Returns null to leave it alone.
  */
-export function effectiveSwatchColour(control, set, path, shown) {
+export function effectiveSwatchColour(control, set, path, shown, sources = {}) {
   if (!control || !path) return null;
   const stored = readControlPath(control, path);
   if (stored !== undefined && canonical(stored) !== canonical(shown)) return null;
-  const drawn = readControlPath(resolvedFor(control, set), path);
+  const drawn = readControlPath(resolvedFor(control, set, sources), path);
   if (typeof drawn !== 'string' || !HEX.test(drawn.trim())) return null;
   return { value: canonical(drawn), fromSet: canonical(drawn) !== canonical(stored ?? shown) };
 }

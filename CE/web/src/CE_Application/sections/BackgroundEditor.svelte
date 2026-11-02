@@ -10,7 +10,7 @@
   import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
-  import { activeControlSet } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
   import { resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { ensureFillGradientSeeded, openFillGradientEditor } from '../stores/gradientTarget.js';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -381,7 +381,7 @@
   // And where the set's family patch draws this fill instead (a section's surface, a display's
   // bezel), show that, as the canvas does: utils/setSwatchValue.js.
   let documentControl = $derived($selectedControls.find((c) => c?._children?.Core?.id === core?.id) ?? null);
-  let setFill = $derived(effectiveSwatchColour(documentControl, $activeControlSet, `${pathPrefix}.Fill.colour`, fill?.colour));
+  let setFill = $derived(effectiveSwatchColour(documentControl, $activeControlSet, `${pathPrefix}.Fill.colour`, fill?.colour, $controlSetSources));
   let displayColour = $derived(setFill?.fromSet ? setFill.value.slice(-6) : resolveColourLiteral(fill?.colour, $activeControlSet, 'FF3A3A3A').slice(-6));
   let gradientPreview = $derived(gradientToCSS(fill?.gradient ?? DEFAULT_FILL_GRADIENT));
 </script>

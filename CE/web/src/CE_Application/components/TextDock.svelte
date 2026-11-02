@@ -1,6 +1,6 @@
 <script>
   import { drawnForInspector } from '../models/controlSetFamilies.js';
-  import { activeControlSet } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
   import { setContext } from 'svelte';
   import { writable } from 'svelte/store';
   import Pin from 'lucide-svelte/icons/pin';
@@ -22,7 +22,7 @@
     : flatControls(panel?.controls ?? []).find((item) => item._children?.Core?.id === $textDockState.pinnedId));
   // What is drawn: the set's value where it decides one (models/controlSetFamilies.js drawnForInspector).
   let control = $derived(drawnForInspector(resolveStateScopedControl(rawControl,
-    $stateEditScope.mode === 'state' ? $stateEditScope.stateName : ''), $activeControlSet));
+    $stateEditScope.mode === 'state' ? $stateEditScope.stateName : ''), $activeControlSet, $controlSetSources));
   let core = $derived(getSection(control, 'Core'));
   let hasText = $derived(!!getSection(control, 'Text'));
   let group = $derived($textDockState.group);

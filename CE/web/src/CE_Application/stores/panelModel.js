@@ -183,7 +183,7 @@ export function serializePanel(panel, options = {}) {
   // resolve against. A saved .cepanel passes none and keeps its references and its `controlSet`,
   // which is what lets the set be switched later.
   const baked = options.bakeControlSet
-    ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet))
+    ? controls.map((control) => resolveControlForSet(control, options.bakeControlSet, { document: data.controlSets }))
     : controls;
   data.controls = elide ? baked.map((control) => toDocumentForm(control)) : baked.map(shrinkAuthoredParts);
   // A saved document writes each drawing more than one control uses once, beside the controls

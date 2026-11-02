@@ -2,7 +2,7 @@
   import { colorTarget, activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { selectedControls } from '../stores/controls.js';
-  import { activeControlSet } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
   import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
 
   // A control's colours as one row of captioned mini-swatches — the panel's
@@ -22,7 +22,7 @@
   let shown = $derived(swatches.map((s) => {
     if (s.target?.type !== 'control') return { ...s, fromSet: false };
     const control = $selectedControls.find((c) => c?._children?.Core?.id === s.target.controlId);
-    const effective = effectiveSwatchColour(control, $activeControlSet, s.target.path, s.value);
+    const effective = effectiveSwatchColour(control, $activeControlSet, s.target.path, s.value, $controlSetSources);
     return effective ? { ...s, value: effective.value, fromSet: effective.fromSet } : { ...s, fromSet: false };
   }));
 

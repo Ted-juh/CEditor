@@ -37,7 +37,7 @@
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Image from 'lucide-svelte/icons/image';
   import { selectedControl, selectedControls, getSection, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty, applyControlPatchesById, renameControl } from '../stores/controls.js';
-  import { activeControlSet } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
   import { drawnForInspector } from '../models/controlSetFamilies.js';
   import { stateEditScope } from '../stores/stateEditScope.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
@@ -62,6 +62,7 @@
     $stateEditScope?.mode === 'state' && $stateEditScope.stateName
       ? resolveStateScopedControl(control, $stateEditScope.stateName) : control,
     $activeControlSet,
+    $controlSetSources,
   ));
   let text = $derived(getSection(textControl, 'Text'));
   let textFill = $derived(text?._children?.Fill ?? null);

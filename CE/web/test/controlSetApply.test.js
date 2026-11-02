@@ -108,6 +108,37 @@ test('the store applies in one write, carries a library set, and clears what the
   }
 });
 
+test('a control pinned to a set of your own keeps it: in the editor, the plug-in and the export', async () => {
+  // The Apply window pins what is not to change to the set it was drawn with. A pin was looked up
+  // among the built-ins only, so a panel on one of your own sets lost it: the knobs left unticked
+  // took the new set after all.
+  const { controlSetForControl, resolveControlForSet } = await import('../src/CE_Application/models/controlSetFamilies.js');
+  const { serializePanel } = await import('../src/CE_Application/stores/panelModel.js');
+  const mine = { ...getControlSet('tolex'), id: 'my-amp', name: 'My Amp', tokens: { ...getControlSet('tolex').tokens, accent: 'FF12AB34' } };
+  panels.set([samplePanel({ controlSet: { id: 'my-amp' }, controlSets: [mine] })]);
+  try {
+    applyControlSetWithChoices('panel-apply', 'graphite-studio', { families: new Set(['Sliders']) });
+    const panel = get(panels)[0];
+    const knob = panel.controls.find((entry) => entry._children.Core.id === 'k1');
+    assert.equal(knob._children.Core.controlSetId, 'my-amp');
+    const panelSet = getControlSet('graphite-studio');
+    assert.equal(controlSetForControl(knob, panelSet, { document: panel.controlSets }).id, 'my-amp', 'found among the panel\'s own sets');
+    assert.equal(controlSetForControl(knob, panelSet, { library: [mine] }).id, 'my-amp', 'and in the library');
+    assert.equal(controlSetForControl(knob, panelSet).id, 'graphite-studio', 'without them, the panel\'s set, as before');
+    const drawn = resolveControlForSet({ ...knob, _children: { ...knob._children, Core: { ...knob._children.Core, controlColour: '{accent}' } } }, panelSet, { document: panel.controlSets });
+    assert.equal(drawn._children.Core.controlColour, 'FF12AB34', 'drawn with its own set\'s colours');
+    // The build bakes each control against its own set, from the sets the document carries.
+    const exported = JSON.parse(serializePanel({ ...panel, controls: [{ ...knob, _children: { ...knob._children, Core: { ...knob._children.Core, controlColour: '{accent}' } } }] }, { bakeControlSet: panelSet, elide: false }));
+    assert.equal(exported.controls[0]._children.Core.controlColour, 'FF12AB34');
+  } finally {
+    panels.set([]);
+  }
+  const canvas = source('editor/CanvasControl.svelte');
+  assert.match(canvas, /controlSetForControl\(documentControl,[\s\S]*?contextSetSources\(\) : \$controlSetSources\)\)/);
+  const preview = source('editor/PanelPreviewSurface.svelte');
+  assert.match(preview, /setContext\(CONTROL_SET_SOURCES_CONTEXT_KEY, panelSetSources\)/);
+});
+
 test('the Library is grouped: the panel\'s set, your own, materials, mechanisms, templates by era', () => {
   const mine = [{ id: 'my-set', name: 'My Set' }];
   const groups = groupControlSets({ librarySets: mine, builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'kiln' });

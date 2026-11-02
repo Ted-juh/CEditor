@@ -9,7 +9,7 @@
    *   control     — $selectedControl (only used when contextMode is 'component')
    *   fallbackLabel — human label for the placeholder
   */
-  import { activeControlSet } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
   import { drawnForInspector } from '../models/controlSetFamilies.js';
   import { setContext } from 'svelte';
   import { isStateScopableTabId } from '../utils/stateTargets.js';
@@ -40,9 +40,9 @@
   // Writes still go to the document through the store, which pins an author's return to the
   // factory value against the set. Tabs that edit structure rather than appearance see the control
   // as stored.
-  let drawnControl = $derived(contextMode === 'component' && control ? drawnForInspector(control, $activeControlSet) : control);
+  let drawnControl = $derived(contextMode === 'component' && control ? drawnForInspector(control, $activeControlSet, $controlSetSources) : control);
   let drawnEditorControl = $derived(
-    contextMode === 'component' && editorControl ? drawnForInspector(editorControl, $activeControlSet) : editorControl,
+    contextMode === 'component' && editorControl ? drawnForInspector(editorControl, $activeControlSet, $controlSetSources) : editorControl,
   );
 
   let editorProps = $derived.by(() => {

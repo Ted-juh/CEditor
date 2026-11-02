@@ -405,6 +405,9 @@ export const CONTROL_SET_CONTEXT_KEY = 'ce.controlSet';
 // And the set's lamp, for the material filters (utils/materialFilter.js): CanvasControl and the
 // panel surfaces provide it, MaterialFilter reads it. A getter as well.
 export const CONTROL_SET_LAMP_CONTEXT_KEY = 'ce.controlSetLamp';
+// And where a set pinned to one control is looked up, `{ document, library }` (getControlSet): the
+// panel's own sets, and in the editor the library. A getter as well.
+export const CONTROL_SET_SOURCES_CONTEXT_KEY = 'ce.controlSetSources';
 export const BASE_CONTROL_SET = BUILT_IN_CONTROL_SETS.find((set) => set.id === DEFAULT_CONTROL_SET_ID);
 
 const SETS_BY_ID = new Map(BUILT_IN_CONTROL_SETS.map((set) => [set.id, set]));

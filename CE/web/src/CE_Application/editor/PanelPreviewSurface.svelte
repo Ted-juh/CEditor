@@ -7,7 +7,7 @@
   import { hostWindowShown } from '../stores/hostWindow.js';
   import { onDestroy, setContext, untrack, tick } from 'svelte';
   import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
-  import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
   import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -345,6 +345,10 @@
   // than the editor's store because the Player renders a document the editor's panel list has
   // never seen — CanvasControl prefers this when present (stores/controlSets.js).
   setContext(CONTROL_SET_CONTEXT_KEY, () => controlSetForPanel(panel));
+  // A set pinned to one control is looked up among the panel's own sets too (the Player has no
+  // library: a set the panel uses is carried in the document).
+  const panelSetSources = () => ({ document: panel?.controlSets ?? [] });
+  setContext(CONTROL_SET_SOURCES_CONTEXT_KEY, panelSetSources);
   // The set's lamp, for every material filter on this panel; and the set's own material for the
   // panel behind the controls (a black tolex, a bead-blasted plate), lit by the same lamp.
   setContext(CONTROL_SET_LAMP_CONTEXT_KEY, () => controlSetForPanel(panel)?.lamp ?? null);
@@ -691,7 +695,7 @@
     // replace a State — a toggle with a lamp keeps its body when checked — and a state that was
     // already applied to the document's control is a state the set can no longer change. Tokens
     // are resolved later, in CanvasControl, as they are for every control.
-    const control = applyDeviceSyncStatus(applySectionValues(resolveControlFamily(rawControl, controlSetForPanel(panel)), previewOverrides?.sectionValues));
+    const control = applyDeviceSyncStatus(applySectionValues(resolveControlFamily(rawControl, controlSetForPanel(panel), panelSetSources()), previewOverrides?.sectionValues));
     // shareUnchanged: what the resolution leaves as it was stays the control's own shared, frozen
     // objects (interactionRuntime.js, reshareUnchanged), not a copy each for as long as it is drawn;
     // the value sources below copy what they change.
@@ -4318,7 +4322,7 @@
     return String(control?._children?.Core?.controlType ?? '') === 'DrumPads';
   }
   function drumGeomFor(control) {
-    const drawing = resolveControlFamily(control, controlSetForPanel(panel));
+    const drawing = resolveControlFamily(control, controlSetForPanel(panel), panelSetSources());
     const t = drawing?._children?.Transform ?? {};
     const headerH = drumConfig(drawing).showHeader !== false ? 22 : 0;
     return drumGeometry(numberOr(t.width, 0), numberOr(t.height, 0),
@@ -6260,7 +6264,7 @@
   // listbox row/hit-test read should go through this so it matches the renderer.
   function lbControl(control) {
     // Match CanvasControl: control-set font/row styling changes list geometry.
-    const drawn = resolveControlForSet(resolvedPreviewFor(control)?.control ?? control, controlSetForPanel(panel));
+    const drawn = resolveControlForSet(resolvedPreviewFor(control)?.control ?? control, controlSetForPanel(panel), panelSetSources());
     return dependentControl(drawn, sessionFor(control)?.dependsParentValue);
   }
   function handleListboxFilterInput(control, event) {

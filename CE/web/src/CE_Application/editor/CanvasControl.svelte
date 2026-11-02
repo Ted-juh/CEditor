@@ -151,7 +151,7 @@
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext, untrack } from 'svelte';
-  import { activeControlSet, CONTROL_SET_CONTEXT_KEY } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
   import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
   import { macroGeometry, macroValue } from '../utils/macroLayout.js';
@@ -248,7 +248,10 @@
   // editor canvas takes the active panel's. Copy-on-write, so a control without references is
   // the same object it always was.
   const contextControlSet = getContext(CONTROL_SET_CONTEXT_KEY) ?? null;
-  let controlSet = $derived(controlSetForControl(documentControl, typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet));
+  const contextSetSources = getContext(CONTROL_SET_SOURCES_CONTEXT_KEY) ?? null;
+  let controlSet = $derived(controlSetForControl(documentControl,
+    typeof contextControlSet === 'function' ? contextControlSet() : $activeControlSet,
+    typeof contextSetSources === 'function' ? contextSetSources() : $controlSetSources));
   // The set's series of voices, for the instruments that colour lanes and nodes from a palette
   // rather than from one property each (Macro, Orbit, Timbre, Constraint). Graphite's series is
   // their old built-in palette, and a set that names none falls back to it.
