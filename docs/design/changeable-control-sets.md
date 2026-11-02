@@ -1,6 +1,8 @@
 # Changeable control sets: what it takes
 
-Status: proposal, 2026-11-02. Nothing here is built yet, except the pin fix under Findings 8.
+Status: proposal, 2026-11-02; the owner's decisions are under Decisions. Built so far: the pin fix
+(Findings 8) and the logic of piece A (`models/controlSetOwnership.js`); its inspector side waits on
+its mock-up.
 
 ## The principle
 
@@ -203,6 +205,104 @@ Image controls (imported strips, KnobMan or Blender renders, vendor packs) in a 
 own in the Library, marked for what they cannot do. They use the filmstrip support that exists. A
 tint per part (hue, brightness) is the one cheap kind of change they can take.
 
+## Bringing designs in: Photoshop and Blender
+
+The owner: "Call it KnobMan on steroids but without the filmstrips. The usage of filmstrips is for
+those that WANT to use Photoshop/Blender etc. OR we must make it easy to import Blender files that
+convert it (without loss of look/design) into a customisable component in layers."
+
+KnobMan builds a knob from layered primitives with lighting effects and writes a filmstrip. CEditor
+can do the same composition and keep it: the layers stay layers, drawn live, so nothing has to be
+written out and nothing is frozen. Pieces B and E are that, for designs made in CEditor. The
+question here is designs made elsewhere.
+
+### What "without loss" can and cannot mean
+
+A Blender knob is geometry, materials and lights, path-traced into pixels. Pixels reproduce that
+look exactly, but only for the view, the light and the colours they were rendered with. Anything
+that changes after the render (a colour, the light, the shape) has to be either worked out from what
+the render recorded, or rendered again. So the two wishes, the exact look and every change, are met
+in levels: the more of the scene comes across, the more can change, and the more CEditor has to
+draw itself.
+
+### Level 0: a picture or a filmstrip (exists)
+
+An image or a strip of frames, from anywhere. Exact, and fixed: size, timing and which value drives
+it, nothing else (F).
+
+### Level 1: layers rendered by Blender (recommended first)
+
+A small add-on for Blender, shipped with CEditor and installed once in Blender's preferences. The
+author names the objects as the SVG and PSD importers already ask (`cap`, `pointer` turn with the
+value; `fader` moves with it; `lamp` lights with a state; everything else stays still), and the
+add-on renders from a camera that matches CEditor's (straight above, the light where a set's lamp
+is) the render passes Cycles already makes, per object:
+
+- **colour**: the object's own colour, with no light on it;
+- **light** and **reflections**: what the lights and the room do to it;
+- **shadow** on the panel, from a shadow catcher, and **occlusion** where parts meet;
+- **emission**, for lamps and lit legends.
+
+It writes them as one file of PNG layers and a manifest, and CEditor imports it into the Component
+Designer as an ordinary component: the layers stacked with their blend modes (colour times light,
+plus reflections, the shadow multiplied onto whatever panel it sits on), the turning objects bound
+to the value, and CEditor's own vector layers on top for the scale, the legends, the value arc and
+the readout.
+
+- **Lossless where it can be**: added back together, the passes are Blender's render, to within the
+  rounding of 8-bit images (they are made to add up; it is how compositing works in Blender).
+- **Changeable**: each object's colour (its colour layer is retinted; its light and reflections are
+  untouched, so a red cap is lit exactly as the grey one was); which objects turn or move, and how
+  far; size; hiding, swapping or combining objects from several imported knobs; everything CEditor
+  draws on top, with bipolar, ranges and text; behaviour; and the panel colour under the shadow.
+- **Not changeable in CEditor**: the 3D shape and the direction of the light. The add-on keeps the
+  scene, so changing them is a re-render and a re-import that keeps what was set in CEditor.
+- **Round and not round**: a round object's light does not change as it turns (its knurls and
+  flutes repeat all the way round), so one image turns while its light stays still, the classic
+  trick done right. An object that is not round (a chicken-head) is rendered at each position, its
+  passes still separate: a filmstrip for that one object, whose colour can still be changed.
+- **Metals**: a coloured metal reflects in its own colour. A retinted colour layer approximates it
+  well for anodised, brass and copper; an exact metal colour is a re-render.
+- **In a plug-in**: images and blend modes, no WebGL, so Windows and Linux alike.
+- **What it needs**: the add-on (a few hundred lines of Python); the import, which writes a
+  component the designer already understands; blend modes on component layers (the part renderer
+  honours them; no editor shows them yet), and a tint on an image layer.
+
+**The same import for Photoshop.** The PSD importer (`utils/psdPanelImport.js`, `psdComposite.js`)
+already reads Photoshop's layers, blend modes, masks and groups and composites them as Photoshop
+does, for a panel's background. The same reader can make a component instead: each layer a
+component layer with its blend mode and opacity, `pointer`/`cap` layers bound to the value, colour
+layers tintable. That is a layered, skeuomorphic knob drawn in Photoshop, with no filmstrip. Both
+importers write the same kind of component, so the designer treats a Photoshop knob and a Blender
+knob alike.
+
+### Level 2: the model itself, drawn by CEditor (later)
+
+Blender exports glTF 2.0 (File › Export › glTF), its standard exchange format: meshes and their
+physically based materials (colour, metal, roughness, clear coat, anisotropy). CEditor imports it as
+a 3D layer, each object a part, drawn by the renderer of the realistic-looks prototype (E) extended
+from the shapes it builds itself to meshes, and lit by the set's lamp.
+
+- Changeable: every material (metal to plastic, roughness, colour, as set roles), the light (it
+  follows the set), which objects turn or move, size. Re-import keeps CEditor's edits by object name.
+- Close to Blender, not identical: a renderer that draws live approximates what Cycles traces (soft
+  shadows, light bouncing between parts). Roughly Blender's own real-time renderer, Eevee.
+- The shape is still Blender's: CEditor does not edit meshes.
+- In a plug-in: baked to images at export, as E does.
+- Large: a glTF reader (a library such as three.js would serve, in the editor only, since the export
+  bakes), meshes and materials in the renderer, caching and baking.
+
+### Level 3: CEditor's own 3D parts (E)
+
+Shapes CEditor builds from properties (turned bodies, knurls, flutes, skirts, tops, pointers) with
+the same materials and light: everything changeable, the shape included, and no other program. It
+shares the renderer with Level 2.
+
+### Order
+
+Level 1 for Photoshop first (the reader exists), then the Blender add-on writing the same component;
+Level 3 with piece E; Level 2 when somebody needs a shape only Blender can make.
+
 ## Recommended order
 
 1. **A** (your own, reset, marks): small, and it answers "can I change it" for every set today.
@@ -211,10 +311,18 @@ tint per part (hue, brightness) is the one cheap kind of change they can take.
 4. **E**: realistic looks as a part material, with export baking.
 5. **D1, D2, D3**, then **B** for buttons, switches and meters, then **F** and **D4**.
 
-## Decisions for the owner
+## Decisions
 
-1. Forms: convert them to parts (recommended), or keep them as a fixed "classic" category beside
-   filmstrips?
-2. Rendered looks: live in the editor and baked into the plug-in at export (recommended), or live
+Taken by the owner, 2026-11-02:
+
+1. **Forms become parts.** "The whole idea of the editor is that components are adjustable in any
+   way", with a few exceptions such as the orbit, the arpeggiator and the step sequencer.
+2. **Start with piece A.**
+3. **Filmstrips are for those who want them** (Photoshop, Blender), as their own category; the way
+   in for those designs should be layers, not strips (Bringing designs in, above).
+
+Open:
+
+1. Rendered looks: live in the editor and baked into the plug-in at export (recommended), or live
    everywhere (needs the Linux JUCE patch)?
-3. A set that names a library component (D4): later (recommended) or as part of this?
+2. A set that names a library component (D4): later (recommended) or as part of this?
