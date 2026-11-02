@@ -12,8 +12,9 @@
  *     the frame drew it;
  *   - a box the frame fits keeps the frame, caption and all, exactly as it was;
  *   - no caption in the drawing falls back to the page's serif;
- *   - the disc (Graphite's knob) draws its value as an arc on its track that ends at its pointer,
- *     and none at zero. It drew only the pointer.
+ *   - Graphite's knob (the disc, drawn with the knob's own parts since the forms became parts,
+ *     models/knobFormParts.js) draws its value as an arc on its track that ends where its pointer
+ *     points, and one of no length at zero. The disc form drew only the pointer, once.
  */
 import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
@@ -107,31 +108,42 @@ try {
     console.log(`  ok  ${id}: buttons and switches read at ${shown.sizes.map(([w, h]) => `${w}x${h}`).join(', ')}`);
   }
 
-  // The disc, at the specimen's values and at zero.
-  const discs = async () => {
+  // Graphite's knob, at the specimen's values and at zero: the arc's end and the pointer line lie on
+  // one ray from the centre.
+  const knobs = async () => {
     await page.waitForTimeout(400);
-    return page.evaluate(() => [...document.querySelectorAll('svg.anatomy[data-form="disc"]')].map((svg) => ({
-      position: Number(svg.getAttribute('data-position')),
-      arc: svg.querySelector('path.value-arc')?.getAttribute('d') ?? null,
-    })));
+    return page.evaluate(() => [...document.querySelectorAll('svg.slider-svg')].map((svg) => {
+      const pointer = svg.querySelector('line[data-pointer="current"]');
+      return {
+        arc: svg.querySelector('mask[id$="-bodyTrackFillArc"] path')?.getAttribute('d') ?? null,
+        pointer: pointer ? ['x1', 'y1', 'x2', 'y2'].map((key) => Number(pointer.getAttribute(key))) : null,
+      };
+    }).filter((knob) => knob.pointer));
   };
   const shownSpecimen = await page.evaluate(() => window.__controlSetShot.show('graphite-studio'));
   await page.waitForFunction((n) => document.querySelectorAll('[data-control-id]').length >= n, shownSpecimen.controls, { timeout: 30000 });
-  const atValue = await discs();
-  assert.ok(atValue.length >= 3, `the designed Graphite draws its knobs as discs (${atValue.length})`);
-  for (const disc of atValue) {
-    assert.ok(disc.arc, `a disc at ${disc.position} draws its value`);
-    const [x, y] = disc.arc.trim().split(/[\s,A]+/).slice(-2).map(Number);
-    const a = (-135 + disc.position * 270) * Math.PI / 180;
-    assert.ok(Math.hypot(x - (80 + Math.sin(a) * 58), y - (76 - Math.cos(a) * 58)) < 0.05, `the arc ends at the pointer for ${disc.position}`);
+  const atValue = await knobs();
+  assert.ok(atValue.length >= 3, `the designed Graphite draws its knobs with a pointer line (${atValue.length})`);
+  for (const knob of atValue) {
+    assert.ok(knob.arc, 'a knob above zero draws its value');
+    const [x, y] = knob.arc.trim().split(/[\s,A]+/).slice(-2).map(Number);
+    const [x1, y1, x2, y2] = knob.pointer;
+    const [px, py, qx, qy] = [x2 - x1, y2 - y1, x - x1, y - y1];
+    const sine = (px * qy - py * qx) / (Math.hypot(px, py) * Math.hypot(qx, qy));
+    assert.ok(Math.abs(sine) < 0.02 && px * qx + py * qy > 0, `the arc ends where the pointer points (${sine.toFixed(3)})`);
   }
   await page.evaluate(() => window.__controlSetShot.showMacro('graphite-studio', { value: 0 }));
   await page.waitForFunction(() => document.querySelectorAll('[data-control-id]').length >= 2, null, { timeout: 30000 });
-  const atZero = await discs();
-  assert.ok(atZero.length >= 1 && atZero.every((disc) => disc.position === 0 && disc.arc === null), 'a disc at zero draws no arc');
-  console.log('  ok  the disc knob draws its value as an arc that ends at its pointer');
+  const atZero = await knobs();
+  // At zero the arc has no length: it starts where it ends.
+  const noLength = (d) => {
+    const n = String(d ?? '').trim().split(/[\s,AM]+/).filter(Boolean).map(Number);
+    return n.length < 4 || Math.hypot(n[0] - n.at(-2), n[1] - n.at(-1)) < 0.01;
+  };
+  assert.ok(atZero.length >= 1 && atZero.every((knob) => noLength(knob.arc)), `a knob at zero draws no arc: ${JSON.stringify(atZero)}`);
+  console.log('  ok  Graphite\'s knob draws its value as an arc that ends where its pointer points');
   assert.deepEqual(errors, [], 'the page must render without throwing');
-  console.log('anatomyForms: buttons and switches read at the sizes people give them; the disc shows its value');
+  console.log('anatomyForms: buttons and switches read at the sizes people give them; the knob shows its value');
 } finally {
   await browser.close();
   server.close();

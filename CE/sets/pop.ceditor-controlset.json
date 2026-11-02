@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "19eb9b24",
+  "fingerprint": "2810b709",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -82,18 +82,15 @@
         "component": {
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
-          "Behavior.showTicks": false,
-          "Core.controlForm": "tab",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.showTicks": true,
+          "Behavior.circularFit": "tight",
+          "Behavior.majorTickCount": 19,
+          "Behavior.minorTickCount": 0,
+          "Behavior.tickPlacement": "inside"
         },
         "parts": {
           "bodyCap": {
-            "visible": true,
+            "visible": false,
             "Layout.width": 77,
             "Layout.height": 77,
             "Background.Fill.colour": "{control.body}",
@@ -102,17 +99,51 @@
             "Background.Border.thickness": 3
           },
           "pointerCurrent": {
-            "kind": "capdot",
-            "Layout.width": 40,
-            "Layout.height": 62,
-            "Background.Fill.colour": "{control.marker}",
-            "Background.Border.enabled": false
+            "kind": "chicken",
+            "Layout.width": 13,
+            "Layout.height": 123,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 7
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 7
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 140,
+            "Layout.height": 140,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "polygon",
+            "outlineCount": 4,
+            "outlineDepth": 0,
+            "outlineRotation": 48,
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "FF202020",
+            "Background.Border.thickness": 1.2
+          },
+          "tickMajor": {
+            "Layout.height": 0.5,
+            "Layout.width": 3,
+            "opacity": 1,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false
           }
         }
       },

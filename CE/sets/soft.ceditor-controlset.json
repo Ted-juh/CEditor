@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "aa77917f",
+  "fingerprint": "5c347f74",
   "set": {
     "id": "soft",
     "name": "Soft",
@@ -83,37 +83,82 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": false,
-          "Core.controlForm": "pebble",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "bodyCap": {
             "visible": true,
-            "Layout.width": 77,
-            "Layout.height": 77,
-            "Background.Fill.colour": "{control.body}",
-            "Background.Border.enabled": true,
+            "Layout.width": 80,
+            "Layout.height": 80,
+            "Background.Fill.colour": "{surface}",
+            "Background.Border.enabled": false,
             "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
+            "Background.Border.thickness": 1,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "outline": "flutes",
+            "outlineCount": 3,
+            "outlineDepth": 10,
+            "turns": true,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": true,
+            "Background.Fill.gradientOpacity": 45,
+            "Background.Fill.gradient": {
+              "type": "radial",
+              "centerX": 38,
+              "centerY": 30,
+              "radiusX": 75,
+              "radiusY": 75,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "FFFFFF",
+                  "position": 0
+                },
+                {
+                  "color": "808080",
+                  "position": 55
+                },
+                {
+                  "color": "000000",
+                  "position": 100
+                }
+              ]
+            }
           },
           "pointerCurrent": {
-            "kind": "line",
-            "Layout.width": 3,
-            "Layout.height": 92,
+            "kind": "capdot",
+            "Layout.width": 34,
+            "Layout.height": 74,
             "Layout.offsetX": 30,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.enabled": false
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 2,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 103,
+            "Layout.height": 103,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 0.15,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false
           }
         }
       },

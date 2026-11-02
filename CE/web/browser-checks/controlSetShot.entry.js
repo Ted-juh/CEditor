@@ -73,7 +73,8 @@ window.__controlSetShot = {
       if (original) control._children.Core.controlForm = 'original';
     }
     mounted = mount(ControlSetShotHarness, { target: document.getElementById('host'), props: { panel } });
-    return { width: panel.width, height: panel.height, controls: panel.controls.length, faders: panel.controls.filter(c=>c._children.Core.controlType==='Slider').map(c=>c._children.Core.id) };
+    const ofType = (type) => panel.controls.filter(c=>c._children.Core.controlType===type).map(c=>c._children.Core.id);
+    return { width: panel.width, height: panel.height, controls: panel.controls.length, faders: ofType('Slider'), knobs: ofType('Knob') };
   },
   gallery() {
     if (mounted) unmount(mounted);

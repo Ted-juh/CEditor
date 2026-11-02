@@ -2,7 +2,7 @@
   import { untrack } from 'svelte';
   import { resolveInteractionContext } from '../utils/interactionRuntime.js';
   import SliderShapeFill from './SliderShapeFill.svelte';
-  import { knobOutlinePath } from '../utils/knobOutlines.js';
+  import { knobOutlinePath, knobOutlineReach } from '../utils/knobOutlines.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
@@ -497,6 +497,17 @@
   });
   let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, showReadout, labelMetrics));
   let circularFitTight = $derived(String(behavior?.circularFit ?? 'auto') === 'tight');
+  // How far the housing reaches, as a multiple of the track's radius: its size and its outline's
+  // reach (a square set square reaches less far than its corners). For the tight fit.
+  let housingReach = $derived.by(() => {
+    if (geometry !== 'circular' || bodyHousingPart?.visible !== true) return 0;
+    const layout = bodyHousingPart?._children?.Layout ?? {};
+    if (String(layout.widthUnit ?? 'percent') === 'px') return 0;
+    const reach = knobOutlineReach(String(bodyHousingPart?.outline ?? 'circle'), {
+      count: bodyHousingPart?.outlineCount, depth: bodyHousingPart?.outlineDepth, rotation: numberOr(bodyHousingPart?.outlineRotation, 0),
+    });
+    return (Math.max(0, numberOr(layout.width, 100)) / 100) * reach;
+  });
   let circularMetrics = $derived(resolveCircularTrackMetrics(width, height, {
     trackThickness,
     // Tight: the pointer it draws. A dot rides the arc and needs its size; a line, needle,
@@ -511,6 +522,9 @@
     labelMetrics,
     tight: circularFitTight,
     showsMinMax: behavior?.showMinMaxLabels !== false,
+    readoutBelow: showReadout && String(behavior?.labelReadoutPlacement ?? 'auto') === 'bottom',
+    outerReach: housingReach,
+    readoutGap: numberOr(behavior?.labelReadoutGap, 14),
   }));
   let circularCenter = $derived({
     x: circularMetrics.centerX,

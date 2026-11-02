@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "98a4a6ee",
+  "fingerprint": "a99893e9",
   "set": {
     "id": "reel",
     "name": "Reel",
@@ -83,51 +83,76 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
-          "Behavior.majorTickCount": 11,
-          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickCount": 5,
+          "Behavior.minorTickCount": 2,
           "Behavior.majorTickLength": 6,
           "Behavior.tickNumerals": "value",
-          "Core.controlForm": "tuning",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.tickPlacement": "inside",
+          "Behavior.circularFit": "tight"
         },
         "parts": {
           "tickMinor": {
-            "kind": "line"
+            "kind": "line",
+            "Layout.height": 3,
+            "Layout.width": 0.6,
+            "Background.Fill.colour": "FFF2F2F2"
           },
           "tickMajor": {
-            "Layout.width": 1,
+            "Layout.width": 1.2,
             "Layout.height": 6,
-            "kind": "numeral"
+            "kind": "numeral",
+            "Background.Fill.colour": "FFF2F2F2"
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 90,
-            "Layout.height": 90,
-            "Background.Fill.colour": "{control.body}",
+            "Layout.width": 38,
+            "Layout.height": 38,
+            "Background.Fill.colour": "{control.track}",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1
+            "Background.Border.colour": "{text.primary}",
+            "Background.Border.thickness": 0.6,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "pointerCurrent": {
             "kind": "line",
-            "Layout.width": 2.5,
-            "Layout.height": 70,
-            "Layout.offsetX": 0,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.enabled": false
+            "Layout.width": 2,
+            "Layout.height": 225,
+            "Layout.offsetX": 100,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false
           },
           "bodyTrackBase": {
-            "Layout.height": 5,
-            "opacity": 0
+            "Layout.height": 2,
+            "opacity": 0,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5,
-            "opacity": 0
+            "Layout.height": 2,
+            "opacity": 0,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "normal"
+          },
+          "bodyHousing": {
+            "visible": true,
+            "Layout.width": 108,
+            "Layout.height": 108,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Border.colour": "{control.track}",
+            "Background.Border.thickness": 4
           }
         }
       },

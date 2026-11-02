@@ -133,8 +133,10 @@ test('the catalogue: seventy-nine built-in sets, each id once, every family patc
     }
     if (set.panel?.material) assert.ok(MATERIAL_KINDS.includes(set.panel.material.kind), `${set.id}: a known panel finish`);
   }
-  // Ember's board showed a chicken-head; Ivory's a black-bodied knob with a coloured pointer.
-  assert.equal(getControlSet('ember').families.Knob.parts.pointerCurrent.kind, 'chicken');
+  // Ember is built on Tolex's design and drew its tuning window, which covered its family's
+  // chicken-head; drawn with the knob's parts now, the window's needle is what its family says.
+  // Ivory's board showed a black-bodied knob with a coloured pointer.
+  assert.equal(getControlSet('ember').families.Knob.parts.pointerCurrent.kind, 'line');
   assert.equal(getControlSet('ivory').families.Knob.parts.bodyCap.visible, true);
   // And the sets actually differ where it shows.
   assert.equal(new Set(BUILT_IN_CONTROL_SETS.map((set) => resolveToken('control.cap', set))).size > 20, true);
@@ -377,20 +379,22 @@ test('every Knob gets a bodyCap it does not draw until something turns it on', (
   assert.equal(part(createSliderSemanticParts() && knob, 'pointerCurrent').kind, undefined, 'the pointer is a dot unless told otherwise');
 });
 
-test('Tolex turns a factory knob into a chicken-head on a cream cap, and leaves the document alone', () => {
+test('Tolex turns a factory knob into its tuning dial, drawn with parts, and leaves the document alone', () => {
   const knob = createControl('Knob');
   const before = JSON.stringify(knob);
   const styled = resolveControlForSet(knob, tolex);
 
   assert.equal(JSON.stringify(knob), before, 'the document is not written to');
+  // The cream window is the housing; the tuning knob in it is the cap (models/knobFormParts.js).
+  assert.equal(part(styled, 'bodyHousing').visible, true);
+  assert.equal(part(styled, 'bodyHousing')._children.Background._children.Fill.colour, 'FFEFE3C8', 'token references written by the patch resolve');
   assert.equal(part(styled, 'bodyCap').visible, true);
-  assert.equal(part(styled, 'bodyCap')._children.Layout.width, 74);
-  assert.equal(part(styled, 'bodyCap')._children.Background._children.Fill.colour, 'FFF1E6CC', 'token references written by the patch resolve');
+  assert.equal(part(styled, 'bodyCap')._children.Layout.width, 38);
   assert.equal(part(styled, 'bodyCap')._children.Background._children.Effects._children.Material.kind, 'glass');
   assert.equal(part(styled, 'bodyCap')._children.Background._children.Effects._children.Shadows.items.length, 1, 'a created Effects section is a whole one');
-  assert.equal(part(styled, 'pointerCurrent').kind, 'chicken');
-  assert.equal(part(styled, 'pointerCurrent')._children.Background._children.Fill.colour, 'FF1C1A17');
-  assert.equal(part(styled, 'bodyTrackBase')._children.Layout.height, 8);
+  assert.equal(part(styled, 'pointerCurrent').kind, 'line');
+  assert.match(part(styled, 'pointerCurrent')._children.Background._children.Fill.colour, /^[0-9A-F]{8}$/i);
+  assert.equal(part(styled, 'bodyTrackBase')._children.Layout.height, 2);
   // Untouched parts keep their identity through the family patch (the token pass then copies
   // whatever still holds a reference). The labels are touched now — the set's type puts its face
   // on them — so the untouched part is one neither the family nor the type reaches.
@@ -408,8 +412,8 @@ test('the family patch stops where the author has been: an edited property keeps
   const styled = resolveControlForSet(knob, tolex);
   assert.equal(part(styled, 'bodyTrackBase')._children.Layout.height, 20, 'the author\'s thickness');
   assert.equal(part(styled, 'bodyCap')._children.Background._children.Fill.colour, 'FF00FF00', 'the author\'s colour');
-  assert.equal(part(styled, 'bodyCap')._children.Layout.width, 74, 'but the size, untouched, follows the set');
-  assert.equal(part(styled, 'pointerCurrent').kind, 'chicken');
+  assert.equal(part(styled, 'bodyCap')._children.Layout.width, 38, 'but the size, untouched, follows the set');
+  assert.equal(part(styled, 'pointerCurrent').kind, 'line');
 
   // Switching to a set with no knob opinion gives the author's knob back, edits and all.
   const plain = resolveControlForSet(knob, { ...getControlSet('graphite'), families: {} });

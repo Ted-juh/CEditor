@@ -2,14 +2,14 @@
 
 Status: proposal, 2026-11-02; the owner's decisions are under Decisions. Built so far: the pin fix
 (Findings 8); piece A (`models/controlSetOwnership.js`, the Control set card, override marks and
-Revert on the fields that name their property); and the first part of piece B: eight of the twelve
-base knob forms (disc, drafting pointer, open glass ring, lens, console skirt, vernier, scalloped
-selector, segment encoder) are drawn with the knob's own parts (`models/knobFormParts.js`), with
-a housing plate, cap and housing outlines, a needle pointer and a tight fit added to the knob
-(`utils/knobOutlines.js`). The sets that used them name no form any more. Still drawn by code: the
-paper tab, the pebble, the roller and the tuning window, the 48 direction forms, and every button,
-switch and meter form. The Knob tab has a section per part, in drawing order: Housing, Track and
-Value Arc, Cap, Pointer (`sections/KnobPartsEditor.svelte`), every field with the override marks.
+Revert on the fields that name their property); and piece B for the knob: all twelve base knob
+forms are drawn with the knob's own parts (`models/knobFormParts.js`), with a housing plate, cap
+and housing outlines (circle, polygon, rounded square, scallop, flutes, ring), a needle pointer and
+a tight fit added to the knob (`utils/knobOutlines.js`). The tight fit keeps the knob, housing
+and all, above a readout placed under it. The sets that used the forms name none any more. The
+Knob tab has a section per part, in drawing order: Housing, Track and Value Arc, Cap, Pointer
+(`sections/KnobPartsEditor.svelte`), every field with the override marks. Still drawn by code:
+the 48 direction forms, and every button, switch and meter form.
 
 ## The principle
 

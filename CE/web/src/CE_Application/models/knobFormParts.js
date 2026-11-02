@@ -14,8 +14,8 @@
 // track was 58 units in a 160 x 170 frame, so a part's width is its radius in the drawing as a
 // percentage of 58, and a stroke in px is its width in the drawing at a knob about 100 px tall.
 
-/** The forms that are parts now; the others are still drawn by the form code. */
-export const KNOB_FORMS_AS_PARTS = ['disc', 'pointer', 'halo', 'lens', 'skirt', 'vernier', 'scallop', 'encoder'];
+/** The forms that are parts now: all twelve base knob forms. The 48 direction forms are still drawn by code. */
+export const KNOB_FORMS_AS_PARTS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
 
 const ROLES = { face: '{surface}', housing: '{control.track}', legend: '{text.primary}', accent: '{accent}' };
 
@@ -47,6 +47,14 @@ const plain = (colour, extra = {}) => ({ opacity: 1, 'Background.Fill.colour': c
 const edged = (colour, edge, thickness = 0.6, extra = {}) => ({ ...plain(colour), 'Background.Border.enabled': true, 'Background.Border.colour': edge, 'Background.Border.thickness': thickness, ...extra });
 const size = (percent) => ({ 'Layout.width': percent, 'Layout.height': percent, 'Layout.widthUnit': 'percent', 'Layout.heightUnit': 'percent' });
 const outline = (kind, count, depth, extra = {}) => ({ outline: kind, outlineCount: count, outlineDepth: depth, ...extra });
+// A highlight off centre, light to dark, laid over the part's own colour: a dome in any colour.
+const dome = (opacity) => ({
+  'Background.Fill.gradientEnabled': true,
+  'Background.Fill.gradientOpacity': opacity,
+  'Background.Fill.gradient': { type: 'radial', centerX: 38, centerY: 30, radiusX: 75, radiusY: 75, edge: 0, stops: [
+    { color: 'FFFFFF', position: 0 }, { color: '808080', position: 55 }, { color: '000000', position: 100 },
+  ] },
+});
 const lit = (kind, strength, shine) => ({
   'Background.Effects.Material.enabled': true,
   'Background.Effects.Material.kind': kind,
@@ -94,6 +102,56 @@ const RECIPES = {
       bodyHousing: { visible: true, ...size(97), ...outline('ring', 0, 34), ...edged(ROLES.face, ink), opacity: 0.55 },
       bodyCap: off,
       pointerCurrent: { kind: 'capdot', 'Layout.width': 44, 'Layout.height': 116, ...plain(ROLES.accent) },
+    },
+  }),
+  // A paper tab: a square of card set slightly askew, a ring of dots, an arrow-head blade.
+  tab: ({ ink }) => ({
+    component: {
+      ...board,
+      // The ring of dots: round-ended ticks too short to be lines, just inside the tab's edge.
+      'Behavior.showTicks': true, 'Behavior.majorTickCount': 19, 'Behavior.minorTickCount': 0, 'Behavior.tickPlacement': 'inside',
+    },
+    parts: {
+      ...noTrack,
+      bodyHousing: { visible: true, ...size(140), ...outline('polygon', 4, 0, { outlineRotation: 48 }), ...edged(ROLES.face, ink, 1.2) },
+      bodyCap: off,
+      pointerCurrent: { kind: 'chicken', 'Layout.width': 13, 'Layout.height': 123, ...plain(ROLES.accent) },
+      tickMajor: { 'Layout.height': 0.5, 'Layout.width': 3, ...plain(ink) },
+    },
+  }),
+  // A moulded pebble: a soft three-lobed cap that turns, a glossy dome, a dot set into it, its
+  // shadow on the panel.
+  pebble: ({ ink }) => merge(noTicks, {
+    component: board,
+    parts: {
+      ...noTrack,
+      bodyHousing: { visible: true, ...size(103), ...plain(ink), opacity: 0.15 },
+      bodyCap: { visible: true, ...size(80), ...outline('flutes', 3, 10, { turns: true }), ...plain(ROLES.face), ...dome(45) },
+      pointerCurrent: { kind: 'capdot', 'Layout.width': 34, 'Layout.height': 74, ...plain(ROLES.accent) },
+    },
+  }),
+  // A rubber roller: a rounded block, a ribbed metal wheel in it that turns, an indicator on the wheel.
+  roller: ({ ink }) => merge(noTicks, {
+    component: board,
+    parts: {
+      ...noTrack,
+      bodyHousing: { visible: true, ...size(104), ...outline('rounded', 0, 55), ...edged(ROLES.housing, ink) },
+      bodyCap: { visible: true, ...size(82), ...outline('flutes', 24, 6, { turns: true }), ...plain(ROLES.face), ...lit('brushed', 60, 50) },
+      pointerCurrent: { kind: 'line', 'Layout.width': 3, 'Layout.height': 92, 'Layout.offsetX': 45, ...plain(ROLES.accent) },
+    },
+  }),
+  // A radio tuning dial: a bright window in a dark bezel, the scale and its ends round the inside,
+  // a long needle from a small dark tuning knob.
+  tuning: ({ ink, divisions }) => merge(ticks(divisions, { placement: 'inside', major: 6, minor: 3 }), {
+    component: board,
+    parts: {
+      ...noTrack,
+      // The scale is printed on the window, in the ink, as the drawing's was.
+      tickMajor: { 'Background.Fill.colour': ink },
+      tickMinor: { 'Background.Fill.colour': ink },
+      bodyHousing: { visible: true, ...size(108), ...edged(ROLES.face, ROLES.housing, 4) },
+      bodyCap: { visible: true, ...size(38), ...edged(ROLES.housing, ROLES.legend, 0.6) },
+      pointerCurrent: { kind: 'line', 'Layout.width': 2, 'Layout.height': 225, 'Layout.offsetX': 100, ...plain(ROLES.accent) },
     },
   }),
   // An optical lens in an octagonal housing, the value read in its centre.

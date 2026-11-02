@@ -102,8 +102,11 @@ export function macroKnobHalo(knob, set) {
   if (!core.controlForm && (drawn._children.Behavior?.labelReadoutPlacement === 'center'
     || drawn._children.Parts?._children?.pointerCurrent?.kind === 'needle')) return null;
   const face = resolveToken('instrument.face', set);
-  const body = core.controlForm ? core.formFaceColour
-    : resolveControlForSet(knob, set)._children.Parts?._children?.bodyCap?._children?.Background?._children?.Fill?.colour;
+  // Its body is what it shows outermost: the housing plate when it has one (the tuning dial's
+  // window), otherwise the cap.
+  const partsOf = drawn._children.Parts?._children ?? {};
+  const outer = partsOf.bodyHousing?.visible === true ? partsOf.bodyHousing : partsOf.bodyCap;
+  const body = core.controlForm ? core.formFaceColour : outer?._children?.Background?._children?.Fill?.colour;
   if (!face || !/^[0-9A-F]{8}$/i.test(String(body)) || contrast(body, face) >= 2.5) return null;
   // The light must read on the face, or there is no ring to see: a reflective set's ink is dark.
   const lit = resolveToken('display.lit', set);

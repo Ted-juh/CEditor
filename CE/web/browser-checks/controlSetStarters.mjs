@@ -62,15 +62,20 @@ try {
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(300);
     assert.equal(await page.locator('[data-control-id]').count(),size.controls);
+    // The two knobs are drawn by a form, or, since the base knob forms became the knob's own parts
+    // (models/knobFormParts.js), with those parts; the button, switch and meter by forms.
     const mechanisms=page.locator('svg.anatomy');
-    assert.equal(await mechanisms.count(),5,`${id}: two rotary faces, button, switch and meter`);
-    const rotary=mechanisms.nth(0);
-    const rotaryControl=rotary.locator('..').locator('..');
-    const valueBefore=Number(await rotary.getAttribute('data-position'));
+    const knobsAreParts=await page.locator(`[data-control-id="${size.knobs[0]}"] svg.anatomy`).count()===0;
+    assert.equal(size.knobs.length,2,`${id}: two rotary faces`);
+    assert.equal(await mechanisms.count(),knobsAreParts?3:5,`${id}: two rotary faces, button, switch and meter`);
+    const rotaryControl=page.locator(`[data-control-id="${size.knobs[0]}"]`);
+    if(knobsAreParts) assert.equal(await rotaryControl.locator('svg.slider-svg').count(),1,`${id}: the knob is drawn with its parts`);
+    const rotaryValue=async()=>Number(knobsAreParts?await rotaryControl.getAttribute('aria-valuenow'):await rotaryControl.locator('svg.anatomy').getAttribute('data-position'));
+    const valueBefore=await rotaryValue();
     await rotaryControl.focus();
     await page.keyboard.press('ArrowUp');
     await page.waitForTimeout(30);
-    assert.ok(Number(await rotary.getAttribute('data-position'))>valueBefore,`${id}: rotary follows keyboard value`);
+    assert.ok(await rotaryValue()>valueBefore,`${id}: rotary follows keyboard value`);
     const switchFace=page.locator('[data-control-id]').filter({has:page.locator('svg.anatomy')}).filter({hasText:'HOLD'}).first();
     const switchSvg=switchFace.locator('svg.anatomy');
     const oldState=await switchSvg.getAttribute('data-active');
@@ -121,13 +126,15 @@ try {
   await page.evaluate(() => window.__controlSetShot.showStarter('satellite',{materialize:false}));
   await page.waitForTimeout(100);
   await checkPerformance('satellite following set without materialization');
-  await page.evaluate(() => window.__controlSetShot.showStarter('tolex',{disabled:true}));
-  const disabledKnob=page.locator('svg.anatomy').first();
-  await disabledKnob.waitFor();
-  const disabledValue=await disabledKnob.getAttribute('data-position');
-  await disabledKnob.locator('..').locator('..').click({force:true});
+  // Tolex's knob is its tuning dial, drawn with its parts; a disabled one cannot be turned.
+  const disabled=await page.evaluate(() => window.__controlSetShot.showStarter('tolex',{disabled:true}));
+  const disabledKnob=page.locator(`[data-control-id="${disabled.knobs[0]}"]`);
+  await disabledKnob.locator('svg.slider-svg').waitFor();
+  const disabledDrawing=await disabledKnob.locator('svg.slider-svg').innerHTML();
+  await disabledKnob.click({force:true});
   await page.keyboard.press('ArrowUp');
-  assert.equal(await disabledKnob.getAttribute('data-position'),disabledValue,'disabled anatomy cannot change values');
+  await page.waitForTimeout(30);
+  assert.equal(await disabledKnob.locator('svg.slider-svg').innerHTML(),disabledDrawing,'a disabled knob cannot change its value');
   await page.evaluate(() => window.__controlSetShot.showStarter('tolex',{original:true}));
   await page.waitForTimeout(50);
   assert.equal(await page.locator('svg.anatomy').count(),0,'original parts explicitly restores legacy drawing');

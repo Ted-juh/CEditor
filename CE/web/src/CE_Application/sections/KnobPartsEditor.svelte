@@ -24,7 +24,7 @@
 
   let { control = null, set = () => {}, setPatch = () => {} } = $props();
 
-  const OUTLINES = [['circle', 'Circle'], ['polygon', 'Polygon'], ['scallop', 'Scallop'], ['flutes', 'Flutes'], ['ring', 'Ring']];
+  const OUTLINES = [['circle', 'Circle'], ['polygon', 'Polygon'], ['rounded', 'Rounded Square'], ['scallop', 'Scallop'], ['flutes', 'Flutes'], ['ring', 'Ring']];
   const POINTERS = [['line', 'Line'], ['needle', 'Needle'], ['chicken', 'Chicken-head'], ['capdot', 'Dot on Cap'], ['dot', 'Dot on Track']];
   const word = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -68,15 +68,15 @@
     <PropertyCell label="Visible" span={1} path={`${prefix}.visible`} hint={`Draw the ${title.toLowerCase()}.`}>
       <PropertyToggle value={part?.visible === true} onchange={(next) => set(`${prefix}.visible`, next)} />
     </PropertyCell>
-    <PropertyCell label="Outline" span={1} path={`${prefix}.outline`} hint="The shape of its edge: a circle, a polygon, a scallop (a star), flutes (a round grip) or a ring.">
+    <PropertyCell label="Outline" span={1} path={`${prefix}.outline`} hint="The shape of its edge: a circle, a polygon, a rounded square, a scallop (a star), flutes (a round grip) or a ring.">
       <select class="val" value={outline} onchange={(e) => set(`${prefix}.outline`, e.target.value)}>
         {#each OUTLINES as [id, label] (id)}<option value={id}>{label}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Points" span={1} compact path={`${prefix}.outlineCount`} disabled={outline === 'circle' || outline === 'ring'} hint="Corners of a polygon, points of a scallop, flutes of a grip.">
+    <PropertyCell label="Points" span={1} compact path={`${prefix}.outlineCount`} disabled={outline === 'circle' || outline === 'ring' || outline === 'rounded'} hint="Corners of a polygon, points of a scallop, flutes of a grip.">
       <NumberCell label="Points" value={numberOr(part?.outlineCount, 8)} defaultValue={8} step={1} min={3} max={96} onchange={(v) => set(`${prefix}.outlineCount`, v)} />
     </PropertyCell>
-    <PropertyCell label="Depth %" span={1} compact path={`${prefix}.outlineDepth`} disabled={outline === 'circle' || outline === 'polygon'} hint="How deep the notches or flutes cut, or how wide a ring is, as a percentage of the radius.">
+    <PropertyCell label="Depth %" span={1} compact path={`${prefix}.outlineDepth`} disabled={outline === 'circle' || outline === 'polygon'} hint="How deep the notches or flutes cut, how wide a ring is, or how round a square's corners are, as a percentage of the radius.">
       <NumberCell label="Depth" value={numberOr(part?.outlineDepth, 20)} defaultValue={20} step={1} min={0} max={95} onchange={(v) => set(`${prefix}.outlineDepth`, v)} />
     </PropertyCell>
     <PropertyCell label="Size %" span={1} compact path={`${prefix}.Layout.width`} hint="Its size, as a percentage of the track's radius.">

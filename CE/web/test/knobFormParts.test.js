@@ -11,7 +11,9 @@ import { familyPatchFor, readControlPath, resolveControlForSet } from '../src/CE
 import { EDITOR_PATHS } from '../src/CE_Application/models/controlSetDesigns.js';
 import { setAnatomy } from '../src/CE_Application/models/controlAnatomy.js';
 import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../src/CE_Application/models/knobFormParts.js';
-import { knobOutlinePath } from '../src/CE_Application/utils/knobOutlines.js';
+import { knobOutlinePath, knobOutlineReach } from '../src/CE_Application/utils/knobOutlines.js';
+import { resolveCircularTrackMetrics } from '../src/CE_Application/utils/sliderGeometry.js';
+import { CONTROL_FORMS } from '../src/CE_Application/models/controlAnatomy.js';
 import { activePanelId, panels } from '../src/CE_Application/stores/panels.js';
 import { applyKnobFormAsParts } from '../src/CE_Application/stores/controlSets.js';
 
@@ -24,6 +26,13 @@ test('outlines: polygon, scallop, flutes and ring, turned by a rotation', () => 
   assert.equal(corners(knobOutlinePath('scallop', 50, 50, 40, { count: 8, depth: 20 })), 16, 'a point and a notch each');
   assert.ok(corners(knobOutlinePath('flutes', 50, 50, 40, { count: 18, depth: 10 })) > 100, 'flutes are smooth');
   assert.equal((knobOutlinePath('ring', 50, 50, 40, { depth: 30 }).match(/M/g) ?? []).length, 2, 'a ring has a hole');
+  // A rounded square round the circle: square at 0, nearly the circle at the most.
+  assert.equal(knobOutlinePath('rounded', 50, 50, 40, { depth: 0 }), 'M90 10 L90 90 L10 90 L10 10 Z');
+  assert.ok(corners(knobOutlinePath('rounded', 50, 50, 40, { depth: 50 })) > 20, 'its corners are arcs');
+  // How far an outline reaches across, for the fit: a square set square less than its corners.
+  assert.equal(knobOutlineReach('circle'), 1);
+  assert.equal(knobOutlineReach('polygon', { count: 4, rotation: 45 }), 0.71);
+  assert.equal(knobOutlineReach('polygon', { count: 4 }), 1);
   // A corner at the top, until it is turned.
   assert.match(knobOutlinePath('polygon', 50, 50, 40, { count: 4 }), /^M50 10 /);
   assert.doesNotMatch(knobOutlinePath('polygon', 50, 50, 40, { count: 4, rotation: 45 }), /^M50 10 /);
@@ -42,11 +51,11 @@ test('every recipe writes only what a set may write, and lands on a factory knob
       for (const path of Object.keys(patch)) assert.notEqual(readControlPath(knob, `Parts.${part}.${path}`), undefined, `${form}: ${part}.${path} lands`);
     }
   }
-  assert.equal(knobFormFamily('tuning'), null, 'a form still drawn by code has no recipe yet');
+  assert.equal(knobFormFamily('new-studio'), null, 'a direction form is still drawn by code');
 });
 
 test('the sets that drew these forms draw them with parts, and name no form', () => {
-  const converted = ['blueprint', 'frost', 'obsidian', 'console', 'machined', 'phosphor', 'graphite-studio'];
+  const converted = ['blueprint', 'frost', 'obsidian', 'console', 'machined', 'phosphor', 'graphite-studio', 'pop', 'soft', 'carbon', 'tolex'];
   for (const id of converted) {
     const set = getControlSet(id);
     const knob = resolveControlForSet(createControl('Knob'), set);
@@ -56,9 +65,14 @@ test('the sets that drew these forms draw them with parts, and name no form', ()
   const console_ = resolveControlForSet(createControl('Knob'), getControlSet('console'));
   assert.equal(console_._children.Parts._children.bodyHousing.visible, true);
   assert.equal(console_._children.Parts._children.pointerCurrent.kind, 'line');
-  // The forms still drawn by code keep their names until their turn.
-  assert.equal(familyPatchFor(getControlSet('tolex'), 'Knob').component['Core.controlForm'], 'tuning');
-  assert.ok(KNOB_FORMS_AS_PARTS.every((form) => !['tab', 'pebble', 'roller', 'tuning'].includes(form)));
+  // Every base knob form is parts now: Tolex's tuning window, Pop's paper tab, Soft's pebble and
+  // Carbon's roller were the last.
+  assert.deepEqual([...KNOB_FORMS_AS_PARTS].sort(), CONTROL_FORMS.Knob.map(([id]) => id).filter((id) => !id.startsWith('new-')).sort());
+  for (const id of ['tolex', 'pop', 'soft', 'carbon']) assert.equal(familyPatchFor(getControlSet(id), 'Knob').component['Core.controlForm'], undefined, id);
+  const tuning = resolveControlForSet(createControl('Knob'), getControlSet('tolex'))._children.Parts._children;
+  assert.equal(tuning.bodyHousing.visible, true);
+  assert.equal(tuning.pointerCurrent.kind, 'line');
+  assert.equal(resolveControlForSet(createControl('Knob'), getControlSet('carbon'))._children.Parts._children.bodyHousing.outline, 'rounded');
   assert.equal(setAnatomy('Knob', 'console'), 'skirt');
 });
 
@@ -130,4 +144,23 @@ test('the Knob tab has a section per part, each field naming a property a set ma
   assert.ok(slider.indexOf('<KnobPartsEditor') > slider.indexOf('title="Type"'), 'after Type');
   assert.match(slider, /\{#if !isKnob\}\s*<PropertyCell label="Track Size"/);
   assert.match(slider, /id: 'bodyHousing', path: 'Parts\.bodyHousing\.Background', label: 'Housing'/);
+});
+
+test('the tight fit keeps a knob above a readout under it, its housing and all', () => {
+  const base = { trackThickness: 2, pointerSize: 0, majorTickLength: 5, hasTicks: true, hasReadout: true, tight: true, showsMinMax: false, labelMetrics: { readoutSize: 12 } };
+  // As before without the readout below: a knob that exists keeps its size.
+  const before = resolveCircularTrackMetrics(120, 128, base);
+  assert.equal(before.centerY, 72);
+  // Below: centred in the room above the readout, and the housing's reach fits in it.
+  const below = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 1.4 });
+  const readoutTop = 128 - 14 - 12 * 0.6;
+  assert.ok(below.centerY < 72);
+  assert.ok(below.centerY + below.radius * 1.4 <= readoutTop, 'the housing clears the readout');
+  assert.ok(below.centerY - below.radius * 1.4 >= 0, 'and the top');
+  // A housing within the track does not shrink it.
+  const small = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 0.9 });
+  assert.ok(small.radius > below.radius);
+  const renderer = source('editor/SliderFamilyRenderer.svelte');
+  assert.match(renderer, /readoutBelow: showReadout && String\(behavior\?\.labelReadoutPlacement \?\? 'auto'\) === 'bottom'/);
+  assert.match(renderer, /outerReach: housingReach/);
 });

@@ -10,9 +10,10 @@
 //   scallop  a star: `count` points, the notches `depth` % of the radius in
 //   flutes   a round grip: `count` rounded flutes `depth` % deep
 //   ring     an annulus: a hole `depth` % of the radius wide (100 - depth is the hole's radius)
+//   rounded  a square round the circle, its corners rounded `depth` % of the way to a circle
 // `rotation` turns the outline, in degrees clockwise: a part that turns with the value passes it.
 
-export const KNOB_OUTLINES = ['circle', 'polygon', 'scallop', 'flutes', 'ring'];
+export const KNOB_OUTLINES = ['circle', 'polygon', 'scallop', 'flutes', 'ring', 'rounded'];
 
 const fixed = (value) => Number(value.toFixed(2));
 
@@ -45,6 +46,24 @@ export function knobOutlinePath(kind, cx, cy, r, { count = 8, depth = 20, rotati
       return point(cx, cy, radius * (1 - d * Math.pow(wave, 0.6)), rotation + t * 360);
     }));
   }
+  if (kind === 'rounded') {
+    // Each corner an arc `depth` % of the half side; a quarter turn of points per corner, so the
+    // rotation turns it as it turns the others.
+    const corner = radius * d;
+    const inset = radius - corner;
+    const steps = corner > 0 ? 8 : 1;
+    const points = [];
+    for (const [sx, sy, from] of [[1, -1, -90], [1, 1, 0], [-1, 1, 90], [-1, -1, 180]]) {
+      for (let i = 0; i < steps; i += 1) {
+        const a = (from + (steps > 1 ? (i * 90) / (steps - 1) : 45)) * Math.PI / 180;
+        const x = sx * inset + Math.cos(a) * corner;
+        const y = sy * inset + Math.sin(a) * corner;
+        // As a distance and a bearing from the centre (clockwise from the top), to be turned.
+        points.push(point(cx, cy, Math.hypot(x, y), (Math.atan2(y, x) * 180) / Math.PI + 90 + rotation));
+      }
+    }
+    return closed(points);
+  }
   if (kind === 'ring') {
     const inner = radius * (1 - Math.max(0.05, d));
     // Two circles, the inner drawn the other way round: the even-odd hole of an annulus.
@@ -52,4 +71,17 @@ export function knobOutlinePath(kind, cx, cy, r, { count = 8, depth = 20, rotati
       + `M${fixed(cx - inner)} ${fixed(cy)} a${fixed(inner)} ${fixed(inner)} 0 1 1 ${fixed(inner * 2)} 0 a${fixed(inner)} ${fixed(inner)} 0 1 1 ${fixed(-inner * 2)} 0 Z`;
   }
   return '';
+}
+
+/**
+ * How far the outline reaches across or down from its centre, at a radius of 1: a circle's 1, a
+ * square set square 0.71, set on its corner 1. What the knob's tight fit sizes a housing by.
+ */
+export function knobOutlineReach(kind, { count = 8, depth = 20, rotation = 0 } = {}) {
+  const d = knobOutlinePath(kind, 0, 0, 1, { count, depth, rotation });
+  if (!d || kind === 'ring') return 1;
+  const numbers = (d.match(/-?\d+(\.\d+)?/g) ?? []).map(Number);
+  let reach = 0;
+  for (const value of numbers) reach = Math.max(reach, Math.abs(value));
+  return reach || 1;
 }

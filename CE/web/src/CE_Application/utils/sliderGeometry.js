@@ -186,6 +186,14 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   // their drawings filled the box (models/knobFormParts.js).
   tight = false,
   showsMinMax = true,
+  // With `tight` and the readout placed under the knob (Behavior.labelReadoutPlacement 'bottom'):
+  // the knob is centred in the room above the readout and sized to fit it, so a housing plate,
+  // which is a full disc where a track leaves its bottom open, does not run into the value.
+  // `outerReach` is how far the housing reaches from the centre, as a multiple of the track's
+  // radius (0 without one); `readoutGap` is the readout's distance from the bottom edge.
+  readoutBelow = false,
+  outerReach = 0,
+  readoutGap = 14,
 } = {}) {
   const readoutSize = Math.max(0, numberOr(labelMetrics?.readoutSize, 12));
   const titleSize = Math.max(0, numberOr(labelMetrics?.titleSize, 11));
@@ -224,6 +232,20 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
     ) - (trackThickness / 2)
   );
   const radius = Math.min(authoredRadius, maxRadius);
+
+  if (tight && readoutBelow) {
+    const bottom = height - Math.max(0, numberOr(readoutGap, 14)) - (readoutSize * 0.6) - 2;
+    const centerY = Math.max(1, bottom / 2);
+    const room = Math.max(1, Math.min(width / 2, centerY) - 2);
+    // The track and what reaches past it (ticks or the pointer, the min/max labels), and the housing.
+    const ring = Math.max(tickRoom, pointerRoom) + (trackThickness / 2) + (labelAllowance * 0.4);
+    const fitted = Math.max(16, Math.min(room - ring, room / Math.max(1, numberOr(outerReach, 0))));
+    return {
+      centerX: center.x,
+      centerY,
+      radius: diameter > 0 ? Math.min(authoredRadius, room) : fitted,
+    };
+  }
 
   return {
     centerX: center.x,
