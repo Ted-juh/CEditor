@@ -351,7 +351,8 @@
   const surfaceUid = $props.id();
   const panelMaterialId = `panel-material-${surfaceUid}`;
   let panelControlSet = $derived(controlSetForPanel(panel));
-  let panelMaterial = $derived(panelControlSet?.panel?.material ?? null);
+  // The panel's own, when the author kept a material while applying a set (utils/controlSetApply.js).
+  let panelMaterial = $derived(panel?.surfaceMaterial ?? panelControlSet?.panel?.material ?? null);
   let panelLit = $derived(materialActive(panelMaterial));
 
   const DEFAULT_LAYER_ORDER = ['solid', 'gradient', 'image', 'texture'];

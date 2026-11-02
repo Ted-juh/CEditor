@@ -10,7 +10,7 @@ import { controlSetForPanel, resolveColourValue } from '../models/controlSets.js
 
 // What panelModel gives a new panel (stores/panelModel.js `bgColour`), spelled the way it is
 // compared here.
-const DEFAULT_PANEL_COLOUR = 'FF333333';
+export const DEFAULT_PANEL_COLOUR = 'FF333333';
 
 /**
  * Parse AARRGGBB or RRGGBB hex to rgba(). Falls back to low-alpha white for 6-char.
@@ -119,7 +119,9 @@ export function buildSolidStyle(panel) {
   const bare = (colour) => String(colour).replace(/^#/, '').toUpperCase();
   const setColour = controlSetForPanel(panel)?.panel?.colour;
   const authored = bare(panel.bgColour || DEFAULT_PANEL_COLOUR);
-  const hex = setColour && authored === DEFAULT_PANEL_COLOUR ? bare(setColour) : authored;
+  // `bgFollowsSet: false`: the author kept this colour when applying a set (utils/controlSetApply.js),
+  // even if it is the default one.
+  const hex = setColour && authored === DEFAULT_PANEL_COLOUR && panel.bgFollowsSet !== false ? bare(setColour) : authored;
   if (hex.length === 8) {
     const a = parseInt(hex.slice(0, 2), 16) / 255;
     const rgb = hex.slice(2);

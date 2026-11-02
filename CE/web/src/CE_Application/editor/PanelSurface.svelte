@@ -57,7 +57,8 @@
   const surfaceUid = $props.id();
   const panelMaterialId = `panel-material-${surfaceUid}`;
   let panelControlSet = $derived(controlSetForPanel(panel));
-  let panelMaterial = $derived(panelControlSet?.panel?.material ?? null);
+  // The panel's own, when the author kept a material while applying a set (utils/controlSetApply.js).
+  let panelMaterial = $derived(panel?.surfaceMaterial ?? panelControlSet?.panel?.material ?? null);
   let panelLit = $derived(materialActive(panelMaterial));
   // What to paint, in order: controls, plus one image for each locked scenery layer. The decision
   // lives in utils/sceneryRenderPlan.js so the preview surface makes it identically — a panel that

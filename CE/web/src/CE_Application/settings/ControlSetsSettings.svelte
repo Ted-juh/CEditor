@@ -6,11 +6,15 @@
   import Trash2 from 'lucide-svelte/icons/trash-2';
   import Upload from 'lucide-svelte/icons/upload';
   import Images from 'lucide-svelte/icons/images';
+  import ChevronDown from 'lucide-svelte/icons/chevron-down';
+  import ChevronRight from 'lucide-svelte/icons/chevron-right';
   import PanelPreviewSurface from '../editor/PanelPreviewSurface.svelte';
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
+  import ControlSetCard from './ControlSetCard.svelte';
+  import { groupControlSets } from '../utils/controlSetGroups.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, NEW_PANEL_CONTROL_SET_ID, getControlSet, normalizeControlSetDefinition, resolveToken } from '../models/controlSets.js';
+  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, normalizeControlSetDefinition, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -19,8 +23,8 @@
     removeControlSetFromLibrary, updateControlSetInLibrary,
   } from '../stores/controlSetLibrary.js';
   import { generalSettings, updateGeneralSettings } from '../stores/appSettings.js';
-  import { activePanel, activePanelId } from '../stores/panels.js';
-  import { setPanelControlSet } from '../stores/controlSets.js';
+  import { activePanelId, panels } from '../stores/panels.js';
+  import { requestControlSetApply } from '../stores/controlSets.js';
   import { deepClone } from '../utils/deepClone.js';
 
   const COLOUR_ROLES = [
@@ -34,16 +38,22 @@
   ];
   const DESIGN_SOURCES = PHYSICAL_DIRECTIONS.map((entry) => getControlSet(entry.id)).filter(Boolean);
 
-  // Opens on the set the panel in front uses: it opened on the default for new panels, so the
-  // Library always showed Graphite whatever the panel was drawn with.
-  let panelSetId = $derived(String($activePanel?.controlSet?.id ?? ''));
-  let selectedId = $state(untrack(() => String($activePanel?.controlSet?.id ?? '') || $generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
+  // Opens on the set the panel uses: it opened on the default for new panels, so the Library always
+  // showed Graphite whatever the panel was drawn with. The panel is the one `activePanelId` names:
+  // `activePanel` is empty while the Settings tab is in front, which is always, here.
+  let targetPanel = $derived($panels.find((entry) => entry.id === $activePanelId) ?? null);
+  let panelSetId = $derived(targetPanel ? String(targetPanel.controlSet?.id || DEFAULT_CONTROL_SET_ID) : '');
+  let selectedId = $state(untrack(() => panelSetId || $generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
   let draft = $state(null);
   let loadedId = $state('');
   let fileInput = $state(null);
   let status = $state('');
   let galleryOpen = $state(false);
   let familySources = $state({});
+  let query = $state('');
+  // The mechanisms fold away by default: twelve odd ones out, opened when wanted.
+  let folded = $state(new Set(['mechanical']));
+  let previewWidth = $state(376);
   let importGeneration = 0;
 
   onDestroy(() => { importGeneration += 1; });
@@ -59,6 +69,8 @@
   let builtInSets = $derived(allSets.filter((set) => set.origin === 'built-in'));
   let selectedSet = $derived(allSets.find((set) => set.id === selectedId) ?? allSets[0]);
   let isCustom = $derived(selectedSet?.origin === 'library');
+  let groups = $derived(groupControlSets({ librarySets: mySets, builtInSets, panelSetId, query }));
+  let panelName = $derived(String(targetPanel?.name ?? ''));
 
   $effect(() => {
     const id = selectedId;
@@ -212,8 +224,20 @@
     }
   }
 
+  /**
+   * Apply opens the Apply window (layout/ApplyControlSetDialog.svelte), where you choose what
+   * changes. Your own set is saved first, so what is applied is what the preview shows.
+   */
   function applyToPanel(id = selectedId) {
-    status = setPanelControlSet($activePanelId, id) ? 'Applied to the current panel.' : 'Open a panel to apply a set.';
+    if (!targetPanel) { status = 'Open a panel to apply a set.'; return; }
+    if (isCustom && draft?.id === id) updateControlSetInLibrary(draft.id, draft);
+    requestControlSetApply(id, $activePanelId);
+  }
+
+  function toggleGroup(id) {
+    const next = new Set(folded);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    folded = next;
   }
 </script>
 
@@ -221,140 +245,212 @@
   <ControlSetGallery initialId={selectedId} onapply={(id) => { choose(id); applyToPanel(id); }} onclose={() => galleryOpen = false} />
 {/if}
 
+<div class="cs-host">
 <div class="control-set-settings">
-  <section class="settings-card default-card">
-    <div class="card-head"><h2>Control Sets</h2><p>Choose the starting design for new panels and manage reusable visual systems.</p></div>
-    <div class="default-row">
-      <label><span>Default for new panels</span>
-        <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value, defaultControlSetChosen: true })}>
-          {#if mySets.length}
-            <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+  <aside class="column library" aria-label="Control set library">
+    <header><strong>Library</strong><button class="icon" title="New control set" aria-label="Create control set" onclick={createSet}><Plus size={15} /></button></header>
+    <input class="search" type="search" placeholder="Search sets…" aria-label="Search control sets" bind:value={query} />
+    <div class="scroll">
+      {#each groups as group (group.id)}
+        {@const open = query.trim() !== '' || !folded.has(group.id)}
+        <section class="group" data-set-group={group.id}>
+          <button type="button" class="group-head" aria-expanded={open} onclick={() => toggleGroup(group.id)}>
+            {#if open}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}
+            <span>{group.label}</span><small>{group.sets.length}</small>
+          </button>
+          {#if open}
+            {#if group.eras}
+              {#each group.eras as era (era.label)}
+                <div class="era">{era.label}</div>
+                <div class="cards">
+                  {#each era.sets as set (set.id)}<ControlSetCard {set} active={selectedId === set.id} onPanel={panelSetId === set.id} onselect={choose} />{/each}
+                </div>
+              {/each}
+            {:else}
+              <div class="cards">
+                {#each group.sets as set (set.id)}<ControlSetCard {set} active={selectedId === set.id} onPanel={panelSetId === set.id} onselect={choose} />{/each}
+              </div>
+            {/if}
           {/if}
-          <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
-          {#if !allSets.some((set) => set.id === defaultSetId)}
-            <option value={defaultSetId}>{defaultSetId} (not installed; new panels use {BASE_CONTROL_SET.name})</option>
-          {/if}
-        </select>
-      </label>
-      <button class="primary" onclick={() => galleryOpen = true}><Images size={15} /> Browse 36 templates</button>
-      <button onclick={() => fileInput?.click()}><Upload size={15} /> Import</button>
-      <input bind:this={fileInput} hidden type="file" accept=".json,application/json" onchange={importFile} />
+        </section>
+      {:else}
+        <p class="empty">No set matches “{query}”.</p>
+      {/each}
     </div>
-  </section>
+  </aside>
 
-  <div class="workspace">
-    <aside class="library">
-      <header><strong>Library</strong><button title="Create set" aria-label="Create control set" onclick={createSet}><Plus size={15} /></button></header>
-      <div class="library-scroll">
-        {#if $controlSetLibrary.length}
-          <div class="library-group"><small>MY SETS</small><div class="library-row">
-            {#each $controlSetLibrary as set}<button class:active={selectedId === set.id} class:on-panel={panelSetId === set.id} onclick={() => choose(set.id)}><b>{set.name}</b><span>{panelSetId === set.id ? 'On this panel' : 'Editable'}</span></button>{/each}
-          </div></div>
-        {/if}
-        <div class="library-group"><small>BUILT IN</small><div class="library-row">
-          {#each BUILT_IN_CONTROL_SETS as set}<button class:active={selectedId === set.id} class:on-panel={panelSetId === set.id} onclick={() => choose(set.id)}><b>{set.name}</b><span>{panelSetId === set.id ? 'On this panel' : set.description}</span></button>{/each}
-        </div></div>
+  {#if draft && previewPanel}
+    <div class="column editor">
+      <header class="editor-head">
+        <div class="title">
+          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">on this panel</span>{/if}</h2>
+          <p>{isCustom ? 'Your own set: edits are saved with Save set, and exported as a file' : 'Built in: change anything and it becomes your own copy'}</p>
+        </div>
+        <div class="actions">
+          <button onclick={duplicateSelected}><Copy size={14} /> Duplicate</button>
+          <button onclick={downloadSelected}><Download size={14} /> Export</button>
+          {#if isCustom}<button class="danger" onclick={removeSelected}><Trash2 size={14} /> Delete</button>{/if}
+          {#if isCustom}<button class="primary" onclick={saveDraft}>Save set</button>{/if}
+        </div>
+      </header>
+
+      <div class="scroll fields">
+        <section>
+          <h3>Identity</h3>
+          <div class="identity">
+            <label><span>Name</span><input type="text" value={draft.name} onchange={(event) => edit((next) => ({ ...next, name: event.target.value }))} /></label>
+            <label><span>Description</span><textarea rows="2" value={draft.description} onchange={(event) => edit((next) => ({ ...next, description: event.target.value }))}></textarea></label>
+          </div>
+        </section>
+
+        <section>
+          <h3>Shared colours</h3>
+          <div class="colour-grid">
+            {#each COLOUR_ROLES as [key, label]}
+              <label><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span>
+                <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
+            {/each}
+          </div>
+        </section>
+
+        <section>
+          <h3>Surface material</h3>
+          <div class="material-row">
+            <label class="check"><input type="checkbox" checked={draft.panel?.material?.enabled === true} onchange={(event) => setMaterial({ enabled: event.target.checked })} /> Enabled</label>
+            <label><span>Finish</span><select value={draft.panel?.material?.kind ?? 'blast'} onchange={(event) => setMaterial({ kind: event.target.value })}>{#each MATERIAL_KINDS as kind}<option value={kind}>{kind}</option>{/each}</select></label>
+            <label><span>Depth</span><input type="range" min="0" max="150" value={draft.panel?.material?.strength ?? 50} onchange={(event) => setMaterial({ strength: Number(event.target.value) })} /></label>
+            <label><span>Shine</span><input type="range" min="0" max="150" value={draft.panel?.material?.shine ?? 40} onchange={(event) => setMaterial({ shine: Number(event.target.value) })} /></label>
+          </div>
+        </section>
+
+        <section>
+          <h3>Control families</h3>
+          <p>Mix mechanisms from the 36 synthesizer templates. The complete family definition is copied into your set.</p>
+          <div class="family-grid">
+            {#each FAMILY_ROLES as [family, label]}
+              <label><span>{label}</span><select value={familySources[family] ?? ''} onchange={(event) => setFamilySource(family, event.target.value)}>
+                <option value="">Keep current design</option>
+                {#each DESIGN_SOURCES as source}<option value={source.id}>{source.name}</option>{/each}
+              </select></label>
+            {/each}
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <aside class="column side" aria-label="Preview and apply">
+      <header><strong>Live preview</strong><span>{draft.name}</span></header>
+      <div class="scroll side-body">
+        <div class="preview-viewport" bind:clientWidth={previewWidth}
+             style:height={`${Math.round((previewWidth / (previewPanel.width || 880)) * (previewPanel.height || 636))}px`}>
+          <div class="preview-scale" style:width={`${previewPanel.width || 880}px`} style:height={`${previewPanel.height || 636}px`}
+               style:transform={`scale(${previewWidth / (previewPanel.width || 880)})`}>
+            {#key JSON.stringify(draft)}<PanelPreviewSurface panel={previewPanel} scale={1} bgLayers={{ solid: buildSolidStyle(previewPanel) }} gridStyle="" />{/key}
+          </div>
+        </div>
+        <div class="side-tools">
+        <button class="primary apply" onclick={() => applyToPanel()} disabled={!targetPanel} data-testid="control-set-apply">
+          {targetPanel ? `Apply to ${panelName || 'the panel'}…` : 'Open a panel to apply a set'}
+        </button>
+        {#if status}<p class="status">{status}</p>{/if}
+
+        <label class="default"><span>Default for new panels</span>
+          <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value, defaultControlSetChosen: true })}>
+            {#if mySets.length}
+              <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+            {/if}
+            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+            {#if !allSets.some((set) => set.id === defaultSetId)}
+              <option value={defaultSetId}>{defaultSetId} (not installed; new panels use {BASE_CONTROL_SET.name})</option>
+            {/if}
+          </select>
+        </label>
+        <button onclick={() => galleryOpen = true}><Images size={15} /> Browse the 36 templates</button>
+        <button onclick={() => fileInput?.click()}><Upload size={15} /> Import a set…</button>
+        <input bind:this={fileInput} hidden type="file" accept=".json,application/json" onchange={importFile} />
+        </div>
       </div>
     </aside>
-
-    {#if draft && previewPanel}
-      <div class="editor">
-        <div class="editor-head">
-          <div><h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">on this panel</span>{/if}</h2><p>{isCustom ? 'Personal set · edits can be saved and exported' : 'Built-in template · change anything and it becomes your own copy'}</p></div>
-          <div class="actions">
-            <button onclick={duplicateSelected}><Copy size={14} /> Duplicate</button>
-            <button onclick={downloadSelected}><Download size={14} /> Export</button>
-            {#if isCustom}<button class="danger" onclick={removeSelected}><Trash2 size={14} /> Delete</button>{/if}
-            <button onclick={() => applyToPanel()}>Apply to panel</button>
-            {#if isCustom}<button class="primary" onclick={saveDraft}>Save set</button>{/if}
-          </div>
-        </div>
-
-        <div class="edit-grid">
-          <div class="fields">
-            <section>
-              <h3>Identity</h3>
-              <label><span>Name</span><input type="text" value={draft.name} onchange={(event) => edit((next) => ({ ...next, name: event.target.value }))} /></label>
-              <label><span>Description</span><textarea rows="2" value={draft.description} onchange={(event) => edit((next) => ({ ...next, description: event.target.value }))}></textarea></label>
-            </section>
-
-            <section>
-              <h3>Shared colours</h3>
-              <div class="colour-grid">
-                {#each COLOUR_ROLES as [key, label]}
-                  <label><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span>
-                    <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
-                {/each}
-              </div>
-            </section>
-
-            <section>
-              <h3>Surface material</h3>
-              <div class="material-row">
-                <label class="check"><input type="checkbox" checked={draft.panel?.material?.enabled === true} onchange={(event) => setMaterial({ enabled: event.target.checked })} /> Enabled</label>
-                <label><span>Finish</span><select value={draft.panel?.material?.kind ?? 'blast'} onchange={(event) => setMaterial({ kind: event.target.value })}>{#each MATERIAL_KINDS as kind}<option value={kind}>{kind}</option>{/each}</select></label>
-                <label><span>Depth</span><input type="range" min="0" max="150" value={draft.panel?.material?.strength ?? 50} onchange={(event) => setMaterial({ strength: Number(event.target.value) })} /></label>
-                <label><span>Shine</span><input type="range" min="0" max="150" value={draft.panel?.material?.shine ?? 40} onchange={(event) => setMaterial({ shine: Number(event.target.value) })} /></label>
-              </div>
-            </section>
-
-            <section>
-              <h3>Control families</h3>
-              <p>Mix mechanisms from the 36 synthesizer templates. The complete family definition is copied into your set.</p>
-              <div class="family-grid">
-                {#each FAMILY_ROLES as [family, label]}
-                  <label><span>{label}</span><select value={familySources[family] ?? ''} onchange={(event) => setFamilySource(family, event.target.value)}>
-                    <option value="">Keep current design</option>
-                    {#each DESIGN_SOURCES as source}<option value={source.id}>{source.name}</option>{/each}
-                  </select></label>
-                {/each}
-              </div>
-            </section>
-          </div>
-
-          <aside class="preview-card">
-            <header><strong>Live preview</strong><span>Representative controls</span></header>
-            <div class="preview-viewport"><div class="preview-scale">
-              {#key JSON.stringify(draft)}<PanelPreviewSurface panel={previewPanel} scale={1} bgLayers={{ solid: buildSolidStyle(previewPanel) }} gridStyle="" />{/key}
-            </div></div>
-            {#if status}<p class="status">{status}</p>{/if}
-          </aside>
-        </div>
-      </div>
-    {/if}
-  </div>
+  {/if}
+</div>
 </div>
 
 <style>
-  .control-set-settings { display:flex; flex-direction:column; gap:12px; padding:18px; color:#ddd; min-width:0; }
-  .settings-card,.workspace { border:1px solid #303030; border-radius:12px; background:linear-gradient(180deg,#222,#181818); overflow:hidden; }
-  .card-head { padding:12px 14px 10px; border-bottom:1px solid #2b2b2b; } h2,h3,p { margin:0; }
-  .card-head h2,.editor-head h2 { font-size:17px; color:#f4f4f4; } .card-head p,.editor-head p { margin-top:4px; font-size:11px; color:#8d8d8d; }
-  .default-row { display:flex; flex-wrap:wrap; align-items:end; gap:9px; padding:13px 14px; } .default-row label { flex:1 1 260px; }
+  /* Three columns, each scrolling on its own: the Library, the set's fields, and the preview with
+     Apply beside them, always in sight. The preview used to sit under the fields, out of view.
+     Laid out by the room the Settings page has, not the window's: the dock and the inspector can
+     take most of a laptop screen. */
+  .cs-host { container-type:inline-size; height:100%; }
+  .control-set-settings {
+    box-sizing:border-box; height:100%; min-height:560px; padding:14px; color:#ddd;
+    display:grid; grid-template-columns:minmax(280px,340px) minmax(0,1fr) minmax(300px,400px); grid-template-rows:minmax(0,1fr); gap:12px;
+  }
+  .column { display:flex; flex-direction:column; min-width:0; min-height:0; border:1px solid #303030; border-radius:10px; background:#1b1b1b; overflow:hidden; }
+  .column > header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 12px; border-bottom:1px solid #2b2b2b; font-size:12px; color:#eee; }
+  .column > header span { color:#7d7d7d; font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .scroll { flex:1 1 auto; min-height:0; overflow:auto; }
+  h2,h3,p { margin:0; }
   label { display:flex; flex-direction:column; gap:6px; font-size:11px; color:#aaa; } select,input,textarea,button { font:inherit; }
-  select,input[type='text'],textarea { color:#e9e9e9; background:#161616; border:1px solid #3b3b3b; border-radius:6px; padding:7px 9px; }
-  textarea { resize:vertical; } button { display:flex; align-items:center; justify-content:center; gap:6px; color:#ddd; background:#292929; border:1px solid #444; border-radius:7px; padding:7px 10px; cursor:pointer; white-space:nowrap; }
-  button:hover { border-color:#5b9bd5; } button.primary { background:#0b5f99; border-color:#177fc3; color:white; } button.danger { color:#efaaaa; }
-  .workspace { min-height:620px; display:flex; flex-direction:column; }
-  .library { background:#191919; border-bottom:1px solid #303030; padding:10px; min-width:0; }
-  .library header { display:flex; align-items:center; justify-content:space-between; padding:3px 4px 9px; } .library header button { padding:5px; }
-  .library-scroll { display:flex; gap:14px; overflow:auto; padding-bottom:3px; } .library-group { flex:0 0 auto; } .library-group > small { display:block; padding:0 4px 5px; color:#727272; font-size:9px; letter-spacing:.12em; }
-  .library-row { display:flex; gap:5px; } .library-row button { display:flex; flex-direction:column; align-items:flex-start; width:132px; text-align:left; border-color:transparent; background:#222; padding:7px 8px; white-space:normal; }
-  .library-row button.active { background:#093f63; border-color:#116998; } .library b { font-size:11px; } .library span { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:#8e8e8e; font-size:9px; }
-  .editor { min-width:0; } .editor-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px 18px; align-items:center; padding:13px 15px; border-bottom:1px solid #303030; }
-  .actions { display:flex; gap:6px; flex-wrap:wrap; } .edit-grid { display:flex; flex-direction:column; }
-  .fields { padding:13px; display:flex; flex-direction:column; gap:11px; } .fields section { padding:12px; background:#1b1b1b; border:1px solid #343434; border-radius:9px; }
-  .fields h3 { font-size:12px; color:#eee; margin-bottom:10px; } .fields section > p { color:#858585; font-size:10px; margin:-5px 0 10px; }
-  .fields section > label + label { margin-top:9px; } input:disabled,textarea:disabled,select:disabled { opacity:.55; }
-  .colour-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; } .colour-grid label { flex-direction:row; align-items:center; padding:5px 7px; background:#242424; border-radius:6px; }
-  .colour-grid .swatch { width:22px; height:22px; flex:0 0 auto; border:1px solid #555; border-radius:4px; }
-  .colour-grid .role { flex:1; min-width:0; } .colour-grid .code { width:82px; flex:0 0 auto; padding:4px 6px; font-family:ui-monospace,monospace; font-size:11px; }
+  select,input[type='text'],input[type='search'],textarea { color:#e9e9e9; background:#161616; border:1px solid #3b3b3b; border-radius:6px; padding:6px 9px; }
+  textarea { resize:vertical; }
+  button { display:flex; align-items:center; justify-content:center; gap:6px; color:#ddd; background:#292929; border:1px solid #444; border-radius:7px; padding:6px 10px; cursor:pointer; white-space:nowrap; }
+  button:hover:not(:disabled) { border-color:#5b9bd5; } button:disabled { opacity:.55; cursor:default; }
+  button.primary { background:#0b5f99; border-color:#177fc3; color:white; } button.danger { color:#efaaaa; }
+  button.icon { padding:4px 6px; }
+
+  .search { margin:8px 10px 4px; }
+  .group-head { width:100%; justify-content:flex-start; gap:5px; padding:7px 10px 3px; border:none; border-radius:0; background:none; color:#6FA8C7; font-size:9.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+  .group-head[aria-expanded='false'] { color:#8a8a8a; }
+  .group-head small { margin-left:auto; color:#777; font-weight:600; letter-spacing:0; }
+  .era { padding:5px 14px 1px; color:#8a8a8a; font-size:10px; }
+  .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:6px; padding:4px 10px 8px; }
+  .empty { padding:14px; color:#888; font-size:11px; }
+
+  .editor-head { align-items:flex-start !important; flex-wrap:wrap; }
+  .editor-head .title { min-width:0; }
+  .editor-head h2 { font-size:15px; color:#f4f4f4; } .editor-head p { margin-top:3px; font-size:11px; color:#8d8d8d; }
+  .actions { display:flex; gap:6px; flex-wrap:wrap; }
+  .fields { padding:12px; display:flex; flex-direction:column; gap:10px; }
+  .fields section { padding:11px 12px; background:#1e1e1e; border:1px solid #343434; border-radius:8px; }
+  .fields h3 { font-size:12px; color:#eee; margin-bottom:9px; } .fields section > p { color:#858585; font-size:10px; margin:-4px 0 9px; }
+  .identity { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,2fr); gap:9px; }
+  .colour-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(190px,1fr)); gap:6px; }
+  .colour-grid label { flex-direction:row; align-items:center; padding:4px 6px; background:#242424; border-radius:5px; }
+  .colour-grid .swatch { width:20px; height:20px; flex:0 0 auto; border:1px solid #555; border-radius:4px; }
+  .colour-grid .role { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .colour-grid .code { width:78px; flex:0 0 auto; padding:3px 6px; font-family:ui-monospace,monospace; font-size:11px; }
+  .material-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px; align-items:end; } .check { flex-direction:row; align-items:center; padding-bottom:8px; }
+  input[type='range'] { accent-color:#2486c5; width:100%; }
+  .family-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
   .on-panel { margin-left:8px; font-size:10px; font-weight:600; color:#8fd1a6; border:1px solid #3c5a46; border-radius:9px; padding:1px 7px; vertical-align:middle; }
-  .library-row button.on-panel span { color:#8fd1a6; }
-  .material-row { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; align-items:end; } .check { flex-direction:row; align-items:center; padding-bottom:8px; }
-  input[type='range'] { accent-color:#2486c5; width:100%; } .family-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
-  .preview-card { border-top:1px solid #303030; background:#161616; padding:13px; } .preview-card header { display:flex; justify-content:space-between; font-size:11px; margin-bottom:10px; } .preview-card header span { color:#777; }
-  .preview-viewport { width:min(360px,100%); height:272px; overflow:hidden; border:1px solid #424242; border-radius:7px; background:#222; } .preview-scale { width:880px; height:636px; transform:scale(.425); transform-origin:top left; }
-  .status { margin-top:10px; color:#9fccec; font-size:11px; line-height:1.4; }
-  @media (max-width:900px) { .colour-grid,.family-grid { grid-template-columns:1fr; } }
+
+  .side-body { padding:12px; display:flex; flex-direction:column; gap:9px; }
+  .preview-viewport { position:relative; width:100%; overflow:hidden; border:1px solid #424242; border-radius:7px; background:#222; flex:0 0 auto; }
+  .preview-scale { transform-origin:top left; }
+  .apply { height:32px; }
+  .default { margin-top:6px; }
+  .status { color:#9fccec; font-size:11px; line-height:1.4; }
+
+  .side-tools { display:flex; flex-direction:column; gap:9px; min-width:0; }
+
+  /* Less room: the preview and Apply above the fields, the Library beside both. */
+  @container (max-width:1079px) {
+    .control-set-settings { grid-template-columns:minmax(240px,300px) minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); }
+    .library { grid-row:1 / span 2; }
+    .side { grid-column:2; grid-row:1; }
+    .editor { grid-column:2; grid-row:2; }
+    .side-body { flex-direction:row; flex-wrap:wrap; align-items:flex-start; }
+    .side .preview-viewport { flex:1 1 240px; max-width:360px; }
+    .side-tools { flex:1 1 200px; }
+  }
+  /* Little room: one column, the page scrolls as a whole. */
+  @container (max-width:679px) {
+    .control-set-settings { display:flex; flex-direction:column; height:auto; min-height:0; }
+    .library { order:0; }
+    .library .scroll { max-height:420px; }
+    .scroll { overflow:visible; }
+    .library .scroll { overflow:auto; }
+    .side { order:1; }
+    .editor { order:2; }
+  }
 </style>

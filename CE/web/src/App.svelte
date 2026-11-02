@@ -26,6 +26,7 @@
   import { initPanelBridge, panels, openSettingsTab, activeEditorTab, flushUnsavedSessionSnapshot, addPanel, activePanel, clearSelection, closeActiveEditorTab, openPanelFromFile, saveActiveEditorDocument, selectComponent, selectedComponentIds } from './CE_Application/stores/panels.js';
   import { get } from 'svelte/store';
   import ComponentExportDialog from './CE_Application/layout/ComponentExportDialog.svelte';
+  import ApplyControlSetDialog from './CE_Application/layout/ApplyControlSetDialog.svelte';
   import { openComponentExport } from './CE_Application/stores/componentExport.js';
   import { importComponentFile, mayBeComponentFile } from './CE_Application/stores/componentImport.js';
   import { notify } from './CE_Application/stores/scriptUi.js';
@@ -552,6 +553,7 @@
 
   <NewPanelDialog />
   <ComponentExportDialog />
+  <ApplyControlSetDialog />
   <HistoryWindow />
 
   {#if showShortcuts}

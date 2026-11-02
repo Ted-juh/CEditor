@@ -35,7 +35,10 @@ test('the preview draws the set being edited, its controls pinned to it', () => 
 
 test('the Library opens on the panel\'s set; built-ins are editable through a copy; colours are typed', () => {
   const source = settings();
-  assert.match(source, /let selectedId = \$state\(untrack\(\(\) => String\(\$activePanel\?\.controlSet\?\.id \?\? ''\) \|\| \$generalSettings\.defaultControlSetId/);
+  // The panel `activePanelId` names: `activePanel` is empty while the Settings tab is in front.
+  assert.match(source, /let targetPanel = \$derived\(\$panels\.find\(\(entry\) => entry\.id === \$activePanelId\)/);
+  assert.match(source, /let selectedId = \$state\(untrack\(\(\) => panelSetId \|\| \$generalSettings\.defaultControlSetId/);
+  assert.doesNotMatch(source, /\$activePanel\?/);
   assert.doesNotMatch(source, /disabled=\{!isCustom\}/, 'nothing greyed out on a built-in');
   assert.match(source, /const copy = duplicateControlSet\(next, `\$\{builtInName\} \(mine\)`\);/);
   assert.doesNotMatch(source, /type="color"/, 'no colour popup');

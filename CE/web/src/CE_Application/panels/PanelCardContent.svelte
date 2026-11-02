@@ -39,7 +39,7 @@
   import ListMusic from 'lucide-svelte/icons/list-music';
   import Palette from 'lucide-svelte/icons/palette';
   import { DEFAULT_CONTROL_SET_ID, getControlSet } from '../models/controlSets.js';
-  import { setActivePanelControlSet } from '../stores/controlSets.js';
+  import { requestControlSetApply } from '../stores/controlSets.js';
   import { availableControlSets, controlSetLibrary } from '../stores/controlSetLibrary.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { formatFileSize, formatDate } from '../utils/formatting.js';
@@ -614,7 +614,9 @@
     {@const activeSet = getControlSet(activeSetId, { document: panel.controlSets, library: $controlSetLibrary })}
     <PropertySection title="Control set" icon={Palette}>
       <PropertyCell label="Set" span={4} hint="One visual language every ready-made control draws from: colours, and for some sets the knob's body, the buttons' finish and the panel's material. Switching restyles every control that has not been given a value of its own.">
-        <select class="val" value={activeSetId} onchange={(e) => setActivePanelControlSet(e.target.value)}>
+        <!-- Through the Apply window, which asks what should change; the dropdown shows the panel's set
+             until it is applied. -->
+        <select class="val" value={activeSetId} onchange={(e) => { const chosen = e.target.value; e.target.value = activeSetId; requestControlSetApply(chosen, panel.id); }}>
           {#each setGroups as group (group.origin)}
             <optgroup label={group.label}>
               {#each group.sets as set (set.id)}

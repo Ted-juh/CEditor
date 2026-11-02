@@ -16,10 +16,12 @@
 // (stores/controlSetLibrary.js), then the built-ins. Choosing a library set copies it into the
 // document, so the Player and the build — which have no library — find it there.
 
-import { derived, get } from 'svelte/store';
+import { derived, get, writable } from 'svelte/store';
 import { activePanel, panels, updatePanel } from './panels.js';
 import { controlSetLibrary, carryControlSetInDocument } from './controlSetLibrary.js';
-import { controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
+import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
+import { applyControlSetChoices } from '../utils/controlSetApply.js';
+import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
 
 export { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY } from '../models/controlSets.js';
 
@@ -59,5 +61,48 @@ export function setPanelControlSet(panelId, id) {
     ? [librarySet, ...(panel.controlSets ?? []).filter((set) => set.id !== librarySet.id)]
     : panel.controlSets;
   updatePanel(panel.id, { controlSet: normalized, controlSets: carried });
+  return true;
+}
+
+/**
+ * The Apply window (layout/ApplyControlSetDialog.svelte): `{ panelId, setId }` while it is open.
+ * Every place a set is applied asks through here, so the choice of what changes is offered once,
+ * the same everywhere: Settings › Control Sets, its template gallery and the panel's own Set.
+ */
+export const controlSetApplyRequest = writable(null);
+
+export function requestControlSetApply(setId, panelId = get(activePanel)?.id) {
+  if (!panelId || !setId) return false;
+  controlSetApplyRequest.set({ panelId, setId: String(setId) });
+  return true;
+}
+
+/**
+ * Apply `setId` to the panel as chosen (utils/controlSetApply.js): one store write, one undo step.
+ * A library set is carried into the document, as choosing it always did.
+ */
+export function applyControlSetWithChoices(panelId, setId, choices = {}) {
+  const panel = get(panels).find((entry) => entry.id === panelId);
+  if (!panel) return false;
+  const library = get(controlSetLibrary);
+  const newRef = normalizeControlSet(setId);
+  const librarySet = library.find((set) => set.id === newRef.id);
+  const oldSetId = String(panel.controlSet?.id ?? DEFAULT_CONTROL_SET_ID);
+  const oldSet = getControlSet(oldSetId, { document: panel.controlSets, library });
+  const newSet = getControlSet(newRef.id, { document: panel.controlSets, library });
+  const applied = applyControlSetChoices(panel, newRef, choices, { oldSetId, oldSet, newSet, defaultPanelColour: DEFAULT_PANEL_COLOUR });
+  const controlSets = librarySet
+    ? [librarySet, ...(panel.controlSets ?? []).filter((set) => set.id !== librarySet.id)]
+    : panel.controlSets;
+  // The old set stays in the document while a control is pinned to it, so a library set pinned
+  // here still resolves where the library is not (the Player, the build).
+  const oldLibrarySet = library.find((set) => set.id === oldSetId);
+  const carried = oldLibrarySet && !(controlSets ?? []).some((set) => set.id === oldSetId)
+    ? [...(controlSets ?? []), oldLibrarySet]
+    : controlSets;
+  const { id: _id, ...patch } = { ...applied, controlSets: carried };
+  // updatePanel merges, so a field the choices took away has to be written as gone.
+  for (const key of ['bgFollowsSet', 'surfaceMaterial']) if (!(key in patch)) patch[key] = undefined;
+  updatePanel(panel.id, patch);
   return true;
 }
