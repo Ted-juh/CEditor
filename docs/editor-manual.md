@@ -506,15 +506,22 @@ part of the drawing still a layer you can change.
 The control opens in the Component Designer, ready to use and to change:
 
 - **From SVG** (Illustrator, Inkscape, Affinity Designer, Figma, Sketch), every shape is a vector
-  layer, with its colours, gradient, outline and opacity. Text stays text.
-- **From Photoshop** (and GIMP, Krita, Affinity Photo, Photopea, Procreate), every layer is a picture
-  layer with its opacity and blend mode, its mask and the layers clipped to it built in. Change a
-  layer's colour with its tint. Text layers stay text where the file says their size and colour.
+  layer, with its colours, gradient (on its fill and its outline), pattern, outline and opacity. Text
+  stays text. A shape cut by a clip path is cut for good and stays a vector; a mask, or a clip on
+  text, a picture or an outlined shape, becomes the layer's own mask. Pictures linked from the SVG
+  are read from beside it.
+- **From Photoshop** (and GIMP, Krita, Affinity Photo, Photopea, Procreate), every pixel layer is a
+  picture layer with its opacity and blend mode, and every shape layer a vector layer, its paths,
+  fill and stroke editable. Layer masks and vector masks stay masks, on or off as they were. Drop
+  shadows and outer glows stay shadows you can change; a shape layer's other styles become its own
+  fill, outline, inner shadows and bevel, and a picture's are drawn into it, close to Photoshop's.
+  Adjustment layers are applied to the layers under them. Change a picture layer's colour with its
+  tint. Text layers stay text where the file says their size and colour.
 
 What moves is wired: a dial, a fader, a switch or a button, with its value, the area that takes the
 mouse, and the layers that follow the value. A drawing with nothing named to move comes in as
-layers only. The Console says what each name made, and what was drawn differently: clip paths and
-pattern fills from SVG, and Photoshop layer styles, vector masks and adjustment layers, are not read.
+layers only. The Console says what each name made, and what was drawn close to rather than exactly:
+Photoshop's Bevel, Satin and some adjustments.
 
 ## 5. Connecting to your synth
 

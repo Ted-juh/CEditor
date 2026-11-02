@@ -318,15 +318,23 @@ control itself, a custom component of layers, opened in the Component Designer
 `utils/artworkComponent.js`):
 
 - **SVG**: every shape a vector layer (a path part, `meta.pathData` in its box), transforms applied
-  to its points, its fill, linear or radial gradient, stroke and opacity from attributes, `style` and
-  class rules, inherited as SVG inherits them; text as text, embedded pictures as pictures. Not read,
-  and reported: clip paths and masks, pattern fills, gradient strokes, linked pictures.
-- **Photoshop**: every layer a picture layer, cropped to its pixels, its layer mask and Fill opacity
-  baked in and the layers clipped to it blended in (`psdComposite.js`); its opacity, blend mode
-  (CSS's, or the nearest) and visibility kept as the layer's; Pass Through groups unfolded, isolated
-  groups flattened; text as text where the file says its size and colour. A layer's colour is
-  changed with the image tint. Not read, and reported: layer effects, vector masks, adjustment
-  layers.
+  to its points, its fill, linear or radial gradient, pattern (as its picture), stroke (a gradient
+  stroke as the outline's gradient) and opacity from attributes, `style` and class rules, inherited
+  as SVG inherits them; text as text, pictures as pictures, linked ones read from beside the file.
+  A plain filled shape under a clip path is cut to it with Paper.js; masks and other clips are the
+  layer's mask.
+- **Photoshop**: every pixel layer a picture layer, cropped to its pixels, the layers clipped to it
+  blended in (`psdComposite.js`); every shape layer a vector layer (`utils/psdVectors.js`); layer and
+  vector masks the layer's mask; opacity, blend mode (CSS's, or the nearest) and visibility kept;
+  Drop Shadow and Outer Glow the layer's shadows, the other styles a shape layer's settings or drawn
+  into a picture (`utils/psdLayerStyles.js`); adjustment layers applied to what is under them
+  (`utils/psdAdjustments.js`). Pass Through groups unfolded, isolated groups flattened; text as text
+  where the file says its size and colour. A layer's colour is changed with the image tint.
+- **Layer masks** (`utils/partMask.js`): a part may carry `mask: { enabled, src, x, y, width,
+  height, invert }`, a PNG or SVG whose alpha is the mask, in % of the part's box, drawn with CSS
+  masking; a masked part is never baked into a static picture. A picture layer casts its shadows
+  from its pixels (`drop-shadow()`), not its box. Editing a mask in the Component Designer waits on
+  its mock-up.
 - **What moves**, from the names, as the panel importers read them: `pointer`/`indicator`/
   `needle`/`rotor` turn about the `pivot` (or the middle of the knob they sit on), `fader`/`thumb`
   slide along the `track`, `lamp`/`led`/`on` and `off` show the state, `pressed` shows while held. The

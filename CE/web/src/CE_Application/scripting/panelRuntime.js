@@ -7546,7 +7546,9 @@ const DEFINE_SPECS = {
       'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
       // A button's or a switch's device parts (models/buttonDeviceParts.js).
       'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
-      'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize'],
+      'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize',
+      // A layer's mask (utils/partMask.js).
+      'mask'],
   },
   ValueChannels: {
     // An array channel's size, items and itemFields come from its own maker.

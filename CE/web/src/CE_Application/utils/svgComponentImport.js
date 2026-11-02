@@ -301,24 +301,51 @@ function background(fill, stroke) {
     // The gradient is the paint; the solid under it shows only through its own transparency.
     f.solidEnabled = false;
   }
+  if (fill.picture) {
+    // A pattern: drawn once, as a picture over the shape's box, and clipped to its outline.
+    Object.assign(f, { solidEnabled: false, imageEnabled: true, imageSrc: fill.picture, imageFit: 'stretch', imageOpacity: 100 });
+  }
   const b = section._children.Border;
   b.enabled = !!stroke;
   if (stroke) {
     b.colour = stroke.colour;
     b.thickness = stroke.width;
+    if (stroke.gradient) {
+      // A gradient outline, straight across the shape as SVG draws it.
+      Object.assign(b, { fillSolid: false, fillGradient: true, gradient: stroke.gradient, gradientFlow: 'across' });
+    }
   }
   section._children.Corners.radius = 0;
   return section;
 }
 
+const matrixText = (m) => `matrix(${m.map((v) => round(v, 6)).join(' ')})`;
+
+function invert(m) {
+  const det = m[0] * m[3] - m[1] * m[2];
+  if (!det) return [1, 0, 0, 1, 0, 0];
+  return [m[3] / det, -m[1] / det, -m[2] / det, m[0] / det, (m[2] * m[5] - m[3] * m[4]) / det, (m[1] * m[4] - m[0] * m[5]) / det];
+}
+
+function svgPicture(svg) {
+  const bytes = new TextEncoder().encode(svg);
+  let binary = '';
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return `data:image/svg+xml;base64,${btoa(binary)}`;
+}
 /**
  * Read `text` and plan the component. Never throws: `{ ok: false, error }` says what to change.
  * `{ ok, name, width, height, component, kind, report, layers, warnings }`.
+ *
+ * `files` maps a linked picture's href to its data URL (the command reads them from beside the file);
+ * `geometry` (utils/partOutlines.js loadGeometry) lets a clipped shape be cut to its clip path and
+ * stay one vector, where without it the clip is the layer's mask.
  */
-export function planSvgComponentImport(text, { fileName = '' } = {}) {
+export function planSvgComponentImport(text, { fileName = '', files = {}, geometry = null } = {}) {
+  const source = String(text ?? '').replace(/^﻿/, '');
   let root;
   try {
-    root = parseXml(text, { doctypeSubset: 'skip' });
+    root = parseXml(source, { offsets: true, doctypeSubset: 'skip' });
   } catch (error) {
     return { ok: false, error: `This is not an SVG file CEditor can read (${error?.message ?? error}).` };
   }
@@ -328,20 +355,85 @@ export function planSvgComponentImport(text, { fileName = '' } = {}) {
 
   const classes = classRules(root);
   const gradients = gradientIndex(root);
+  // Ids by kind: a file may give a gradient and a shape the same id ("cap"), and a fill means the
+  // gradient, a <use> the shape.
   const ids = new Map();
+  const defs = { paint: new Map(), clipPath: new Map(), mask: new Map() };
   const indexIds = (node) => {
-    if (node.attributes?.id) ids.set(node.attributes.id, node);
+    const id = node.attributes?.id;
+    if (id) {
+      if (node.name === 'linearGradient' || node.name === 'radialGradient' || node.name === 'pattern') defs.paint.set(id, node);
+      else if (node.name === 'clipPath') defs.clipPath.set(id, node);
+      else if (node.name === 'mask') defs.mask.set(id, node);
+      else if (!ids.has(id)) ids.set(id, node);
+    }
     for (const child of node.children ?? []) indexIds(child);
   };
   indexIds(root);
+
+  // The document's definitions, carried into every picture made from part of it (a mask, a clip, a
+  // pattern), so what they refer to is there: gradients, patterns, styles, clip paths, masks.
+  const DEFINITIONS = new Set(['linearGradient', 'radialGradient', 'pattern', 'style', 'filter', 'clipPath', 'mask', 'symbol', 'marker']);
+  const definitions = [];
+  const gatherDefinitions = (node) => {
+    if (DEFINITIONS.has(node.name) && Number.isFinite(node.start) && Number.isFinite(node.end)) {
+      definitions.push(source.slice(node.start, node.end));
+      return;
+    }
+    for (const child of node.children ?? []) gatherDefinitions(child);
+  };
+  gatherDefinitions(root);
+  const defsText = definitions.join('');
+  /** A picture of `content` (in document pixels) over `box`, for a mask or a fill. */
+  const picture = (box, content) => svgPicture(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"`
+    + ` width="${round(Math.max(1, box.width))}" height="${round(Math.max(1, box.height))}" viewBox="${round(box.x, 3)} ${round(box.y, 3)} ${round(Math.max(1e-3, box.width), 3)} ${round(Math.max(1e-3, box.height), 3)}"`
+    + ` preserveAspectRatio="none"><defs>${defsText}</defs>${content}</svg>`);
 
   const layers = [];
   const taken = new Set();
   const warnings = [];
   const noted = new Map();
   const note = (key, text) => { if (!noted.has(key)) noted.set(key, new Set()); noted.get(key).add(text); };
+  const refOf = (value) => String(value ?? '').match(/^url\(\s*["']?#([^)"'\s]+)["']?\s*\)/)?.[1] ?? '';
 
-  const visit = (node, matrix, inherited, opacity, names, depth = 0) => {
+  /**
+   * The clips and masks a layer sits under, outermost first: `{ kind: 'clip' | 'mask', id, matrix }`,
+   * the matrix the one their element is drawn with. Each becomes part of the layer's mask, or, for a
+   * plain filled shape under one clip and nothing else, cuts the shape itself.
+   */
+  const maskContent = (stack, box) => {
+    // The innermost first, wrapped outward: each group masks what is inside it.
+    let content = `<rect x="${round(box.x - 1, 3)}" y="${round(box.y - 1, 3)}" width="${round(box.width + 2, 3)}" height="${round(box.height + 2, 3)}" fill="#fff"/>`;
+    // The clip or mask is evaluated in its element's own space; the inner group undoes that space,
+    // so what it masks stays where it is in the document.
+    for (const entry of [...stack].reverse()) {
+      const attribute = entry.kind === 'clip' ? 'clip-path' : 'mask';
+      content = `<g transform="${matrixText(entry.matrix)}" ${attribute}="url(#${entry.id})"><g transform="${matrixText(invert(entry.matrix))}">${content}</g></g>`;
+    }
+    return content;
+  };
+  const applyMasks = (part, box, stack) => {
+    if (!stack.length) return;
+    part.mask = { enabled: true, src: picture(box, maskContent(stack, box)), x: 0, y: 0, width: 100, height: 100, invert: false };
+  };
+
+  /** A clip path's region in the document, as path data, or '' (for Paper.js to cut a shape to). */
+  const clipRegion = (entry) => {
+    const clip = defs.clipPath.get(entry.id);
+    if (!clip || String(clip.attributes?.clipPathUnits ?? '') === 'objectBoundingBox') return '';
+    const own = multiply(entry.matrix, parseTransform(clip.attributes?.transform));
+    const pieces = [];
+    for (const child of clip.children ?? []) {
+      if (!SHAPES.has(child.name)) return '';
+      const data = shapePathData(child);
+      if (!data) continue;
+      const model = transformModel(parsePathData(data), multiply(own, parseTransform(child.attributes?.transform)));
+      pieces.push(serializePathData(model, 4));
+    }
+    return pieces.join(' ');
+  };
+
+  const visit = (node, matrix, inherited, opacity, names, stack, depth = 0) => {
     if (!node?.name || depth > 64 || SKIPPED.has(node.name)) return;
     const style = { ...inherited };
     const own = ownStyle(node, classes);
@@ -353,37 +445,46 @@ export function planSvgComponentImport(text, { fileName = '' } = {}) {
     // An unnamed shape is called after its group ("body", "body_2"), then after what it is.
     const label = name || names[0] || node.name;
     const chain = name ? [name, ...names] : names;
-    if (node.attributes?.['clip-path'] || node.attributes?.mask || /clip-path|mask/.test(String(node.attributes?.style ?? ''))) {
-      note('clip', label);
+    // Its own clip and mask join those of its groups.
+    const clipId = refOf(node.attributes?.['clip-path'] ?? own['clip-path']);
+    const maskId = refOf(node.attributes?.mask ?? own.mask);
+    const here = [...stack];
+    if (clipId) {
+      if (defs.clipPath.has(clipId)) here.push({ kind: 'clip', id: clipId, matrix: m });
+      else note('missing', label);
+    }
+    if (maskId) {
+      if (defs.mask.has(maskId)) here.push({ kind: 'mask', id: maskId, matrix: m });
+      else note('missing', label);
     }
 
     if (node.name === 'g' || node.name === 'svg' || node.name === 'a' || node.name === 'switch') {
-      for (const child of node.children ?? []) visit(child, m, style, alpha, chain, depth + 1);
+      for (const child of node.children ?? []) visit(child, m, style, alpha, chain, here, depth + 1);
       return;
     }
     if (node.name === 'use') {
       const target = ids.get(String(node.attributes?.href ?? node.attributes?.['xlink:href'] ?? '').replace(/^#/, ''));
       if (!target) { note('use', label); return; }
       const shifted = multiply(m, [1, 0, 0, 1, num(node.attributes?.x), num(node.attributes?.y)]);
-      visit(target.name === 'symbol' ? { ...target, name: 'g' } : target, shifted, style, alpha, chain, depth + 1);
+      visit(target.name === 'symbol' ? { ...target, name: 'g' } : target, shifted, style, alpha, chain, here, depth + 1);
       return;
     }
     if (SHAPES.has(node.name)) {
-      shapeLayer(node, m, style, alpha, label, chain);
+      shapeLayer(node, m, style, alpha, label, chain, here);
       return;
     }
     if (node.name === 'text') {
-      textLayer(node, m, style, alpha, label, chain);
+      textLayer(node, m, style, alpha, label, chain, here);
       return;
     }
     if (node.name === 'image') {
-      imageLayer(node, m, alpha, label, chain);
+      imageLayer(node, m, alpha, label, chain, here);
       return;
     }
     note('unknown', `<${node.name}>`);
   };
 
-  const shapeLayer = (node, m, style, alpha, label, chain) => {
+  const shapeLayer = (node, m, style, alpha, label, chain, stack) => {
     const data = shapePathData(node);
     if (!data) return;
     let model;
@@ -394,38 +495,72 @@ export function planSvgComponentImport(text, { fileName = '' } = {}) {
       return;
     }
     if (!model.length) return;
-    const placed = transformModel(model, m);
-    const bounds = modelBounds(placed);
-    if (!bounds) return;
+    let placed = transformModel(model, m);
     const fillValue = style.fill ?? '#000000';
     const strokeValue = style.stroke ?? 'none';
-    const fillRef = String(fillValue).match(/^url\(\s*#([^)\s]+)\s*\)/);
-    const strokeColour = parseColour(String(strokeValue).match(/^url\(/) ? 'none' : strokeValue);
-    if (String(strokeValue).match(/^url\(/)) note('strokeGradient', label);
+    const fillRef = refOf(fillValue);
+    const strokeRef = refOf(strokeValue);
+    const strokeColour = strokeRef ? 'gradient' : parseColour(strokeValue);
     const strokeWidth = strokeColour ? num(style['stroke-width'], 1) * scaleOf(m) : 0;
     const open = node.name === 'line' || node.name === 'polyline' || placed.every((subpath) => !subpath.closed);
+
+    // A plain filled shape under one clip path is cut to it, and stays one vector you can edit. A
+    // stroked one, or one under a mask or several clips, is masked: the stroke stays whole round the
+    // outline and is cut where SVG cuts it.
+    let masks = stack;
+    if (geometry && stack.length === 1 && stack[0].kind === 'clip' && !strokeColour && !open) {
+      const region = clipRegion(stack[0]);
+      if (region) {
+        try {
+          const { scope } = geometry;
+          const shape = new scope.CompoundPath({ pathData: serializePathData(placed, 4), insert: false });
+          if (String(style['fill-rule'] ?? '') === 'evenodd') shape.fillRule = 'evenodd';
+          const cut = shape.intersect(new scope.CompoundPath({ pathData: region, insert: false }), { insert: false });
+          if (!cut || cut.isEmpty?.() || !cut.pathData) return;
+          placed = parsePathData(cut.pathData);
+          if (!placed.length) return;
+          masks = [];
+        } catch {
+          masks = stack;
+        }
+      }
+    }
+    const bounds = modelBounds(placed);
+    if (!bounds) return;
     // A drawn stroke sits half outside the outline; the layer's box holds all of it, and the
     // renderer insets the outline by half the stroke (editor/InteractivePartRenderer.svelte).
     const half = strokeWidth / 2;
     const box = { x: bounds.x - half, y: bounds.y - half, width: Math.max(1, bounds.width + strokeWidth), height: Math.max(1, bounds.height + strokeWidth) };
     const inner = { x: bounds.x, y: bounds.y, width: Math.max(1e-6, bounds.width), height: Math.max(1e-6, bounds.height) };
+    const local = modelBounds(model) ?? inner;
 
-    let fill = { colour: '00000000', gradient: null };
+    let fill = { colour: '00000000', gradient: null, picture: '' };
     if (!open) {
-      if (fillRef) {
-        const gradient = gradients.get(fillRef[1]);
-        const local = modelBounds(model) ?? inner;
-        fill = gradient ? { colour: '00000000', gradient: gradientFill(gradient, gradients, classes, local, inner, m) } : fill;
-        if (!gradient) note('pattern', label);
+      const target = fillRef ? defs.paint.get(fillRef) : null;
+      if (target?.name === 'linearGradient' || target?.name === 'radialGradient') {
+        fill = { colour: '00000000', gradient: gradientFill(target, gradients, classes, local, inner, m), picture: '' };
+      } else if (target?.name === 'pattern') {
+        // The pattern drawn over the shape's own box, as SVG draws it there, and the shape clips it.
+        fill = { colour: '00000000', gradient: null, picture: picture(inner, `<g transform="${matrixText(m)}"><rect x="${round(local.x, 3)}" y="${round(local.y, 3)}" width="${round(local.width, 3)}" height="${round(local.height, 3)}" fill="url(#${fillRef})"/></g>`) };
+      } else if (fillRef) {
+        note('missing', label);
       } else {
         const colour = parseColour(fillValue);
-        if (colour === undefined) note('pattern', label);
-        else if (colour) fill = { colour: argb(colour, opacityOf(style['fill-opacity'])), gradient: null };
+        if (colour === undefined) note('paint', label);
+        else if (colour) fill = { colour: argb(colour, opacityOf(style['fill-opacity'])), gradient: null, picture: '' };
       }
     }
     if (open && !strokeColour) return;
-    const stroke = strokeColour ? { colour: argb(strokeColour, opacityOf(style['stroke-opacity'])), width: round(Math.max(0.5, strokeWidth)) } : null;
-    if (!stroke && fill.colour === '00000000' && !fill.gradient) return;
+    let stroke = null;
+    if (strokeColour === 'gradient') {
+      const target = defs.paint.get(strokeRef);
+      const gradient = target?.name === 'linearGradient' || target?.name === 'radialGradient' ? gradientFill(target, gradients, classes, local, inner, m) : null;
+      if (!gradient) note('paint', label);
+      stroke = { colour: gradient?.stops?.[0]?.color ?? 'FF000000', width: round(Math.max(0.5, strokeWidth)), gradient };
+    } else if (strokeColour) {
+      stroke = { colour: argb(strokeColour, opacityOf(style['stroke-opacity'])), width: round(Math.max(0.5, strokeWidth)) };
+    }
+    if (!stroke && fill.colour === '00000000' && !fill.gradient && !fill.picture) return;
 
     const partName = uniqueLayerName(label, taken);
     const part = createPartNode(partName, {
@@ -440,10 +575,11 @@ export function planSvgComponentImport(text, { fileName = '' } = {}) {
         ...(String(style['fill-rule'] ?? '') === 'evenodd' ? { fillRule: 'evenodd' } : {}),
       },
     });
+    applyMasks(part, box, masks);
     layers.push({ name: label, part, box, names: chain });
   };
 
-  const textLayer = (node, m, style, alpha, label, chain) => {
+  const textLayer = (node, m, style, alpha, label, chain, stack) => {
     const words = [];
     const collect = (n) => { if (n.text) words.push(String(n.text)); for (const child of n.children ?? []) collect(child); };
     collect(node);
@@ -480,12 +616,15 @@ export function planSvgComponentImport(text, { fileName = '' } = {}) {
       layout: { x: round(box.x), y: round(box.y), width: round(box.width), height: round(box.height), xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
       sections: { Text: text },
     });
+    applyMasks(part, box, stack);
     layers.push({ name: label, part, box, names: chain });
   };
 
-  const imageLayer = (node, m, alpha, label, chain) => {
-    const href = String(node.attributes?.href ?? node.attributes?.['xlink:href'] ?? '');
-    if (!href.startsWith('data:image/')) { note('link', label); return; }
+  const imageLayer = (node, m, alpha, label, chain, stack) => {
+    const linked = String(node.attributes?.href ?? node.attributes?.['xlink:href'] ?? '');
+    // A linked picture is read from beside the file, where the command could (files).
+    const href = linked.startsWith('data:image/') ? linked : String(files?.[linked] ?? '');
+    if (!href.startsWith('data:image/')) { note('link', label || linked); return; }
     const w = num(node.attributes?.width);
     const h = num(node.attributes?.height);
     if (!(w > 0 && h > 0)) return;
@@ -506,18 +645,18 @@ export function planSvgComponentImport(text, { fileName = '' } = {}) {
       layout: { x: round(box.x), y: round(box.y), width: round(box.width), height: round(box.height), xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
       sections: { Background: section },
     });
+    applyMasks(part, box, stack);
     layers.push({ name: label, part, box, names: chain });
   };
 
   const rootStyle = { fill: '#000000' };
-  for (const child of root.children ?? []) visit(child, frame.matrix, rootStyle, 1, []);
+  for (const child of root.children ?? []) visit(child, frame.matrix, rootStyle, 1, [], []);
 
   if (!layers.length) return { ok: false, error: 'The drawing has no shapes, text or embedded pictures to make layers of.' };
   const list = (key) => [...(noted.get(key) ?? [])].slice(0, 5).join(', ');
-  if (noted.has('clip')) warnings.push(`Clip paths and masks are not applied, so these are drawn whole: ${list('clip')}. Release the clipping mask in your editor, or crop the shape itself.`);
-  if (noted.has('pattern')) warnings.push(`Pattern fills are not read: ${list('pattern')}. Give them a colour or a gradient.`);
-  if (noted.has('strokeGradient')) warnings.push(`Gradient strokes are not read: ${list('strokeGradient')}. Outline the stroke in your editor to make it a filled shape.`);
-  if (noted.has('link')) warnings.push(`Linked pictures are not embedded: ${list('link')}. Embed them before exporting the SVG.`);
+  if (noted.has('paint')) warnings.push(`Paints that are not a colour, gradient or pattern are not read: ${list('paint')}.`);
+  if (noted.has('missing')) warnings.push(`References to a gradient, pattern, clip path or mask that is not in the file: ${list('missing')}.`);
+  if (noted.has('link')) warnings.push(`Linked pictures that could not be read: ${list('link')}. Keep them beside the SVG, or embed them before exporting.`);
   if (noted.has('use')) warnings.push(`References to nothing in the file: ${list('use')}.`);
   if (noted.has('unknown')) warnings.push(`Not read: ${list('unknown')}.`);
   if (noted.has('path')) warnings.push(`Paths that could not be read: ${list('path')}.`);

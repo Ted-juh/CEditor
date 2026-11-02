@@ -6,6 +6,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writePsdUint8Array } from 'ag-psd';
 import { readFileSync } from 'node:fs';
+import { inflateSync } from 'node:zlib';
 import { planSvgComponentImport } from '../src/CE_Application/utils/svgComponentImport.js';
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 import { artworkRole, describeArtworkComponent, nameWords } from '../src/CE_Application/utils/artworkComponent.js';
@@ -124,16 +125,16 @@ test('an SVG fader and a switch, wired by their names', () => {
   assert.deepEqual(still.component._children.Bindings._children, {});
 });
 
-test('an SVG that cannot be read says why, and what is not drawn is reported', () => {
+test('an SVG that cannot be read says why, and what could not be read is reported', () => {
   assert.match(planSvgComponentImport('not xml').error, /not an SVG file/);
   assert.match(planSvgComponentImport('<svg xmlns="http://www.w3.org/2000/svg"></svg>').error, /no size/);
   assert.match(planSvgComponentImport('<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10"></svg>').error, /no shapes/);
   const plan = planSvgComponentImport(`<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20">
-    <rect id="a" width="20" height="20" fill="#123" clip-path="url(#c)"/>
+    <rect id="a" width="20" height="20" fill="#123" clip-path="url(#nowhere)"/>
     <image id="photo" href="file.png" width="10" height="10"/></svg>`);
   assert.equal(plan.ok, true);
-  assert.ok(plan.warnings.some((line) => /Clip paths/.test(line) && /\ba\b/.test(line)));
-  assert.ok(plan.warnings.some((line) => /Linked pictures/.test(line) && /photo/.test(line)));
+  assert.ok(plan.warnings.some((line) => /not in the file/.test(line) && /\ba\b/.test(line)));
+  assert.ok(plan.warnings.some((line) => /Linked pictures/.test(line) && /photo/.test(line)), 'not beside the file: not read');
 });
 
 function solid(name, left, top, w, h, rgba, extra = {}) {
@@ -179,7 +180,7 @@ test('a Photoshop knob: every layer a picture layer, its blend mode, opacity and
   assert.equal(bindings(plan)[0].target, 'Parts.Pointer.Layout.rotation');
 });
 
-test('a Photoshop layer\'s mask and clipped layers are baked into its picture; effects and adjustments reported', () => {
+test('a Photoshop layer\'s mask is its own; its clipped layers are in its picture; its styles drawn', () => {
   const mask = solid('', 0, 0, 20, 20, [0, 0, 0, 255]);
   for (let y = 0; y < 20; y += 1) for (let x = 10; x < 20; x += 1) mask.imageData.data[(y * 20 + x) * 4] = 255;
   const bytes = writePsdUint8Array({
@@ -195,9 +196,13 @@ test('a Photoshop layer\'s mask and clipped layers are baked into its picture; e
   assert.equal(plan.ok, true, plan.error);
   const p = parts(plan);
   assert.deepEqual(Object.keys(p), ['base', 'glow'], 'the clipped layer is in its base');
-  // Cropped to what the mask leaves: the right half.
-  assert.deepEqual(['x', 'width'].map((k) => p.base._children.Layout[k]), [10, 10]);
-  assert.ok(plan.warnings.some((line) => /Layer effects/.test(line) && /glow/.test(line)));
+  // The whole layer, and its mask beside it: the right half shows.
+  assert.deepEqual(['x', 'width'].map((k) => p.base._children.Layout[k]), [0, 20]);
+  assert.equal(p.base.mask.enabled, true);
+  assert.match(p.base.mask.src, /^data:image\/png;base64,/);
+  // The drop shadow is the layer's own, from its pixels.
+  assert.equal(p.glow._children.Effects._children.Shadows.items[0].type, 'drop');
+  assert.ok(plan.kept.includes('Drop Shadow'));
   assert.match(planPsdComponentImport(new Uint8Array([1, 2, 3])).error, /not a Photoshop file/);
 });
 
@@ -208,4 +213,136 @@ test('the commands are in the File menu and open the component in the Component 
   const actions = readFileSync(new URL('../src/CE_Application/stores/artworkComponentActions.js', import.meta.url), 'utf8');
   assert.match(actions, /createComponentDocument\(\{ control: plan\.component, name: plan\.name \}\)/);
   assert.match(actions, /setActiveEditorTab\(\{ type: 'component', id: document\.id \}\)/);
+});
+
+test('SVG clip paths cut a plain shape and stay one vector; masks, clipped text and stroked shapes get a real mask', async () => {
+  const { loadGeometry } = await import('../src/CE_Application/utils/partOutlines.js');
+  const geometry = await loadGeometry();
+  const plan = planSvgComponentImport(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <defs>
+   <clipPath id="half"><rect x="0" y="0" width="50" height="100"/></clipPath>
+   <linearGradient id="fade" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#000"/></linearGradient>
+   <mask id="soft"><rect width="100" height="100" fill="url(#fade)"/></mask>
+   <pattern id="dots" width="10" height="10" patternUnits="userSpaceOnUse"><circle cx="5" cy="5" r="2" fill="#f00"/></pattern>
+   <linearGradient id="rim" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#eee"/><stop offset="1" stop-color="#333"/></linearGradient>
+  </defs>
+  <circle id="cut" cx="50" cy="50" r="40" fill="#08f" clip-path="url(#half)"/>
+  <circle id="cutEdge" cx="50" cy="50" r="40" fill="#08f" stroke="#000" clip-path="url(#half)"/>
+  <rect id="faded" x="10" y="10" width="80" height="80" fill="#0f0" mask="url(#soft)"/>
+  <rect id="dotted" x="20" y="20" width="60" height="60" fill="url(#dots)"/>
+  <circle id="ring" cx="50" cy="50" r="30" fill="none" stroke="url(#rim)" stroke-width="4"/>
+  <g clip-path="url(#half)"><text id="label" x="50" y="95" font-size="10">CUT</text></g>
+  <image id="photo" href="photo.png" x="0" y="0" width="10" height="10"/>
+  </svg>`, { geometry, files: { 'photo.png': 'data:image/png;base64,iVBORw0KGgo=' } });
+  assert.equal(plan.ok, true, plan.error);
+  assert.deepEqual(plan.warnings, []);
+  const p = parts(plan);
+  // Cut to its left half, a vector without a mask.
+  assert.deepEqual(['x', 'width'].map((k) => p.cut._children.Layout[k]), [10, 40]);
+  assert.equal(p.cut.mask, undefined);
+  // Stroked: whole, and masked, so the stroke is cut where SVG cuts it.
+  assert.equal(p.cutEdge._children.Layout.width, 81);
+  assert.match(svgOf(p.cutEdge.mask.src), /clip-path="url\(#half\)"/);
+  assert.match(svgOf(p.faded.mask.src), /mask="url\(#soft\)"/);
+  assert.match(svgOf(p.faded.mask.src), /<mask id="soft">/, 'the file\'s definitions travel with the mask');
+  assert.ok(p.label.mask, 'text under a clipped group is masked');
+  // A pattern, as the shape's picture.
+  const dotted = p.dotted._children.Background._children.Fill;
+  assert.equal(dotted.imageEnabled, true);
+  assert.match(svgOf(dotted.imageSrc), /fill="url\(#dots\)"/);
+  // A gradient outline.
+  const rim = p.ring._children.Background._children.Border;
+  assert.equal(rim.fillGradient, true);
+  assert.equal(rim.gradient.angle, 180);
+  // A linked picture, read from beside the file.
+  assert.equal(p.photo._children.Background._children.Fill.imageSrc, 'data:image/png;base64,iVBORw0KGgo=');
+});
+
+function svgOf(dataUrl) {
+  return Buffer.from(String(dataUrl).split(',')[1], 'base64').toString('utf8');
+}
+
+test('Photoshop shape layers are vectors, adjustments change what is under them, styles are kept or drawn', async () => {
+  const { loadGeometry } = await import('../src/CE_Application/utils/partOutlines.js');
+  const geometry = await loadGeometry();
+  const knot = (x, y) => ({ linked: true, points: [x, y, x, y, x, y] });
+  const rect = (x0, y0, x1, y1, operation = 'combine') => ({ open: false, operation, fillRule: 'non-zero', knots: [knot(x0, y0), knot(x1, y0), knot(x1, y1), knot(x0, y1)] });
+  const bytes = writePsdUint8Array({
+    width: 40,
+    height: 40,
+    children: [
+      solid('base', 0, 0, 40, 40, [100, 150, 200, 255]),
+      { name: 'frame', left: 0, top: 0, right: 40, bottom: 40, imageData: { width: 40, height: 40, data: new Uint8ClampedArray(40 * 40 * 4) },
+        vectorFill: { type: 'color', color: { r: 255, g: 0, b: 0 } },
+        vectorMask: { paths: [rect(5, 5, 35, 35), rect(15, 15, 25, 25, 'subtract')] },
+        vectorStroke: { strokeEnabled: true, fillEnabled: true, lineWidth: { units: 'Pixels', value: 2 }, content: { type: 'color', color: { r: 0, g: 0, b: 255 } } },
+        effects: { innerShadow: [{ enabled: true, size: { units: 'Pixels', value: 4 }, distance: { units: 'Pixels', value: 2 }, angle: 90, color: { r: 0, g: 0, b: 0 }, opacity: 0.5 }] } },
+      { name: 'Invert', adjustment: { type: 'invert' } },
+      solid('styled', 10, 10, 10, 10, [255, 255, 255, 255], { effects: {
+        stroke: [{ enabled: true, size: { units: 'Pixels', value: 3 }, position: 'outside', color: { r: 0, g: 255, b: 0 }, opacity: 1 }],
+        solidFill: [{ enabled: true, color: { r: 255, g: 0, b: 255 }, opacity: 1, blendMode: 'normal' }],
+      } }),
+      solid('cutout', 0, 0, 40, 40, [10, 10, 10, 255], { vectorMask: { paths: [rect(0, 0, 20, 40)], disable: true } }),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes, { geometry });
+  assert.equal(plan.ok, true, plan.error);
+  const p = parts(plan);
+  // A vector layer, its hole cut by the subtracting path, its stroke its outline.
+  assert.equal(p.frame.kind, 'path');
+  assert.equal((p.frame.meta.pathData.match(/M/g) ?? []).length, 2, 'the outline and the hole');
+  assert.deepEqual(['x', 'width'].map((k) => p.frame._children.Layout[k]), [4, 32], 'the stroke inside the box');
+  // Inverted by the adjustment layer above it, as a colour; the base picture too.
+  assert.equal(p.frame._children.Background._children.Fill.colour, 'FF00FFFF');
+  assert.equal(p.frame._children.Background._children.Border.colour, 'FFFFFF00');
+  const basePixel = pixelsOf(p.base._children.Background._children.Fill.imageSrc);
+  assert.deepEqual([...basePixel.slice(0, 3)], [155, 105, 55], 'the base picture, inverted');
+  // On a vector, an inner shadow is its own setting.
+  assert.equal(p.frame._children.Effects._children.Shadows.items.find((item) => item.type === 'inner').blur, 4);
+  // On a picture: drawn in, above the adjustment so not inverted; the outside stroke grows its box.
+  assert.deepEqual(['x', 'width'].map((k) => p.styled._children.Layout[k]), [7, 16]);
+  const styled = pixelsOf(p.styled._children.Background._children.Fill.imageSrc, 16);
+  assert.deepEqual([...styled.pixel(8, 8).slice(0, 3)], [255, 0, 255], 'the colour overlay');
+  assert.deepEqual([...styled.pixel(1, 8).slice(0, 3)], [0, 255, 0], 'the stroke');
+  // A vector mask kept as the layer's mask, disabled as it was in Photoshop.
+  assert.equal(p.cutout.mask.enabled, false);
+  assert.match(svgOf(p.cutout.mask.src), /<path d="/);
+  assert.ok(plan.warnings.some((line) => /drawn into the pictures/.test(line) && /Stroke/.test(line)));
+});
+
+function pixelsOf(dataUrl, width = 0) {
+  const png = Buffer.from(String(dataUrl).split(',')[1], 'base64');
+  let off = 8; let w = width; const idat = [];
+  while (off < png.length) {
+    const len = png.readUInt32BE(off);
+    const type = png.toString('ascii', off + 4, off + 8);
+    if (type === 'IHDR') w = png.readUInt32BE(off + 8);
+    if (type === 'IDAT') idat.push(png.subarray(off + 8, off + 8 + len));
+    off += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const row = w * 4 + 1;
+  const out = Uint8Array.from(raw.subarray(1, 1 + w * 4));
+  out.pixel = (x, y) => raw.subarray(y * row + 1 + x * 4, y * row + 1 + x * 4 + 4);
+  return out;
+}
+
+
+test('a layer mask is drawn with CSS masking, inverted on request, and keeps a masked layer live', async () => {
+  const { partMaskCSS, pictureShadowFilters, isPictureLayer } = await import('../src/CE_Application/utils/partMask.js');
+  const css = partMaskCSS({ src: 'data:image/png;base64,AA', x: 10, y: 0, width: 50, height: 100 }, 200, 100);
+  assert.match(css, /-webkit-mask-image:url\("data:image\/png;base64,AA"\)/);
+  assert.match(css, /mask-size:100px 100px/);
+  assert.match(css, /mask-position:20px 0px/);
+  assert.equal(partMaskCSS({ src: 'x', enabled: false }, 10, 10), '', 'a disabled mask is not drawn');
+  assert.match(partMaskCSS({ src: 'x', invert: true }, 10, 10), /mask-composite:exclude/);
+  // A picture's shadows follow its pixels.
+  const effects = { _children: { Shadows: { items: [{ enabled: true, type: 'drop', offsetX: 2, offsetY: 3, blur: 4, colour: '80000000' }, { enabled: true, type: 'inner', blur: 2 }] } } };
+  assert.equal(pictureShadowFilters(effects), 'drop-shadow(2px 3px 4px rgba(0, 0, 0, 0.502))');
+  assert.equal(isPictureLayer({ _children: { Fill: { imageEnabled: true, imageSrc: 'data:x', solidEnabled: false } } }), true);
+  const { whyNotBakeable } = await import('../src/CE_Application/utils/partsToSvg.js');
+  assert.equal(whyNotBakeable({ kind: 'rectangle', mask: { src: 'x' }, _children: {} }), 'a mask');
+  const renderer = readFileSync(new URL('../src/CE_Application/editor/InteractivePartRenderer.svelte', import.meta.url), 'utf8');
+  assert.match(renderer, /let maskCSS = \$derived\(partMaskCSS\(part\?\.mask, frame\.width, frame\.height\)\)/);
+  assert.match(renderer, /pictureLayer \? pictureShadowFilters\(effects\) : ''/);
 });

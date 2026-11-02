@@ -150,6 +150,8 @@ export function whyNotBakeable(part) {
   if (children.Effects) return 'effects section';
   if (part.meta && (part.meta.valueArc || part.meta.arcTrack)) return 'arc meta';
   if (part.clipChildren === true) return 'clips children';
+  // A mask is the layer's own (utils/partMask.js): drawn live, never folded into the picture.
+  if (part.mask?.src && part.mask.enabled !== false) return 'a mask';
 
   const layout = layoutIsPlain(children.Layout);
   if (layout) return layout;

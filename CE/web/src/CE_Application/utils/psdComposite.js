@@ -147,6 +147,10 @@ function compositeBuffer(dst, src, mode, opacity) {
 }
 
 /** The mask's value (0..1) at document pixel (x, y), or 1 when the layer has no usable mask. */
+export function layerMaskSampler(layer) {
+  return maskSampler(layer);
+}
+
 function maskSampler(layer) {
   const mask = layer.mask;
   if (!mask || mask.disabled || mask.fromVectorData) return null;

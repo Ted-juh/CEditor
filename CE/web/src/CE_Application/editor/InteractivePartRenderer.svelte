@@ -47,6 +47,7 @@
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
+  import { isPictureLayer, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import ControlAnatomy from './ControlAnatomy.svelte';
@@ -224,8 +225,13 @@
 
   let partScale = $derived(Math.max(0.01, numberOr(layout?.scale, 1)));
   let partRotation = $derived(numberOr(layout?.rotation, 0));
-  // On an outline the shadows are drawn from the outline (utils/outlineShadows.js), not the box.
-  let shadowCSS = $derived(shape.rendersOutline ? '' : buildShadowCSS(effects));
+  // On an outline the shadows are drawn from the outline (utils/outlineShadows.js), not the box; on a
+  // picture, from its pixels (utils/partMask.js), as filters below.
+  let pictureLayer = $derived(!shape.rendersOutline && !shape.rendersVectorShape && isPictureLayer(background));
+  let shadowCSS = $derived(shape.rendersOutline || pictureLayer ? '' : buildShadowCSS(effects));
+  let pictureShadows = $derived(pictureLayer ? pictureShadowFilters(effects) : '');
+  // The layer's mask, from its own picture (utils/partMask.js).
+  let maskCSS = $derived(partMaskCSS(part?.mask, frame.width, frame.height));
   let blendCSS = $derived(buildBlendCSS(effects));
   // A lit material (utils/materialFilter.js) is an SVG filter this part owns; it goes first in the
   // filter list so the CSS blur / brightness that follow act on the lit surface.
@@ -234,9 +240,11 @@
   const materialId = `part-material-${partUid}`;
   let filterCSS = $derived.by(() => {
     const css = buildFilterCSS(effects);
-    if (!materialLit) return css;
     const rest = css.replace(/^filter:\s*/, '').replace(/;$/, '');
-    return `filter: url(#${materialId})${rest ? ` ${rest}` : ''};`;
+    // One filter list: the lit material first, the CSS filters, then a picture's shadows, cast by
+    // what the filters made of it.
+    const list = [materialLit ? `url(#${materialId})` : '', rest, pictureShadows].filter(Boolean).join(' ');
+    return list ? `filter: ${list};` : '';
   });
   let hiddenForFade = $derived(fadeHidden && part?.visible === false);
   let partStyle = $derived.by(() => {
@@ -266,6 +274,7 @@
       shadowCSS,
       blendCSS,
       filterCSS,
+      maskCSS,
       // A flat colour or a single gradient paints here rather than on a child of its own. This
       // element exists either way; the div it replaces did not. `.interactive-part` has no
       // overflow clip unless a part asks for one, so a border-radius here shapes the background

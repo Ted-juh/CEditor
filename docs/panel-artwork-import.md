@@ -108,13 +108,24 @@ control: a custom component, every shape (SVG) or layer (Photoshop) one of its l
 Component Designer to change and save (`utils/svgComponentImport.js`, `utils/psdComponentImport.js`).
 
 - **SVG**: each `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` and `path` is a vector
-  layer with its transforms applied, its fill (a colour, a linear or radial gradient), its stroke as
-  the layer's outline, and its opacity; Illustrator's class rules are read. `<text>` is a text layer,
-  an embedded `<image>` a picture layer, `<use>` the shape it uses.
-- **Photoshop**: each layer is a picture layer cropped to its pixels, with its mask, Fill opacity
-  and clipped layers built into its pixels, and its opacity, blend mode and visibility as the layer's.
-  Pass Through groups are unfolded; a group with its own mode or mask is one layer. Text layers stay
-  text where the file says their size and colour.
+  layer with its transforms applied, its fill (a colour, a linear or radial gradient, a pattern drawn
+  as its picture), its stroke as the layer's outline (a gradient stroke as the outline's gradient),
+  and its opacity; Illustrator's class rules are read. `<text>` is a text layer, an `<image>` a
+  picture layer (a linked one read from beside the SVG, in the desktop app), `<use>` the shape it
+  uses. A plain filled shape under a clip path is cut to it and stays one vector; a `<mask>`, or a
+  clip on text, a picture, an outlined shape or several clips, becomes the layer's mask: an SVG
+  picture of the mask, made from the file's own definitions, drawn with CSS masking.
+- **Photoshop**: each pixel layer is a picture layer cropped to its pixels, the layers clipped to it
+  blended in, its opacity, blend mode and visibility as the layer's. Each shape layer is a vector
+  layer: its paths combined by their operations, its fill colour or gradient, its stroke. A layer
+  mask and a vector mask are the layer's own mask, kept off if Photoshop had them off. Drop Shadow
+  and Outer Glow are the layer's shadows (a picture casts them from its pixels); on a shape layer,
+  Color and Gradient Overlay, Stroke, Inner Shadow, Inner Glow and Bevel become its own settings; on a
+  picture they are drawn into it, with Satin, close to Photoshop's. Adjustment layers (Levels, Curves,
+  Exposure, Invert, Posterize, Threshold, Channel Mixer, Gradient Map exactly; Brightness/Contrast,
+  Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter closely) are applied to every
+  layer under them, pictures and colours alike. Pass Through groups are unfolded; a group with its
+  own mode or mask is one layer. Text layers stay text where the file says their size and colour.
 
 **What moves comes from the names**, anywhere in a layer's name or its group's, as whole words:
 
@@ -130,8 +141,9 @@ The control is wired from what was found: a dial, a fader, a switch, or a button
 layer is called button. With nothing named to move it is layers only. Not `cap`: a cap's highlight
 would swing round with it; name a cap that should turn `rotor`.
 
-Not read, and listed in the Console: SVG clip paths and masks, pattern fills, gradient strokes and
-linked pictures; Photoshop layer styles, vector masks and adjustment layers.
+Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
+approximate adjustments), Selective Color and Color Lookup adjustments (not applied), adjustment
+layers inside groups with their own blend mode, and references to anything not in the file.
 
 ## Update Panel from SVG Artwork
 
