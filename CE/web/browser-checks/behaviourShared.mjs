@@ -90,8 +90,11 @@ try {
     });
 
     const published = await offered();
-    led.check(X, 'linkPolicy — publishedOnly', 'the default reaches only the properties the author published, so a component\'s internals stay its own',
-      ['input:mainValue', 'input:mode', 'input:accentColour', 'output:mainValue', 'output:mode'],
+    // Since custom components were simplified every value is the panel's unless its author keeps it
+    // in (utils/componentPanelValues.js), so the default reaches what advancedOptIn does.
+    led.check(X, 'linkPolicy — publishedOnly', 'the default reaches the published values and every other value the author has not kept in — `gain`, never published, both ways; `secret`, kept in, neither',
+      ['input:mainValue', 'input:mode', 'input:accentColour', 'input:gain',
+       'output:mainValue', 'output:mode', 'output:gain'],
       published);
 
     await kit.set(a, { 'ExternalAPI.linkPolicy': 'advancedOptIn' });
@@ -111,12 +114,12 @@ try {
     await kit.set(a, { 'ExternalAPI.linkPolicy': 'publishedOnly', 'ExternalAPI.emitsExternalLinks': false });
     await kit.settle(500);
     led.check(X, 'emitsExternalLinks', 'switching it off takes away everything this component could drive others WITH — its outputs go, its inputs stay, so the component can still be driven while driving nothing',
-      ['input:mainValue', 'input:mode', 'input:accentColour'], await offered());
+      ['input:mainValue', 'input:mode', 'input:accentColour', 'input:gain'], await offered());
 
     await kit.set(a, { 'ExternalAPI.emitsExternalLinks': true, 'ExternalAPI.acceptsExternalLinks': false });
     await kit.settle(500);
     led.check(X, 'acceptsExternalLinks', 'and the mirror of it: with inbound refused the component offers only what it can drive others with',
-      ['output:mainValue', 'output:mode'], await offered());
+      ['output:mainValue', 'output:mode', 'output:gain'], await offered());
 
     // THE HALF THAT MAKES THESE SWITCHES RATHER THAN PICKER FILTERS. The list above is what the
     // Links editor draws; this is the run time. A link made while the component accepted input has

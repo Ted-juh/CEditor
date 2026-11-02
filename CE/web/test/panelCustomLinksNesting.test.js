@@ -8,7 +8,9 @@ function customComponent(id) {
     _children: {
       Core: { id, name: id, controlType: 'CustomComponent' },
       PublishedProperties: { inputs: { mainValue: { channel: 'mainValue', label: 'Main', type: 'float', enabled: true } }, outputs: {} },
-      ValueChannels: { _children: { mainValue: { type: 'float', min: 0, max: 1 } } },
+      // Published as an input only; since every value is the panel's unless its author keeps it in
+      // (componentPanelValues.js), the output it should not have is kept in.
+      ValueChannels: { _children: { mainValue: { type: 'float', min: 0, max: 1, publicOutput: false } } },
     },
   };
 }

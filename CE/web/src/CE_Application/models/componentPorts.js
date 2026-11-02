@@ -11,6 +11,7 @@ import { keyboardPorts } from '../utils/keyboardLayout.js';
 import { sequencerPorts } from '../utils/stepSequencerLayout.js';
 import { tabPorts } from '../utils/tabContainerLayout.js';
 import { scrollPorts } from '../utils/scrollAreaLayout.js';
+import { panelValueEntries } from '../utils/componentPanelValues.js';
 
 export const PARAMETER_TYPES = {
   INTEGER: 'integer',
@@ -305,11 +306,11 @@ function parameterTypesForPublishedType(type) {
   }
 }
 
+// Every value the panel can use, published or not (utils/componentPanelValues.js): a value made on
+// the Interact tab binds on the Device tab without being published first.
 function publishedPorts(control) {
-  const published = control?._children?.PublishedProperties;
-  if (!published) return [];
-  const inputs = Object.entries(published.inputs ?? {})
-    .filter(([, entry]) => entry?.enabled !== false)
+  if (!control?._children?.PublishedProperties && !control?._children?.ValueChannels) return [];
+  const inputs = panelValueEntries(control, 'input')
     .map(([name, entry]) => ({
       id: String(entry?.channel || name),
       label: entry?.label || name,
@@ -322,8 +323,7 @@ function publishedPorts(control) {
       publishedName: name,
       channel: entry?.channel || name,
     }));
-  const outputs = Object.entries(published.outputs ?? {})
-    .filter(([, entry]) => entry?.enabled !== false)
+  const outputs = panelValueEntries(control, 'output')
     .map(([name, entry]) => ({
       id: `out:${entry?.channel || name}`,
       label: `${entry?.label || name} Out`,

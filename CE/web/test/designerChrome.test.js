@@ -28,8 +28,9 @@ test('the layer quick bar says what its buttons do with icons, not letters, and 
   assert.doesNotMatch(style, /position: absolute/);
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
   assert.match(designer, /\{#snippet actions\(\)\}\s*\{#if activeSelectionFrame[^}]*\}\s*<SurfaceQuickbar/);
-  // The notice snippet: the empty component's hint (newCustomComponent.test.js), else the readiness steps.
-  assert.match(designer, /\{#snippet notice\(\)\}\s*\{#if componentEmpty\}\s*<div class="readiness-nudge empty-start"[\s\S]*?\{:else if !readinessNudgeDismissed && readinessNudgeSteps\.length\}\s*<div class="readiness-nudge"/);
+  // The notice snippet: the empty component's hint (newCustomComponent.test.js), and nothing else:
+  // the readiness steps that followed it went with the readiness checks (componentExportImport.test.js).
+  assert.match(designer, /\{#snippet notice\(\)\}\s*\{#if componentEmpty\}\s*<div class="readiness-nudge empty-start"[^\n]*\n\s*\{\/if\}\s*\{\/snippet\}/);
   const lookBar = src('CE_Application/sections/SurfaceLookBar.svelte');
   assert.match(lookBar, /<div class="lookbar-middle">\s*\{@render notice\?\.\(\)\}\s*\{@render actions\?\.\(\)\}/);
   // Nothing of the two is placed over the canvas any more.
@@ -207,7 +208,7 @@ test('the look bar is one row at one height, so selecting a layer does not move 
   assert.match(quick, /flex-wrap: nowrap;\s*flex-shrink: 0;/);
   const designer = src('CE_Application/sections/CustomDesignSurfaceEditor.svelte');
   assert.match(designer, /\.readiness-nudge \{[\s\S]*?flex-wrap: nowrap;[\s\S]*?overflow: hidden;/);
-  assert.match(designer, /<span class="nudge-text">\{step\.label\} — \{step\.detail\}<\/span>/);
+  assert.match(designer, /<span class="nudge-text">\{EMPTY_COMPONENT_HINT\}<\/span>/);
 });
 
 test("the colour dock takes a share of the designer's height, and never leaves the canvas without room", async () => {

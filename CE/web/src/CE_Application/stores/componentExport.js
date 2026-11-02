@@ -9,9 +9,12 @@ import { get, writable } from 'svelte/store';
 import { customComponentLibrary } from './customComponentLibrary.js';
 import { applyControlPatch, standaloneComponentControl } from './controls.js';
 import { markComponentDocumentSaved } from './componentWorkspace.js';
-import { createCustomComponentExportEnvelope } from '../utils/customComponentPackage.js';
+import { createCustomComponentExportEnvelope, createCustomComponentLibraryEnvelope } from '../utils/customComponentPackage.js';
 import { relinkCustomComponentPatch } from '../utils/customComponentSourceLink.js';
 import { componentExportFileName } from '../utils/componentExport.js';
+import { refreshSettingDefaultsPatch } from '../utils/componentSettings.js';
+import { applyPatchObject } from './controlTreeUtils.js';
+import { deepClone } from '../utils/deepClone.js';
 import { notify } from './scriptUi.js';
 
 /** Whether the Export window is open. */
@@ -26,7 +29,7 @@ export function closeComponentExport() {
 }
 
 /** A file the browser (or the app's WebView) saves as a download, as Package file did. */
-function downloadText(text, fileName) {
+export function downloadText(text, fileName) {
   if (typeof document === 'undefined' || typeof Blob === 'undefined') return false;
   const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
   const link = document.createElement('a');
@@ -48,16 +51,33 @@ function downloadText(text, fileName) {
  *
  * Returns `{ ok, entry, fileName, error }`.
  */
-export function exportComponent(control, { name, version, changes = '', toLibrary = true, toFile = false } = {}) {
+export function exportComponent(control, { name, version, changes = '', details = {}, toLibrary = true, toFile = false } = {}) {
   const id = control?._children?.Core?.id;
   if (!id) return { ok: false, error: 'There is no component to export.' };
   if (!toLibrary && !toFile) return { ok: false, error: 'Choose where to save it: the library, a file, or both.' };
-  const metadata = { name: String(name ?? '').trim() || undefined, version: String(version ?? '').trim() || undefined, changes };
+  const metadata = {
+    name: String(name ?? '').trim() || undefined,
+    version: String(version ?? '').trim() || undefined,
+    changes,
+    // The Export window's Details: what the library shows and searches. Left out, the package
+    // reads them from the component as it always did (normalizeCustomComponentMetadata).
+    ...Object.fromEntries(['description', 'category', 'tags', 'author', 'license']
+      .filter((key) => details?.[key] !== undefined)
+      .map((key) => [key, details[key]])),
+  };
   const standalone = get(standaloneComponentControl)?._children?.Core?.id === id;
-  // A component open on its own is named by its document; it takes the name it is exported under.
-  const exported = standalone && metadata.name
-    ? { ...control, _children: { ...control._children, Core: { ...control._children.Core, name: metadata.name } } }
-    : control;
+
+  // Every setting starts, on a copy placed from what is exported, as the component looks now
+  // (utils/componentSettings.js), however the author changed it since adding it.
+  const defaults = refreshSettingDefaultsPatch(control);
+  if (Object.keys(defaults).length) applyControlPatch(id, defaults);
+  let exported = control;
+  if (Object.keys(defaults).length || (standalone && metadata.name)) {
+    exported = deepClone(control);
+    applyPatchObject(exported, defaults);
+    // A component open on its own is named by its document; it takes the name it is exported under.
+    if (standalone && metadata.name) exported._children.Core.name = metadata.name;
+  }
 
   let entry = null;
   if (toLibrary) {
@@ -79,4 +99,22 @@ export function exportComponent(control, { name, version, changes = '', toLibrar
   const where = [entry ? 'to the library' : '', fileName ? `as ${fileName}` : ''].filter(Boolean).join(' and ');
   notify(`Exported ${metadata.name ?? 'the component'} ${entry?.version ?? metadata.version ?? ''} ${where}.`.replace(/\s+/g, ' '));
   return { ok: true, entry, fileName };
+}
+
+/** The dock Library tab's Save as file…: one saved component, as the file Export writes. */
+export function saveLibraryEntryToFile(entry) {
+  if (!entry?.envelope) return '';
+  const fileName = componentExportFileName(entry.name, entry.version);
+  downloadText(JSON.stringify(entry.envelope, null, 2), fileName);
+  return fileName;
+}
+
+/** The dock Library tab's Export all…: every saved component in one file, which Import reads back. */
+export function exportWholeLibrary(entries = get(customComponentLibrary)) {
+  const list = Array.isArray(entries) ? entries : [];
+  if (!list.length) return '';
+  const bundle = createCustomComponentLibraryEnvelope(list);
+  const fileName = `ceditor-component-library-${new Date().toISOString().slice(0, 10)}.json`;
+  downloadText(JSON.stringify(bundle, null, 2), fileName);
+  return fileName;
 }

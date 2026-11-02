@@ -10,6 +10,7 @@
   import CircleOff from 'lucide-svelte/icons/circle-off';
   import { getSection, applyControlPatch, updateControlProperty } from '../stores/controls.js';
   import { valueAtPath } from '../stores/controlTreeUtils.js';
+  import { panelValueEntries } from '../utils/componentPanelValues.js';
   import CustomSourceLinkCard from './CustomSourceLinkCard.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -24,8 +25,9 @@
   let channels = $derived(getSection(control, 'ValueChannels'));
   let published = $derived(getSection(control, 'PublishedProperties'));
   let api = $derived(getSection(control, 'ExternalAPI'));
-  let rawInputEntries = $derived(Object.entries(published?.inputs ?? {}).filter(([, entry]) => entry?.enabled !== false));
-  let rawOutputEntries = $derived(Object.entries(published?.outputs ?? {}).filter(([, entry]) => entry?.enabled !== false));
+  // Every value the panel can use, published or not (utils/componentPanelValues.js).
+  let rawInputEntries = $derived(panelValueEntries(control, 'input'));
+  let rawOutputEntries = $derived(panelValueEntries(control, 'output'));
   let rawPropertyEntries = $derived(Object.entries(published?.editableProperties ?? {}).filter(([, entry]) => entry?.enabled !== false));
   let inputEntries = $derived(
     rawInputEntries.filter(([, entry]) => hasValidChannel(entry))
@@ -205,7 +207,7 @@
 
   function openPublicApiEditor() {
     if (!core?.id) return;
-    // Jump to the author-side Publish tab in contract mode (opens the
+    // Jump to the author-side Settings tab (its id is still 'publish'; opens the
     // Designer workspace first when needed — Stage A6 rule).
     applyControlPatch(core.id, {
       'Designer.focusSection': 'publish',
@@ -268,10 +270,10 @@
       <span>Open Designer</span>
     </button>
   </PropertyCell>
-  <PropertyCell label="Authoring" span={2} hint="Open the Public API authoring tab to change what this package exposes.">
+  <PropertyCell label="Authoring" span={2} hint="Open the component's Settings tab: the values a panel can use and the settings it can change.">
     <button class="jump-btn" onclick={openPublicApiEditor} disabled={!core?.id}>
       <Cable size={14} strokeWidth={1.7} />
-      <span>Open Public API Editor</span>
+      <span>Open Settings</span>
     </button>
   </PropertyCell>
   {#if issueEntries.length}

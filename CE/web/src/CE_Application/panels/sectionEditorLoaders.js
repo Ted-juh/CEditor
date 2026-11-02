@@ -77,9 +77,10 @@ const LAZY_COMPONENT_LOADERS = {
   // controls and are embedded by CustomReactEditor.
   react: () => import('../sections/CustomReactEditor.svelte'),
   assets: () => import('../sections/CustomAssetsEditor.svelte'),
-  // Publish = contract + variant definitions + package/library (Stage B1);
-  // the instance-facing "Values" half lives in the `properties` tab (Stage A).
-  publish: () => import('../sections/CustomPublishEditor.svelte'),
+  // Settings (the tab id is still `publish`): the values a panel can use and the settings it can
+  // change on a copy. It replaced Publish's Contract and Package & Library pages when custom
+  // components were simplified; the instance-facing half lives in the `properties` tab (Stage A).
+  publish: () => import('../sections/CustomSettingsEditor.svelte'),
   properties: () => import('../sections/CustomInstancePropertiesEditor.svelte'),
   testbench: () => import('../sections/CustomTestBenchEditor.svelte'),
 };

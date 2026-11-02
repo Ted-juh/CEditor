@@ -778,20 +778,36 @@ Import one or start one, change it, choose what a panel may change about it, and
    ready-wired knobs, sliders and buttons. **Starters** gives you a beginning to work from. Press
    **?** for the designer's shortcuts. The properties panel works for the component as it does for
    a control on a panel, in its own tab too.
-3. On the properties panel's **Publish** tab, **Contract** sets what the component offers to the
-   panel: its inputs, outputs and the settings a panel may change on each copy.
+3. On the properties panel's **Settings** tab, choose what a panel can change on each copy (see
+   below).
 4. Press **Export...** in the designer's header (or Ctrl+S in a component's own tab). Give it a
    **Name** and a **Version** (it suggests the next one after what your library holds under that
    name) and, if you like, a line on **What changed**. Under **Save to**, tick **My component
    library**, **A file** (a `.ceditor-component.json` to keep or give to someone), or both, and
-   press **Export**.
+   press **Export**. **Details** opens the description, category, tags, author and licence the
+   library shows and searches; they are filled in from the last version you exported.
 5. On a panel, press **Back to Panel**. A component exported from a panel stays there as a linked
    copy of what you saved.
 
 The Export window checks three things: that the component draws something, that something on it (a
 hit zone) changes its value, and that every setting a panel may change points at something that
 still exists. A warning never stops the export; a display, for one, rightly has no hit zone. A
-setting that points at nothing has a **Remove** button beside it.
+setting that points at nothing has a **Remove** button beside it. These are the only checks: the
+designer does not grade a component while you draw it.
+
+The **Settings** tab has two lists:
+
+- **Values.** Every value the component has (made on the Interact tab) is the panel's: a panel can
+  bind it to a synth parameter on the Device tab, link it to other components, and the exported
+  plug-in automates it. Nothing has to be published. Switch **Panel can use it** off for a value
+  only the component itself uses.
+- **Settings the panel can change.** What each copy on a panel can set for itself, such as a label's
+  text or a colour. **+ Add a setting** lists the component's own layers under **Texts**,
+  **Colours**, **Images** and **Show / hide**. A setting shows the component's own value, and
+  changing it here changes the component, so a copy starts as the component looks. Click a
+  colour's swatch to colour it in the dock's **Colors** tool with its layer selected, or type its
+  code. Click a setting's name to rename it (the name is what the panel's author sees), and ✕ to
+  remove it.
 
 The **Shapes** palette down the left is for drawing. It opens folded, two narrow columns of its
 tools, so the artboard has the room; point at a tool for its name and key. The first of the three
@@ -839,8 +855,9 @@ a setting, so every copy can have its own.
 ### Using saved components
 
 The dock's **Library** tool shows every saved component, drawn as it really looks. Double-click a
-card, drag it onto the panel, or press **Place a copy**. The icon rail and the insert search list your
-saved components too.
+card, drag it onto the panel, or press **Place a copy**. **Open in Designer** opens it in a tab of
+its own to change and export again, and **Save as file...** writes it as a `.ceditor-component.json`.
+The icon rail and the insert search list your saved components too.
 
 A placed copy stays linked to its package in the library. Its **Source** card offers **Update to
 <version>** when a newer version exists, **Reset to library**, **Update N copies on panel**, and
@@ -853,8 +870,9 @@ can edit.
 
 Your library lives inside CEditor, not as files on disk. To give a component to someone else, export
 it with **A file** ticked. On the other computer, use **File → Import Component...** or drop the file
-on the window. To give all of them at once, use **Library file** under **Publish → Package &
-Library**; importing that file adds every component in it to the library.
+on the window. To give all of them at once, press **Export all...** in the dock's **Library** tool;
+**Import...** beside it (or File → Import Component...) adds every component in that file to the
+library.
 
 ## 11. Saving and sharing
 

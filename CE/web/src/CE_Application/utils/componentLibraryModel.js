@@ -41,7 +41,8 @@ export const LIBRARY_SORTS = [
   { key: 'recent', label: 'Recent', hint: 'Most recently saved first.' },
   { key: 'name', label: 'Name', hint: 'Alphabetical.' },
   { key: 'used', label: 'Most used', hint: 'How often you have placed it.' },
-  { key: 'ready', label: 'Readiness', hint: "The package's own readiness score." },
+  // No "Readiness": the score went with the readiness checks when custom components were
+  // simplified; the Export window's three checks are what is left of them.
 ];
 
 export const LIBRARY_SORT_KEYS = LIBRARY_SORTS.map((entry) => entry.key);
@@ -109,7 +110,6 @@ export function sortLibrary(rows, sort = 'recent') {
   const rank = (row) => {
     if (key === 'name') return null;
     if (key === 'used') return -row.useCount;
-    if (key === 'ready') return -row.readiness;
     return row.index;
   };
   return [...(rows ?? [])].sort((left, right) => {

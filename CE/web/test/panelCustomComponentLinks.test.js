@@ -30,6 +30,9 @@ function makeCustom(id, name, value = 0) {
             type: 'enum',
             defaultValue: 'A',
             values: ['A', 'B'],
+            // Published as an input only. Since every value is the panel's unless its author keeps
+            // it in (componentPanelValues.js), an output it should not have is kept in here.
+            publicOutput: false,
           },
         },
       },
@@ -270,13 +273,22 @@ test('a direction turned off stops links already authored in it from carrying a 
   assert.equal(applyPanelCustomLinkRoutes([source, target], sessions).target.customValues.mainValue, 0.73);
 });
 
-test('publishedOnly is the default and offers only the published contract', () => {
+test('the default offers the published values and every other value not kept in, as advancedOptIn does', () => {
+  // publishedOnly kept every unpublished value out until custom components were simplified: every
+  // value is the panel's now unless its author keeps it in, so `gain`, never published, is offered
+  // both ways, and `internalTrim`, kept in, is not.
   const control = withOptInChannel(withPrivateChannel(makeCustom('a', 'A')));
-  assert.deepEqual(listPanelCustomApiEndpoints([control]).map(key),
-    ['input:mainValue', 'input:mode', 'output:mainValue']);
+  const expected = ['input:mainValue', 'input:mode', 'input:gain', 'output:mainValue', 'output:gain'];
+  assert.deepEqual(listPanelCustomApiEndpoints([control]).map(key), expected);
   // Named explicitly, to prove the default is the value and not the absence of the section.
-  assert.deepEqual(listPanelCustomApiEndpoints([withApi(control, { linkPolicy: 'publishedOnly' })]).map(key),
-    ['input:mainValue', 'input:mode', 'output:mainValue']);
+  assert.deepEqual(listPanelCustomApiEndpoints([withApi(control, { linkPolicy: 'publishedOnly' })]).map(key), expected);
+  assert.deepEqual(listPanelCustomApiEndpoints([withApi(control, { linkPolicy: 'advancedOptIn' })]).map(key), expected);
+});
+
+test('a published entry switched off keeps its value out, as it did', () => {
+  const control = withOptInChannel(makeCustom('a', 'A'));
+  control._children.PublishedProperties.inputs.mode.enabled = false;
+  assert.equal(listPanelCustomApiEndpoints([control]).some((endpoint) => endpoint.channel === 'mode'), false);
 });
 
 test('advancedOptIn adds unpublished channels that are not marked private, and keeps out the ones that are', () => {
@@ -284,7 +296,7 @@ test('advancedOptIn adds unpublished channels that are not marked private, and k
   const offered = listPanelCustomApiEndpoints([control]).map(key);
   assert.deepEqual(offered, [
     'input:mainValue', 'input:mode', 'input:gain',
-    'output:mainValue', 'output:mode', 'output:gain',
+    'output:mainValue', 'output:gain',
   ]);
   assert.equal(offered.some((k) => k.endsWith(':internalTrim')), false);
   // The channel's own bounds come with it, so a link built on one is not silently 0..1.

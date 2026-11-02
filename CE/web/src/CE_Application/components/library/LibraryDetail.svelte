@@ -14,6 +14,8 @@
   import Plus from 'lucide-svelte/icons/plus';
   import Replace from 'lucide-svelte/icons/replace';
   import Trash2 from 'lucide-svelte/icons/trash-2';
+  import PencilRuler from 'lucide-svelte/icons/pencil-ruler';
+  import Download from 'lucide-svelte/icons/download';
   import { relativeTime } from '../../utils/componentLibraryModel.js';
 
   let {
@@ -24,6 +26,8 @@
     onplace = () => {},
     onreplace = () => {},
     onremove = () => {},
+    onopen = () => {},
+    onsavefile = () => {},
   } = $props();
 
   let confirmRemoveId = $state('');
@@ -85,6 +89,13 @@
       <button type="button" class="go" disabled={!canPlace} onclick={() => onplace(row)}
               title={canPlace ? 'Add a copy to the current panel' : 'Open a panel first'}>
         <Plus size={11} /> Place a copy
+      </button>
+      <!-- File › Open Component from Library…, for this card; and the old "Package file". -->
+      <button type="button" data-testid="library-open" onclick={() => onopen(row)} title={`Open ${row.name} in the Component Designer, in a tab of its own`}>
+        <PencilRuler size={11} /> Open in Designer
+      </button>
+      <button type="button" data-testid="library-save-file" disabled={!row.envelope} onclick={() => onsavefile(row)} title={`Save ${row.name} ${row.version} as a .ceditor-component.json file, to keep or give to someone`}>
+        <Download size={11} /> Save as file…
       </button>
       <button type="button" disabled={!canReplace} onclick={() => onreplace(row)}
               title={canReplace ? `Overwrite every section of ${targetName} with this package` : 'Select a custom component to replace'}>

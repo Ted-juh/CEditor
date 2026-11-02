@@ -8,7 +8,7 @@
   import { selectedControl, applyControlPatch } from '../stores/controls.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { closeComponentExport, componentExportOpen, exportComponent } from '../stores/componentExport.js';
-  import { componentExportChecks, componentExportName, componentExportVersion } from '../utils/componentExport.js';
+  import { COMPONENT_CATEGORIES, componentExportChecks, componentExportDetails, componentExportName, componentExportVersion } from '../utils/componentExport.js';
   import { editablePropertiesWithMissingTargets } from '../utils/customComponentPackage.js';
 
   let control = $derived(String($selectedControl?._children?.Core?.controlType ?? '') === 'CustomComponent' ? $selectedControl : null);
@@ -20,6 +20,9 @@
   let toLibrary = $state(true);
   let toFile = $state(false);
   let error = $state('');
+  // Details: what the library shows and searches (Package & Library had them). Folded until opened.
+  let detailsOpen = $state(false);
+  let details = $state({ description: '', category: 'custom', tags: '', author: '', license: '' });
 
   // Filled in each time the window opens, from the component and the library as they are then.
   let openedFor = $state(null);
@@ -34,6 +37,7 @@
     was = suggested.was;
     changes = '';
     error = '';
+    details = componentExportDetails(control, $customComponentLibrary, name);
   });
   // A different name is a different family in the library: suggest its version again.
   function nameChanged() {
@@ -55,7 +59,11 @@
 
   function run() {
     if (!control) return;
-    const result = exportComponent(control, { name, version, changes, toLibrary, toFile });
+    const { tags, ...rest } = details;
+    const result = exportComponent(control, {
+      name, version, changes, toLibrary, toFile,
+      details: String(tags ?? '').trim() ? { ...rest, tags } : rest,
+    });
     if (!result.ok) { error = result.error; return; }
     closeComponentExport();
   }
@@ -109,6 +117,38 @@
           </label>
         </div>
 
+        <div class="details" data-testid="component-export-details">
+          <button type="button" class="fold" aria-expanded={detailsOpen} onclick={() => { detailsOpen = !detailsOpen; }}>
+            <span aria-hidden="true">{detailsOpen ? '▾' : '▸'}</span> Details (optional)
+            <em>what the library shows and searches</em>
+          </button>
+          {#if detailsOpen}
+            <label class="field">
+              <span>Description</span>
+              <textarea bind:value={details.description} rows="2" placeholder="What this component is for."></textarea>
+            </label>
+            <div class="row2">
+              <label class="field">
+                <span>Category</span>
+                <select bind:value={details.category}>
+                  {#each COMPONENT_CATEGORIES as category (category)}<option value={category}>{category}</option>{/each}
+                </select>
+              </label>
+              <label class="field">
+                <span>Tags</span>
+                <input type="text" bind:value={details.tags} placeholder="knob, filmstrip" />
+              </label>
+              <label class="field">
+                <span>Author</span>
+                <input type="text" bind:value={details.author} />
+              </label>
+              <label class="field">
+                <span>Licence</span>
+                <input type="text" bind:value={details.license} placeholder="personal / MIT / CC0" />
+              </label>
+            </div>
+          {/if}
+        </div>
         <div class="field">
           <span>Checks</span>
           <ul class="checks" data-testid="component-export-checks">
@@ -178,6 +218,7 @@
   }
 
   .field input[type="text"],
+  .field select,
   .field textarea {
     background: #1C1C1C;
     border: 1px solid #3A3A3A;
@@ -188,7 +229,16 @@
     padding: 0 8px;
     outline: none;
   }
-  .field input[type="text"] { height: 26px; width: 100%; box-sizing: border-box; }
+  .field input[type="text"], .field select { height: 26px; width: 100%; box-sizing: border-box; }
+
+  .details { display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #333; padding-top: 8px; }
+  .details .fold {
+    display: inline-flex; align-items: baseline; gap: 6px; align-self: flex-start;
+    border: none; background: none; padding: 0; cursor: pointer; font: inherit;
+    color: #8F8F8F; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;
+  }
+  .details .fold:hover { color: #CCC; }
+  .details .fold em { font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; font-size: 11px; }
   .field textarea { padding: 6px 8px; resize: vertical; }
   .field input[type="text"]:focus,
   .field textarea:focus { border-color: #5B9BD5; }

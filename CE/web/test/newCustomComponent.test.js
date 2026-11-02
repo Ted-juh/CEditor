@@ -83,8 +83,9 @@ test('a component that already has the property is offered a Fix that removes it
 
 test('an empty component opens on what to do first, not on why it is not reusable', () => {
   const source = readFileSync(new URL('../src/CE_Application/sections/CustomDesignSurfaceEditor.svelte', import.meta.url), 'utf8');
-  assert.match(source, /let componentEmpty = \$derived\(!!readiness\?\.steps\.some\(\(step\) => step\.id === 'visuals' && !step\.done\)\);/);
-  assert.match(source, /if \(!readiness \|\| componentEmpty\) return \[\];/, 'no readiness steps while nothing is drawn');
+  // Nothing drawn: no layers of its own and none a generator makes. The readiness steps that
+  // followed it once something was drawn are gone (componentExportImport.test.js).
+  assert.match(source, /let componentEmpty = \$derived\(!!componentSummary && \(componentSummary\.parts \?\? 0\) === 0 && \(componentSummary\.generatedParts \?\? 0\) === 0\);/);
   assert.match(source, /\{#if componentEmpty\}\s*<div class="readiness-nudge empty-start" role="status"/);
   assert.match(source, /EMPTY_COMPONENT_HINT = 'Nothing drawn yet: pick a shape on the left and drag on the canvas, or start from Starters\.'/);
   // "visuals" is the step that read "0 authored/runtime layer(s)": one layer ends the empty state.

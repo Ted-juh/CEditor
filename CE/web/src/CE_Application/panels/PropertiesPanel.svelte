@@ -20,13 +20,13 @@
   import MousePointer from 'lucide-svelte/icons/mouse-pointer';
   import Rows3 from 'lucide-svelte/icons/rows-3';
   import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
+  import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
   import Gauge from 'lucide-svelte/icons/gauge';
   import Spline from 'lucide-svelte/icons/spline';
   import Grid2x2 from 'lucide-svelte/icons/grid-2x2';
   import Crosshair from 'lucide-svelte/icons/crosshair';
   import ArrowLeftRight from 'lucide-svelte/icons/arrow-left-right';
   import Hash from 'lucide-svelte/icons/hash';
-  import SlidersVertical from 'lucide-svelte/icons/sliders-vertical';
   import CircleDashed from 'lucide-svelte/icons/circle-dashed';
   import Orbit from 'lucide-svelte/icons/orbit';
   import AudioWaveform from 'lucide-svelte/icons/audio-waveform';
@@ -253,7 +253,9 @@
     { id: 'interact',   icon: Settings2,     label: 'Interact',   section: 'ValueChannels' },
     { id: 'react',      icon: Workflow,      label: 'React',      section: 'Links', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     { id: 'assets',     icon: Image,         label: 'Assets',     section: 'Assets' },
-    { id: 'publish',    icon: Cable,         label: 'Publish',    section: 'PublishedProperties' },
+    // Settings (was Publish): the values a panel can use and the settings it can change on a copy.
+    // The id stays 'publish': Designer.focusSection and the audience rules name the tab by it.
+    { id: 'publish',    icon: SlidersVertical, label: 'Settings', section: 'PublishedProperties' },
     { id: 'testbench',  icon: Play,          label: 'Test Bench', section: 'Designer', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') === 'CustomComponent' },
     // No Scripts tab: scripts are authored in the Behavior Designer, reached from the
     // Scripts zone on the Look bar (ScriptInsight). A tab here had no editor behind it

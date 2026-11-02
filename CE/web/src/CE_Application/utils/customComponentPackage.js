@@ -4,6 +4,7 @@ import { summarizeCustomArpeggiator } from './customComponentArpeggiator.js';
 import { migrateCustomComponentPlan } from './customComponentMigrations.js';
 import { numberOr } from './primitives.js';
 import { sanitizeControlName } from './controlNames.js';
+import { panelValueCounts, panelValueEntries } from './componentPanelValues.js';
 
 export const CUSTOM_COMPONENT_PACKAGE_FORMAT = 'ceditor-component';
 export const CUSTOM_COMPONENT_PACKAGE_VERSION = 1;
@@ -303,8 +304,9 @@ export function summarizeCustomComponent(control) {
     variants: Object.keys(objectChildren(sections.Variants)).length,
     images: Object.keys(assets.images ?? {}).length,
     filmstrips: Object.keys(assets.filmstrips ?? {}).length,
-    publicInputs: Object.values(published.inputs ?? {}).filter((entry) => entry?.enabled !== false).length,
-    publicOutputs: Object.values(published.outputs ?? {}).filter((entry) => entry?.enabled !== false).length,
+    // Every value the panel can use, published or not (componentPanelValues.js).
+    publicInputs: panelValueCounts(control).inputs,
+    publicOutputs: panelValueCounts(control).outputs,
     editableProperties: Object.values(published.editableProperties ?? {}).filter((entry) => entry?.enabled !== false).length,
     arpeggiator: arpeggiator.enabled,
     arpeggiatorSteps: arpeggiator.stepCount,
@@ -471,8 +473,9 @@ function publishedEntryWarnings(kind, name, entry, channel = null) {
 export function summarizeCustomComponentPublicApi(control) {
   const published = control?._children?.PublishedProperties ?? {};
   const channels = control?._children?.ValueChannels?._children ?? {};
-  const inputs = enabledEntries(published.inputs ?? {}).map(([name, entry]) => compactPublicInputEntry(name, entry, channels[entry?.channel]));
-  const outputs = enabledEntries(published.outputs ?? {}).map(([name, entry]) => compactPublicOutputEntry(name, entry, channels[entry?.channel]));
+  // Every value the panel can use, published or not (componentPanelValues.js).
+  const inputs = panelValueEntries(control, 'input').map(([name, entry]) => compactPublicInputEntry(name, entry, channels[entry?.channel]));
+  const outputs = panelValueEntries(control, 'output').map(([name, entry]) => compactPublicOutputEntry(name, entry, channels[entry?.channel]));
   const properties = enabledEntries(published.editableProperties ?? {}).map(([name, entry]) => compactEditablePropertyEntry(name, entry));
   return {
     inputs,

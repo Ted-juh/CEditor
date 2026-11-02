@@ -50,8 +50,7 @@
   import { buildInteractivePatch } from '../utils/customComponentScaffold.js';
   import { customHitZoneRect } from '../utils/customComponentInteraction.js';
   import { materializedCustomComponentSnapshot } from '../utils/customComponentMaterializer.js';
-  import { analyzeCustomComponentReadiness } from '../utils/customComponentPackage.js';
-  import { readinessAutoFix } from '../utils/customComponentReadinessFixes.js';
+  import { summarizeCustomComponent } from '../utils/customComponentPackage.js';
   import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
@@ -253,26 +252,12 @@
   let helpOverlayOpen = $state(false);
   let surfaceShellEl = $state(null);
   let surfaceArtboardEl = $state(null);
-  // Inline readiness nudge: open required/recommended steps, dismissible. Steps that can be
-  // scaffolded mechanically carry their fix inline, so the nudge is actionable rather than
-  // just a scolding — readinessAutoFix returns null for anything needing a human decision.
+  // Nothing drawn yet: what to do first. It used to be followed, once something was drawn, by a
+  // "Not reusable yet" bar of readiness steps with Fix buttons; that went when custom components were
+  // simplified, and the Export window's three checks are what is left of it (utils/componentExport.js).
   const EMPTY_COMPONENT_HINT = 'Nothing drawn yet: pick a shape on the left and drag on the canvas, or start from Starters.';
-  let readinessNudgeDismissed = $state(false);
-  let readiness = $derived(control ? analyzeCustomComponentReadiness(control) : null);
-  // Nothing drawn yet: what to do first, not why it is not reusable. A new component opened on a red
-  // "Not reusable yet: Visual Layers — 0 authored/runtime layer(s)".
-  let componentEmpty = $derived(!!readiness?.steps.some((step) => step.id === 'visuals' && !step.done));
-  let readinessNudgeSteps = $derived.by(() => {
-    if (!readiness || componentEmpty) return [];
-    return readiness.steps
-      .filter((step) => !step.done && ['required', 'recommended'].includes(step.severity))
-      .map((step) => ({ ...step, fix: readinessAutoFix(control, step.id) }));
-  });
-
-  function applyReadinessFix(step) {
-    if (!core?.id || !step?.fix?.patch) return;
-    applyControlPatch(core.id, step.fix.patch);
-  }
+  let componentSummary = $derived(control ? summarizeCustomComponent(control) : null);
+  let componentEmpty = $derived(!!componentSummary && (componentSummary.parts ?? 0) === 0 && (componentSummary.generatedParts ?? 0) === 0);
   let artboardWidth = $derived(Math.max(1, numberOr(transform?.width, 220)));
   let artboardHeight = $derived(Math.max(1, numberOr(transform?.height, 120)));
   // --surface-unzoom keeps the layer and zone name labels at their own size on screen at any zoom.
@@ -3590,19 +3575,6 @@
       {#snippet notice()}
         {#if componentEmpty}
           <div class="readiness-nudge empty-start" role="status" title={EMPTY_COMPONENT_HINT}><span class="nudge-text">{EMPTY_COMPONENT_HINT}</span></div>
-        {:else if !readinessNudgeDismissed && readinessNudgeSteps.length}
-          <div class="readiness-nudge" role="status" title={readinessNudgeSteps.map((step) => `${step.label} — ${step.detail}`).join('\n')}>
-            <strong>Not reusable yet:</strong>
-            {#each readinessNudgeSteps as step (step.id)}
-              <span class={`nudge-step ${step.severity}`}>
-                <span class="nudge-text">{step.label} — {step.detail}</span>
-                {#if step.fix}
-                  <button type="button" class="nudge-fix" title={step.fix.label} onclick={() => applyReadinessFix(step)}>Fix</button>
-                {/if}
-              </span>
-            {/each}
-            <button type="button" onclick={() => { readinessNudgeDismissed = true; }} title="Dismiss">×</button>
-          </div>
         {/if}
       {/snippet}
       {#snippet actions()}
@@ -4764,7 +4736,7 @@
     box-shadow: 0 10px 22px rgba(0, 0, 0, 0.34);
   }
 
-  /* One line in the look bar: the steps shorten, and the whole of each is the notice's tooltip. */
+  /* One line in the look bar, shortened, and the whole of it is the notice's tooltip. */
   .readiness-nudge {
     display: flex;
     align-items: center;
@@ -4781,67 +4753,8 @@
     font-size: 10px;
   }
 
-  .readiness-nudge strong {
-    color: rgba(232, 192, 138, 0.95);
-    font-size: 10px;
-  }
-
-  .readiness-nudge strong { flex-shrink: 0; white-space: nowrap; }
   .readiness-nudge.empty-start { color: rgba(200, 212, 226, 0.85); }
   .readiness-nudge .nudge-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .readiness-nudge .nudge-step {
-    display: inline-flex;
-    flex: 0 1 auto;
-    min-width: 0;
-    align-items: center;
-    gap: 6px;
-    padding: 2px 6px;
-    border-radius: 4px;
-    border: 1px solid rgba(106, 87, 57, 0.6);
-    background: rgba(33, 29, 25, 0.9);
-    color: #E8C08A;
-  }
-
-  .readiness-nudge .nudge-step.required {
-    border-color: rgba(106, 57, 57, 0.7);
-    background: rgba(37, 23, 23, 0.9);
-    color: #E8A0A0;
-  }
-
-  /* Overrides the dismiss-button sizing below — this one carries a word, not a glyph. */
-  .readiness-nudge .nudge-step .nudge-fix {
-    width: auto;
-    height: auto;
-    padding: 1px 7px;
-    border: 1px solid currentColor;
-    border-radius: 3px;
-    background: transparent;
-    color: inherit;
-    font-size: 10px;
-    opacity: 0.85;
-  }
-
-  .readiness-nudge .nudge-step .nudge-fix:hover {
-    background: currentColor;
-    color: #191919;
-    opacity: 1;
-  }
-
-  .readiness-nudge button {
-    width: 18px;
-    height: 18px;
-    border: none;
-    border-radius: 4px;
-    background: transparent;
-    color: rgba(222, 228, 238, 0.7);
-    font-size: 13px;
-    line-height: 1;
-    cursor: pointer;
-  }
-
-  .readiness-nudge button:hover {
-    background: rgba(220, 90, 90, 0.3);
-  }
 
   .surface-scroll.space-pan {
     cursor: grab;

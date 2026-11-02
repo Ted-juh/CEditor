@@ -132,7 +132,10 @@ test('a pinned entry leads whatever the sort', () => {
 
 test('the sorts order what they say they order', () => {
   assert.deepEqual(sortLibrary(rows, 'used').map((r) => r.id), ['c', 'a', 'b']);
-  assert.deepEqual(sortLibrary(rows, 'ready').map((r) => r.id), ['c', 'b', 'a']);
+  // "Readiness" went with the readiness score when custom components were simplified: an old
+  // 'ready' falls back to the store's own order.
+  assert.deepEqual(sortLibrary(rows, 'ready').map((r) => r.id), ['c', 'a', 'b']);
+  assert.equal(LIBRARY_SORT_KEYS.includes('ready'), false);
   assert.deepEqual(sortLibrary(rows, 'name').map((r) => r.id), ['c', 'a', 'b']);
   assert.deepEqual(sortLibrary(rows, 'recent').map((r) => r.id), ['c', 'a', 'b']);
 });

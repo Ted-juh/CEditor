@@ -113,3 +113,30 @@ export function componentExportChecks(control) {
   }
   return checks;
 }
+
+/** The library's categories, as Package & Library offered them; the dock's Library tab filters by them. */
+export const COMPONENT_CATEGORIES = [
+  'custom', 'button', 'slider', 'multi-control', 'grid', 'keyboard', 'meter', 'display', 'utility', 'experimental',
+];
+
+/**
+ * The Export window's Details, filled in from the newest version the library holds under this name
+ * (what was typed last time), else from the package the component came from, else empty. They were
+ * on Package & Library, which left the designer when custom components were simplified.
+ */
+export function componentExportDetails(control, libraryEntries = [], name = componentExportName(control)) {
+  const key = String(name ?? '').trim().toLowerCase();
+  const newest = (libraryEntries ?? [])
+    .filter((entry) => String(entry?.name ?? '').trim().toLowerCase() === key)
+    .sort((a, b) => compareVersions(b?.version, a?.version))[0] ?? null;
+  const designer = control?._children?.Designer ?? {};
+  const source = designer.sourcePackage ?? {};
+  const tags = (newest?.tags ?? []).filter((tag) => tag && tag !== 'custom-component');
+  return {
+    description: String(newest?.description || designer.notes || ''),
+    category: String(newest?.category || source.category || 'custom'),
+    tags: tags.join(', '),
+    author: String(newest?.author || source.author || ''),
+    license: String(newest?.license || source.license || ''),
+  };
+}

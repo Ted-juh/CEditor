@@ -32,6 +32,9 @@
   import { deepClone } from '../utils/deepClone.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { customComponentPackageProvenance } from '../utils/customComponentPackage.js';
+  import { importComponentFromFile } from '../stores/componentImport.js';
+  import { exportWholeLibrary, saveLibraryEntryToFile } from '../stores/componentExport.js';
+  import { openComponentLibraryEntry } from '../stores/recentFileActions.js';
   import {
     describeLibrary,
     filterLibrary,
@@ -118,6 +121,23 @@
     wantedId = '';
   }
 
+  // The library's file actions, from Package & Library when it left the designer.
+  function open(row) {
+    if (!row?.entry) return;
+    openComponentLibraryEntry(row.entry);
+    status = `Opened ${row.name}`;
+  }
+
+  function saveFile(row) {
+    const fileName = saveLibraryEntryToFile(row?.entry);
+    if (fileName) status = `Saved ${fileName}`;
+  }
+
+  function exportAll() {
+    const fileName = exportWholeLibrary($customComponentLibrary);
+    if (fileName) status = `Saved ${counts.total} component${counts.total === 1 ? '' : 's'} as ${fileName}`;
+  }
+
   function pin(row) {
     if (!row?.id) return;
     customComponentLibrary.togglePinned(row.id);
@@ -145,14 +165,22 @@
                 title={entry.hint} onclick={() => { sort = entry.key; }}>{entry.label}</button>
       {/each}
     </div>
+
+    <div class="files">
+      <button type="button" data-testid="library-import" onclick={() => importComponentFromFile()}
+              title="Bring in a .ceditor-component.json file, or a library file: File › Import Component…">Import…</button>
+      <button type="button" data-testid="library-export-all" disabled={!counts.total} onclick={exportAll}
+              title="Save every component in the library as one file, which Import reads back">Export all…</button>
+    </div>
   </div>
 
   {#if !counts.total}
     <div class="empty">
       <strong>The library is empty.</strong>
       <p>
-        Save a custom component from the Publish tab — Package &amp; Library — and it appears here,
-        drawn by the same renderer that draws it on the canvas.
+        Export a custom component (Export… in the Component Designer, or Ctrl+S with one open in a
+        tab of its own), or bring one in with Import…, and it appears here, drawn by the same
+        renderer that draws it on the canvas.
       </p>
     </div>
   {:else}
@@ -191,6 +219,8 @@
           canReplace={!!target}
           onplace={place}
           onreplace={replace}
+          onopen={open}
+          onsavefile={saveFile}
           onremove={remove}
         />
       </div>
@@ -278,6 +308,20 @@
   }
   .sorts button:hover { color: #DDE6EC; }
   .sorts button.on { border-color: #5B9BD5; background: #173449; color: #EAF5FF; }
+
+  .files { display: flex; gap: 4px; margin-left: auto; }
+  .files button {
+    border: 1px solid #3A4A56;
+    background: #1D2730;
+    color: #CFE0EC;
+    font: 600 10px/1 'IBM Plex Sans', system-ui, sans-serif;
+    padding: 5px 9px;
+    border-radius: 3px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .files button:hover:not(:disabled) { border-color: #5B9BD5; color: #EAF5FF; }
+  .files button:disabled { opacity: 0.45; cursor: default; }
 
   .cols {
     display: flex;

@@ -6,6 +6,7 @@ import {
 import { syncCustomArpeggiatorValues } from './customComponentArpeggiator.js';
 import { numberOr } from './primitives.js';
 import { flatControls } from './containment.js';
+import { panelValueEntries } from './componentPanelValues.js';
 
 function controlId(control) {
   return String(control?._children?.Core?.id ?? '');
@@ -27,9 +28,10 @@ function isCustomComponent(control) {
  * by default". So the names are the specification, and both wider settings are built out of markers
  * the model already carries rather than out of a new field:
  *
- *   publishedOnly   only what `PublishedProperties` lists. The deliberate public contract, and what
- *                   the engine did when the other two were unread — so this stays the default and
- *                   every existing panel behaves exactly as it did.
+ *   publishedOnly   only what `PublishedProperties` lists. The deliberate public contract, and the
+ *                   default. SINCE CUSTOM COMPONENTS WERE SIMPLIFIED it reaches what advancedOptIn
+ *                   does (see publishedEntries below): every value is the panel's unless its author
+ *                   keeps it in, so the default could no longer keep unpublished values out.
  *   advancedOptIn   that, plus any value channel the author has NOT marked private. `publicInput`
  *                   and `publicOutput` are the opt-in: they already exist on every channel, the
  *                   Value Channels editor already shows them as "private in" / "private out", and
@@ -86,40 +88,23 @@ function endpointFrom(control, direction, name, entry, channel) {
   };
 }
 
-/** True when the policy lets this channel be reached in this direction without being published. */
-function policyAdmitsChannel(policy, channel, direction) {
-  if (policy === 'allInternals') return true;
-  if (policy !== 'advancedOptIn') return false;
-  return direction === 'output' ? channel?.publicOutput !== false : channel?.publicInput !== false;
-}
-
+/**
+ * The values other components may link into (input) or out of (output). Every value the panel can
+ * use (utils/componentPanelValues.js): its published entries, under their own names, labels and
+ * ranges, and every other value its author has not kept in. "allInternals" adds the kept-in ones.
+ *
+ * "publishedOnly" and "advancedOptIn" reach the same values now. publishedOnly was the default, and
+ * kept every unpublished value out; when custom components were simplified every value became the
+ * panel's unless its author keeps it in, which is what advancedOptIn always did. The Policy has no
+ * place on screen any more, and the two names are kept so a file that says either still reads.
+ */
 function publishedEntries(control, direction) {
   if (!acceptsDirection(control, direction)) return [];
-
-  const published = control?._children?.PublishedProperties ?? {};
-  const entries = direction === 'output' ? published.outputs : published.inputs;
   const channels = control?._children?.ValueChannels?._children ?? {};
-
-  const out = [];
-  const claimed = new Set();
-  for (const [name, entry] of Object.entries(entries ?? {})) {
-    if (entry?.enabled === false) continue;
-    const channelName = String(entry?.channel || name);
-    claimed.add(channelName);
-    out.push(endpointFrom(control, direction, name, entry, channels[channelName] ?? {}));
-  }
-
-  // The wider policies, added after the published contract so a published entry keeps its name,
-  // label and narrowed range and an unpublished channel is never listed twice.
-  const policy = getLinkPolicy(control);
-  if (policy === 'publishedOnly') return out;
-  for (const [channelName, channel] of Object.entries(channels)) {
-    if (claimed.has(channelName)) continue;
-    if (!policyAdmitsChannel(policy, channel, direction)) continue;
-    out.push(endpointFrom(control, direction, channelName,
-      { channel: channelName, label: channel?.label || channelName }, channel ?? {}));
-  }
-  return out;
+  const includeInternal = getLinkPolicy(control) === 'allInternals';
+  return panelValueEntries(control, direction, { includeInternal }).map(([name, entry]) => (
+    endpointFrom(control, direction, name, entry, channels[String(entry?.channel || name)] ?? {})
+  ));
 }
 
 /**
