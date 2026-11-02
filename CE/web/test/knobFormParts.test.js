@@ -103,3 +103,31 @@ test('choosing a converted form, or Convert to Parts, writes the parts in one st
   assert.match(core, /onchange=\{\(e\) => chooseForm\(e\.target\.value\)\}/);
   assert.match(core, /label="Convert to Parts"/);
 });
+
+test('the Knob tab has a section per part, each field naming a property a set may write', () => {
+  const editor = source('sections/KnobPartsEditor.svelte');
+  // In drawing order: Housing, Track and Value Arc, Cap, Pointer.
+  const order = ["plate('bodyHousing', 'Housing'", 'title="Track and Value Arc"', "plate('bodyCap', 'Cap'", 'title="Pointer"']
+    .map((needle) => editor.indexOf(needle));
+  assert.ok(order.every((at) => at > 0), 'every section is there');
+  assert.deepEqual([...order].sort((a, b) => a - b), order, 'in drawing order');
+  // Every field carries its path, so it has the override marks; the plate's are per part.
+  const paths = [...editor.matchAll(/path=\{?[`"]([^`"]+)[`"]\}?/g)].map((m) => m[1])
+    .flatMap((path) => (path.includes('${prefix}') ? ['bodyHousing', 'bodyCap'].map((name) => path.replace('${prefix}', `Parts.${name}`)) : [path]));
+  assert.ok(paths.length >= 20, `${paths.length} fields`);
+  for (const path of paths) {
+    const key = path.replace(/^Parts\.[A-Za-z]+\./, '');
+    assert.ok(path.startsWith('Parts.') && EDITOR_PATHS.some((re) => re.test(key)), `${path} is one a set may write`);
+  }
+  assert.equal((editor.match(/<PropertyCell /g) ?? []).length, (editor.match(/<PropertyCell [^>]*path=/g) ?? []).length, 'no field without a path');
+  // Colours open the Colors dock, never a popup of their own.
+  assert.match(editor, /activateInspectorColorTarget\(/);
+  assert.doesNotMatch(editor, /type="color"/);
+
+  // Only a knob gets them, and its Style section drops the two cells they replace.
+  const slider = source('sections/SliderEditor.svelte');
+  assert.match(slider, /\{#if isKnob\}\s*<KnobPartsEditor \{control\} \{set\} \{setPatch\} \/>/);
+  assert.ok(slider.indexOf('<KnobPartsEditor') > slider.indexOf('title="Type"'), 'after Type');
+  assert.match(slider, /\{#if !isKnob\}\s*<PropertyCell label="Track Size"/);
+  assert.match(slider, /id: 'bodyHousing', path: 'Parts\.bodyHousing\.Background', label: 'Housing'/);
+});

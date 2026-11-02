@@ -31,6 +31,7 @@
   import MousePointer from 'lucide-svelte/icons/mouse-pointer';
   import Palette from 'lucide-svelte/icons/palette';
   import BackgroundEditor from './BackgroundEditor.svelte';
+  import KnobPartsEditor from './KnobPartsEditor.svelte';
   import { createSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr } from '../utils/primitives.js';
   import { getSliderDirection } from '../utils/sliderBehavior.js';
@@ -44,6 +45,11 @@
     { id: 'pointerStart', path: 'Parts.pointerStart.Background', label: 'Start Handle' },
     { id: 'pointerCurrent', path: 'Parts.pointerCurrent.Background', label: 'Current Handle' },
     { id: 'pointerEnd', path: 'Parts.pointerEnd.Background', label: 'End Handle' },
+  ];
+  // A knob's housing and cap are parts too (KnobPartsEditor), and take the full fill editor as well.
+  const KNOB_STYLE_TARGETS = [
+    { id: 'bodyHousing', path: 'Parts.bodyHousing.Background', label: 'Housing' },
+    { id: 'bodyCap', path: 'Parts.bodyCap.Background', label: 'Cap' },
   ];
 
   let selectedStyleTarget = $state('bodyTrackBase');
@@ -234,7 +240,8 @@
   let parts = $derived(getSection(control, 'Parts'));
   let geometry = $derived(String(behavior?.geometry ?? 'linear'));
   let valueMode = $derived(String(behavior?.valueMode ?? 'single'));
-  let selectedStyleTargetMeta = $derived(STYLE_TARGETS.find((target) => target.id === selectedStyleTarget) ?? STYLE_TARGETS[0]);
+  let styleTargets = $derived(isKnob ? [...KNOB_STYLE_TARGETS, ...STYLE_TARGETS] : STYLE_TARGETS);
+  let selectedStyleTargetMeta = $derived(styleTargets.find((target) => target.id === selectedStyleTarget) ?? STYLE_TARGETS[0]);
   let selectedStyleBackground = $derived(parts?._children?.[selectedStyleTargetMeta?.id]?._children?.Background ?? null);
 </script>
 
@@ -330,6 +337,12 @@
       {/if}
     {/if}
   </PropertySection>
+
+  <!-- A knob's parts, in drawing order (the owner approved the mock-up): the knob forms are drawn
+       with these now (models/knobFormParts.js), so their shapes, sizes and colours are fields. -->
+  {#if isKnob}
+    <KnobPartsEditor {control} {set} {setPatch} />
+  {/if}
 
   <PropertySection title="Values" icon={Hash}>
     <PropertyCell label="Min" span={1} compact hint="Numeric minimum for the slider domain.">
@@ -620,7 +633,7 @@
   <PropertySection title="Style" icon={Palette}>
     <PropertyCell label="Edit Part" span={4} hint="Choose which slider element gets the full layered fill editor with solid, gradient, image, and overlay support.">
       <div class="style-target-grid">
-        {#each STYLE_TARGETS as target (target.id)}
+        {#each styleTargets as target (target.id)}
           <button
             class="style-target-btn"
             class:active={selectedStyleTarget === target.id}
@@ -633,6 +646,8 @@
       </div>
     </PropertyCell>
 
+    <!-- A knob has these in its part sections above (Track and Value Arc, Pointer). -->
+    {#if !isKnob}
     <PropertyCell label="Track Size" span={1} compact hint="Thickness used by the ready-made slider body.">
       <NumberCell label="Track" value={parts?._children?.bodyTrackBase?._children?.Layout?.height ?? 10} defaultValue={10} step={1} min={2} onchange={(value) => setPatch({
         'Parts.bodyTrackBase.Layout.height': value,
@@ -651,6 +666,7 @@
         'Parts.pointerEnd.Layout.height': value,
       })} />
     </PropertyCell>
+    {/if}
     <PropertyCell label="Tick Major" span={1} compact hint="Generated major tick length.">
       <NumberCell label="Major" value={parts?._children?.tickMajor?._children?.Layout?.height ?? 12} defaultValue={12} step={1} min={2} onchange={(value) => set('Parts.tickMajor.Layout.height', value)} />
     </PropertyCell>

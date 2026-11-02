@@ -8,7 +8,8 @@ selector, segment encoder) are drawn with the knob's own parts (`models/knobForm
 a housing plate, cap and housing outlines, a needle pointer and a tight fit added to the knob
 (`utils/knobOutlines.js`). The sets that used them name no form any more. Still drawn by code: the
 paper tab, the pebble, the roller and the tuning window, the 48 direction forms, and every button,
-switch and meter form. The Knob tab's fields for the new parts wait on their mock-up.
+switch and meter form. The Knob tab has a section per part, in drawing order: Housing, Track and
+Value Arc, Cap, Pointer (`sections/KnobPartsEditor.svelte`), every field with the override marks.
 
 ## The principle
 
