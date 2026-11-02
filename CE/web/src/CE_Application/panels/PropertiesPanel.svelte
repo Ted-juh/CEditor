@@ -280,7 +280,8 @@
         && (typeof tab.when === 'function' ? tab.when($selectedControl) : true)
         && tabAllowedForAudience(tab.id, audienceContext, selectedIsCustomComponent)
         && !(selectedIsCustomComponent && $creatorMode === 'simple' && CREATOR_SIMPLE_HIDDEN_TABS.has(tab.id))
-      ))
+      // A knob runs on the slider's engine and has its tab; it is called what it is.
+      )).map((tab) => (tab.id === 'slider' && getSection($selectedControl, 'Core')?.controlType === 'Knob' ? { ...tab, label: 'Knob' } : tab))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
   let selectedControlId = $derived($selectedControl?._children?.Core?.id ?? '');

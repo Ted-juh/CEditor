@@ -160,6 +160,11 @@
     { label: 'Band', geometry: 'circular', valueMode: 'band', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 220, height: 220 },
   ];
 
+  // A knob runs on the slider's engine and is always drawn as a dial, so linear is not a choice for it:
+  // its linear presets and the Geometry choice are not offered. One set to linear before that (it
+  // went on drawing a dial, dragged as a line) gets a button back to circular.
+  let isKnob = $derived(String(getSection(control, 'Core')?.controlType ?? '') === 'Knob');
+
   /** Bipolar is what the Bipolar presets write: the fill grows from the centre of a range below zero. */
   let isBipolar = $derived(String(behavior?.fillOrigin ?? '') === 'center' && numberOr(behavior?.min, 0) < 0);
 
@@ -228,7 +233,8 @@
 </script>
 
 {#if behavior}
-  <PropertySection title="Slider Presets" icon={Bookmark}>
+  <PropertySection title={isKnob ? 'Knob Presets' : 'Slider Presets'} icon={Bookmark}>
+    {#if !isKnob}
     <PropertyCell label="Linear" span={4} hint="Insert a ready-made starting point and refresh the semantic slider style parts. The slider keeps its size.">
       <div class="preset-grid">
         {#each LINEAR_PRESETS as preset (preset.label)}
@@ -236,6 +242,11 @@
         {/each}
       </div>
     </PropertyCell>
+    {:else if geometry !== 'circular'}
+    <PropertyCell label="" span={4} compact hint="A knob is always drawn as a dial; set to linear, it is dragged as a line.">
+      <button class="preset-btn wide" type="button" data-testid="knob-back-to-circular" onclick={() => setSliderType('geometry', 'circular')}>This knob is set to linear, which it cannot draw: make it circular</button>
+    </PropertyCell>
+    {/if}
     <PropertyCell label="Circular" span={4} hint="Circular presets keep the same slider family and just change geometry/value mode defaults. Changing between linear and circular resizes it to fit.">
       <div class="preset-grid">
         {#each CIRCULAR_PRESETS as preset (preset.label)}
@@ -249,12 +260,14 @@
   </PropertySection>
 
   <PropertySection title="Type" icon={Shapes}>
+    {#if !isKnob}
     <PropertyCell label="Geometry" span={2} hint="Linear uses a track axis, circular uses a dial arc.">
       <select class="val" value={geometry} onchange={(event) => setSliderType('geometry', event.target.value)}>
         <option value="linear">linear</option>
         <option value="circular">circular</option>
       </select>
     </PropertyCell>
+    {/if}
     <PropertyCell label="Mode" span={2} hint="Single uses one handle, range uses two, band uses three.">
       <select class="val" value={valueMode} onchange={(event) => set('Behavior.valueMode', event.target.value)}>
         <option value="single">single</option>

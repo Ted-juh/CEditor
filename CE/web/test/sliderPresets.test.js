@@ -30,3 +30,27 @@ test('a preset keeps the size; only linear to circular, or back, resizes', () =>
   assert.match(body, /if \(preset\.geometry !== geometry\) \{\s*basePatch\['Transform\.width'\] = preset\.width;\s*basePatch\['Transform\.height'\] = preset\.height;\s*\}/);
   assert.equal((body.match(/'Transform\.width'/g) ?? []).length, 1, 'no unconditional size in the patch');
 });
+
+// A knob runs on the slider's engine and has the same tab, which offered it the linear presets and
+// a linear geometry; set to linear, it went on drawing a dial and was dragged as a line.
+function knobHtml(patch = {}) {
+  const control = createControl('Knob');
+  Object.assign(control._children.Behavior, patch);
+  return render(SliderEditor, { props: { control } }).body;
+}
+
+test('a knob is offered circular only, and its tab and presets are called Knob', () => {
+  const html = knobHtml();
+  const text = html.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
+  assert.match(text, /Knob Presets/);
+  assert.doesNotMatch(text, /Linear Single Bipolar/);
+  assert.match(text, /Circular Single Bipolar Range Band/);
+  assert.doesNotMatch(html, /<option value="linear"[^>]*>linear<\/option>/, 'no Geometry choice');
+  assert.doesNotMatch(html, /knob-back-to-circular/);
+  assert.match(knobHtml({ geometry: 'linear' }), /data-testid="knob-back-to-circular"/, 'one set to linear gets a way back');
+  const panel = readFileSync(new URL('../src/CE_Application/panels/PropertiesPanel.svelte', import.meta.url), 'utf8');
+  assert.match(panel, /tab\.id === 'slider' && getSection\(\$selectedControl, 'Core'\)\?\.controlType === 'Knob' \? \{ \.\.\.tab, label: 'Knob' \} : tab/);
+  // A slider keeps both.
+  const slider = render(SliderEditor, { props: { control: createControl('Slider') } }).body;
+  assert.match(slider, /<option value="linear"[^>]*>linear<\/option>/);
+});
