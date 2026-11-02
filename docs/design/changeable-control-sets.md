@@ -13,7 +13,8 @@ button forms and the twelve base switch forms are drawn with the control's own d
 (`models/buttonDeviceParts.js`: housing, guard, key, symbol, indicator, legend, each a shape in a
 box of the form frame, `utils/deviceShapes.js`, that moves, swings and lights when pressed or on;
 recipes in `models/buttonFormParts.js`). Their fields wait on the Button and Switch tab's mock-up.
-Still drawn by code: the 48 direction forms, and the meter forms.
+Still drawn by code: the 48 direction forms, and the meter forms. SVG and Photoshop drawings import
+as layered components (Bringing designs in, below).
 
 ## The principle
 
@@ -309,10 +310,68 @@ Shapes CEditor builds from properties (turned bodies, knurls, flutes, skirts, to
 the same materials and light: everything changeable, the shape included, and no other program. It
 shares the renderer with Level 2.
 
+### Built: SVG and Photoshop as layered components
+
+File › New Component from SVG Artwork and New Component from Photoshop Artwork make a drawing the
+control itself, a custom component of layers, opened in the Component Designer
+(`utils/svgComponentImport.js`, `utils/psdComponentImport.js`, the wiring in
+`utils/artworkComponent.js`):
+
+- **SVG**: every shape a vector layer (a path part, `meta.pathData` in its box), transforms applied
+  to its points, its fill, linear or radial gradient, stroke and opacity from attributes, `style` and
+  class rules, inherited as SVG inherits them; text as text, embedded pictures as pictures. Not read,
+  and reported: clip paths and masks, pattern fills, gradient strokes, linked pictures.
+- **Photoshop**: every layer a picture layer, cropped to its pixels, its layer mask and Fill opacity
+  baked in and the layers clipped to it blended in (`psdComposite.js`); its opacity, blend mode
+  (CSS's, or the nearest) and visibility kept as the layer's; Pass Through groups unfolded, isolated
+  groups flattened; text as text where the file says its size and colour. A layer's colour is
+  changed with the image tint. Not read, and reported: layer effects, vector masks, adjustment
+  layers.
+- **What moves**, from the names, as the panel importers read them: `pointer`/`indicator`/
+  `needle`/`rotor` turn about the `pivot` (or the middle of the knob they sit on), `fader`/`thumb`
+  slide along the `track`, `lamp`/`led`/`on` and `off` show the state, `pressed` shows while held. The
+  component gets the dial, fader, switch or button wiring the designer builds (value channel,
+  behaviour, grab area, bindings). Not `cap`: a cap's highlight would swing round with it.
+
+This is Level 1 for Photoshop without the add-on: a knob painted in layers in any of the programs
+that write PSD comes in as a layered, changeable control.
+
+### Native files: Illustrator (.ai), Figma (.fig), Blender (.blend)
+
+The owner asked about reading these directly. What each format is, and the route that works:
+
+- **Illustrator .ai.** Since Illustrator 9 an .ai file is saved, by default ("Create PDF Compatible
+  File"), as a PDF with Illustrator's own data in private streams. The PDF part holds the artwork as
+  drawing operators: paths, fills, axial and radial shadings (the gradients), text as positioned
+  glyphs, and the layers as optional content groups. So reading .ai is reading PDF: pdf.js (Mozilla,
+  Apache 2.0) parses it into an operator list that maps onto the same vector layers the SVG importer
+  makes. Medium work; text would come as outlines or glyph runs rather than editable text. A file
+  saved without PDF compatibility holds only Illustrator's private, undocumented data and cannot be
+  read; the answer there is SVG export (Export As › SVG with "Object IDs: Layer Names"), which works
+  today. **Recommendation:** worth doing if Illustrator is a main tool; until then SVG export.
+- **Figma .fig.** A proprietary binary (a "fig-kiwi" header, a Kiwi-schema message, compressed),
+  undocumented and changed by Figma without notice. Community parsers exist, but an importer built on
+  one breaks with the format. Figma's supported routes are better: its SVG export (works today; tick
+  "Include id attribute" to keep layer names), its REST API (`GET /v1/files/:key` returns the whole
+  document as JSON: every node's name, vector geometry, fills, strokes and effects; it needs the
+  user's access token and the network), and a Figma plugin, which runs inside Figma and could write a
+  CEditor component file directly. **Recommendation:** SVG now; a Figma plugin, or the REST API, if
+  Figma becomes a main source. Not the .fig file itself.
+- **Blender .blend.** Blender's own database (structures described by the file itself, "SDNA"),
+  readable in principle, but what makes a knob look like a knob (materials, lights, the render) only
+  exists once Blender renders it. Importing the file without Blender would mean rebuilding Blender's
+  renderer. So Blender works from inside: the add-on of Level 1 renders each named object's passes
+  and writes them as a layered file CEditor reads. The Photoshop component import above is that
+  reader already: an add-on that writes the passes as a layered PSD (or a component file directly),
+  the layers named as above and blended as compositing adds them (colour, multiply the shadow and
+  occlusion, add the reflections), comes in as a changeable layered control with no new import code.
+  glTF (Level 2) stays the route for live 3D. **Recommendation:** the add-on, writing PSD.
+
 ### Order
 
-Level 1 for Photoshop first (the reader exists), then the Blender add-on writing the same component;
-Level 3 with piece E; Level 2 when somebody needs a shape only Blender can make.
+Built: SVG and Photoshop as layered components. Next: the Blender add-on writing a layered PSD (the
+reader exists); .ai through its PDF part if Illustrator files are wanted directly; a Figma plugin if
+Figma is; Level 3 with piece E; Level 2 when somebody needs a shape only Blender can make.
 
 ## Recommended order
 

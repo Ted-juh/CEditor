@@ -1,4 +1,4 @@
-# Panels from drawn artwork, and components that stay linked
+# Panels and components from drawn artwork, and components that stay linked
 
 Two editor workflows for building panels quickly and keeping them consistent. Both are in the web
 editor and need nothing from the native build.
@@ -100,6 +100,38 @@ Photoshop before importing.
 **File › Update Panel from Photoshop Artwork...** brings a revised file into the panel you already
 worked on, by the same rules as the SVG update below. Controls are matched to their layers by
 **layer name**, so keep the names stable between revisions.
+
+## New Component from SVG Artwork, and from Photoshop Artwork
+
+Where the panel importers make a panel with the drawing as its picture, these make the drawing the
+control: a custom component, every shape (SVG) or layer (Photoshop) one of its layers, opened in the
+Component Designer to change and save (`utils/svgComponentImport.js`, `utils/psdComponentImport.js`).
+
+- **SVG**: each `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` and `path` is a vector
+  layer with its transforms applied, its fill (a colour, a linear or radial gradient), its stroke as
+  the layer's outline, and its opacity; Illustrator's class rules are read. `<text>` is a text layer,
+  an embedded `<image>` a picture layer, `<use>` the shape it uses.
+- **Photoshop**: each layer is a picture layer cropped to its pixels, with its mask, Fill opacity
+  and clipped layers built into its pixels, and its opacity, blend mode and visibility as the layer's.
+  Pass Through groups are unfolded; a group with its own mode or mask is one layer. Text layers stay
+  text where the file says their size and colour.
+
+**What moves comes from the names**, anywhere in a layer's name or its group's, as whole words:
+
+| Name | Does |
+|---|---|
+| `pointer`, `indicator`, `needle`, `rotor`, `marker`, `turns` | turns with the value, -135° to 135°, the drawn angle in the middle |
+| `pivot`, `centre`, `axis` | where those turn; without it, the middle of the knob they sit on |
+| `fader`, `thumb`, `handle`, `slide` | slides along the `track` (`slot`, `rail`), the value 0 at the bottom or left |
+| `lamp`, `led`, `light`, `on` / `off` | shown when the value is on / off |
+| `pressed`, `down` | shown while it is held |
+
+The control is wired from what was found: a dial, a fader, a switch, or a button when the file or a
+layer is called button. With nothing named to move it is layers only. Not `cap`: a cap's highlight
+would swing round with it; name a cap that should turn `rotor`.
+
+Not read, and listed in the Console: SVG clip paths and masks, pattern fills, gradient strokes and
+linked pictures; Photoshop layer styles, vector masks and adjustment layers.
 
 ## Update Panel from SVG Artwork
 

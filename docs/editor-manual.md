@@ -491,6 +491,31 @@ from SVG Artwork...** moves the controls whose placeholders moved and adds new o
 controls, and it shows you what will change first. Photoshop layer styles, masks and adjustment layers
 are not drawn.
 
+### Importing a control you drew
+
+A knob, a fader or a switch drawn in a drawing program can become a control of its own, with every
+part of the drawing still a layer you can change.
+
+1. Draw the control. Name the parts that move: **pointer** (or indicator, needle, rotor) turns with
+   the value; **fader** (or thumb, handle) slides along the layer called **track**; **lamp** (or led,
+   light, on) shows when the value is on, **off** when it is off, and **pressed** while it is held.
+   A layer named **pivot** marks where a pointer turns; without one, it turns about the middle of
+   the knob it sits on. A name counts inside a group's name too.
+2. Choose **File → New Component from SVG Artwork...** or **New Component from Photoshop Artwork...**.
+
+The control opens in the Component Designer, ready to use and to change:
+
+- **From SVG** (Illustrator, Inkscape, Affinity Designer, Figma, Sketch), every shape is a vector
+  layer, with its colours, gradient, outline and opacity. Text stays text.
+- **From Photoshop** (and GIMP, Krita, Affinity Photo, Photopea, Procreate), every layer is a picture
+  layer with its opacity and blend mode, its mask and the layers clipped to it built in. Change a
+  layer's colour with its tint. Text layers stay text where the file says their size and colour.
+
+What moves is wired: a dial, a fader, a switch or a button, with its value, the area that takes the
+mouse, and the layers that follow the value. A drawing with nothing named to move comes in as
+layers only. The Console says what each name made, and what was drawn differently: clip paths and
+pattern fills from SVG, and Photoshop layer styles, vector masks and adjustment layers, are not read.
+
 ## 5. Connecting to your synth
 
 ### Devices and ports
@@ -1153,6 +1178,8 @@ CEditor is a beta. Things to know before you rely on it:
 | **Open Recent** | | Recently used panels, components, device profiles and script workspaces. |
 | **New Custom Component** | | Opens an empty custom component in its own tab. |
 | **Import Component...** | | Brings in a `.ceditor-component.json` (or library) file and opens a single component. Dropping the file on the window does the same. |
+| **New Component from SVG Artwork...** | | Makes a control from an SVG drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
+| **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer. |
 | **Open Component from Library...** | | Opens a component from your library in its own tab. |
 | **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |
 | **Open Device Profile** | | Opens a loaded device profile in the designer. |

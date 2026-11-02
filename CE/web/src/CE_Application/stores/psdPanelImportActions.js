@@ -142,7 +142,8 @@ function ensureListeners() {
   });
 }
 
-function choosePsd(handle) {
+/** Ask for a Photoshop file, then `handle(bytes, filePath)`: the app's own dialog, or the browser's. */
+export function choosePsd(handle) {
   if (!isJuceAvailable()) {
     if (typeof window === 'undefined' || !window.document) return;
     const input = window.document.createElement('input');

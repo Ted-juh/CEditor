@@ -47,6 +47,7 @@
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
   import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
   import { newPanelFromPsdArtwork, updatePanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
+  import { newComponentFromSvgArtwork, newComponentFromPsdArtwork } from '../stores/artworkComponentActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
   import { floating } from '../utils/floatingUi.js';
 
@@ -182,6 +183,10 @@
       // A component file into the library, opened to change (stores/componentImport.js). It could
       // only come in from a paste box inside another component's Publish tab.
       { label: 'Import Component...', action: () => importComponentFromFile() },
+      // A drawing made the control itself: every shape or layer a layer of a new component, still
+      // editable, and the layers named pointer, fader or lamp wired to move (utils/artworkComponent.js).
+      { label: 'New Component from SVG Artwork...', action: () => newComponentFromSvgArtwork() },
+      { label: 'New Component from Photoshop Artwork...', action: () => newComponentFromPsdArtwork() },
       { label: 'Open Component from Library...', action: () => openSavedCustomComponent() },
       { type: 'separator' },
       { label: 'New Device Profile', action: () => newDeviceProfile() },

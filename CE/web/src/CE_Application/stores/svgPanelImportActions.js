@@ -254,7 +254,8 @@ function fallbackPicker(handle) {
   input.click();
 }
 
-function chooseSvg(handle) {
+/** Ask for an SVG file, then `handle(text, filePath)`: the app's own dialog, or the browser's. */
+export function chooseSvg(handle) {
   if (!isJuceAvailable()) {
     fallbackPicker(handle);
     return;
