@@ -11,7 +11,7 @@
   import PanelPreviewSurface from '../editor/PanelPreviewSurface.svelte';
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
   import ControlSetCard from './ControlSetCard.svelte';
-  import { groupControlSets } from '../utils/controlSetGroups.js';
+  import { SET_STYLES, groupControlSets } from '../utils/controlSetGroups.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
   import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, normalizeControlSetDefinition, resolveToken } from '../models/controlSets.js';
@@ -59,6 +59,7 @@
   let folded = $state(new Set(['mechanical']));
   let previewWidth = $state(376);
   let cardFamily = $state('Knob');
+  let cardStyle = $state('');
   let importGeneration = 0;
 
   onDestroy(() => { importGeneration += 1; });
@@ -74,7 +75,7 @@
   let builtInSets = $derived(allSets.filter((set) => set.origin === 'built-in'));
   let selectedSet = $derived(allSets.find((set) => set.id === selectedId) ?? allSets[0]);
   let isCustom = $derived(selectedSet?.origin === 'library');
-  let groups = $derived(groupControlSets({ librarySets: mySets, builtInSets, panelSetId, query }));
+  let groups = $derived(groupControlSets({ librarySets: mySets, builtInSets, panelSetId, query, style: cardStyle }));
   let panelName = $derived(String(targetPanel?.name ?? ''));
 
   $effect(() => {
@@ -260,16 +261,23 @@
         <button type="button" class:on={cardFamily === family} aria-pressed={cardFamily === family} data-card-family={family} onclick={() => cardFamily = family}>{label}</button>
       {/each}
     </div>
+    <div class="card-families styles" role="group" aria-label="Which style">
+      <button type="button" class:on={!cardStyle} aria-pressed={!cardStyle} data-card-style="" onclick={() => cardStyle = ''}>All</button>
+      {#each SET_STYLES as [style, label] (style)}
+        <button type="button" class:on={cardStyle === style} aria-pressed={cardStyle === style} data-card-style={style} onclick={() => cardStyle = style}>{label}</button>
+      {/each}
+    </div>
     <div class="scroll">
       {#each groups as group (group.id)}
-        {@const open = query.trim() !== '' || !folded.has(group.id)}
+        {@const open = query.trim() !== '' || cardStyle !== '' || !folded.has(group.id)}
         <section class="group" data-set-group={group.id}>
           <button type="button" class="group-head" aria-expanded={open} onclick={() => toggleGroup(group.id)}>
             {#if open}<ChevronDown size={13} />{:else}<ChevronRight size={13} />{/if}
             <span>{group.label}</span><small>{group.sets.length}</small>
           </button>
           {#if open}
-            {#if group.eras}
+            <!-- By era only while the whole Library shows: a style or a search leaves one or two per era. -->
+            {#if group.eras && !cardStyle && !query.trim()}
               {#each group.eras as era (era.label)}
                 <div class="era">{era.label}</div>
                 <div class="cards">
@@ -284,7 +292,7 @@
           {/if}
         </section>
       {:else}
-        <p class="empty">No set matches “{query}”.</p>
+        <p class="empty">{query.trim() ? `No set matches “${query.trim()}”.` : 'No set has this style.'}</p>
       {/each}
     </div>
   </aside>
@@ -412,6 +420,8 @@
   .card-families { display:flex; flex-wrap:wrap; gap:3px; padding:2px 10px 4px; }
   .card-families button { flex:1 1 auto; padding:3px 5px; border-radius:11px; border-color:#3a3a3a; background:#202020; color:#bbb; font-size:10px; }
   .card-families button.on { background:#094771; border-color:#0B6EB5; color:#fff; }
+  .card-families.styles { padding-top:0; }
+  .card-families.styles button.on { background:#3d3220; border-color:#a07a2c; color:#f4dfa8; }
   .group-head { width:100%; justify-content:flex-start; gap:5px; padding:7px 10px 3px; border:none; border-radius:0; background:none; color:#6FA8C7; font-size:9.5px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
   .group-head[aria-expanded='false'] { color:#8a8a8a; }
   .group-head small { margin-left:auto; color:#777; font-weight:600; letter-spacing:0; }

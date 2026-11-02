@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { BUILT_IN_CONTROL_SETS, getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { applyControlSetChoices, controlFamily, panelSetSummary } from '../src/CE_Application/utils/controlSetApply.js';
-import { groupControlSets, MECHANICAL_SET_IDS } from '../src/CE_Application/utils/controlSetGroups.js';
+import { controlSetStyle, groupControlSets, MECHANICAL_SET_IDS, SET_STYLES } from '../src/CE_Application/utils/controlSetGroups.js';
 import { DEFAULT_PANEL_COLOUR, buildSolidStyle } from '../src/CE_Application/utils/backgroundCSS.js';
 import { panels } from '../src/CE_Application/stores/panels.js';
 import { applyControlSetWithChoices, controlSetApplyRequest, requestControlSetApply } from '../src/CE_Application/stores/controlSets.js';
@@ -118,6 +118,20 @@ test('the Library is grouped: the panel\'s set, your own, materials, mechanisms,
   assert.equal(byId.materials.sets.length + byId.mechanical.sets.length + byId.templates.sets.length, BUILT_IN_CONTROL_SETS.length, 'every built-in is somewhere');
   const found = groupControlSets({ librarySets: mine, builtInSets: BUILT_IN_CONTROL_SETS, query: 'tolex' });
   assert.deepEqual(found.flatMap((group) => group.sets.map((set) => set.id)), ['tolex']);
+});
+
+test('every built-in has a style, and a style keeps the Library to it', () => {
+  const counts = {};
+  for (const set of BUILT_IN_CONTROL_SETS) counts[controlSetStyle(set)] = (counts[controlSetStyle(set)] ?? 0) + 1;
+  // Each listed by hand: an id misspelt in the list would fall to Modern and change these.
+  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 18, glow: 12, mechanical: 12 });
+  assert.deepEqual(SET_STYLES.map(([id]) => id).sort(), Object.keys(counts).sort());
+  assert.equal(controlSetStyle({ id: 'my-amp', basedOn: 'tolex' }), 'vintage', 'your own set takes the style it was copied from');
+  const vintage = groupControlSets({ builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'neon', style: 'vintage' });
+  const shown = vintage.filter((group) => group.id !== 'panel').flatMap((group) => group.sets);
+  assert.equal(shown.length, 18);
+  assert.ok(shown.every((set) => controlSetStyle(set) === 'vintage'));
+  assert.deepEqual(vintage[0].sets.map((set) => set.id), ['neon'], 'the panel\'s own set stays in sight');
 });
 
 test('every place a set is applied asks through the Apply window', () => {
