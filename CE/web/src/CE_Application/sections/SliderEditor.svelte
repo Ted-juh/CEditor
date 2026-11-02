@@ -1,5 +1,5 @@
 <script>
-  import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch } from '../stores/controls.js';
+  import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch, convertRangeControlType } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -160,10 +160,16 @@
     { label: 'Band', geometry: 'circular', valueMode: 'band', direction: 'cw', startAngle: 135, sweepAngle: 270, width: 220, height: 220 },
   ];
 
-  // A knob runs on the slider's engine and is always drawn as a dial, so linear is not a choice for it:
-  // its linear presets and the Geometry choice are not offered. One set to linear before that (it
-  // went on drawing a dial, dragged as a line) gets a button back to circular.
+  // A knob runs on the slider's engine and is always drawn as a dial; a slider is a line. The type
+  // decides the geometry, so neither is offered the other's presets or a Geometry choice: Change to
+  // Slider / Change to Knob changes the type, and takes the control set's design for it. One set to
+  // the other geometry before that gets a button back.
   let isKnob = $derived(String(getSection(control, 'Core')?.controlType ?? '') === 'Knob');
+
+  function convertType() {
+    const controlId = getSection(control, 'Core')?.id;
+    if (controlId) convertRangeControlType(controlId);
+  }
 
   /** Bipolar is what the Bipolar presets write: the fill grows from the centre of a range below zero. */
   let isBipolar = $derived(String(behavior?.fillOrigin ?? '') === 'center' && numberOr(behavior?.min, 0) < 0);
@@ -234,25 +240,25 @@
 
 {#if behavior}
   <PropertySection title={isKnob ? 'Knob Presets' : 'Slider Presets'} icon={Bookmark}>
-    {#if !isKnob}
-    <PropertyCell label="Linear" span={4} hint="Insert a ready-made starting point and refresh the semantic slider style parts. The slider keeps its size.">
+    <!-- A slider is offered the linear presets, a knob the circular ones, and each the change to
+         the other type (utils/rangeControlConversion.js): a dial is a Knob, so the control set
+         styles it as one. -->
+    <PropertyCell label={isKnob ? 'Circular' : 'Linear'} span={4} hint="Insert a ready-made starting point and refresh the semantic style parts. The control keeps its size.">
       <div class="preset-grid">
-        {#each LINEAR_PRESETS as preset (preset.label)}
+        {#each isKnob ? CIRCULAR_PRESETS : LINEAR_PRESETS as preset (preset.label)}
           <button class="preset-btn" class:active={presetMatches(preset)} aria-pressed={presetMatches(preset)} type="button" onclick={() => applyPreset(preset)}>{preset.label}</button>
         {/each}
       </div>
     </PropertyCell>
-    {:else if geometry !== 'circular'}
-    <PropertyCell label="" span={4} compact hint="A knob is always drawn as a dial; set to linear, it is dragged as a line.">
-      <button class="preset-btn wide" type="button" data-testid="knob-back-to-circular" onclick={() => setSliderType('geometry', 'circular')}>This knob is set to linear, which it cannot draw: make it circular</button>
-    </PropertyCell>
+    {#if geometry !== (isKnob ? 'circular' : 'linear')}
+      <PropertyCell label="" span={4} compact hint={isKnob ? 'A knob is drawn as a dial; set to linear, it is dragged as a line.' : 'This slider is set to circular: it is drawn as a dial the control set does not style as a knob.'}>
+        <button class="preset-btn wide" type="button" data-testid="range-geometry-mismatch" onclick={() => setSliderType('geometry', isKnob ? 'circular' : 'linear')}>
+          {isKnob ? 'This knob is set to linear, which it cannot draw: make it circular' : 'This slider is set to circular: make it linear'}
+        </button>
+      </PropertyCell>
     {/if}
-    <PropertyCell label="Circular" span={4} hint="Circular presets keep the same slider family and just change geometry/value mode defaults. Changing between linear and circular resizes it to fit.">
-      <div class="preset-grid">
-        {#each CIRCULAR_PRESETS as preset (preset.label)}
-          <button class="preset-btn" class:active={presetMatches(preset)} aria-pressed={presetMatches(preset)} type="button" onclick={() => applyPreset(preset)}>{preset.label}</button>
-        {/each}
-      </div>
+    <PropertyCell label="Type" span={4} hint={isKnob ? 'Make it a slider: it keeps its name, value, range, bindings and scripts, and takes the control set\'s slider design and a slider\'s size, centred where it is.' : 'Make it a knob: it keeps its name, value, range, bindings and scripts, and takes the control set\'s knob design and a knob\'s size, centred where it is.'}>
+      <button class="preset-btn wide" type="button" data-testid="range-convert" onclick={convertType}>{isKnob ? 'Change to Slider' : 'Change to Knob'}</button>
     </PropertyCell>
     <PropertyCell label="Refresh Parts" span={4} hint="Rebuild the semantic ready-made slider style parts if they were removed or drifted too far.">
       <button class="preset-btn wide" type="button" onclick={regenerateSliderParts}>Regenerate parts</button>
@@ -260,14 +266,8 @@
   </PropertySection>
 
   <PropertySection title="Type" icon={Shapes}>
-    {#if !isKnob}
-    <PropertyCell label="Geometry" span={2} hint="Linear uses a track axis, circular uses a dial arc.">
-      <select class="val" value={geometry} onchange={(event) => setSliderType('geometry', event.target.value)}>
-        <option value="linear">linear</option>
-        <option value="circular">circular</option>
-      </select>
-    </PropertyCell>
-    {/if}
+    <!-- No Geometry choice: the type decides it (a Knob is circular, a Slider linear), and Change to
+         Knob / Change to Slider above changes the type. -->
     <PropertyCell label="Mode" span={2} hint="Single uses one handle, range uses two, band uses three.">
       <select class="val" value={valueMode} onchange={(event) => set('Behavior.valueMode', event.target.value)}>
         <option value="single">single</option>

@@ -30,6 +30,7 @@ import { mutatePanelControlsByIdsInList, mutatePanelControlsInList, patchPanelCo
 import { activeComponentControl, mutateComponentDocumentControl } from './componentWorkspace.js';
 import { targetLayerName } from './panelLayerActions.js';
 import { withSetPins } from '../models/controlSetFamilies.js';
+import { convertRangeControl } from '../utils/rangeControlConversion.js';
 import { isDesignerViewPatch } from '../utils/designerViewState.js';
 
 // Re-export for convenience
@@ -773,6 +774,19 @@ export function applyControlPatch(controlId, patch, { pin = false } = {}) {
  * paths — a linked custom component updated from its library source can gain and lose sections, and a
  * patch can only set values. One store update, so one undo step however many controls it replaces.
  */
+/**
+ * Change a Knob into a Slider or a Slider into a Knob (utils/rangeControlConversion.js): one store
+ * write, so one undo step. Returns the control as it now is, or null when it is neither.
+ */
+export function convertRangeControlType(controlId) {
+  const panel = get(panels).find((entry) => entry.id === get(resolvedActivePanelId));
+  const control = panel ? findControlById(panel.controls, controlId) : null;
+  const next = convertRangeControl(control);
+  if (!next) return null;
+  replaceControlsById(new Map([[controlId, next]]));
+  return next;
+}
+
 export function replaceControlsById(replacements, targetPanelId = get(resolvedActivePanelId)) {
   if (!replacements || replacements.size === 0) return;
   if (targetPanelId == null) {
