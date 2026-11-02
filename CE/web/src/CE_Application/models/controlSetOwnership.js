@@ -20,7 +20,7 @@ import {
   familyPatchFor, pristineControlFor, readControlPath, resolveControlFamily, resolveControlForSet,
   controlSetForControl, sameControlValue, setPatchablePaths,
 } from './controlSetFamilies.js';
-import { isColourKey, isTokenReference } from './controlSets.js';
+import { isColourKey, isTokenReference, resolveColourValue } from './controlSets.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const typeOf = (control) => String(control?._children?.Core?.controlType ?? '');
@@ -37,6 +37,9 @@ function familyPaths(family) {
 export function colourRolePaths(node, prefix = '', out = []) {
   if (!node || typeof node !== 'object') return out;
   const visit = (key, value) => {
+    // A State's patch map names a property by a dotted key ('Background.Fill.colour'), which a
+    // dotted path cannot address; it is not a field of the inspector either.
+    if (String(key).includes('.')) return;
     const path = prefix ? `${prefix}.${key}` : String(key);
     if (typeof value === 'string') {
       if (isColourKey(String(key)) && isTokenReference(value)) out.push(path);
@@ -57,34 +60,72 @@ export function colourRolePaths(node, prefix = '', out = []) {
 }
 
 /**
- * Which properties of `control` its set decides and which are its own: `{ set, fromSet, own }`,
- * `fromSet` and `own` being Sets of dotted paths, `set` the set the control is drawn with.
+ * Which properties of `control` its set decides and which are its own:
+ *   set       the set the control is drawn with
+ *   fromSet   paths it inherits from the set
+ *   own       paths it overrides (the inspector's overrides)
+ *   setValues path → the value the set would give an overridden one, colours resolved
+ *   roles     path → the colour role ('{control.cap}') a colour is drawn from, after the family
+ *   detached  the id of the set it was detached from, or ''
+ * A detached control has no overrides: its whole look is stored on it (ownLookControl).
  */
 export function setOwnership(control, panelSet, sources = {}) {
   const set = controlSetForControl(control, panelSet, sources);
   const fromSet = new Set();
   const own = new Set();
+  const setValues = new Map();
+  const roles = new Map();
+  const detached = String(control?._children?.Core?.detachedFromSet ?? '');
   const pristine = pristineControlFor(typeOf(control));
-  if (!control || !pristine) return { set, fromSet, own };
+  const result = { set, fromSet, own, setValues, roles, detached };
+  if (!control || !pristine) return result;
+  const drawn = resolveControlFamily(control, set);
+  for (const path of colourRolePaths(drawn)) roles.set(path, readControlPath(drawn, path));
+  if (detached) {
+    for (const path of roles.keys()) fromSet.add(path);
+    return result;
+  }
+  const family = familyPatchFor(set, typeOf(control));
   const pins = new Set(pinsOf(control));
-  for (const path of familyPaths(familyPatchFor(set, typeOf(control)))) {
+  const asShown = (value) => (typeof value === 'string' && isTokenReference(value) ? resolveColourValue(value, set) : value);
+  for (const path of familyPaths(family)) {
     const mine = readControlPath(control, path);
-    if (pins.has(path) || !sameControlValue(mine, readControlPath(pristine, path))) own.add(path);
-    else fromSet.add(path);
+    if (pins.has(path) || !sameControlValue(mine, readControlPath(pristine, path))) {
+      own.add(path);
+      setValues.set(path, asShown(familyValueAt(family, path)));
+    } else {
+      fromSet.add(path);
+    }
   }
   // A colour that came as a role and was given a colour of its own; and every role the control
   // holds, which follows the set wherever it was written.
   for (const path of colourRolePaths(pristine)) {
     if (fromSet.has(path) || own.has(path)) continue;
     const value = readControlPath(control, path);
-    if (value !== undefined && !isTokenReference(value)) own.add(path);
+    if (value !== undefined && !isTokenReference(value)) {
+      own.add(path);
+      setValues.set(path, asShown(readControlPath(pristine, path)));
+    }
   }
   for (const path of colourRolePaths(control)) {
     if (pins.has(path)) continue;
     own.delete(path);
+    setValues.delete(path);
     fromSet.add(path);
   }
-  return { set, fromSet, own };
+  return result;
+}
+
+function familyValueAt(family, path) {
+  if (Object.hasOwn(family?.component ?? {}, path)) return family.component[path];
+  const match = /^Parts\.([^.]+)\.(.+)$/.exec(path);
+  return match ? family?.parts?.[match[1]]?.[match[2]] : undefined;
+}
+
+/** A colour role's name as the inspector shows it: '{control.cap}' → 'Control Cap'. */
+export function colourRoleName(token) {
+  return String(token ?? '').replace(/[{}]/g, '').split(/[.\s_-]+/).filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
 }
 
 /**
@@ -97,6 +138,9 @@ export function ownLookControl(control, panelSet, sources = {}, { keepColourRole
   const drawn = deepClone(keepColourRoles ? resolveControlFamily(control, set) : resolveControlForSet(control, set));
   const patchable = setPatchablePaths(typeOf(control), [set, ...extraSets].filter(Boolean));
   drawn._children.Core.setOverrides = [...new Set([...pinsOf(control), ...patchable])];
+  // What the inspector says of it: detached, from which set, and whether its colours stay linked.
+  drawn._children.Core.detachedFromSet = String(set?.id ?? '');
+  drawn._children.Core.detachedColourRoles = keepColourRoles === true;
   return drawn;
 }
 
@@ -120,5 +164,10 @@ export function resetToSetPatch(control, paths = null, { extraSets = [] } = {}) 
   }
   const remaining = pins.filter((path) => !targets.includes(path));
   if (remaining.length !== pins.length) patch['Core.setOverrides'] = remaining;
+  // Reattached: inherits from the set again.
+  if (!paths && control._children.Core.detachedFromSet !== undefined) {
+    patch['Core.detachedFromSet'] = undefined;
+    patch['Core.detachedColourRoles'] = undefined;
+  }
   return patch;
 }

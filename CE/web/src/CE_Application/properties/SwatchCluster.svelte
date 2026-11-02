@@ -62,9 +62,9 @@
               class:from-set={s.fromSet}
               style="background:#{rgb(s.value)}"
               title={s.fromSet
-                ? `${s.label} — from the control set. Click to edit in the Colors tab; a colour you pick is this control's own.`
+                ? `${s.label}: inherited from the control set. Click to edit in the Colors tab; a colour you pick overrides it.`
                 : `${s.label} — click to edit in the Colors tab`}
-              aria-label={s.fromSet ? `${s.label} colour, from the control set` : `${s.label} colour`}
+              aria-label={s.fromSet ? `${s.label} colour, inherited from the control set` : `${s.label} colour`}
               onclick={() => pick(s)}></button>
       <i>{s.label}</i>
     </span>

@@ -79,9 +79,9 @@
 {#if request && panel}
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <div class="backdrop" onmousedown={(event) => { if (event.target === event.currentTarget) close(); }} onkeydown={keydown}>
-    <div class="dialog" role="dialog" aria-label="Apply a control set" data-testid="apply-control-set">
-      <div class="title">Apply {newSet?.name ?? request.setId} to {panel.name}</div>
-      <p class="muted">Ticked: drawn with {newSet?.name ?? 'the set'}. Unticked: keeps the look it has now.</p>
+    <div class="dialog" role="dialog" aria-label="Apply Control Set" data-testid="apply-control-set">
+      <div class="title">Apply Control Set: {newSet?.name ?? request.setId}</div>
+      <p class="muted">Panel: {panel.name}. Selected items take {newSet?.name ?? 'the set'}'s appearance. Others keep their current appearance.</p>
 
       <div class="group">Panel</div>
       <label class="choice"><input type="checkbox" bind:checked={background} data-testid="apply-background" />
@@ -92,7 +92,7 @@
         Surface material <em>({newSet?.name ?? 'the set'}: {newMaterialName})</em>
       </label>
 
-      <div class="group">Controls on this panel
+      <div class="group">Controls
         {#if summary.families.length}
           <button type="button" class="link" onclick={() => { families = new Set(summary.families.map((entry) => entry.label)); }}>All</button>
           <button type="button" class="link" onclick={() => { families = new Set(); }}>None</button>
@@ -105,14 +105,14 @@
           {/each}
         </div>
       {:else}
-        <p class="muted">No controls follow the panel's set yet.</p>
+        <p class="muted">No controls inherit from the panel's set.</p>
       {/if}
       {#if selectionCount}
-        <label class="choice"><input type="checkbox" bind:checked={onlySelected} />Only the {selectionCount} selected control{selectionCount === 1 ? '' : 's'}</label>
+        <label class="choice"><input type="checkbox" bind:checked={onlySelected} />Selected controls only ({selectionCount})</label>
       {/if}
       {#if summary.pinned}
         <label class="note"><input type="checkbox" bind:checked={includePinned} />
-          {summary.pinned} control{summary.pinned === 1 ? ' is' : 's are'} pinned to another set ({summary.pinnedSets.map((id) => getControlSet(id, { document: panel.controlSets, library: $controlSetLibrary })?.name ?? id).join(', ')}) and keep{summary.pinned === 1 ? 's' : ''} it. Change them too
+          {summary.pinned} control{summary.pinned === 1 ? ' is' : 's are'} assigned to another set ({summary.pinnedSets.map((id) => getControlSet(id, { document: panel.controlSets, library: $controlSetLibrary })?.name ?? id).join(', ')}). Include them
         </label>
       {/if}
 

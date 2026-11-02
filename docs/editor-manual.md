@@ -352,14 +352,22 @@ pins that one control to a different design, form and size.
 controls, grouped (the panel's set, your own, the built-ins), searchable, with two rows of buttons above
 it: which control the cards show (Knobs, Sliders, Buttons, Switches, Meters, Pads) and which style
 (Modern, Metal, Vintage, Glow, Mechanical). In the middle, the chosen set's colours, surface material
-and control families; change anything in a built-in set and it becomes your own copy. On the right,
+and control families; built-in sets are read-only, and editing one creates a copy. On the right,
 the live preview, **Apply to** the panel, the default for new panels, **Browse the 36 templates** and
 **Import a set…**.
 
-Applying a set opens a window that asks what should change: the background colour, the surface
-material, each kind of control on the panel, or only the selected controls, and whether controls
-pinned to another set change too. What you leave unticked keeps the look it has. It is one undo step,
-and the panel's own **Set** asks the same.
+Applying a set opens the **Apply Control Set** window: the background colour, the surface material,
+each kind of control on the panel, or the selected controls only, and whether controls assigned to
+another set are included. Items left unselected keep their current appearance. It is one undo step,
+and the panel's own **Set** opens the same window.
+
+A control **inherits** its appearance from its set. A property you change on the control is an
+**override**: the properties panel marks it with a bar in the margin and a bold label, and **Revert**
+beside it restores the set's value. A colour drawn from one of the set's colour roles shows the role's
+name. **Core → Control design** shows the control's set and its number of overrides, with **Clear
+Overrides**, which reverts them all, and **Detach from Set**, which stores the set's appearance on the
+control so that set changes no longer affect it (with **Keep colour roles linked**, its colours still
+follow the set). **Reattach to Set** makes it inherit again. All three apply to every selected control.
 
 ### Colours
 

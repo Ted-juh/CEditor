@@ -815,7 +815,7 @@
         ontoggle={(value) => setCollapsed(sectionKey('font'), value)}
         tools={dock ? undefined : openType}
       >
-        <PropertyCell label="Font" span={2} hint="Choose the font family for this text">
+        <PropertyCell label="Font" span={2} path={`${textPathPrefix}.Font.family`} hint="Choose the font family for this text">
           <select
             class="text-select"
             style={`font-family:'${selectedFontPreviewFamily}'`}
@@ -873,7 +873,7 @@
         {#if !dock}
           {@render spacingFields()}
         {:else}
-          <PropertyCell label="Colour" span={2} hint="Text fill colour; click the swatch to open the colour editor.">
+          <PropertyCell label="Colour" span={2} path={`${textPathPrefix}.Fill.colour`} hint="Text fill colour; click the swatch to open the colour editor.">
             <PropertyColor value={String(textFill?.colour ?? 'FFFFFFFF')} onchange={setFillColor} onswatchclick={handleFillColorSwatch} />
           </PropertyCell>
         {/if}
@@ -1245,9 +1245,9 @@
         collapsed={$sectionCollapse[fillLayerCollapseKey('solid')] ?? false}
         ontoggle={(value) => setCollapsed(fillLayerCollapseKey('solid'), value)}
       >
-        <PropertyCell label="Colour" span={2} hint="The text fill colour. The swatch opens it in the display panel.">
+        <PropertyCell label="Colour" span={2} path={`${textPathPrefix}.Fill.colour`} hint="The text fill colour. The swatch opens it in the display panel.">
           <div class="color-input">
-            <button class="mini-swatch" title={setTextFill?.fromSet ? 'From the control set. Pick a colour to make it this control\'s own' : 'Pick colour'} style={`background:#${displayTextFillColour}`} onclick={handleFillColorSwatch}></button>
+            <button class="mini-swatch" title={setTextFill?.fromSet ? 'Inherited from the control set. Picking a colour overrides it.' : 'Pick colour'} style={`background:#${displayTextFillColour}`} onclick={handleFillColorSwatch}></button>
             <input class="val" type="text" value={displayTextFillColour} onfocus={selectAll} onchange={setTextFillDisplayColour} />
           </div>
           {#if textFillToken}

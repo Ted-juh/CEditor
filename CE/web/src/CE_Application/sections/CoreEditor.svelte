@@ -14,6 +14,7 @@
   import { offeredControlSetsWith } from '../models/controlSets.js';
   import { anatomyOptions } from '../models/controlAnatomy.js';
   import PropertySection from '../properties/PropertySection.svelte';
+  import ControlSetOverridesCard from './ControlSetOverridesCard.svelte';
   import PropertyCell from '../properties/PropertyCell.svelte';
   import PropertyText from '../properties/PropertyText.svelte';
   import PropertyButton from '../properties/PropertyButton.svelte';
@@ -136,6 +137,11 @@
     {/if}
   </PropertySection>
   <PropertySection title="Control design" icon={Tag}>
+    {#if core.controlType !== 'CustomComponent'}
+      <PropertyCell label="Control set" span={4} compact hint="Whether the control inherits its appearance from its control set, its overrides, and detaching it from the set.">
+        <ControlSetOverridesCard {control} />
+      </PropertyCell>
+    {/if}
     <PropertyCell label="Set" span={4} hint="Follow the panel, or pin a built-in design to this control so it keeps its look when copied to another panel. Your property edits take precedence.">
       <select class="val" value={core.controlSetId ?? ''} onchange={(e) => set('controlSetId', e.target.value)}>
         <option value="">Follow panel</option>
@@ -143,18 +149,18 @@
       </select>
     </PropertyCell>
     {#if anatomyOptions(core.controlType).length}
-      <PropertyCell label="Form" span={4} hint="Changes the control's physical construction. Uses the existing control's value, input and MIDI behavior. Choose Original parts to use the Parts editor.">
+      <PropertyCell label="Form" span={4} path="Core.controlForm" hint="Changes the control's physical construction. Uses the existing control's value, input and MIDI behavior. Choose Original parts to use the Parts editor.">
         <select class="val" value={core.controlForm ?? ''} onchange={(e) => set('controlForm', e.target.value)}>
           <option value="">Follow set</option><option value="original">Original parts</option>
           {#each anatomyOptions(core.controlType) as [id, name]}<option value={id}>{name}</option>{/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Size %" span={2} hint="Size of the mechanism within its control bounds."><NumberCell value={core.formSize ?? 100} min={60} max={115} step={5} onchange={(v) => set('formSize', v)} /></PropertyCell>
-      <PropertyCell label="Depth %" span={2} hint="Highlight and pressed travel strength."><NumberCell value={core.formDepth ?? 60} min={0} max={100} step={5} onchange={(v) => set('formDepth', v)} /></PropertyCell>
-      <PropertyCell label="Divisions" span={2} hint="Visual scale divisions. Does not quantize the value."><NumberCell value={core.formDivisions ?? 12} min={4} max={48} step={1} onchange={(v) => set('formDivisions', v)} /></PropertyCell>
-      <PropertyCell label="Readout" span={2}><select class="val" value={core.formShowValue !== false ? 'yes' : 'no'} onchange={(e) => set('formShowValue', e.target.value === 'yes')}><option value="yes">Show</option><option value="no">Hide</option></select></PropertyCell>
+      <PropertyCell label="Size %" span={2} path="Core.formSize" hint="Size of the mechanism within its control bounds."><NumberCell value={core.formSize ?? 100} min={60} max={115} step={5} onchange={(v) => set('formSize', v)} /></PropertyCell>
+      <PropertyCell label="Depth %" span={2} path="Core.formDepth" hint="Highlight and pressed travel strength."><NumberCell value={core.formDepth ?? 60} min={0} max={100} step={5} onchange={(v) => set('formDepth', v)} /></PropertyCell>
+      <PropertyCell label="Divisions" span={2} path="Core.formDivisions" hint="Visual scale divisions. Does not quantize the value."><NumberCell value={core.formDivisions ?? 12} min={4} max={48} step={1} onchange={(v) => set('formDivisions', v)} /></PropertyCell>
+      <PropertyCell label="Readout" span={2} path="Core.formShowValue"><select class="val" value={core.formShowValue !== false ? 'yes' : 'no'} onchange={(e) => set('formShowValue', e.target.value === 'yes')}><option value="yes">Show</option><option value="no">Hide</option></select></PropertyCell>
       {#each [['formFaceColour','Face'],['formHousingColour','Housing'],['formInkColour','Ink'],['formLabelColour','Legends'],['formAccentColour','Indicator']] as [key, title]}
-        <PropertyCell label={title} span={4} hint={'AARRGGBB colour or a set token such as {accent}.'}><PropertyText value={core[key] ?? ''} commit={(v) => set(key, v)} /></PropertyCell>
+        <PropertyCell label={title} span={4} path={`Core.${key}`} hint={'AARRGGBB colour or a set token such as {accent}.'}><PropertyText value={core[key] ?? ''} commit={(v) => set(key, v)} /></PropertyCell>
       {/each}
     {/if}
   </PropertySection>

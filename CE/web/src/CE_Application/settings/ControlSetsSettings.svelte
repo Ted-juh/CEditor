@@ -116,7 +116,7 @@
     const copy = duplicateControlSet(draft ?? selectedSet);
     if (!copy) return;
     choose(copy.id);
-    status = `${copy.name} is now editable.`;
+    status = `Created “${copy.name}”.`;
   }
 
   function createSet() {
@@ -128,17 +128,17 @@
 
   function saveDraft() {
     const saved = updateControlSetInLibrary(draft?.id, draft);
-    status = saved ? `Saved ${saved.name}.` : 'This built-in is protected. Duplicate it to edit.';
+    status = saved ? `Saved “${saved.name}”.` : 'Built-in sets are read-only. Duplicate the set to edit it.';
   }
 
   function removeSelected() {
     if (!isCustom || !draft) return;
-    if (typeof window !== 'undefined' && !window.confirm(`Delete “${draft.name}” from your library?`)) return;
+    if (typeof window !== 'undefined' && !window.confirm(`Delete “${draft.name}” from the library?`)) return;
     const wasDefault = $generalSettings.defaultControlSetId === draft.id;
     removeControlSetFromLibrary(draft.id);
     if (wasDefault) updateGeneralSettings({ defaultControlSetId: NEW_PANEL_CONTROL_SET_ID, defaultControlSetChosen: false });
     choose(wasDefault ? NEW_PANEL_CONTROL_SET_ID : ($generalSettings.defaultControlSetId || NEW_PANEL_CONTROL_SET_ID));
-    status = 'Removed from your library.';
+    status = 'Removed from the library.';
   }
 
   /**
@@ -152,10 +152,10 @@
     if (!next) return;
     if (isCustom) { draft = next; return; }
     const builtInName = draft.name;
-    const copy = duplicateControlSet(next, `${builtInName} (mine)`);
+    const copy = duplicateControlSet(next, `${builtInName} Copy`);
     if (!copy) return;
     choose(copy.id);
-    status = `${builtInName} is built in, so your change went into your own copy, “${copy.name}”. Save set keeps later changes; Apply to panel uses it.`;
+    status = `Built-in sets are read-only. “${copy.name}” was created; Save Set stores further changes.`;
   }
 
   /** A colour typed as a code (#RRGGBB, RRGGBB or AARRGGBB): no colour picker pops up. */
@@ -295,7 +295,7 @@
           {/if}
         </section>
       {:else}
-        <p class="empty">{query.trim() ? `No set matches “${query.trim()}”.` : 'No set has this style.'}</p>
+        <p class="empty">{query.trim() ? `No set matches “${query.trim()}”.` : 'No sets in this style.'}</p>
       {/each}
     </div>
   </aside>
@@ -304,14 +304,14 @@
     <div class="column editor">
       <header class="editor-head">
         <div class="title">
-          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">on this panel</span>{/if}</h2>
-          <p>{isCustom ? 'Your own set: edits are saved with Save set, and exported as a file' : 'Built in: change anything and it becomes your own copy'}</p>
+          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">In use</span>{/if}</h2>
+          <p>{isCustom ? 'User set. Save Set stores changes; Export writes it to a file.' : 'Built-in set. Editing creates a copy.'}</p>
         </div>
         <div class="actions">
           <button onclick={duplicateSelected}><Copy size={14} /> Duplicate</button>
           <button onclick={downloadSelected}><Download size={14} /> Export</button>
           {#if isCustom}<button class="danger" onclick={removeSelected}><Trash2 size={14} /> Delete</button>{/if}
-          {#if isCustom}<button class="primary" onclick={saveDraft}>Save set</button>{/if}
+          {#if isCustom}<button class="primary" onclick={saveDraft}>Save Set</button>{/if}
         </div>
       </header>
 
@@ -387,7 +387,7 @@
           </select>
         </label>
         <button onclick={() => galleryOpen = true}><Images size={15} /> Browse the 36 templates</button>
-        <button onclick={() => fileInput?.click()}><Upload size={15} /> Import a set…</button>
+        <button onclick={() => fileInput?.click()}><Upload size={15} /> Import Set…</button>
         <input bind:this={fileInput} hidden type="file" accept=".json,application/json" onchange={importFile} />
         </div>
       </div>

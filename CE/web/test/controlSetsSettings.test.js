@@ -40,6 +40,6 @@ test('the Library opens on the panel\'s set; built-ins are editable through a co
   assert.match(source, /let selectedId = \$state\(untrack\(\(\) => panelSetId \|\| \$generalSettings\.defaultControlSetId/);
   assert.doesNotMatch(source, /\$activePanel\?/);
   assert.doesNotMatch(source, /disabled=\{!isCustom\}/, 'nothing greyed out on a built-in');
-  assert.match(source, /const copy = duplicateControlSet\(next, `\$\{builtInName\} \(mine\)`\);/);
+  assert.match(source, /const copy = duplicateControlSet\(next, `\$\{builtInName\} Copy`\);/);
   assert.doesNotMatch(source, /type="color"/, 'no colour popup');
 });

@@ -453,9 +453,9 @@
           ontoggle={(v) => setCollapsed(layerCollapseKey('solid'), v)}
         >
           {#snippet tools()}{@render layerTools('solid')}{/snippet}
-          <PropertyCell label="Colour" span={2} hint="The layer colour. The swatch opens it in the display panel; the field takes AARRGGBB or RRGGBB.">
+          <PropertyCell label="Colour" span={2} path={`${pathPrefix}.Fill.colour`} hint="The layer colour. The swatch opens it in the display panel; the field takes AARRGGBB or RRGGBB.">
             <div class="color-input">
-              <button class="mini-swatch" title={setFill?.fromSet ? 'From the control set. Pick a colour to make it this control\'s own' : 'Pick colour'} style="background:#{displayColour}" onclick={handleSwatchClick}></button>
+              <button class="mini-swatch" title={setFill?.fromSet ? 'Inherited from the control set. Picking a colour overrides it.' : 'Pick colour'} style="background:#{displayColour}" onclick={handleSwatchClick}></button>
               <input class="val" type="text" value={displayColour} onfocus={selectAll} onchange={setColour} />
             </div>
             {#if fillToken}

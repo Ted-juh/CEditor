@@ -9,10 +9,13 @@
    *   control     — $selectedControl (only used when contextMode is 'component')
    *   fallbackLabel — human label for the placeholder
   */
-  import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
+  import { activeControlSet, controlSetSources, resetControlLookToSet } from '../stores/controlSets.js';
   import { drawnForInspector } from '../models/controlSetFamilies.js';
+  import { setOwnership } from '../models/controlSetOwnership.js';
+  import { selectedComponentIds } from '../stores/panels.js';
+  import { get } from 'svelte/store';
   import { setContext } from 'svelte';
-  import { isStateScopableTabId } from '../utils/stateTargets.js';
+  import { BASE_STATE_TARGET, isStateScopableTabId } from '../utils/stateTargets.js';
   import { sectionEditorInstanceKey } from './sectionEditorKey.js';
   import {
     ensureSectionEditorComponent,
@@ -44,6 +47,25 @@
   let drawnEditorControl = $derived(
     contextMode === 'component' && editorControl ? drawnForInspector(editorControl, $activeControlSet, $controlSetSources) : editorControl,
   );
+
+  // What the control's set decides and what the control overrides, for the fields that name their
+  // property (properties/PropertyCell.svelte `path`): the base control only, since a state's value
+  // is not what a set supplies.
+  let ownership = $derived(
+    contextMode === 'component' && control?._children?.Core && (stateTargetKey === BASE_STATE_TARGET || stateTargetKey === 'base')
+      ? setOwnership(control, $activeControlSet, $controlSetSources)
+      : null,
+  );
+  const controlIdsToEdit = () => {
+    const id = control?._children?.Core?.id;
+    const selected = [...(get(selectedComponentIds) ?? [])];
+    return selected.includes(id) ? selected : [id];
+  };
+  setContext('ce.setOwnership', () => (ownership ? {
+    ...ownership,
+    setName: ownership.set?.name ?? '',
+    revert: (path) => resetControlLookToSet(controlIdsToEdit(), [path]),
+  } : null));
 
   let editorProps = $derived.by(() => {
     if (contextMode === 'panel') {

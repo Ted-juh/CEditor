@@ -54,7 +54,7 @@
     {#if knob}<EffectPreview control={knob} boxWidth={88} boxHeight={64} maxScale={1} />{/if}
   </span>
   <b>{set?.name ?? ''}</b>
-  {#if onPanel}<i>on panel</i>{/if}
+  {#if onPanel}<i>In use</i>{/if}
 </button>
 
 <style>
