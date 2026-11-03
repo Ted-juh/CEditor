@@ -338,7 +338,17 @@ and **Device** (what it is bound to).
 - Many tabs have **Presets** at the bottom, to save a look and apply it again.
 
 A knob, a button and a switch each have a tab for the parts they are drawn with: **Knob** (housing,
-track and value arc, cap, pointer), **Button** and, on a toggle, **Switch**. The Button and Switch
+skirt, track and value arc, cap, insert, pointer), **Button** and, on a toggle, **Switch**. On the
+Knob tab the **Housing**, **Skirt**, **Cap** and **Insert** are plates, one over the other: each has
+an **Outline** (a circle, a polygon, a rounded square, a scallop, flutes, a **Gear**, the ribbed
+grip of a synth knob, or a ring), a size, a fill and a border, a finish, and a **Shadow** on the
+panel: its outline again, lower by **Shadow %** of its radius, its edge as soft as **Softness %**.
+An insert with no fill and a border is a ring engraved in the cap. The **Pointer** can be a
+**Bar**, a painted bar with square ends: **Taper %** narrows its tip into a wedge (below 0 the tip is
+the wider end) and **Edge** draws a rim round it, or two fine lines when the bar has no fill. Under
+the ticks, **Scale Radius %** sets the scale on a radius of its own, outside a value arc that runs
+close round the cap, and **Numbers** prints numbers round it, evenly **From** one value **To**
+another: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. The Button and Switch
 tabs show one part at a time: pick **Housing**, **Guard**, **Actuator** (called **Key** on a button),
 **Symbol**, **Indicator** or **Legend** in the row at the top (a green dot marks a part that is drawn),
 then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid),

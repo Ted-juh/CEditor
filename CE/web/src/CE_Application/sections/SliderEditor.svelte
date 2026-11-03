@@ -536,6 +536,30 @@
         <option value="endsCentre">ends and centre</option>
       </select>
     </PropertyCell>
+    {#if geometry !== 'linear'}
+      <!-- A knob's printed scale (models/directionKnobParts.js): on a radius of its own, and its
+           numbers round it. -->
+      <PropertyCell label="Scale Radius %" span={1} compact path="Behavior.tickRadius" hint="Where the ticks sit, as a percentage of the track's radius: a scale printed outside a value arc that runs close round the cap. 0 puts them on the track.">
+        <NumberCell label="Radius" value={behavior.tickRadius ?? 0} defaultValue={0} step={1} min={0} max={250} onchange={(value) => set('Behavior.tickRadius', Math.max(0, Number(value) || 0))} />
+      </PropertyCell>
+      <PropertyCell label="Numbers" span={1} compact path="Behavior.scaleNumberCount" hint="Numbers printed round the scale, evenly from the start of the sweep to its end: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. 0 for none.">
+        <NumberCell label="Numbers" value={behavior.scaleNumberCount ?? 0} defaultValue={0} step={1} min={0} max={41} onchange={(value) => set('Behavior.scaleNumberCount', Math.max(0, Math.min(41, Math.round(Number(value) || 0))))} />
+      </PropertyCell>
+      {#if (behavior.scaleNumberCount ?? 0) >= 2}
+        <PropertyCell label="From" span={1} compact path="Behavior.scaleNumberFrom" hint="What the first number says.">
+          <NumberCell label="From" value={behavior.scaleNumberFrom ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.scaleNumberFrom', Number(value) || 0)} />
+        </PropertyCell>
+        <PropertyCell label="To" span={1} compact path="Behavior.scaleNumberTo" hint="What the last number says.">
+          <NumberCell label="To" value={behavior.scaleNumberTo ?? 10} defaultValue={10} step={1} onchange={(value) => set('Behavior.scaleNumberTo', Number(value) || 0)} />
+        </PropertyCell>
+        <PropertyCell label="Number Radius %" span={1} compact path="Parts.tickNumber.Layout.offsetX" hint="How far out the numbers sit, as a percentage of the track's radius.">
+          <NumberCell label="Radius" value={parts?._children?.tickNumber?._children?.Layout?.offsetX ?? 122} defaultValue={122} step={1} min={20} max={300} onchange={(value) => set('Parts.tickNumber.Layout.offsetX', Number(value) || 122)} />
+        </PropertyCell>
+        <PropertyCell label="Number Size" span={1} compact path="Parts.tickNumber.Text.Font.size" hint="The numbers' size, in px.">
+          <NumberCell label="Size" value={parts?._children?.tickNumber?._children?.Text?._children?.Font?.size ?? 7} defaultValue={7} step={0.5} min={4} max={40} onchange={(value) => set('Parts.tickNumber.Text.Font.size', Number(value) || 7)} />
+        </PropertyCell>
+      {/if}
+    {/if}
   </PropertySection>
 
   <PropertySection title="Interaction" icon={MousePointer}>

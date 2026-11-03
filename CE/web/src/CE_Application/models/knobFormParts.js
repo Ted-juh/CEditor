@@ -14,8 +14,17 @@
 // track was 58 units in a 160 x 170 frame, so a part's width is its radius in the drawing as a
 // percentage of 58, and a stroke in px is its width in the drawing at a knob about 100 px tall.
 
-/** The forms that are parts now: all twelve base knob forms. The 48 direction forms are still drawn by code. */
-export const KNOB_FORMS_AS_PARTS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
+import { DIRECTION_KNOB_FORMS, directionKnobFamily } from './directionKnobParts.js';
+
+/** The base knob forms, all twelve parts now. */
+export const BASE_KNOB_FORMS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
+/**
+ * The forms that are parts now: the twelve base forms, and the synth direction sets' knobs of the
+ * first two series (models/directionKnobParts.js). The other 24 direction forms are still drawn by
+ * code: the sculpted series, drawn in perspective, and the twelve additional designs, most of which
+ * are not turning knobs at all (a bellows, an iris, a fan).
+ */
+export const KNOB_FORMS_AS_PARTS = [...BASE_KNOB_FORMS, ...DIRECTION_KNOB_FORMS];
 
 const ROLES = { face: '{surface}', housing: '{control.track}', legend: '{text.primary}', accent: '{accent}' };
 
@@ -219,11 +228,12 @@ const RECIPES = {
 
 /**
  * The family patch that draws `form` with the knob's parts, or null when the form is still drawn by
- * code. `ink` is the set's ink against its surface; `divisions` the form's scale divisions.
+ * code. `ink` is the set's ink against its surface; `divisions` the form's scale divisions; `face`
+ * the set's surface as a literal colour, for a direction knob's tinted glass.
  */
-export function knobFormFamily(form, { ink = 'FF20282C', divisions = 12 } = {}) {
+export function knobFormFamily(form, { ink = 'FF20282C', divisions = 12, face = 'FFDEDBD2' } = {}) {
   const recipe = RECIPES[String(form ?? '')];
-  if (!recipe) return null;
+  if (!recipe) return directionKnobFamily(form, { ink, face });
   const family = recipe({ ink, divisions });
   return merge({ parts: readout() }, family);
 }

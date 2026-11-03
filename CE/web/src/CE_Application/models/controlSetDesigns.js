@@ -425,9 +425,9 @@ export const EDITOR_PATHS = [
   /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY|rotation)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
-  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit)$/,
+  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit|tickRadius|scaleNumberCount|scaleNumberFrom|scaleNumberTo)$/,
   /^Text\.Fill\.colour$/,
-  /^Text\.Font\.(family|weight|weightValue|letterSpacing)$/,
+  /^Text\.Font\.(family|weight|weightValue|letterSpacing|size)$/,
   /^Text\.Effects\.(shadowEnabled|shadowStyle|shadowOffsetX|shadowOffsetY|shadowBlur|shadowColour|glowEnabled|glowSize|glowIntensity|glowColour)$/,
   /^ContentLayout\.(lamp|lampSize|lampSide|lampGap|lampColour|lampOffColour|lampBezelColour)$/,
   /^States\.Selected$/,
@@ -435,6 +435,9 @@ export const EDITOR_PATHS = [
   /^(kind|grooveColour|plateColour|sheen|shadow|glow|slot|inset)$/,
   // A knob's cap and housing outline (utils/knobOutlines.js), the knob forms as parts.
   /^(outline|outlineCount|outlineDepth|outlineRotation|turns)$/,
+  // A knob plate's shadow, a bar pointer's taper, a lit tick (the synth sets' knobs as parts,
+  // models/directionKnobParts.js).
+  /^(shadowOffset|shadowColour|shadowBlur|taper)$/,
   // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
   /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   // A meter's parts (models/meterDeviceParts.js), the meter forms as parts.

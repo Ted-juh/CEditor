@@ -926,6 +926,14 @@ export const SECTION_DEFAULTS = {
     tickStops: 'all',             // all / ends / endsCentre
     // What a numeral tick prints: the stop's index (a dial's 0…10) or the value at the stop.
     tickNumerals: 'index',        // index / value
+    // A knob's scale numbers (Parts.tickNumber): how many, evenly round the sweep, and what the
+    // first and the last say — a synth panel's 0 2 4 6 8 10 is 6 from 0 to 10. 0 draws none.
+    scaleNumberCount: 0,
+    // A knob's scale on a radius of its own, a percentage of the track's (0: on the track): the
+    // printed scale outside a value arc that runs close round the cap.
+    tickRadius: 0,
+    scaleNumberFrom: 0,
+    scaleNumberTo: 10,
     showMinMaxLabels: true,
     showHandleLabels: false,
     showValueReadout: true,

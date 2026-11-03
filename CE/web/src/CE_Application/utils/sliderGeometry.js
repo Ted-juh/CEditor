@@ -194,6 +194,10 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   readoutBelow = false,
   outerReach = 0,
   readoutGap = 14,
+  // A knob's scale numbers (Parts.tickNumber): their distance from the centre as a multiple of the
+  // track's radius, and their size in px, which hangs half outside that distance. Tight fit only.
+  numberReach = 0,
+  numberSize = 0,
 } = {}) {
   const readoutSize = Math.max(0, numberOr(labelMetrics?.readoutSize, 12));
   const titleSize = Math.max(0, numberOr(labelMetrics?.titleSize, 11));
@@ -239,7 +243,8 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
     const room = Math.max(1, Math.min(width / 2, centerY) - 2);
     // The track and what reaches past it (ticks or the pointer, the min/max labels), and the housing.
     const ring = Math.max(tickRoom, pointerRoom) + (trackThickness / 2) + (labelAllowance * 0.4);
-    const fitted = Math.max(16, Math.min(room - ring, room / Math.max(1, numberOr(outerReach, 0))));
+    const numbers = numberOr(numberReach, 0) > 0 ? (room - Math.max(0, numberOr(numberSize, 0)) * 0.75) / numberOr(numberReach, 1) : Infinity;
+    const fitted = Math.max(16, Math.min(room - ring, room / Math.max(1, numberOr(outerReach, 0)), numbers));
     return {
       centerX: center.x,
       centerY,

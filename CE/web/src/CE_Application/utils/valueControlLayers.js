@@ -93,6 +93,18 @@ export function valueLayersRefusal(resolved) {
       return `a ${label} that turns under a fixed light (a gradient or finish), which a turning layer would turn with it`;
     }
   }
+  // The synth sets' knobs (models/directionKnobParts.js) draw with parts no layer draws yet.
+  if (parts.bodySkirt?.visible === true) return 'a skirt, which a layer does not draw yet';
+  if (parts.bodyInsert?.visible === true) return 'an insert in its cap, which a layer does not draw yet';
+  for (const [name, label] of [['bodyHousing', 'housing'], ['bodyCap', 'cap']]) {
+    if (parts[name]?.visible === true && (Number(parts[name]?.shadowOffset) > 0 || Number(parts[name]?.shadowBlur) > 0)) {
+      return `a shadow under its ${label}, which a layer does not draw yet`;
+    }
+  }
+  if (String(parts.pointerCurrent?.kind ?? '').toLowerCase() === 'bar') return 'a bar for a pointer, which a layer does not draw yet';
+  if (behavior.showTicks !== false && Number(behavior.tickRadius) > 0) return 'a scale on a radius of its own, which a layer does not draw yet';
+  if (Number(behavior.scaleNumberCount) >= 2) return 'numbers round its scale, which a layer does not draw yet';
+  if (behavior.showTicks !== false && (parts.tickMajor?.activeColour || parts.tickMinor?.activeColour)) return 'ticks that light up to the value, which a layer does not draw yet';
   if (partVisible(parts.bodyTrackBase) && fillIsRich(parts.bodyTrackBase)) return 'a gradient along its track, which a layer does not draw yet';
   if (partVisible(parts.bodyTrackFill) && fillIsRich(parts.bodyTrackFill)) return 'a gradient along its value arc, which a layer does not draw yet';
   if (behavior.showHandleLabels === true) return 'a label that rides the pointer';

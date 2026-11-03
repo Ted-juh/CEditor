@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f0e10a1e",
+  "fingerprint": "f6a1c26f",
   "set": {
     "id": "cassette-deck",
     "name": "Workstation",
@@ -83,51 +83,125 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
-          "Behavior.majorTickCount": 11,
-          "Behavior.minorTickCount": 0,
+          "Behavior.majorTickCount": 9,
+          "Behavior.minorTickCount": 1,
           "Behavior.majorTickLength": 5,
-          "Core.controlForm": "new-cassette-deck",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.circularFit": "tight",
+          "Behavior.tickPlacement": "inside",
+          "Behavior.tickRadius": 0,
+          "Behavior.scaleNumberCount": 0,
+          "Behavior.scaleNumberFrom": 0,
+          "Behavior.scaleNumberTo": 10
         },
         "parts": {
           "tickMajor": {
-            "Layout.width": 1.5,
-            "Layout.height": 5
+            "Layout.width": 1.19,
+            "Layout.height": 4.25,
+            "kind": "line",
+            "Background.Fill.colour": "{text.primary}",
+            "opacity": 0.8
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 77,
-            "Layout.height": 77,
-            "Background.Fill.colour": "{control.body}",
+            "Layout.width": 59.09,
+            "Layout.height": 59.09,
+            "Background.Fill.colour": "{surface}",
             "Background.Border.enabled": true,
-            "Background.Border.colour": "{control.cap.edge}",
-            "Background.Border.thickness": 1,
-            "Background.Effects.Material.enabled": true,
+            "Background.Border.colour": "FF839098",
+            "Background.Border.thickness": 0.85,
+            "Background.Effects.Material.enabled": false,
             "Background.Effects.Material.kind": "brushed",
             "Background.Effects.Material.strength": 40,
             "Background.Effects.Material.shine": 60,
-            "Background.Effects.Material.grain": 100
+            "Background.Effects.Material.grain": 100,
+            "opacity": 1,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Background.Fill.gradientEnabled": false,
+            "outline": "circle",
+            "turns": false,
+            "shadowOffset": 0
           },
           "pointerCurrent": {
-            "kind": "line",
-            "Layout.width": 3,
-            "Layout.height": 92,
-            "Layout.offsetX": 30,
-            "Background.Fill.colour": "{control.cap}",
-            "Background.Border.enabled": false
+            "kind": "bar",
+            "Layout.width": 35.9,
+            "Layout.height": 120.51,
+            "Layout.offsetX": 71.79,
+            "Background.Fill.colour": "{accent}",
+            "Background.Border.enabled": false,
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.gradientEnabled": false,
+            "taper": 0
           },
           "bodyTrackBase": {
-            "Layout.height": 5,
-            "opacity": 0
+            "Layout.height": 0.5,
+            "opacity": 0,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5,
-            "opacity": 0
+            "Layout.height": 0.5,
+            "opacity": 0,
+            "visible": false
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "Regular",
+            "Text.Font.weightValue": 400
+          },
+          "tickMinor": {
+            "kind": "line",
+            "Layout.height": 2.13,
+            "Layout.width": 0.64,
+            "Background.Fill.colour": "{text.primary}",
+            "opacity": 0.8
+          },
+          "bodyHousing": {
+            "visible": true,
+            "opacity": 1,
+            "Layout.width": 75.76,
+            "Layout.height": 75.76,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Border.enabled": true,
+            "Background.Effects.Material.enabled": false,
+            "outline": "gear",
+            "turns": true,
+            "shadowOffset": 12,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 168.7,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "FF9B9F9E",
+                  "position": 0
+                },
+                {
+                  "color": "00000000",
+                  "position": 12
+                },
+                {
+                  "color": "FF111719",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF131A20",
+            "Background.Border.thickness": 0.85,
+            "shadowColour": "FF101519",
+            "outlineCount": 24,
+            "outlineDepth": 6
+          },
+          "bodySkirt": {
+            "visible": false
+          },
+          "bodyInsert": {
+            "visible": false
           }
         }
       },

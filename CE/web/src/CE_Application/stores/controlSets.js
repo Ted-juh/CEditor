@@ -187,6 +187,12 @@ export function applyFormAsParts(ids, form) {
     const patch = { 'Core.controlForm': '', ...recipe.component };
     const deviceParts = BUTTON_DEVICE_TYPES.has(type) ? BUTTON_DEVICE_PARTS : METER_DEVICE_TYPES.has(type) ? METER_DEVICE_PARTS : [];
     for (const name of deviceParts) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
+    // A knob's plates and scale that only the synth sets' knobs draw (models/directionKnobParts.js):
+    // off again under a form that does not.
+    if (type === 'Knob') {
+      for (const name of ['bodySkirt', 'bodyInsert']) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
+      for (const [path, value] of [['Behavior.tickRadius', 0], ['Behavior.scaleNumberCount', 0]]) if (!(path in recipe.component)) patch[path] = value;
+    }
     // What a form shapes and moves, back to the factory's unless this form says: a switch made a
     // lever and then a slide must not still swing, a knob made scalloped and then a disc must not
     // keep its scallop.
@@ -210,15 +216,21 @@ const FORM_PART_KEYS = [
   'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
   'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
   'Background.Effects.Material.enabled',
+  // A knob plate's shadow, a bar pointer's taper (models/directionKnobParts.js).
+  'shadowOffset', 'shadowBlur', 'shadowColour', 'taper',
   // A meter's (models/meterDeviceParts.js).
   'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
   'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',
 ];
 
 /** The recipe that draws `form` on a control of `type` with its own parts, or null. `set`, where
- * known, gives a meter's sheen its face colour. */
+ * known, gives a meter's sheen and a synth knob's glass their face colour. */
 export function formAsPartsRecipe(type, form, set = null) {
-  if (type === 'Knob') return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12 }) : null;
+  if (type === 'Knob') {
+    // A synth set's tinted glass is its face colour with an alpha: a literal, from the set's surface.
+    const face = set ? resolveColourLiteral('{surface}', set, '') : '';
+    return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12, ...(face ? { face } : {}) }) : null;
+  }
   if (type === 'Meter' || type === 'ProgressBar') {
     return meterFormFamily(type, form, { ink: '{text.primary}', divisions: 12, face: set ? resolveColourLiteral('{surface}', set, '') : '' });
   }

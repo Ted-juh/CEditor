@@ -10,7 +10,7 @@ import { getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { familyPatchFor, readControlPath, resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
 import { EDITOR_PATHS } from '../src/CE_Application/models/controlSetDesigns.js';
 import { setAnatomy } from '../src/CE_Application/models/controlAnatomy.js';
-import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../src/CE_Application/models/knobFormParts.js';
+import { BASE_KNOB_FORMS, KNOB_FORMS_AS_PARTS, knobFormFamily } from '../src/CE_Application/models/knobFormParts.js';
 import { knobOutlinePath, knobOutlineReach } from '../src/CE_Application/utils/knobOutlines.js';
 import { resolveCircularTrackMetrics } from '../src/CE_Application/utils/sliderGeometry.js';
 import { CONTROL_FORMS } from '../src/CE_Application/models/controlAnatomy.js';
@@ -67,7 +67,8 @@ test('the sets that drew these forms draw them with parts, and name no form', ()
   assert.equal(console_._children.Parts._children.pointerCurrent.kind, 'line');
   // Every base knob form is parts now: Tolex's tuning window, Pop's paper tab, Soft's pebble and
   // Carbon's roller were the last.
-  assert.deepEqual([...KNOB_FORMS_AS_PARTS].sort(), CONTROL_FORMS.Knob.map(([id]) => id).filter((id) => !id.startsWith('new-')).sort());
+  assert.deepEqual([...BASE_KNOB_FORMS].sort(), CONTROL_FORMS.Knob.map(([id]) => id).filter((id) => !id.startsWith('new-')).sort());
+  assert.deepEqual(KNOB_FORMS_AS_PARTS.filter((id) => !id.startsWith('new-')), BASE_KNOB_FORMS);
   for (const id of ['tolex', 'pop', 'soft', 'carbon']) assert.equal(familyPatchFor(getControlSet(id), 'Knob').component['Core.controlForm'], undefined, id);
   const tuning = resolveControlForSet(createControl('Knob'), getControlSet('tolex'))._children.Parts._children;
   assert.equal(tuning.bodyHousing.visible, true);
@@ -78,8 +79,11 @@ test('the sets that drew these forms draw them with parts, and name no form', ()
 
 test('the knob renderer draws the housing, the outlines, the needle, and hides what is hidden', () => {
   const renderer = source('editor/SliderFamilyRenderer.svelte');
-  assert.ok(renderer.indexOf("maskIdFor('bodyHousing')") < renderer.indexOf("maskIdFor('bodyTrackBaseCircle')"), 'the housing under the track');
-  assert.match(renderer, /outlineShapeFor\(bodyCapPart, bodyCapRadius\)/);
+  const housingAt = renderer.indexOf("{@render bodyPlate(bodyHousingPart, bodyHousingRadius, 'bodyHousing'");
+  assert.ok(housingAt > 0 && housingAt < renderer.indexOf("maskIdFor('bodyTrackBaseCircle')"), 'the housing under the track');
+  // Every plate is drawn the one way: its shadow, its fill in its outline, its border.
+  assert.match(renderer, /\{#snippet bodyPlate\(part, r, mask, borderFallback, role = mask\)\}\s*\{@const shape = outlineShapeFor\(part, r\)\}/);
+  assert.match(renderer, /\{@render bodyPlate\(bodyCapPart, bodyCapRadius, 'bodyCapCircle', 1, 'bodyCap'\)\}/);
   assert.match(renderer, /kind === 'needle'/);
   assert.match(renderer, /trackBasePart\?\.visible === false/);
   assert.match(renderer, /pointerKind !== 'dot' && pointerCurrentPart\?\.visible !== false/);

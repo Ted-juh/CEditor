@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "4c034aa9",
+  "fingerprint": "120c7c81",
   "set": {
     "id": "flightdeck",
     "name": "Modular Metal",
@@ -83,47 +83,172 @@
           "Behavior.showMinMaxLabels": false,
           "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.majorTickCount": 11,
-          "Behavior.minorTickCount": 0,
+          "Behavior.minorTickCount": 1,
           "Behavior.majorTickLength": 5,
-          "Core.controlForm": "new-flightdeck",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Behavior.circularFit": "tight",
+          "Behavior.showTicks": true,
+          "Behavior.tickPlacement": "inside",
+          "Behavior.tickRadius": 0,
+          "Behavior.scaleNumberCount": 6,
+          "Behavior.scaleNumberFrom": 0,
+          "Behavior.scaleNumberTo": 10
         },
         "parts": {
           "tickMajor": {
-            "kind": "engraved",
-            "Layout.width": 1.5,
-            "Layout.height": 5
+            "kind": "line",
+            "Layout.width": 1.19,
+            "Layout.height": 4.25,
+            "Background.Fill.colour": "{text.primary}",
+            "opacity": 0.8
           },
           "tickMinor": {
-            "kind": "engraved"
+            "kind": "line",
+            "Layout.height": 2.13,
+            "Layout.width": 0.64,
+            "Background.Fill.colour": "{text.primary}",
+            "opacity": 0.8
           },
           "bodyTrackBase": {
-            "Layout.height": 5
+            "Layout.height": 0.5,
+            "visible": false
           },
           "bodyTrackFill": {
-            "Layout.height": 5
+            "Layout.height": 0.5,
+            "visible": false
           },
           "bodyCap": {
             "visible": true,
-            "Layout.width": 70,
-            "Layout.height": 70,
+            "Layout.width": 45.61,
+            "Layout.height": 45.61,
             "Background.Border.thickness": 1.5,
-            "Background.Effects.Material.enabled": true,
+            "Background.Effects.Material.enabled": false,
             "Background.Effects.Material.kind": "blast",
             "Background.Effects.Material.strength": 100,
-            "Background.Effects.Material.shine": 100
+            "Background.Effects.Material.shine": 100,
+            "opacity": 1,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Border.enabled": false,
+            "outline": "circle",
+            "turns": false,
+            "shadowOffset": 0,
+            "Background.Fill.gradient": {
+              "type": "radial",
+              "centerX": 35,
+              "centerY": 20,
+              "radiusX": 95,
+              "radiusY": 95,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "73FFFFFF",
+                  "position": 0
+                },
+                {
+                  "color": "00000000",
+                  "position": 35
+                },
+                {
+                  "color": "00000000",
+                  "position": 78
+                },
+                {
+                  "color": "FF141819",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100
           },
           "pointerCurrent": {
-            "kind": "line",
-            "Layout.width": 2,
-            "Layout.height": 88,
-            "Background.Fill.colour": "{control.marker}",
-            "Background.Border.enabled": false
+            "kind": "bar",
+            "Layout.width": 15.38,
+            "Layout.height": 126.92,
+            "Background.Fill.colour": "FFE4E7DE",
+            "Background.Border.enabled": false,
+            "visible": true,
+            "opacity": 1,
+            "Layout.offsetX": 11.54,
+            "Background.Fill.gradientEnabled": false,
+            "taper": 0
+          },
+          "labelValue": {
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.family": "JetBrains Mono",
+            "Text.Font.weight": "Regular",
+            "Text.Font.weightValue": 400
+          },
+          "tickNumber": {
+            "visible": true,
+            "opacity": 1,
+            "Layout.offsetX": 121.05,
+            "Text.Fill.colour": "{text.primary}",
+            "Text.Font.size": 5.95,
+            "Text.Font.family": "Arial",
+            "Text.Font.weight": "Regular",
+            "Text.Font.weightValue": 400
+          },
+          "bodyHousing": {
+            "visible": true,
+            "opacity": 1,
+            "Layout.width": 66.67,
+            "Layout.height": 66.67,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Background.Fill.colour": "FF171E1F",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Effects.Material.enabled": false,
+            "outline": "circle",
+            "turns": false,
+            "shadowOffset": 13.16,
+            "Background.Border.colour": "FFD4D7D1",
+            "Background.Border.thickness": 0.85,
+            "shadowColour": "FF3B4140"
+          },
+          "bodySkirt": {
+            "visible": true,
+            "opacity": 1,
+            "Layout.width": 64.91,
+            "Layout.height": 64.91,
+            "Layout.widthUnit": "percent",
+            "Layout.heightUnit": "percent",
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": true,
+            "Background.Border.enabled": true,
+            "Background.Effects.Material.enabled": false,
+            "outline": "gear",
+            "turns": true,
+            "shadowOffset": 0,
+            "Background.Fill.gradient": {
+              "type": "linear",
+              "angle": 168.7,
+              "edge": 0,
+              "stops": [
+                {
+                  "color": "FF9B9F9E",
+                  "position": 0
+                },
+                {
+                  "color": "00000000",
+                  "position": 12
+                },
+                {
+                  "color": "FF111719",
+                  "position": 100
+                }
+              ]
+            },
+            "Background.Fill.gradientOpacity": 100,
+            "Background.Border.colour": "FF111819",
+            "Background.Border.thickness": 0.85,
+            "outlineCount": 8,
+            "outlineDepth": 16.22
+          },
+          "bodyInsert": {
+            "visible": false
           }
         }
       },

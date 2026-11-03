@@ -18,7 +18,8 @@ import { deepClone } from '../utils/deepClone.js';
 
 // The parts by the names the inspector's tabs give them.
 const PART_LABELS = {
-  bodyHousing: 'Housing', bodyCap: 'Cap', bodyTrackBase: 'Track', bodyTrackFill: 'Value Arc', bodySelectedRange: 'Range',
+  bodyHousing: 'Housing', bodySkirt: 'Skirt', bodyCap: 'Cap', bodyInsert: 'Insert', bodyTrackBase: 'Track', bodyTrackFill: 'Value Arc', bodySelectedRange: 'Range',
+  tickMajor: 'Ticks', tickMinor: 'Minor Ticks', tickNumber: 'Scale Numbers',
   pointerCurrent: 'Pointer', pointerStart: 'Start Handle', pointerEnd: 'End Handle', labelValue: 'Readout', labelTitle: 'Title',
   housing: 'Housing', guard: 'Guard', key: 'Key', symbol: 'Symbol', indicator: 'Indicator', legend: 'Legend',
   face: 'Face', track: 'Track', scale: 'Scale', marker: 'Marker', cover: 'Cover', lamp: 'Clip Lamp',
@@ -36,6 +37,9 @@ const PROPERTY_LABELS = {
   shapeDepth: 'Depth', patternCount: 'Count', patternRows: 'Rows', travelX: 'Move X', travelY: 'Move Y', activeColour: 'Lit Colour',
   activeOpacity: 'Lit Opacity', 'Core.controlForm': 'Form', 'Core.formSize': 'Form Size', 'Core.formDepth': 'Form Depth',
   'Core.formDivisions': 'Divisions', 'Core.formShowValue': 'Readout',
+  shadowOffset: 'Shadow', shadowBlur: 'Shadow Softness', shadowColour: 'Shadow Colour', 'Text.Font.size': 'Size',
+  'Behavior.tickRadius': 'Scale Radius', 'Behavior.scaleNumberCount': 'Numbers', 'Behavior.scaleNumberFrom': 'Numbers From',
+  'Behavior.scaleNumberTo': 'Numbers To',
 };
 
 const words = (text) => String(text).replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[._]/g, ' ')

@@ -296,6 +296,9 @@
   });
   let showReadout = $derived(behavior?.showValueReadout !== false);
   let showTicks = $derived(behavior?.showTicks !== false);
+  // Behavior.tickRadius: the scale's own radius, a percentage of the track's, where a knob prints
+  // its scale away from its value arc (0, the default: on the track, either side of its width).
+  let tickRadiusShare = $derived(Math.max(0, numberOr(behavior?.tickRadius, 0)) / 100);
   let showMinMaxLabels = $derived(behavior?.showMinMaxLabels !== false);
   let showHandleLabels = $derived(behavior?.showHandleLabels === true);
   let trackBasePart = $derived(parts?._children?.bodyTrackBase ?? null);
@@ -355,11 +358,43 @@
     const size = Math.max(0, numberOr(layout.width, 72));
     return String(layout.widthUnit ?? 'percent') === 'px' ? size / 2 : circularMetrics.radius * (size / 100);
   });
+  // The skirt (utils/sliderEntityFactory.js `bodySkirt`): a second plate between the housing and
+  // the cap; the insert (`bodyInsert`): a disc set into the cap. Sized as the housing and the cap
+  // are, a percentage of the track's radius or px.
+  let bodySkirtPart = $derived(parts?._children?.bodySkirt ?? null);
+  let bodyInsertPart = $derived(parts?._children?.bodyInsert ?? null);
+  function plateRadius(part, fallback) {
+    if (geometry !== 'circular' || part?.visible !== true) return 0;
+    const layout = part?._children?.Layout ?? {};
+    const size = Math.max(0, numberOr(layout.width, fallback));
+    return String(layout.widthUnit ?? 'percent') === 'px' ? size / 2 : circularMetrics.radius * (size / 100);
+  }
+  let bodySkirtRadius = $derived(plateRadius(bodySkirtPart, 90));
+  let bodyInsertRadius = $derived(plateRadius(bodyInsertPart, 45));
+  // A plate's shadow: its own outline again, `shadowOffset` % of its radius lower, in
+  // `shadowColour`, softened by `shadowBlur` % of its radius. None unless the part asks.
+  function plateShadow(part, r) {
+    const offset = numberOr(part?.shadowOffset, 0);
+    if (!(r > 0) || !(offset > 0 || numberOr(part?.shadowBlur, 0) > 0)) return null;
+    return { dy: r * offset / 100, blur: r * Math.max(0, numberOr(part?.shadowBlur, 0)) / 100, colour: argbToCss(part?.shadowColour, 'rgba(0,0,0,0.6)') };
+  }
+  // The scale numbers (`tickNumber`, Behavior.scaleNumberCount/From/To): evenly round the sweep,
+  // `Layout.offsetX` % of the track's radius out from the centre.
+  let tickNumberPart = $derived(parts?._children?.tickNumber ?? null);
+  let scaleNumberCount = $derived(geometry === 'circular' && tickNumberPart?.visible !== false ? Math.max(0, Math.min(41, Math.round(numberOr(behavior?.scaleNumberCount, 0)))) : 0);
+  let scaleNumberSize = $derived(labelFontSize(tickNumberPart, 7));
+  let scaleNumberReach = $derived(scaleNumberCount >= 2 ? Math.max(0, numberOr(tickNumberPart?._children?.Layout?.offsetX, 122)) / 100 : 0);
+  function scaleNumberText(i) {
+    const from = numberOr(behavior?.scaleNumberFrom, 0);
+    const to = numberOr(behavior?.scaleNumberTo, 10);
+    const value = from + ((to - from) * i) / Math.max(1, scaleNumberCount - 1);
+    return String(Math.round(value * 100) / 100);
+  }
   // How the current-value pointer is drawn on a circular track: the dot that rides the arc, or a
   // line / chicken-head drawn from the centre out along the value angle, over the cap.
   let pointerKind = $derived.by(() => {
     const kind = String(pointerCurrentPart?.kind ?? 'dot').toLowerCase();
-    return geometry === 'circular' && (kind === 'line' || kind === 'chicken' || kind === 'capdot' || kind === 'needle') ? kind : 'dot';
+    return geometry === 'circular' && (kind === 'line' || kind === 'bar' || kind === 'chicken' || kind === 'capdot' || kind === 'needle') ? kind : 'dot';
   });
   let pointerReach = $derived(bodyCapRadius > 0 ? bodyCapRadius : circularMetrics.radius * 0.7);
   // On a linear track a cap (current, start or end) can be the original dot, a fader cap
@@ -459,6 +494,20 @@
     }
     const px = -uy;
     const py = ux;
+    if (kind === 'bar') {
+      // A painted bar with square ends, from Layout.offsetX to Layout.height out, its width a % of
+      // the cap radius as theirs are, so it keeps its proportions at any size. `taper` narrows the
+      // tip by that % of the width (a wedge), a negative one widens it. A border is an edge round
+      // it, outside the fill: two fine lines with no fill between them, or a dark rim round a bar.
+      const r0 = pointerReach * (numberOr(pointerCurrentPart?._children?.Layout?.offsetX, 30) / 100);
+      const halfBase = Math.max(0.5, pointerReach * numberOr(pointerCurrentPart?._children?.Layout?.width, 12) / 200);
+      const halfTip = halfBase * (1 - Math.max(-300, Math.min(100, numberOr(pointerCurrentPart?.taper, 0))) / 100);
+      const quad = (grow) => [[r0 - grow, -halfBase - grow], [tip + grow, -halfTip - grow], [tip + grow, halfTip + grow], [r0 - grow, halfBase + grow]]
+        .map(([r, side]) => `${(cx + ux * r + px * side).toFixed(2)},${(cy + uy * r + py * side).toFixed(2)}`)
+        .join(' ');
+      const edge = partBorderWidth(pointerCurrentPart, 0);
+      return { bar: { points: quad(0), edge: edge > 0 ? quad(edge / 2) : '', edgeWidth: edge } };
+    }
     if (kind === 'needle') {
       // A drafting needle: a taper from its full width at the centre to a point, with a short
       // tail behind the centre. Width is its base in px, height its reach as a % of the cap radius.
@@ -499,15 +548,20 @@
   let circularFitTight = $derived(String(behavior?.circularFit ?? 'auto') === 'tight');
   // How far the housing reaches, as a multiple of the track's radius: its size and its outline's
   // reach (a square set square reaches less far than its corners). For the tight fit.
-  let housingReach = $derived.by(() => {
-    if (geometry !== 'circular' || bodyHousingPart?.visible !== true) return 0;
-    const layout = bodyHousingPart?._children?.Layout ?? {};
+  // The skirt's too, and either one's shadow below it.
+  function plateReach(part, fallback) {
+    if (geometry !== 'circular' || part?.visible !== true) return 0;
+    const layout = part?._children?.Layout ?? {};
     if (String(layout.widthUnit ?? 'percent') === 'px') return 0;
-    const reach = knobOutlineReach(String(bodyHousingPart?.outline ?? 'circle'), {
-      count: bodyHousingPart?.outlineCount, depth: bodyHousingPart?.outlineDepth, rotation: numberOr(bodyHousingPart?.outlineRotation, 0),
+    const reach = knobOutlineReach(String(part?.outline ?? 'circle'), {
+      count: part?.outlineCount, depth: part?.outlineDepth, rotation: numberOr(part?.outlineRotation, 0),
     });
-    return (Math.max(0, numberOr(layout.width, 100)) / 100) * reach;
-  });
+    const shadow = 1 + Math.max(0, numberOr(part?.shadowOffset, 0) + numberOr(part?.shadowBlur, 0)) / 100;
+    return (Math.max(0, numberOr(layout.width, fallback)) / 100) * reach * shadow;
+  }
+  // A scale set out on a radius of its own (Behavior.tickRadius) reaches that far too.
+  let housingReach = $derived(Math.max(plateReach(bodyHousingPart, 100), plateReach(bodySkirtPart, 90),
+    geometry === 'circular' && showTicks && tickRadiusShare > 0 && circularFitTight ? tickRadiusShare + (String(behavior?.tickPlacement ?? 'outside') === 'outside' ? 0.1 : 0.02) : 0));
   let circularMetrics = $derived(resolveCircularTrackMetrics(width, height, {
     trackThickness,
     // Tight: the pointer it draws. A dot rides the arc and needs its size; a line, needle,
@@ -525,6 +579,8 @@
     readoutBelow: showReadout && String(behavior?.labelReadoutPlacement ?? 'auto') === 'bottom',
     outerReach: housingReach,
     readoutGap: numberOr(behavior?.labelReadoutGap, 14),
+    numberReach: scaleNumberReach,
+    numberSize: scaleNumberSize,
   }));
   let circularCenter = $derived({
     x: circularMetrics.centerX,
@@ -692,15 +748,17 @@
 
   function circularTickLine(angle, length) {
     const placement = String(behavior?.tickPlacement ?? 'outside').trim().toLowerCase();
-    let startRadius = circularMetrics.radius + (trackThickness / 2);
+    const base = tickRadiusShare > 0 ? circularMetrics.radius * tickRadiusShare : circularMetrics.radius;
+    const half = tickRadiusShare > 0 ? 0 : trackThickness / 2;
+    let startRadius = base + half;
     let endRadius = startRadius + length;
 
     if (placement === 'inside') {
-      startRadius = circularMetrics.radius - (trackThickness / 2);
+      startRadius = base - half;
       endRadius = startRadius - length;
     } else if (placement === 'cross') {
-      startRadius = circularMetrics.radius - (length / 2);
-      endRadius = circularMetrics.radius + (length / 2);
+      startRadius = base - (length / 2);
+      endRadius = base + (length / 2);
     }
 
     const start = resolveCircularPoint(width, height, angle, startRadius, circularCenter);
@@ -780,6 +838,43 @@
 <!-- The control's own colour frames stop here: what is drawn inside belongs to its parts. -->
 <div class="slider-family-renderer" style={partColours ? colourVariables(null) : undefined}>
   <svg class="slider-svg" viewBox={`0 0 ${Math.max(1, width)} ${Math.max(1, height)}`} width={width} height={height} aria-hidden="true">
+    <!-- A knob's plate (housing, skirt, cap, insert): its shadow, its fill in its outline, its
+         border. `mask` names its fill's mask; `role` the part the pointer styles follow. -->
+    {#snippet bodyPlate(part, r, mask, borderFallback, role = mask)}
+      {@const shape = outlineShapeFor(part, r)}
+      {@const shadow = plateShadow(part, r)}
+      {@const op = numberOr(part?.opacity, 1)}
+      {#if shadow}
+        {#if shadow.blur > 0}
+          <filter id={maskIdFor(`${mask}Shadow`)} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation={(shadow.blur / 2).toFixed(2)} /></filter>
+        {/if}
+        <g data-plate-shadow={role} transform={`translate(0 ${shadow.dy.toFixed(2)})`} filter={shadow.blur > 0 ? `url(#${maskIdFor(`${mask}Shadow`)})` : undefined} opacity={op}>
+          {#if shape.kind === 'circle'}
+            <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill={shadow.colour} />
+          {:else}
+            <path d={shape.d} fill={shadow.colour} fill-rule="evenodd" />
+          {/if}
+        </g>
+      {/if}
+      <SliderShapeFill
+        background={part?._children?.Background ?? null}
+        bounds={circleBounds(circularCenter.x, circularCenter.y, r)}
+        shape={shape}
+        maskId={maskIdFor(mask)}
+        svgWidth={width}
+        svgHeight={height}
+        opacity={op}
+        style={pointerStyleFor(role)}
+      />
+      {#if partBorderWidth(part, borderFallback) > 0}
+        {#if shape.kind === 'circle'}
+          <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill="none" stroke={partBorderColour(part, '#333333')} stroke-width={partBorderWidth(part, borderFallback)} opacity={op} />
+        {:else}
+          <path d={shape.d} fill="none" stroke={partBorderColour(part, '#333333')} stroke-width={partBorderWidth(part, borderFallback)} opacity={op} />
+        {/if}
+      {/if}
+    {/snippet}
+
     {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}
       {#if kind === 'dot'}
         <circle data-tick cx={(line.x1 + line.x2) / 2} cy={(line.y1 + line.y2) / 2} r={Math.max(1.5, length * 0.45)} fill={colour} opacity={opacity} />
@@ -1005,12 +1100,12 @@
         {#each minorStopsShown as stop (stop.key)}
           {@const tickLine = linearTickLine(stop.normalized, minorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(minorTickKind, tickLine, argbToCss(tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
+          {@render tickMark(minorTickKind, tickLine, argbToCss((highlighted && tickMinorPart?.activeColour) || tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
         {/each}
         {#each majorStopsShown as stop (stop.key)}
           {@const tickLine = linearTickLine(stop.normalized, majorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(majorTickKind, tickLine, argbToCss(tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
+          {@render tickMark(majorTickKind, tickLine, argbToCss((highlighted && tickMajorPart?.activeColour) || tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
         {/each}
       {/if}
 
@@ -1027,24 +1122,10 @@
       {/if}
     {:else}
       {#if bodyHousingRadius > 0}
-        {@const housingShape = outlineShapeFor(bodyHousingPart, bodyHousingRadius)}
-        <SliderShapeFill
-          background={bodyHousingPart?._children?.Background ?? null}
-          bounds={circleBounds(circularCenter.x, circularCenter.y, bodyHousingRadius)}
-          shape={housingShape}
-          maskId={maskIdFor('bodyHousing')}
-          svgWidth={width}
-          svgHeight={height}
-          opacity={numberOr(bodyHousingPart?.opacity, 1)}
-          style={pointerStyleFor('bodyHousing')}
-        />
-        {#if partBorderWidth(bodyHousingPart, 0) > 0}
-          {#if housingShape.kind === 'circle'}
-            <circle cx={housingShape.cx} cy={housingShape.cy} r={housingShape.r} fill="none" stroke={partBorderColour(bodyHousingPart, '#333333')} stroke-width={partBorderWidth(bodyHousingPart, 0)} opacity={numberOr(bodyHousingPart?.opacity, 1)} />
-          {:else}
-            <path d={housingShape.d} fill="none" stroke={partBorderColour(bodyHousingPart, '#333333')} stroke-width={partBorderWidth(bodyHousingPart, 0)} opacity={numberOr(bodyHousingPart?.opacity, 1)} />
-          {/if}
-        {/if}
+        {@render bodyPlate(bodyHousingPart, bodyHousingRadius, 'bodyHousing', 0)}
+      {/if}
+      {#if bodySkirtRadius > 0}
+        {@render bodyPlate(bodySkirtPart, bodySkirtRadius, 'bodySkirt', 0)}
       {/if}
       <!-- A hidden track is not drawn (it was drawn whatever its `visible` said); its thickness still
            sets where the ticks start. -->
@@ -1120,40 +1201,35 @@
         {#each minorStopsShown as stop (stop.key)}
           {@const tickLine = circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), minorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(minorTickKind, tickLine, argbToCss(tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
+          {@render tickMark(minorTickKind, tickLine, argbToCss((highlighted && tickMinorPart?.activeColour) || tickMinorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#BFE0FF' : '#B0B0B0'), minorTickStrokeWidth, minorTickLength, highlighted ? 0.9 : numberOr(tickMinorPart?.opacity, 0.55), tickNumeral(stop))}
         {/each}
         {#each majorStopsShown as stop (stop.key)}
           {@const tickLine = circularTickLine(sliderNormalizedToAngle(behavior, stop.normalized), majorTickLength)}
           {@const highlighted = highlightStop(stop.normalized, valueMode, selectionStart, normalizedValues.current, selectionEnd)}
-          {@render tickMark(majorTickKind, tickLine, argbToCss(tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
+          {@render tickMark(majorTickKind, tickLine, argbToCss((highlighted && tickMajorPart?.activeColour) || tickMajorPart?._children?.Background?._children?.Fill?.colour, highlighted ? '#FFFFFF' : '#D0D0D0'), tickStrokeWidth, majorTickLength, highlighted ? 1 : numberOr(tickMajorPart?.opacity, 0.95), tickNumeral(stop))}
+        {/each}
+      {/if}
+
+      {#if scaleNumberCount >= 2}
+        {#each Array.from({ length: scaleNumberCount }) as _, i (i)}
+          {@const a = (sliderNormalizedToAngle(behavior, i / (scaleNumberCount - 1)) * Math.PI) / 180}
+          <text data-scale-number
+            x={circularCenter.x + Math.cos(a) * circularMetrics.radius * scaleNumberReach}
+            y={circularCenter.y + Math.sin(a) * circularMetrics.radius * scaleNumberReach}
+            text-anchor="middle" dominant-baseline="central"
+            font-size={scaleNumberSize}
+            font-family={tickNumberPart?._children?.Text?._children?.Font?.family ?? 'Arial'}
+            font-weight={numberOr(tickNumberPart?._children?.Text?._children?.Font?.weightValue, 400)}
+            fill={argbToCss(tickNumberPart?._children?.Text?._children?.Fill?.colour, '#D0D0D0')}
+            opacity={numberOr(tickNumberPart?.opacity, 1)}>{scaleNumberText(i)}</text>
         {/each}
       {/if}
 
       {#if bodyCapRadius > 0}
-        {@const capShape = outlineShapeFor(bodyCapPart, bodyCapRadius)}
-        <SliderShapeFill
-          background={bodyCapPart?._children?.Background ?? null}
-          bounds={circleBounds(circularCenter.x, circularCenter.y, bodyCapRadius)}
-          shape={capShape}
-          maskId={maskIdFor('bodyCapCircle')}
-          svgWidth={width}
-          svgHeight={height}
-          opacity={numberOr(bodyCapPart?.opacity, 1)}
-          style={pointerStyleFor('bodyCap')}
-        />
-        {#if capShape.kind === 'circle'}
-          <circle
-            cx={circularCenter.x}
-            cy={circularCenter.y}
-            r={bodyCapRadius}
-            fill="none"
-            stroke={partBorderColour(bodyCapPart, '#333333')}
-            stroke-width={partBorderWidth(bodyCapPart, 1)}
-            opacity={numberOr(bodyCapPart?.opacity, 1)}
-          />
-        {:else}
-          <path d={capShape.d} fill="none" stroke={partBorderColour(bodyCapPart, '#333333')} stroke-width={partBorderWidth(bodyCapPart, 1)} opacity={numberOr(bodyCapPart?.opacity, 1)} />
-        {/if}
+        {@render bodyPlate(bodyCapPart, bodyCapRadius, 'bodyCapCircle', 1, 'bodyCap')}
+      {/if}
+      {#if bodyInsertRadius > 0}
+        {@render bodyPlate(bodyInsertPart, bodyInsertRadius, 'bodyInsert', 1)}
       {/if}
 
       {#if valueMode !== 'single'}
@@ -1187,6 +1263,16 @@
             cx={radial.dot.cx}
             cy={radial.dot.cy}
             r={radial.dot.r}
+            fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
+            opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+            style={pointerStyleFor('pointerCurrent', 'fill')}
+          />
+        {:else if radial.bar}
+          {#if radial.bar.edge}
+            <polygon points={radial.bar.edge} fill="none" stroke={partBorderColour(pointerCurrentPart, '#202020')} stroke-width={radial.bar.edgeWidth} stroke-linejoin="miter" opacity={numberOr(pointerCurrentPart?.opacity, 1)} />
+          {/if}
+          <polygon data-pointer="current"
+            points={radial.bar.points}
             fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
             opacity={numberOr(pointerCurrentPart?.opacity, 1)}
             style={pointerStyleFor('pointerCurrent', 'fill')}

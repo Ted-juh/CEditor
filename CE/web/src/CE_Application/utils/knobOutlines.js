@@ -11,9 +11,11 @@
 //   flutes   a round grip: `count` rounded flutes `depth` % deep
 //   ring     an annulus: a hole `depth` % of the radius wide (100 - depth is the hole's radius)
 //   rounded  a square round the circle, its corners rounded `depth` % of the way to a circle
+//   gear     a knurled grip: `count` square teeth, the gaps `depth` % of the radius deep, each
+//            tooth, slope and gap a quarter of its pitch (the ribbed skirts of the synth sets)
 // `rotation` turns the outline, in degrees clockwise: a part that turns with the value passes it.
 
-export const KNOB_OUTLINES = ['circle', 'polygon', 'scallop', 'flutes', 'ring', 'rounded'];
+export const KNOB_OUTLINES = ['circle', 'polygon', 'scallop', 'flutes', 'ring', 'rounded', 'gear'];
 
 const fixed = (value) => Number(value.toFixed(2));
 
@@ -37,6 +39,10 @@ export function knobOutlinePath(kind, cx, cy, r, { count = 8, depth = 20, rotati
   }
   if (kind === 'scallop') {
     return closed(Array.from({ length: n * 2 }, (_, i) => point(cx, cy, i % 2 ? radius * (1 - d) : radius, rotation + (i * 180) / n)));
+  }
+  if (kind === 'gear') {
+    // Four corners a tooth: two on the rim, two at the root, a quarter pitch apart.
+    return closed(Array.from({ length: n * 4 }, (_, i) => point(cx, cy, i % 4 < 2 ? radius : radius * (1 - d), rotation + (i * 90) / n)));
   }
   if (kind === 'flutes') {
     const steps = n * 12;
