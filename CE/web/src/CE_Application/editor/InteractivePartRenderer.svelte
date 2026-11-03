@@ -4,11 +4,14 @@
 </script>
 
 <script>
+  import { untrack } from 'svelte';
   import BackgroundRenderer from '../../CE_Panel/components/BackgroundRenderer.svelte';
+  import { parseTiming } from '../utils/easing.js';
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { buildTextShadowValue, textEffectColor } from './canvasControlStyles.js';
   import { materialActive } from '../utils/materialFilter.js';
   import { isPictureLayer, maskActive, maskLinked, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -314,8 +317,26 @@
       'text-overflow:ellipsis',
       'pointer-events:none',
       `text-transform:${String(textFont?.caseMode ?? 'normal').toLowerCase() === 'uppercase' ? 'uppercase' : (String(textFont?.caseMode ?? 'normal').toLowerCase() === 'lowercase' ? 'lowercase' : 'none')}`,
+      ...textEffectRules(text._children?.Effects),
     ].join('; ');
   });
+
+  // A text layer's soft shadow and glow, and an outline outside its glyphs, as the panel's text draws
+  // them (editor/canvasControlStyles.js). A meter made into layers needs them: its readout and scale
+  // labels have a shadow, an arc meter's labels an outline. The rest of the text effects are the
+  // panel's alone.
+  function textEffectRules(effects) {
+    if (!effects) return [];
+    const rules = [];
+    const shadow = buildTextShadowValue(effects);
+    if (shadow) rules.push(`text-shadow:${shadow}`);
+    if (effects.outlineEnabled === true && String(effects.outlinePlacement ?? 'outer') === 'outer') {
+      // Centred on the edge and drawn under the fill: twice as wide, so its outer half shows.
+      const width = Math.max(0, numberOr(effects.outlineThickness, 1)) * 2;
+      if (width > 0) rules.push(`-webkit-text-stroke:${width}px ${textEffectColor(effects.outlineColour, 'FF000000')}`, 'paint-order:stroke fill');
+    }
+    return rules;
+  }
 
   let inputStyle = $derived.by(() => {
     if (!editableInput) return '';
@@ -400,17 +421,61 @@
     ].join('; ');
   });
 
+  // --- An arc's glide -------------------------------------------------------------------------
+  // An arc's sweep and start are SVG attributes (a dash length, a rotation), which CSS cannot ease.
+  // When a value-change animation gives this part a size timing for this change (a knob or meter
+  // made into layers carries its value glide as one: utils/customComponentFromControls.js), the
+  // drawn angles move along that curve in JS, as SliderFamilyRenderer moves a knob's value. The
+  // tracker gives no timing during a drag, so a dragged arc still follows the pointer.
+  let arcTarget = $derived.by(() => {
+    if (!shape.rendersArcTrack) return null;
+    const arcTrack = part?.meta?.arcTrack ?? part?.meta?.ringArc ?? null;
+    return { start: numberOr(arcTrack?.startAngle, -135), sweep: clampNumber(arcTrack?.sweepAngle, 0, 360) };
+  });
+  let arcTiming = $derived(transitionBucket?.size ? parseTiming(transitionBucket.size) : null);
+  let arcGlide = $state(null);
+  let arcGlideFrame = 0;
+  let arcGlideFrom = null;
+  const sameAngles = (a, b) => !!a && !!b && Math.abs(a.start - b.start) < 1e-6 && Math.abs(a.sweep - b.sweep) < 1e-6;
+  $effect.pre(() => {
+    const next = arcTarget;
+    const timing = arcTiming;
+    untrack(() => {
+      if (arcGlideFrame && sameAngles(arcGlideFrom, next)) return;
+      const from = arcGlide ?? arcGlideFrom;
+      arcGlideFrom = next;
+      if (arcGlideFrame) { cancelAnimationFrame(arcGlideFrame); arcGlideFrame = 0; }
+      if (!next || !timing || timing.duration + timing.delay <= 0 || !from || sameAngles(from, next)
+          || typeof requestAnimationFrame !== 'function') {
+        arcGlide = null;
+        return;
+      }
+      const startedAt = performance.now();
+      arcGlide = from;
+      const step = (now) => {
+        const progress = Math.min(1, Math.max(0, (now - startedAt - timing.delay) / Math.max(1, timing.duration)));
+        if (progress >= 1) { arcGlide = null; arcGlideFrame = 0; return; }
+        const t = timing.ease(progress);
+        arcGlide = { start: from.start + (next.start - from.start) * t, sweep: from.sweep + (next.sweep - from.sweep) * t };
+        arcGlideFrame = requestAnimationFrame(step);
+      };
+      arcGlideFrame = requestAnimationFrame(step);
+    });
+  });
+  $effect(() => () => { if (arcGlideFrame) cancelAnimationFrame(arcGlideFrame); arcGlideFrame = 0; });
+
   let arcSvgData = $derived.by(() => {
     if (!shape.rendersArcTrack) return null;
     const arcTrack = part?.meta?.arcTrack ?? part?.meta?.ringArc ?? null;
+    const angles = arcGlide ?? arcTarget;
     const backgroundFill = background?._children?.Fill ?? null;
     const backgroundBorder = background?._children?.Border ?? null;
     const size = Math.max(1, Math.min(frame.width, frame.height));
     const thickness = clampNumber(arcTrack?.thickness ?? backgroundBorder?.thickness, 1, size / 2);
     const r = Math.max(0.5, size / 2 - thickness / 2);
-    const sweepAngle = clampNumber(arcTrack?.sweepAngle, 0, 360);
+    const sweepAngle = clampNumber(angles?.sweep, 0, 360);
     const direction = String(arcTrack?.direction ?? 'cw').trim().toLowerCase() === 'ccw' ? 'ccw' : 'cw';
-    const startAngle = numberOr(arcTrack?.startAngle, -135);
+    const startAngle = numberOr(angles?.start, -135);
     const renderedStartAngle = direction === 'ccw' ? startAngle - sweepAngle : startAngle;
     const cap = arcTrack?.cap === 'round' ? 'round' : 'butt';
     const colour = cssColour(arcTrack?.colour ?? backgroundBorder?.colour ?? backgroundFill?.colour, '#2B3742');
@@ -418,7 +483,44 @@
     const arcLength = circumference * Math.min(sweepAngle, 359.99) / 360;
     // SVG 0° = 3-o'clock; CSS conic 0° = 12-o'clock → subtract 90 to align
     const rotation = renderedStartAngle - 90;
-    return { size, r, thickness, arcLength, circumference, rotation, cap, colour };
+    // Zone colours along the arc (a meter's green, yellow, red: utils/valueControlLayers.js
+    // plainMeterLayers), fixed to the arc's full travel (`zoneSweep`) while `sweepAngle`, which the
+    // value moves, decides how much of it shows. One SVG stroke cannot change colour along a curve,
+    // so these draw as a conic gradient on a ring, below.
+    const zones = Array.isArray(arcTrack?.zones) ? arcTrack.zones.filter((zone) => zone && zone.colour) : [];
+    const zoneSweep = clampNumber(arcTrack?.zoneSweep ?? sweepAngle, 0, 360);
+    return { size, r, thickness, arcLength, circumference, rotation, cap, colour, zones, zoneSweep, sweepAngle, direction, renderedStartAngle, blend: arcTrack?.blend !== false };
+  });
+
+  let arcZoneStyle = $derived.by(() => {
+    const arc = arcSvgData;
+    if (!arc || arc.zones.length === 0 || arc.sweepAngle <= 0) return '';
+    const visible = Math.min(arc.sweepAngle, 360);
+    // Degrees from where the conic starts (the visible part's first end): along the travel for a
+    // clockwise arc, back from its far end for an anticlockwise one.
+    const at = (fraction) => {
+      const along = clampNumber(fraction, 0, 1) * arc.zoneSweep;
+      return arc.direction === 'ccw' ? visible - along : along;
+    };
+    let list = arc.zones.map((zone) => ({ deg: at(zone.from), colour: cssColour(zone.colour, '#5B9BD5') }));
+    if (arc.direction === 'ccw') list = list.reverse();
+    const stops = arc.blend
+      ? list.map((stop) => `${stop.colour} ${stop.deg.toFixed(3)}deg`)
+      // Hard edges: clockwise, a zone runs from its own start to the next one's; anticlockwise, the
+      // list is reversed, and a zone runs from the one before it to its own start.
+      : list.map((stop, i) => (arc.direction === 'ccw'
+        ? `${stop.colour} ${(i === 0 ? 0 : list[i - 1].deg).toFixed(3)}deg ${(i === list.length - 1 ? 360 : stop.deg).toFixed(3)}deg`
+        : `${stop.colour} ${(i === 0 ? 0 : stop.deg).toFixed(3)}deg ${(list[i + 1]?.deg ?? 360).toFixed(3)}deg`));
+    const inner = Math.max(0, arc.size / 2 - arc.thickness);
+    return [
+      `width:${arc.size}px`, `height:${arc.size}px`,
+      `background:conic-gradient(from ${arc.renderedStartAngle}deg, ${stops.join(', ')})`,
+      // The ring, and the part of the turn that shows: both masks at once.
+      `-webkit-mask:conic-gradient(from ${arc.renderedStartAngle}deg, #000 0deg ${visible}deg, transparent ${visible}deg 360deg), radial-gradient(circle closest-side, transparent ${Math.max(0, inner - 0.5)}px, #000 ${inner + 0.5}px, #000 calc(100% - 0.5px), transparent 100%)`,
+      '-webkit-mask-composite:source-in',
+      `mask:conic-gradient(from ${arc.renderedStartAngle}deg, #000 0deg ${visible}deg, transparent ${visible}deg 360deg), radial-gradient(circle closest-side, transparent ${Math.max(0, inner - 0.5)}px, #000 ${inner + 0.5}px, #000 calc(100% - 0.5px), transparent 100%)`,
+      'mask-composite:intersect',
+    ].join('; ');
   });
 
   // The gradient of a round shape or a polygon, which used to draw one solid colour (the designer
@@ -782,7 +884,9 @@
       <div class="interactive-value-arc" style={valueArcStyle}></div>
     {/if}
 
-    {#if arcSvgData}
+    {#if arcZoneStyle}
+      <div class="interactive-arc-zones" style={arcZoneStyle}></div>
+    {:else if arcSvgData}
       <svg class="interactive-arc-svg" viewBox="0 0 {arcSvgData.size} {arcSvgData.size}" aria-hidden="true">
         <circle
           cx={arcSvgData.size / 2}
@@ -910,6 +1014,14 @@
     position: absolute;
     inset: 0;
     border-radius: 50%;
+    pointer-events: none;
+  }
+
+  .interactive-arc-zones {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
     pointer-events: none;
   }
 

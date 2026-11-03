@@ -290,7 +290,10 @@ components):
    one exact part, named: the 48 sets whose knob is a control form not made of parts, six with a
    cap turning under a fixed light (a turning layer turns its light with it), and fader caps with
    a block, console, lens or glass body, a glow or a sheen, and gradients along a track or fill.
-   Value glide is not carried: the layers go straight to the value.
+   Value glide is carried: the knob's value-change animation (`pointerSlide`, 140 ms) becomes one on
+   its channel over every layer property its bindings move that can ease, an arc's sweep included,
+   which the part renderer eases in JS as the slider renderer eases a knob (CSS cannot ease an SVG
+   attribute). The tracker drops it during a drag, as it does the knob's own.
    **Buttons and switches** (Button, MomentaryButton, ToggleButton) come in as layers only: a plain
    one as its plate and its text (the label's text part and rules), one drawn as a device as a path
    layer per part (housing, guard, key, symbol, indicator; `utils/deviceShapes.js` shapes over their
@@ -312,9 +315,16 @@ components):
    box, fitted as ControlAnatomy fits the 160 by 100 frame: a needle swinging, a pointer or marker
    sliding, a bar growing from its edge (a rectangle, so its corners keep their radius), lit cells
    each lit from its level and moved by the lit offset, a scale's marks and numerals, a fixed legend
-   and the readout. Refused by name: arc meters, readouts and labels on a plain meter, peak hold and
-   parts that follow the peak, decibel scales, zone-coloured parts, counter digits, legends that
-   show the reading, patterned or shaped fills, a value taken from another control.
+   and the readout. A plain meter's readout, label (above or below, its line measured in its font,
+   as it takes that much from the body) and scale labels are text layers, with the shadow or outline
+   the meter draws them with (text layers draw a soft shadow and an outer outline now). An arc meter
+   is its SVG fitted to the body: the track, its segments each lit by the reading, or one fill arc in
+   the zones' colours whose sweep is the reading. An arc layer draws zone colours (`zones`, fixed to
+   `zoneSweep`, blended or hard) as a conic gradient on a ring; the meter's own blended arc, 128
+   spans, had a seam at every join, and its spans now overlap. Refused by name: peak hold and parts
+   that follow the peak, decibel scales, zone-coloured parts, counter digits, legends that show the
+   reading, patterned or shaped fills, a value taken from another control, and a bar meter's track
+   you can see through (its fill shows under a cover in the track's colour).
    The pixel check compares, since buttons, by the other picture's 3 by 3 neighbourhood: a pixel
    differs when a channel falls outside that neighbourhood's range by more than 24, so a half-pixel
    edge or an anti-aliased one against a crisp one passes and a part missing, moved or recoloured

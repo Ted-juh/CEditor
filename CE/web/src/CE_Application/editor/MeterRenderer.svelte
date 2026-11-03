@@ -85,8 +85,12 @@
     // Constant-colour zone spans need one path; smooth colour blends use small
     // spans around the arc, since SVG linear gradients do not follow a curve.
     const stops = cfg.gradient === false ? zones.map(z => z.from) : Array.from({ length: 128 }, (_, i) => i / 128);
+    // Each span runs half a span into the next, which is drawn over it: butt ends that only meet
+    // anti-alias into a thin seam at every join, 128 of them round a blended arc. The last stops
+    // at the reading.
+    const overlap = cfg.gradient === false ? 0 : 0.5 / 128;
     return stops.filter(from => from < pos).map((from, i) => ({
-      from, to: Math.min(pos, stops[i + 1] ?? 1),
+      from, to: Math.min(pos, (stops[i + 1] ?? 1) + overlap),
       colour: css(meterFillColourAt((from + Math.min(pos, stops[i + 1] ?? 1)) / 2, cfg)),
     }));
   });

@@ -399,6 +399,11 @@ export const PART_PATH_BUCKETS = {
   // this target it fades: the renderer keeps such a part mounted while hidden, so there is a
   // `visibility: hidden; opacity: 0` to ease to and from (utils/transitionCss.js).
   visible: 'visibility',
+  // An arc layer's sweep and start, which a value moves (a knob's value arc, a meter's fill). They
+  // are drawn as SVG attributes, which CSS cannot ease, so InteractivePartRenderer eases them in JS
+  // on this bucket's timing.
+  'meta.arcTrack.sweepAngle': 'size',
+  'meta.arcTrack.startAngle': 'size',
 };
 
 export const ROOT_PATH_BUCKETS = {

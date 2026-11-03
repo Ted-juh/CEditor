@@ -12,6 +12,8 @@
  * passes, its reason shown.
  *
  * CE_KNOB_LAYERS_SETS="graphite,tolex" checks those sets only; CE_KNOB_LAYERS_ALL=1 checks every set.
+ * CE_KNOB_LAYERS_PROPS='{"Meter.orientation":"arc","Meter.showValue":true}' sets those properties on
+ * the control as well, to check what a set's own control does not use (a meter's readout, its label).
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -41,6 +43,7 @@ const SIZE = TYPE === 'Knob'
 // layer (1.9 to 2 %). A part missing or misplaced is far more: a turning cap's light turned with it
 // was 12 %, a ring outline read as points 6 %.
 const MAX_SHARE = Number(process.env.CE_KNOB_LAYERS_MAX ?? 0.025);
+const EXTRA = JSON.parse(process.env.CE_KNOB_LAYERS_PROPS || '{}');
 
 const kit = await boot({ width: 1400, height: 1000 });
 const page = kit.page;
@@ -145,7 +148,7 @@ try {
       }, setId);
       const knob = await kit.make(TYPE, BUTTON
         ? { 'Core.name': 'Play', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Text.content': 'PLAY', 'Behavior.defaultValue': value === 1 }
-        : METER ? { 'Core.name': 'Level', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Meter.value': value, 'Meter.valueMin': 0, 'Meter.valueMax': 1 }
+        : METER ? { 'Core.name': 'Level', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Meter.value': value, 'Meter.valueMin': 0, 'Meter.valueMax': 1, ...EXTRA }
         : {
           'Core.name': 'Cutoff', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, ...(TYPE === 'Slider' ? { 'Behavior.orientation': ORIENTATION } : {}),
           'Behavior.min': 0, 'Behavior.max': 100, 'Behavior.step': 1, 'Behavior.defaultValue': value * 100, 'Behavior.defaultCurrentValue': value * 100,

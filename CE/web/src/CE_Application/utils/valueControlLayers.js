@@ -39,7 +39,8 @@ import { anatomyForm } from '../models/controlAnatomy.js';
 import { BUTTON_DEVICE_PARTS, DEVICE_FRAME } from '../models/buttonDeviceParts.js';
 import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
 import { meterLitOffset, meterPartDrawing } from './meterParts.js';
-import { meterFillColourAt, meterSegmentCenter, meterTicks, meterZones } from './meterLayout.js';
+import { meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, meterTicks, meterZones } from './meterLayout.js';
+import { normalLineHeight } from './textLineHeight.js';
 import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { buttonAnatomyLayout } from './anatomyLayout.js';
 import { scalePathData } from './svgPathScale.js';
@@ -244,12 +245,12 @@ function outlineLayers(name, part, centre, r, origin, { zIndex, borderFallback, 
 }
 
 /** An arc of the track's circle as an arc layer: `start` in the designer's degrees (0 at 12 o'clock). */
-function arcLayer(name, { centre, radius, thickness, start, sweep, direction, colour, opacity, zIndex, origin, role }) {
+function arcLayer(name, { centre, radius, thickness, start, sweep, direction, colour, opacity, zIndex, origin, role, cap = 'round', extra = {} }) {
   const size = 2 * radius + thickness;
   const box = { x: centre.x - size / 2, y: centre.y - size / 2, width: size, height: size };
   return createPartNode(name, {
     role, kind: 'arcTrack', zIndex, opacity, layout: pxBox(box, origin),
-    meta: { arcTrack: { startAngle: r3(start), sweepAngle: r3(sweep), direction, thickness, cap: 'round', colour } },
+    meta: { arcTrack: { startAngle: r3(start), sweepAngle: r3(sweep), direction, thickness: r3(thickness), cap, colour, ...extra } },
     sections: { Background: solidBackground('00000000') },
   });
 }
@@ -1460,27 +1461,35 @@ function edgeBackground(background, bw) {
 
 // --- plain meters ----------------------------------------------------------------------------------
 
-/** Why a plain meter (editor/MeterRenderer.svelte, a bar or segments) cannot become layers, or ''. */
+/** Why a plain meter (editor/MeterRenderer.svelte: a bar, segments or an arc) cannot become layers, or ''. */
 export function plainMeterLayersRefusal(resolved) {
   const cfg = resolved?._children?.Meter ?? {};
-  if (String(cfg.orientation ?? 'horizontal') === 'arc') return 'an arc meter, which comes in as layers in a later step';
   if (String(cfg.scale ?? 'linear') === 'db') return 'a decibel scale, which a layer does not follow yet';
   if (String(cfg.valueSourceId ?? '').trim()) return 'its value taken from another control';
   if (cfg.peakHold === true) return 'peak hold, which a layer does not keep';
-  if (cfg.showValue === true) return 'a readout, which comes in as layers in a later step';
-  if (cfg.showScaleLabels === true) return 'scale labels, which come in as layers in a later step';
-  if (String(cfg.label ?? '').trim() && ['above', 'below'].includes(String(cfg.labelPosition ?? 'none'))) return 'a label, which comes in as layers in a later step';
+  // A bar's fill shows up to the reading under a cover in the track's colour, which only hides the
+  // fill if nothing shows through it. Segments and an arc draw their fill over the track instead.
   const track = String(cfg.trackColour ?? 'FF141414');
-  if (/^[0-9a-f]{8}$/i.test(track) && track.slice(0, 2).toUpperCase() !== 'FF') return 'a track you can see through';
+  const bar = String(cfg.orientation ?? 'horizontal') !== 'arc' && Math.round(num(cfg.segments, 0)) <= 0;
+  if (bar && /^[0-9a-f]{8}$/i.test(track) && track.slice(0, 2).toUpperCase() !== 'FF') return 'a track you can see through';
   return '';
 }
 
+/** An AARRGGBB colour as the RRGGBB a text layer draws and the opacity it needs for the alpha. */
+function textColourOf(raw, fallback = 'E6DCDCDC') {
+  const hex = /^[0-9a-f]{8}$/i.test(String(raw ?? '')) ? String(raw) : (/^[0-9a-f]{6}$/i.test(String(raw ?? '')) ? `FF${raw}` : fallback);
+  return { colour: `FF${hex.slice(2).toUpperCase()}`, alpha: parseInt(hex.slice(0, 2), 16) / 255 };
+}
+
 /**
- * A plain meter as layers, as MeterRenderer lays it out (padding 4, the track filling the body or
- * `thickness` across it): its plate; for a bar, the track, the zones' gradient over the whole track,
- * and over that, from the reading to the end, a cover in the track's colour, so the gradient shows
- * up to the reading and stays where the panel draws it; for segments, each segment plain until the
- * reading reaches its middle, then lit in its zone's colour; and the ticks.
+ * A plain meter as layers, as MeterRenderer lays it out: padding 4 round a column of its label (above
+ * or below, as tall as one line of its text) and its body, 3 apart. In the body, for a bar, the
+ * track, the zones' gradient over the whole track, and over that, from the reading to the end, a
+ * cover in the track's colour, so the gradient shows up to the reading and stays where the panel
+ * draws it; for segments, each segment plain until the reading reaches its middle, then lit in its
+ * zone's colour; and the ticks, the scale's labels and the readout. An arc is the meter's SVG fitted
+ * to the body: the track, the fill as one arc in the zones' colours whose sweep is the reading (or
+ * its segments), the ticks, the labels round it and the readout under it.
  */
 export function plainMeterLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName }) {
   const cfg = resolved?._children?.Meter ?? {};
@@ -1493,17 +1502,57 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
   let depth = zIndex;
   const add = (part) => { out.parts.push(part); depth += 1; return part; };
   const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
-  const vertical = String(cfg.orientation ?? 'horizontal') === 'vertical';
+  const orientation = String(cfg.orientation ?? 'horizontal');
+  const vertical = orientation === 'vertical';
+  const arc = orientation === 'arc';
   const thickness = Math.max(0, num(cfg.thickness, 0));
   const radius = num(cfg.rounded, 3);
   const trackColour = styledCfg.trackColour ?? 'FF141414';
-  // The body: the box less its padding. The track fills it, or is `thickness` across it, centred.
-  const body = { x: 4, y: 4, width: Math.max(1, width - 8), height: Math.max(1, height - 8) };
-  const track = thickness > 0
-    ? (vertical
-      ? { x: body.x + (body.width - Math.min(thickness, body.width)) / 2, y: body.y, width: Math.min(thickness, body.width), height: body.height }
-      : { x: body.x, y: body.y + (body.height - Math.min(thickness, body.height)) / 2, width: body.width, height: Math.min(thickness, body.height) })
-    : body;
+  const segments = Math.max(0, Math.round(num(cfg.segments, 0)));
+  const zones = meterZones(styledCfg);
+
+  // The meter's text: its Text section's font, its colour (the renderer's pale grey without one).
+  const font = resolved?._children?.Text?._children?.Font ?? {};
+  const family = String(font.family ?? 'Arial');
+  const fontSize = Math.max(7, num(font.size, 11));
+  const ink = textColourOf(styled?._children?.Text?._children?.Fill?.colour ?? resolved?._children?.Text?._children?.Fill?.colour);
+  const textLayer = (suffix, words, box, size, { justification = 'centred', opacity = 1, shadow = '', outline = false } = {}) => {
+    const text = deepClone(SECTION_DEFAULTS.Text);
+    text.content = words;
+    text._children.Fill.colour = ink.colour;
+    text._children.Font.family = family;
+    text._children.Font.size = r3(size);
+    text._children.Font.weightValue = 400;
+    text._children.Font.weight = 'Regular';
+    text._children.Position.justification = justification;
+    if (shadow) Object.assign(text._children.Effects, { shadowEnabled: true, shadowStyle: 'soft', shadowOffsetX: 0, shadowOffsetY: 1, shadowBlur: 2, shadowColour: shadow });
+    if (outline) Object.assign(text._children.Effects, { outlineEnabled: true, outlinePlacement: 'outer', outlineThickness: 1, outlineColour: 'BF000000' });
+    return add(createPartNode(named(suffix), {
+      role: 'label', kind: 'rectangle', zIndex: depth, opacity: r3(opacity * ink.alpha), layout: pxBox(box, origin), sections: { Text: text },
+    }));
+  };
+  // A text layer's box keeps 8 px clear each side (its text's padding): text centred at (x, y), or
+  // starting or ending at x.
+  const textAt = (x, y, size, anchor = 'middle') => {
+    const span = Math.max(width, size * 8);
+    const h = Math.max(size * 2, 4);
+    if (anchor === 'start') return { x: x - 8, y: y - h / 2, width: span, height: h };
+    if (anchor === 'end') return { x: x + 8 - span, y: y - h / 2, width: span, height: h };
+    return { x: x - span / 2, y: y - h / 2, width: span, height: h };
+  };
+
+  // Padding 4, the label's line and a gap of 3, and the body the rest.
+  const label = String(cfg.label ?? '').trim() && ['above', 'below'].includes(String(cfg.labelPosition ?? 'none')) ? String(cfg.label) : '';
+  const labelSize = fontSize * 0.82;
+  const labelLine = label ? normalLineHeight(family, labelSize) : 0;
+  const above = label && String(cfg.labelPosition) === 'above';
+  const body = {
+    x: 4,
+    y: 4 + (above ? labelLine + 3 : 0),
+    width: Math.max(1, width - 8),
+    height: Math.max(1, height - 8 - (label ? labelLine + 3 : 0)),
+  };
+
   const solid = (colour, corners = null) => {
     const background = solidBackground(colour);
     if (corners) {
@@ -1525,8 +1574,32 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
   if (fill.solidEnabled === true || fill.gradientEnabled === true || fill.imageEnabled === true || border.enabled === true) {
     rectLayer('plate', { x: 0, y: 0, width, height }, deepClone(styled?._children?.Background ?? plate));
   }
-  const zones = meterZones(styledCfg);
-  const segments = Math.max(0, Math.round(num(cfg.segments, 0)));
+  if (label) {
+    textLayer('label', label, textAt(4 + (width - 8) / 2, (above ? 4 : height - 4 - labelLine) + labelLine / 2, labelSize), labelSize, { opacity: 0.75 });
+  }
+
+  const readoutSize = fontSize * 0.9;
+  const readoutLine = normalLineHeight(family, readoutSize);
+  const readout = (box) => {
+    const layer = textLayer('readout', '', box, readoutSize, { justification: box.justification ?? 'centred', opacity: 0.92, shadow: '99000000' });
+    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
+  };
+  const ticks = cfg.showTicks === true || cfg.showScaleLabels === true ? meterTicks(cfg, cfg.tickCount) : [];
+
+  if (arc) {
+    plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, source, out, named, add, depthOf: () => depth, trackColour, zones, segments, ticks, fontSize, textLayer, textAt });
+    if (cfg.showValue === true) {
+      readout(textAt(body.x + body.width / 2, body.y + body.height - 6 - readoutLine / 2, readoutSize));
+    }
+    return out;
+  }
+
+  // The track fills the body, or is `thickness` across it, centred.
+  const track = thickness > 0
+    ? (vertical
+      ? { x: body.x + (body.width - Math.min(thickness, body.width)) / 2, y: body.y, width: Math.min(thickness, body.width), height: body.height }
+      : { x: body.x, y: body.y + (body.height - Math.min(thickness, body.height)) / 2, width: body.width, height: Math.min(thickness, body.height) })
+    : body;
   if (segments > 0) {
     const gap = num(cfg.segmentGap, 2);
     const along = vertical ? track.height : track.width;
@@ -1576,14 +1649,100 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
     }
   }
   if (cfg.showTicks === true) {
-    for (const [i, tick] of meterTicks(cfg, cfg.tickCount).entries()) {
+    for (const [i, tick] of ticks.entries()) {
       const box = vertical
         ? { x: track.x, y: track.y + track.height * (1 - tick.pos), width: track.width, height: 1 }
         : { x: track.x + track.width * tick.pos, y: track.y, width: 1, height: track.height };
       add(createPartNode(named(`tick${i}`), { role: 'custom', kind: 'rectangle', zIndex: depth, opacity: 1, layout: pxBox(box, origin), sections: { Background: solidBackground('2EFFFFFF') } }));
     }
   }
+  if (cfg.showScaleLabels === true) {
+    // Over the body, 2 px in from its bottom (or its left, upright), each at its tick; the first and
+    // last kept inside it.
+    const size = fontSize * 0.7;
+    ticks.forEach((tick, i) => {
+      const first = i === 0;
+      const last = i === ticks.length - 1;
+      let box;
+      if (vertical) {
+        const y = body.y + body.height * (1 - tick.pos);
+        const middle = first ? y - size / 2 : (last ? body.y + size / 2 : y);
+        box = textAt(body.x + 2, middle, size, 'start');
+      } else {
+        const x = body.x + body.width * tick.pos;
+        const middle = body.y + body.height - 2 - size / 2;
+        box = first ? textAt(x, middle, size, 'start') : (last ? textAt(x, middle, size, 'end') : textAt(x, middle, size));
+        box.justification = first ? 'left' : (last ? 'right' : 'centred');
+      }
+      textLayer(`scale${i}`, meterTickLabel(tick, cfg), box, size, { justification: box.justification ?? 'left', opacity: 0.78, shadow: 'CC000000' });
+    });
+  }
+  if (cfg.showValue === true) {
+    // At the body's right, 5 px in, across its middle; upright, centred 4 px below its top.
+    if (vertical) readout(textAt(body.x + body.width / 2, body.y + 4 + readoutLine / 2, readoutSize));
+    else readout({ ...textAt(body.x + body.width - 5, body.y + body.height / 2, readoutSize, 'end'), justification: 'right' });
+  }
   return out;
+}
+
+/**
+ * An arc meter's layers: MeterRenderer's SVG, its viewBox the meter's whole box fitted ("meet") into
+ * the body, so a point (x, y) of the drawing is at the body's offset plus (x, y) times the fit. The
+ * drawing's angles run clockwise from 3 o'clock; a layer's from 12, so 90 more.
+ */
+function plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, source, out, named, add, depthOf, trackColour, zones, segments, ticks, fontSize, textLayer, textAt }) {
+  const fit = Math.min(body.width / width, body.height / height);
+  const ox = body.x + (body.width - width * fit) / 2;
+  const oy = body.y + (body.height - height * fit) / 2;
+  const min = Math.min(width, height);
+  const stroke = Math.min(min / 2, num(cfg.thickness, 0) > 0 ? num(cfg.thickness, 0) : Math.max(6, min * 0.16));
+  const r = Math.max(0, min / 2 - stroke / 2 - 2);
+  const centre = { x: ox + (width / 2) * fit, y: oy + (height / 2) * fit };
+  const startSvg = num(cfg.arcStart, 135);
+  const sweepSvg = num(cfg.arcSweep, 270);
+  const direction = sweepSvg < 0 ? 'ccw' : 'cw';
+  const sweep = Math.min(360, Math.abs(sweepSvg));
+  const designer = (pos) => meterArcAngle(pos, startSvg, sweepSvg) + 90;
+  const arcOf = (name, from, to, colour, { cap = 'butt', opacity = 1, extra = {} } = {}) => add(arcLayer(named(name), {
+    centre, radius: r * fit, thickness: stroke * fit, start: designer(from), sweep: Math.abs(designer(to) - designer(from)), direction,
+    colour, opacity, zIndex: depthOf(), origin, role: 'custom', cap, extra,
+  }));
+
+  arcOf('track', 0, 1, trackColour, { cap: num(cfg.rounded, 3) > 0 ? 'round' : 'butt' });
+  if (segments > 0) {
+    const gap = Math.min(0.8 / segments, Math.max(0, num(cfg.segmentGap, 2)) / Math.max(1, r * sweep * Math.PI / 180));
+    for (let i = 0; i < segments; i += 1) {
+      const from = i / segments + gap / 2;
+      const to = (i + 1) / segments - gap / 2;
+      const plain = arcOf(`segment${i}`, from, to, trackColour);
+      const lit = arcOf(`segment${i}lit`, from, to, meterFillColourAt(meterSegmentCenter(i, segments), styledCfg), { opacity: 0 });
+      const t = (i + 0.5) / segments;
+      out.bindings[`${lit.name}Lit`] = rangeBinding(`${lit.name}Lit`, source, `Parts.${lit.name}.opacity`, 0, 1, t - 0.0005, t);
+      out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, source, `Parts.${plain.name}.opacity`, 1, 0, t - 0.0005, t);
+    }
+  } else {
+    // One arc in the zones' colours, fixed to the whole travel; the reading decides how much shows.
+    const fillArc = arcOf('fill', 0, 1, zones[0]?.colour ?? 'FF39D98A', {
+      extra: { zones: zones.map((zone) => ({ from: r3(zone.from), colour: zone.colour })), zoneSweep: r3(sweep), blend: cfg.gradient !== false },
+    });
+    out.bindings[`${fillArc.name}Sweep`] = rangeBinding(`${fillArc.name}Sweep`, source, `Parts.${fillArc.name}.meta.arcTrack.sweepAngle`, 0, r3(sweep));
+  }
+  if (cfg.showTicks === true) {
+    for (const [i, tick] of ticks.entries()) {
+      add(radialBar(named(`tick${i}`), {
+        centre, angle: designer(tick.pos), from: (r - stroke / 2) * fit, to: (r + stroke / 2) * fit, width: fit, round: false,
+        colour: '66FFFFFF', opacity: 1, zIndex: depthOf(), origin,
+      }));
+    }
+  }
+  if (cfg.showScaleLabels === true) {
+    const size = Math.max(7, fontSize * 0.72) * fit;
+    const at = Math.max(0, r - stroke / 2 - fontSize) * fit;
+    ticks.forEach((tick, i) => {
+      const angle = ((designer(tick.pos) - 90) * Math.PI) / 180;
+      textLayer(`scale${i}`, meterTickLabel(tick, cfg), textAt(centre.x + at * Math.cos(angle), centre.y + at * Math.sin(angle), size), size, { opacity: 0.78, outline: true });
+    });
+  }
 }
 
 /** A part's outline as drawn at the start of the travel, for a part that turns with the value. */

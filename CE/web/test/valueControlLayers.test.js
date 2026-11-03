@@ -184,3 +184,27 @@ test('a meter comes in as layers: a needle swings, a bar\'s gradient is covered 
   // What a layer does not draw yet is named.
   assert.match(plan([meter({ Meter: { peakHold: true } })], 'graphite').refused[0].reason, /peak hold/);
 });
+
+test('the knob\'s value glide comes with its layers: its pointer and its arc ease when the value changes', () => {
+  // A Knob ships pointerSlide: 140 ms, outCubic, on a value change. The layers went straight to the
+  // value; now the timing is an animation on the channel over what the knob's bindings move.
+  const layered = plan([knob()]);
+  const glide = layered.component._children.Animations._children.CutoffGlide;
+  assert.ok(glide, 'an animation for the channel');
+  assert.deepEqual(glide.trigger, { type: 'valueChange', source: 'channel.Cutoff.normalized', origin: 'any' });
+  assert.equal(glide.duration, 140);
+  assert.equal(glide.easing, 'outCubic');
+  const paths = glide.targets.map((target) => target.path);
+  assert.ok(paths.includes('Parts.Cutoff_pointer.Layout.rotation'), 'the pointer turns on it');
+  assert.ok(paths.includes('Parts.Cutoff_value.meta.arcTrack.sweepAngle'), 'the value arc sweeps on it');
+  assert.ok(!paths.some((path) => path.endsWith('Text.content')), 'a readout cannot ease, so it is not listed');
+  // A knob without a glide brings none.
+  const still = knob();
+  still._children.Animations._children.pointerSlide.enabled = false;
+  still._children.Animations._children.rangeSlide.enabled = false;
+  assert.equal(plan([still]).component._children.Animations?._children?.CutoffGlide, undefined);
+  // The arc's sweep eases in the renderer, on its size timing: CSS cannot ease an SVG attribute.
+  const renderer = readFileSync(new URL('../src/CE_Application/editor/InteractivePartRenderer.svelte', import.meta.url), 'utf8');
+  assert.match(renderer, /let arcTiming = \$derived\(transitionBucket\?\.size \? parseTiming\(transitionBucket\.size\) : null\);/);
+  assert.match(renderer, /const angles = arcGlide \?\? arcTarget;/);
+});

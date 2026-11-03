@@ -57,6 +57,7 @@ import { anatomyForm } from '../models/controlAnatomy.js';
 import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
 import { meterDeviceDrawn } from '../models/meterDeviceParts.js';
 import { isDisplayOnly } from './displayMode.js';
+import { targetBuckets } from './interactionRuntime.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
 /** Controls with a value that convert: drawn by SliderFamilyRenderer, one value each. */
@@ -769,6 +770,9 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   children.HitZones = { ...children.HitZones, _children: valueSections.hitZones };
   children.Bindings = { ...children.Bindings, _children: valueSections.bindings };
   children.States = { ...children.States, _children: valueSections.states };
+  if (Object.keys(valueSections.animations).length) {
+    children.Animations = { ...children.Animations, _children: { ...(children.Animations?._children ?? {}), ...valueSections.animations } };
+  }
   children.PublishedProperties = {
     ...children.PublishedProperties,
     inputs: valueSections.published,
@@ -808,7 +812,7 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
  *              hover and focus are the whole component's.
  */
 function knobSections(values, bounds, allParts = {}) {
-  const out = { channels: {}, behaviors: {}, hitZones: {}, bindings: {}, states: {}, published: {}, carried: [] };
+  const out = { channels: {}, behaviors: {}, hitZones: {}, bindings: {}, states: {}, animations: {}, published: {}, carried: [] };
   const width = Math.max(1, bounds.width);
   const height = Math.max(1, bounds.height);
   for (const entry of values) {
@@ -886,6 +890,8 @@ function knobSections(values, bounds, allParts = {}) {
       // The knob as layers: its bindings, and its interaction states written to the layers its parts
       // became, when THIS knob's grab area is hovered, dragged or focused.
       Object.assign(out.bindings, layered.bindings);
+      const glide = valueGlideAnimation(resolved, channelName, layered.bindings);
+      if (glide) out.animations[glide.name] = glide;
       const states = resolved?._children?.States?._children ?? {};
       const when = {
         Hover: { hoveredCustomHitZone: zoneName },
@@ -1039,6 +1045,44 @@ function buttonSections(out, { control, resolved, local, paintIndex, buttoned },
       ? []
       : (deviceBindings.bindings ?? []).map((binding) => ({ ...deepClone(binding), port: channelName })),
   });
+}
+
+/**
+ * The knob's value glide, carried to its layers: when its value changes other than by a drag, its
+ * pointer and arc ease to it (a Knob or Slider ships one, `pointerSlide`, 140 ms; the set or the
+ * author may change it). The layers went straight to the value. Now the same timing is an animation
+ * on the channel, over every layer property a binding of this knob moves that can ease: a turn or a
+ * place, an opacity, a size, an arc's sweep (InteractivePartRenderer eases that in JS). The tracker
+ * drops it while the knob is dragged, as it does the knob's own.
+ */
+function valueGlideAnimation(resolved, channelName, bindings) {
+  const VALUE_SOURCES = ['value.normalized', 'value.current.normalized'];
+  const animations = resolved?._children?.Animations;
+  if (animations?.enabled === false) return null;
+  const glide = Object.values(animations?._children ?? {}).find((animation) => animation?.enabled !== false
+    && String(animation?.kind ?? 'transition') === 'transition'
+    && String(animation?.trigger?.type ?? '') === 'valueChange'
+    && VALUE_SOURCES.includes(String(animation?.trigger?.source ?? 'value.normalized'))
+    && Number(animation?.duration ?? 0) + Number(animation?.delay ?? 0) > 0);
+  if (!glide) return null;
+  const seen = new Set();
+  const targets = [];
+  for (const binding of Object.values(bindings ?? {})) {
+    const path = String(binding?.target ?? '');
+    if (!path.startsWith('Parts.') || seen.has(path)) continue;
+    seen.add(path);
+    if (targetBuckets({ path })?.buckets?.length) targets.push({ path, properties: [] });
+  }
+  if (!targets.length) return null;
+  const name = `${channelName}Glide`;
+  return {
+    _type: 'Animation', name, enabled: true, kind: 'transition',
+    trigger: { type: 'valueChange', source: `channel.${channelName}.normalized`, origin: glide.trigger?.origin ?? 'any' },
+    targets,
+    duration: Number(glide.duration ?? 140),
+    delay: Number(glide.delay ?? 0),
+    easing: deepClone(glide.easing ?? 'outCubic'),
+  };
 }
 
 /**
