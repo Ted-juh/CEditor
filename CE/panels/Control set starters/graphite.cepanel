@@ -538,10 +538,22 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1752752637570","controlSetId":"graphite","controlForm":"bar","formFaceColour":"FF3A3A3A","formInkColour":"FFFFFFFF","formLabelColour":"FFFFFFFF","formAccentColour":"FF5B9BD5","id":"ctrl_1752752637570","controlType":"Meter"},
+        "Core": {"name":"Meter_1752752637570","controlSetId":"graphite","id":"ctrl_1752752637570","controlType":"Meter"},
         "Transform": {"x":540,"y":342,"width":312,"height":108},
         "Meter": {"value":0.7,"valuePrecision":2},
-        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"}}}
+        "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"}}},
+        "Parts": {
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF2C2C2C"}}}}},
+            "face": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF3A3A3A"}}}}},
+            "track": {"visible":true,"opacity":0.22,"_children":{"Layout":{"x":5,"y":34,"width":90,"height":30},"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "scale": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "indicator": {"visible":true,"motion":"fill","_children":{"Layout":{"x":5,"y":34,"width":90,"height":30},"Background":{"_children":{"Fill":{"colour":"FF5B9BD5"}}}}},
+            "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF5B9BD5"}}}}},
+            "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}}
+          }
+        }
       },
       "_type": "Control"
     },

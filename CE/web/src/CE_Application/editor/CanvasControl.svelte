@@ -16,6 +16,7 @@
   import ControlAnatomy from './ControlAnatomy.svelte';
   import { anatomyForm } from '../models/controlAnatomy.js';
   import { BUTTON_DEVICE_TYPES, buttonDeviceDrawn, isButtonDevicePart } from '../models/buttonDeviceParts.js';
+  import { METER_DEVICE_TYPES, meterDeviceDrawn, isMeterDevicePart } from '../models/meterDeviceParts.js';
   import LcdDisplayRenderer from './LcdDisplayRenderer.svelte';
   import ParameterStatusEditor from './ParameterStatusEditor.svelte';
   import { parameterStatusDesignModel } from '../utils/parameterStatus.js';
@@ -305,7 +306,7 @@
   let core = $derived(getSection(control, 'Core'));
   // A form draws the control, or, for a button or switch, its own parts (models/buttonDeviceParts.js),
   // which the form frame lays out the same way, caption and all.
-  let hasAnatomy = $derived(!!anatomyForm(core?.controlType, core?.controlForm) || buttonDeviceDrawn(renderControl));
+  let hasAnatomy = $derived(!!anatomyForm(core?.controlType, core?.controlForm) || buttonDeviceDrawn(renderControl) || meterDeviceDrawn(renderControl));
   let transform = $derived(getSection(control, 'Transform'));
   let isCustomComponent = $derived(String(core?.controlType ?? '') === 'CustomComponent');
   // Which body renderer draws this control, if one does: '' for the many that are drawn from
@@ -500,13 +501,15 @@
     String(sourceBehavior?.family ?? behavior?.family ?? '').trim().toLowerCase() === 'range'
     && String(sourceBehavior?.role ?? behavior?.role ?? '').trim().toLowerCase() === 'slider'
   );
-  // A slider's and a button's own parts are drawn by their renderers, not as free parts.
+  // A slider's, a button's and a meter's own parts are drawn by their renderers, not as free parts.
   let visiblePartEntries = $derived.by(() => (
     isSliderControl
       ? renderPartEntries.filter(([partName]) => !SLIDER_SEMANTIC_PARTS.has(String(partName)))
       : BUTTON_DEVICE_TYPES.has(String(core?.controlType ?? ''))
         ? renderPartEntries.filter(([partName]) => !isButtonDevicePart(partName))
-        : renderPartEntries
+        : METER_DEVICE_TYPES.has(String(core?.controlType ?? ''))
+          ? renderPartEntries.filter(([partName]) => !isMeterDevicePart(partName))
+          : renderPartEntries
   ));
   // Parts that nothing can ever change are compiled to one SVG and drawn as a single element.
   // On the GAIA panel that is 2,821 of 3,295 parts: 12,025 surface DOM nodes become 5,509 and the

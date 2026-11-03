@@ -1,4 +1,5 @@
 import { createButtonDeviceParts } from './buttonDeviceParts.js';
+import { createMeterDeviceParts } from './meterDeviceParts.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 export {
   METER_FAMILY, RIBBON_FAMILY, isMeterFamily, isRibbonFamily,
@@ -1382,13 +1383,15 @@ export const COMPONENT_TYPES = {
    * need to store, and a second twenty-field section would be a copy that drifts.
    */
   ProgressBar: {
-    sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // Parts: the meter a control set draws it as (models/meterDeviceParts.js), hidden until on.
+    sections: ['Background', 'Meter', 'Text', 'Effects', 'Parts', 'DeviceBindings', 'Scripts'],
     // HOST AUTOMATION: none, for the Meter's reason. It reports; a host writing the reading would
     // be arguing with whatever is doing the work.
     exportValues: [],
     ports: getComponentPorts('Meter'),
     defaultOverrides: {
       Transform: { width: 220, height: 20 },
+      Parts: createMeterDeviceParts(),
       Meter: {
         // No peak to hold and no threshold zones: 40% of a file copied is not "amber", it is 40%.
         peakHold: false,
@@ -1479,7 +1482,8 @@ export const COMPONENT_TYPES = {
   },
 
   Meter: {
-    sections: ['Background', 'Meter', 'Text', 'Effects', 'DeviceBindings', 'Scripts'],
+    // Parts: the meter a control set draws it as (models/meterDeviceParts.js), hidden until on.
+    sections: ['Background', 'Meter', 'Text', 'Effects', 'Parts', 'DeviceBindings', 'Scripts'],
     // HOST AUTOMATION: none, deliberately. A meter DISPLAYS a level that arrives from somewhere
     // else — `valueSourceId` names where — so a host parameter would let a DAW write a reading the
     // component is supposed to be reporting. An output is not an automation target. Declared
@@ -1489,6 +1493,7 @@ export const COMPONENT_TYPES = {
     defaultOverrides: {
       // A horizontal level meter in a dark inset by default.
       Transform: { width: 220, height: 34 },
+      Parts: createMeterDeviceParts(),
       Background: {
         _children: {
           Fill: { colour: 'FF121212' },

@@ -744,7 +744,19 @@
         "Background": {"_children":{"Fill":{"colour":"FFE1E3DE"},"Border":{"thickness":0},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":16,"segmentGap":3,"trackColour":"FFE1E3DE","fillColour":"FF3D7983","thickness":10,"rounded":false,"peakColour":"FF3D7983","showTicks":true,"valuePrecision":2},
         "Text": {"_children":{"Fill":{"colour":"FF202020"},"Font":{"family":"Nunito Sans"}}},
-        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":-3,"offsetY":-3,"blur":6,"spread":0,"colour":"E6FFFFFF"},{"enabled":true,"type":"drop","offsetX":4,"offsetY":4,"blur":8,"spread":0,"colour":"33000000"}]}}}
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":-3,"offsetY":-3,"blur":6,"spread":0,"colour":"E6FFFFFF"},{"enabled":true,"type":"drop","offsetX":4,"offsetY":4,"blur":8,"spread":0,"colour":"33000000"}]}}},
+        "Parts": {
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFE1E3DE"}}}}},
+            "face": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF1F1E9"}}}}},
+            "track": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}},
+            "scale": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}},
+            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF3D7983"}}}}},
+            "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF3D7983"}}}}},
+            "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}}
+          }
+        }
       },
       "_type": "Control"
     },

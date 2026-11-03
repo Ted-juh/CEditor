@@ -33,7 +33,8 @@
 
   // A knob form that is parts now (models/knobFormParts.js) is written as the knob's own parts.
   // The tab its parts are edited on: Knob, Switch (a toggle) or Button.
-  let partsTab = $derived(core?.controlType === 'Knob' ? 'Knob' : core?.controlType === 'ToggleButton' ? 'Switch' : 'Button');
+  let partsTab = $derived(core?.controlType === 'Knob' ? 'Knob' : core?.controlType === 'ToggleButton' ? 'Switch'
+    : ['Meter', 'ProgressBar'].includes(core?.controlType) ? '' : 'Button');
   let formIsParts = (form) => !!form && !!formAsPartsRecipe(core?.controlType, form);
   function chooseForm(form) {
     if (formIsParts(form)) applyFormAsParts($selectedComponentIds.size > 1 ? [...$selectedComponentIds] : [core.id], form);
@@ -166,8 +167,8 @@
         </select>
       </PropertyCell>
       {#if formIsParts(core.controlForm)}
-        <PropertyCell label="" span={4} compact hint={`This form can be drawn with the control's own parts, which can be edited on the ${partsTab} tab. Convert writes them onto this control.`}>
-          <PropertyButton label="Convert to Parts" title={`Draw this form with the control's own parts, editable on the ${partsTab} tab.`} onclick={() => chooseForm(core.controlForm)} />
+        <PropertyCell label="" span={4} compact hint={partsTab ? `This form can be drawn with the control's own parts, which can be edited on the ${partsTab} tab. Convert writes them onto this control.` : "This form can be drawn with the control's own parts. Convert writes them onto this control."}>
+          <PropertyButton label="Convert to Parts" title={partsTab ? `Draw this form with the control's own parts, editable on the ${partsTab} tab.` : "Draw this form with the control's own parts."} onclick={() => chooseForm(core.controlForm)} />
         </PropertyCell>
       {/if}
       <PropertyCell label="Size %" span={2} path="Core.formSize" hint="Size of the mechanism within its control bounds."><NumberCell value={core.formSize ?? 100} min={60} max={115} step={5} onchange={(v) => set('formSize', v)} /></PropertyCell>

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "aaefdce9",
+  "fingerprint": "325e2507",
   "set": {
     "id": "ivory",
     "name": "Ivory",
@@ -702,7 +702,7 @@
           "Background.Border.thickness": 1,
           "Background.Fill.gradientEnabled": false,
           "Background.Fill.colour": "{control.field}",
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "DM Sans",
           "Meter.segments": 12,
           "Meter.segmentGap": 3,
@@ -711,14 +711,67 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "ruler",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "track": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5,
+            "Layout.y": 63.5,
+            "Layout.width": 90,
+            "Layout.height": 1
+          },
+          "scale": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 6.25,
+            "Layout.y": 43,
+            "Layout.width": 87.5,
+            "Layout.height": 21,
+            "pattern": "ticks",
+            "patternCount": 20,
+            "majorEvery": 5,
+            "shapeDepth": 42.86,
+            "tickWidth": 1
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5.94,
+            "Layout.y": 25,
+            "Layout.width": 0.63,
+            "Layout.height": 50,
+            "motion": "slide",
+            "travelX": 87.5
+          },
+          "marker": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "shape": "pointer",
+            "Layout.x": 1.88,
+            "Layout.y": 25,
+            "Layout.width": 8.75,
+            "Layout.height": 14,
+            "motion": "slide",
+            "travelX": 87.5
+          }
         }
       },
       "ProgressBar": {
@@ -727,7 +780,7 @@
           "Background.Border.thickness": 1,
           "Background.Fill.gradientEnabled": false,
           "Background.Fill.colour": "{control.field}",
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "DM Sans",
           "Meter.segments": 12,
           "Meter.segmentGap": 3,
@@ -736,14 +789,67 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "ruler",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 24
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "track": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5,
+            "Layout.y": 63.5,
+            "Layout.width": 90,
+            "Layout.height": 1
+          },
+          "scale": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 6.25,
+            "Layout.y": 43,
+            "Layout.width": 87.5,
+            "Layout.height": 21,
+            "pattern": "ticks",
+            "patternCount": 20,
+            "majorEvery": 5,
+            "shapeDepth": 42.86,
+            "tickWidth": 1
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5.94,
+            "Layout.y": 25,
+            "Layout.width": 0.63,
+            "Layout.height": 50,
+            "motion": "slide",
+            "travelX": 87.5
+          },
+          "marker": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "shape": "pointer",
+            "Layout.x": 1.88,
+            "Layout.y": 25,
+            "Layout.width": 8.75,
+            "Layout.height": 14,
+            "motion": "slide",
+            "travelX": 87.5
+          }
         }
       },
       "Ribbon": {

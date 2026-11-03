@@ -19,12 +19,14 @@
 import { derived, get, writable } from 'svelte/store';
 import { activePanel, panels, updatePanel } from './panels.js';
 import { controlSetLibrary, carryControlSetInDocument, documentControlSets } from './controlSetLibrary.js';
-import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet } from '../models/controlSets.js';
+import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet, resolveColourLiteral } from '../models/controlSets.js';
 import { applyControlSetChoices } from '../utils/controlSetApply.js';
 import { ownLookControl, resetToSetPatch } from '../models/controlSetOwnership.js';
 import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../models/knobFormParts.js';
 import { buttonFormFamily } from '../models/buttonFormParts.js';
 import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
+import { METER_DEVICE_PARTS, METER_DEVICE_TYPES } from '../models/meterDeviceParts.js';
+import { meterFormFamily } from '../models/meterFormParts.js';
 import { createControl } from '../models/componentTypes.js';
 import { readControlPath } from '../models/controlSetFamilies.js';
 import { applyControlPatchesById, replaceControlsById } from './controls.js';
@@ -179,13 +181,12 @@ export function applyFormAsParts(ids, form) {
   const patches = new Map();
   for (const id of ids ?? []) {
     const control = findControlById(context.panel.controls, id);
-    const recipe = formAsPartsRecipe(control?._children?.Core?.controlType, form);
+    const recipe = formAsPartsRecipe(control?._children?.Core?.controlType, form, context.set);
     if (!recipe) continue;
     const type = String(control._children.Core.controlType);
     const patch = { 'Core.controlForm': '', ...recipe.component };
-    if (BUTTON_DEVICE_TYPES.has(type)) {
-      for (const name of BUTTON_DEVICE_PARTS) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
-    }
+    const deviceParts = BUTTON_DEVICE_TYPES.has(type) ? BUTTON_DEVICE_PARTS : METER_DEVICE_TYPES.has(type) ? METER_DEVICE_PARTS : [];
+    for (const name of deviceParts) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
     // What a form shapes and moves, back to the factory's unless this form says: a switch made a
     // lever and then a slide must not still swing, a knob made scalloped and then a disc must not
     // keep its scallop.
@@ -209,11 +210,17 @@ const FORM_PART_KEYS = [
   'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
   'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
   'Background.Effects.Material.enabled',
+  // A meter's (models/meterDeviceParts.js).
+  'motion', 'fillFrom', 'cellWidth', 'cellHeight', 'majorEvery', 'tickWidth', 'zoneFrom', 'textSource', 'legendText', 'fontFamily',
 ];
 
-/** The recipe that draws `form` on a control of `type` with its own parts, or null. */
-export function formAsPartsRecipe(type, form) {
+/** The recipe that draws `form` on a control of `type` with its own parts, or null. `set`, where
+ * known, gives a meter's sheen its face colour. */
+export function formAsPartsRecipe(type, form, set = null) {
   if (type === 'Knob') return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12 }) : null;
+  if (type === 'Meter' || type === 'ProgressBar') {
+    return meterFormFamily(type, form, { ink: '{text.primary}', divisions: 12, face: set ? resolveColourLiteral('{surface}', set, '') : '' });
+  }
   return buttonFormFamily(type, form, { ink: '{text.primary}' });
 }
 

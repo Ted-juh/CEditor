@@ -744,7 +744,19 @@
         "Background": {"_children":{"Fill":{"colour":"FF34332D","gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"656C5E","position":0},{"color":"3A4230","position":55},{"color":"2A3023","position":100}]}},"Border":{"colour":"FF1D2118"},"Corners":{"style":"chamfer"},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"hammer","strength":50,"shine":30,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Meter": {"value":0.7,"segments":20,"segmentGap":3,"trackColour":"FF34332D","fillColour":"FFD5B36D","thickness":16,"rounded":false,"peakColour":"FFD5B36D","showTicks":true,"valuePrecision":2},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Allerta Stencil"}}},
-        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}}
+        "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":3,"spread":0,"colour":"99000000"}]}}},
+        "Parts": {
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF34332D"}}}}},
+            "face": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF777564"}}}}},
+            "track": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "scale": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD5B36D"}}}}},
+            "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD5B36D"}}}}},
+            "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
+          }
+        }
       },
       "_type": "Control"
     },

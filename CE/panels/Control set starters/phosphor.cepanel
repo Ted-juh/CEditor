@@ -568,11 +568,23 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1723706708839","controlSetId":"phosphor","controlForm":"dots","formDivisions":24,"formFaceColour":"FF151815","formHousingColour":"FF1F241F","formInkColour":"FFF2F2F2","formLabelColour":"FFD6FFE3","formAccentColour":"FF39FF7A","id":"ctrl_1723706708839","controlType":"Meter"},
+        "Core": {"name":"Meter_1723706708839","controlSetId":"phosphor","id":"ctrl_1723706708839","controlType":"Meter"},
         "Transform": {"x":540,"y":342,"width":312,"height":108},
         "Background": {"_children":{"Fill":{"colour":"FF0B0D0B"},"Border":{"colour":"FF39FF7A"},"Corners":{"radius":3}}},
         "Meter": {"value":0.7,"segments":32,"segmentGap":1,"trackColour":"FF1F241F","fillColour":"FF39FF7A","thickness":6,"rounded":false,"peakColour":"FF39FF7A","showTicks":true,"valuePrecision":2},
-        "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"JetBrains Mono"}}}
+        "Text": {"_children":{"Fill":{"colour":"FFD6FFE3"},"Font":{"family":"JetBrains Mono"}}},
+        "Parts": {
+          "_children": {
+            "housing": {"visible":true,"_children":{"Layout":{"x":2.5,"y":17,"width":95,"height":68},"Background":{"_children":{"Fill":{"colour":"FF1F241F"},"Border":{"enabled":true,"colour":"59F2F2F2"},"Corners":{"radius":3}}}}},
+            "face": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF151815"}}}}},
+            "track": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "scale": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "indicator": {"visible":true,"opacity":0.13,"shape":"ellipse","pattern":"grid","patternCount":15,"patternRows":4,"cellWidth":63.83,"cellHeight":40,"motion":"light","activeOpacity":1,"_children":{"Layout":{"x":6.88,"y":25,"width":86,"height":51},"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF39FF7A"}}}}},
+            "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD6FFE3"}}}}}
+          }
+        }
       },
       "_type": "Control"
     },

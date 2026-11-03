@@ -2,6 +2,7 @@ import { ADDITIONAL_DIRECTIONS, additionalNumberFamily } from './additionalContr
 import { setAnatomy } from './controlAnatomy.js';
 import { KNOB_FORMS_AS_PARTS, knobFormFamily } from './knobFormParts.js';
 import { buttonFormFamily } from './buttonFormParts.js';
+import { meterFormFamily } from './meterFormParts.js';
 // Visual properties only. Musical values, routing, gestures and authored edits remain local.
 // Each row is a design direction, not a new name for a palette.
 export const STARTER_CONTROL_SETS = [
@@ -63,6 +64,11 @@ export function extendControlSet(set) {
   if (!d) return set;
   const families = { ...set.families };
   const face = set.families?.Button?.component ?? {};
+  // A set role as the colour it names, or '' where it names none.
+  function literalOf(value) {
+    for (let i = 0; i < 8 && /^\{.+\}$/.test(value ?? ''); i++) value = set.tokens[value.slice(1, -1)];
+    return /^[0-9a-f]{8}$/i.test(String(value ?? '')) ? String(value).toUpperCase() : '';
+  }
   function inkOn(value) {
     for (let i = 0; i < 8 && /^\{.+\}$/.test(value ?? ''); i++) value = set.tokens[value.slice(1, -1)];
     const raw = String(value ?? '202020');
@@ -126,9 +132,13 @@ export function extendControlSet(set) {
     // A knob form that is parts now (models/knobFormParts.js): the set's knob family draws it with
     // the knob's own parts, every one of them editable, instead of naming the form.
     const form = setAnatomy(type, d.id);
-    // A button or switch form that is parts now (models/buttonFormParts.js): the same, with the
-    // control's device parts.
-    const deviceRecipe = type === 'Knob' ? null : buttonFormFamily(type, form, { ink: inkOn(set.tokens.surface) });
+    // A button, switch or meter form that is parts now (models/buttonFormParts.js,
+    // models/meterFormParts.js): the same, with the control's device parts.
+    const divisions = ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12;
+    const deviceRecipe = type === 'Knob' ? null
+      : (type === 'Meter' || type === 'ProgressBar')
+        ? meterFormFamily(type, form, { ink: inkOn(set.tokens.surface), divisions, face: literalOf('{surface}') })
+        : buttonFormFamily(type, form, { ink: inkOn(set.tokens.surface) });
     if (deviceRecipe) {
       const parts = { ...(families[type]?.parts ?? {}) };
       for (const [name, patch] of Object.entries(deviceRecipe.parts)) parts[name] = { ...(parts[name] ?? {}), ...patch };

@@ -109,9 +109,15 @@ test('the designed Graphite is Graphite: its colours, lettering, lamp, buttons a
 test('it draws the knob and the meter Graphite\'s starter already drew with', () => {
   const starter = createControlSetStarter('graphite');
   const starterControl = (type) => starter.controls.find((c) => c._children.Core.controlType === type);
-  // The meter is still a form, the same one.
-  assert.ok(starterControl('Meter')._children.Core.controlForm, 'the starter draws a Meter form');
-  assert.equal(form('Meter', designed), starterControl('Meter')._children.Core.controlForm);
+  // The meter is Graphite's flat bar, drawn as the meter's parts in both (models/meterFormParts.js).
+  const designedMeter = resolveControlForSet(createControl('Meter'), designed);
+  for (const meter of [starterControl('Meter'), designedMeter]) {
+    const parts = meter._children.Parts._children;
+    assert.equal(meter._children.Core.controlForm || '', '', 'no form');
+    assert.equal(parts.track.visible, true, 'a groove');
+    assert.equal(parts.indicator.motion, 'fill', 'the value as a bar filling it');
+    assert.equal(parts.scale.visible, false, 'no scale');
+  }
   // The knob is Graphite's flat disc, drawn as the knob's parts in both (models/knobFormParts.js).
   const knobPart = (control, name) => control._children.Parts._children[name];
   const designedKnob = resolveControlForSet(createControl('Knob'), designed);

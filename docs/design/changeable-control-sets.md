@@ -16,8 +16,16 @@ recipes in `models/buttonFormParts.js`). The Button tab (Switch on a toggle) edi
 a time, as the owner approved in its mock-up (`sections/ButtonPartsEditor.svelte`): Shape,
 Position, Appearance, When On or When Pressed, and the legend's text, every field with the override
 marks.
-Still drawn by code: the 48 direction forms, and the meter forms. SVG and Photoshop drawings import
-as layered components (Bringing designs in, below).
+The twelve base meter forms are drawn with the meter's own parts (`models/meterDeviceParts.js`:
+housing, face, track, scale, indicator, marker, cover, legend, in the form frame's 160 by 100
+units; each answers the reading by filling, sliding, swinging or lighting its cells, a scale is
+ticks along a line or round an arc with a zone, a legend says words, the percentage or the figures;
+what a part draws at a reading is `utils/meterParts.js`, recipes in `models/meterFormParts.js`).
+Each matches its form drawn by code to within 0.4% of its pixels at empty, 5%, 62% and full: the
+form drew a one-unit sliver at empty, and the rest is anti-aliasing. A capsule's sheen runs
+through the set's face colour, which a gradient stop holds as a colour, not a role. Their fields
+wait on the Meter tab's mock-up. Still drawn by code: the 48 direction forms. SVG and Photoshop
+drawings import as layered components (Bringing designs in, below).
 
 ## The principle
 

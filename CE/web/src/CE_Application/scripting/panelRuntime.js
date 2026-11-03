@@ -7547,6 +7547,8 @@ const DEFINE_SPECS = {
       // A button's or a switch's device parts (models/buttonDeviceParts.js).
       'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
       'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize',
+      // A meter's parts (models/meterDeviceParts.js).
+      'motion', 'fillFrom', 'cellWidth', 'cellHeight', 'majorEvery', 'tickWidth', 'zoneFrom', 'textSource', 'legendText', 'fontFamily',
       // A layer's mask (utils/partMask.js).
       'mask'],
   },

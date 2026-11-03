@@ -2,6 +2,7 @@ import { createControl } from './componentTypes.js';
 import { getControlSet } from './controlSets.js';
 import { resolveControlForSet, writeControlPath } from './controlSetFamilies.js';
 import { KNOB_FORMS_AS_PARTS, knobFormFamily } from './knobFormParts.js';
+import { meterFormFamily } from './meterFormParts.js';
 import { createPanel } from '../stores/panelModel.js';
 import { setAnatomy } from './controlAnatomy.js';
 import { starterDirection } from './controlSetCoverage.js';
@@ -24,13 +25,15 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
   function place(type, x, y, width, height, extra = {}) {
     // Given a number, the id and the name createControl would have made from it.
     const n = nextId?.();
-    // Graphite's starter draws Graphite's forms; a form that is parts now (models/knobFormParts.js)
-    // is written as the control's own parts instead of named.
+    // Graphite's starter draws Graphite's forms; a form that is parts now (models/knobFormParts.js,
+    // models/meterFormParts.js) is written as the control's own parts instead of named.
     const graphiteForm = setId === 'graphite' ? setAnatomy(type, setId) : '';
-    const asParts = type === 'Knob' && KNOB_FORMS_AS_PARTS.includes(graphiteForm);
+    const recipe = !graphiteForm ? null
+      : type === 'Knob' ? (KNOB_FORMS_AS_PARTS.includes(graphiteForm) ? knobFormFamily(graphiteForm, { ink: '{text.primary}' }) : null)
+        : meterFormFamily(type, graphiteForm, { ink: '{text.primary}' });
+    const asParts = !!recipe;
     let c = createControl(type, { ...(n == null ? {} : { name: `${type}_${n}` }), Core: { ...(n == null ? {} : { id: `ctrl_${n}` }), controlSetId: setOverride?.id ?? setId, ...(graphiteForm && !asParts ? { controlForm: graphiteForm, formFaceColour: '{surface}', formInkColour: '{text.primary}', formLabelColour: '{text.primary}', formAccentColour: '{accent}' } : {}) }, Transform: { x, y, width, height }, ...extra });
     if (asParts) {
-      const recipe = knobFormFamily(graphiteForm, { ink: '{text.primary}' });
       for (const [path, value] of Object.entries(recipe.component)) c = writeControlPath(c, path, value);
       for (const [part, patch] of Object.entries(recipe.parts)) {
         for (const [path, value] of Object.entries(patch)) c = writeControlPath(c, `Parts.${part}.${path}`, value);

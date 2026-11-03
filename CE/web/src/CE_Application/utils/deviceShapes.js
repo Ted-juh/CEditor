@@ -17,12 +17,18 @@
 //   pair       two halves side by side, `depth` % of the width apart
 //   ribbon     a bookmark: a strip with a notch cut into its foot, `depth` % of the height
 //   ring       a ring `depth` % of the radius wide, round a hole
+//   arch       a radio's cabinet: straight sides, a curved top, its shoulders `depth` % down
+//   ticket     a paper tally: its top edge pinked in teeth `depth` % of the height high
+//   pointer    a cursor: a triangle pointing down
 //
 // `pattern` repeats the shape in its box: 'lines' as `count` bars across, 'grid' as `count` by
-// `rows` cells. The grooves of a rubber pad, the dots of a pixel key, a binary cell.
+// `rows` cells, 'columns' as `count` bars side by side. The grooves of a rubber pad, the dots of a
+// pixel key, a binary cell, the strokes of a tally. In 'grid' and 'columns' the first cell starts
+// at the box's left edge and the last ends at its right; `cellWidth` and `cellHeight` say how much
+// of its pitch a cell fills, in %.
 
-export const DEVICE_SHAPES = ['rect', 'ellipse', 'diamond', 'hexagon', 'flap', 'corner', 'pillow', 'bracket', 'crosshair', 'pair', 'ribbon', 'ring'];
-export const DEVICE_PATTERNS = ['solid', 'lines', 'grid'];
+export const DEVICE_SHAPES = ['rect', 'ellipse', 'diamond', 'hexagon', 'flap', 'corner', 'pillow', 'bracket', 'crosshair', 'pair', 'ribbon', 'ring', 'arch', 'ticket', 'pointer'];
+export const DEVICE_PATTERNS = ['solid', 'lines', 'grid', 'columns'];
 
 const f = (value) => Number(Number(value).toFixed(2));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -119,31 +125,58 @@ export function deviceShapePath(kind, x, y, w, h, { depth = 20, radius = 0 } = {
         + ` A${f(iw / 2)} ${f(ih / 2)} 0 1 1 ${f(x + (width + iw) / 2)} ${f(y + height / 2)}`
         + ` A${f(iw / 2)} ${f(ih / 2)} 0 1 1 ${f(x + (width - iw) / 2)} ${f(y + height / 2)} Z`;
     }
+    case 'arch': {
+      // A quadratic top through the box's top edge, from shoulders `depth` % down each side.
+      const shoulder = y + height * d;
+      const control = 2 * y - shoulder;
+      return `M${f(x)} ${f(y + height)} V${f(shoulder)} Q${f(x + width / 2)} ${f(control)} ${f(x + width)} ${f(shoulder)} V${f(y + height)} Z`;
+    }
+    case 'ticket': {
+      // Pinked: teeth `depth` % of the height high and 3.2 times as wide, from the left, the last
+      // half tooth running out to the right edge (as the paper tally was drawn).
+      const tooth = Math.max(0.5, height * d);
+      const half = tooth * 1.6;
+      const points = [];
+      for (let i = 0; x + i * half <= x + width - half + 1e-6; i += 1) points.push([x + i * half, y + (i % 2 ? 0 : tooth)]);
+      if (points.length > 2 && points.length % 2 === 1) points.pop();
+      return polygon([...points, [x + width, y + tooth], [x + width, y + height], [x, y + height]]);
+    }
+    case 'pointer':
+      return polygon([[x, y], [x + width, y], [x + width / 2, y + height]]);
     default:
       return rect(x, y, width, height, radius);
   }
 }
 
+// A cell's share of its pitch, from a % (a grid's default: two thirds, the gap half a cell).
+const share = (value, fallback) => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.min(1, n / 100) : fallback;
+};
+
 /**
  * The cells a pattern repeats the shape into: one box for 'solid', `count` bars across the box
- * for 'lines' (each half the pitch high), `count` by `rows` square-ish cells for 'grid' (each half
- * again the gap).
+ * for 'lines' (each half the pitch high), `count` by `rows` cells for 'grid', `count` bars side by
+ * side for 'columns'. Each cell says its column, `col`, of `cols`: a meter lights its cells by it.
  */
-export function devicePatternCells(pattern, x, y, w, h, { count = 4, rows = 3 } = {}) {
-  const n = Math.max(1, Math.min(32, Math.round(Number(count) || 1)));
+export function devicePatternCells(pattern, x, y, w, h, { count = 4, rows = 3, cellWidth = null, cellHeight = null } = {}) {
+  const n = Math.max(1, Math.min(64, Math.round(Number(count) || 1)));
   if (pattern === 'lines') {
     const pitch = h / n;
-    return Array.from({ length: n }, (_, i) => ({ x, y: y + i * pitch + pitch / 4, w, h: pitch / 2 }));
+    const ch = pitch * share(cellHeight, 0.5);
+    return Array.from({ length: n }, (_, i) => ({ x, y: y + i * pitch + (pitch - ch) / 2, w, h: ch, col: 0, cols: 1 }));
   }
-  if (pattern === 'grid') {
-    const r = Math.max(1, Math.min(32, Math.round(Number(rows) || 1)));
-    const cw = w / (n * 1.5 - 0.5);
-    const ch = h / (r * 1.5 - 0.5);
+  if (pattern === 'grid' || pattern === 'columns') {
+    const r = pattern === 'columns' ? 1 : Math.max(1, Math.min(64, Math.round(Number(rows) || 1)));
+    const sx = share(cellWidth, pattern === 'columns' ? 0.5 : 2 / 3);
+    const sy = pattern === 'columns' ? 1 : share(cellHeight, 2 / 3);
+    const px = w / (n - 1 + sx);
+    const py = h / (r - 1 + sy);
     const cells = [];
     for (let j = 0; j < r; j += 1) {
-      for (let i = 0; i < n; i += 1) cells.push({ x: x + i * cw * 1.5, y: y + j * ch * 1.5, w: cw, h: ch });
+      for (let i = 0; i < n; i += 1) cells.push({ x: x + i * px, y: y + j * py, w: px * sx, h: py * sy, col: i, cols: n });
     }
     return cells;
   }
-  return [{ x, y, w, h }];
+  return [{ x, y, w, h, col: 0, cols: 1 }];
 }

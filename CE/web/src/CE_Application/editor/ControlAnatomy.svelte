@@ -8,6 +8,9 @@
   import { buttonAnatomyLayout } from '../utils/anatomyLayout.js';
   import ButtonDeviceParts from './ButtonDeviceParts.svelte';
   import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
+  import MeterDeviceParts from './MeterDeviceParts.svelte';
+  import { meterDeviceDrawn } from '../models/meterDeviceParts.js';
+  import { meterFigures } from '../utils/meterParts.js';
   let { control, runtime = null, width = 160, height = 160, checked = false, label = '' } = $props();
   const uid = $props.id();
   let core = $derived(control?._children?.Core ?? {});
@@ -18,6 +21,9 @@
   // A button or switch drawn with its own parts (models/buttonDeviceParts.js): no form named, its
   // key on. Its caption is its own text, in its own text colour.
   let partsDrawn = $derived(!knob && !meter && !anatomyForm(core.controlType, form) && buttonDeviceDrawn(control));
+  // A meter drawn with its own parts (models/meterDeviceParts.js): no form named, its indicator on.
+  // Its readout is its own text, in its own text colour.
+  let meterPartsDrawn = $derived(meter && !anatomyForm(core.controlType, form) && meterDeviceDrawn(control));
   let signals = $derived(runtime?.signals ?? {});
   let value = $derived(anatomyValue(control, signals));
   let cfg = $derived(meterConfig(control));
@@ -33,7 +39,7 @@
   let face = $derived(css(core.formFaceColour, '#dedbd2'));
   let housing = $derived(css(core.formHousingColour, '#171a20'));
   let ink = $derived(css(core.formInkColour, '#20282c'));
-  let legend = $derived(partsDrawn ? css(control?._children?.Text?._children?.Fill?.colour, ink) : css(core.formLabelColour, ink));
+  let legend = $derived(partsDrawn || meterPartsDrawn ? css(control?._children?.Text?._children?.Fill?.colour, ink) : css(core.formLabelColour, ink));
   let accent = $derived(css(core.formAccentColour, '#40bccc'));
   let vh = $derived(knob ? 170 : 100);
   // A button or switch in a box too small for the frame's caption is laid out in the box's own
@@ -55,7 +61,7 @@
   function polygon(n,r1,r2) { return Array.from({length:n*2},(_,i)=>{const q=point(i*180/n,i%2?r2:r1);return `${q.x},${q.y}`;}).join(' '); }
 </script>
 
-<svg class="anatomy" data-form={partsDrawn ? 'parts' : form} data-position={p} data-active={active} viewBox={lay ? `0 0 ${width} ${height}` : `0 0 160 ${vh}`} {width} {height} aria-hidden="true" style={`--face:${face};--ink:${ink};--accent:${accent};font-family:${captionFamily};`}>
+<svg class="anatomy" data-form={partsDrawn || meterPartsDrawn ? 'parts' : form} data-position={p} data-active={active} viewBox={lay ? `0 0 ${width} ${height}` : `0 0 160 ${vh}`} {width} {height} aria-hidden="true" style={`--face:${face};--ink:${ink};--accent:${accent};font-family:${captionFamily};`}>
   <defs>
     <linearGradient id={`${uid}-metal`} x2="0" y2="1"><stop stop-color="#fff" stop-opacity={.8*depth}/><stop offset=".42" stop-color={face}/><stop offset=".55" stop-color={face}/><stop offset="1" stop-color="#000" stop-opacity={.65*depth}/></linearGradient>
     <radialGradient id={`${uid}-dome`} cx=".32" cy=".25" r=".8"><stop stop-color="#fff" stop-opacity={.85*depth}/><stop offset=".45" stop-color={face}/><stop offset="1" stop-color="#000" stop-opacity={.6*depth}/></radialGradient>
@@ -114,6 +120,9 @@
     {/if}
     </g>
     {#if core.formShowValue!==false && !['lens','vernier','encoder'].includes(form)}<text x="80" y="164" text-anchor="middle" fill={legend} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text>{/if}
+  {:else if meter && meterPartsDrawn}
+    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} />
+    {#if core.formShowValue!==false}<text x="80" y="98" text-anchor="middle" fill={legend} font-size="10">{readout}</text>{/if}
   {:else if meter}
     <g transform={`translate(80 46) scale(${size}) translate(-80 -46)`}>
     {#if ['vu','radio','dial'].includes(form)}

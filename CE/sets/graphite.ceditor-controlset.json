@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6be0f297",
+  "fingerprint": "d2a0668b",
   "set": {
     "id": "graphite-studio",
     "name": "Graphite",
@@ -388,7 +388,7 @@
           "Background.Border.thickness": 1,
           "Background.Fill.gradientEnabled": false,
           "Background.Fill.colour": "{control.field}",
-          "Text.Fill.colour": "FFF2F2F2",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "DM Sans",
           "Meter.segments": 0,
           "Meter.segmentGap": 3,
@@ -397,14 +397,35 @@
           "Meter.showTicks": false,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "bar",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "track": {
+            "visible": true,
+            "opacity": 0.22,
+            "Background.Fill.colour": "FFF2F2F2",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5,
+            "Layout.y": 34,
+            "Layout.width": 90,
+            "Layout.height": 30
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5,
+            "Layout.y": 34,
+            "Layout.width": 90,
+            "Layout.height": 30,
+            "motion": "fill",
+            "fillFrom": "left"
+          }
         }
       },
       "ProgressBar": {
@@ -413,7 +434,7 @@
           "Background.Border.thickness": 1,
           "Background.Fill.gradientEnabled": false,
           "Background.Fill.colour": "{control.field}",
-          "Text.Fill.colour": "FFF2F2F2",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "DM Sans",
           "Meter.segments": 0,
           "Meter.segmentGap": 3,
@@ -422,14 +443,35 @@
           "Meter.showTicks": false,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "bar",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "track": {
+            "visible": true,
+            "opacity": 0.22,
+            "Background.Fill.colour": "FFF2F2F2",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5,
+            "Layout.y": 34,
+            "Layout.width": 90,
+            "Layout.height": 30
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{accent}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 5,
+            "Layout.y": 34,
+            "Layout.width": 90,
+            "Layout.height": 30,
+            "motion": "fill",
+            "fillFrom": "left"
+          }
         }
       },
       "Ribbon": {

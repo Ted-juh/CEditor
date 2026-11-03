@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e9027689",
+  "fingerprint": "6809fa51",
   "set": {
     "id": "pop",
     "name": "Pop",
@@ -836,7 +836,7 @@
             }
           ],
           "Background.Fill.gradientEnabled": false,
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Rubik",
           "Meter.segments": 8,
           "Meter.segmentGap": 3,
@@ -845,14 +845,43 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "ticket",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "face": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Corners.radius": 0,
+            "Background.Border.colour": "FF202020",
+            "Background.Border.thickness": 2,
+            "shape": "ticket",
+            "shapeDepth": 8.06,
+            "Layout.x": 3.13,
+            "Layout.y": 18,
+            "Layout.width": 93.75,
+            "Layout.height": 62
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 0.15,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 8.13,
+            "Layout.y": 39,
+            "Layout.width": 81.25,
+            "Layout.height": 26,
+            "pattern": "columns",
+            "patternCount": 15,
+            "cellWidth": 44.44,
+            "motion": "light",
+            "activeColour": "{accent}",
+            "activeOpacity": 1
+          }
         }
       },
       "ProgressBar": {
@@ -873,7 +902,7 @@
             }
           ],
           "Background.Fill.gradientEnabled": false,
-          "Text.Fill.colour": "FF202020",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Rubik",
           "Meter.segments": 8,
           "Meter.segmentGap": 3,
@@ -882,14 +911,43 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "ticket",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FF202020",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "face": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": true,
+            "Background.Corners.radius": 0,
+            "Background.Border.colour": "FF202020",
+            "Background.Border.thickness": 2,
+            "shape": "ticket",
+            "shapeDepth": 8.06,
+            "Layout.x": 3.13,
+            "Layout.y": 18,
+            "Layout.width": 93.75,
+            "Layout.height": 62
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 0.15,
+            "Background.Fill.colour": "FF202020",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 8.13,
+            "Layout.y": 39,
+            "Layout.width": 81.25,
+            "Layout.height": 26,
+            "pattern": "columns",
+            "patternCount": 15,
+            "cellWidth": 44.44,
+            "motion": "light",
+            "activeColour": "{accent}",
+            "activeOpacity": 1
+          }
         }
       },
       "Ribbon": {

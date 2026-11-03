@@ -568,11 +568,23 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1776129950829","controlSetId":"blueprint","controlForm":"ruler","formDivisions":24,"formFaceColour":"FF14243A","formHousingColour":"FF22375A","formInkColour":"FFF2F2F2","formLabelColour":"FFDCE8F5","formAccentColour":"FFDCE8F5","id":"ctrl_1776129950829","controlType":"Meter"},
+        "Core": {"name":"Meter_1776129950829","controlSetId":"blueprint","id":"ctrl_1776129950829","controlType":"Meter"},
         "Transform": {"x":540,"y":342,"width":312,"height":108},
         "Background": {"_children":{"Fill":{"colour":"FF0E1A2C"},"Border":{"colour":"FFDCE8F5"},"Corners":{"radius":0}}},
         "Meter": {"value":0.7,"segments":12,"segmentGap":3,"trackColour":"FF22375A","fillColour":"FFDCE8F5","thickness":6,"rounded":false,"peakColour":"FFFFD166","showTicks":true,"valuePrecision":2},
-        "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"JetBrains Mono"}}}
+        "Text": {"_children":{"Fill":{"colour":"FFDCE8F5"},"Font":{"family":"JetBrains Mono"}}},
+        "Parts": {
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF22375A"}}}}},
+            "face": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF14243A"}}}}},
+            "track": {"visible":true,"_children":{"Layout":{"x":5,"y":63.5,"width":90,"height":1},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}},
+            "scale": {"visible":true,"shapeDepth":42.86,"pattern":"ticks","patternCount":20,"majorEvery":5,"_children":{"Layout":{"x":6.25,"y":43,"width":87.5,"height":21},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}},
+            "indicator": {"visible":true,"motion":"slide","travelX":87.5,"_children":{"Layout":{"x":5.94,"y":25,"width":0.63,"height":50},"Background":{"_children":{"Fill":{"colour":"FFDCE8F5"}}}}},
+            "marker": {"visible":true,"shape":"pointer","motion":"slide","travelX":87.5,"_children":{"Layout":{"x":1.88,"y":25,"width":8.75,"height":14},"Background":{"_children":{"Fill":{"colour":"FFDCE8F5"}}}}},
+            "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFDCE8F5"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFDCE8F5"}}}}}
+          }
+        }
       },
       "_type": "Control"
     },

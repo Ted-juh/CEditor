@@ -71,7 +71,7 @@ test('every recipe writes only what a set may write, and lands on a factory cont
     }
   }
   assert.equal(buttonFormFamily('Button', 'new-studio'), null, 'a direction form is still drawn by code');
-  assert.equal(buttonFormFamily('Meter', 'bar'), null, 'meters are still forms');
+  assert.equal(buttonFormFamily('Meter', 'bar'), null, 'a meter is not a button (models/meterFormParts.js)');
   assert.ok(buttonFormFamily('MomentaryButton', 'tile'), 'every button type takes the button forms');
 });
 
@@ -124,7 +124,7 @@ test('choosing a converted form, or Convert to Parts, writes the parts in one st
 test('the form frame draws the parts, caption and all, and the canvas treats them as a form', () => {
   const anatomy = source('editor/ControlAnatomy.svelte');
   assert.match(anatomy, /\{#if partsDrawn\}\s*<ButtonDeviceParts /);
-  assert.match(anatomy, /data-form=\{partsDrawn \? 'parts' : form\}/);
+  assert.match(anatomy, /data-form=\{partsDrawn \|\| meterPartsDrawn \? 'parts' : form\}/);
   const canvas = source('editor/CanvasControl.svelte');
   assert.match(canvas, /anatomyForm\(core\?\.controlType, core\?\.controlForm\) \|\| buttonDeviceDrawn\(renderControl\)/);
   assert.match(canvas, /BUTTON_DEVICE_TYPES\.has\(String\(core\?\.controlType \?\? ''\)\)\s*\? renderPartEntries\.filter\(\(\[partName\]\) => !isButtonDevicePart\(partName\)\)/);

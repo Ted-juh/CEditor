@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "317b8b21",
+  "fingerprint": "6aae22e3",
   "set": {
     "id": "ember",
     "name": "Ember",
@@ -1240,7 +1240,7 @@
               "colour": "99000000"
             }
           ],
-          "Text.Fill.colour": "FFF2F2F2",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Barlow Semi Condensed",
           "Meter.segments": 16,
           "Meter.segmentGap": 3,
@@ -1249,14 +1249,42 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "blocks",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "housing": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "FFF2F2F2",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 3.75,
+            "Layout.y": 33,
+            "Layout.width": 91.25,
+            "Layout.height": 39,
+            "pattern": "columns",
+            "patternCount": 8,
+            "cellWidth": 68.42
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 3,
+            "Layout.x": 4.38,
+            "Layout.y": 35,
+            "Layout.width": 91.25,
+            "Layout.height": 34,
+            "pattern": "columns",
+            "patternCount": 8,
+            "cellWidth": 68.42,
+            "motion": "light",
+            "activeColour": "{accent}",
+            "travelY": -8
+          }
         }
       },
       "ProgressBar": {
@@ -1306,7 +1334,7 @@
               "colour": "99000000"
             }
           ],
-          "Text.Fill.colour": "FFF2F2F2",
+          "Text.Fill.colour": "{text.primary}",
           "Text.Font.family": "Barlow Semi Condensed",
           "Meter.segments": 16,
           "Meter.segmentGap": 3,
@@ -1315,14 +1343,42 @@
           "Meter.showTicks": true,
           "Meter.trackColour": "{control.track}",
           "Meter.fillColour": "{control.fill}",
-          "Meter.peakColour": "{accent.hot}",
-          "Core.controlForm": "blocks",
-          "Core.formFaceColour": "{surface}",
-          "Core.formInkColour": "FFF2F2F2",
-          "Core.formLabelColour": "{text.primary}",
-          "Core.formAccentColour": "{accent}",
-          "Core.formHousingColour": "{control.track}",
-          "Core.formDivisions": 12
+          "Meter.peakColour": "{accent.hot}"
+        },
+        "parts": {
+          "housing": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "FFF2F2F2",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "Layout.x": 3.75,
+            "Layout.y": 33,
+            "Layout.width": 91.25,
+            "Layout.height": 39,
+            "pattern": "columns",
+            "patternCount": 8,
+            "cellWidth": 68.42
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 1,
+            "Background.Fill.colour": "{surface}",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 3,
+            "Layout.x": 4.38,
+            "Layout.y": 35,
+            "Layout.width": 91.25,
+            "Layout.height": 34,
+            "pattern": "columns",
+            "patternCount": 8,
+            "cellWidth": 68.42,
+            "motion": "light",
+            "activeColour": "{accent}",
+            "travelY": -8
+          }
         }
       },
       "Ribbon": {
