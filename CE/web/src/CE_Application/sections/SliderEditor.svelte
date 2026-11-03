@@ -545,6 +545,12 @@
       <PropertyCell label="Numbers" span={1} compact path="Behavior.scaleNumberCount" hint="Numbers printed round the scale, evenly from the start of the sweep to its end: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. 0 for none.">
         <NumberCell label="Numbers" value={behavior.scaleNumberCount ?? 0} defaultValue={0} step={1} min={0} max={41} onchange={(value) => set('Behavior.scaleNumberCount', Math.max(0, Math.min(41, Math.round(Number(value) || 0))))} />
       </PropertyCell>
+      <PropertyCell label="Second Scale %" span={1} compact path="Behavior.secondScaleRadius" hint="A second ring of ticks further in, at this percentage of the track's radius, drawn as the first scale's: Dual Scale's on its collar. 0 for none.">
+        <NumberCell label="2nd Radius" value={behavior.secondScaleRadius ?? 0} defaultValue={0} step={1} min={0} max={250} onchange={(value) => set('Behavior.secondScaleRadius', Math.max(0, Number(value) || 0))} />
+      </PropertyCell>
+      <PropertyCell label="Second Scale Divisions" span={1} compact path="Behavior.secondScaleCount" hint="How many divisions the second scale has, long and short ticks in turn. 0 for none.">
+        <NumberCell label="2nd Div" value={behavior.secondScaleCount ?? 0} defaultValue={0} step={1} min={0} max={96} onchange={(value) => set('Behavior.secondScaleCount', Math.max(0, Math.min(96, Math.round(Number(value) || 0))))} />
+      </PropertyCell>
       {#if (behavior.scaleNumberCount ?? 0) >= 2}
         <PropertyCell label="From" span={1} compact path="Behavior.scaleNumberFrom" hint="What the first number says.">
           <NumberCell label="From" value={behavior.scaleNumberFrom ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.scaleNumberFrom', Number(value) || 0)} />

@@ -133,6 +133,15 @@
     <PropertyCell label="Shadow Colour" span={2} path={`${prefix}.shadowColour`} hint="The shadow's colour; its alpha is how dark it falls.">
       <PropertyColor value={shown(part?.shadowColour, '99000000')} onchange={(v) => set(`${prefix}.shadowColour`, v)} onswatchclick={() => pickColour(`${prefix}.shadowColour`, part?.shadowColour)} />
     </PropertyCell>
+    <PropertyCell label="Grooves" span={1} compact path={`${prefix}.grooves`} hint="Fine lines in from its edge, this many round it: knurling, as on Precision's face. They turn with it when it turns. 0 for none.">
+      <NumberCell label="Grooves" value={numberOr(part?.grooves, 0)} defaultValue={0} step={1} min={0} max={180} onchange={(v) => set(`${prefix}.grooves`, Math.max(0, Math.round(Number(v) || 0)))} />
+    </PropertyCell>
+    <PropertyCell label="Groove Length %" span={1} compact path={`${prefix}.grooveLength`} hint="How far in from the edge the grooves run, as a percentage of its radius.">
+      <NumberCell label="Length" value={numberOr(part?.grooveLength, 15)} defaultValue={15} step={1} min={1} max={100} onchange={(v) => set(`${prefix}.grooveLength`, v)} />
+    </PropertyCell>
+    <PropertyCell label="Groove Colour" span={2} path={`${prefix}.grooveColour`} hint="The grooves' colour; its alpha is how deep they look.">
+      <PropertyColor value={shown(part?.grooveColour, 'BF253136')} onchange={(v) => set(`${prefix}.grooveColour`, v)} onswatchclick={() => pickColour(`${prefix}.grooveColour`, part?.grooveColour)} />
+    </PropertyCell>
   </PropertySection>
 {/snippet}
 
@@ -189,6 +198,18 @@
   {/if}
   <PropertyCell label="Colour" span={2} path="Parts.pointerCurrent.Background.Fill.colour" hint="Its colour. The swatch opens it in the Colors dock.">
     <PropertyColor value={shown(fillOf(pointer), 'FFFFFFFF')} onchange={(v) => set('Parts.pointerCurrent.Background.Fill.colour', v)} onswatchclick={() => pickColour('Parts.pointerCurrent.Background.Fill.colour', fillOf(pointer))} />
+  </PropertyCell>
+  <PropertyCell label="Second Bar From %" span={1} compact path="Parts.pointerCurrent.markFrom" hint="A second bar on the cap, turning with the pointer: where it starts, as a percentage of the cap's radius. Dual Scale's dark bar.">
+    <NumberCell label="2nd From" value={numberOr(pointer?.markFrom, 0)} defaultValue={0} step={1} min={0} max={1000} onchange={(v) => set('Parts.pointerCurrent.markFrom', v)} />
+  </PropertyCell>
+  <PropertyCell label="Second Bar To %" span={1} compact path="Parts.pointerCurrent.markTo" hint="Where the second bar ends, as a percentage of the cap's radius. Below its start, none is drawn.">
+    <NumberCell label="2nd To" value={numberOr(pointer?.markTo, 0)} defaultValue={0} step={1} min={0} max={1000} onchange={(v) => set('Parts.pointerCurrent.markTo', v)} />
+  </PropertyCell>
+  <PropertyCell label="Second Bar Width %" span={1} compact path="Parts.pointerCurrent.markWidth" hint="The second bar's width, as a percentage of the cap's radius. 0 for none.">
+    <NumberCell label="2nd Width" value={numberOr(pointer?.markWidth, 0)} defaultValue={0} step={0.5} min={0} max={200} onchange={(v) => set('Parts.pointerCurrent.markWidth', v)} />
+  </PropertyCell>
+  <PropertyCell label="Second Bar Colour" span={2} path="Parts.pointerCurrent.markColour" hint="The second bar's colour.">
+    <PropertyColor value={shown(pointer?.markColour, 'FF1C2226')} onchange={(v) => set('Parts.pointerCurrent.markColour', v)} onswatchclick={() => pickColour('Parts.pointerCurrent.markColour', pointer?.markColour)} />
   </PropertyCell>
 </PropertySection>
 </div>

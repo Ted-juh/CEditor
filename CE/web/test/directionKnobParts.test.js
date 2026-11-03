@@ -235,3 +235,12 @@ test('Dual Scale draws its second scale and its dark bar, Precision its knurling
   assert.match(store, /\['Behavior\.secondScaleRadius', 0\], \['Behavior\.secondScaleCount', 0\]/);
   assert.match(store, /'grooves', 'grooveLength', 'grooveWidth', 'grooveColour', 'markFrom', 'markTo', 'markWidth', 'markColour',/);
 });
+
+test('the Knob tab edits the second scale, a plate\'s grooves and the pointer\'s second bar', () => {
+  const plates = readFileSync(new URL('../src/CE_Application/sections/KnobPartsEditor.svelte', import.meta.url), 'utf8');
+  for (const path of ['`${prefix}.grooves`', '`${prefix}.grooveLength`', '`${prefix}.grooveColour`']) assert.ok(plates.includes(`path={${path}}`), path);
+  for (const key of ['markFrom', 'markTo', 'markWidth', 'markColour']) assert.match(plates, new RegExp(`path="Parts\\.pointerCurrent\\.${key}"`));
+  const ticks = readFileSync(new URL('../src/CE_Application/sections/SliderEditor.svelte', import.meta.url), 'utf8');
+  assert.match(ticks, /path="Behavior\.secondScaleRadius"/);
+  assert.match(ticks, /path="Behavior\.secondScaleCount"/);
+});
