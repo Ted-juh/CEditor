@@ -157,7 +157,7 @@ test('every offered built-in has a style, and a style keeps the Library to it', 
   const counts = {};
   for (const set of OFFERED_CONTROL_SETS) counts[controlSetStyle(set)] = (counts[controlSetStyle(set)] ?? 0) + 1;
   // Each listed by hand: an id misspelt in the list would fall to Modern and change these.
-  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 15, glow: 12, mechanical: 8 });
+  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 15, glow: 12, mechanical: 2 });
   assert.deepEqual(SET_STYLES.map(([id]) => id).sort(), Object.keys(counts).sort());
   assert.equal(controlSetStyle({ id: 'my-amp', basedOn: 'tolex' }), 'vintage', 'your own set takes the style it was copied from');
   const vintage = groupControlSets({ builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'neon', style: 'vintage' });
@@ -169,8 +169,10 @@ test('every offered built-in has a style, and a style keeps the Library to it', 
 
 test('sets no longer offered: still drawn where they are used, offered nowhere', () => {
   // The owner: Walnut, Kiln, Arcade, Saddle & Brass, Field, Atlas and Spool "have nothing to do with
-  // synths. Fun but not suitable for a panel."
-  assert.deepEqual([...RETIRED_CONTROL_SET_IDS].sort(), ['arcade', 'atlas', 'field', 'kiln', 'saddle', 'spool', 'walnut']);
+  // synths. Fun but not suitable for a panel." Then Tessera, Bellows, Helix, Balance, Fan and Crown:
+  // "hardly usable for a synthesizer panel". Iris and Satellite stay.
+  assert.deepEqual([...RETIRED_CONTROL_SET_IDS].sort(), ['arcade', 'atlas', 'balance', 'bellows', 'crown', 'fan', 'field', 'helix', 'kiln', 'saddle', 'spool', 'tessera', 'walnut']);
+  assert.deepEqual([...MECHANICAL_SET_IDS].sort(), ['iris', 'satellite']);
   for (const id of RETIRED_CONTROL_SET_IDS) {
     assert.ok(getControlSet(id), `${id} still resolves, so a panel drawn with it looks as it did`);
     assert.ok(!OFFERED_CONTROL_SETS.some((set) => set.id === id), `${id} is not offered`);

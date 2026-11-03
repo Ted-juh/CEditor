@@ -11,8 +11,11 @@
 import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
 import { isRetiredControlSet } from '../models/controlSets.js';
 
-/** The built-ins that are mechanisms rather than finishes. Listed: nothing in a set says so. */
-export const MECHANICAL_SET_IDS = ['tessera', 'bellows', 'helix', 'iris', 'balance', 'satellite', 'fan', 'crown'];
+/**
+ * The built-ins that are mechanisms rather than finishes: an iris, a satellite dish. Listed: nothing
+ * in a set says so. The other six were retired (models/controlSets.js RETIRED_CONTROL_SET_IDS).
+ */
+export const MECHANICAL_SET_IDS = ['iris', 'satellite'];
 
 /** The Library's styles, in the order of its buttons. */
 export const SET_STYLES = [['modern', 'Modern'], ['metal', 'Metal'], ['vintage', 'Vintage'], ['glow', 'Glow'], ['mechanical', 'Mechanical']];

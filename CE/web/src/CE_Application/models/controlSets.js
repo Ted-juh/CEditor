@@ -379,10 +379,13 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map(withDisplayDesign);
 
 // Sets that are no longer offered: the owner's call, "nothing to do with synths, fun but not
-// suitable for a panel". Each stays defined, so a panel or a control drawn with one opens looking as
-// it did (getControlSet still finds it, as Graphite Classic is kept for old documents); the pickers,
-// the Library, the default for new panels and the shipped starters offer OFFERED_CONTROL_SETS.
-export const RETIRED_CONTROL_SET_IDS = Object.freeze(['walnut', 'kiln', 'arcade', 'saddle', 'field', 'atlas', 'spool']);
+// suitable for a panel", and later of six more of the mechanical ones, "hardly usable for a
+// synthesizer panel" (Iris and Satellite stay, marked as working unlike the rest). Each stays
+// defined, so a panel or a control drawn with one opens looking as it did (getControlSet still finds
+// it, as Graphite Classic is kept for old documents); the pickers, the Library, the default for new
+// panels and the shipped starters offer OFFERED_CONTROL_SETS.
+export const RETIRED_CONTROL_SET_IDS = Object.freeze(['walnut', 'kiln', 'arcade', 'saddle', 'field', 'atlas', 'spool',
+  'tessera', 'bellows', 'helix', 'balance', 'fan', 'crown']);
 export function isRetiredControlSet(id) {
   return RETIRED_CONTROL_SET_IDS.includes(String(id ?? ''));
 }

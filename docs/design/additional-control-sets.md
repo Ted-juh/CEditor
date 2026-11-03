@@ -21,6 +21,19 @@ additional finishes.
 | Fan | Opening folded fan | Pleated fan outlines | Triangular buttons at different heights |
 | Crown | Toothed gear and spokes | Gear outlines | Hexagonal buttons beside a tall central field |
 
+**Ten of the twelve are retired.** Atlas, Kiln, Arcade and Spool went first, judged unrelated to
+synthesizers. After reviewing a starter panel for each of the remaining eight, the owner retired
+Tessera, Bellows, Helix, Balance, Fan and Crown as "hardly usable for a synthesizer panel". A
+retired set stays defined in `RETIRED_CONTROL_SET_IDS` (`models/controlSets.js`), so a panel
+that uses one still draws. It is not offered in the set pickers, the Library, a new panel or the
+starter gallery, and its starter file is gone. No shipped panel used any of the ten. Their
+definitions stay in place because `ADDITIONAL_DIRECTIONS`, `NUMBER_LAYOUTS` and the form tables
+are indexed by position.
+
+Iris and Satellite stay. They are the only sets in the Mechanical style. Unlike the other sets,
+they are drawn by code rather than built from editable parts, and their rotary controls do not
+read as a pointer on a dial.
+
 Each new starter includes a stopped, editable eight-step, two-track sequencer. Its cells
 follow the pad design. Active cells still display velocity through opacity; muted tracks
 remain dim, and the live playhead remains distinct. Track order, step order and MIDI notes
