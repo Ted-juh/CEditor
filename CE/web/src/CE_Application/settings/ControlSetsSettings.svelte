@@ -25,17 +25,20 @@
   import { generalSettings, updateGeneralSettings } from '../stores/appSettings.js';
   import { activePanelId, panels } from '../stores/panels.js';
   import { requestControlSetApply } from '../stores/controlSets.js';
+  import { availableFonts } from '../stores/appSettings.js';
+  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
+  import { placeFamilyControlForEditing } from '../stores/setFromControl.js';
+  import {
+    DERIVED_ROLE_GROUP, ROLE_GROUPS, familyLabel, familySourceLabel, groupedFamilies, setLettering, withFamilyReset, withLamp, withLettering,
+  } from '../models/setEditing.js';
   import { deepClone } from '../utils/deepClone.js';
 
-  const COLOUR_ROLES = [
-    ['panel.surface', 'Panel surface'], ['surface', 'Button surface'], ['control.body', 'Control body'], ['control.cap', 'Knob / fader cap'],
-    ['control.fill', 'Value fill'], ['accent', 'Accent'], ['text.primary', 'Primary text'],
-    ['display.screen', 'Display glass'], ['display.lit', 'Display light'],
-  ];
-  const FAMILY_ROLES = [
-    ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'],
-    ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'], ['Label', 'Labels'],
-  ];
+  // Every colour role and every family a set holds (models/setEditing.js), grouped; the groups the
+  // page opens on, the rest folded.
+  let openRoleGroups = $state(new Set(['panel', 'controls']));
+  let openFamilyGroups = $state(new Set(['rotary', 'buttons', 'meters']));
+  const WEIGHTS = [[300, 'Light'], [400, 'Regular'], [500, 'Medium'], [600, 'Semibold'], [700, 'Bold']];
   // What the Library's cards show of each set: one kind of control at a time, chosen above them.
   const CARD_FAMILIES = [
     ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'], ['ToggleButton', 'Switches'], ['Meter', 'Meters'], ['DrumPads', 'Pads'],
@@ -171,6 +174,49 @@
       if (key === 'panel.surface') next.panel = { ...(next.panel ?? {}), colour: value };
       return next;
     });
+  }
+
+  /** A role's swatch: the Colors dock edits it, as every colour is edited. */
+  function pickRole(key, label) {
+    if (!draft) return;
+    const raw = String(resolveToken(key, draft) ?? 'FFFFFFFF').replace('#', '');
+    activateColorTarget({
+      type: 'callback',
+      label: `${draft.name} › ${label}`,
+      _swatchKey: `controlset:${key}`,
+      apply: (hex) => setToken(key, hex),
+    }, /^[0-9a-f]{8}$/i.test(raw) ? raw.toUpperCase() : `FF${raw.slice(-6).toUpperCase()}`);
+    displayTabRequest.set({ tab: 'colors' });
+  }
+
+  function toggleIn(setState, id) {
+    const next = new Set(setState);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  }
+
+  let lettering = $derived(draft ? setLettering(draft) : { family: '', weightValue: 400, letterSpacing: 0 });
+  function setLetteringField(patch) { edit((next) => withLettering(next, patch)); }
+  function setLampField(patch) { edit((next) => withLamp(next, patch)); }
+
+  // Where a family goes back to: the built-in the set descends from, or the set's own built-in self.
+  let resetSource = $derived(draft ? (getControlSet(draft.basedOn) ?? (isCustom ? null : getControlSet(draft.id))) : null);
+  function resetFamily(type) {
+    if (!resetSource) return;
+    edit((next) => withFamilyReset(next, type, resetSource));
+    const { [type]: _, ...rest } = familySources;
+    familySources = rest;
+  }
+
+  /**
+   * Edit on Panel: the family's control placed on the open panel, drawn with this set, to style and
+   * then Apply to Set. Your own set is saved first, so the panel draws what this page shows.
+   */
+  function editOnPanel(type) {
+    if (!targetPanel) { status = 'Open a panel to edit a family on it.'; return; }
+    if (isCustom && draft) updateControlSetInLibrary(draft.id, draft);
+    const placed = placeFamilyControlForEditing(draft?.id ?? selectedId, type, targetPanel.id);
+    if (!placed) status = 'The family\'s control could not be placed on this panel.';
   }
 
   function colourValue(key) {
@@ -325,12 +371,55 @@
         </section>
 
         <section>
-          <h3>Shared colours</h3>
-          <div class="colour-grid">
-            {#each COLOUR_ROLES as [key, label]}
-              <label><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span>
-                <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
-            {/each}
+          <h3>Colour roles</h3>
+          <p>Every colour a set gives its controls. A swatch opens the Colors dock; a code can be typed.</p>
+          {#each ROLE_GROUPS as group (group.id)}
+            <button type="button" class="fold-head" aria-expanded={openRoleGroups.has(group.id)} data-role-group={group.id}
+              onclick={() => (openRoleGroups = toggleIn(openRoleGroups, group.id))}>
+              {#if openRoleGroups.has(group.id)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}{group.label} <span>{group.roles.length}</span>
+            </button>
+            {#if openRoleGroups.has(group.id)}
+              <div class="colour-grid">
+                {#each group.roles as [key, label] (key)}
+                  <label><button type="button" class="swatch" style:background={colourValue(key)} title={`Edit ${label} in the Colors dock`} aria-label={`Edit ${label} in the Colors dock`} onclick={() => pickRole(key, label)}></button><span class="role">{label}</span>
+                    <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
+                {/each}
+              </div>
+            {/if}
+          {/each}
+          <button type="button" class="fold-head" aria-expanded={openRoleGroups.has('derived')} onclick={() => (openRoleGroups = toggleIn(openRoleGroups, 'derived'))}>
+            {#if openRoleGroups.has('derived')}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}{DERIVED_ROLE_GROUP.label} <span>{DERIVED_ROLE_GROUP.roles.length}</span>
+          </button>
+          {#if openRoleGroups.has('derived')}
+            <div class="colour-grid derived">
+              {#each DERIVED_ROLE_GROUP.roles as [key, label] (key)}
+                <div class="derived-role" title="Worked out from the set's other colours on every read"><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span><span class="code">{colourValue(key).toUpperCase()}</span></div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section>
+          <h3>Lettering</h3>
+          <p>The typeface of every family's text: captions, legends, readouts.</p>
+          <div class="material-row">
+            <label><span>Typeface</span><select aria-label="Lettering typeface" value={lettering.family} onchange={(event) => setLetteringField({ family: event.target.value })}>
+              {#if lettering.family && !$availableFonts.some((font) => font.value === lettering.family)}<option value={lettering.family}>{lettering.family}</option>{/if}
+              {#each $availableFonts as font (font.value)}<option value={font.value}>{font.label}</option>{/each}
+            </select></label>
+            <label><span>Weight</span><select aria-label="Lettering weight" value={lettering.weightValue} onchange={(event) => setLetteringField({ weightValue: Number(event.target.value) })}>
+              {#each WEIGHTS as [value, label] (value)}<option {value}>{label}</option>{/each}
+            </select></label>
+            <label><span>Letter spacing</span><input type="number" step="0.1" aria-label="Lettering spacing" value={lettering.letterSpacing} onchange={(event) => setLetteringField({ letterSpacing: Number(event.target.value) })} /></label>
+          </div>
+        </section>
+
+        <section>
+          <h3>Lamp</h3>
+          <p>Where the light on finishes and materials comes from.</p>
+          <div class="material-row">
+            <label><span>From (degrees)</span><input type="number" min="0" max="360" step="5" aria-label="Lamp direction" value={draft.lamp?.azimuth ?? 225} onchange={(event) => setLampField({ azimuth: event.target.value })} /></label>
+            <label><span>Height (degrees)</span><input type="number" min="0" max="90" step="1" aria-label="Lamp height" value={draft.lamp?.elevation ?? 48} onchange={(event) => setLampField({ elevation: event.target.value })} /></label>
           </div>
         </section>
 
@@ -346,15 +435,29 @@
 
         <section>
           <h3>Control families</h3>
-          <p>Mix mechanisms from the 36 synthesizer templates. The complete family definition is copied into your set.</p>
-          <div class="family-grid">
-            {#each FAMILY_ROLES as [family, label]}
-              <label><span>{label}</span><select value={familySources[family] ?? ''} onchange={(event) => setFamilySource(family, event.target.value)}>
-                <option value="">Keep current design</option>
-                {#each DESIGN_SOURCES as source}<option value={source.id}>{source.name}</option>{/each}
-              </select></label>
-            {/each}
-          </div>
+          <p>Each family takes its design from one of the 36 synthesizer templates or an Own design; <b>Reset</b> returns it to the set it was copied from. <b>Edit on Panel</b> places one on the open panel to style, then Apply to Set.</p>
+          {#each groupedFamilies(draft) as group (group.id)}
+            <button type="button" class="fold-head" aria-expanded={openFamilyGroups.has(group.id)} data-family-group={group.id}
+              onclick={() => (openFamilyGroups = toggleIn(openFamilyGroups, group.id))}>
+              {#if openFamilyGroups.has(group.id)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}{group.label} <span>{group.types.length}</span>
+            </button>
+            {#if openFamilyGroups.has(group.id)}
+              <div class="family-rows">
+                {#each group.types as type (type)}
+                  {@const own = draft.chosenFamilies?.[type] === 'own'}
+                  <div class="family-row" data-family={type}>
+                    <span class="family-name">{familyLabel(type)}</span>
+                    <select aria-label={`${familyLabel(type)} design`} value={own ? 'own' : (familySources[type] ?? '')} onchange={(event) => event.target.value && event.target.value !== 'own' && setFamilySource(type, event.target.value)}>
+                      {#if own}<option value="own">{familySourceLabel(draft, type)}</option>{:else}<option value="">Keep current design</option>{/if}
+                      {#each DESIGN_SOURCES as source (source.id)}<option value={source.id}>{source.name}</option>{/each}
+                    </select>
+                    <button type="button" onclick={() => editOnPanel(type)} disabled={!targetPanel} title={targetPanel ? `Place one of ${draft.name}'s ${familyLabel(type).toLowerCase()} on ${panelName} to style, then Apply to Set` : 'Open a panel first'}>Edit on Panel</button>
+                    <button type="button" onclick={() => resetFamily(type)} disabled={!resetSource?.families?.[type]} title={resetSource ? `Back to ${resetSource.name}'s ${familyLabel(type).toLowerCase()}` : 'This set has nothing to go back to'}>Reset</button>
+                  </div>
+                {/each}
+              </div>
+            {/if}
+          {/each}
         </section>
       </div>
     </div>
@@ -412,7 +515,7 @@
   .scroll { flex:1 1 auto; min-height:0; overflow:auto; }
   h2,h3,p { margin:0; }
   label { display:flex; flex-direction:column; gap:6px; font-size:11px; color:#aaa; } select,input,textarea,button { font:inherit; }
-  select,input[type='text'],input[type='search'],textarea { color:#e9e9e9; background:#161616; border:1px solid #3b3b3b; border-radius:6px; padding:6px 9px; }
+  select,input[type='text'],input[type='search'],input[type='number'],textarea { color:#e9e9e9; background:#161616; border:1px solid #3b3b3b; border-radius:6px; padding:6px 9px; }
   textarea { resize:vertical; }
   button { display:flex; align-items:center; justify-content:center; gap:6px; color:#ddd; background:#292929; border:1px solid #444; border-radius:7px; padding:6px 10px; cursor:pointer; white-space:nowrap; }
   button:hover:not(:disabled) { border-color:#5b9bd5; } button:disabled { opacity:.55; cursor:default; }
@@ -447,7 +550,18 @@
   .colour-grid .code { width:78px; flex:0 0 auto; padding:3px 6px; font-family:ui-monospace,monospace; font-size:11px; }
   .material-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px; align-items:end; } .check { flex-direction:row; align-items:center; padding-bottom:8px; }
   input[type='range'] { accent-color:#2486c5; width:100%; }
-  .family-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
+  .fold-head { display:flex; align-items:center; justify-content:flex-start; gap:5px; width:100%; margin:6px 0 4px; padding:2px 0; border:0; background:none; color:#a9b9c6; font:inherit; font-size:11px; font-weight:600; cursor:pointer; text-align:left; }
+  .fold-head span { color:#6f6f6f; font-weight:400; }
+  .colour-grid .swatch { padding:0; cursor:pointer; }
+  .colour-grid .derived-role { display:flex; gap:6px; align-items:center; padding:4px 6px; background:#242424; border-radius:5px; opacity:.75; font-size:11px; }
+  .colour-grid.derived .code { color:#9a9a9a; }
+  .family-rows { display:flex; flex-direction:column; }
+  .family-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(0,1.4fr) auto auto; gap:6px; align-items:center; padding:4px 0; border-top:1px solid #2a2a2a; }
+  .family-row:first-child { border-top:0; }
+  .family-row .family-name { color:#ddd; font-size:11.5px; }
+  .family-row button { height:24px; padding:0 9px; border:1px solid #3b3b3b; border-radius:4px; background:#262626; color:#ddd; font:inherit; font-size:11px; cursor:pointer; white-space:nowrap; }
+  .family-row button:hover:not(:disabled) { border-color:#5B9BD5; }
+  .family-row button:disabled { opacity:.45; cursor:default; }
   .on-panel { margin-left:8px; font-size:10px; font-weight:600; color:#8fd1a6; border:1px solid #3c5a46; border-radius:9px; padding:1px 7px; vertical-align:middle; }
 
   .side-body { padding:12px; display:flex; flex-direction:column; gap:9px; }

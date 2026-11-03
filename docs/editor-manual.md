@@ -377,8 +377,14 @@ pins that one control to a different design, form and size.
 **Settings → Control Sets** has three columns. On the left, the **Library**: each set shown by one of its
 controls, grouped (the panel's set, your own, the built-ins), searchable, with two rows of buttons above
 it: which control the cards show (Knobs, Sliders, Buttons, Switches, Meters, Pads) and which style
-(Modern, Metal, Vintage, Glow, Mechanical). In the middle, the chosen set's colours, surface material
-and control families; built-in sets are read-only, and editing one creates a copy. On the right,
+(Modern, Metal, Vintage, Glow, Mechanical). In the middle, the chosen set itself: its colour roles in
+groups (panel and borders, controls, buttons, fields and menus, text and accent, displays; the ten
+worked out from those are shown and not edited), its **Lettering** (typeface, weight and letter
+spacing for every family's text), its **Lamp** (where the light on finishes comes from), its surface
+material and its control families. A swatch opens the **Colors** dock on that role. Each family takes
+its design from one of the templates or is an **Own design**; **Reset** returns it to the set it was
+copied from, and **Edit on Panel** places one of the family's controls on the open panel to style.
+Built-in sets are read-only, and editing one creates a copy. On the right,
 the live preview, **Apply to** the panel, the default for new panels, **Browse the 36 templates** and
 **Import a set…**.
 
@@ -394,6 +400,18 @@ name. **Core → Control design** shows the control's set and its number of over
 Overrides**, which reverts them all, and **Detach from Set**, which stores the set's appearance on the
 control so that set changes no longer affect it (with **Keep colour roles linked**, its colours still
 follow the set). **Reattach to Set** makes it inherit again. All three apply to every selected control.
+
+The card also lists the overrides, each with **Revert** and **Apply**. **Apply to Set…** works the other
+way round: it writes the control's overrides into its set, so every control of its kind that follows the
+set takes the look (as a prefab's overrides are applied in Unity, or a main component is updated in
+Figma). The window lists the overrides, all ticked, and says how many other controls of the kind change
+and how many keep a value of their own. A colour drawn from a role stays a role. A built-in set is never
+changed: the window names a copy of it, the change goes into the copy, and the panel moves to the copy.
+The control then inherits the applied values from the set again. It is one undo step.
+
+**Edit on Panel**, in Settings → Control Sets, starts from the set instead: it places one of the family's
+controls on the open panel, selected, with a banner above the status bar. Style it, then press **Apply
+to Set** in the banner, or **Cancel** to take it away.
 
 ### Colours
 

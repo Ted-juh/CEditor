@@ -198,6 +198,32 @@ The natural way to design a set is on the panel: style one knob in the propertie
 reverse: **Edit the set's Knob**, which places one to edit. Settings › Control Sets gets every
 colour role (grouped), the fonts, the lamp, and every family, not 7.
 
+**Built** (owner's approved mock-up, in the words of Unity's prefab overrides and Figma's main
+components):
+
+- **Overrides list** on Core › Control design: each override by part and property, with Revert and
+  Apply. `models/setFromControl.js controlOverrides` reads them from `setOwnership`, which now
+  counts every look path the set may write (`EDITOR_PATHS`, part properties included), not only
+  colour roles; a colour role counts only where the control differs from both the factory value
+  and what the family gives it.
+- **Apply to Set…** (`layout/ApplyToSetDialog.svelte`, `stores/setFromControl.js`): the overrides
+  ticked, and what changes (how many other controls of the type follow, how many keep a value of
+  their own). Applying writes the values as the control holds them into the family (a role stays a
+  role), marks the family the author's own (`chosenFamilies[type] = 'own'`, so no derived design
+  writes over it) and hands the control back to the set. A set of the author's is changed in the
+  library and in the copy the panel carries (the panel's copy wins a lookup, so both must change).
+  A built-in set is copied under a name the window offers, and the panel moves to the copy, or the
+  control does where it was assigned a set of its own. One panel write, one undo step.
+- **Settings › Control Sets** (`models/setEditing.js`): the 45 colour roles in six groups, the ten
+  derived ones shown read-only; the swatch opens the Colors dock on the role (colours go through
+  the dock, never a popup). Lettering: typeface, weight and spacing written to every family's text,
+  a knob's readout part included. Lamp: direction and height. Families grouped as the Insert menu
+  groups them, each with its design source, Edit on Panel and Reset (back to the built-in the set
+  was copied from).
+- **Edit on Panel**: places one of the family's controls on the open panel where a new control
+  goes, drawn with the set (assigned to it if it is not the panel's), selected, with a banner in the
+  window's notice row: Apply to Set, or Cancel, which removes it.
+
 ### D. Components and sets meet (medium to large)
 
 1. The designer's colour fields offer the set's roles (Accent, Knob cap, Panel surface...) beside a

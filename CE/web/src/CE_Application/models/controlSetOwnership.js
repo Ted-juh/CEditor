@@ -21,6 +21,7 @@ import {
   controlSetForControl, sameControlValue, setPatchablePaths,
 } from './controlSetFamilies.js';
 import { isColourKey, isTokenReference, resolveColourValue } from './controlSets.js';
+import { EDITOR_PATHS } from './controlSetDesigns.js';
 import { deepClone } from '../utils/deepClone.js';
 
 const typeOf = (control) => String(control?._children?.Core?.controlType ?? '');
@@ -31,6 +32,42 @@ function familyPaths(family) {
     ...Object.keys(family?.component ?? {}),
     ...Object.entries(family?.parts ?? {}).flatMap(([part, patch]) => Object.keys(patch ?? {}).map((path) => `Parts.${part}.${path}`)),
   ];
+}
+
+/** Whether `path` names a look a set may decide: EDITOR_PATHS, a part's own keys by their tail. */
+export function isLookPath(path) {
+  const match = /^Parts\.[^.]+\.(.+)$/.exec(String(path));
+  const tail = match ? match[1] : String(path);
+  return EDITOR_PATHS.some((pattern) => pattern.test(tail));
+}
+
+/**
+ * Every look a control holds, as dotted paths: the leaves under its sections and parts that a set
+ * may decide (isLookPath). A whole value the vocabulary names (a gradient, a shadow list) is one
+ * leaf; State patch maps and other dotted keys are not looks.
+ */
+export function lookPaths(control) {
+  const out = [];
+  const walk = (node, prefix) => {
+    if (!node || typeof node !== 'object' || Array.isArray(node)) return;
+    for (const [key, value] of Object.entries(node)) {
+      if (key === '_children' || key === '_type' || String(key).includes('.')) continue;
+      const path = `${prefix}.${key}`;
+      if (isLookPath(path)) out.push(path);
+      else if (value && typeof value === 'object' && !Array.isArray(value)) walk(value, path);
+    }
+    for (const [key, child] of Object.entries(node._children ?? {})) {
+      if (String(key).includes('.')) continue;
+      const path = `${prefix}.${key}`;
+      if (isLookPath(path)) out.push(path);
+      else walk(child, path);
+    }
+  };
+  for (const [section, node] of Object.entries(control?._children ?? {})) {
+    if (section === 'States' || section === 'Animations' || section === 'Scripts') continue;
+    walk(node, section);
+  }
+  return out;
 }
 
 /** Every colour in a control tree that holds a role, as dotted paths the patch maps use. */
@@ -107,8 +144,29 @@ export function setOwnership(control, panelSet, sources = {}) {
       setValues.set(path, asShown(readControlPath(pristine, path)));
     }
   }
+  // A look the family does not name, changed from the factory's: the set gives the factory value
+  // there, so the control's is its own (and Apply to Set can give it to the family).
+  for (const path of lookPaths(control)) {
+    if (fromSet.has(path) || own.has(path)) continue;
+    const mine = readControlPath(control, path);
+    if (mine === undefined || sameControlValue(mine, readControlPath(pristine, path))) continue;
+    own.add(path);
+    setValues.set(path, asShown(readControlPath(pristine, path)));
+  }
+  // A role the control holds follows the set's colours: it is the set's, unless it is another role
+  // than the one the set gives there (a cap moved from Knob cap to Accent), which is the author's.
   for (const path of colourRolePaths(control)) {
     if (pins.has(path)) continue;
+    // Still the factory's role, or the family's: the set decides it. Another role: the author's.
+    const mine = readControlPath(control, path);
+    const factory = readControlPath(pristine, path);
+    const given = familyValueAt(family, path);
+    if (!sameControlValue(mine, factory) && (given === undefined || !sameControlValue(mine, given))) {
+      own.add(path);
+      setValues.set(path, given ?? factory);
+      fromSet.delete(path);
+      continue;
+    }
     own.delete(path);
     setValues.delete(path);
     fromSet.add(path);

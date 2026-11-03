@@ -1,5 +1,7 @@
 <script>
   import ScriptTrustBanner from './CE_Application/components/ScriptTrustBanner.svelte';
+  import SetEditBanner from './CE_Application/layout/SetEditBanner.svelte';
+  import ApplyToSetDialog from './CE_Application/layout/ApplyToSetDialog.svelte';
   import { onMount, untrack } from 'svelte';
 
   let menuBarHeight = $state(28);
@@ -536,6 +538,7 @@
     <!-- "Scripts are paused": a row of its own, empty unless the panel's scripts wait for trust. -->
     <div class="trust-area">
       <ScriptTrustBanner />
+      <SetEditBanner />
     </div>
 
     <div class="statusbar-area">
@@ -554,6 +557,7 @@
   <NewPanelDialog />
   <ComponentExportDialog />
   <ApplyControlSetDialog />
+  <ApplyToSetDialog />
   <HistoryWindow />
 
   {#if showShortcuts}
