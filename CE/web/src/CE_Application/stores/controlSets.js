@@ -211,7 +211,8 @@ const FORM_PART_KEYS = [
   'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
   'Background.Effects.Material.enabled',
   // A meter's (models/meterDeviceParts.js).
-  'motion', 'fillFrom', 'cellWidth', 'cellHeight', 'majorEvery', 'tickWidth', 'zoneFrom', 'textSource', 'legendText', 'fontFamily',
+  'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
+  'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',
 ];
 
 /** The recipe that draws `form` on a control of `type` with its own parts, or null. `set`, where

@@ -592,7 +592,8 @@
             "indicator": {"visible":true,"motion":"fill","_children":{"Layout":{"x":5,"y":34,"width":90,"height":30},"Background":{"_children":{"Fill":{"colour":"FF5B5BD6"},"Corners":{"radius":15}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF5B5BD6"}}}}},
             "cover": {"visible":true,"opacity":0.35,"_children":{"Layout":{"x":5,"y":34,"width":90,"height":30},"Background":{"_children":{"Fill":{"colour":"00000000","gradientEnabled":true,"gradient":{"type":"linear","angle":180,"edge":0,"stops":[{"color":"7AFFFFFF","position":0},{"color":"FFF7F8FA","position":42},{"color":"FFF7F8FA","position":55},{"color":"64000000","position":100}]}},"Corners":{"radius":15}}}}},
-            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF262A33"}}}}}
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF262A33"}}}}},
+            "lamp": {"activeColour":"FF3E3EC4","_children":{"Background":{"_children":{"Fill":{"colour":"FFD3D7DE"}}}}}
           }
         }
       },

@@ -551,7 +551,8 @@
             "indicator": {"visible":true,"motion":"fill","_children":{"Layout":{"x":5,"y":34,"width":90,"height":30},"Background":{"_children":{"Fill":{"colour":"FF5B9BD5"}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF5B9BD5"}}}}},
             "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
-            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}}
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}},
+            "lamp": {"activeColour":"FF89C2FF","_children":{"Background":{"_children":{"Fill":{"colour":"FF2C2C2C"}}}}}
           }
         }
       },

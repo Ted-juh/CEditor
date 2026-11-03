@@ -4,7 +4,8 @@
    * units: ControlAnatomy places the frame and sets the readout under it, as it does for a form.
    * What each part draws at the reading comes from utils/meterParts.js; this paints it, each part
    * with its fill, a gradient laid over it, a border and a finish, its lit cells and its zone in
-   * the active colour.
+   * the active colour, and where the meter's colour zones decide, in theirs. A scale's numerals are
+   * drawn upright, outside the part's own turn.
    */
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
@@ -12,7 +13,7 @@
   import { materialActive } from '../utils/materialFilter.js';
   import { numberOr } from '../utils/primitives.js';
 
-  let { parts = {}, p = 0, figures = '0', uid = 'meter' } = $props();
+  let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter' } = $props();
 
   const W = METER_FRAME.width;
   const H = METER_FRAME.height;
@@ -49,18 +50,23 @@
       const background = part?._children?.Background ?? null;
       const fill = background?._children?.Fill ?? {};
       const border = background?._children?.Border ?? {};
-      const drawing = meterPartDrawing(name, part, { p, figures });
+      const drawing = meterPartDrawing(name, part, { p, peak, figures, meter });
       const opacity = numberOr(part.opacity, 1);
       const activeColour = String(part.activeColour ?? '').trim();
+      // The base paths in the part's own paint, and those the meter's zones colour, apart.
+      const own = drawing.paths.filter((path) => path.role === 'base' && !path.colour);
       return {
         name,
         part,
         drawing,
-        base: drawing.paths.filter((path) => path.role === 'base').map((path) => path.d).join(' '),
-        lit: drawing.paths.filter((path) => path.role === 'lit').map((path) => path.d).join(' '),
+        base: own.map((path) => path.d).join(' '),
+        zoned: drawing.paths.filter((path) => path.role === 'base' && path.colour).map((path) => ({ d: path.d, colour: css(path.colour) })),
+        lit: drawing.paths.filter((path) => path.role === 'lit'),
         zone: drawing.paths.filter((path) => path.role === 'zone').map((path) => path.d).join(' '),
         litOffset: meterLitOffset(part),
-        colour: css(fill.colour, 'transparent'),
+        // A fill that is a gradient only (Fill Type: Gradient) shows no colour under it.
+        colour: fill.solidEnabled === false ? 'transparent' : css(fill.colour, 'transparent'),
+        textColour: css(drawing.textColour ?? fill.colour, 'transparent'),
         activeColour: css(activeColour || fill.colour, 'transparent'),
         opacity,
         activeOpacity: part.activeOpacity != null ? numberOr(part.activeOpacity, 1) : opacity,
@@ -77,7 +83,16 @@
 
 {#each drawn as item (item.name)}
   <g data-part={item.name} transform={item.drawing.transform || undefined}>
-    {#if item.base}
+    {#if item.drawing.zoneFill && item.base}
+      <!-- A fill coloured by position: the zones along its own direction, across its whole box. -->
+      <defs>
+        <linearGradient id={`${uid}-${item.name}-z`} gradientUnits="userSpaceOnUse" x1={item.drawing.zoneFill.x1} y1={item.drawing.zoneFill.y1} x2={item.drawing.zoneFill.x2} y2={item.drawing.zoneFill.y2}>
+          {#each item.drawing.zoneFill.stops as stop, i (i)}<stop offset={stop.offset} stop-color={css(stop.colour, '#000')} />{/each}
+        </linearGradient>
+      </defs>
+      <path d={item.base} fill={`url(#${uid}-${item.name}-z)`} fill-rule="evenodd" opacity={item.opacity} />
+      {#if item.stroke}<path d={item.base} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.opacity} />{/if}
+    {:else if item.base}
       {#if item.full}
         <g opacity={item.opacity}>
           <SliderShapeFill background={item.background} bounds={{ x: item.drawing.box.x, y: item.drawing.box.y, width: item.drawing.box.w, height: item.drawing.box.h }}
@@ -104,17 +119,25 @@
         <path d={item.base} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.opacity} />
       {/if}
     {/if}
+    {#each item.zoned as path, i (i)}
+      <path d={path.d} fill={path.colour} fill-rule="evenodd" opacity={item.opacity} />
+    {/each}
     {#if item.zone}
       <path d={item.zone} fill={item.activeColour} fill-rule="evenodd" opacity={item.opacity} />
     {/if}
-    {#if item.lit}
+    {#if item.lit.length}
       <g transform={item.litOffset.x || item.litOffset.y ? `translate(${item.litOffset.x} ${item.litOffset.y})` : undefined}>
-        <path d={item.lit} fill={item.activeColour} fill-rule="evenodd" opacity={item.activeOpacity} />
-        {#if item.stroke}<path d={item.lit} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.activeOpacity} />{/if}
+        {#each item.lit as path, i (i)}
+          <path d={path.d} fill={path.colour ? css(path.colour) : item.activeColour} fill-rule="evenodd" opacity={item.activeOpacity} />
+          {#if item.stroke}<path d={path.d} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.activeOpacity} />{/if}
+        {/each}
       </g>
     {/if}
     {#each item.drawing.texts as text, i (i)}
-      <text x={text.x} y={text.y} text-anchor="middle" fill={item.colour} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>
+      <text x={text.x} y={text.y} text-anchor="middle" fill={item.textColour} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>
     {/each}
   </g>
+  {#each item.drawing.labels as label, i (i)}
+    <text data-numeral={item.name} x={label.x} y={label.y} text-anchor={label.anchor} dominant-baseline="central" fill={item.textColour} opacity={item.opacity} font-size={label.size} font-family={item.fontFamily}>{label.text}</text>
+  {/each}
 {/each}

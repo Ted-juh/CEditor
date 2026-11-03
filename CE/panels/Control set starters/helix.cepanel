@@ -603,7 +603,8 @@
             "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFA6432B"}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFA6432B"}}}}},
             "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}},
-            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}}
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF202529"}}}}},
+            "lamp": {"activeColour":"FFA6432B","_children":{"Background":{"_children":{"Fill":{"colour":"FFD4D9D8"}}}}}
           }
         }
       },

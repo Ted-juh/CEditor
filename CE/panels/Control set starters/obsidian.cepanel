@@ -592,7 +592,8 @@
             "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF5FE3FF"}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF5FE3FF"}}}}},
             "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFE6F0FA"}}}}},
-            "legend": {"visible":true,"pattern":"digits","cellWidth":92,"textSource":"value","fontSize":33,"fontFamily":"monospace","_children":{"Layout":{"x":5,"y":29,"width":88.13,"height":33},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}}
+            "legend": {"visible":true,"pattern":"digits","cellWidth":92,"textSource":"value","fontSize":33,"fontFamily":"monospace","_children":{"Layout":{"x":5,"y":29,"width":88.13,"height":33},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}},
+            "lamp": {"activeColour":"FFFFFFFF","_children":{"Background":{"_children":{"Fill":{"colour":"FF030406"}}}}}
           }
         }
       },

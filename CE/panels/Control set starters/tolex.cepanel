@@ -588,11 +588,12 @@
             "housing": {"visible":true,"shape":"arch","shapeDepth":35.1,"_children":{"Layout":{"x":3.75,"y":8.5,"width":92.5,"height":75.5},"Background":{"_children":{"Fill":{"colour":"FFB8892E"},"Border":{"enabled":true,"colour":"59202020"}}}}},
             "face": {"visible":true,"shape":"arch","shapeDepth":37.93,"_children":{"Layout":{"x":8.75,"y":18,"width":82.5,"height":58},"Background":{"_children":{"Fill":{"colour":"FFEFE3C8"}}}}},
             "track": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF1E6CC"}}}}},
-            "scale": {"visible":true,"shapeDepth":12.96,"pattern":"arc","patternCount":12,"swing":130,"activeColour":"FFC8342B","tickWidth":1.5,"zoneFrom":0.8,"_children":{"Layout":{"x":16.25,"y":26,"width":67.5,"height":108,"rotation":-65},"Background":{"_children":{"Fill":{"colour":"FF202020"}}}}},
+            "scale": {"visible":true,"pattern":"arc","swing":130,"activeColour":"FFC8342B","zoneFrom":0.8,"majorCount":13,"majorLength":12.96,"minorLength":8,"majorWidth":1.5,"_children":{"Layout":{"x":16.25,"y":26,"width":67.5,"height":108,"rotation":-65},"Background":{"_children":{"Fill":{"colour":"FF202020"}}}}},
             "indicator": {"visible":true,"motion":"swing","swing":130,"pivotY":100,"_children":{"Layout":{"x":49.38,"y":30,"width":1.25,"height":50,"rotation":-65},"Background":{"_children":{"Fill":{"colour":"FFC8342B"}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFC8342B"}}}}},
             "cover": {"visible":true,"shape":"ellipse","_children":{"Layout":{"x":46.25,"y":74,"width":7.5,"height":12},"Background":{"_children":{"Fill":{"colour":"FF202020"}}}}},
-            "legend": {"visible":true,"legendText":"SIGNAL","_children":{"Layout":{"x":8.13,"y":47,"width":83.75,"height":10},"Background":{"_children":{"Fill":{"colour":"FF202020"}}}}}
+            "legend": {"visible":true,"legendText":"SIGNAL","_children":{"Layout":{"x":8.13,"y":47,"width":83.75,"height":10},"Background":{"_children":{"Fill":{"colour":"FF202020"}}}}},
+            "lamp": {"activeColour":"FFE85A4F","_children":{"Background":{"_children":{"Fill":{"colour":"FFB8892E"}}}}}
           }
         }
       },

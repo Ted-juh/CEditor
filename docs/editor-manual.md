@@ -348,6 +348,21 @@ it moves and swings, its opacity and colour then, and whether it follows the act
 a lever does. The Legend part has its text as well. Choosing a form under **Core → Control design**
 fills the parts in, to change from there.
 
+A meter's parts are on its **Meter** tab, below its value, **Colour Zones** and peak hold. Pick
+**Housing**, **Face**, **Track**, **Scale**, **Indicator**, **Marker**, **Cover**, **Legend** or
+**Clip Lamp**. **Reading** says how the part answers the meter's reading, or the peak it holds:
+it **fills** from an edge (a bar, a glass column), **slides** (a ruler's cursor), **swings** from
+its rest angle (a needle), **lights** its cells up to the reading from the left or the foot (a dot
+array, an LED ladder), or, as a **Clip Lamp**, lights at its level and stays lit while the peak
+holds. **Zone Colours** colours a part from the meter's colour zones: **By Position**, each part
+of a bar, each lit cell and each tick in the zone it sits in, or **By Level**, all of it in the
+reading's zone. The zones themselves are rows of a level in % and a colour, with **Steps** or
+**Blend** between them. On the **Scale** part: marks **Along a Line** or **Round an Arc**, the
+**Major Count** and **Minor / Gap**, each kind's length and width, the arc's sweep, a zone of
+ticks in their own colour, and **Numerals** on the long ticks in the reading's units, dB or
+percent. **Fill Type** makes any part a gradient, edited in the Gradient tab of the dock. While
+the parts draw the meter, the plain meter's own fill, arc and tick settings are hidden.
+
 The **context bar** above the canvas holds the settings you change most often — text, fill, border,
 size and position, effects and icon — so you can often work without the properties panel.
 

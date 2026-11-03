@@ -7548,7 +7548,8 @@ const DEFINE_SPECS = {
       'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
       'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize',
       // A meter's parts (models/meterDeviceParts.js).
-      'motion', 'fillFrom', 'cellWidth', 'cellHeight', 'majorEvery', 'tickWidth', 'zoneFrom', 'textSource', 'legendText', 'fontFamily',
+      'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
+      'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',
       // A layer's mask (utils/partMask.js).
       'mask'],
   },

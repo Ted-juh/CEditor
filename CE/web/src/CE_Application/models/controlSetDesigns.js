@@ -438,7 +438,7 @@ export const EDITOR_PATHS = [
   // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
   /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   // A meter's parts (models/meterDeviceParts.js), the meter forms as parts.
-  /^(motion|fillFrom|cellWidth|cellHeight|majorEvery|tickWidth|zoneFrom|textSource|legendText|fontFamily)$/,
+  /^(motion|fillFrom|lightFrom|source|cellWidth|cellHeight|zoneFrom|zoneColours|clipFrom|textSource|legendText|fontFamily|majorCount|minorCount|majorLength|minorLength|majorWidth|minorWidth|numerals|numeralSize|numeralPlacement|numeralUnits)$/,
   /^Listbox\.(cardRows|rowHeight|selectionStyle|zebra|accentColour)$/,
   /^TabContainer\.(appearance|accentColour|stripColour|tabColour|activeTabColour|labelColour|activeLabelColour)$/,
   /^ScrollArea\.(scrollbarSize|trackColour|thumbColour)$/,

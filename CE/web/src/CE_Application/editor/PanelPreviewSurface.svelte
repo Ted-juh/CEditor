@@ -79,6 +79,7 @@
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl, sortDependentControls } from '../utils/dependentChoices.js';
   import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
+  import { meterNeedsPeak } from '../models/meterDeviceParts.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
     envDragNode, envAddNode, envRemoveNode, normalizePoints,
@@ -1766,7 +1767,9 @@
       }
     }
 
-    if (meter.peakHold === true) {
+    // Peak Hold's marker, or a part drawn from the held peak: a peak needle, a clip lamp
+    // (models/meterDeviceParts.js).
+    if (meter.peakHold === true || meterNeedsPeak(base)) {
       ensureMeterTicker();
       void meterClock; // re-evaluate as the peak decays
       const pos = meterPosition(value, nextMeter);

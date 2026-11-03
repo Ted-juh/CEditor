@@ -592,7 +592,8 @@
             "indicator": {"visible":true,"opacity":0.15,"pattern":"columns","patternCount":15,"cellWidth":44.44,"motion":"light","activeColour":"FFFF6B5B","activeOpacity":1,"_children":{"Layout":{"x":8.13,"y":39,"width":81.25,"height":26},"Background":{"_children":{"Fill":{"colour":"FF202020"}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFFF6B5B"}}}}},
             "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF1B1B1B"}}}}},
-            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF1B1B1B"}}}}}
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF1B1B1B"}}}}},
+            "lamp": {"activeColour":"FF1B1B1B","_children":{"Background":{"_children":{"Fill":{"colour":"FFFFFFFF"}}}}}
           }
         }
       },

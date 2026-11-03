@@ -56,8 +56,10 @@ const needle = (ink, divisions, housing, face, word) => ({
   housing: { ...part(ROLES.housing, edge(faint(ink, 0.35), 1)), ...housing },
   face: { ...part(ROLES.face), ...face },
   scale: {
-    ...part(ink), ...at(26, 26, 108, 108), 'Layout.rotation': -65, pattern: 'arc', patternCount: divisions, swing: 130,
-    shapeDepth: 12.96, tickWidth: 1.5, zoneFrom: 0.8, activeColour: ROLES.accent,
+    ...part(ink), ...at(26, 26, 108, 108), 'Layout.rotation': -65, pattern: 'arc', swing: 130,
+    // Minor ticks, where the author adds them, a little shorter and finer than the majors.
+    majorCount: divisions + 1, minorCount: 0, majorLength: 12.96, minorLength: 8, majorWidth: 1.5, minorWidth: 1,
+    zoneFrom: 0.8, activeColour: ROLES.accent,
   },
   indicator: { ...part(ROLES.accent), ...at(79, 30, 2, 50), 'Layout.rotation': -65, motion: 'swing', swing: 130, pivotX: 50, pivotY: 100 },
   cover: { ...part(ink), shape: 'ellipse', ...at(74, 74, 12, 12) },
@@ -73,7 +75,10 @@ const METERS = {
   // A cursor riding a ruler: a baseline, twenty steps with every fifth long, a line and its head.
   ruler: ({ ink }) => ({
     track: { ...part(ink), ...at(8, 63.5, 144, 1) },
-    scale: { ...part(ink), ...at(10, 43, 140, 21), pattern: 'ticks', patternCount: 20, majorEvery: 5, shapeDepth: 42.86, tickWidth: 1 },
+    scale: {
+      ...part(ink), ...at(10, 43, 140, 21), pattern: 'ticks',
+      majorCount: 5, minorCount: 4, majorLength: 100, minorLength: 42.86, majorWidth: 1, minorWidth: 1,
+    },
     indicator: { ...part(ROLES.accent), ...at(9.5, 25, 1, 50), motion: 'slide', travelX: pct(140, W) },
     marker: { ...part(ROLES.accent), shape: 'pointer', ...at(3, 25, 14, 14), motion: 'slide', travelX: pct(140, W) },
   }),
@@ -98,7 +103,7 @@ const METERS = {
     track: { ...part(clear, { ...radius(21), ...edge(ink, 1) }), ...at(48, 6, 64, 82) },
     indicator: { ...part(ROLES.accent, radius(14)), ...at(55, 14, 50, 66), motion: 'fill', fillFrom: 'bottom' },
     cover: { ...part('FFFFFFFF'), ...at(58, 16, 4, 59), opacity: 0.6 },
-    scale: { ...part(ROLES.legend), ...at(117, 16, 8, 64), pattern: 'ticks', patternCount: 4, majorEvery: 1, tickWidth: 1 },
+    scale: { ...part(ROLES.legend), ...at(117, 16, 8, 64), pattern: 'ticks', majorCount: 5, minorCount: 0, majorLength: 100, minorLength: 60, majorWidth: 1, minorWidth: 1 },
   }),
   // A row of number wheels in a case, a figure on each, a seam across them.
   counter: ({ ink }) => ({

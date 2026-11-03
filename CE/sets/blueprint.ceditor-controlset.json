@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "187151ae",
+  "fingerprint": "3d2e035e",
   "set": {
     "id": "blueprint",
     "name": "Blueprint",
@@ -737,10 +737,12 @@
             "Layout.width": 87.5,
             "Layout.height": 21,
             "pattern": "ticks",
-            "patternCount": 20,
-            "majorEvery": 5,
-            "shapeDepth": 42.86,
-            "tickWidth": 1
+            "majorCount": 5,
+            "minorCount": 4,
+            "majorLength": 100,
+            "minorLength": 42.86,
+            "majorWidth": 1,
+            "minorWidth": 1
           },
           "indicator": {
             "visible": true,
@@ -816,10 +818,12 @@
             "Layout.width": 87.5,
             "Layout.height": 21,
             "pattern": "ticks",
-            "patternCount": 20,
-            "majorEvery": 5,
-            "shapeDepth": 42.86,
-            "tickWidth": 1
+            "majorCount": 5,
+            "minorCount": 4,
+            "majorLength": 100,
+            "minorLength": 42.86,
+            "majorWidth": 1,
+            "minorWidth": 1
           },
           "indicator": {
             "visible": true,

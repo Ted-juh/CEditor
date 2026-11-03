@@ -754,7 +754,8 @@
             "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD4BA8E"}}}}},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD4BA8E"}}}}},
             "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
-            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "lamp": {"activeColour":"FFD4BA8E","_children":{"Background":{"_children":{"Fill":{"colour":"FF292D31"}}}}}
           }
         }
       },

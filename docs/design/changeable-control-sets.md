@@ -23,8 +23,15 @@ ticks along a line or round an arc with a zone, a legend says words, the percent
 what a part draws at a reading is `utils/meterParts.js`, recipes in `models/meterFormParts.js`).
 Each matches its form drawn by code to within 0.4% of its pixels at empty, 5%, 62% and full: the
 form drew a one-unit sliver at empty, and the rest is anti-aliasing. A capsule's sheen runs
-through the set's face colour, which a gradient stop holds as a colour, not a role. Their fields
-wait on the Meter tab's mock-up. Still drawn by code: the 48 direction forms. SVG and Photoshop
+through the set's face colour, which a gradient stop holds as a colour, not a role. The Meter tab
+edits them below the meter's own value, colour zones and peak hold, as the owner approved in its
+mock-up (`sections/MeterPartsEditor.svelte`): part chips, Reading (fill, slide, swing, light, or a
+clip lamp that lights at its level and holds with the peak; the reading or the held peak; Zone
+Colours by position or by level, from the meter's own zones, the ones scripts' zone events
+report), Shape, Position, Appearance (Fill Type solid or gradient), and on the Scale part major
+and minor ticks in the Knob tab's words, each kind its own length and width, and numerals. A
+ninth part, the Clip Lamp, is a round lamp in the top right corner from the start. Still drawn by
+code: the 48 direction forms. SVG and Photoshop
 drawings import as layered components (Bringing designs in, below).
 
 ## The principle

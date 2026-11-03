@@ -157,14 +157,15 @@ const share = (value, fallback) => {
 /**
  * The cells a pattern repeats the shape into: one box for 'solid', `count` bars across the box
  * for 'lines' (each half the pitch high), `count` by `rows` cells for 'grid', `count` bars side by
- * side for 'columns'. Each cell says its column, `col`, of `cols`: a meter lights its cells by it.
+ * side for 'columns'. Each cell says its column, `col`, of `cols`, and its row, `row`, of `rows`: a
+ * meter lights its cells by them.
  */
 export function devicePatternCells(pattern, x, y, w, h, { count = 4, rows = 3, cellWidth = null, cellHeight = null } = {}) {
   const n = Math.max(1, Math.min(64, Math.round(Number(count) || 1)));
   if (pattern === 'lines') {
     const pitch = h / n;
     const ch = pitch * share(cellHeight, 0.5);
-    return Array.from({ length: n }, (_, i) => ({ x, y: y + i * pitch + (pitch - ch) / 2, w, h: ch, col: 0, cols: 1 }));
+    return Array.from({ length: n }, (_, i) => ({ x, y: y + i * pitch + (pitch - ch) / 2, w, h: ch, col: 0, cols: 1, row: i, rows: n }));
   }
   if (pattern === 'grid' || pattern === 'columns') {
     const r = pattern === 'columns' ? 1 : Math.max(1, Math.min(64, Math.round(Number(rows) || 1)));
@@ -174,9 +175,9 @@ export function devicePatternCells(pattern, x, y, w, h, { count = 4, rows = 3, c
     const py = h / (r - 1 + sy);
     const cells = [];
     for (let j = 0; j < r; j += 1) {
-      for (let i = 0; i < n; i += 1) cells.push({ x: x + i * px, y: y + j * py, w: px * sx, h: py * sy, col: i, cols: n });
+      for (let i = 0; i < n; i += 1) cells.push({ x: x + i * px, y: y + j * py, w: px * sx, h: py * sy, col: i, cols: n, row: j, rows: r });
     }
     return cells;
   }
-  return [{ x, y, w, h, col: 0, cols: 1 }];
+  return [{ x, y, w, h, col: 0, cols: 1, row: 0, rows: 1 }];
 }

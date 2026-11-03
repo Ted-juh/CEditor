@@ -19,6 +19,10 @@
   import Mountain from 'lucide-svelte/icons/mountain';
   import Ruler from 'lucide-svelte/icons/ruler';
   import Radius from 'lucide-svelte/icons/radius';
+  import PropertyToggle from '../properties/PropertyToggle.svelte';
+  import MeterPartsEditor from './MeterPartsEditor.svelte';
+  import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js';
+  import { anatomyForm } from '../models/controlAnatomy.js';
 
   let { control = null } = $props();
 
@@ -37,6 +41,20 @@
   function toggle(prop) { set(prop, !(m?.[prop] === true)); }
 
   let zones = $derived(Array.isArray(m?.zones) ? m.zones : []);
+
+  // Drawn with its own parts (models/meterDeviceParts.js, sections/MeterPartsEditor.svelte), a
+  // meter has no use for the plain meter's orientation, fill, arc, ticks or peak marker colour: those
+  // are hidden, as the Knob tab hides the slider's. Its zones, peak hold and readout still apply.
+  let partsMode = $derived(!anatomyForm(core?.controlType, core?.controlForm) && meterDeviceDrawn(control));
+  let needsPeak = $derived(meterNeedsPeak(control));
+  const without = (fields, keys) => fields.filter((field) => !keys.includes(field.key ?? field.slot));
+  let meterFields = $derived(partsMode ? without(METER_FIELDS, ['orientation']) : METER_FIELDS);
+  // Steps or Blend is the zones' own setting now, in the Zones section.
+  let fillFields = $derived(without(METER_FILL_FIELDS, ['gradient']));
+  let peakFields = $derived(partsMode ? without(METER_PEAK_FIELDS, ['peakColour']) : METER_PEAK_FIELDS);
+  let readoutFields = $derived(partsMode ? without(METER_READOUT_FIELDS, ['showTicks', 'tickCount', 'showValue']) : METER_READOUT_FIELDS);
+  // A part showing the held peak, or a clip lamp, keeps the peak whether or not the marker is on.
+  let peakValues = $derived(needsPeak ? { ...m, peakHold: true } : m);
   function setZones(next) { set('zones', next); }
   function addZone() {
     setZones(componentListWithElement('Meter', 'zones', zones, m));
@@ -88,30 +106,32 @@
   {/snippet}
 
   <PropertySection title="Meter" icon={Gauge}>
-    <FieldList fields={METER_FIELDS} values={m} {set} />
+    <FieldList fields={meterFields} values={m} {set} />
   </PropertySection>
 
   <PropertySection title="Value" icon={Hash}>
     <FieldList fields={METER_VALUE_FIELDS} values={m} {set} slots={{ source }} />
   </PropertySection>
 
-  <PropertySection title="Fill" icon={PaintBucket}>
-    <FieldList fields={METER_FILL_FIELDS} values={m} {set} slots={{ track }} />
-  </PropertySection>
+  {#if !partsMode}
+    <PropertySection title="Fill" icon={PaintBucket}>
+      <FieldList fields={fillFields} values={m} {set} slots={{ track }} />
+    </PropertySection>
+  {/if}
 
-  <PropertySection title="Zones" icon={SquareDashed}>
+  <PropertySection title="Colour Zones" icon={SquareDashed}>
     {#snippet tools()}
       <button type="button" class="hdr-btn" title="Add zone" onclick={addZone}>+ Add</button>
     {/snippet}
-    <PropertyCell label="" span={4} hint="Each zone lights the fill from its position (0–1) upward; leave one at 0 for the base colour." compact>
+    <PropertyCell label="" span={4} hint="Each zone colours the meter from its level upward, in %; leave one at 0 for the base colour." compact>
       <div class="zones">
         {#if zones.length === 0}
           <div class="empty">No zones — the fill uses one colour. Add a zone to colour by level.</div>
         {/if}
         {#each zones as z, i (i)}
           <div class="zrow">
-            <span class="zfrom nc-wrap" title="From (0–1)">
-              <NumberCell min={0} max={1} step={0.05} value={z.from ?? 0} defaultValue={0} onchange={(v) => updateZone(i, 'from', Math.max(0, Math.min(1, v)))} />
+            <span class="zfrom nc-wrap" title="From, in % of the meter">
+              <NumberCell label="From %" min={0} max={100} step={1} value={Math.round((z.from ?? 0) * 1000) / 10} defaultValue={0} onchange={(v) => updateZone(i, 'from', Math.max(0, Math.min(100, Number(v) || 0)) / 100)} />
             </span>
             <SwatchCluster swatches={[
               { key: `zone-${i}`, label: 'Zone', value: z.colour ?? 'FF39D98A', target: { type: 'callback', apply: (hex) => updateZone(i, 'colour', hex) } },
@@ -121,6 +141,12 @@
         {/each}
       </div>
     </PropertyCell>
+    <PropertyCell label="Between Zones" span={2} path="Meter.gradient" hint="Steps: each zone its own colour. Blend: one runs into the next.">
+      <select class="val" aria-label="Between zones" value={m.gradient === false ? 'steps' : 'blend'} onchange={(e) => set('gradient', e.target.value === 'blend')}>
+        <option value="steps">Steps</option>
+        <option value="blend">Blend</option>
+      </select>
+    </PropertyCell>
   </PropertySection>
 
   <PropertySection title="Peak hold" icon={Mountain}>
@@ -129,14 +155,21 @@
                   title="Show a marker at the recent maximum that holds then falls."
                   onchange={() => toggle('peakHold')} />
     {/snippet}
-    <FieldList fields={METER_PEAK_FIELDS} values={m} {set} slots={{ peakColour }} />
+    <FieldList fields={peakFields} values={peakValues} {set} slots={{ peakColour }} />
   </PropertySection>
 
-  <PropertySection title="Scale & readout" icon={Ruler}>
-    <FieldList fields={METER_READOUT_FIELDS} values={m} {set} slots={{ suffix, caption }} />
+  <MeterPartsEditor {control} />
+
+  <PropertySection title={partsMode ? 'Readout' : 'Scale & readout'} icon={Ruler}>
+    {#if partsMode}
+      <PropertyCell label="Readout" path="Core.formShowValue" hint="Show the reading under the meter.">
+        <PropertyToggle value={core?.formShowValue !== false} ariaLabel="Readout" onchange={(next) => core?.id && updateControlProperty(core.id, 'Core.formShowValue', next)} />
+      </PropertyCell>
+    {/if}
+    <FieldList fields={readoutFields} values={partsMode ? { ...m, showValue: true } : m} {set} slots={{ suffix, caption }} />
   </PropertySection>
 
-  {#if String(m.orientation) === 'arc'}
+  {#if !partsMode && String(m.orientation) === 'arc'}
     <PropertySection title="Arc" icon={Radius}>
       <FieldList fields={METER_ARC_FIELDS} values={m} {set} />
     </PropertySection>

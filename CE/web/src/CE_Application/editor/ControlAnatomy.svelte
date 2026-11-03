@@ -121,7 +121,7 @@
     </g>
     {#if core.formShowValue!==false && !['lens','vernier','encoder'].includes(form)}<text x="80" y="164" text-anchor="middle" fill={legend} font-size="12" font-family="monospace">{core.formShowValue!==false ? readout : ""}</text>{/if}
   {:else if meter && meterPartsDrawn}
-    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} />
+    <MeterDeviceParts parts={control?._children?.Parts?._children ?? {}} {p} peak={cfg.__peak ?? null} meter={cfg} figures={meterFigures(cfg.__value ?? cfg.value ?? 0, cfg.valuePrecision)} uid={`${uid}-meter`} />
     {#if core.formShowValue!==false}<text x="80" y="98" text-anchor="middle" fill={legend} font-size="10">{readout}</text>{/if}
   {:else if meter}
     <g transform={`translate(80 46) scale(${size}) translate(-80 -46)`}>

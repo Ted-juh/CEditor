@@ -113,8 +113,8 @@ try {
   });
 
   // --- Chord Pad, Meter, Mod Matrix: whole numbers and a clamped fraction -------------------------
-  const select = async (type, y, tab) => {
-    const made = await kit.make(type, { 'Transform.x': 60, 'Transform.y': y });
+  const select = async (type, y, tab, overrides = {}) => {
+    const made = await kit.make(type, { 'Transform.x': 60, 'Transform.y': y, ...overrides });
     await kit.page.evaluate(async (id) => {
       const { selectedComponentIds } = await import('/src/CE_Application/stores/panels.js');
       selectedComponentIds.set(new Set([id]));
@@ -146,7 +146,8 @@ try {
     assert.deepEqual(swapped, { inv: 0, oct: 2 }, 'Octaves (span) and Octave (transpose) both read "Oct"');
   });
 
-  const meter = await select('Meter', 660, 'Meter');
+  // A plain meter: Segments is the plain meter's, and the set's own meter draws with its parts.
+  const meter = await select('Meter', 660, 'Meter', { 'Core.controlForm': 'original' });
   await type('Seg', '7.4');
   const seg = await kit.read(meter, 'Meter.segments');
   await type('Seg', '100');

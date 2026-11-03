@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "2a85cc68",
+  "fingerprint": "3df74508",
   "set": {
     "id": "frost",
     "name": "Frost",
@@ -907,9 +907,12 @@
             "Layout.width": 5,
             "Layout.height": 64,
             "pattern": "ticks",
-            "patternCount": 4,
-            "majorEvery": 1,
-            "tickWidth": 1
+            "majorCount": 5,
+            "minorCount": 0,
+            "majorLength": 100,
+            "minorLength": 60,
+            "majorWidth": 1,
+            "minorWidth": 1
           }
         }
       },
@@ -1007,9 +1010,12 @@
             "Layout.width": 5,
             "Layout.height": 64,
             "pattern": "ticks",
-            "patternCount": 4,
-            "majorEvery": 1,
-            "tickWidth": 1
+            "majorCount": 5,
+            "minorCount": 0,
+            "majorLength": 100,
+            "minorLength": 60,
+            "majorWidth": 1,
+            "minorWidth": 1
           }
         }
       },
