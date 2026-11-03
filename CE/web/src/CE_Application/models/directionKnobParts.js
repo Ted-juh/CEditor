@@ -19,7 +19,10 @@
 //   gear, chicken    the ribbed grip and the chicken-head, as outlines (utils/knobOutlines.js);
 //   pointer          a bar with square ends, tapered, edged or shaded (pointerCurrent kind 'bar');
 //   scale            ticks on a radius of their own (Behavior.tickRadius) and the 0 to 10 numbers
-//                    round them (Behavior.scaleNumberCount, Parts.tickNumber);
+//                    round them (Behavior.scaleNumberCount, Parts.tickNumber), and a second ring of
+//                    ticks further in (Behavior.secondScaleRadius, secondScaleCount: Dual Scale);
+//   grooves, mark    fine lines in from a plate's edge (knurling: Precision) and a second bar on
+//                    the cap, turning with the pointer (Dual Scale);
 //   value arc        the track and its fill, where the design had one.
 //
 // Each design is written here as it was drawn: radii and lengths in the units of its 160 by 170
@@ -35,8 +38,7 @@
 // highlights stay put while the knob turns, as a light does; the drawing turned them with the cap.
 //
 // Left out, as no part draws them yet: the faint inner ring of Vintage Mono, the line under the
-// digital knobs, the second scale of Dual Scale and its dark inner bar, the dark tail of Classic
-// Poly's and Heritage's pointers, the knurling round Precision's face, Recessed's grip line, Arc
+// digital knobs, the dark tail of Classic Poly's and Heritage's pointers, Recessed's grip line, Arc
 // Line's centre dot and the gap between its two arcs (one track carries both here); in the sculpted
 // series, the specular glints, the line painted along a pointer, Prism Cap's facets, Coin Edge's
 // accent tick and Gimbal Ring's two beads.
@@ -82,7 +84,7 @@ const SHADES = {
 
 /** A plate: `r` its radius; `fill` its colour; `shade` a gradient over it; `border` [colour, width]. */
 function plate(R, { r, fill, shade = null, border = null, shadow = null, gear = null, rounded = null, ring = null, opacity = 1,
-  oval = null, at = 0, star = null, polygon = null, chicken = false, turns = false }) {
+  oval = null, at = 0, star = null, polygon = null, chicken = false, turns = false, grooves = null }) {
   const out = {
     visible: true,
     opacity,
@@ -111,17 +113,21 @@ function plate(R, { r, fill, shade = null, border = null, shadow = null, gear = 
   if (rounded != null) Object.assign(out, { outline: 'rounded', outlineDepth: pct(rounded, r) });
   // A full ring `ring` units wide.
   if (ring != null) Object.assign(out, { outline: 'ring', outlineDepth: pct(ring, r) });
+  // [count, length, colour, width]: fine lines in from the edge, `length` units long (knurling).
+  if (grooves) Object.assign(out, { grooves: grooves[0], grooveLength: pct(grooves[1], r), grooveColour: grooves[2], grooveWidth: px(grooves[3] ?? 1) });
   return out;
 }
 
 /** The pointer: a bar from `from` to `to` units out, `width` wide, against the cap's radius `reach`. */
-function bar(reach, { from, to, width, colour, taper = 0, edge = null, shade = null }) {
+function bar(reach, { from, to, width, colour, taper = 0, edge = null, shade = null, mark = null }) {
   const out = {
     visible: true, kind: 'bar', opacity: 1,
     'Layout.width': pct(width, reach), 'Layout.height': pct(to, reach), 'Layout.offsetX': pct(from, reach),
     'Background.Fill.colour': colour, 'Background.Fill.gradientEnabled': false, taper,
     'Background.Border.enabled': Boolean(edge),
   };
+  // A second bar on the cap, turning with the first: Dual Scale's dark bar under its accent tip.
+  if (mark) Object.assign(out, { markFrom: pct(mark.from, reach), markTo: pct(mark.to, reach), markWidth: pct(mark.width, reach), markColour: mark.colour });
   if (edge) Object.assign(out, { 'Background.Border.colour': edge[0], 'Background.Border.thickness': px(edge[1]) });
   // A shaded bar (Lever Dial's brushed lever): the gradient over its colour, as a plate's.
   if (shade) Object.assign(out, { 'Background.Fill.gradientEnabled': true, 'Background.Fill.gradient': shade, 'Background.Fill.gradientOpacity': 100 });
@@ -256,10 +262,11 @@ const DESIGNS = {
     cap: { r: 40, fill: ROLES.face },
     pointer: { from: 23, to: 42, width: 4, colour: ROLES.accent },
   }),
-  // Precision: a turned metal face, a shaded cap ringed in light, a dark line, a faint ring.
+  // Precision: a turned metal face knurled round its edge, a shaded cap ringed in light, a dark
+  // line, a faint ring.
   chronograph: () => knob(68, {
     scale: { r: 68, count: 24, numbers: true },
-    housing: { r: 50, fill: ROLES.face, shade: S1.metal, shadow: [4, 'FF111719'] },
+    housing: { r: 50, fill: ROLES.face, shade: S1.metal, shadow: [4, 'FF111719'], grooves: [48, 8, 'BF253136', 1] },
     cap: { r: 39, fill: ROLES.face, shade: S1.cap, border: ['FFCED6D8', 1] },
     insert: { r: 32, fill: CLEAR, border: ['FFDCE1E1', 1], opacity: 0.22 },
     pointer: { from: 12, to: 38, width: 2, colour: 'FF172127' },
@@ -310,14 +317,16 @@ const DESIGNS = {
     cap: { r: 36, fill: ROLES.face, shade: S2.cap, border: ['FF596263', 1] },
     pointer: { from: 17, to: 53, width: 4, colour: CLEAR, edge: ['FFE7E2D0', 2] },
   }),
-  // Dual Scale: a metal skirt, a collar in the housing colour, a shaded cap, an accent tip past it.
-  'dual-scale': () => knob(68, {
+  // Dual Scale: a metal skirt, a collar in the housing colour with a second scale on it, a shaded
+  // cap with a dark bar, an accent tip past it.
+  'dual-scale': ({ ink }) => knob(68, {
     scale: { r: 68, count: 20, numbers: true, series: 2 },
+    component: { 'Behavior.secondScaleRadius': pct(44, 68), 'Behavior.secondScaleCount': 10 },
     housing: { r: 53, fill: ROLES.face, shade: S2.metal, shadow: [5, 'FF0D1419'] },
     skirt: { r: 47, fill: ROLES.housing },
     cap: { r: 32, fill: ROLES.face, shade: S2.cap, border: ['FFB7C3C5', 2] },
     insert: { r: 22, fill: CLEAR, border: ['FFD3DBD9', 1], opacity: 0.3 },
-    pointer: { from: 39, to: 51, width: 6, colour: ROLES.accent },
+    pointer: { from: 39, to: 51, width: 6, colour: ROLES.accent, mark: { from: 8, to: 31, width: 4, colour: ink } },
   }),
   // Broadcast: a metal skirt, a dished cap, a long dark bar, a faint ring.
   broadcast: () => knob(67, {

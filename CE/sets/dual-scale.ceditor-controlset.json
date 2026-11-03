@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e9492258",
+  "fingerprint": "648b2d3b",
   "set": {
     "id": "dual-scale",
     "name": "Dual Scale",
@@ -91,7 +91,9 @@
           "Behavior.tickRadius": 0,
           "Behavior.scaleNumberCount": 6,
           "Behavior.scaleNumberFrom": 0,
-          "Behavior.scaleNumberTo": 10
+          "Behavior.scaleNumberTo": 10,
+          "Behavior.secondScaleRadius": 64.71,
+          "Behavior.secondScaleCount": 10
         },
         "parts": {
           "tickMajor": {
@@ -176,7 +178,11 @@
             "opacity": 1,
             "Layout.offsetX": 121.88,
             "Background.Fill.gradientEnabled": false,
-            "taper": 0
+            "taper": 0,
+            "markFrom": 25,
+            "markTo": 96.88,
+            "markWidth": 12.5,
+            "markColour": "FF202020"
           },
           "labelValue": {
             "Text.Fill.colour": "{text.primary}",

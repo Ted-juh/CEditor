@@ -932,6 +932,10 @@ export const SECTION_DEFAULTS = {
     // A knob's scale on a radius of its own, a percentage of the track's (0: on the track): the
     // printed scale outside a value arc that runs close round the cap.
     tickRadius: 0,
+    // A second scale further in, on a radius of its own (a percentage of the track's), with this many
+    // divisions, long and short in turn: Dual Scale's ring of ticks on its collar. 0 draws none.
+    secondScaleRadius: 0,
+    secondScaleCount: 0,
     scaleNumberFrom: 0,
     scaleNumberTo: 10,
     showMinMaxLabels: true,

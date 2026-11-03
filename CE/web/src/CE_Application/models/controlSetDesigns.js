@@ -425,7 +425,7 @@ export const EDITOR_PATHS = [
   /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY|rotation)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
-  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit|tickRadius|scaleNumberCount|scaleNumberFrom|scaleNumberTo)$/,
+  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit|tickRadius|secondScaleRadius|secondScaleCount|scaleNumberCount|scaleNumberFrom|scaleNumberTo)$/,
   /^Text\.Fill\.colour$/,
   /^Text\.Font\.(family|weight|weightValue|letterSpacing|size)$/,
   /^Text\.Effects\.(shadowEnabled|shadowStyle|shadowOffsetX|shadowOffsetY|shadowBlur|shadowColour|glowEnabled|glowSize|glowIntensity|glowColour)$/,
@@ -438,6 +438,8 @@ export const EDITOR_PATHS = [
   // A knob plate's shadow and perspective, a bar pointer's taper (the synth sets' knobs as parts,
   // models/directionKnobParts.js).
   /^(shadowOffset|shadowColour|shadowBlur|taper|aspect|shiftY)$/,
+  // A plate's grooves (Precision's knurling) and a second bar on the pointer (Dual Scale's).
+  /^(grooves|grooveLength|grooveWidth|markFrom|markTo|markWidth|markColour)$/,
   // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
   /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   // A meter's parts (models/meterDeviceParts.js), the meter forms as parts.

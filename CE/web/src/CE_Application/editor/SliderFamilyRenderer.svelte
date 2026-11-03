@@ -642,6 +642,66 @@
   }
   let majorTickKind = $derived(tickKindOf(tickMajorPart));
   let minorTickKind = $derived(tickKindOf(tickMinorPart));
+
+  // Grooves on a plate (`grooves`, a count): fine lines in from its edge, `grooveLength` % of its
+  // radius, `grooveWidth` px, `grooveColour`; Precision's knurling round its face. They turn with
+  // the plate when it turns.
+  function plateGrooves(part, r) {
+    const count = Math.max(0, Math.round(numberOr(part?.grooves, 0)));
+    if (!count || r <= 0) return [];
+    const turn = part?.turns === true ? sliderNormalizedToAngle(behavior, normalizedValues.current) + 90 : 0;
+    const { shift } = plateFrame(part);
+    const inner = r * (1 - Math.max(0, Math.min(100, numberOr(part?.grooveLength, 15))) / 100);
+    const cx = circularCenter.x;
+    const cy = circularCenter.y + shift;
+    return Array.from({ length: count }, (_, i) => {
+      const a = ((i * 360) / count + turn) * Math.PI / 180;
+      const sx = Math.sin(a);
+      const cy0 = -Math.cos(a);
+      return { x1: cx + sx * r, y1: cy + cy0 * r, x2: cx + sx * inner, y2: cy + cy0 * inner };
+    });
+  }
+
+  // A second scale (Behavior.secondScaleRadius, % of the track's radius; secondScaleCount, its
+  // divisions): Dual Scale's inner ring of ticks, long and short in turn, in from that radius,
+  // drawn as the first scale's ticks are.
+  let secondScale = $derived.by(() => {
+    if (geometry !== 'circular') return [];
+    const share = Math.max(0, numberOr(behavior?.secondScaleRadius, 0)) / 100;
+    const count = Math.max(0, Math.round(numberOr(behavior?.secondScaleCount, 0)));
+    if (!share || !count) return [];
+    const base = circularMetrics.radius * share;
+    return Array.from({ length: count + 1 }, (_, i) => {
+      const major = i % 2 === 0;
+      const length = major ? majorTickLength : minorTickLength;
+      const angle = sliderNormalizedToAngle(behavior, i / count);
+      const start = resolveCircularPoint(width, height, angle, base, circularCenter);
+      const end = resolveCircularPoint(width, height, angle, base - length, circularCenter);
+      return { major, line: { x1: start.x, y1: start.y, x2: end.x, y2: end.y } };
+    });
+  });
+
+  // A second bar on the pointer (pointerCurrent markFrom, markTo, markWidth: % of the cap's radius,
+  // as the bar's own; markColour): Dual Scale's dark bar on its cap, turning with the value.
+  let pointerMark = $derived.by(() => {
+    if (geometry !== 'circular' || !pointerCurrentPart || pointerCurrentPart.visible === false) return null;
+    const to = numberOr(pointerCurrentPart.markTo, 0);
+    const from = numberOr(pointerCurrentPart.markFrom, 0);
+    const widthShare = numberOr(pointerCurrentPart.markWidth, 0);
+    if (!(to > from) || widthShare <= 0) return null;
+    const angle = (sliderNormalizedToAngle(behavior, normalizedValues.current) * Math.PI) / 180;
+    const ux = Math.cos(angle);
+    const uy = Math.sin(angle);
+    const half = Math.max(0.25, pointerReach * widthShare / 200);
+    const r0 = pointerReach * from / 100;
+    const r1 = pointerReach * to / 100;
+    const cx = circularCenter.x;
+    const cy = circularCenter.y;
+    const points = [[r0, -half], [r1, -half], [r1, half], [r0, half]]
+      .map(([r, side]) => `${(cx + ux * r - uy * side).toFixed(2)},${(cy + uy * r + ux * side).toFixed(2)}`).join(' ');
+    return { points, colour: argbToCss(pointerCurrentPart.markColour, '#1C2226') };
+  });
+
   // What a numeral tick prints: the stop's index, or the value at the stop in the readout's
   // format with its trailing zeros dropped — a dial reads 0 · 0.5 · 1, not 0.00 · 0.50 · 1.00;
   // the precision is the readout's, and a scale is not a readout.
@@ -913,6 +973,10 @@
           <path d={shape.d} fill="none" stroke={partBorderColour(part, '#333333')} stroke-width={partBorderWidth(part, borderFallback)} opacity={op} transform={shape.transform} vector-effect={shape.transform ? 'non-scaling-stroke' : undefined} />
         {/if}
       {/if}
+      {#each plateGrooves(part, r) as groove, i (i)}
+        <line data-plate-groove={role} x1={groove.x1} y1={groove.y1} x2={groove.x2} y2={groove.y2}
+          stroke={argbToCss(part?.grooveColour, '#253136')} stroke-width={Math.max(0.25, numberOr(part?.grooveWidth, 0.85))} opacity={op} />
+      {/each}
     {/snippet}
 
     {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}
@@ -1250,6 +1314,15 @@
         {/each}
       {/if}
 
+      {#if showTicks}
+        {#each secondScale as tick, i (i)}
+          {@render tickMark(tick.major ? majorTickKind : minorTickKind, tick.line,
+            argbToCss((tick.major ? tickMajorPart : tickMinorPart)?._children?.Background?._children?.Fill?.colour, tick.major ? '#D0D0D0' : '#B0B0B0'),
+            tick.major ? tickStrokeWidth : minorTickStrokeWidth, tick.major ? majorTickLength : minorTickLength,
+            numberOr((tick.major ? tickMajorPart : tickMinorPart)?.opacity, tick.major ? 0.95 : 0.55), '')}
+        {/each}
+      {/if}
+
       {#if scaleNumberCount >= 2}
         {#each Array.from({ length: scaleNumberCount }) as _, i (i)}
           {@const a = (sliderNormalizedToAngle(behavior, i / (scaleNumberCount - 1)) * Math.PI) / 180}
@@ -1351,6 +1424,9 @@
             opacity={numberOr(pointerCurrentPart?.opacity, 1)}
             style={pointerStyleFor('pointerCurrent', 'both')}
           />
+        {/if}
+        {#if pointerMark}
+          <polygon data-pointer-mark points={pointerMark.points} fill={pointerMark.colour} opacity={numberOr(pointerCurrentPart?.opacity, 1)} style={pointerStyleFor('pointerCurrent', 'fill')} />
         {/if}
       {:else if (valueMode === 'single' || valueMode === 'band') && pointerKind === 'dot'}
         {@const currentCircularPoint = circularPointerPoint('current')}

@@ -191,7 +191,9 @@ export function applyFormAsParts(ids, form) {
     // off again under a form that does not.
     if (type === 'Knob') {
       for (const name of ['bodySkirt', 'bodyInsert']) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
-      for (const [path, value] of [['Behavior.tickRadius', 0], ['Behavior.scaleNumberCount', 0]]) if (!(path in recipe.component)) patch[path] = value;
+      for (const [path, value] of [['Behavior.tickRadius', 0], ['Behavior.scaleNumberCount', 0], ['Behavior.secondScaleRadius', 0], ['Behavior.secondScaleCount', 0]]) {
+        if (!(path in recipe.component)) patch[path] = value;
+      }
     }
     // What a form shapes and moves, back to the factory's unless this form says: a switch made a
     // lever and then a slide must not still swing, a knob made scalloped and then a disc must not
@@ -216,8 +218,10 @@ const FORM_PART_KEYS = [
   'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
   'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
   'Background.Effects.Material.enabled',
-  // A knob plate's shadow and perspective, a bar pointer's taper (models/directionKnobParts.js).
+  // A knob plate's shadow, perspective and grooves, a bar pointer's taper and second bar
+  // (models/directionKnobParts.js).
   'shadowOffset', 'shadowBlur', 'shadowColour', 'taper', 'aspect', 'shiftY',
+  'grooves', 'grooveLength', 'grooveWidth', 'grooveColour', 'markFrom', 'markTo', 'markWidth', 'markColour',
   // A meter's (models/meterDeviceParts.js).
   'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
   'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',

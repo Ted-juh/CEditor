@@ -212,3 +212,26 @@ test('chosen on Core › Control design, a synth knob writes its parts; another 
     panels.set([]); activePanelId.set(null);
   }
 });
+
+test('Dual Scale draws its second scale and its dark bar, Precision its knurling, as parts', () => {
+  // Left out when the 36 knobs became parts; drawn now (editor/SliderFamilyRenderer.svelte).
+  const dual = directionKnobFamily('new-dual-scale', { ink: 'FF20282C' });
+  assert.equal(dual.component['Behavior.secondScaleRadius'], 64.71, 'its collar\'s ring of ticks, 44 of 68 units out');
+  assert.equal(dual.component['Behavior.secondScaleCount'], 10);
+  const pointer = dual.parts.pointerCurrent;
+  assert.deepEqual([pointer.markFrom, pointer.markTo, pointer.markWidth, pointer.markColour], [25, 96.88, 12.5, 'FF20282C'], 'the dark bar on its cap, in the ink');
+  const precision = directionKnobFamily('new-chronograph', {});
+  assert.deepEqual([precision.parts.bodyHousing.grooves, precision.parts.bodyHousing.grooveLength, precision.parts.bodyHousing.grooveColour], [48, 16, 'BF253136']);
+  // Each path is the editor's to write, and a knob with them names them when it is made into layers.
+  for (const path of ['Behavior.secondScaleRadius', 'Behavior.secondScaleCount', 'grooves', 'grooveLength', 'grooveWidth', 'markFrom', 'markTo', 'markWidth', 'markColour']) {
+    assert.ok(EDITOR_PATHS.some((pattern) => pattern.test(path)), path);
+  }
+  const renderer = readFileSync(new URL('../src/CE_Application/editor/SliderFamilyRenderer.svelte', import.meta.url), 'utf8');
+  assert.match(renderer, /\{#each plateGrooves\(part, r\) as groove, i \(i\)\}/);
+  assert.match(renderer, /\{#each secondScale as tick, i \(i\)\}/);
+  assert.match(renderer, /<polygon data-pointer-mark points=\{pointerMark\.points\}/);
+  // Another form takes them off again (stores/controlSets.js applyFormAsParts).
+  const store = readFileSync(new URL('../src/CE_Application/stores/controlSets.js', import.meta.url), 'utf8');
+  assert.match(store, /\['Behavior\.secondScaleRadius', 0\], \['Behavior\.secondScaleCount', 0\]/);
+  assert.match(store, /'grooves', 'grooveLength', 'grooveWidth', 'grooveColour', 'markFrom', 'markTo', 'markWidth', 'markColour',/);
+});

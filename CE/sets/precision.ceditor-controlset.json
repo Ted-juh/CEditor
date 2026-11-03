@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "6d021499",
+  "fingerprint": "d45fe07c",
   "set": {
     "id": "chronograph",
     "name": "Precision",
@@ -239,7 +239,11 @@
               ]
             },
             "Background.Fill.gradientOpacity": 100,
-            "shadowColour": "FF111719"
+            "shadowColour": "FF111719",
+            "grooves": 48,
+            "grooveLength": 16,
+            "grooveColour": "BF253136",
+            "grooveWidth": 0.85
           },
           "bodySkirt": {
             "visible": false

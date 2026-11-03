@@ -40,6 +40,9 @@ const PROPERTY_LABELS = {
   shadowOffset: 'Shadow', shadowBlur: 'Shadow Softness', shadowColour: 'Shadow Colour', 'Text.Font.size': 'Size',
   aspect: 'Height', shiftY: 'Offset Y',
   'Behavior.tickRadius': 'Scale Radius', 'Behavior.scaleNumberCount': 'Numbers', 'Behavior.scaleNumberFrom': 'Numbers From',
+  'Behavior.secondScaleRadius': 'Second Scale Radius', 'Behavior.secondScaleCount': 'Second Scale Divisions',
+  grooves: 'Grooves', grooveLength: 'Groove Length', grooveWidth: 'Groove Width',
+  markFrom: 'Second Bar From', markTo: 'Second Bar To', markWidth: 'Second Bar Width', markColour: 'Second Bar Colour',
   'Behavior.scaleNumberTo': 'Numbers To',
 };
 
