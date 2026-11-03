@@ -528,6 +528,13 @@ export function normalizeControlSetDefinition(value) {
     ? Object.fromEntries(Object.entries(entry).filter(([, v]) => typeof v === 'string')) : null);
   const chosen = plainStrings(value.chosenFamilies);
   if (chosen && Object.keys(chosen).length) out.chosenFamilies = chosen;
+  // A family that names a library component, placed as linked copies (utils/setLibraryComponents.js).
+  if (value.libraryComponents && typeof value.libraryComponents === 'object' && !Array.isArray(value.libraryComponents)) {
+    const named = Object.fromEntries(Object.entries(value.libraryComponents)
+      .filter(([, ref]) => ref && typeof ref === 'object' && typeof ref.id === 'string' && ref.id.trim())
+      .map(([type, ref]) => [type, { id: ref.id.trim(), name: String(ref.name ?? ''), version: String(ref.version ?? ''), fingerprint: String(ref.fingerprint ?? '') }]));
+    if (Object.keys(named).length) out.libraryComponents = named;
+  }
   // What the designs wrote on the last read, per family: key and value, or (as the label design kept
   // it before values were recorded) a list of keys. An empty record is kept: it says the design wrote
   // nothing its author had not already, which no record would not.
