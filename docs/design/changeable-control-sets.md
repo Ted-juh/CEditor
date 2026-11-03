@@ -235,6 +235,21 @@ components):
    a colour picked after it is a literal again. The designer's look bar draws a linked swatch as the
    panel's set gives it and names the role. Library cards draw with the open panel's set.
 2. From selection turns a knob into editable layers once forms are parts (B), not a frozen copy.
+   **Built** for knobs and sliders (`utils/valueControlLayers.js`), chosen in the new Create
+   Component from Selection window (`layout/ComponentFromSelectionDialog.svelte`): housing and cap
+   as path layers (any outline, its fill, gradient, finish and border; a see-through or lit border
+   as a separate edge layer, as the panel strokes it over the fill), track and value arc as arc
+   layers, ticks (line, dot, engraved, numeral) lit up to the value by opacity bindings, the
+   pointer turning about the centre, readout and labels as text; a slider's track, edge and slot,
+   a fill that grows from its origin, and a fader cap (dot, ring, line, bar) moving along it.
+   Geometry from the renderer's own helpers; colours from the family with roles kept; the knob's
+   interaction states written to its layers. `browser-checks/knobLayers.mjs` draws each built-in
+   set's knob and slider, converts it and compares the pixels at four values (within 2.5 %, a
+   one-pixel shift forgiven): all 79 sets' knobs match. What a layer cannot draw yet comes in as
+   one exact part, named: the 48 sets whose knob is a control form not made of parts, six with a
+   cap turning under a fixed light (a turning layer turns its light with it), and fader caps with
+   a block, console, lens or glass body, a glow or a sheen, and gradients along a track or fill.
+   Value glide is not carried: the layers go straight to the value.
 3. Channel curves (bipolar, exponential, stepped) take effect. **Built:** `utils/channelCurves.js`
    maps travel to value (Linear, Exponential and Logarithmic through a Centre value, S-Curve,
    Stepped with Steps and Hysteresis, Bipolar, Dead Zone). `normalizeCustomChannelValue` is the

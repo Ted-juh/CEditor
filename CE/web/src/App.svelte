@@ -2,6 +2,7 @@
   import ScriptTrustBanner from './CE_Application/components/ScriptTrustBanner.svelte';
   import SetEditBanner from './CE_Application/layout/SetEditBanner.svelte';
   import ApplyToSetDialog from './CE_Application/layout/ApplyToSetDialog.svelte';
+  import ComponentFromSelectionDialog from './CE_Application/layout/ComponentFromSelectionDialog.svelte';
   import { onMount, untrack } from 'svelte';
 
   let menuBarHeight = $state(28);
@@ -558,6 +559,7 @@
   <ComponentExportDialog />
   <ApplyControlSetDialog />
   <ApplyToSetDialog />
+  <ComponentFromSelectionDialog />
   <HistoryWindow />
 
   {#if showShortcuts}

@@ -976,9 +976,16 @@ and so does artwork bound to the channel's **0 to 1**. An exported plug-in gives
 curve, so a DAW's automation lane drawn half way sits where the knob is at half travel.
 
 You can also turn existing artwork into a component: select some backgrounds, images, shapes,
-labels, knobs or sliders and choose **Edit → Create Component from Selection...**. CEditor saves
-them as a component in your library and puts a linked copy in their place. Each label's text becomes
-a setting, so every copy can have its own.
+labels, knobs or sliders and choose **Edit → Create Component from Selection...**. A window asks for
+the component's name and, for knobs and sliders, how they come in. **As layers** makes each part a
+layer you can select, move, restyle and recolour (housing, track, value arc, cap, pointer, ticks,
+readout; a slider's track, fill and fader cap), wired to the value by bindings the **React** tab
+shows, with their colours still linked to the set's colour roles. **As one exact part** keeps the
+knob as it was, drawn by the panel's own knob code. A knob a layer does not draw yet (a control form
+that is not made of parts, a cap that turns under a fixed light, a gradient along the track, some
+fader caps) comes in as one exact part either way, and the window names it and why. CEditor saves
+the result as a component in your library and puts a linked copy in their place. Each label's text
+becomes a setting, so every copy can have its own.
 
 > **Not finished yet:** **Variants**, named looks a copy could pick, are hidden while custom
 > components are being made simpler. A component made with variants keeps the look it shows.

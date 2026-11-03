@@ -46,7 +46,8 @@ import { createBehaviorModule, createHitZone, createPartNode, createValueChannel
 import { shapeConfig, shapeNeedsRoundCap, shapePath, shapeStrokeDash, shapeTakesFill } from './shapePrimitives.js';
 import { createControl } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
-import { resolveControlForSet } from '../models/controlSetFamilies.js';
+import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
+import { knobChannelFormat, knobLayers, layerStatePatches, seedLayersAt, sliderLayers, valueLayersRefusal } from './valueControlLayers.js';
 import { getControlLayer, sortControlsForRender } from './controlOrder.js';
 import { SLIDER_CONTROL_KIND, SLIDER_SEMANTIC_PARTS, sliderControlSnapshot } from './sliderControlPart.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
@@ -413,7 +414,7 @@ function uniquePartName(wanted, taken) {
   return name;
 }
 
-function partsFor(control, resolved, rect, zIndex, taken) {
+function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, asLayers = false } = {}) {
   const type = control._children.Core.controlType;
   const transform = control._children.Transform ?? {};
   const common = {
@@ -423,6 +424,25 @@ function partsFor(control, resolved, rect, zIndex, taken) {
     layout: pxLayout(rect, transform),
   };
   const name = nameOf(control);
+  if (VALUE_TYPES.includes(type) && asLayers) {
+    // Layers the designer edits (utils/valueControlLayers.js): one per part of the knob, wired to its
+    // value. The channel is named as the one exact part would have been.
+    const channel = uniquePartName(name, taken);
+    const circular = String(resolved?._children?.Behavior?.geometry ?? (type === 'Knob' ? 'circular' : 'linear')) === 'circular';
+    const built = (circular ? knobLayers : sliderLayers)({
+      resolved, styled, rect, channel, prefix: channel, zIndex,
+      uniqueName: (wanted) => uniquePartName(wanted, taken),
+    });
+    // Standing at the knob's value, as the panel drew it: the designer draws what is authored.
+    const behavior = resolved?._children?.Behavior ?? {};
+    const min = Number(behavior.min ?? 0);
+    const max = Number(behavior.max ?? 1);
+    const value = Number(behavior.defaultCurrentValue ?? behavior.defaultValue ?? min);
+    const travel = max > min && Number.isFinite(value) ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+    seedLayersAt(built.parts, built.bindings, travel);
+    for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
+    return Object.assign(built.parts, { layered: { channel, ...built } });
+  }
   if (VALUE_TYPES.includes(type)) {
     // The knob itself, drawn by the panel's own renderer (sliderControlPart.js). Its value, hover and
     // press are written into meta.sliderControl by the bindings and states planComponentFromSelection
@@ -505,7 +525,7 @@ function partsFor(control, resolved, rect, zIndex, taken) {
  * `{ ok, refused: [{ id, name, reason }], rootIds, bounds, layer, component }` — `component` is the
  * finished CustomComponent control (not yet saved or placed); `bounds` is where the placed copy goes.
  */
-export function planComponentFromSelection(panel, ids, { set = null, name = 'Artwork', measure = null } = {}) {
+export function planComponentFromSelection(panel, ids, { set = null, name = 'Artwork', measure = null, valueControlsAs = 'part' } = {}) {
   const controls = panel?.controls ?? [];
   const topLevel = new Map(controls.map((control, index) => [String(control?._children?.Core?.id ?? ''), { control, index }]));
   const wanted = [...new Set([...(ids ?? [])].map(String))];
@@ -581,9 +601,22 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   const parts = {};
   const published = {};
   const values = [];
+  // Knobs asked for as layers that a layer cannot draw yet, and come in as one exact part.
+  const asParts = [];
   order.forEach(({ control, resolved, rect }, i) => {
     const local = { ...rect, x: rect.x - bounds.x, y: rect.y - bounds.y };
-    for (const part of partsFor(control, resolved, local, (i + 1) * 10, taken)) {
+    let asLayers = false;
+    if (valueControlsAs === 'layers' && VALUE_TYPES.includes(String(control._children.Core.controlType))) {
+      const why = valueLayersRefusal(resolved);
+      if (why) asParts.push({ id: String(control._children.Core.id), name: nameOf(control), reason: why });
+      else asLayers = true;
+    }
+    // Layers keep the set's colour roles as roles: the family applied, the tokens not resolved.
+    const styled = asLayers ? resolveControlFamily(control, set, { document: panel?.controlSets ?? [] }) : resolved;
+    // A knob's layers take ten depths each and more; the next control paints above all of them.
+    const built = partsFor(control, resolved, local, (i + 1) * 1000, taken, { styled, asLayers });
+    if (built.layered) values.push({ control, resolved, local, paintIndex: i, layered: built.layered });
+    for (const part of built) {
       parts[part.name] = part;
       if (part.kind === SLIDER_CONTROL_KIND) values.push({ control, resolved, part, local, paintIndex: i });
       if (part.role === 'label') {
@@ -605,7 +638,7 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   children.Parts = { _type: 'Parts', _children: parts };
   // None of the starter channels or behaviours a fresh component is given: artwork has no value, and
   // each knob brings exactly its own.
-  const valueSections = knobSections(values, bounds);
+  const valueSections = knobSections(values, bounds, parts);
   children.ValueChannels = { ...children.ValueChannels, _children: valueSections.channels };
   children.Behaviors = { ...children.Behaviors, _children: valueSections.behaviors };
   children.HitZones = { ...children.HitZones, _children: valueSections.hitZones };
@@ -633,6 +666,8 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     // What the placed copy carries for each knob (see placeValueControls): its bindings, now on the
     // knob's channel, and the host parameter it exported as.
     values: valueSections.carried,
+    // Knobs asked for as layers that came in as one exact part, and why.
+    asParts,
   };
 }
 
@@ -647,13 +682,13 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
  *              which run the knob's own Hover, Pressed, Dragging and Focused states. A component's own
  *              hover and focus are the whole component's.
  */
-function knobSections(values, bounds) {
+function knobSections(values, bounds, allParts = {}) {
   const out = { channels: {}, behaviors: {}, hitZones: {}, bindings: {}, states: {}, published: {}, carried: [] };
   const width = Math.max(1, bounds.width);
   const height = Math.max(1, bounds.height);
-  for (const { control, part, local, paintIndex } of values) {
+  for (const { control, resolved, part, local, paintIndex, layered } of values) {
     const behavior = control._children.Behavior ?? {};
-    const channelName = part.name;
+    const channelName = layered ? layered.channel : part.name;
     const zoneName = `${channelName}Zone`;
     const min = Number.isFinite(Number(behavior.min)) ? Number(behavior.min) : 0;
     let max = Number.isFinite(Number(behavior.max)) ? Number(behavior.max) : 1;
@@ -668,10 +703,26 @@ function knobSections(values, bounds) {
       max,
       step: Number(behavior.step) > 0 ? Number(behavior.step) : 0.01,
       defaultValue,
-      // The host reads its unit from the suffix first (exportParameters.paramFromChannel).
-      format: { suffix: unit, unit },
+      // The host reads its unit from the suffix first (exportParameters.paramFromChannel). As layers
+      // the channel's display IS the readout, so it is formatted as the knob's readout was.
+      format: layered ? knobChannelFormat(resolved?._children?.Behavior ?? behavior) : { suffix: unit, unit },
     });
-    out.behaviors[channelName] = {
+    out.behaviors[channelName] = layered ? {
+      ...createBehaviorModule(channelName, {
+        type: 'slider', role: 'slider', valueChannel: channelName, geometry: layered.behavior.geometry,
+        dragMode: layered.behavior.dragMode === 'relative' ? 'relative' : 'auto',
+        interaction: { wheel: behavior.wheelEnabled !== false },
+        // A slider that runs right to left, or top to bottom.
+        reverseMouseDirection: layered.behavior.reversed === true,
+      }),
+      ...(layered.behavior.geometry === 'circular' ? {
+        startAngle: layered.behavior.startAngle,
+        sweepAngle: layered.behavior.sweepAngle,
+        direction: layered.behavior.direction,
+        centerX: layered.behavior.centerX,
+        centerY: layered.behavior.centerY,
+      } : {}),
+    } : {
       ...createBehaviorModule(channelName, { type: SLIDER_CONTROL_KIND, valueChannel: channelName, role: 'custom' }),
       part: part.name,
     };
@@ -681,50 +732,83 @@ function knobSections(values, bounds) {
       targetValueChannel: channelName,
       action: 'dragValue',
       cursor: String(control._children.Mouse?.cursor ?? 'pointer'),
-      bounds: {
-        x: (local.x / width) * 100,
-        y: (local.y / height) * 100,
-        width: (local.width / width) * 100,
-        height: (local.height / height) * 100,
-        unit: 'percent',
-      },
+      // A slider as layers is dragged along its track: the zone is the track's length, so a point
+      // on it maps to the value the panel's slider gives there.
+      bounds: (() => {
+        const zone = layered?.behavior?.zone;
+        const box = zone ? { x: local.x + zone.x, y: local.y + zone.y, width: zone.width, height: zone.height } : local;
+        return {
+          x: (box.x / width) * 100,
+          y: (box.y / height) * 100,
+          width: (Math.max(1, box.width) / width) * 100,
+          height: (Math.max(1, box.height) / height) * 100,
+          unit: 'percent',
+        };
+      })(),
     });
     // The knob painted last is on top, so it takes the pointer where two overlap, as on the panel.
     out.hitZones[zoneName].priority = paintIndex;
-    out.bindings[`${channelName}Value`] = {
-      _type: 'Binding',
-      name: `${channelName}Value`,
-      enabled: true,
-      source: `channel.${channelName}.raw`,
-      mapMode: 'direct',
-      target: `Parts.${part.name}.meta.sliderControl.value`,
-    };
-    out.states[`${channelName}Hover`] = {
-      _type: 'State', name: `${channelName}Hover`, group: 'interaction', enabled: true,
-      description: `The pointer is over ${nameOf(control)}.`,
-      when: { hoveredCustomHitZone: zoneName },
-      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.hover': true } } },
-    };
-    out.states[`${channelName}Pressed`] = {
-      _type: 'State', name: `${channelName}Pressed`, group: 'interaction', enabled: true,
-      description: `${nameOf(control)} is being dragged.`,
-      when: { activeCustomHitZone: zoneName, dragging: true },
-      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.pressed': true } } },
-    };
-    out.states[`${channelName}Focused`] = {
-      _type: 'State', name: `${channelName}Focused`, group: 'interaction', enabled: true,
-      description: `${nameOf(control)} has focus (sliderControlPart.js keeps each knob's focus apart).`,
-      when: { focusedCustomHitZones: zoneName },
-      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.focused': true } } },
-    };
-    // The knob that stands for the component's DOM focus wears the preview's keyboard focus ring,
-    // where the panel knob wore it (CanvasControl moves the ring off the component onto this part).
-    out.states[`${channelName}DomFocus`] = {
-      _type: 'State', name: `${channelName}DomFocus`, group: 'interaction', enabled: true,
-      description: `${nameOf(control)} holds the keyboard focus.`,
-      when: { domFocusCustomHitZone: zoneName },
-      patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.domFocus': true } } },
-    };
+    if (layered) {
+      // The knob as layers: its bindings, and its interaction states written to the layers its parts
+      // became, when THIS knob's grab area is hovered, dragged or focused.
+      Object.assign(out.bindings, layered.bindings);
+      const states = resolved?._children?.States?._children ?? {};
+      const when = {
+        Hover: { hoveredCustomHitZone: zoneName },
+        Pressed: { activeCustomHitZone: zoneName, dragging: true },
+        Dragging: { activeCustomHitZone: zoneName, dragging: true },
+        ActiveHandleCurrent: { activeCustomHitZone: zoneName, dragging: true },
+        Focused: { focusedCustomHitZones: zoneName },
+      };
+      for (const [stateName, condition] of Object.entries(when)) {
+        const state = states[stateName];
+        if (!state || state.enabled === false) continue;
+        const patches = layerStatePatches(state.patches?.parts, layered.partNames, allParts);
+        if (!Object.keys(patches).length) continue;
+        out.states[`${channelName}${stateName}`] = {
+          _type: 'State', name: `${channelName}${stateName}`, group: 'interaction', enabled: true,
+          description: `${nameOf(control)}: its ${stateName.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase()} look.`,
+          when: condition,
+          patches: { component: {}, parts: patches },
+        };
+      }
+    }
+    if (!layered) {
+      out.bindings[`${channelName}Value`] = {
+        _type: 'Binding',
+        name: `${channelName}Value`,
+        enabled: true,
+        source: `channel.${channelName}.raw`,
+        mapMode: 'direct',
+        target: `Parts.${part.name}.meta.sliderControl.value`,
+      };
+      out.states[`${channelName}Hover`] = {
+        _type: 'State', name: `${channelName}Hover`, group: 'interaction', enabled: true,
+        description: `The pointer is over ${nameOf(control)}.`,
+        when: { hoveredCustomHitZone: zoneName },
+        patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.hover': true } } },
+      };
+      out.states[`${channelName}Pressed`] = {
+        _type: 'State', name: `${channelName}Pressed`, group: 'interaction', enabled: true,
+        description: `${nameOf(control)} is being dragged.`,
+        when: { activeCustomHitZone: zoneName, dragging: true },
+        patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.pressed': true } } },
+      };
+      out.states[`${channelName}Focused`] = {
+        _type: 'State', name: `${channelName}Focused`, group: 'interaction', enabled: true,
+        description: `${nameOf(control)} has focus (sliderControlPart.js keeps each knob's focus apart).`,
+        when: { focusedCustomHitZones: zoneName },
+        patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.focused': true } } },
+      };
+      // The knob that stands for the component's DOM focus wears the preview's keyboard focus ring,
+      // where the panel knob wore it (CanvasControl moves the ring off the component onto this part).
+      out.states[`${channelName}DomFocus`] = {
+        _type: 'State', name: `${channelName}DomFocus`, group: 'interaction', enabled: true,
+        description: `${nameOf(control)} holds the keyboard focus.`,
+        when: { domFocusCustomHitZone: zoneName },
+        patches: { component: {}, parts: { [part.name]: { 'meta.sliderControl.domFocus': true } } },
+      };
+    }
     out.published[channelName] = {
       channel: channelName, label: nameOf(control), type: out.channels[channelName].type, enabled: true, min, max, defaultValue,
     };

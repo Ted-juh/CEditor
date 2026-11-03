@@ -19,7 +19,7 @@
 // store with no undo of its own. The package is what the user asked for, so that is the right way
 // round, and the notification says where it went.
 
-import { get } from 'svelte/store';
+import { get, writable } from 'svelte/store';
 
 import { panels, resolvedActivePanelId, selectedComponentIds } from './panels.js';
 import { activeControlSet } from './controlSets.js';
@@ -73,7 +73,7 @@ export function unusedPackageName(wanted, entries = []) {
  * way — the refusals name every control and setting, because "could not create component" is not
  * something anyone can act on.
  */
-export function createComponentFromSelection(wantedName = 'Artwork') {
+export function createComponentFromSelection(wantedName = 'Artwork', { valueControlsAs = 'part' } = {}) {
   const panelId = get(resolvedActivePanelId);
   const panel = get(panels).find((entry) => entry.id === panelId);
   const ids = [...(get(selectedComponentIds) ?? [])];
@@ -87,6 +87,7 @@ export function createComponentFromSelection(wantedName = 'Artwork') {
     set: get(activeControlSet),
     name,
     measure: typeof document === 'undefined' ? null : measureLabelText,
+    valueControlsAs,
   });
   if (!plan.ok) {
     const lines = describeRefusals(plan.refused);
@@ -178,19 +179,44 @@ export function repointExportParameters(list, instance, values) {
 }
 
 /**
- * The menu command: ask for a name, then convert. The suggestion is the first label's text, which is
- * usually what the artwork says it is ("FILTER"); Cancel does nothing.
+ * The Create Component from Selection window (layout/ComponentFromSelectionDialog.svelte): `{ panelId,
+ * ids, suggestion }` while open.
  */
+export const componentFromSelectionRequest = writable(null);
+
+/** The name the window suggests: the first selected label's text, usually what the artwork says it is ("FILTER"). */
+export function suggestedComponentName(panel, ids) {
+  const wanted = new Set([...(ids ?? [])].map(String));
+  const firstLabel = (panel?.controls ?? []).find((control) => wanted.has(String(control?._children?.Core?.id))
+    && control._children.Core.controlType === 'Label' && String(control._children.Text?.content ?? '').trim());
+  return String(firstLabel?._children?.Text?.content ?? '').trim().slice(0, 40) || 'Artwork';
+}
+
+/**
+ * What the window shows before anything is made: the plan for the selection, as layers or as one
+ * exact part per knob, with the knobs that come in as one part anyway and why (planComponentFromSelection).
+ */
+export function previewComponentFromSelection(valueControlsAs = 'layers') {
+  const request = get(componentFromSelectionRequest);
+  const panel = get(panels).find((entry) => entry.id === (request?.panelId ?? get(resolvedActivePanelId)));
+  if (!panel) return null;
+  return planComponentFromSelection(panel, request?.ids ?? [...(get(selectedComponentIds) ?? [])], {
+    set: get(activeControlSet),
+    name: 'Preview',
+    measure: typeof document === 'undefined' ? null : measureLabelText,
+    valueControlsAs,
+  });
+}
+
+/** The menu command: open the window for the selection. */
 export function createComponentFromSelectionWithPrompt() {
   const panelId = get(resolvedActivePanelId);
   const panel = get(panels).find((entry) => entry.id === panelId);
-  const ids = new Set([...(get(selectedComponentIds) ?? [])].map(String));
-  const firstLabel = (panel?.controls ?? []).find((control) => ids.has(String(control?._children?.Core?.id))
-    && control._children.Core.controlType === 'Label' && String(control._children.Text?.content ?? '').trim());
-  const suggestion = String(firstLabel?._children?.Text?.content ?? '').trim().slice(0, 40) || 'Artwork';
-  const answer = typeof window !== 'undefined' && typeof window.prompt === 'function'
-    ? window.prompt('Name the new component:', suggestion)
-    : suggestion;
-  if (answer == null) return null;
-  return createComponentFromSelection(answer);
+  const ids = [...(get(selectedComponentIds) ?? [])].map(String);
+  if (!panel || !ids.length) {
+    notify('Select the artwork to turn into a component first.', { kind: 'warn' });
+    return null;
+  }
+  componentFromSelectionRequest.set({ panelId, ids, suggestion: suggestedComponentName(panel, ids) });
+  return true;
 }
