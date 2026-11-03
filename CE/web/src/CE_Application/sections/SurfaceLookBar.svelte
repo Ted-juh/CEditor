@@ -16,6 +16,14 @@
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { numberOr } from '../utils/primitives.js';
   import { numericInputValue, swatchCss } from '../utils/customDesignSurfaceHelpers.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { isTokenReference, resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
+  import { roleLabel } from '../models/setEditing.js';
+
+  // A layer colour linked to one of the set's colours (piece D1) is drawn as the panel's set gives
+  // it, marked, and named in its tooltip, as the panel's properties show a role.
+  const shown = (value, fallback) => (isTokenReference(value) ? resolveColourLiteral(value, $activeControlSet, fallback) : value);
+  const linkTitle = (what, value, plain) => (isTokenReference(value) ? `${what}: linked to the set's ${roleLabel(tokenNameOf(value))}` : plain);
 
   let {
     activeSelectionKind = '',
@@ -59,10 +67,11 @@
             ></button>
             <button type="button" class="mini-swatch-btn"
               disabled={!canPaintLayer || selectedFill?.solidEnabled === false}
-              style={swatchCss(selectedFill?.colour)}
+              class:linked={isTokenReference(selectedFill?.colour)}
+              style={swatchCss(shown(selectedFill?.colour, 'FF5B9BD5'))}
               onclick={() => openLayerColour('Background.Fill.colour', selectedFill?.colour)}
-              title="Pick fill colour"
-            ></button>
+              title={linkTitle('Fill', selectedFill?.colour, 'Pick fill colour')}
+            >{#if isTokenReference(selectedFill?.colour)}<span class="link-mark" aria-hidden="true">🔗</span>{/if}</button>
           </label>
         {/if}
         {#if selectedFill?.gradientEnabled}
@@ -89,10 +98,11 @@
           <span>Stroke</span>
             <button type="button" class="mini-swatch-btn"
               disabled={!canPaintLayer}
-              style={swatchCss(selectedBorder?.colour, 'FFFFFF')}
+              class:linked={isTokenReference(selectedBorder?.colour)}
+              style={swatchCss(shown(selectedBorder?.colour, 'FFFFFFFF'), 'FFFFFF')}
               onclick={() => openLayerColour('Background.Border.colour', selectedBorder?.colour)}
-              title="Pick stroke colour"
-            ></button>
+              title={linkTitle('Stroke', selectedBorder?.colour, 'Pick stroke colour')}
+            >{#if isTokenReference(selectedBorder?.colour)}<span class="link-mark" aria-hidden="true">🔗</span>{/if}</button>
         </label>
         <!-- The stroke's width, beside its colour and with no letter of its own: it read "W", which is
              the layer's width everywhere else in the designer. -->
@@ -131,10 +141,11 @@
           <span>Text</span>
             <button type="button" class="mini-swatch-btn"
               disabled={!canPaintLayer}
-              style={swatchCss(selectedTextFill?.colour, 'FFFFFF')}
+              class:linked={isTokenReference(selectedTextFill?.colour)}
+              style={swatchCss(shown(selectedTextFill?.colour, 'FFFFFFFF'), 'FFFFFF')}
               onclick={() => openLayerColour('Text.Fill.colour', selectedTextFill?.colour)}
-              title="Pick text colour"
-            ></button>
+              title={linkTitle('Text', selectedTextFill?.colour, 'Pick text colour')}
+            >{#if isTokenReference(selectedTextFill?.colour)}<span class="link-mark" aria-hidden="true">🔗</span>{/if}</button>
         </label>
         <label class="paint-number text-size">
           <span>Size</span>
@@ -202,6 +213,8 @@
   </div>
 
 <style>
+  .mini-swatch-btn.linked { position: relative; }
+  .link-mark { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border-radius: 50%; background: #12324A; border: 1px solid #3A6A8E; font-size: 7px; line-height: 10px; text-align: center; pointer-events: none; }
   .surface-lookbar { grid-area: lookbar; }
 
   .lookbar-middle {

@@ -1894,6 +1894,8 @@
       ? {
           type: 'callback',
           _swatchKey: `surface:${relativePath}`,
+          acceptsRoles: true,
+          controlId,
           apply: (hex) => {
             for (const name of targetLayerNames) {
               updateControlProperty(controlId, `Parts.${name}.${relativePath}`, hex);

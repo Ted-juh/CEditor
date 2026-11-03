@@ -227,7 +227,13 @@ components):
 ### D. Components and sets meet (medium to large)
 
 1. The designer's colour fields offer the set's roles (Accent, Knob cap, Panel surface...) beside a
-   literal colour, so a component follows the panel's set.
+   literal colour, so a component follows the panel's set. **Built:** the Colors dock's **Set
+   colours** (`panels/DisplayPanel.svelte`), for every target that can hold a role
+   (`colorTargetAcceptsRoles`: a colour property of a control or a layer, or a callback marked
+   `acceptsRoles`), from the set the target's control is drawn with (`colorTargetSet`). A role is
+   written as a token (`applyRoleToTarget`), which `resolveControlForSet` already resolves for parts;
+   a colour picked after it is a literal again. The designer's look bar draws a linked swatch as the
+   panel's set gives it and names the role. Library cards draw with the open panel's set.
 2. From selection turns a knob into editable layers once forms are parts (B), not a frozen copy.
 3. Channel curves (bipolar, exponential, stepped) take effect. **Built:** `utils/channelCurves.js`
    maps travel to value (Linear, Exponential and Logarithmic through a Centre value, S-Curve,

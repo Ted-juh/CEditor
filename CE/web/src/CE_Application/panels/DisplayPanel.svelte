@@ -41,7 +41,13 @@
   import SwatchGrid from '../components/SwatchGrid.svelte';
   import GradientTab from './GradientTab.svelte';
   import { activePanel, updatePanel } from '../stores/panels.js';
-  import { colorTarget, applyColorToTarget, clearColorTarget, colorTargetRestoreValue, restoreColorTargetSelection } from '../stores/colorTarget.js';
+  import {
+    colorTarget, applyColorToTarget, applyRoleToTarget, clearColorTarget, colorTargetAcceptsRoles, colorTargetRestoreValue, colorTargetSet,
+    restoreColorTargetSelection,
+  } from '../stores/colorTarget.js';
+  import { controlSetLibrary } from '../stores/controlSetLibrary.js';
+  import { ROLE_GROUPS, roleLabel } from '../models/setEditing.js';
+  import { makeTokenReference, resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
   import { componentDesignerStatus } from '../stores/componentDesignerStatus.js';
   import { designerFillTarget, followDesignerFill } from '../stores/designerColourTarget.js';
@@ -331,8 +337,33 @@
       colorTargetDirty = false;
       userPickedColor = t._initialColor;
       userPickedAlpha = t._initialAlpha ?? 1;
+      linkedRole = tokenNameOf(t._initialRawColor);
     });
   });
+
+  // Set colours (piece D1): the roles of the set the edited thing is drawn with, offered where the
+  // target can hold one. `linkedRole` is the role the edited colour is linked to, or ''.
+  let linkedRole = $state('');
+  let roleSet = $derived.by(() => {
+    $activePanel; $controlSetLibrary;
+    return colorTargetAcceptsRoles($colorTarget) ? colorTargetSet($colorTarget) : null;
+  });
+  let roleSetIsPanels = $derived.by(() => {
+    const control = $colorTarget?.controlId ? flatControls($activePanel?.controls ?? []).find((entry) => entry?._children?.Core?.id === $colorTarget.controlId) : null;
+    return !String(control?._children?.Core?.controlSetId ?? '').trim();
+  });
+  const roleColour = (set, key) => resolveColourLiteral(makeTokenReference(key), set, '00000000');
+  const rgbOfRole = (set, key) => roleColour(set, key).slice(2);
+
+  function pickRole(key) {
+    if (editingGradientStop !== null || pickingNotepadColor) return;
+    const literal = applyRoleToTarget(key);
+    if (!literal) return;
+    colorTargetDirty = true;
+    linkedRole = key;
+    userPickedAlpha = parseInt(literal.slice(0, 2), 16) / 255;
+    userPickedColor = literal.slice(2, 8);
+  }
 
   // In the Component Designer the panel is out of sight, so the Colors tab edits the fill of the
   // layers selected on its surface instead (stores/designerColourTarget.js). Reading $colorTarget
@@ -580,6 +611,8 @@
       userPickedColor = hex.slice(0, 6);
     }
     noteRecentColour(userPickedColor);
+    // A colour picked is a literal: the link to a set colour, if there was one, is broken.
+    linkedRole = '';
 
     // Deferred modes — preview only, commit happens on "back to X"
     if (editingGradientStop !== null || pickingNotepadColor) return;
@@ -1057,6 +1090,9 @@
       <div class="tab-pane">
         <div class="context-bar" class:active={colorContextActive}>
           <span class="context-label">Editing: <strong>{colorContextLabel}</strong></span>
+          {#if linkedRole && roleSet}
+            <span class="context-link" data-testid="colour-role-link" title={`Linked to ${roleSet.name}'s ${roleLabel(linkedRole)}: it follows the set`}>🔗 {roleLabel(linkedRole)}</span>
+          {/if}
           {#if colorContextActive}
             <button class="context-cancel" title="Discard this edit and put the original colour back" onclick={handleColorCancel}>Cancel</button>
             <button class="context-done" onclick={handleColorDone}>Done</button>
@@ -1101,6 +1137,24 @@
                 onApplyColor={handleColorChange}
               />
             </div>
+            {#if roleSet}
+              <div class="set-colours" data-testid="set-colours">
+                <div class="set-colours-head">Set colours <em>· {roleSet.name}{roleSetIsPanels ? ", the panel's set" : ''}</em></div>
+                {#each ROLE_GROUPS as group (group.id)}
+                  <div class="role-row">
+                    <span class="role-row-label">{group.label}</span>
+                    <div class="role-chips">
+                      {#each group.roles as [key, label] (key)}
+                        <button class="role-chip" class:on={linkedRole === key} style="background:#{rgbOfRole(roleSet, key)}"
+                          title="{label} · #{rgbOfRole(roleSet, key)}" aria-label="Link to {label}" data-role={key}
+                          onclick={() => pickRole(key)}></button>
+                      {/each}
+                    </div>
+                  </div>
+                {/each}
+                <p class="set-colours-hint">Click a role to link the colour to it. A colour picked here, or a chip below, unlinks it.</p>
+              </div>
+            {/if}
             {#if documentColours.length || $recentColours.length}
               <div class="colour-rows">
                 {#if documentColours.length}
@@ -1568,6 +1622,25 @@
     flex: 3;
     overflow: auto;
   }
+
+  /* Set colours: the roles of the edited thing's set (piece D1). */
+  .set-colours { display: flex; flex-direction: column; gap: 3px; padding: 2px 0 4px; container-type: inline-size; align-self: stretch; width: 100%; box-sizing: border-box; text-align: left; }
+  /* Narrow (the designer's dock): each group's name above its chips, rather than chips wrapping
+     beside a name squeezed to two lines. */
+  @container (max-width: 300px) {
+    .set-colours .role-row { flex-direction: column; align-items: flex-start; gap: 1px; }
+    .set-colours .role-row-label { width: auto; }
+  }
+  .set-colours-head { font-size: 10px; color: #5B9BD5; text-transform: uppercase; letter-spacing: .06em; }
+  .set-colours-head em { color: #888; font-style: normal; text-transform: none; letter-spacing: 0; }
+  .role-row { display: flex; align-items: center; gap: 6px; }
+  .role-row-label { flex: none; width: 92px; color: #9a9a9a; font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .role-chips { display: flex; flex-wrap: wrap; justify-content: flex-start; gap: 2px; }
+  .role-chip { width: 13px; height: 13px; padding: 0; border: 1px solid #555; border-radius: 3px; cursor: pointer; }
+  .role-chip:hover { border-color: #ddd; }
+  .role-chip.on { outline: 2px solid #2A8FD6; outline-offset: 1px; }
+  .set-colours-hint { margin: 2px 0 0; color: #8a8a8a; font-size: 10.5px; }
+  .context-link { padding: 1px 6px; border: 1px solid #3A6A8E; border-radius: 3px; color: #BFE0FA; background: #12324A; font-size: 11px; white-space: nowrap; }
 
   /* Document ("Panel") + Recent colour chip rows */
   .colour-rows {

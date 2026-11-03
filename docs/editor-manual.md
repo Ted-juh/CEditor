@@ -417,7 +417,14 @@ to Set** in the banner, or **Cancel** to take it away.
 
 Click any colour swatch — in the properties panel or the context bar — and the dock opens on **Colors**,
 showing what you are editing. Choose a colour and press **Done**, or **Cancel** to go back. **Panel**
-shows the colours this panel already uses and **Recent** the ones you used last. The swatch grid holds
+shows the colours this panel already uses and **Recent** the ones you used last.
+
+For a colour of a control or of a component's layer, **Set colours** above them shows the colour roles
+of the control set it is drawn with (the control's own set, or the panel's), in the groups Settings →
+Control Sets uses. Click one to link the colour to that role: the bar above the picker shows the link
+(🔗 Knob / fader cap), and the colour then follows the set, so a component placed on a panel with
+another set takes that set's colours. A colour picked after that, or a Panel or Recent chip, unlinks it.
+In the Component Designer the look bar marks a linked swatch and names its role. The swatch grid holds
 your own palettes: click an empty square to store the current colour, click a filled one to use it,
 right-click for more.
 

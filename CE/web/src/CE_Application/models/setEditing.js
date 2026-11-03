@@ -46,6 +46,17 @@ const DERIVED_LABELS = {
   'series.four': 'Series 4', 'series.five': 'Series 5', 'series.alert': 'Series alert',
 };
 
+/** A colour role by the name the page and the Colors dock give it ('control.cap' is "Knob / fader cap"). */
+export function roleLabel(key) {
+  const name = String(key ?? '').replace(/[{}]/g, '');
+  for (const group of ROLE_GROUPS) {
+    const hit = group.roles.find(([role]) => role === name);
+    if (hit) return hit[1];
+  }
+  if (DERIVED_LABELS[name]) return DERIVED_LABELS[name];
+  return name.split(/[.\s_-]+/).filter(Boolean).map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+}
+
 /** The ten roles worked out from the others, by name. */
 export const DERIVED_ROLE_GROUP = { id: 'derived', label: 'Worked out from the colours above', roles: DERIVED_ROLES.map((key) => [key, DERIVED_LABELS[key] ?? key]) };
 
