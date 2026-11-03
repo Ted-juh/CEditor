@@ -341,11 +341,14 @@ A knob, a button and a switch each have a tab for the parts they are drawn with:
 skirt, track and value arc, cap, insert, pointer), **Button** and, on a toggle, **Switch**. On the
 Knob tab the **Housing**, **Skirt**, **Cap** and **Insert** are plates, one over the other: each has
 an **Outline** (a circle, a polygon, a rounded square, a scallop, flutes, a **Gear**, the ribbed
-grip of a synth knob, or a ring), a size, a fill and a border, a finish, and a **Shadow** on the
-panel: its outline again, lower by **Shadow %** of its radius, its edge as soft as **Softness %**.
-An insert with no fill and a border is a ring engraved in the cap. The **Pointer** can be a
-**Bar**, a painted bar with square ends: **Taper %** narrows its tip into a wedge (below 0 the tip is
-the wider end) and **Edge** draws a rim round it, or two fine lines when the bar has no fill. Under
+grip of a synth knob, a **Chicken-head**, or a ring), a size, a fill and a border, a finish, and a
+**Shadow** on the panel: its outline again, lower by **Shadow %** of its radius, its edge as soft as
+**Softness %** (with no drop and a bright colour, a glow). **Height %** makes a plate an oval, a
+round part seen at an angle, and **Offset Y %** moves it down or up: a side wall under a top, a cap
+lifted off it. An oval that turns turns as a gimbal does. An insert with no fill and a border is a
+ring engraved in the cap. The **Pointer** can be a **Bar**, a painted bar with square ends: **Taper
+%** narrows its tip into a wedge (below 0 the tip is the wider end) and **Edge** draws a rim round
+it, or two fine lines when the bar has no fill; a gradient on its fill makes it a brushed lever. Under
 the ticks, **Scale Radius %** sets the scale on a radius of its own, outside a value arc that runs
 close round the cap, and **Numbers** prints numbers round it, evenly **From** one value **To**
 another: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. The Button and Switch

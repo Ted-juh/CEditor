@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "68099735",
+  "fingerprint": "a2d9ae82",
   "set": {
     "id": "gemstone",
     "name": "Glass Signal",
@@ -109,6 +109,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 147,
@@ -192,6 +195,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 180,
@@ -223,6 +229,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Border.colour": "FF76949F",
             "Background.Border.thickness": 0.85
           },

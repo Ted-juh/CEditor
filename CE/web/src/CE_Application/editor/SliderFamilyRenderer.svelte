@@ -342,15 +342,43 @@
   });
   // The cap's and the housing's outline (utils/knobOutlines.js): a circle unless the part says
   // otherwise, turned with the value when the part `turns`.
+  //
+  // A plate seen in perspective (the sculpted synth set, models/directionKnobParts.js): `aspect` is
+  // its height as a percentage of its width (an oval below 100) and `shiftY` moves it down, or up
+  // below 0, by that percentage of the track's radius. Its outline is drawn at its own rotation,
+  // squashed, then turned with the value and moved, so an oval ring turns as a gimbal does.
+  function plateFrame(part) {
+    return {
+      aspect: Math.max(5, Math.min(400, numberOr(part?.aspect, 100))) / 100,
+      shift: (circularMetrics.radius * numberOr(part?.shiftY, 0)) / 100,
+    };
+  }
   function outlineShapeFor(part, r) {
     const kind = String(part?.outline ?? 'circle');
     const turnDegrees = part?.turns === true ? sliderNormalizedToAngle(behavior, normalizedValues.current) + 90 : 0;
-    const d = kind === 'circle' ? '' : knobOutlinePath(kind, circularCenter.x, circularCenter.y, r, {
+    const { aspect, shift } = plateFrame(part);
+    const cx = circularCenter.x;
+    const cy = circularCenter.y;
+    if (aspect !== 1 || shift !== 0) {
+      const d = kind === 'circle'
+        ? `M${(cx - r).toFixed(2)} ${cy.toFixed(2)} a${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(2 * r).toFixed(2)} 0 a${r.toFixed(2)} ${r.toFixed(2)} 0 1 0 ${(-2 * r).toFixed(2)} 0 Z`
+        : knobOutlinePath(kind, cx, cy, r, { count: part?.outlineCount, depth: part?.outlineDepth, rotation: numberOr(part?.outlineRotation, 0) });
+      const transform = `translate(0 ${shift.toFixed(2)}) rotate(${turnDegrees.toFixed(2)} ${cx.toFixed(2)} ${cy.toFixed(2)}) `
+        + `translate(${cx.toFixed(2)} ${cy.toFixed(2)}) scale(1 ${aspect.toFixed(4)}) translate(${(-cx).toFixed(2)} ${(-cy).toFixed(2)})`;
+      // Its fill's box: the oval's own while it stays put, so a gradient runs across the oval; a
+      // square that holds it at any angle while it turns.
+      const half = r * Math.max(1, aspect);
+      const bounds = part?.turns === true
+        ? { x: cx - half - 1, y: cy + shift - half - 1, width: 2 * half + 2, height: 2 * half + 2 }
+        : { x: cx - r - 1, y: cy + shift - r * aspect - 1, width: 2 * r + 2, height: 2 * r * aspect + 2 };
+      return { kind: 'filled-path', d, transform, bounds };
+    }
+    const d = kind === 'circle' ? '' : knobOutlinePath(kind, cx, cy, r, {
       count: part?.outlineCount, depth: part?.outlineDepth, rotation: numberOr(part?.outlineRotation, 0) + turnDegrees,
     });
     return d
       ? { kind: 'filled-path', d }
-      : { kind: 'circle', cx: circularCenter.x, cy: circularCenter.y, r };
+      : { kind: 'circle', cx, cy, r };
   }
   let bodyCapRadius = $derived.by(() => {
     if (geometry !== 'circular' || bodyCapPart?.visible !== true) return 0;
@@ -506,7 +534,17 @@
         .map(([r, side]) => `${(cx + ux * r + px * side).toFixed(2)},${(cy + uy * r + py * side).toFixed(2)}`)
         .join(' ');
       const edge = partBorderWidth(pointerCurrentPart, 0);
-      return { bar: { points: quad(0), edge: edge > 0 ? quad(edge / 2) : '', edgeWidth: edge } };
+      const points = quad(0);
+      const xy = points.split(' ').map((pair) => pair.split(',').map(Number));
+      const xs = xy.map(([x]) => x);
+      const ys = xy.map(([, y]) => y);
+      return { bar: {
+        points, edge: edge > 0 ? quad(edge / 2) : '', edgeWidth: edge,
+        // A shaded bar (a lever in brushed metal) is filled as a part is, through its Background.
+        shaded: pointerCurrentPart?._children?.Background?._children?.Fill?.gradientEnabled === true,
+        d: `M${xy.map(([x, y]) => `${x} ${y}`).join(' L')} Z`,
+        bounds: { x: Math.min(...xs) - 1, y: Math.min(...ys) - 1, width: Math.max(...xs) - Math.min(...xs) + 2, height: Math.max(...ys) - Math.min(...ys) + 2 },
+      } };
     }
     if (kind === 'needle') {
       // A drafting needle: a taper from its full width at the centre to a point, with a short
@@ -557,7 +595,9 @@
       count: part?.outlineCount, depth: part?.outlineDepth, rotation: numberOr(part?.outlineRotation, 0),
     });
     const shadow = 1 + Math.max(0, numberOr(part?.shadowOffset, 0) + numberOr(part?.shadowBlur, 0)) / 100;
-    return (Math.max(0, numberOr(layout.width, fallback)) / 100) * reach * shadow;
+    // An oval taller than it is wide, or one moved off the centre, reaches further.
+    const tall = Math.max(1, Math.max(5, numberOr(part?.aspect, 100)) / 100);
+    return (Math.max(0, numberOr(layout.width, fallback)) / 100) * reach * shadow * tall + Math.abs(numberOr(part?.shiftY, 0)) / 100;
   }
   // A scale set out on a radius of its own (Behavior.tickRadius) reaches that far too.
   let housingReach = $derived(Math.max(plateReach(bodyHousingPart, 100), plateReach(bodySkirtPart, 90),
@@ -852,13 +892,13 @@
           {#if shape.kind === 'circle'}
             <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill={shadow.colour} />
           {:else}
-            <path d={shape.d} fill={shadow.colour} fill-rule="evenodd" />
+            <path d={shape.d} fill={shadow.colour} fill-rule="evenodd" transform={shape.transform} />
           {/if}
         </g>
       {/if}
       <SliderShapeFill
         background={part?._children?.Background ?? null}
-        bounds={circleBounds(circularCenter.x, circularCenter.y, r)}
+        bounds={shape.bounds ?? circleBounds(circularCenter.x, circularCenter.y, r)}
         shape={shape}
         maskId={maskIdFor(mask)}
         svgWidth={width}
@@ -870,7 +910,7 @@
         {#if shape.kind === 'circle'}
           <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill="none" stroke={partBorderColour(part, '#333333')} stroke-width={partBorderWidth(part, borderFallback)} opacity={op} />
         {:else}
-          <path d={shape.d} fill="none" stroke={partBorderColour(part, '#333333')} stroke-width={partBorderWidth(part, borderFallback)} opacity={op} />
+          <path d={shape.d} fill="none" stroke={partBorderColour(part, '#333333')} stroke-width={partBorderWidth(part, borderFallback)} opacity={op} transform={shape.transform} vector-effect={shape.transform ? 'non-scaling-stroke' : undefined} />
         {/if}
       {/if}
     {/snippet}
@@ -1271,9 +1311,21 @@
           {#if radial.bar.edge}
             <polygon points={radial.bar.edge} fill="none" stroke={partBorderColour(pointerCurrentPart, '#202020')} stroke-width={radial.bar.edgeWidth} stroke-linejoin="miter" opacity={numberOr(pointerCurrentPart?.opacity, 1)} />
           {/if}
+          {#if radial.bar.shaded}
+            <SliderShapeFill
+              background={pointerCurrentPart?._children?.Background ?? null}
+              bounds={radial.bar.bounds}
+              shape={{ kind: 'filled-path', d: radial.bar.d }}
+              maskId={maskIdFor('pointerBar')}
+              svgWidth={width}
+              svgHeight={height}
+              opacity={numberOr(pointerCurrentPart?.opacity, 1)}
+              style={pointerStyleFor('pointerCurrent')}
+            />
+          {/if}
           <polygon data-pointer="current"
             points={radial.bar.points}
-            fill={argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
+            fill={radial.bar.shaded ? 'transparent' : argbToCss(pointerCurrentPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')}
             opacity={numberOr(pointerCurrentPart?.opacity, 1)}
             style={pointerStyleFor('pointerCurrent', 'fill')}
           />

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "8c356ee1",
+  "fingerprint": "8626e975",
   "set": {
     "id": "studio-white",
     "name": "Studio White",
@@ -108,7 +108,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",
@@ -168,6 +171,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 8.33,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 32,

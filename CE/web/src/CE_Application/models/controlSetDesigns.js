@@ -435,9 +435,9 @@ export const EDITOR_PATHS = [
   /^(kind|grooveColour|plateColour|sheen|shadow|glow|slot|inset)$/,
   // A knob's cap and housing outline (utils/knobOutlines.js), the knob forms as parts.
   /^(outline|outlineCount|outlineDepth|outlineRotation|turns)$/,
-  // A knob plate's shadow, a bar pointer's taper, a lit tick (the synth sets' knobs as parts,
+  // A knob plate's shadow and perspective, a bar pointer's taper (the synth sets' knobs as parts,
   // models/directionKnobParts.js).
-  /^(shadowOffset|shadowColour|shadowBlur|taper)$/,
+  /^(shadowOffset|shadowColour|shadowBlur|taper|aspect|shiftY)$/,
   // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
   /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   // A meter's parts (models/meterDeviceParts.js), the meter forms as parts.

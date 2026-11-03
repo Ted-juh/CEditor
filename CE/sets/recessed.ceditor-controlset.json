@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0e935fa8",
+  "fingerprint": "256c0337",
   "set": {
     "id": "recessed",
     "name": "Recessed",
@@ -108,7 +108,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",
@@ -164,6 +167,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 168.7,
@@ -200,7 +206,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "bodyInsert": {
             "visible": false

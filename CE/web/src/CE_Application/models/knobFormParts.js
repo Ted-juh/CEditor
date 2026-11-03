@@ -19,10 +19,9 @@ import { DIRECTION_KNOB_FORMS, directionKnobFamily } from './directionKnobParts.
 /** The base knob forms, all twelve parts now. */
 export const BASE_KNOB_FORMS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
 /**
- * The forms that are parts now: the twelve base forms, and the synth direction sets' knobs of the
- * first two series (models/directionKnobParts.js). The other 24 direction forms are still drawn by
- * code: the sculpted series, drawn in perspective, and the twelve additional designs, most of which
- * are not turning knobs at all (a bellows, an iris, a fan).
+ * The forms that are parts now: the twelve base forms, and the 36 synth direction sets' knobs
+ * (models/directionKnobParts.js). The twelve additional designs are still drawn by code, a classic
+ * category: most are not turning knobs at all (a bellows, an iris, a fan).
  */
 export const KNOB_FORMS_AS_PARTS = [...BASE_KNOB_FORMS, ...DIRECTION_KNOB_FORMS];
 
@@ -229,11 +228,11 @@ const RECIPES = {
 /**
  * The family patch that draws `form` with the knob's parts, or null when the form is still drawn by
  * code. `ink` is the set's ink against its surface; `divisions` the form's scale divisions; `face`
- * the set's surface as a literal colour, for a direction knob's tinted glass.
+ * and `housing` the set's surface and track as literal colours, for a direction knob's glass.
  */
-export function knobFormFamily(form, { ink = 'FF20282C', divisions = 12, face = 'FFDEDBD2' } = {}) {
+export function knobFormFamily(form, { ink = 'FF20282C', divisions = 12, face = 'FFDEDBD2', housing = 'FF171A20' } = {}) {
   const recipe = RECIPES[String(form ?? '')];
-  if (!recipe) return directionKnobFamily(form, { ink, face });
+  if (!recipe) return directionKnobFamily(form, { ink, face, housing });
   const family = recipe({ ink, divisions });
   return merge({ parts: readout() }, family);
 }

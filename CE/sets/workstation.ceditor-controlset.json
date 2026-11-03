@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "f6a1c26f",
+  "fingerprint": "63b685ab",
   "set": {
     "id": "cassette-deck",
     "name": "Workstation",
@@ -120,7 +120,10 @@
             "Background.Fill.gradientEnabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",
@@ -171,6 +174,9 @@
             "outline": "gear",
             "turns": true,
             "shadowOffset": 12,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 168.7,

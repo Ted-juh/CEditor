@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "178ffa20",
+  "fingerprint": "1e10cea6",
   "set": {
     "id": "hi-fi",
     "name": "Studio Console",
@@ -121,6 +121,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 35,
@@ -208,6 +211,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 8.16,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 168.7,
@@ -244,6 +250,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 141.3,
@@ -289,6 +298,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Border.colour": "FFFFFFFF",
             "Background.Border.thickness": 0.85
           }

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "81124499",
+  "fingerprint": "0260dae9",
   "set": {
     "id": "arc-line",
     "name": "Arc Line",
@@ -103,7 +103,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",
@@ -158,7 +161,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           }
         }
       },

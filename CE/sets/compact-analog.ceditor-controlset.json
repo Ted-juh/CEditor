@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bed3bbbf",
+  "fingerprint": "0bf79109",
   "set": {
     "id": "porcelain",
     "name": "Compact Analog",
@@ -109,6 +109,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 35,
@@ -191,6 +194,9 @@
             "outline": "gear",
             "turns": true,
             "shadowOffset": 9.52,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 168.7,

@@ -23,24 +23,69 @@ import { applyFormAsParts } from '../src/CE_Application/stores/controlSets.js';
 const source = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
 const knobOf = (id) => resolveControlForSet(createControl('Knob'), getControlSet(id));
 
-test('the 24 knobs of the first two series are parts; the sculpted and the additional ones are still forms', () => {
-  const series12 = PHYSICAL_DIRECTIONS.filter((d) => (d.series ?? 1) <= 2).map((d) => d.id);
-  assert.equal(series12.length, 24);
-  assert.deepEqual([...DIRECTION_KNOB_FORMS].sort(), series12.map((id) => `new-${id}`).sort());
+test('the 36 synth sets\' knobs are parts; the twelve additional designs stay forms, a classic category', () => {
+  const synth = PHYSICAL_DIRECTIONS.map((d) => d.id);
+  assert.equal(synth.length, 36);
+  assert.deepEqual([...DIRECTION_KNOB_FORMS].sort(), synth.map((id) => `new-${id}`).sort());
   for (const form of DIRECTION_KNOB_FORMS) assert.ok(KNOB_FORMS_AS_PARTS.includes(form), form);
-  for (const id of series12) {
+  for (const id of synth) {
     const knob = knobOf(id);
     assert.equal(knob._children.Core.controlForm || '', '', `${id}: no form`);
     assert.equal(knob._children.Behavior.circularFit, 'tight', id);
     assert.ok(['bar', 'dot'].includes(knob._children.Parts._children.pointerCurrent.kind), `${id}: its pointer`);
   }
-  for (const d of PHYSICAL_DIRECTIONS.filter((entry) => entry.series === 3)) {
-    assert.equal(knobOf(d.id)._children.Core.controlForm, `new-${d.id}`, `${d.id} is still drawn by code`);
+  for (const id of ['atlas', 'kiln', 'arcade', 'spool', 'tessera', 'bellows', 'helix', 'iris', 'balance', 'satellite', 'fan', 'crown']) {
+    assert.equal(knobOf(id)._children.Core.controlForm, `new-${id}`, `${id}: not a turning knob, still a form`);
+    assert.equal(directionKnobFamily(`new-${id}`), null, id);
   }
-  assert.equal(knobOf('bellows')._children.Core.controlForm, 'new-bellows', 'not a turning knob: still a form');
-  assert.equal(directionKnobFamily('new-valve-console'), null);
   assert.equal(directionKnobFamily('brassworks'), null, 'a set id is not a form');
 });
+
+test('the sculpted series in perspective: ovals moved up and down, a chicken-head cap, turning gimbal rings, a brushed lever', () => {
+  const valve = knobOf('valve-console')._children.Parts._children;
+  assert.ok(valve.bodyHousing.aspect > 80 && valve.bodyHousing.aspect < 90, 'the wall an oval');
+  assert.ok(valve.bodyHousing.shiftY > 0, 'the wall below');
+  assert.ok(valve.bodyCap.shiftY < 0, 'the cap lifted above it');
+  assert.ok(valve.bodyCap.shadowBlur > 0, "the drawing's drop shadow, soft");
+  const chicken = knobOf('chicken-head')._children.Parts._children.bodyCap;
+  assert.equal(chicken.outline, 'chicken');
+  assert.equal(chicken.turns, true);
+  const gimbal = knobOf('gimbal-ring')._children.Parts._children;
+  assert.equal(gimbal.bodySkirt.outline, 'ring');
+  assert.equal(gimbal.bodySkirt.turns, true);
+  assert.ok(gimbal.bodySkirt.aspect < 100 && gimbal.bodyInsert.aspect > 100, 'one ring wide, one tall');
+  const lever = knobOf('lever-dial')._children.Parts._children.pointerCurrent;
+  assert.equal(lever.kind, 'bar');
+  assert.equal(lever._children.Background._children.Fill.gradientEnabled, true, 'the lever brushed metal');
+  assert.equal(knobOf('hex-drive')._children.Parts._children.bodyHousing.outline, 'polygon');
+  assert.equal(knobOf('floating-halo')._children.Parts._children.bodyHousing.shadowOffset, 0, 'a glow: a shadow with no drop');
+  assert.ok(knobOf('floating-halo')._children.Parts._children.bodyHousing.shadowBlur > 0);
+});
+
+test('a chicken-head outline runs to a point at the radius and turns about the centre', () => {
+  const up = knobOutlinePath('chicken', 0, 0, 10, { rotation: 0 });
+  assert.match(up, /^M0 -10 L/);
+  const right = knobOutlinePath('chicken', 0, 0, 10, { rotation: 90 });
+  assert.match(right, /^M10 0 L/);
+  assert.equal(knobOutlineReach('chicken'), 1);
+});
+
+test('the renderer draws a plate in perspective by a transform of its outline, and a shaded bar through its fill', () => {
+  const renderer = source('editor/SliderFamilyRenderer.svelte');
+  assert.match(renderer, /rotate\(\$\{turnDegrees\.toFixed\(2\)\} \$\{cx\.toFixed\(2\)\} \$\{cy\.toFixed\(2\)\}\) `\s*\+ `translate\(\$\{cx\.toFixed\(2\)\} \$\{cy\.toFixed\(2\)\}\) scale\(1 \$\{aspect\.toFixed\(4\)\}\)/, 'squashed, then turned, then moved');
+  assert.match(renderer, /shaded: pointerCurrentPart\?\._children\?\.Background\?\._children\?\.Fill\?\.gradientEnabled === true/);
+  assert.match(source('editor/SliderShapeFill.svelte'), /fill-rule="evenodd" transform=\{shape\.transform\}/);
+  // Every knob that exists keeps its look: no part is an oval or moved unless it says so.
+  const knob = createControl('Knob');
+  for (const name of ['bodyHousing', 'bodySkirt', 'bodyCap', 'bodyInsert']) {
+    assert.equal(knob._children.Parts._children[name].aspect ?? 100, 100, name);
+    assert.equal(knob._children.Parts._children[name].shiftY ?? 0, 0, name);
+  }
+  const tab = source('sections/KnobPartsEditor.svelte');
+  for (const words of ['label="Height %"', 'label="Offset Y %"', "['chicken', 'Chicken-head']"]) assert.ok(tab.includes(words), words);
+  assert.match(valueLayersRefusal(knobOf('turret-stack')), /a skirt|perspective/);
+});
+
 
 test('every direction recipe writes only what a set may write, and lands on a factory knob', () => {
   for (const form of DIRECTION_KNOB_FORMS) {

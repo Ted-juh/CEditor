@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ce11decd",
+  "fingerprint": "508e848b",
   "set": {
     "id": "carbon-pro",
     "name": "Carbon Pro",
@@ -121,6 +121,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 32,
@@ -198,6 +201,9 @@
             "outline": "gear",
             "turns": true,
             "shadowOffset": 7.55,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 174.3,

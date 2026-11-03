@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "25d7fdb7",
+  "fingerprint": "c00622f0",
   "set": {
     "id": "diesel",
     "name": "Modern Flat",
@@ -103,7 +103,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",

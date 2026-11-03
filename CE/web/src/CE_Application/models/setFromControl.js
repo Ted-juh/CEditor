@@ -38,6 +38,7 @@ const PROPERTY_LABELS = {
   activeOpacity: 'Lit Opacity', 'Core.controlForm': 'Form', 'Core.formSize': 'Form Size', 'Core.formDepth': 'Form Depth',
   'Core.formDivisions': 'Divisions', 'Core.formShowValue': 'Readout',
   shadowOffset: 'Shadow', shadowBlur: 'Shadow Softness', shadowColour: 'Shadow Colour', 'Text.Font.size': 'Size',
+  aspect: 'Height', shiftY: 'Offset Y',
   'Behavior.tickRadius': 'Scale Radius', 'Behavior.scaleNumberCount': 'Numbers', 'Behavior.scaleNumberFrom': 'Numbers From',
   'Behavior.scaleNumberTo': 'Numbers To',
 };

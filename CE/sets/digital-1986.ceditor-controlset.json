@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "d0d3633e",
+  "fingerprint": "33a98b9e",
   "set": {
     "id": "switchboard",
     "name": "Digital 1986",
@@ -123,7 +123,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",
@@ -165,6 +168,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 8.7,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 168.7,

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "ef6b6e42",
+  "fingerprint": "b8cc6119",
   "set": {
     "id": "pinstripe",
     "name": "Pinstripe",
@@ -121,6 +121,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 32,
@@ -210,6 +213,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 5.45,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 174.3,
@@ -246,6 +252,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Border.colour": "FF7A8080",
             "Background.Border.thickness": 0.68
           },

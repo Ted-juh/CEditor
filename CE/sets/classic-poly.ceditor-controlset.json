@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "3c365272",
+  "fingerprint": "743873a0",
   "set": {
     "id": "bakelite",
     "name": "Classic Poly",
@@ -121,6 +121,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 35,
@@ -198,6 +201,9 @@
             "outline": "gear",
             "turns": true,
             "shadowOffset": 9.8,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 168.7,

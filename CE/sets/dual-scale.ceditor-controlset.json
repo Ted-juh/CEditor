@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "94ed27e8",
+  "fingerprint": "cc457e88",
   "set": {
     "id": "dual-scale",
     "name": "Dual Scale",
@@ -134,6 +134,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "radial",
               "centerX": 32,
@@ -205,6 +208,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 9.43,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Fill.gradient": {
               "type": "linear",
               "angle": 147,
@@ -244,7 +250,10 @@
             "Background.Effects.Material.enabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "bodyInsert": {
             "visible": true,
@@ -260,6 +269,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Border.colour": "FFD3DBD9",
             "Background.Border.thickness": 0.85
           }

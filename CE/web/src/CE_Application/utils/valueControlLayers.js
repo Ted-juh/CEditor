@@ -101,6 +101,12 @@ export function valueLayersRefusal(resolved) {
       return `a shadow under its ${label}, which a layer does not draw yet`;
     }
   }
+  for (const [name, label] of [['bodyHousing', 'housing'], ['bodyCap', 'cap']]) {
+    if (parts[name]?.visible === true && (Number(parts[name]?.aspect ?? 100) !== 100 || Number(parts[name]?.shiftY ?? 0) !== 0)) {
+      return `a ${label} drawn in perspective (an oval, or moved off the centre), which a layer does not draw yet`;
+    }
+    if (parts[name]?.visible === true && String(parts[name]?.outline ?? '') === 'chicken') return `a chicken-head ${label}, which a layer does not draw yet`;
+  }
   if (String(parts.pointerCurrent?.kind ?? '').toLowerCase() === 'bar') return 'a bar for a pointer, which a layer does not draw yet';
   if (behavior.showTicks !== false && Number(behavior.tickRadius) > 0) return 'a scale on a radius of its own, which a layer does not draw yet';
   if (Number(behavior.scaleNumberCount) >= 2) return 'numbers round its scale, which a layer does not draw yet';

@@ -25,7 +25,7 @@
 
   let { control = null, set = () => {}, setPatch = () => {} } = $props();
 
-  const OUTLINES = [['circle', 'Circle'], ['polygon', 'Polygon'], ['rounded', 'Rounded Square'], ['scallop', 'Scallop'], ['flutes', 'Flutes'], ['gear', 'Gear'], ['ring', 'Ring']];
+  const OUTLINES = [['circle', 'Circle'], ['polygon', 'Polygon'], ['rounded', 'Rounded Square'], ['scallop', 'Scallop'], ['flutes', 'Flutes'], ['gear', 'Gear'], ['chicken', 'Chicken-head'], ['ring', 'Ring']];
   const POINTERS = [['line', 'Line'], ['bar', 'Bar'], ['needle', 'Needle'], ['chicken', 'Chicken-head'], ['capdot', 'Dot on Cap'], ['dot', 'Dot on Track']];
   const SIZES = { bodyHousing: 100, bodySkirt: 90, bodyCap: 72, bodyInsert: 45 };
   const word = (text) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -61,6 +61,9 @@
   function setSize(prefix, value) {
     setPatch({ [`${prefix}.Layout.width`]: value, [`${prefix}.Layout.height`]: value });
   }
+  // The outlines whose count or depth mean nothing.
+  const NO_COUNT = ['circle', 'ring', 'rounded', 'chicken'];
+  const NO_DEPTH = ['circle', 'polygon', 'chicken'];
 </script>
 
 {#snippet plate(name, title, icon, part, { turns = false } = {})}
@@ -72,15 +75,15 @@
     <PropertyCell label="Visible" span={1} path={`${prefix}.visible`} hint={`Draw the ${title.toLowerCase()}.`}>
       <PropertyToggle value={part?.visible === true} onchange={(next) => set(`${prefix}.visible`, next)} />
     </PropertyCell>
-    <PropertyCell label="Outline" span={1} path={`${prefix}.outline`} hint="The shape of its edge: a circle, a polygon, a rounded square, a scallop (a star), flutes (a round grip), a gear (a ribbed grip) or a ring.">
+    <PropertyCell label="Outline" span={1} path={`${prefix}.outline`} hint="The shape of its edge: a circle, a polygon, a rounded square, a scallop (a star), flutes (a round grip), a gear (a ribbed grip), a chicken-head or a ring.">
       <select class="val" value={outline} onchange={(e) => set(`${prefix}.outline`, e.target.value)}>
         {#each OUTLINES as [id, label] (id)}<option value={id}>{label}</option>{/each}
       </select>
     </PropertyCell>
-    <PropertyCell label="Points" span={1} compact path={`${prefix}.outlineCount`} disabled={outline === 'circle' || outline === 'ring' || outline === 'rounded'} hint="Corners of a polygon, points of a scallop, flutes or teeth of a grip.">
+    <PropertyCell label="Points" span={1} compact path={`${prefix}.outlineCount`} disabled={NO_COUNT.includes(outline)} hint="Corners of a polygon, points of a scallop, flutes or teeth of a grip.">
       <NumberCell label="Points" value={numberOr(part?.outlineCount, 8)} defaultValue={8} step={1} min={3} max={96} onchange={(v) => set(`${prefix}.outlineCount`, v)} />
     </PropertyCell>
-    <PropertyCell label="Depth %" span={1} compact path={`${prefix}.outlineDepth`} disabled={outline === 'circle' || outline === 'polygon'} hint="How deep the notches, flutes or teeth cut, how wide a ring is, or how round a square's corners are, as a percentage of the radius.">
+    <PropertyCell label="Depth %" span={1} compact path={`${prefix}.outlineDepth`} disabled={NO_DEPTH.includes(outline)} hint="How deep the notches, flutes or teeth cut, how wide a ring is, or how round a square's corners are, as a percentage of the radius.">
       <NumberCell label="Depth" value={numberOr(part?.outlineDepth, 20)} defaultValue={20} step={1} min={0} max={95} onchange={(v) => set(`${prefix}.outlineDepth`, v)} />
     </PropertyCell>
     <PropertyCell label="Size %" span={1} compact path={`${prefix}.Layout.width`} hint="Its size, as a percentage of the track's radius.">
@@ -109,6 +112,12 @@
     </PropertyCell>
     <PropertyCell label="Border Colour" span={2} path={`${prefix}.Background.Border.colour`} hint="The colour of its edge.">
       <PropertyColor value={shown(border.colour, 'FF333333')} onchange={(v) => set(`${prefix}.Background.Border.colour`, v)} onswatchclick={() => pickColour(`${prefix}.Background.Border.colour`, border.colour)} />
+    </PropertyCell>
+    <PropertyCell label="Height %" span={1} compact path={`${prefix}.aspect`} hint="Its height as a percentage of its width: below 100 an oval, a round part seen at an angle. It turns with the part when the part turns.">
+      <NumberCell label="Height" value={numberOr(part?.aspect, 100)} defaultValue={100} step={1} min={5} max={400} onchange={(v) => set(`${prefix}.aspect`, v)} />
+    </PropertyCell>
+    <PropertyCell label="Offset Y %" span={1} compact path={`${prefix}.shiftY`} hint="Moves it down, or up below 0, by this percentage of the track's radius: a side wall under a top, a cap lifted off it.">
+      <NumberCell label="Offset Y" value={numberOr(part?.shiftY, 0)} defaultValue={0} step={1} min={-100} max={100} onchange={(v) => set(`${prefix}.shiftY`, v)} />
     </PropertyCell>
     <PropertyCell label="Shadow %" span={1} compact path={`${prefix}.shadowOffset`} hint="A shadow on the panel: its outline again, this percentage of its radius lower. 0 for none.">
       <NumberCell label="Shadow" value={numberOr(part?.shadowOffset, 0)} defaultValue={0} step={1} min={0} max={60} onchange={(v) => set(`${prefix}.shadowOffset`, v)} />

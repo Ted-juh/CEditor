@@ -31,23 +31,29 @@ Colours by position or by level, from the meter's own zones, the ones scripts' z
 report), Shape, Position, Appearance (Fill Type solid or gradient), and on the Scale part major
 and minor ticks in the Knob tab's words, each kind its own length and width, and numerals. A
 ninth part, the Clip Lamp, is a round lamp in the top right corner from the start. The knobs of the
-24 synth sets of the first two series (Vintage Mono to Future Lab, Heritage to Carbon Pro) are the
+36 synth sets (Vintage Mono to Future Lab, Heritage to Carbon Pro, Valve Console to Prism Cap) are the
 knob's parts too (`models/directionKnobParts.js`), each written as its drawing was, in its 160 by 170
 units: a skirt between the housing and the cap and an insert set into the cap (two more plates, the
-Knob tab's **Skirt** and **Insert**), a shadow under any plate (its outline again, lower), a **gear**
-outline for the ribbed grips, a **bar** pointer with square ends that can taper or carry an edge,
+Knob tab's **Skirt** and **Insert**), a shadow under any plate (its outline again, lower, as soft as
+asked; with no drop, a glow), a plate in perspective for the sculpted series (an oval, `aspect`,
+moved up or down, `shiftY`: the outline squashed, then turned with the value, then moved, so an
+oval ring turns as a gimbal does), a **gear** and a **chicken-head** outline, a **bar** pointer with
+square ends that can taper, carry an edge or be shaded (Lever Dial's brushed lever),
 the scale on a radius of its own (`Behavior.tickRadius`) with its 0 to 10 numbers round it
 (`Behavior.scaleNumberCount`, `Parts.tickNumber`), and ticks that light in a colour of their own up
 to the value (`activeColour`, the LED ring). Their shading is the drawing's gradients laid over the
 part's own colour, clear where the drawing used the set's face, so the knob still follows its set.
 Compared side by side with the drawings at two values: the same knobs, a little smaller in the box
-since the scale numbers take room of their own; a cap's highlight stays put while it turns. Left
-out, as no part draws them yet: Vintage Mono's faint inner ring, the line under the digital knobs,
-Dual Scale's second scale and inner bar, the pointer tails of Classic Poly and Heritage,
-Precision's knurling, Recessed's grip line, Arc Line's centre dot and the gap between its two arcs.
-Still drawn by code: the 12 sculpted knobs of the third series, drawn in perspective (ellipses, soft
-shadows, glows), and the 12 additional designs, most of which are not turning knobs at all (a
-bellows, an iris, a fan, a balance); and the 48 sets' buttons, switches and meters. SVG and Photoshop
+since the scale numbers take room of their own (the sculpted drawings let them run off the top of
+the frame); a cap's highlight, and the sculpted series' perspective, stay put while the knob turns
+(the drawings turned them with it). Left out, as no part draws them yet: Vintage Mono's faint inner
+ring, the line under the digital knobs, Dual Scale's second scale and inner bar, the pointer tails
+of Classic Poly and Heritage, Precision's knurling, Recessed's grip line, Arc Line's centre dot and
+the gap between its two arcs; the sculpted series' specular glints, the lines painted along their
+pointers, Prism Cap's facets, Coin Edge's accent tick and Gimbal Ring's two beads. Still drawn by
+code, a classic category as the owner decided: the 12 additional designs, most of which are not
+turning knobs at all (a bellows, an iris, a fan, a balance); and the 48 sets' buttons, switches and
+meters. SVG and Photoshop
 drawings import as layered components (Bringing designs in, below).
 
 ## The principle

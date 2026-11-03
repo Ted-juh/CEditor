@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "20b8e73e",
+  "fingerprint": "2e41a11e",
   "set": {
     "id": "leatherbound",
     "name": "Future Lab",
@@ -128,7 +128,10 @@
             "Background.Fill.gradientEnabled": false,
             "outline": "circle",
             "turns": false,
-            "shadowOffset": 0
+            "shadowOffset": 0,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0
           },
           "pointerCurrent": {
             "kind": "bar",
@@ -170,6 +173,9 @@
             "outline": "circle",
             "turns": false,
             "shadowOffset": 4.35,
+            "shadowBlur": 0,
+            "aspect": 100,
+            "shiftY": 0,
             "Background.Border.colour": "FF7C929F",
             "Background.Border.thickness": 0.68,
             "shadowColour": "FF090E15"

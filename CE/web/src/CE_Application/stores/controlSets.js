@@ -216,8 +216,8 @@ const FORM_PART_KEYS = [
   'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
   'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
   'Background.Effects.Material.enabled',
-  // A knob plate's shadow, a bar pointer's taper (models/directionKnobParts.js).
-  'shadowOffset', 'shadowBlur', 'shadowColour', 'taper',
+  // A knob plate's shadow and perspective, a bar pointer's taper (models/directionKnobParts.js).
+  'shadowOffset', 'shadowBlur', 'shadowColour', 'taper', 'aspect', 'shiftY',
   // A meter's (models/meterDeviceParts.js).
   'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
   'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',
@@ -227,9 +227,10 @@ const FORM_PART_KEYS = [
  * known, gives a meter's sheen and a synth knob's glass their face colour. */
 export function formAsPartsRecipe(type, form, set = null) {
   if (type === 'Knob') {
-    // A synth set's tinted glass is its face colour with an alpha: a literal, from the set's surface.
+    // A synth set's tinted glass is its face and track colours with an alpha: literals, from the set.
     const face = set ? resolveColourLiteral('{surface}', set, '') : '';
-    return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12, ...(face ? { face } : {}) }) : null;
+    const housing = set ? resolveColourLiteral('{control.track}', set, '') : '';
+    return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12, ...(face ? { face } : {}), ...(housing ? { housing } : {}) }) : null;
   }
   if (type === 'Meter' || type === 'ProgressBar') {
     return meterFormFamily(type, form, { ink: '{text.primary}', divisions: 12, face: set ? resolveColourLiteral('{surface}', set, '') : '' });
