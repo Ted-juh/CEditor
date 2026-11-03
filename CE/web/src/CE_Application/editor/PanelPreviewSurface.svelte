@@ -7364,6 +7364,7 @@
       dragState: pointerCustomDragState,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
+      release: event?.release === true,
     });
     if (!controlId || !Object.keys(patch).length) return;
     patchControlSession(controlId, {
@@ -7444,10 +7445,14 @@
     });
   }
 
-  function patchCustomKeyboardActivation(control, event) {
+  // Enter and Space act at the key-up, as a button does; a momentary zone is on from the key-down
+  // and off again at the key-up.
+  function patchCustomKeyboardActivation(control, event, phase = 'up') {
     const resolvedPreview = resolvedPreviewFor(control);
     const hitZoneEntry = defaultCustomActivationHitZone(resolvedPreview?.control ?? control)
       ?? defaultCustomActivationHitZone(control);
+    const momentary = String(hitZoneEntry?.zone?.action ?? '').trim().toLowerCase() === 'momentaryvalue';
+    if (phase === 'down' && !momentary) return;
     // Keyboard off on the behaviour Enter and Space would press.
     const behavior = getCustomBehaviors(control)?.[hitZoneEntry?.zone?.targetBehavior] ?? customMainBehaviorModule(control);
     if (!behaviorTakesInput(behavior, 'keyboard')) return;
@@ -7457,6 +7462,7 @@
       currentTarget: event?.currentTarget,
       clientX: rect ? rect.left + rect.width / 2 : undefined,
       clientY: rect ? rect.top + rect.height / 2 : undefined,
+      release: momentary && phase === 'up',
     }, {
       focused: true,
       hover: true,
@@ -8575,6 +8581,17 @@
         // A panel knob's press is one patch, value included (setSliderRoleValue); the press above
         // already is that for a knob part, and a second at the same point would send it twice.
         if (!sliderControlForZone(control, pointerCustomHitZone?.zone)) updateCustomDragFromPointer(control, event);
+      } else if (action === 'momentaryvalue') {
+        // A momentary button: on at the press, off at the release (below).
+        patchCustomInteraction(control, pointerCustomHitZone, event, {
+          hover: true,
+          pressed: false,
+          focused: false,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+          ...knobFocus,
+        });
       } else {
         patchControlSession(pointerActiveControlId, {
           hover: true,
@@ -8889,7 +8906,15 @@
 
     if (isCustomComponent(activeControl)) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
+      if (action === 'momentaryvalue' && activeControl) {
+        // Let go, inside or out: a momentary button is off again.
+        patchCustomInteraction(activeControl, pointerCustomHitZone, { clientX: event?.clientX, clientY: event?.clientY, release: true }, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+      } else if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
         patchCustomInteraction(activeControl, pointerCustomHitZone, event, {
           hover: inside,
           pressed: false,
@@ -9143,6 +9168,7 @@
         pressed: isCustomComponent(control) ? false : true,
         ...(momentaryButtonPreview.beginPress(controlId, getBehavior(control)) ?? {}),
       });
+      if (isCustomComponent(control)) patchCustomKeyboardActivation(control, event, 'down');
       if (isTimedButtonBehavior(getBehavior(control))) {
         timedButtonPreview.beginPress(controlId, getBehavior(control));
       }

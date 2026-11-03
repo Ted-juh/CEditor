@@ -36,6 +36,13 @@ import { knobOutlinePath, knobOutlineReach } from './knobOutlines.js';
 import { formatBehaviorDisplay } from './parameterDisplay.js';
 import { deepClone } from './deepClone.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
+import { BUTTON_DEVICE_PARTS, DEVICE_FRAME } from '../models/buttonDeviceParts.js';
+import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
+import { meterLitOffset, meterPartDrawing } from './meterParts.js';
+import { meterFillColourAt, meterSegmentCenter, meterTicks, meterZones } from './meterLayout.js';
+import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
+import { buttonAnatomyLayout } from './anatomyLayout.js';
+import { scalePathData } from './svgPathScale.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 
 const num = (value, fallback) => {
@@ -963,6 +970,597 @@ export function seedLayersAt(parts, bindings, travel) {
     if (node) node[path[path.length - 1]] = value;
   }
   return parts;
+}
+
+// --- buttons and switches drawn as a device ----------------------------------------------------------
+
+/**
+ * Why a button or switch drawn with device parts cannot become layers, or ''. A part that rides a
+ * key which turns would need two turns at once; a layer has one.
+ */
+export function buttonDeviceLayersRefusal(resolved) {
+  const parts = resolved?._children?.Parts?._children ?? {};
+  const key = parts.key;
+  const keyTurns = Boolean(Number(key?.swing ?? 0) || Number(key?._children?.Layout?.rotation ?? 0));
+  for (const name of BUTTON_DEVICE_PARTS) {
+    const part = parts[name];
+    if (part?.visible !== true || name === 'key') continue;
+    // Riding a key that turns, a part turns about the key's pivot; one that also turns itself would
+    // need two turns about two points, which one layer cannot do.
+    const ownTurn = Boolean(Number(part.swing ?? 0) || Number(part?._children?.Layout?.rotation ?? 0)
+      || Number(part.travelX ?? 0) || Number(part.travelY ?? 0));
+    if (String(part.follows ?? '') === 'key' && keyTurns && ownTurn) return `its ${name} moves on a key that turns, which one layer cannot do`;
+  }
+  return '';
+}
+
+/** Where the device frame's units land in the control's box: `{ x, y, scale }`, and the caption. */
+function deviceFrameIn(width, height, caption, letterSpacing) {
+  const lay = buttonAnatomyLayout(width, height, caption, { letterSpacing });
+  if (lay) {
+    const [x, y, scale] = (/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/.exec(lay.device) ?? [0, 0, 0, 1]).slice(1).map(Number);
+    return { x, y, scale, caption: lay.caption ?? null, inFrame: false };
+  }
+  // The frame's 160 by 100 units, fitted into the box and centred (an svg's viewBox, "meet").
+  const scale = Math.min(width / 160, height / 100);
+  return { x: (width - 160 * scale) / 2, y: (height - 100 * scale) / 2, scale, caption: null, inFrame: true };
+}
+
+/**
+ * A button or switch drawn with device parts (models/buttonDeviceParts.js, editor/ButtonDeviceParts
+ * .svelte) as layers: each part a path layer, its shape over its pattern's cells, with its fill,
+ * gradient, finish and border; the legend and the caption as text. Pressed or on, a part moves and
+ * turns as it says (bindings on the channel, 0 or 1) and takes its lit colour, opacity and legend
+ * (`onPatches`, for the state the caller makes). `caption` is the control's text.
+ */
+export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName, caption = '', captionText = null }) {
+  const geometry = resolved?._children?.Parts?._children ?? {};
+  const colours = styled?._children?.Parts?._children ?? geometry;
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  const origin = { x: rect.x, y: rect.y };
+  const source = `channel.${channel}.normalized`;
+  const font = resolved?._children?.Text?._children?.Font ?? {};
+  const spacing = Math.max(0, num(font.letterSpacing, 0));
+  const frame = deviceFrameIn(width, height, caption, spacing);
+  const S = frame.scale;
+  const at = (fx, fy) => ({ x: frame.x + fx * S, y: frame.y + fy * S });
+  const out = { parts: [], bindings: {}, partNames: {}, onPatches: {} };
+  let depth = zIndex;
+  const add = (devicePart, part) => {
+    out.parts.push(part);
+    if (devicePart) out.partNames[devicePart] = [...(out.partNames[devicePart] ?? []), part.name];
+    depth += 1;
+    return part;
+  };
+  const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
+  const W = DEVICE_FRAME.width;
+  const H = DEVICE_FRAME.height;
+  const boxOf = (part) => {
+    const layout = part?._children?.Layout ?? {};
+    return { x: (num(layout.x, 0) / 100) * W, y: (num(layout.y, 0) / 100) * H, w: Math.max(0, (num(layout.width, 0) / 100) * W), h: Math.max(0, (num(layout.height, 0) / 100) * H) };
+  };
+  const motion = (part) => ({
+    dx: (num(part?.travelX, 0) / 100) * W * S,
+    dy: (num(part?.travelY, 0) / 100) * H * S,
+    turn: num(part?._children?.Layout?.rotation, 0),
+    swing: num(part?.swing, 0),
+  });
+  const keyMotion = motion(geometry.key);
+  const drawn = BUTTON_DEVICE_PARTS
+    .filter((name) => geometry[name]?.visible === true)
+    .sort((a, b) => num(geometry[a].zIndex, 0) - num(geometry[b].zIndex, 0));
+  for (const name of drawn) {
+    const part = geometry[name];
+    const styledPart = colours[name] ?? part;
+    const box = boxOf(part);
+    if (!(box.w > 0 && box.h > 0)) continue;
+    // A device part keeps a few settings of each; the layer's background renderer wants them all.
+    const background = deepClone(styledPart?._children?.Background ?? SECTION_DEFAULTS.Background);
+    background._children ??= {};
+    for (const key of ['Fill', 'Border', 'Corners']) {
+      background._children[key] = { ...deepClone(SECTION_DEFAULTS.Background._children[key]), ...(background._children[key] ?? {}) };
+    }
+    const fill = background._children.Fill;
+    const own = motion(part);
+    // A part that rides the key moves as the key does, then as itself; where the key turns, the part
+    // (which then does not turn itself: refused) turns with it, about the key's pivot.
+    const rides = String(part.follows ?? '') === 'key' && name !== 'key' ? keyMotion : { dx: 0, dy: 0, turn: 0, swing: 0 };
+    const opacity = num(part.opacity, 1);
+    const keyBox = boxOf(geometry.key);
+    const turnsWithKey = Boolean(rides.turn || rides.swing);
+    const pivot = turnsWithKey
+      ? at(keyBox.x + (num(geometry.key?.pivotX, 50) / 100) * keyBox.w, keyBox.y + (num(geometry.key?.pivotY, 50) / 100) * keyBox.h)
+      : at(box.x + (num(part.pivotX, 50) / 100) * box.w, box.y + (num(part.pivotY, 50) / 100) * box.h);
+    if (turnsWithKey) {
+      own.turn = rides.turn;
+      own.swing = rides.swing;
+    }
+    let layer;
+    let extra = null;
+    if (name === 'legend') {
+      const size = num(part.fontSize, 11) * S;
+      const text = deepClone(SECTION_DEFAULTS.Text);
+      text.content = String(part.offText ?? '');
+      text._children.Fill.colour = fill.colour ?? 'FFFFFFFF';
+      text._children.Font.size = r3(size);
+      text._children.Font.weightValue = 400;
+      text._children.Font.weight = 'Regular';
+      if (font.family) text._children.Font.family = font.family;
+      text._children.Position.justification = 'centred';
+      const centre = at(box.x + box.w / 2, box.y + box.h / 2);
+      const textBox = { x: centre.x - width, y: centre.y - size, width: width * 2, height: size * 2 };
+      layer = createPartNode(named('legend'), { role: 'label', kind: 'rectangle', zIndex: depth, opacity, layout: { ...pxBox(textBox, origin), ...pivotIn(textBox, pivot), rotation: own.turn }, sections: { Text: text } });
+      const on = {};
+      if (part.onText !== undefined && String(part.onText) !== String(part.offText ?? '')) on['Text.content'] = String(part.onText ?? '');
+      if (String(part.activeColour ?? '').trim()) on['Text.Fill.colour'] = styledPart.activeColour ?? part.activeColour;
+      if (part.activeOpacity != null) on.opacity = num(part.activeOpacity, 1);
+      if (Object.keys(on).length) out.onPatches[layer.name] = on;
+    } else {
+      const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
+      const d = devicePatternCells(String(part.pattern ?? 'solid'), 0, 0, box.w, box.h, { count: part.patternCount, rows: part.patternRows })
+        .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius }))
+        .filter(Boolean)
+        .join(' ');
+      if (!d) continue;
+      const border = part?._children?.Background?._children?.Border ?? {};
+      const bw = border.enabled === true && num(border.thickness, 0) > 0 ? num(border.thickness, 0) * S : 0;
+      background._children.Border = { ...(background._children.Border ?? {}), enabled: bw > 0, thickness: r3(bw) };
+      if (background._children.Corners) background._children.Corners.radius = 0;
+      const topLeft = at(box.x, box.y);
+      const pathLayerOf = (layerName, layerBackground, grow, closed) => {
+        const boxed = { x: topLeft.x - grow / 2, y: topLeft.y - grow / 2, width: box.w * S + grow, height: box.h * S + grow };
+        return createPartNode(layerName, {
+          role: name, kind: 'path', zIndex: depth, opacity,
+          layout: { ...pxBox(boxed, origin), ...pivotIn(boxed, pivot), rotation: own.turn },
+          meta: { pathData: scalePathData(d, 1 / box.w, 1 / box.h), closed },
+          sections: { Background: layerBackground },
+        });
+      };
+      // The panel strokes a part's border over its fill: a line along the outline, half outside it,
+      // round at the corners. A path layer that is not closed is drawn as just that stroke, so a part
+      // with a border is two layers, its fill and its edge.
+      const fillOnly = deepClone(background);
+      fillOnly._children.Border.enabled = false;
+      fillOnly._children.Border.thickness = 0;
+      layer = pathLayerOf(named(name), bw > 0 ? fillOnly : background, 0, true);
+      if (bw > 0) extra = pathLayerOf(named(`${name}Edge`), edgeBackground(background, bw), bw, false);
+      const on = {};
+      if (String(part.activeColour ?? '').trim()) on['Background.Fill.colour'] = styledPart.activeColour ?? part.activeColour;
+      if (part.activeOpacity != null) on.opacity = num(part.activeOpacity, 1);
+      if (Object.keys(on).length) out.onPatches[layer.name] = on;
+      if (extra && part.activeOpacity != null) out.onPatches[extra.name] = { opacity: num(part.activeOpacity, 1) };
+    }
+    for (const each of [layer, extra].filter(Boolean)) {
+      add(name, each);
+      const dx = own.dx + rides.dx;
+      const dy = own.dy + rides.dy;
+      if (dx) out.bindings[`${each.name}MoveX`] = rangeBinding(`${each.name}MoveX`, source, `Parts.${each.name}.Layout.offsetX`, 0, dx);
+      if (dy) out.bindings[`${each.name}MoveY`] = rangeBinding(`${each.name}MoveY`, source, `Parts.${each.name}.Layout.offsetY`, 0, dy);
+      if (own.swing) out.bindings[`${each.name}Swing`] = rangeBinding(`${each.name}Swing`, source, `Parts.${each.name}.Layout.rotation`, own.turn, own.turn + own.swing);
+    }
+  }
+
+  // The caption: under the device in the frame, or where the box's own layout puts it.
+  const words = String(captionText ?? caption ?? '').trim();
+  const captionColour = resolved?._children?.Text?._children?.Fill?.colour;
+  if (words) {
+    const text = deepClone(styled?._children?.Text ?? resolved?._children?.Text ?? SECTION_DEFAULTS.Text);
+    text.content = words;
+    text._children ??= {};
+    text._children.Fill = { ...(text._children.Fill ?? {}), colour: text._children.Fill?.colour ?? captionColour ?? 'FF20282C' };
+    text._children.Font = { ...(text._children.Font ?? {}) };
+    text._children.Position = { ...(text._children.Position ?? {}), justification: 'centred', offsetX: 0, offsetY: 0 };
+    let box;
+    if (frame.inFrame) {
+      const size = 11 * S;
+      text._children.Font.size = r3(size);
+      // The frame's caption sets no weight of its own: the page's, a regular one.
+      text._children.Font.weightValue = 400;
+      text._children.Font.weight = 'Regular';
+      text._children.Font.letterSpacing = 0;
+      const base = at(80, 96);
+      // A baseline at y, centred: the glyphs' middle sits about a third of the size above it.
+      box = { x: base.x - width, y: base.y - size * 0.36 - size, width: width * 2, height: size * 2 };
+    } else if (frame.caption) {
+      const size = frame.caption.size;
+      text._children.Font.size = r3(size);
+      const weight = num(font.weightValue, /bold/i.test(String(font.weight ?? '')) ? 700 : 400);
+      text._children.Font.weightValue = weight;
+      text._children.Font.weight = weight >= 600 ? 'Bold' : 'Regular';
+      text.content = frame.caption.text;
+      const middle = frame.caption.y - size * 0.36;
+      if (frame.caption.anchor === 'start') {
+        text._children.Position.justification = 'left';
+        box = { x: frame.caption.x - 8, y: middle - size, width: Math.max(1, width - frame.caption.x + 16), height: size * 2 };
+      } else {
+        box = { x: frame.caption.x - width, y: middle - size, width: width * 2, height: size * 2 };
+      }
+    }
+    if (box) add('caption', createPartNode(named('caption'), { role: 'label', kind: 'rectangle', zIndex: depth, opacity: 1, layout: pxBox(box, origin), sections: { Text: text } }));
+  }
+  return out;
+}
+
+// --- meters drawn as a device ------------------------------------------------------------------------
+
+/** Why a meter drawn with device parts cannot become layers, or ''. */
+export function meterDeviceLayersRefusal(resolved) {
+  const meter = resolved?._children?.Meter ?? {};
+  if (String(meter.scale ?? 'linear') === 'db') return 'a decibel scale, which a layer does not follow yet';
+  if (String(meter.valueSourceId ?? '').trim()) return 'its value taken from another control';
+  const parts = resolved?._children?.Parts?._children ?? {};
+  for (const name of METER_DEVICE_PARTS) {
+    const part = parts[name];
+    if (part?.visible !== true) continue;
+    const motion = String(part.motion ?? 'none');
+    const pattern = String(part.pattern ?? 'solid');
+    if (pattern === 'digits') return `counter digits on its ${name}, which a layer does not draw yet`;
+    if (String(part.zoneColours ?? 'off') !== 'off') return `its ${name} coloured by the meter's zones, which a layer does not do yet`;
+    if (String(part.source ?? 'reading') === 'peak' || motion === 'clip') return `its ${name} follows the held peak, which a layer does not keep`;
+    if (name === 'legend' && String(part.textSource ?? 'fixed') !== 'fixed') return 'a legend that shows the reading';
+    if (motion === 'fill' && (pattern !== 'solid' || String(part.shape ?? 'rect') !== 'rect')) return `a ${name} that fills in a pattern or shape, which a layer does not draw yet`;
+  }
+  return '';
+}
+
+/**
+ * A meter drawn with device parts (models/meterDeviceParts.js, utils/meterParts.js) as layers, placed
+ * as ControlAnatomy fits the 160 by 100 frame in the box: each part a path layer in its own box,
+ * swinging (a needle) or sliding (a pointer, a marker) with the reading, a fill growing from its edge,
+ * lit cells each lit from its own level, a scale's marks and numerals, a fixed legend, and the readout.
+ */
+export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName }) {
+  const geometry = resolved?._children?.Parts?._children ?? {};
+  const colours = styled?._children?.Parts?._children ?? geometry;
+  const meter = resolved?._children?.Meter ?? {};
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  const origin = { x: rect.x, y: rect.y };
+  const source = `channel.${channel}.normalized`;
+  const W = METER_FRAME.width;
+  const H = METER_FRAME.height;
+  const S = Math.min(width / W, height / H);
+  const ox = (width - W * S) / 2;
+  const oy = (height - H * S) / 2;
+  const at = (fx, fy) => ({ x: ox + fx * S, y: oy + fy * S });
+  const out = { parts: [], bindings: {}, partNames: {} };
+  let depth = zIndex;
+  const add = (meterPart, part) => {
+    out.parts.push(part);
+    if (meterPart) out.partNames[meterPart] = [...(out.partNames[meterPart] ?? []), part.name];
+    depth += 1;
+    return part;
+  };
+  const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
+  const font = resolved?._children?.Text?._children?.Font ?? {};
+  // A path in the frame's units as layers over `box` (frame units): its fill, and where it has a
+  // border, its edge, stroked as the panel strokes it (buttonDeviceLayers says why two).
+  const pathLayers = (name, d, box, background, { opacity, bw = 0, pivot = null, rotation = 0 } = {}) => {
+    const topLeft = at(box.x, box.y);
+    const pathData = scalePathData(translatePathData(d, -box.x, -box.y), 1 / box.w, 1 / box.h);
+    const layerOf = (layerName, layerBackground, grow, closed) => {
+      const pxBoxed = { x: topLeft.x - grow / 2, y: topLeft.y - grow / 2, width: box.w * S + grow, height: box.h * S + grow };
+      return createPartNode(named(layerName), {
+        role: 'custom', kind: 'path', zIndex: depth, opacity,
+        layout: { ...pxBox(pxBoxed, origin), ...(pivot ? pivotIn(pxBoxed, at(pivot.x, pivot.y)) : {}), rotation },
+        meta: { pathData, closed },
+        sections: { Background: layerBackground },
+      });
+    };
+    if (!(bw > 0)) return [layerOf(name, background, 0, true)];
+    const fillOnly = deepClone(background);
+    fillOnly._children.Border.enabled = false;
+    fillOnly._children.Border.thickness = 0;
+    return [layerOf(name, fillOnly, 0, true), layerOf(`${name}Edge`, edgeBackground(background, bw), bw, false)];
+  };
+  const backgroundOf = (styledPart, part, colour = null) => {
+    const background = deepClone(styledPart?._children?.Background ?? SECTION_DEFAULTS.Background);
+    background._children ??= {};
+    for (const key of ['Fill', 'Border', 'Corners']) {
+      background._children[key] = { ...deepClone(SECTION_DEFAULTS.Background._children[key]), ...(background._children[key] ?? {}) };
+    }
+    if (colour) {
+      background._children.Fill.colour = colour;
+      background._children.Fill.solidEnabled = true;
+      background._children.Fill.gradientEnabled = false;
+    }
+    const border = part?._children?.Background?._children?.Border ?? {};
+    const bw = border.enabled === true && num(border.thickness, 0) > 0 ? num(border.thickness, 0) * S : 0;
+    background._children.Border.enabled = bw > 0;
+    background._children.Border.thickness = r3(bw);
+    background._children.Corners.radius = 0;
+    return { background, bw };
+  };
+  const textLayer = (name, words, x, y, size, colour, { anchor = 'middle', baseline = 'alphabetic', family = '', opacity = 1 } = {}) => {
+    const text = deepClone(SECTION_DEFAULTS.Text);
+    text.content = words;
+    text._children.Fill.colour = colour ?? 'FFFFFFFF';
+    text._children.Font.size = r3(size);
+    text._children.Font.weightValue = 400;
+    text._children.Font.weight = 'Regular';
+    if (family || font.family) text._children.Font.family = family || font.family;
+    text._children.Position.justification = anchor === 'start' ? 'left' : (anchor === 'end' ? 'right' : 'centred');
+    // A baseline at y: the glyphs' middle about a third of the size above it; `central` is the middle.
+    const middle = baseline === 'central' ? y : y - size * 0.36;
+    const span = Math.max(size * 6, width);
+    const box = anchor === 'start' ? { x: x - 8, y: middle - size, width: span, height: size * 2 }
+      : anchor === 'end' ? { x: x - span + 8, y: middle - size, width: span, height: size * 2 }
+        : { x: x - span / 2, y: middle - size, width: span, height: size * 2 };
+    return createPartNode(named(name), { role: 'label', kind: 'rectangle', zIndex: depth, opacity, layout: pxBox(box, origin), sections: { Text: text } });
+  };
+
+  const drawn = METER_DEVICE_PARTS
+    .filter((name) => geometry[name]?.visible === true)
+    .sort((a, b) => num(geometry[a].zIndex, 0) - num(geometry[b].zIndex, 0));
+  for (const name of drawn) {
+    const part = geometry[name];
+    const styledPart = colours[name] ?? part;
+    const motion = String(part.motion ?? 'none');
+    const opacity = num(part.opacity, 1);
+    const fill = styledPart?._children?.Background?._children?.Fill ?? {};
+    const textColour = fill.colour ?? 'FFFFFFFF';
+    const rest = meterPartDrawing(name, part, { p: 0, meter });
+    const box = rest.box;
+    if (!(box.w > 0 && box.h > 0)) continue;
+    const pivot = { x: box.x + (num(part.pivotX, 50) / 100) * box.w, y: box.y + (num(part.pivotY, 50) / 100) * box.h };
+    const restTurn = num(part?._children?.Layout?.rotation, 0);
+    if (name === 'legend') {
+      for (const [i, t] of rest.texts.entries()) {
+        const point = at(t.x, t.y);
+        add(name, textLayer(`legend${i || ''}`, t.text, point.x, point.y, t.size * S, textColour, { family: String(part.fontFamily ?? '').trim(), opacity }));
+      }
+      continue;
+    }
+    if (motion === 'light') {
+      // Each cell: its plain look until the reading reaches it, then lit (moved by the lit offset).
+      const parts = part?._children?.Background?._children ?? {};
+      const litColour = String(styledPart.activeColour ?? part.activeColour ?? '').trim() || fill.colour;
+      const litOpacity = part.activeOpacity != null ? num(part.activeOpacity, 1) : opacity;
+      const offset = meterLitOffset(part);
+      const bottom = String(part.lightFrom ?? 'left') === 'bottom';
+      const cells = devicePatternCells(String(part.pattern ?? 'solid'), box.x, box.y, box.w, box.h, {
+        count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight,
+      });
+      const radius = num(parts.Corners?.radius, 0);
+      cells.forEach((cell, i) => {
+        const index = bottom ? cell.rows - 1 - cell.row : cell.col;
+        const count = bottom ? cell.rows : cell.cols;
+        const t = index / count;
+        const d = deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius });
+        if (!d) return;
+        const cellBox = { x: cell.x, y: cell.y, w: cell.w, h: cell.h };
+        const base = backgroundOf(styledPart, part);
+        const lit = backgroundOf(styledPart, part, litColour);
+        // Lit, the cell stands where the part's lit offset moves it.
+        const litBox = { ...cellBox, x: cellBox.x + offset.x, y: cellBox.y + offset.y };
+        const litD = deviceShapePath(part.shape, litBox.x, litBox.y, litBox.w, litBox.h, { depth: part.shapeDepth, radius });
+        // A cell is lit when its level (its index over the count) is at or under the reading.
+        for (const plain of pathLayers(`${name}${i}`, d, cellBox, base.background, { opacity, bw: base.bw })) {
+          add(name, plain);
+          out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, source, `Parts.${plain.name}.opacity`, opacity, 0, t - 0.0005, t);
+        }
+        for (const lighted of pathLayers(`${name}${i}lit`, litD, litBox, lit.background, { opacity: 0, bw: lit.bw })) {
+          add(name, lighted);
+          out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, source, `Parts.${lighted.name}.opacity`, 0, litOpacity, t - 0.0005, t);
+        }
+      });
+      continue;
+    }
+    if (motion === 'fill') {
+      // A rectangle growing from its edge; its corners keep their radius as it grows.
+      const { background, bw } = backgroundOf(styledPart, part);
+      background._children.Corners.radius = r3(num(part?._children?.Background?._children?.Corners?.radius, 0) * S);
+      const topLeft = at(box.x, box.y);
+      const full = { x: topLeft.x - bw / 2, y: topLeft.y - bw / 2, width: box.w * S + bw, height: box.h * S + bw };
+      const from = String(part.fillFrom ?? 'left');
+      const layer = add(name, createPartNode(named(name), {
+        role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(full, origin), sections: { Background: background },
+      }));
+      const lengthKey = from === 'left' || from === 'right' ? 'width' : 'height';
+      out.bindings[`${layer.name}Grow`] = rangeBinding(`${layer.name}Grow`, source, `Parts.${layer.name}.Layout.${lengthKey}`, 0, full[lengthKey]);
+      if (from === 'right' || from === 'bottom') {
+        const posKey = from === 'right' ? 'x' : 'y';
+        out.bindings[`${layer.name}Edge`] = rangeBinding(`${layer.name}Edge`, source, `Parts.${layer.name}.Layout.${posKey}`, layer._children.Layout[posKey] + full[lengthKey], layer._children.Layout[posKey]);
+      }
+      continue;
+    }
+    // A part that stands, swings or slides: its marks or its shape, and a scale's numerals.
+    const d = rest.paths.map((path) => path.d).filter(Boolean).join(' ');
+    if (d) {
+      const { background, bw } = backgroundOf(styledPart, part);
+      for (const layer of pathLayers(name, d, box, background, { opacity, bw, pivot, rotation: restTurn })) {
+        add(name, layer);
+        if (motion === 'swing' && num(part.swing, 0)) {
+          out.bindings[`${layer.name}Swing`] = rangeBinding(`${layer.name}Swing`, source, `Parts.${layer.name}.Layout.rotation`, restTurn, restTurn + num(part.swing, 0));
+        }
+        if (motion === 'slide') {
+          const dx = (num(part.travelX, 0) / 100) * W * S;
+          const dy = (num(part.travelY, 0) / 100) * H * S;
+          if (dx) out.bindings[`${layer.name}SlideX`] = rangeBinding(`${layer.name}SlideX`, source, `Parts.${layer.name}.Layout.offsetX`, 0, dx);
+          if (dy) out.bindings[`${layer.name}SlideY`] = rangeBinding(`${layer.name}SlideY`, source, `Parts.${layer.name}.Layout.offsetY`, 0, dy);
+        }
+      }
+    }
+    for (const [i, label] of rest.labels.entries()) {
+      const point = at(label.x, label.y);
+      add(name, textLayer(`${name}Numeral${i}`, label.text, point.x, point.y, label.size * S, textColour, {
+        anchor: label.anchor ?? 'middle', baseline: 'central', family: String(part.fontFamily ?? '').trim(), opacity,
+      }));
+    }
+  }
+
+  // The readout under the frame, as the meter prints its value.
+  const core = resolved?._children?.Core ?? {};
+  if (core.formShowValue !== false) {
+    const point = at(80, 98);
+    const colour = resolved?._children?.Text?._children?.Fill?.colour ?? 'FF20282C';
+    const layer = add('readout', textLayer('readout', '', point.x, point.y, 10 * S, styled?._children?.Text?._children?.Fill?.colour ?? colour));
+    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
+  }
+  return out;
+}
+
+/** Path data moved by (dx, dy): absolute coordinates shifted, relative ones as they are. */
+function translatePathData(d, dx, dy) {
+  const tokens = String(d ?? '').match(/[a-df-z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? [];
+  const counts = { m: 2, l: 2, h: 1, v: 1, c: 6, s: 4, q: 4, t: 2, a: 7, z: 0 };
+  const out = [];
+  let command = '';
+  let i = 0;
+  while (i < tokens.length) {
+    if (/^[a-z]$/i.test(tokens[i])) { command = tokens[i]; out.push(command); i += 1; if (command.toLowerCase() === 'z') continue; }
+    const lower = command.toLowerCase();
+    const n = counts[lower];
+    if (!n) { i += 1; continue; }
+    const args = tokens.slice(i, i + n).map(Number);
+    if (args.length < n) break;
+    i += n;
+    if (command === lower) { out.push(...args.map(r3)); continue; }
+    if (lower === 'h') out.push(r3(args[0] + dx));
+    else if (lower === 'v') out.push(r3(args[0] + dy));
+    else if (lower === 'a') out.push(...args.slice(0, 5).map(r3), r3(args[5] + dx), r3(args[6] + dy));
+    else out.push(...args.map((value, k) => r3(value + (k % 2 === 0 ? dx : dy))));
+    if (lower === 'm') command = command === 'M' ? 'L' : 'l';
+  }
+  return out.join(' ');
+}
+
+/** A background that draws only its border: the edge layer of a part stroked over its fill. */
+function edgeBackground(background, bw) {
+  const edge = deepClone(background);
+  Object.assign(edge._children.Fill, { solidEnabled: false, gradientEnabled: false, imageEnabled: false, overlayEnabled: false });
+  edge._children.Border = { ...edge._children.Border, enabled: true, thickness: r3(bw) };
+  delete edge._children.Effects;
+  return edge;
+}
+
+// --- plain meters ----------------------------------------------------------------------------------
+
+/** Why a plain meter (editor/MeterRenderer.svelte, a bar or segments) cannot become layers, or ''. */
+export function plainMeterLayersRefusal(resolved) {
+  const cfg = resolved?._children?.Meter ?? {};
+  if (String(cfg.orientation ?? 'horizontal') === 'arc') return 'an arc meter, which comes in as layers in a later step';
+  if (String(cfg.scale ?? 'linear') === 'db') return 'a decibel scale, which a layer does not follow yet';
+  if (String(cfg.valueSourceId ?? '').trim()) return 'its value taken from another control';
+  if (cfg.peakHold === true) return 'peak hold, which a layer does not keep';
+  if (cfg.showValue === true) return 'a readout, which comes in as layers in a later step';
+  if (cfg.showScaleLabels === true) return 'scale labels, which come in as layers in a later step';
+  if (String(cfg.label ?? '').trim() && ['above', 'below'].includes(String(cfg.labelPosition ?? 'none'))) return 'a label, which comes in as layers in a later step';
+  const track = String(cfg.trackColour ?? 'FF141414');
+  if (/^[0-9a-f]{8}$/i.test(track) && track.slice(0, 2).toUpperCase() !== 'FF') return 'a track you can see through';
+  return '';
+}
+
+/**
+ * A plain meter as layers, as MeterRenderer lays it out (padding 4, the track filling the body or
+ * `thickness` across it): its plate; for a bar, the track, the zones' gradient over the whole track,
+ * and over that, from the reading to the end, a cover in the track's colour, so the gradient shows
+ * up to the reading and stays where the panel draws it; for segments, each segment plain until the
+ * reading reaches its middle, then lit in its zone's colour; and the ticks.
+ */
+export function plainMeterLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName }) {
+  const cfg = resolved?._children?.Meter ?? {};
+  const styledCfg = styled?._children?.Meter ?? cfg;
+  const width = Math.max(1, rect.width);
+  const height = Math.max(1, rect.height);
+  const origin = { x: rect.x, y: rect.y };
+  const source = `channel.${channel}.normalized`;
+  const out = { parts: [], bindings: {}, partNames: {} };
+  let depth = zIndex;
+  const add = (part) => { out.parts.push(part); depth += 1; return part; };
+  const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
+  const vertical = String(cfg.orientation ?? 'horizontal') === 'vertical';
+  const thickness = Math.max(0, num(cfg.thickness, 0));
+  const radius = num(cfg.rounded, 3);
+  const trackColour = styledCfg.trackColour ?? 'FF141414';
+  // The body: the box less its padding. The track fills it, or is `thickness` across it, centred.
+  const body = { x: 4, y: 4, width: Math.max(1, width - 8), height: Math.max(1, height - 8) };
+  const track = thickness > 0
+    ? (vertical
+      ? { x: body.x + (body.width - Math.min(thickness, body.width)) / 2, y: body.y, width: Math.min(thickness, body.width), height: body.height }
+      : { x: body.x, y: body.y + (body.height - Math.min(thickness, body.height)) / 2, width: body.width, height: Math.min(thickness, body.height) })
+    : body;
+  const solid = (colour, corners = null) => {
+    const background = solidBackground(colour);
+    if (corners) {
+      background._children.Corners.linked = false;
+      background._children.Corners.radius = radius;
+      for (const [key, r] of Object.entries(corners)) background._children.Corners[key] = { ...(background._children.Corners[key] ?? {}), radius: r };
+    } else {
+      background._children.Corners.radius = radius;
+    }
+    return background;
+  };
+  const rectLayer = (name, box, background, opacity = 1) => add(createPartNode(named(name), {
+    role: 'custom', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(box, origin), sections: { Background: background },
+  }));
+
+  const plate = resolved?._children?.Background;
+  const fill = plate?._children?.Fill ?? {};
+  const border = plate?._children?.Border ?? {};
+  if (fill.solidEnabled === true || fill.gradientEnabled === true || fill.imageEnabled === true || border.enabled === true) {
+    rectLayer('plate', { x: 0, y: 0, width, height }, deepClone(styled?._children?.Background ?? plate));
+  }
+  const zones = meterZones(styledCfg);
+  const segments = Math.max(0, Math.round(num(cfg.segments, 0)));
+  if (segments > 0) {
+    const gap = num(cfg.segmentGap, 2);
+    const along = vertical ? track.height : track.width;
+    const size = Math.max(0.5, (along - gap * (segments - 1)) / segments);
+    for (let idx = 0; idx < segments; idx += 1) {
+      const offset = idx * (size + gap);
+      const box = vertical
+        ? { x: track.x, y: track.y + along - offset - size, width: track.width, height: size }
+        : { x: track.x + offset, y: track.y, width: size, height: track.height };
+      const plain = rectLayer(`segment${idx}`, box, solid(trackColour));
+      const lit = rectLayer(`segment${idx}lit`, box, solid(meterFillColourAt(meterSegmentCenter(idx, segments), styledCfg)), 0);
+      // Lit once the reading reaches the segment's middle (meterSegmentsLit rounds).
+      const t = (idx + 0.5) / segments;
+      out.bindings[`${lit.name}Lit`] = rangeBinding(`${lit.name}Lit`, source, `Parts.${lit.name}.opacity`, 0, 1, t - 0.0005, t);
+      out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, source, `Parts.${plain.name}.opacity`, 1, 0, t - 0.0005, t);
+    }
+  } else {
+    rectLayer('track', track, solid(trackColour));
+    // The zones as a gradient over the whole track (MeterRenderer's gradientCss).
+    const stops = [];
+    zones.forEach((zone, i) => {
+      const at = Math.round(zone.from * 100);
+      if (cfg.gradient === false && i > 0) stops.push({ color: zones[i - 1].colour, position: at });
+      stops.push({ color: zone.colour, position: at });
+    });
+    const gradientBackground = solid(zones[0]?.colour ?? 'FF39D98A');
+    if (zones.length > 1) {
+      gradientBackground._children.Fill.gradientEnabled = true;
+      gradientBackground._children.Fill.gradient = { type: 'linear', angle: vertical ? 0 : 90, stops };
+    }
+    rectLayer('fill', track, gradientBackground);
+    // The cover: from the reading to the end of the track, square where the reading is.
+    const cover = vertical
+      ? rectLayer('cover', track, solid(trackColour, { topLeft: radius, topRight: radius, bottomLeft: 0, bottomRight: 0 }))
+      : rectLayer('cover', track, solid(trackColour, { topLeft: 0, bottomLeft: 0, topRight: radius, bottomRight: radius }));
+    const name = cover.name;
+    if (vertical) {
+      out.bindings[`${name}Height`] = rangeBinding(`${name}Height`, source, `Parts.${name}.Layout.height`, track.height, 0);
+    } else {
+      out.bindings[`${name}Edge`] = rangeBinding(`${name}Edge`, source, `Parts.${name}.Layout.x`, cover._children.Layout.x, cover._children.Layout.x + track.width);
+      out.bindings[`${name}Width`] = rangeBinding(`${name}Width`, source, `Parts.${name}.Layout.width`, track.width, 0);
+    }
+    // At no reading the cover is the whole track, rounded where the track is.
+    const near = vertical ? ['bottomLeft', 'bottomRight'] : ['topLeft', 'bottomLeft'];
+    for (const corner of near) {
+      out.bindings[`${name}${corner}`] = rangeBinding(`${name}${corner}`, source, `Parts.${name}.Background.Corners.${corner}.radius`, radius, 0, 0, 0.0005);
+    }
+  }
+  if (cfg.showTicks === true) {
+    for (const [i, tick] of meterTicks(cfg, cfg.tickCount).entries()) {
+      const box = vertical
+        ? { x: track.x, y: track.y + track.height * (1 - tick.pos), width: track.width, height: 1 }
+        : { x: track.x + track.width * tick.pos, y: track.y, width: 1, height: track.height };
+      add(createPartNode(named(`tick${i}`), { role: 'custom', kind: 'rectangle', zIndex: depth, opacity: 1, layout: pxBox(box, origin), sections: { Background: solidBackground('2EFFFFFF') } }));
+    }
+  }
+  return out;
 }
 
 /** A part's outline as drawn at the start of the travel, for a part that turns with the value. */

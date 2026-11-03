@@ -250,6 +250,34 @@ components):
    cap turning under a fixed light (a turning layer turns its light with it), and fader caps with
    a block, console, lens or glass body, a glow or a sheen, and gradients along a track or fill.
    Value glide is not carried: the layers go straight to the value.
+   **Buttons and switches** (Button, MomentaryButton, ToggleButton) come in as layers only: a plain
+   one as its plate and its text (the label's text part and rules), one drawn as a device as a path
+   layer per part (housing, guard, key, symbol, indicator; `utils/deviceShapes.js` shapes over their
+   pattern cells, placed as ControlAnatomy places the 160 by 80 frame) with its legend and caption as
+   text. A bool channel; a toggle's grab area `toggleValue`, a momentary one the new
+   `momentaryValue` action (on while pressed, by the pointer or by Space or Enter, off on release
+   or a lost pointer, on the panel and in the designer's Preview). Pressed or on, a part's travel and swing are bindings, its lit
+   colour, opacity and legend a state (`rule: '<channel> == true'`); the button's own hover,
+   focus, pressed and selected looks are states on its layers. The pixel check compares them in
+   Preview, off and on. Refused by name: control forms not made of parts, a lamp, a part that moves
+   on a key that turns, timed and one-shot buttons. A device part with a border is two layers, its
+   fill and its edge, the edge an open path the part renderer strokes as the panel does (round
+   joins, half outside the outline).
+   **Meters** come in as layers only, with a display-only channel (no grab area) printed as the
+   meter's readout. A plain one (MeterRenderer) as its plate, its track, the zones as one gradient
+   over the whole track and a cover in the track's colour from the reading to the end (square at
+   the reading, rounded at the end, bound by the reading), or its segments each lit from its middle,
+   and its ticks. One drawn with device parts (`utils/meterParts.js`) as a layer per part in its own
+   box, fitted as ControlAnatomy fits the 160 by 100 frame: a needle swinging, a pointer or marker
+   sliding, a bar growing from its edge (a rectangle, so its corners keep their radius), lit cells
+   each lit from its level and moved by the lit offset, a scale's marks and numerals, a fixed legend
+   and the readout. Refused by name: arc meters, readouts and labels on a plain meter, peak hold and
+   parts that follow the peak, decibel scales, zone-coloured parts, counter digits, legends that
+   show the reading, patterned or shaped fills, a value taken from another control.
+   The pixel check compares, since buttons, by the other picture's 3 by 3 neighbourhood: a pixel
+   differs when a channel falls outside that neighbourhood's range by more than 24, so a half-pixel
+   edge or an anti-aliased one against a crisp one passes and a part missing, moved or recoloured
+   does not (a switch compared with another set's: 47 %).
 3. Channel curves (bipolar, exponential, stepped) take effect. **Built:** `utils/channelCurves.js`
    maps travel to value (Linear, Exponential and Logarithmic through a Centre value, S-Curve,
    Stepped with Steps and Hysteresis, Bipolar, Dead Zone). `normalizeCustomChannelValue` is the

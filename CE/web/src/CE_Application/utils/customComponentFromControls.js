@@ -47,15 +47,24 @@ import { shapeConfig, shapeNeedsRoundCap, shapePath, shapeStrokeDash, shapeTakes
 import { createControl } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
-import { knobChannelFormat, knobLayers, layerStatePatches, seedLayersAt, sliderLayers, valueLayersRefusal } from './valueControlLayers.js';
+import {
+  buttonDeviceLayers, buttonDeviceLayersRefusal, knobChannelFormat, knobLayers, layerStatePatches, meterDeviceLayers, meterDeviceLayersRefusal,
+  plainMeterLayers, plainMeterLayersRefusal, seedLayersAt, sliderLayers, valueLayersRefusal,
+} from './valueControlLayers.js';
 import { getControlLayer, sortControlsForRender } from './controlOrder.js';
 import { SLIDER_CONTROL_KIND, SLIDER_SEMANTIC_PARTS, sliderControlSnapshot } from './sliderControlPart.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
+import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
+import { meterDeviceDrawn } from '../models/meterDeviceParts.js';
 import { isDisplayOnly } from './displayMode.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
 /** Controls with a value that convert: drawn by SliderFamilyRenderer, one value each. */
 export const VALUE_TYPES = ['Knob', 'Slider'];
+/** Buttons and switches, which come in as layers (a plate and its text) when asked for layers. */
+export const BUTTON_TYPES = ['Button', 'MomentaryButton', 'ToggleButton'];
+/** Meters, which come in as layers when drawn with device parts. */
+export const METER_TYPES = ['Meter'];
 
 /** The Text leaves the part renderer draws exactly as a label does. Everything else must be default. */
 const TEXT_KEYS = new Set([
@@ -303,9 +312,75 @@ function whyNotValueConvertible(control, resolved) {
   return '';
 }
 
+/**
+ * Why this button cannot become layers that draw and behave as it does, or ''. It comes in as its
+ * plate and its text, drawn as a label's are (the same text renderer), so a label's rules apply to
+ * its text, against the button's own defaults and as its set draws it.
+ */
+function whyNotButtonLayers(control, resolved, measure) {
+  const kids = control._children;
+  const core = kids.Core ?? {};
+  const behavior = resolved?._children?.Behavior ?? kids.Behavior ?? {};
+  const transform = kids.Transform ?? {};
+  if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
+  if (Number(transform.scale ?? 1) !== 1) return 'scaled';
+  if (Number(transform.rotation ?? 0)) return 'rotated';
+  if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
+  if (core.enabled === false) return 'disabled';
+  if (core.visible === false) return 'hidden';
+  const kind = String(behavior.buttonType ?? 'momentary');
+  if (kind !== 'toggle' && kind !== 'momentary') return `a ${kind.replace(/_/g, '-')} button, which comes in as a toggle or a momentary button only`;
+  if (behavior.repeating === true || behavior.pressToTalk === true || behavior.press_to_talk === true) return 'a repeating or press-to-talk button';
+  const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
+  if (form) return `drawn in the "${form}" control form, which is not made of parts`;
+  // Drawn as a device, the control's own plate, text, icon and lamp are not drawn: its parts are.
+  if (buttonDeviceDrawn(resolved)) return buttonDeviceLayersRefusal(resolved);
+  if (nonDefault(resolved, 'Icon').length) return 'an icon';
+  const lamp = String(resolved?._children?.ContentLayout?.lamp ?? 'none');
+  if (lamp && lamp !== 'none') return 'a lamp';
+  const layout = nonDefault(resolved, 'ContentLayout', (key) => LAYOUT_KEYS.has(key) || key.startsWith('lamp'));
+  if (layout.length) return `the text layout setting ${layout[0]}`;
+  const text = nonDefault(resolved, 'Text', (key) => TEXT_KEYS.has(key));
+  if (text.length) return TEXT_LABELS[text[0]] ?? `the text setting ${text[0]}`;
+  const justification = String(resolved?._children?.Text?._children?.Position?.justification ?? 'centred');
+  if (!JUSTIFICATIONS.has(justification)) return `text aligned ${justification.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
+  const colour = String(resolved?._children?.Text?._children?.Fill?.colour ?? 'FFFFFFFF');
+  if (/^[0-9a-f]{8}$/i.test(colour) && !/^ff/i.test(colour)) return 'semi-transparent text';
+  if (String(resolved?._children?.Text?.content ?? '').includes('\n')) return 'text on more than one line';
+  if (overflows(resolved, measure)) return 'text wider than its box — the panel wraps it, a component would not';
+  if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
+  const ports = (kids.DeviceBindings?.bindings ?? []).map((binding) => String(binding?.port ?? 'value')).filter((port) => port !== 'value');
+  if (ports.length) return `a device binding on its ${ports[0]} port`;
+  return '';
+}
+
+/** Why this meter cannot become layers that draw as it does, or ''. */
+function whyNotMeterLayers(control, resolved) {
+  const kids = control._children;
+  const core = kids.Core ?? {};
+  const transform = kids.Transform ?? {};
+  if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
+  if (Number(transform.scale ?? 1) !== 1) return 'scaled';
+  if (Number(transform.rotation ?? 0)) return 'rotated';
+  if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
+  if (core.visible === false) return 'hidden';
+  const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
+  if (form) return `drawn in the "${form}" control form, which is not made of parts`;
+  if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
+  return meterDeviceDrawn(resolved) ? meterDeviceLayersRefusal(resolved) : plainMeterLayersRefusal(resolved);
+}
+
 /** Why this control cannot convert faithfully, or '' when it can. */
-export function whyNotConvertible(control, resolved, { measure = null } = {}) {
+export function whyNotConvertible(control, resolved, { measure = null, layers = false } = {}) {
   const type = String(control?._children?.Core?.controlType ?? '');
+  if (BUTTON_TYPES.includes(type)) {
+    if (!layers) return `a ${type} — as one exact part only artwork, knobs and sliders convert; ask for layers`;
+    return whyNotButtonLayers(control, resolved, measure);
+  }
+  if (METER_TYPES.includes(type)) {
+    if (!layers) return `a ${type} — as one exact part only artwork, knobs and sliders convert; ask for layers`;
+    return whyNotMeterLayers(control, resolved);
+  }
   if (VALUE_TYPES.includes(type)) {
     const transform = control._children.Transform ?? {};
     if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
@@ -414,6 +489,34 @@ function uniquePartName(wanted, taken) {
   return name;
 }
 
+/**
+ * A label's (or a button's) text as a part over its CONTENT box — the box inset by the layout padding,
+ * which is what the label renderer centres (or left/right-aligns) the glyphs in. The part renderer
+ * insets its text 8px either side, so the text part is widened by that much: the centre stays put,
+ * and text clips where the label's would. `styled` gives the text section (with colour roles kept).
+ */
+function labelTextPart(name, resolved, styled, rect, transform, common) {
+  const layout = resolved._children.ContentLayout ?? {};
+  const position = resolved._children.Text?._children?.Position ?? {};
+  const pad = (key) => Number.isFinite(Number(layout[key])) ? Number(layout[key]) : 0;
+  const offsetX = (Number(layout.textOffsetX) || 0) + (Number(position.offsetX) || 0);
+  const offsetY = (Number(layout.textOffsetY) || 0) + (Number(position.offsetY) || 0);
+  const textBox = {
+    x: rect.x + pad('paddingLeft') - 8 + offsetX,
+    y: rect.y + pad('paddingTop') + offsetY,
+    width: Math.max(1, rect.width - pad('paddingLeft') - pad('paddingRight') + 16),
+    height: Math.max(1, rect.height - pad('paddingTop') - pad('paddingBottom')),
+  };
+  const text = deepClone(styled?._children?.Text ?? resolved._children.Text);
+  // Rotation turns the whole label about ITS centre; the text part must turn about the same point.
+  const textLayout = pxLayout(textBox, transform);
+  if (textLayout.rotation) {
+    textLayout.pivotX = ((rect.x + rect.width / 2 - textBox.x) / textBox.width) * 100;
+    textLayout.pivotY = ((rect.y + rect.height / 2 - textBox.y) / textBox.height) * 100;
+  }
+  return createPartNode(name, { ...common, role: 'label', kind: 'rectangle', layout: textLayout, sections: { Text: text } });
+}
+
 function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, asLayers = false } = {}) {
   const type = control._children.Core.controlType;
   const transform = control._children.Transform ?? {};
@@ -424,6 +527,49 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
     layout: pxLayout(rect, transform),
   };
   const name = nameOf(control);
+  if (METER_TYPES.includes(type)) {
+    // A meter drawn with device parts: a layer per part, moving with the reading; no grab areas.
+    const channel = uniquePartName(name, taken);
+    const built = (meterDeviceDrawn(resolved) ? meterDeviceLayers : plainMeterLayers)({
+      resolved, styled, rect, channel, prefix: channel, zIndex,
+      uniqueName: (wanted) => uniquePartName(wanted, taken),
+    });
+    const cfg = resolved?._children?.Meter ?? {};
+    const lo = Number(cfg.valueMin ?? 0);
+    const hi = Number(cfg.valueMax ?? 1);
+    const value = Number(cfg.value ?? lo);
+    seedLayersAt(built.parts, built.bindings, hi > lo ? Math.max(0, Math.min(1, (value - lo) / (hi - lo))) : 0);
+    for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
+    return Object.assign(built.parts, { metered: { channel, ...built } });
+  }
+  if (BUTTON_TYPES.includes(type) && buttonDeviceDrawn(resolved)) {
+    // A button or switch drawn as a device: a layer per part, the caption as text.
+    const channel = uniquePartName(name, taken);
+    const toggle = String(resolved?._children?.Behavior?.buttonType ?? 'momentary') === 'toggle';
+    const caption = String(resolved._children.Text?.content ?? '');
+    const built = buttonDeviceLayers({
+      resolved, styled, rect, channel, prefix: channel, zIndex,
+      uniqueName: (wanted) => uniquePartName(wanted, taken),
+      caption, captionText: caption.trim() || (toggle ? 'SWITCH' : 'PRESS'),
+    });
+    for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
+    const captionLayer = built.partNames.caption?.[0] ?? '';
+    return Object.assign(built.parts, { buttoned: { channel, plate: '', text: captionLayer, device: built } });
+  }
+  if (BUTTON_TYPES.includes(type)) {
+    // A button as layers: its plate and its text, drawn as a label's are, in the set's colour roles.
+    const channel = uniquePartName(name, taken);
+    const plate = drawsBackground(resolved._children.Background)
+      ? createPartNode(uniquePartName(`${channel}_plate`, taken), {
+        ...common, role: 'background', kind: 'rectangle', sections: { Background: deepClone(styled?._children?.Background ?? resolved._children.Background) },
+      })
+      : null;
+    const textPart = String(resolved._children.Text?.content ?? '').trim()
+      ? labelTextPart(uniquePartName(`${channel}_text`, taken), resolved, styled, rect, transform, { ...common, zIndex: zIndex + 1 })
+      : null;
+    const built = [plate, textPart].filter(Boolean);
+    return Object.assign(built, { buttoned: { channel, plate: plate?.name ?? '', text: textPart?.name ?? '' } });
+  }
   if (VALUE_TYPES.includes(type) && asLayers) {
     // Layers the designer edits (utils/valueControlLayers.js): one per part of the knob, wired to its
     // value. The channel is named as the one exact part would have been.
@@ -466,32 +612,7 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
         ...common, role: 'background', kind: 'rectangle', sections: { Background: deepClone(resolved._children.Background) },
       }));
     }
-    const layout = resolved._children.ContentLayout ?? {};
-    const position = resolved._children.Text?._children?.Position ?? {};
-    const pad = (key) => Number.isFinite(Number(layout[key])) ? Number(layout[key]) : 0;
-    const offsetX = (Number(layout.textOffsetX) || 0) + (Number(position.offsetX) || 0);
-    const offsetY = (Number(layout.textOffsetY) || 0) + (Number(position.offsetY) || 0);
-    const textBox = {
-      x: rect.x + pad('paddingLeft') - 8 + offsetX,
-      y: rect.y + pad('paddingTop') + offsetY,
-      width: Math.max(1, rect.width - pad('paddingLeft') - pad('paddingRight') + 16),
-      height: Math.max(1, rect.height - pad('paddingTop') - pad('paddingBottom')),
-    };
-    const text = deepClone(resolved._children.Text);
-    // Rotation turns the whole label about ITS centre; the text part must turn about the same point.
-    const textLayout = pxLayout(textBox, transform);
-    if (textLayout.rotation) {
-      textLayout.pivotX = ((rect.x + rect.width / 2 - textBox.x) / textBox.width) * 100;
-      textLayout.pivotY = ((rect.y + rect.height / 2 - textBox.y) / textBox.height) * 100;
-    }
-    parts.push(createPartNode(uniquePartName(name, taken), {
-      ...common,
-      zIndex: zIndex + 1,
-      role: 'label',
-      kind: 'rectangle',
-      layout: textLayout,
-      sections: { Text: text },
-    }));
+    parts.push(labelTextPart(uniquePartName(name, taken), resolved, resolved, rect, transform, { ...common, zIndex: zIndex + 1 }));
     return parts;
   }
   if (type === 'Shape') {
@@ -534,9 +655,10 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   const chosen = [];
 
   const converting = new Set(wanted);
+  const valueTypes = valueControlsAs === 'layers' ? [...VALUE_TYPES, ...BUTTON_TYPES, ...METER_TYPES] : VALUE_TYPES;
   const references = valueReferences(
     panel,
-    wanted.map((id) => topLevel.get(id)?.control).filter((control) => VALUE_TYPES.includes(String(control?._children?.Core?.controlType ?? ''))),
+    wanted.map((id) => topLevel.get(id)?.control).filter((control) => valueTypes.includes(String(control?._children?.Core?.controlType ?? ''))),
     converting,
   );
   for (const id of wanted) {
@@ -547,7 +669,7 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     }
     const { control } = entry;
     const resolved = resolveControlForSet(control, set);
-    const why = whyNotConvertible(control, resolved, { measure })
+    const why = whyNotConvertible(control, resolved, { measure, layers: valueControlsAs === 'layers' })
       || (scriptReference(scripts, control) ? `used by ${scriptReference(scripts, control)}` : '')
       || references.get(id)
       || '';
@@ -612,10 +734,13 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
       else asLayers = true;
     }
     // Layers keep the set's colour roles as roles: the family applied, the tokens not resolved.
-    const styled = asLayers ? resolveControlFamily(control, set, { document: panel?.controlSets ?? [] }) : resolved;
+    const isButton = [...BUTTON_TYPES, ...METER_TYPES].includes(String(control._children.Core.controlType));
+    const styled = asLayers || isButton ? resolveControlFamily(control, set, { document: panel?.controlSets ?? [] }) : resolved;
     // A knob's layers take ten depths each and more; the next control paints above all of them.
     const built = partsFor(control, resolved, local, (i + 1) * 1000, taken, { styled, asLayers });
     if (built.layered) values.push({ control, resolved, local, paintIndex: i, layered: built.layered });
+    if (built.buttoned) values.push({ control, resolved, local, paintIndex: i, buttoned: built.buttoned });
+    if (built.metered) values.push({ control, resolved, local, paintIndex: i, metered: built.metered });
     for (const part of built) {
       parts[part.name] = part;
       if (part.kind === SLIDER_CONTROL_KIND) values.push({ control, resolved, part, local, paintIndex: i });
@@ -686,7 +811,16 @@ function knobSections(values, bounds, allParts = {}) {
   const out = { channels: {}, behaviors: {}, hitZones: {}, bindings: {}, states: {}, published: {}, carried: [] };
   const width = Math.max(1, bounds.width);
   const height = Math.max(1, bounds.height);
-  for (const { control, resolved, part, local, paintIndex, layered } of values) {
+  for (const entry of values) {
+    if (entry.buttoned) {
+      buttonSections(out, entry, width, height, allParts);
+      continue;
+    }
+    if (entry.metered) {
+      meterSections(out, entry);
+      continue;
+    }
+    const { control, resolved, part, local, paintIndex, layered } = entry;
     const behavior = control._children.Behavior ?? {};
     const channelName = layered ? layered.channel : part.name;
     const zoneName = `${channelName}Zone`;
@@ -825,6 +959,117 @@ function knobSections(values, bounds, allParts = {}) {
     });
   }
   return out;
+}
+
+/**
+ * A button as layers: a bool channel; a toggle flips it on a click, a momentary button holds it on
+ * while pressed (the `momentaryValue` action). Its looks, which the button's States write to the
+ * whole control, are written to its plate and text when THIS button is hovered, focused, pressed (a
+ * momentary button, by its value) or on (a toggle).
+ */
+function buttonSections(out, { control, resolved, local, paintIndex, buttoned }, width, height, allParts) {
+  const behavior = resolved?._children?.Behavior ?? control._children.Behavior ?? {};
+  const channelName = buttoned.channel;
+  const zoneName = `${channelName}Zone`;
+  const toggle = String(behavior.buttonType ?? 'momentary') === 'toggle';
+  out.channels[channelName] = createValueChannel(channelName, {
+    label: nameOf(control), type: 'bool', min: 0, max: 1, step: 1,
+    defaultValue: toggle && (behavior.defaultValue === true || behavior.defaultCurrentValue === true),
+  });
+  out.behaviors[channelName] = createBehaviorModule(channelName, {
+    type: toggle ? 'toggle' : 'button', role: 'button', valueChannel: channelName, geometry: 'none',
+    interaction: { wheel: false },
+  });
+  out.hitZones[zoneName] = createHitZone(zoneName, {
+    shape: 'rectangle', targetBehavior: channelName, targetValueChannel: channelName,
+    action: toggle ? 'toggleValue' : 'momentaryValue',
+    cursor: String(control._children.Mouse?.cursor ?? 'pointer'),
+    bounds: { x: (local.x / width) * 100, y: (local.y / height) * 100, width: (local.width / width) * 100, height: (local.height / height) * 100, unit: 'percent' },
+  });
+  out.hitZones[zoneName].priority = paintIndex;
+  // The button's own look changes, from the whole control onto its two layers.
+  const onLayers = (patch) => {
+    const parts = {};
+    for (const [path, value] of Object.entries(patch ?? {})) {
+      const layer = path.startsWith('Background.') ? buttoned.plate : (path.startsWith('Text.') ? buttoned.text : '');
+      if (!layer || !allParts[layer]) continue;
+      (parts[layer] ??= {})[path] = deepClone(value);
+    }
+    return parts;
+  };
+  const on = `${channelName} == true`;
+  const conditions = {
+    Hover: { when: { hoveredCustomHitZone: zoneName } },
+    Focused: { when: { focusedCustomHitZones: zoneName } },
+    Pressed: toggle ? null : { rule: on },
+    Selected: toggle ? { rule: on } : null,
+  };
+  // Drawn as a device: pressed or on, its parts move (bindings) and light up (a state).
+  if (buttoned.device) {
+    Object.assign(out.bindings, buttoned.device.bindings);
+    if (Object.keys(buttoned.device.onPatches).length) {
+      out.states[`${channelName}On`] = {
+        _type: 'State', name: `${channelName}On`, group: 'interaction', enabled: true,
+        description: `${nameOf(control)}: ${toggle ? 'on' : 'pressed'}, its parts lit.`,
+        when: {}, rule: on, patches: { component: {}, parts: deepClone(buttoned.device.onPatches) },
+      };
+    }
+  }
+  for (const [stateName, state] of Object.entries(resolved?._children?.States?._children ?? {})) {
+    const condition = conditions[stateName];
+    if (!condition || !state || state.enabled === false) continue;
+    const parts = onLayers(state.patches?.component);
+    if (!Object.keys(parts).length) continue;
+    out.states[`${channelName}${stateName}`] = {
+      _type: 'State', name: `${channelName}${stateName}`, group: 'interaction', enabled: true,
+      description: `${nameOf(control)}: its ${stateName.toLowerCase()} look.`,
+      when: condition.when ?? {},
+      ...(condition.rule ? { rule: condition.rule } : {}),
+      patches: { component: {}, parts },
+    };
+  }
+  out.published[channelName] = { channel: channelName, label: nameOf(control), type: 'bool', enabled: true, min: 0, max: 1, defaultValue: out.channels[channelName].defaultValue };
+  const deviceBindings = control._children.DeviceBindings ?? {};
+  out.carried.push({
+    controlId: String(control._children.Core.id ?? ''),
+    name: nameOf(control),
+    channel: channelName,
+    hostParameter: { id: `${nameOf(control)}.value`, label: nameOf(control) },
+    bindings: deviceBindings.enabled === false
+      ? []
+      : (deviceBindings.bindings ?? []).map((binding) => ({ ...deepClone(binding), port: channelName })),
+  });
+}
+
+/**
+ * A meter as layers: a channel over the meter's range, printed as its readout was, driving the layers'
+ * bindings; no grab area, no behaviour, as a meter takes no input of its own. Its value arrives as a
+ * knob's does: its device bindings, moved to the channel, and the host.
+ */
+function meterSections(out, { control, resolved, metered }) {
+  const cfg = resolved?._children?.Meter ?? control._children.Meter ?? {};
+  const channelName = metered.channel;
+  const min = Number.isFinite(Number(cfg.valueMin)) ? Number(cfg.valueMin) : 0;
+  let max = Number.isFinite(Number(cfg.valueMax)) ? Number(cfg.valueMax) : 1;
+  if (max <= min) max = min + 1;
+  const value = Math.min(max, Math.max(min, Number.isFinite(Number(cfg.value)) ? Number(cfg.value) : min));
+  out.channels[channelName] = createValueChannel(channelName, {
+    label: nameOf(control), type: 'float', min, max, step: 0, defaultValue: value,
+    format: { precision: Math.max(0, Math.min(6, Math.round(Number(cfg.valuePrecision) || 0))), prefix: String(cfg.valuePrefix ?? ''), suffix: String(cfg.valueSuffix ?? ''), unit: '' },
+    snap: { enabled: false },
+  });
+  Object.assign(out.bindings, metered.bindings);
+  out.published[channelName] = { channel: channelName, label: nameOf(control), type: 'float', enabled: true, min, max, defaultValue: value };
+  const deviceBindings = control._children.DeviceBindings ?? {};
+  out.carried.push({
+    controlId: String(control._children.Core.id ?? ''),
+    name: nameOf(control),
+    channel: channelName,
+    hostParameter: { id: `${nameOf(control)}.value`, label: nameOf(control) },
+    bindings: deviceBindings.enabled === false
+      ? []
+      : (deviceBindings.bindings ?? []).map((binding) => ({ ...deepClone(binding), port: channelName })),
+  });
 }
 
 /** One line per refusal, for the notification and the console. */

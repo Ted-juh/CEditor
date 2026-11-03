@@ -448,6 +448,22 @@ export function snapCustomChannelValue(channel, rawValue) {
   return type === 'int' ? Math.round(next) : next;
 }
 
+/**
+ * A momentary channel's value while held (`on`) and once let go: true and false for a bool, the
+ * maximum and the default (or minimum) for a number, the last and the first option of a list.
+ */
+export function momentaryChannelValue(channel, on) {
+  const type = String(channel?.type ?? 'float').trim().toLowerCase();
+  if (type === 'bool' || type === 'boolean') return on === true;
+  if (type === 'enum') {
+    const values = (Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []))
+      .map((entry) => entry?.value ?? entry?.id ?? entry);
+    return on ? values[values.length - 1] : values[0];
+  }
+  const min = numberOr(channel?.min, 0);
+  return snapCustomChannelValue(channel, on ? numberOr(channel?.max, 1) : numberOr(channel?.defaultValue, min));
+}
+
 export function nextCustomEnumValue(channel, currentValue) {
   const explicitValues = Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []);
   const values = explicitValues
@@ -550,7 +566,10 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
   const currentValue = previousValues[channelName] ?? customChannelDefaultValue(channel);
   const nextValues = { ...previousValues };
 
-  if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
+  if (action === 'momentaryvalue') {
+    // Tried from the Test Bench: the value while held.
+    nextValues[channelName] = momentaryChannelValue(channel, true);
+  } else if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = nextCustomEnumValue(channel, currentValue);
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
@@ -1037,7 +1056,11 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   let normalized = normalizeCustomChannelValue(channel, currentValue);
   const nextValues = { ...previousValues };
 
-  if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
+  if (action === 'momentaryvalue') {
+    // On while held: the press sets the channel on, the release (point.release) back off.
+    nextValue = momentaryChannelValue(channel, point?.release !== true);
+    normalized = normalizeCustomChannelValue(channel, nextValue);
+  } else if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValue = nextCustomEnumValue(channel, currentValue);
     normalized = normalizeCustomChannelValue(channel, nextValue);
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {

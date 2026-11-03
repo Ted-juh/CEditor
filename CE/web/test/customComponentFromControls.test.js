@@ -95,13 +95,14 @@ test('an artwork component is a complete package, not one "with issues"', () => 
 
 // --- What is refused, and the reason given ---------------------------------------------------------
 
-test('a button is refused, and so is the whole command — nothing converts partly', () => {
-  // Knobs and sliders convert (test/knobsFromSelection.test.js); buttons still do not.
+test('as one exact part a button is refused, and so is the whole command — nothing converts partly', () => {
+  // Knobs and sliders convert as one exact part (test/knobsFromSelection.test.js); a button comes in
+  // only as layers (test/valueControlLayers.test.js), and the refusal says so.
   const panel = artworkPanel();
   panel.controls.push(at('Button', 'go', 240, 20, 50, 30));
   const plan = planComponentFromSelection(panel, ids('plate', 'go'));
   assert.equal(plan.ok, false);
-  assert.match(refusal(plan, 'go'), /a Button — only artwork \(shapes, labels, images, backgrounds\), knobs and sliders/);
+  assert.match(refusal(plan, 'go'), /a Button — as one exact part only artwork, knobs and sliders convert; ask for layers/);
   assert.equal(plan.component, undefined);
 });
 

@@ -1,14 +1,17 @@
 <script>
   /**
    * Create Component from Selection (docs/design/changeable-control-sets.md, piece D2), as the owner
-   * approved in the mock-up: the component's name, and for knobs and sliders, how they come in:
+   * approved in the mock-up: the component's name, and for knobs, sliders, buttons, switches and
+   * meters, how they come in:
    *
    *   As layers          each part a layer the designer edits (utils/valueControlLayers.js), wired to
    *                      the value by bindings, colours linked to the set's colour roles;
-   *   As one exact part  drawn by the panel's own knob code, as before (utils/sliderControlPart.js).
+   *   As one exact part  drawn by the panel's own knob code, as before (utils/sliderControlPart.js);
+   *                      knobs and sliders only.
    *
-   * A knob a layer cannot draw yet comes in as one exact part either way, named here with the reason,
-   * and a selection that cannot convert at all says why before anything is made. Opened by
+   * A knob a layer cannot draw yet comes in as one exact part either way, named here with the reason;
+   * a button or a meter layers cannot draw is refused, and a selection that cannot convert says why
+   * before anything is made. Opened by
    * stores/componentFromSelectionActions.js `createComponentFromSelectionWithPrompt` (Edit menu, canvas
    * menu).
    */
@@ -21,7 +24,8 @@
 
   const KIND_NAMES = {
     Knob: ['knob', 'knobs'], Slider: ['slider', 'sliders'], Label: ['label', 'labels'], Shape: ['shape', 'shapes'],
-    Image: ['image', 'images'], Background: ['background', 'backgrounds'],
+    Image: ['image', 'images'], Background: ['background', 'backgrounds'], Button: ['button', 'buttons'],
+    MomentaryButton: ['button', 'buttons'], ToggleButton: ['switch', 'switches'], Meter: ['meter', 'meters'],
   };
 
   let request = $derived($componentFromSelectionRequest);
@@ -51,7 +55,7 @@
       return `${n} ${n === 1 ? one : many}`;
     });
   });
-  let hasValueControls = $derived(selected.some((control) => ['Knob', 'Slider'].includes(String(control._children.Core.controlType))));
+  let hasValueControls = $derived(selected.some((control) => ['Knob', 'Slider', 'Button', 'MomentaryButton', 'ToggleButton', 'Meter'].includes(String(control._children.Core.controlType))));
   // Read again when the panel changes, or the choice does.
   let plan = $derived(request && $panels ? previewComponentFromSelection(valueControlsAs) : null);
   let refusals = $derived(plan && !plan.ok ? describeRefusals(plan.refused) : []);
@@ -87,14 +91,14 @@
       </label>
 
       {#if hasValueControls}
-        <div class="group">Knobs and sliders</div>
+        <div class="group">Knobs, sliders, buttons, switches and meters</div>
         <label class="option" class:on={valueControlsAs === 'layers'}>
           <input type="radio" name="value-controls-as" value="layers" bind:group={valueControlsAs} />
-          <span><b>As layers</b><em>Each part a layer you can edit: housing, track, value arc, cap, pointer, ticks, readout. Colours stay linked to the set's colour roles.</em></span>
+          <span><b>As layers</b><em>Each part a layer you can edit: housing, track, value arc, cap, pointer, ticks, readout; a button's plate and text, or its housing, key and legend; a meter's track and fill, or its face, scale and needle. Colours stay linked to the set's colour roles.</em></span>
         </label>
         <label class="option" class:on={valueControlsAs === 'part'}>
           <input type="radio" name="value-controls-as" value="part" bind:group={valueControlsAs} />
-          <span><b>As one exact part</b><em>Drawn by the panel's own knob code. Looks and behaves exactly the same; not editable layer by layer.</em></span>
+          <span><b>As one exact part</b><em>Drawn by the panel's own knob code. Looks and behaves exactly the same; not editable layer by layer. Knobs and sliders only.</em></span>
         </label>
         {#each asParts as entry (entry.id)}
           <p class="warn" data-testid="as-one-part">⚠ {entry.name} comes in as one exact part: {entry.reason}.</p>

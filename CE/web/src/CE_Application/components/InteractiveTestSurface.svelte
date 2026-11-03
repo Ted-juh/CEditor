@@ -383,6 +383,10 @@
     }
     momentaryButtonPreview.cancel(control?._children?.Core?.id);
     const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
+    // A momentary custom button held when the pointer is lost: off again.
+    if (pointerActive && String(pointerCustomHitZone?.zone?.action ?? '').toLowerCase() === 'momentaryvalue') {
+      patchCustomInteraction(pointerCustomHitZone, { release: true }, {});
+    }
     if (pointerActive) {
       patchSession({
         hover: false,
@@ -624,6 +628,7 @@
       startValues: pointerCustomStartValues,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
+      release: event?.release === true,
     });
     if (!Object.keys(patch).length) return;
     patchSession({
@@ -1490,6 +1495,15 @@
           dragging: true,
         });
         updateCustomDragFromPointer(event);
+      } else if (action === 'momentaryvalue') {
+        // A momentary button: on at the press, off at the release.
+        patchCustomInteraction(pointerCustomHitZone, event, {
+          hover: true,
+          pressed: true,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+        });
       } else {
         patchSession({
           hover: true,
@@ -1600,7 +1614,14 @@
 
     if (isCustomComponent) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (inside && !isDisabled && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
+      if (action === 'momentaryvalue') {
+        patchCustomInteraction(pointerCustomHitZone, { clientX: event?.clientX, clientY: event?.clientY, release: true }, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+      } else if (inside && !isDisabled && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
         patchCustomInteraction(pointerCustomHitZone, event, {
           hover: inside,
           pressed: false,
