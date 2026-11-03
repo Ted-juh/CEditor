@@ -12,6 +12,8 @@
 // surface (models/controlSetCoverage.js inkOn) and passes in. The boxes are the drawings' own, in
 // the 160 by 80 device frame, as percentages of it; a key travels the 2.4 units the forms pressed it.
 
+import { directionDeviceParts } from './directionDeviceParts.js';
+
 export const BUTTON_FORMS_AS_PARTS = ['tile', 'crosskey', 'fold', 'cushion', 'glasskey', 'touch', 'piano', 'rubber', 'hexkey', 'typewriter', 'guardkey', 'pixelkey'];
 export const TOGGLE_FORMS_AS_PARTS = ['slide', 'knife', 'bookmark', 'rocker', 'orbit', 'split', 'latch', 'strap', 'bolt', 'lever', 'guard', 'binary'];
 
@@ -213,12 +215,17 @@ export function buttonFormsAsParts(type) {
 
 /**
  * The family patch that draws `form` with a button's or a switch's own parts, or null when the form
- * is still drawn by code. `ink` is the set's ink against its surface.
+ * is still drawn by code. `ink` is the set's ink against its surface; `face` and `housing` its
+ * surface and track as literals, for a synth set's glass.
  */
-export function buttonFormFamily(type, form, { ink = 'FF20282C' } = {}) {
+export function buttonFormFamily(type, form, { ink = 'FF20282C', face, housing } = {}) {
   const recipes = type === 'ToggleButton' ? SWITCHES : (buttonFormsAsParts(type).length ? BUTTONS : null);
   const recipe = recipes?.[String(form ?? '')];
-  if (!recipe) return null;
+  if (!recipe) {
+    // A synth set's button or switch (models/directionDeviceParts.js).
+    const parts = recipes ? directionDeviceParts(type, form, { ink, ...(face ? { face } : {}), ...(housing ? { housing } : {}) }) : null;
+    return parts ? { component: { 'Text.Fill.colour': ROLES.legend }, parts } : null;
+  }
   // The caption in the legend colour, as the forms set it.
   return { component: { 'Text.Fill.colour': ROLES.legend }, parts: recipe({ ink }) };
 }

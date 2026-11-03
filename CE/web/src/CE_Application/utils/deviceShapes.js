@@ -20,6 +20,11 @@
 //   arch       a radio's cabinet: straight sides, a curved top, its shoulders `depth` % down
 //   ticket     a paper tally: its top edge pinked in teeth `depth` % of the height high
 //   pointer    a cursor: a triangle pointing down
+//   bow        a bowed line, a dial's scale: rising from the box's bottom corners to its top in the
+//              middle, `depth` % of the height thick
+//   bevel      a key cut away at its two bottom corners, `depth` % of the height up and two fifths of
+//              that in (the synth sets' piano keys)
+//   octagon    a rectangle with its four corners cut `depth` % of its shorter side
 //
 // `pattern` repeats the shape in its box: 'lines' as `count` bars across, 'grid' as `count` by
 // `rows` cells, 'columns' as `count` bars side by side. The grooves of a rubber pad, the dots of a
@@ -27,7 +32,7 @@
 // at the box's left edge and the last ends at its right; `cellWidth` and `cellHeight` say how much
 // of its pitch a cell fills, in %.
 
-export const DEVICE_SHAPES = ['rect', 'ellipse', 'diamond', 'hexagon', 'flap', 'corner', 'pillow', 'bracket', 'crosshair', 'pair', 'ribbon', 'ring', 'arch', 'ticket', 'pointer'];
+export const DEVICE_SHAPES = ['rect', 'ellipse', 'diamond', 'hexagon', 'flap', 'corner', 'pillow', 'bracket', 'crosshair', 'pair', 'ribbon', 'ring', 'arch', 'ticket', 'pointer', 'bow', 'bevel', 'octagon'];
 export const DEVICE_PATTERNS = ['solid', 'lines', 'grid', 'columns'];
 
 const f = (value) => Number(Number(value).toFixed(2));
@@ -143,6 +148,25 @@ export function deviceShapePath(kind, x, y, w, h, { depth = 20, radius = 0 } = {
     }
     case 'pointer':
       return polygon([[x, y], [x + width, y], [x + width / 2, y + height]]);
+    case 'bow': {
+      // Two quadratic curves, each rising from the bottom corners to the top in the middle: the
+      // outer from `t` above the foot, the inner `t` below the top. A curve's control point sits as
+      // far beyond its peak as its ends are below it, so the peak is on the curve.
+      const t = Math.max(0.2, height * d);
+      const end = y + height;
+      return `M${f(x)} ${f(end - t)} Q${f(x + width / 2)} ${f(2 * y - (end - t))} ${f(x + width)} ${f(end - t)} `
+        + `L${f(x + width)} ${f(end)} Q${f(x + width / 2)} ${f(2 * (y + t) - end)} ${f(x)} ${f(end)} Z`;
+    }
+    case 'bevel': {
+      const up = height * d;
+      const inset = Math.min(width / 2, up * 0.4);
+      return polygon([[x, y], [x + width, y], [x + width, y + height - up], [x + width - inset, y + height], [x + inset, y + height], [x, y + height - up]]);
+    }
+    case 'octagon': {
+      const cut = Math.min(width, height) * Math.min(0.5, d);
+      return polygon([[x + cut, y], [x + width - cut, y], [x + width, y + cut], [x + width, y + height - cut],
+        [x + width - cut, y + height], [x + cut, y + height], [x, y + height - cut], [x, y + cut]]);
+    }
     default:
       return rect(x, y, width, height, radius);
   }

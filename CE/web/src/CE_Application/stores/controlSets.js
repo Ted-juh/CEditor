@@ -232,10 +232,12 @@ export function formAsPartsRecipe(type, form, set = null) {
     const housing = set ? resolveColourLiteral('{control.track}', set, '') : '';
     return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12, ...(face ? { face } : {}), ...(housing ? { housing } : {}) }) : null;
   }
+  const face = set ? resolveColourLiteral('{surface}', set, '') : '';
+  const housing = set ? resolveColourLiteral('{control.track}', set, '') : '';
   if (type === 'Meter' || type === 'ProgressBar') {
-    return meterFormFamily(type, form, { ink: '{text.primary}', divisions: 12, face: set ? resolveColourLiteral('{surface}', set, '') : '' });
+    return meterFormFamily(type, form, { ink: '{text.primary}', divisions: 12, face, housing });
   }
-  return buttonFormFamily(type, form, { ink: '{text.primary}' });
+  return buttonFormFamily(type, form, { ink: '{text.primary}', face, housing });
 }
 
 /** The knob form as parts: applyFormAsParts, kept by its first name. */

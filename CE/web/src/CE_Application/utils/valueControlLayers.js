@@ -1000,6 +1000,10 @@ export function buttonDeviceLayersRefusal(resolved) {
   const parts = resolved?._children?.Parts?._children ?? {};
   const key = parts.key;
   const keyTurns = Boolean(Number(key?.swing ?? 0) || Number(key?._children?.Layout?.rotation ?? 0));
+  // A drop shadow under a part (the sculpted synth set's), which a layer does not draw yet.
+  for (const name of BUTTON_DEVICE_PARTS) {
+    if (parts[name]?.visible === true && (Number(parts[name]?.shadowOffset) > 0 || Number(parts[name]?.shadowBlur) > 0)) return `a shadow under its ${name}, which a layer does not draw yet`;
+  }
   for (const name of BUTTON_DEVICE_PARTS) {
     const part = parts[name];
     if (part?.visible !== true || name === 'key') continue;
@@ -1116,7 +1120,7 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       if (Object.keys(on).length) out.onPatches[layer.name] = on;
     } else {
       const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
-      const d = devicePatternCells(String(part.pattern ?? 'solid'), 0, 0, box.w, box.h, { count: part.patternCount, rows: part.patternRows })
+      const d = devicePatternCells(String(part.pattern ?? 'solid'), 0, 0, box.w, box.h, { count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight })
         .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius }))
         .filter(Boolean)
         .join(' ');
@@ -1214,6 +1218,7 @@ export function meterDeviceLayersRefusal(resolved) {
     const motion = String(part.motion ?? 'none');
     const pattern = String(part.pattern ?? 'solid');
     if (pattern === 'digits') return `counter digits on its ${name}, which a layer does not draw yet`;
+    if (Number(part.shadowOffset) > 0 || Number(part.shadowBlur) > 0) return `a shadow under its ${name}, which a layer does not draw yet`;
     if (String(part.zoneColours ?? 'off') !== 'off') return `its ${name} coloured by the meter's zones, which a layer does not do yet`;
     if (String(part.source ?? 'reading') === 'peak' || motion === 'clip') return `its ${name} follows the held peak, which a layer does not keep`;
     if (name === 'legend' && String(part.textSource ?? 'fixed') !== 'fixed') return 'a legend that shows the reading';

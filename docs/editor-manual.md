@@ -356,7 +356,8 @@ tabs show one part at a time: pick **Housing**, **Guard**, **Actuator** (called 
 **Symbol**, **Indicator** or **Legend** in the row at the top (a green dot marks a part that is drawn),
 then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid),
 **Position** (in % of the device, with its rotation and the pivot it turns about), **Appearance**
-(fill, opacity, finish, border and shading) and what it does **When On** or **When Pressed**: how far
+(fill, opacity, finish, border and shading, and a drop **Shadow** under it, with its **Softness** and
+colour) and what it does **When On** or **When Pressed**: how far
 it moves and swings, its opacity and colour then, and whether it follows the actuator, as the ball on
 a lever does. The Legend part has its text as well. Choosing a form under **Core → Control design**
 fills the parts in, to change from there.
@@ -373,7 +374,9 @@ reading's zone. The zones themselves are rows of a level in % and a colour, with
 **Blend** between them. On the **Scale** part: marks **Along a Line** or **Round an Arc**, the
 **Major Count** and **Minor / Gap**, each kind's length and width, the arc's sweep, a zone of
 ticks in their own colour, and **Numerals** on the long ticks in the reading's units, dB or
-percent. **Fill Type** makes any part a gradient, edited in the Gradient tab of the dock. While
+percent. **Fill Type** makes any part a gradient, edited in the Gradient tab of the dock; a part can
+cast a drop **Shadow**, as a button's can. A **Bow** is the curved line of a paper meter's scale.
+While
 the parts draw the meter, the plain meter's own fill, arc and tick settings are hidden.
 
 The **context bar** above the canvas holds the settings you change most often — text, fill, border,

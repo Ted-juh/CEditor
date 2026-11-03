@@ -603,14 +603,21 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1764022301557","controlSetId":"brassworks","controlForm":"new-brassworks","formFaceColour":"FF333330","formHousingColour":"FF242321","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD8BA7F","id":"ctrl_1764022301557","controlType":"Button"},
+        "Core": {"name":"Button_1764022301557","controlSetId":"brassworks","id":"ctrl_1764022301557","controlType":"Button"},
         "Transform": {"x":586,"y":126,"width":116,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FFF1E6CF","gradientEnabled":true,"gradient":{"type":"radial","centerX":38,"centerY":30,"radiusX":70,"radiusY":70,"edge":0,"stops":[{"color":"F6EFE0","position":0},{"color":"F1E6CF","position":55},{"color":"A9A191","position":100}]}},"Border":{"thickness":1.5,"colour":"FF3A2E1E"},"Corners":{"radius":5}}},
-        "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
+        "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":2,"spread":0,"colour":"88000000"}]}}},
         "ContentLayout": {"lampColour":"FFD8BA7F","lampOffColour":"FF242321","lampBezelColour":"AA1C1A17"},
         "Parts": {
-          "_drawing": "91331ba2"
+          "_children": {
+            "housing": {"visible":true,"_children":{"Layout":{"x":13.13,"y":16.25,"width":73.75,"height":73.75},"Background":{"_children":{"Fill":{"colour":"FF0C1114"},"Border":{"enabled":true,"colour":"FF657073","thickness":0.8},"Corners":{"radius":6}}}},"shadowOffset":0,"shadowBlur":0},
+            "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "key": {"visible":true,"travelY":3.75,"_children":{"Layout":{"x":15.63,"y":17.5,"width":68.75,"height":63.75},"Background":{"_children":{"Fill":{"colour":"FF333330","gradientEnabled":true,"gradient":{"type":"radial","centerX":35,"centerY":20,"radiusX":95,"radiusY":95,"edge":0,"stops":[{"color":"FF3E4244","position":0},{"color":"003E4244","position":35},{"color":"00141819","position":35},{"color":"003E4244","position":78},{"color":"00141819","position":78},{"color":"FF141819","position":100}]}},"Border":{"enabled":true,"colour":"FF282E30","thickness":0.8},"Corners":{"radius":4}}}},"shadowOffset":0,"shadowBlur":0},
+            "symbol": {"visible":true,"opacity":0.7,"follows":"key","_children":{"Layout":{"x":42.5,"y":56.25,"width":15,"height":2.5},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}},"shadowOffset":0,"shadowBlur":0},
+            "indicator": {"visible":true,"follows":"key","activeColour":"FFD8BA7F","_children":{"Layout":{"x":41.88,"y":31.25,"width":16.25,"height":5},"Background":{"_children":{"Fill":{"colour":"FF242321"},"Corners":{"radius":1}}}},"shadowOffset":0,"shadowBlur":0},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
+          }
         },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF333330"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF333330"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD8BA7F"}}}}}
       },
@@ -618,15 +625,22 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1764022301558","controlSetId":"brassworks","controlForm":"new-brassworks","formFaceColour":"FF333330","formHousingColour":"FF242321","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD8BA7F","id":"ctrl_1764022301558","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1764022301558","controlSetId":"brassworks","id":"ctrl_1764022301558","controlType":"ToggleButton"},
         "Transform": {"x":728,"y":126,"width":124,"height":76},
         "Background": {"_children":{"Fill":{"colour":"FFF1E6CF","gradientEnabled":true,"gradient":{"type":"radial","centerX":38,"centerY":30,"radiusX":70,"radiusY":70,"edge":0,"stops":[{"color":"F6EFE0","position":0},{"color":"F1E6CF","position":55},{"color":"A9A191","position":100}]}},"Border":{"thickness":1.5,"colour":"FF3A2E1E"},"Corners":{"radius":5}}},
-        "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
+        "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":2,"spread":0,"colour":"88000000"}]}}},
         "ContentLayout": {"lamp":"jewel","lampSize":12,"lampColour":"FFD8BA7F","lampOffColour":"FF242321","lampBezelColour":"AA1C1A17"},
         "Behavior": {"defaultValue":true},
         "Parts": {
-          "_drawing": "91331ba2"
+          "_children": {
+            "housing": {"visible":true,"_children":{"Layout":{"x":29.38,"y":11.25,"width":41.25},"Background":{"_children":{"Fill":{"colour":"FF333330","gradientEnabled":true,"gradient":{"type":"linear","angle":168.7,"edge":0,"stops":[{"color":"FF9B9F9E","position":0},{"color":"009B9F9E","position":12},{"color":"00111719","position":12},{"color":"FF111719","position":100}]}},"Border":{"enabled":true,"colour":"FF131819"},"Corners":{"radius":4}}}},"shadowOffset":0,"shadowBlur":0},
+            "guard": {"visible":true,"_children":{"Layout":{"x":33.75,"y":18.75,"width":32.5,"height":63.75},"Background":{"_children":{"Fill":{"colour":"FF0C1216"},"Corners":{"radius":3}}}},"shadowOffset":0,"shadowBlur":0},
+            "key": {"visible":true,"swing":-20.6,"_children":{"Layout":{"x":36.25,"y":26.88,"width":27.5,"height":47.5,"rotation":10.3},"Background":{"_children":{"Fill":{"colour":"FF333330","gradientEnabled":true,"gradient":{"type":"radial","centerX":35,"centerY":20,"radiusX":95,"radiusY":95,"edge":0,"stops":[{"color":"FF3E4244","position":0},{"color":"003E4244","position":35},{"color":"00141819","position":35},{"color":"003E4244","position":78},{"color":"00141819","position":78},{"color":"FF141819","position":100}]}},"Border":{"enabled":true,"colour":"FF333330"}}}},"shadowOffset":0,"shadowBlur":0},
+            "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "indicator": {"visible":true,"travelY":5,"activeColour":"FFD8BA7F","_children":{"Layout":{"x":43.75,"y":34.38,"width":12.5,"height":3.75},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}},"shadowOffset":0,"shadowBlur":0},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
+          }
         },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF333330"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF333330"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD8BA7F"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD8BA7F","_removed":["Background.Fill.colour","Text.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF333330","Background.Border.colour":"FFC98A2A","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
@@ -641,7 +655,14 @@
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":2,"spread":0,"colour":"88000000"}]},"Bevel":{"enabled":true,"depth":120,"size":2,"softness":1,"shadowOpacity":70}}},
         "ContentLayout": {"lampColour":"FFD8BA7F","lampOffColour":"FF242321","lampBezelColour":"AA1C1A17"},
         "Parts": {
-          "_drawing": "91331ba2"
+          "_children": {
+            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF242321"}}}}},
+            "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF333330"}}}}},
+            "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD8BA7F"}}}}},
+            "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
+          }
         },
         "States": {"_children":{"Hover":{"patches":{"component":{"Background.Fill.colour":"FF333330"}}},"Pressed":{"patches":{"component":{"Background.Fill.colour":"FF333330"}}},"Focused":{"patches":{"component":{"Background.Border.colour":"FFD8BA7F"}}},"Selected":{"patches":{"component":{"Background.Border.colour":"FFD8BA7F","Text.Fill.colour":"FFF2F2F2","_removed":["Background.Fill.colour"]}}},"Mixed":{"patches":{"component":{"Background.Fill.colour":"FF333330","Background.Border.colour":"FFC98A2A","Text.Fill.colour":"FFF7F4EC"}}}}}
       },
@@ -751,21 +772,21 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1764022301569","controlSetId":"brassworks","controlForm":"new-brassworks","formFaceColour":"FF333330","formHousingColour":"FF242321","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFD8BA7F","id":"ctrl_1764022301569","controlType":"Meter"},
+        "Core": {"name":"Meter_1764022301569","controlSetId":"brassworks","id":"ctrl_1764022301569","controlType":"Meter"},
         "Transform": {"x":540,"y":352,"width":312,"height":92},
         "Background": {"_children":{"Fill":{"colour":"FF242321","gradient":{"type":"radial","centerX":38,"centerY":30,"radiusX":70,"radiusY":70,"edge":0,"stops":[{"color":"F6EFE0","position":0},{"color":"F1E6CF","position":55},{"color":"A9A191","position":100}]}},"Border":{"thickness":1.5,"colour":"FF3A2E1E"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":16,"segmentGap":3,"trackColour":"FF242321","fillColour":"FFD8BA7F","thickness":10,"rounded":false,"peakColour":"FFD8BA7F","showTicks":true,"valuePrecision":2},
-        "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Libre Franklin"}}},
+        "Text": {"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono"}}},
         "Effects": {"_children":{"Shadows":{"items":[{"enabled":true,"type":"drop","offsetX":0,"offsetY":2,"blur":2,"spread":0,"colour":"88000000"}]}}},
         "Parts": {
           "_children": {
-            "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF242321"}}}}},
-            "face": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF333330"}}}}},
-            "track": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
-            "scale": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
-            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD8BA7F"}}}}},
+            "housing": {"visible":true,"_children":{"Layout":{"x":2.5,"width":95,"height":72},"Background":{"_children":{"Fill":{"colour":"FF333330","gradientEnabled":true,"gradient":{"type":"linear","angle":168.7,"edge":0,"stops":[{"color":"FF9B9F9E","position":0},{"color":"009B9F9E","position":12},{"color":"00111719","position":12},{"color":"FF111719","position":100}]}},"Border":{"enabled":true,"colour":"FF101719"},"Corners":{"radius":3}}}},"shadowOffset":0,"shadowBlur":0},
+            "face": {"visible":true,"_children":{"Layout":{"x":6.88,"y":17,"width":86.25,"height":56},"Background":{"_children":{"Fill":{"colour":"FFDED6BD"},"Corners":{"radius":2}}}},"shadowOffset":0,"shadowBlur":0},
+            "track": {"visible":true,"shape":"bow","shapeDepth":6.25,"_children":{"Layout":{"x":11.88,"y":30,"width":76.25,"height":16},"Background":{"_children":{"Fill":{"colour":"FF706553"}}}},"shadowOffset":0,"shadowBlur":0},
+            "scale": {"visible":true,"pattern":"arc","swing":56.8,"majorCount":6,"majorLength":3.22,"_children":{"Layout":{"x":-27.69,"y":30,"width":155.38,"height":248.6,"rotation":-28.4},"Background":{"_children":{"Fill":{"colour":"FF706553"}}}},"shadowOffset":0,"shadowBlur":0},
+            "indicator": {"visible":true,"motion":"swing","swing":94,"pivotY":100,"_children":{"Layout":{"x":49.44,"y":23,"width":1.13,"height":44,"rotation":-47},"Background":{"_children":{"Fill":{"colour":"FFA5573E"}}}},"shadowOffset":0,"shadowBlur":0},
             "marker": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD8BA7F"}}}}},
-            "cover": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
+            "cover": {"visible":true,"_children":{"Layout":{"x":6.88,"y":17,"width":86.25,"height":56},"Background":{"_children":{"Fill":{"colour":"00000000","gradientEnabled":true,"gradient":{"type":"linear","angle":147,"edge":0,"stops":[{"color":"66EEFAFF","position":0},{"color":"1A333330","position":46},{"color":"38E5F5FF","position":49},{"color":"1A333330","position":100}]}}}}},"shadowOffset":0,"shadowBlur":0},
             "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
             "lamp": {"activeColour":"FFD8BA7F","_children":{"Background":{"_children":{"Fill":{"colour":"FF242321"}}}}}
           }
@@ -831,16 +852,6 @@
         "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"JetBrains Mono","weight":"Regular","weightValue":400,"letterSpacing":0.9}}}}},
         "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","letterSpacing":0.9}}}}},
         "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Libre Franklin","letterSpacing":0.9}}}}}
-      }
-    },
-    "91331ba2": {
-      "_children": {
-        "housing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF242321"}}}}},
-        "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
-        "key": {"_children":{"Background":{"_children":{"Fill":{"colour":"FF333330"}}}}},
-        "symbol": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}},
-        "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD8BA7F"}}}}},
-        "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF7F4EC"}}}}}
       }
     }
   },

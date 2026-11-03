@@ -30,7 +30,7 @@
 
   // A gradient laid over the fill, as SVG: the CSS angle (180 runs top to bottom) and a radial's
   // centre and reach, in the part's own box (as editor/ButtonDeviceParts.svelte).
-  function gradientOf(fill) {
+  function gradientOf(fill, box = null) {
     const g = fill?.gradientEnabled === true ? fill?.gradient : null;
     const stops = Array.isArray(g?.stops) ? g.stops : [];
     if (!g || stops.length < 2) return null;
@@ -38,8 +38,20 @@
     if (g.type === 'radial') {
       return { radial: true, cx: numberOr(g.centerX, 50) / 100, cy: numberOr(g.centerY, 50) / 100, r: numberOr(g.radiusX, 70) / 100, stops: list };
     }
+    // A linear one runs as CSS runs it, across the box at its angle in the drawing's own units, its
+    // ends where the box's far corners meet it: as the Gradient dock shows it and a layer draws it.
+    // (In the box's fractions, as it was, an angle that is not straight up, down or across skewed on
+    // a box that is not square.)
     const a = (numberOr(g.angle, 180) * Math.PI) / 180;
-    return { radial: false, x1: 0.5 - Math.sin(a) / 2, y1: 0.5 + Math.cos(a) / 2, x2: 0.5 + Math.sin(a) / 2, y2: 0.5 - Math.cos(a) / 2, stops: list };
+    const dx = Math.sin(a);
+    const dy = -Math.cos(a);
+    if (box && box.w > 0 && box.h > 0) {
+      const half = (Math.abs(box.w * dx) + Math.abs(box.h * dy)) / 2;
+      const cx = box.x + box.w / 2;
+      const cy = box.y + box.h / 2;
+      return { radial: false, user: true, x1: cx - dx * half, y1: cy - dy * half, x2: cx + dx * half, y2: cy + dy * half, stops: list };
+    }
+    return { radial: false, x1: 0.5 - dx / 2, y1: 0.5 - dy / 2, x2: 0.5 + dx / 2, y2: 0.5 + dy / 2, stops: list };
   }
 
   let drawn = $derived(METER_DEVICE_PARTS
@@ -71,14 +83,23 @@
         opacity,
         activeOpacity: part.activeOpacity != null ? numberOr(part.activeOpacity, 1) : opacity,
         stroke: border.enabled === true && numberOr(border.thickness, 0) > 0 ? { colour: css(border.colour, '#000'), width: numberOr(border.thickness, 0) } : null,
-        gradient: gradientOf(fill),
+        gradient: gradientOf(fill, drawing.box),
         gradientOpacity: numberOr(fill.gradientOpacity, 100) / 100,
         // What a plain path cannot paint: a finish, an image. Those go through the full fill.
         full: materialActive(background?._children?.Effects?._children?.Material) || fill.imageEnabled === true || fill.overlayEnabled === true,
         background,
         fontFamily: String(part.fontFamily ?? '').trim() || 'inherit',
+        shadow: shadowOf(part),
       };
     }));
+
+  // A drop shadow under a part (the sculpted synth set's cases): its outline again, `shadowOffset` %
+  // of the frame's height lower, softened by `shadowBlur` %, in `shadowColour`. None unless asked.
+  function shadowOf(part) {
+    const dy = (numberOr(part?.shadowOffset, 0) / 100) * H;
+    const blur = (numberOr(part?.shadowBlur, 0) / 100) * H;
+    return dy > 0 || blur > 0 ? { dy, blur, colour: css(part?.shadowColour, 'rgba(0,0,0,0.6)') } : null;
+  }
 </script>
 
 {#each drawn as item (item.name)}
@@ -93,6 +114,12 @@
       <path d={item.base} fill={`url(#${uid}-${item.name}-z)`} fill-rule="evenodd" opacity={item.opacity} />
       {#if item.stroke}<path d={item.base} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.opacity} />{/if}
     {:else if item.base}
+      {#if item.shadow}
+        {#if item.shadow.blur > 0}
+          <filter id={`${uid}-${item.name}-s`} x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation={item.shadow.blur / 2} /></filter>
+        {/if}
+        <path data-part-shadow={item.name} d={item.base} transform={`translate(0 ${item.shadow.dy})`} fill={item.shadow.colour} fill-rule="evenodd" filter={item.shadow.blur > 0 ? `url(#${uid}-${item.name}-s)` : undefined} />
+      {/if}
       {#if item.full}
         <g opacity={item.opacity}>
           <SliderShapeFill background={item.background} bounds={{ x: item.drawing.box.x, y: item.drawing.box.y, width: item.drawing.box.w, height: item.drawing.box.h }}
@@ -108,7 +135,7 @@
               {#each item.gradient.stops as stop, i (i)}<stop offset={`${stop.offset}%`} stop-color={stop.colour} />{/each}
             </radialGradient>
           {:else}
-            <linearGradient id={`${uid}-${item.name}-g`} x1={item.gradient.x1} y1={item.gradient.y1} x2={item.gradient.x2} y2={item.gradient.y2}>
+            <linearGradient id={`${uid}-${item.name}-g`} gradientUnits={item.gradient.user ? 'userSpaceOnUse' : undefined} x1={item.gradient.x1} y1={item.gradient.y1} x2={item.gradient.x2} y2={item.gradient.y2}>
               {#each item.gradient.stops as stop, i (i)}<stop offset={`${stop.offset}%`} stop-color={stop.colour} />{/each}
             </linearGradient>
           {/if}

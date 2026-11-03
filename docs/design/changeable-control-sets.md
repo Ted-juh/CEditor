@@ -52,8 +52,27 @@ of Classic Poly and Heritage, Precision's knurling, Recessed's grip line, Arc Li
 the gap between its two arcs; the sculpted series' specular glints, the lines painted along their
 pointers, Prism Cap's facets, Coin Edge's accent tick and Gimbal Ring's two beads. Still drawn by
 code, a classic category as the owner decided: the 12 additional designs, most of which are not
-turning knobs at all (a bellows, an iris, a fan, a balance); and the 48 sets' buttons, switches and
-meters. SVG and Photoshop
+turning knobs at all (a bellows, an iris, a fan, a balance).
+The 36 synth sets' buttons, switches and meters are their own device parts too
+(`models/directionDeviceParts.js`), each written as drawn in its device frame: a key in a well that
+goes down and lights its bar, a rocker that tips, a piano key (a new **bevel** shape), a key with a
+lamp in a side window that rises, flat touch, membrane and edge-lit keys; the sculpted series' keys
+on a drop shadow, which device parts now cast (`shadowOffset`, `shadowBlur`, `shadowColour`, on the
+Button and Meter tabs). The meters: paper VU meters with their scale's curve (a **bow**), ticks
+round it and a needle, two side by side on Studio Console (the right needle the marker), bars that
+fill with a cursor at their end, LED ladders, dots and twin rows that light, the sculpted series'
+split ladder (its low cells the marker). Device gradients are drawn in SVG, which fades through a
+clear stop's own colour, so a clear stop takes its neighbours'; and a linear one now runs as CSS
+runs it, across the part's box in the drawing's units, where it ran in the box's fractions and so
+skewed at an angle on a box that is not square: the part, the Gradient dock and a layer made from it
+agree (the base sets' gradients run straight down and draw as they did). Compared side by side with the
+drawings off and on, empty and full: the same controls. Left out: the faint lines across the console
+keys, a border that lights (Edge Light, Floating Halo), the slant of the guard keys' bars, Gimbal
+Ring's frame in metal, the lens keys' highlight line, the second VU's ticks on Studio Console, and
+the paper meters' curved tick lines (an arc of ticks instead). As layers, the series 1 and 2
+controls convert; the sculpted ones, on their shadow, come in refused, named. The twelve classic
+sets' buttons, switches and meters are illustrations like their knobs and stay drawn by code.
+SVG and Photoshop
 drawings import as layered components (Bringing designs in, below).
 
 ## The principle

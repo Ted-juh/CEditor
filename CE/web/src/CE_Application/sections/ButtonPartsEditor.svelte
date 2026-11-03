@@ -38,6 +38,7 @@
   const SHAPE_LABELS = {
     rect: 'Rectangle', ellipse: 'Ellipse', diamond: 'Diamond', hexagon: 'Hexagon', flap: 'Folded Sheet', corner: 'Fold',
     pillow: 'Cushion', bracket: 'Guard Bracket', crosshair: 'Crosshair', pair: 'Pair', ribbon: 'Ribbon', ring: 'Ring',
+    arch: 'Arch', ticket: 'Paper Tally', pointer: 'Pointer', bow: 'Bow', bevel: 'Bevelled Key', octagon: 'Octagon',
   };
   const PATTERN_LABELS = { solid: 'Solid', lines: 'Lines', grid: 'Grid' };
   const word = (text) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -222,6 +223,15 @@
       </PropertyCell>
       <PropertyCell label="Border Colour" span={2} path={`${prefix}.Background.Border.colour`} hint="The colour of its edge.">
         <PropertyColor value={shown(border.colour, 'FF333333')} onchange={(v) => set(`${prefix}.Background.Border.colour`, v)} onswatchclick={() => pickColour(`${prefix}.Background.Border.colour`, border.colour, 'FF333333', 'Border Colour')} />
+      </PropertyCell>
+      <PropertyCell label="Shadow %" compact path={`${prefix}.shadowOffset`} hint="A drop shadow under it: its outline again, this percentage of the device's height lower. 0 for none.">
+        <NumberCell label="Shadow" value={numberOr(part.shadowOffset, 0)} defaultValue={0} step={0.5} min={0} max={50} onchange={(v) => set(`${prefix}.shadowOffset`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Softness %" compact path={`${prefix}.shadowBlur`} hint="How soft the shadow's edge is, as a percentage of the device's height. 0 for a hard edge.">
+        <NumberCell label="Softness" value={numberOr(part.shadowBlur, 0)} defaultValue={0} step={0.5} min={0} max={50} onchange={(v) => set(`${prefix}.shadowBlur`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Shadow Colour" span={2} path={`${prefix}.shadowColour`} hint="The shadow's colour; its alpha is how dark it falls.">
+        <PropertyColor value={shown(part.shadowColour, '99000000')} onchange={(v) => set(`${prefix}.shadowColour`, v)} onswatchclick={() => pickColour(`${prefix}.shadowColour`, part.shadowColour, '99000000', 'Shadow Colour')} />
       </PropertyCell>
     </PropertySection>
 

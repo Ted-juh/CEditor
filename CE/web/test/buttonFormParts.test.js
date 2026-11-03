@@ -147,13 +147,14 @@ test('the Button tab, Switch on a toggle, edits every part; each field names its
     'Layout.x', 'Layout.y', 'Layout.width', 'Layout.height', 'Layout.rotation', 'pivotX', 'pivotY', 'zIndex',
     'Background.Fill.colour', 'opacity', 'Background.Effects.Material.kind', 'Background.Border.thickness',
     'Background.Fill.gradientEnabled', 'Background.Border.colour', 'travelX', 'travelY', 'swing', 'activeOpacity',
-    'activeColour', 'follows', 'offText', 'onText', 'fontSize'];
+    'activeColour', 'follows', 'offText', 'onText', 'fontSize', 'shadowOffset', 'shadowBlur', 'shadowColour'];
   for (const key of keys) assert.ok(editor.includes(`path={\`\${prefix}.${key}\`}`), key);
   const cells = editor.match(/<PropertyCell /g).length;
   assert.equal((editor.match(/<PropertyCell [^>]*path=/g) ?? []).length, cells, 'every cell names its path');
   // Colours go through the Colors dock, never a picker of their own.
   assert.doesNotMatch(editor, /type="color"/);
-  assert.equal((editor.match(/onswatchclick=/g) ?? []).length, 3);
+  // Fill, border and shadow colours.
+  assert.equal((editor.match(/onswatchclick=/g) ?? []).length, 4);
   // Device parts write only keys a set may write too.
   for (const key of ['shape', 'shapeDepth', 'pattern', 'travelX', 'swing', 'activeColour', 'follows', 'Layout.rotation', 'Background.Fill.gradient']) {
     assert.ok(EDITOR_PATHS.some((pattern) => pattern.test(key)), key);
