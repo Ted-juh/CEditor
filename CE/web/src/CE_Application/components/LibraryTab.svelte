@@ -41,6 +41,8 @@
     sortLibrary,
     libraryCounts,
     libraryTags,
+    filterLibraryKind,
+    LIBRARY_KINDS,
     LIBRARY_SORTS,
   } from '../utils/componentLibraryModel.js';
 
@@ -50,7 +52,11 @@
 
   let query = $state('');
   let sort = $state('recent');
-  let visible = $derived(sortLibrary(filterLibrary(rows, query), sort));
+  // Which kind the grid shows: all, those made of parts, the image strips (LIBRARY_KINDS). The filter
+  // only shows once there are strips; with none, every component is made of parts.
+  let kind = $state('all');
+  let shownKind = $derived(counts.strips ? kind : 'all');
+  let visible = $derived(sortLibrary(filterLibrary(filterLibraryKind(rows, shownKind), query), sort));
 
   let wantedId = $state('');
   let selectedId = $derived(visible.some((row) => row.id === wantedId) ? wantedId : (visible[0]?.id ?? ''));
@@ -189,6 +195,16 @@
         <div class="colh">
           Components <s>{visible.length}{visible.length === rows.length ? '' : ` of ${rows.length}`}</s>
         </div>
+        {#if counts.strips}
+          <div class="kinds" role="group" aria-label="Which components">
+            {#each LIBRARY_KINDS as entry (entry.key)}
+              <button type="button" class:on={shownKind === entry.key} aria-pressed={shownKind === entry.key} title={entry.hint ?? ''} data-library-kind={entry.key}
+                      onclick={() => { kind = entry.key; }}>
+                {entry.label} <i>{entry.key === 'all' ? counts.total : entry.key === 'strips' ? counts.strips : counts.total - counts.strips}</i>
+              </button>
+            {/each}
+          </div>
+        {/if}
         <LibraryGrid
           rows={visible}
           {selectedId}
@@ -371,4 +387,8 @@
     .cols { flex-wrap: wrap; }
     .detailcol { flex: 1 1 100%; }
   }
+  .kinds { display: flex; flex-wrap: wrap; gap: 4px; padding: 2px 0 6px; }
+  .kinds button { font: inherit; font-size: 10.5px; padding: 2px 8px; border-radius: 10px; border: 1px solid #3a3f44; background: #1d2124; color: #cfd6da; cursor: pointer; }
+  .kinds button.on { background: #173449; border-color: #3F6C92; color: #eaf5ff; }
+  .kinds i { font-style: normal; color: #8a949a; margin-left: 3px; }
 </style>

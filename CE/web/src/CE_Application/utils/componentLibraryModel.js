@@ -47,6 +47,34 @@ export const LIBRARY_SORTS = [
 
 export const LIBRARY_SORT_KEYS = LIBRARY_SORTS.map((entry) => entry.key);
 
+/**
+ * Whether a saved component is an image strip: drawn from pictures, one per position (an imported
+ * strip, a KnobMan or Blender render, a vendor pack), by a frames generator or a layer whose Image
+ * shows frames. Its shapes and colours cannot be edited part by part, only tinted per layer
+ * (Effects › Filters), so the Library gives them a category of their own (the owner: "filmstrips
+ * are for those who want them, as their own category").
+ */
+export function isImageStripComponent(component) {
+  const generators = Object.values(component?._children?.Generators?._children ?? {});
+  if (generators.some((generator) => generator?.enabled !== false && ['filmstrip-frames', 'filmstrip'].includes(String(generator?.type ?? '')))) return true;
+  const parts = Object.values(component?._children?.Parts?._children ?? {});
+  return parts.some((part) => String(part?._children?.Image?.mode ?? '') === 'filmstrip');
+}
+
+/** The Library's kinds, in the order of its filter: everything, the components made of parts, the strips. */
+export const LIBRARY_KINDS = [
+  { key: 'all', label: 'All' },
+  { key: 'parts', label: 'Made of parts', hint: 'Components drawn from layers you can edit one by one.' },
+  { key: 'strips', label: 'Image strips', hint: 'Components drawn from pictures, one per position: resize and tint them, but their shapes are fixed.' },
+];
+
+/** The rows of one kind (LIBRARY_KINDS). */
+export function filterLibraryKind(rows, kind = 'all') {
+  if (kind === 'strips') return (rows ?? []).filter((row) => row.imageStrip);
+  if (kind === 'parts') return (rows ?? []).filter((row) => !row.imageStrip);
+  return [...(rows ?? [])];
+}
+
 /** One library entry, reduced to what the grid and the detail column read. */
 export function describeEntry(entry, index = 0) {
   const summary = entry?.summary ?? {};
@@ -74,6 +102,7 @@ export function describeEntry(entry, index = 0) {
     editableProperties: Math.max(0, Math.round(numberOr(summary.editableProperties, 0))),
     thumbnailParts: Array.isArray(entry?.thumbnail?.parts) ? entry.thumbnail.parts.length : 0,
     component: entry?.component ?? null,
+    imageStrip: isImageStripComponent(entry?.component),
     envelope: entry?.envelope ?? null,
     entry,
   };
@@ -142,6 +171,7 @@ export function libraryCounts(rows) {
     pinned: list.filter((row) => row.pinned).length,
     invalid: list.filter((row) => !row.valid).length,
     unused: list.filter((row) => row.useCount === 0).length,
+    strips: list.filter((row) => row.imageStrip).length,
   };
 }
 
@@ -171,5 +201,6 @@ export function relativeTime(iso, now = Date.now()) {
 export function allLibraryFieldLabels() {
   const labels = new Set(['Name', 'Version', 'Author', 'Category', 'Tags', 'Pinned']);
   for (const sort of LIBRARY_SORTS) labels.add(sort.label);
+  for (const kind of LIBRARY_KINDS) labels.add(kind.label);
   return [...labels];
 }

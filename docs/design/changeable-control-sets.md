@@ -367,6 +367,13 @@ Image controls (imported strips, KnobMan or Blender renders, vendor packs) in a 
 own in the Library, marked for what they cannot do. They use the filmstrip support that exists. A
 tint per part (hue, brightness) is the one cheap kind of change they can take.
 
+**Built** (the owner approved the mock-up): `isImageStripComponent` (`utils/componentLibraryModel.js`)
+finds a component drawn from frames, by an enabled frames generator or a layer whose Image shows
+frames. The Library tab's cards mark it **Image strip**; once the library holds one, a row above the
+cards filters **All**, **Made of parts**, **Image strips**; and the detail column says what a strip
+cannot do and that it tints per layer through Effects › Filters (brightness and hue rotation, which
+parts already had).
+
 ## Bringing designs in: Photoshop and Blender
 
 The owner: "Call it KnobMan on steroids but without the filmstrips. The usage of filmstrips is for
@@ -555,8 +562,8 @@ Taken by the owner, 2026-11-02:
 3. **Filmstrips are for those who want them** (Photoshop, Blender), as their own category; the way
    in for those designs should be layers, not strips (Bringing designs in, above).
 
-Open:
+Taken by the owner, 2026-11-03:
 
-1. Rendered looks: live in the editor and baked into the plug-in at export (recommended), or live
-   everywhere (needs the Linux JUCE patch)?
-2. A set that names a library component (D4): later (recommended) or as part of this?
+4. **Rendered looks (E): live in the editor, baked into the plug-in at export**, as recommended. The
+   plug-in needs no WebGL, and Linux, whose webview has no GPU, needs no JUCE patch.
+5. **A set that names a library component (D4): later.**

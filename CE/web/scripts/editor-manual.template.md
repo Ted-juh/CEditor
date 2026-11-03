@@ -1045,6 +1045,12 @@ card, drag it onto the panel, or press **Place a copy**. **Open in Designer** op
 its own to change and export again, and **Save as file...** writes it as a `.ceditor-component.json`.
 The icon rail and the insert search list your saved components too.
 
+An **image strip** is a component drawn from pictures, one per position: an imported strip, a KnobMan
+or Blender render, a vendor pack. Its card says **Image strip**, and when the library holds one, a row
+above the cards shows **All**, **Made of parts** or **Image strips**. A strip's shapes and colours
+cannot be edited part by part; it can be resized, and tinted per layer in **Effects › Filters** (hue
+and brightness).
+
 Select a placed copy and the properties panel opens on its **Component** tab (moving on to another
 copy keeps the tab you are on):
 
