@@ -393,19 +393,19 @@
         <NumberCell label="Ctr" value={curveCentreValue} step={selected.step ?? 0.01} min={Math.min(selected.min ?? 0, selected.max ?? 1)} max={Math.max(selected.min ?? 0, selected.max ?? 1)}
           defaultValue={defaultCurveCentre(selected, selectedCurve.mode)} disabled={!curveTakesCentre} onchange={(value) => set('curve.centre', value)} />
       </PropertyCell>
-      <PropertyCell label="Dead Zone" span={1} compact hint="A band around the centre, as a share of the travel, that holds the centre value.">
-        <NumberCell label="DZ" value={selected.curve?.deadZone ?? (selectedCurve.mode === 'dead-zone' ? 0.1 : 0)} step={0.01} min={0} max={0.9} defaultValue={0}
-          disabled={!curveTakesDeadZone} onchange={(value) => set('curve.deadZone', value)} />
+      <PropertyCell label="Steps" span={2} compact hint="How many positions a Stepped curve clicks into.">
+        <NumberCell label="Steps" value={selectedCurve.steps} step={1} min={2} max={128} defaultValue={defaultCurveSteps(selected)}
+          disabled={selectedCurve.mode !== 'stepped'} onchange={(value) => set('curve.steps', Math.max(2, Math.round(value)))} />
       </PropertyCell>
       <PropertyCell label="Hysteresis" span={1} compact hint="How far past a step's edge, as a share of a step, the travel goes before the step changes.">
         <NumberCell label="Hys" value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={0.49} defaultValue={0}
           disabled={selectedCurve.mode !== 'stepped'} onchange={(value) => set('curve.hysteresis', value)} />
       </PropertyCell>
-      <PropertyCell label="Steps" span={2} compact hint="How many positions a Stepped curve clicks into.">
-        <NumberCell label="Steps" value={selectedCurve.steps} step={1} min={2} max={128} defaultValue={defaultCurveSteps(selected)}
-          disabled={selectedCurve.mode !== 'stepped'} onchange={(value) => set('curve.steps', Math.max(2, Math.round(value)))} />
+      <PropertyCell label="Dead Zone" span={1} compact hint="A band around the centre, as a share of the travel, that holds the centre value.">
+        <NumberCell label="DZ" value={selected.curve?.deadZone ?? (selectedCurve.mode === 'dead-zone' ? 0.1 : 0)} step={0.01} min={0} max={0.9} defaultValue={0}
+          disabled={!curveTakesDeadZone} onchange={(value) => set('curve.deadZone', value)} />
       </PropertyCell>
-      <PropertyCell label="" span={4} hint="Travel across, value up.">
+      <PropertyCell label="" span={4} compact hint="Travel across, value up.">
         <div class="curve-view" data-testid="channel-curve">
           <svg viewBox="-4 -4 108 108" width="110" height="96" aria-label={`${CURVE_LABELS[selectedCurve.mode]} curve`}>
             <rect x="0" y="0" width="100" height="100" class="frame" />
