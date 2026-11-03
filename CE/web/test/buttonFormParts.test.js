@@ -132,3 +132,30 @@ test('the form frame draws the parts, caption and all, and the canvas treats the
   assert.match(parts, /String\(part\?\.follows \?\? ''\) !== 'key'/);
   assert.match(parts, /active && String\(part\.activeColour/);
 });
+
+test('the Button tab, Switch on a toggle, edits every part; each field names its property', () => {
+  const panel = source('panels/PropertiesPanel.svelte');
+  assert.match(panel, /\{ id: 'button',\s+icon: RectangleHorizontal, label: 'Button', section: 'Parts', when: \(control\) => BUTTON_DEVICE_TYPES\.has/);
+  assert.match(panel, /tab\.id === 'button' && getSection\(\$selectedControl, 'Core'\)\?\.controlType === 'ToggleButton' \? \{ \.\.\.tab, label: 'Switch', icon: ToggleRight \}/);
+  assert.match(source('panels/sectionEditorLoaders.js'), /button: \(\) => import\('\.\.\/sections\/ButtonPartsEditor\.svelte'\)/);
+  const editor = source('sections/ButtonPartsEditor.svelte');
+  // One chip per part, the key called Actuator on a switch and Key on a button.
+  assert.match(editor, /\{#each BUTTON_DEVICE_PARTS as name \(name\)\}/);
+  assert.match(editor, /name === 'key' \? \(isSwitch \? 'Actuator' : 'Key'\)/);
+  // Every key a part has is a field, and every field names its path, so it carries the marks.
+  const keys = ['visible', 'shape', 'shapeDepth', 'Background.Corners.radius', 'pattern', 'patternCount', 'patternRows',
+    'Layout.x', 'Layout.y', 'Layout.width', 'Layout.height', 'Layout.rotation', 'pivotX', 'pivotY', 'zIndex',
+    'Background.Fill.colour', 'opacity', 'Background.Effects.Material.kind', 'Background.Border.thickness',
+    'Background.Fill.gradientEnabled', 'Background.Border.colour', 'travelX', 'travelY', 'swing', 'activeOpacity',
+    'activeColour', 'follows', 'offText', 'onText', 'fontSize'];
+  for (const key of keys) assert.ok(editor.includes(`path={\`\${prefix}.${key}\`}`), key);
+  const cells = editor.match(/<PropertyCell /g).length;
+  assert.equal((editor.match(/<PropertyCell [^>]*path=/g) ?? []).length, cells, 'every cell names its path');
+  // Colours go through the Colors dock, never a picker of their own.
+  assert.doesNotMatch(editor, /type="color"/);
+  assert.equal((editor.match(/onswatchclick=/g) ?? []).length, 3);
+  // Device parts write only keys a set may write too.
+  for (const key of ['shape', 'shapeDepth', 'pattern', 'travelX', 'swing', 'activeColour', 'follows', 'Layout.rotation', 'Background.Fill.gradient']) {
+    assert.ok(EDITOR_PATHS.some((pattern) => pattern.test(key)), key);
+  }
+});

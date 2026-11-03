@@ -62,6 +62,7 @@ const LAZY_COMPONENT_LOADERS = {
   setlist: () => import('../sections/SetlistEditor.svelte'),
   transport: () => import('../sections/TransportEditor.svelte'),
   slider: () => import('../sections/SliderEditor.svelte'),
+  button: () => import('../sections/ButtonPartsEditor.svelte'),
   label: () => import('../sections/SliderLabelEditor.svelte'),
   states: () => import('../sections/StatesEditor.svelte'),
   value: () => import('../sections/ValueEditor.svelte'),

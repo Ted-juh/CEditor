@@ -337,6 +337,17 @@ and **Device** (what it is bound to).
   drag sideways on the label. Double-click the label to go back to the default.
 - Many tabs have **Presets** at the bottom, to save a look and apply it again.
 
+A knob, a button and a switch each have a tab for the parts they are drawn with: **Knob** (housing,
+track and value arc, cap, pointer), **Button** and, on a toggle, **Switch**. The Button and Switch
+tabs show one part at a time: pick **Housing**, **Guard**, **Actuator** (called **Key** on a button),
+**Symbol**, **Indicator** or **Legend** in the row at the top (a green dot marks a part that is drawn),
+then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid),
+**Position** (in % of the device, with its rotation and the pivot it turns about), **Appearance**
+(fill, opacity, finish, border and shading) and what it does **When On** or **When Pressed**: how far
+it moves and swings, its opacity and colour then, and whether it follows the actuator, as the ball on
+a lever does. The Legend part has its text as well. Choosing a form under **Core → Control design**
+fills the parts in, to change from there.
+
 The **context bar** above the canvas holds the settings you change most often — text, fill, border,
 size and position, effects and icon — so you can often work without the properties panel.
 
@@ -517,6 +528,26 @@ The control opens in the Component Designer, ready to use and to change:
   fill, outline, inner shadows and bevel, and a picture's are drawn into it, close to Photoshop's.
   Adjustment layers are applied to the layers under them. Change a picture layer's colour with its
   tint. Text layers stay text where the file says their size and colour.
+
+### Layer masks
+
+A mask says how much of a layer shows: white shows it, black or clear hides it, grey shows it
+partly. In the Component Designer's **Layers** list a masked layer shows its mask beside its own
+thumbnail. Click the mask to edit it in the dock's **Mask** tab; Shift-click it to turn it off and
+on (it is struck through while off). The link between the two says whether the mask moves with the
+layer; click it to unlink, and the mask stays put while the layer moves under it, as a pointer
+turning behind a fixed window does.
+
+In the **Mask** tab:
+
+- **Enabled** and **Invert** turn the mask off, or show the layer where the mask is clear instead.
+- **Linked to Layer** is the same link. **X %**, **Y %**, **W %** and **H %** place the mask: in %
+  of the layer while linked, in % of the component while not. **Fit to Layer** puts it back over
+  the whole layer.
+- **Add Mask** gives a layer a mask that shows all of it, to size from there. **Load Image...** uses
+  a picture: its transparency, or for a picture without any, its brightness. **Mask With Layer**
+  uses another layer's outline, as a clipping mask does; that layer stays as it is, so hide it when
+  it should only mask. **Delete Mask** removes it.
 
 What moves is wired: a dial, a fader, a switch or a button, with its value, the area that takes the
 mouse, and the layers that follow the value. A drawing with nothing named to move comes in as
@@ -1269,6 +1300,7 @@ an open panel the items are greyed out.
 | **Colors** | The colour picker. When you clicked a colour swatch elsewhere, it shows what you are editing, with **Cancel** and **Done**. |
 | **Gradient** | Edits a gradient fill. |
 | **Effects** | The selected control's effects: shadows, glows, blur and more, and saved looks. |
+| **Mask** | In the Component Designer only: the selected layer's mask; see [Layer masks](#layer-masks). |
 | **Text** | Every text setting of the selected control: font, size, spacing, alignment and more. |
 | **Assets** | A control's images, including filmstrips (one image holding every frame of a knob). |
 | **Screen** | Editors for LCD and pixel display controls. |

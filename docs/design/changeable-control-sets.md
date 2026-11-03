@@ -12,7 +12,10 @@ Knob tab has a section per part, in drawing order: Housing, Track and Value Arc,
 button forms and the twelve base switch forms are drawn with the control's own device parts
 (`models/buttonDeviceParts.js`: housing, guard, key, symbol, indicator, legend, each a shape in a
 box of the form frame, `utils/deviceShapes.js`, that moves, swings and lights when pressed or on;
-recipes in `models/buttonFormParts.js`). Their fields wait on the Button and Switch tab's mock-up.
+recipes in `models/buttonFormParts.js`). The Button tab (Switch on a toggle) edits them one part at
+a time, as the owner approved in its mock-up (`sections/ButtonPartsEditor.svelte`): Shape,
+Position, Appearance, When On or When Pressed, and the legend's text, every field with the override
+marks.
 Still drawn by code: the 48 direction forms, and the meter forms. SVG and Photoshop drawings import
 as layered components (Bringing designs in, below).
 
@@ -333,8 +336,14 @@ control itself, a custom component of layers, opened in the Component Designer
 - **Layer masks** (`utils/partMask.js`): a part may carry `mask: { enabled, src, x, y, width,
   height, invert }`, a PNG or SVG whose alpha is the mask, in % of the part's box, drawn with CSS
   masking; a masked part is never baked into a static picture. A picture layer casts its shadows
-  from its pixels (`drop-shadow()`), not its box. Editing a mask in the Component Designer waits on
-  its mock-up.
+  from its pixels (`drop-shadow()`), not its box. A mask may be unlinked (`linked: false`): its
+  rect is then in % of the artboard and it is drawn on a wrapper the artboard's size, so the layer
+  moves under it. The Component Designer edits masks as the owner approved in the mock-up: each
+  masked layer shows its mask beside its thumbnail in the Layers list (click: edit, Shift-click:
+  off and on, the link: linked or not), and the dock's Mask tab (`components/MaskTab.svelte`) has
+  Enabled, Invert, Linked to Layer, the mask's place and size, Fit to Layer, Add Mask, Load Image
+  (an opaque picture's brightness becomes its alpha), Mask With Layer (another layer's outline,
+  `utils/layerMaskOutline.js`) and Delete Mask.
 - **What moves**, from the names, as the panel importers read them: `pointer`/`indicator`/
   `needle`/`rotor` turn about the `pivot` (or the middle of the knob they sit on), `fader`/`thumb`
   slide along the `track`, `lamp`/`led`/`on` and `off` show the state, `pressed` shows while held. The

@@ -55,5 +55,5 @@ test('a knob is offered its circular presets and Change to Slider; a slider its 
   assert.match(html('Knob', { geometry: 'linear' }), /data-testid="range-geometry-mismatch"[^>]*>\s*This knob is set to linear/);
   assert.match(html('Slider', { geometry: 'circular' }), /data-testid="range-geometry-mismatch"[^>]*>\s*This slider is set to circular/);
   const panel = readFileSync(new URL('../src/CE_Application/panels/PropertiesPanel.svelte', import.meta.url), 'utf8');
-  assert.match(panel, /tab\.id === 'slider' && getSection\(\$selectedControl, 'Core'\)\?\.controlType === 'Knob' \? \{ \.\.\.tab, label: 'Knob' \} : tab/);
+  assert.match(panel, /tab\.id === 'slider' && getSection\(\$selectedControl, 'Core'\)\?\.controlType === 'Knob' \? \{ \.\.\.tab, label: 'Knob' \}/);
 });

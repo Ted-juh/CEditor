@@ -49,6 +49,8 @@ const METAL = { type: 'linear', angle: 180, edge: 0, stops: [
 const DOME = { type: 'radial', centerX: 32, centerY: 25, radiusX: 80, radiusY: 80, edge: 0, stops: [
   { color: '82FFFFFF', position: 0 }, { color: '00FFFFFF', position: 45 }, { color: '5C000000', position: 100 },
 ] };
+/** The finishes by name, for the Button and Switch tabs' Shading (sections/ButtonPartsEditor.svelte). */
+export const DEVICE_SHADINGS = Object.freeze({ metal: METAL, dome: DOME });
 const shaded = (gradient) => ({ 'Background.Fill.gradientEnabled': true, 'Background.Fill.gradient': gradient, 'Background.Fill.gradientOpacity': 100 });
 
 const BUTTONS = {

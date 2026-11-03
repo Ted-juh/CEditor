@@ -343,6 +343,9 @@ test('a layer mask is drawn with CSS masking, inverted on request, and keeps a m
   const { whyNotBakeable } = await import('../src/CE_Application/utils/partsToSvg.js');
   assert.equal(whyNotBakeable({ kind: 'rectangle', mask: { src: 'x' }, _children: {} }), 'a mask');
   const renderer = readFileSync(new URL('../src/CE_Application/editor/InteractivePartRenderer.svelte', import.meta.url), 'utf8');
-  assert.match(renderer, /let maskCSS = \$derived\(partMaskCSS\(part\?\.mask, frame\.width, frame\.height\)\)/);
+  // Linked: on the part's own box. Not linked: on a wrapper the artboard's size, so the part moves under it.
+  assert.match(renderer, /let maskCSS = \$derived\(maskFixed \? '' : partMaskCSS\(part\?\.mask, frame\.width, frame\.height\)\)/);
+  assert.match(renderer, /partMaskCSS\(part\?\.mask, parentWidth, parentHeight\)/);
+  assert.match(renderer, /class="interactive-part-fixed-mask"/);
   assert.match(renderer, /pictureLayer \? pictureShadowFilters\(effects\) : ''/);
 });

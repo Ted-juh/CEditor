@@ -8,9 +8,11 @@
 //     enabled   false keeps it, unapplied (Photoshop's "Disable Layer Mask")
 //     src       the picture: a PNG, or an SVG for a vector mask (a Photoshop vector mask, an SVG
 //               clip path or mask), whose ALPHA is the mask
-//     x, y, width, height   where it sits, in % of the part's own box, so it moves, turns and scales
-//               with the layer as a linked mask does
+//     x, y, width, height   where it sits: in % of the part's own box while linked, so it moves,
+//               turns and scales with the layer; in % of the artboard while not
 //     invert    true: shows where the picture is clear
+//     linked    false: the mask stays put on the artboard while the layer moves under it (a
+//               pointer turning behind a fixed window); absent or true: it moves with the layer
 //   }
 //
 // It is drawn with CSS masking on the part's element (the -webkit- spelling for WebKitGTK and older
@@ -27,6 +29,78 @@ const num = (value, fallback) => {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
 };
+
+/**
+ * Add Layer Mask's picture: opaque everywhere, so the layer shows whole until the mask is moved,
+ * sized or replaced. An SVG with a view box and no fixed aspect, so it stretches to any size.
+ */
+export const REVEAL_ALL_MASK_SRC = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16' preserveAspectRatio='none'%3E%3Crect width='16' height='16' fill='%23fff'/%3E%3C/svg%3E";
+
+/** A new mask over the whole layer: `src` (a reveal-all picture when none), linked, on. */
+export function newMask(src = REVEAL_ALL_MASK_SRC) {
+  return { enabled: true, src: src || REVEAL_ALL_MASK_SRC, x: 0, y: 0, width: 100, height: 100, invert: false, linked: true };
+}
+
+/** Whether the mask moves with its layer (the default) rather than staying put on the artboard. */
+export function maskLinked(mask) {
+  return mask?.linked !== false;
+}
+
+const round2 = (value) => Math.round(value * 100) / 100;
+
+/**
+ * The mask linked to its layer or not, placed where it was: its rect turned from % of the layer's
+ * box into % of the artboard, or back. `frame` is the layer's box on the artboard in px (unturned:
+ * a turned layer's mask is placed by its box), `artboard` is `{ width, height }`.
+ */
+export function relinkMask(mask, frame, artboard, linked) {
+  if (!mask || maskLinked(mask) === !!linked) return mask;
+  const fw = Math.max(1e-6, num(frame?.width, 1));
+  const fh = Math.max(1e-6, num(frame?.height, 1));
+  const aw = Math.max(1e-6, num(artboard?.width, 1));
+  const ah = Math.max(1e-6, num(artboard?.height, 1));
+  const left = num(frame?.left, 0);
+  const top = num(frame?.top, 0);
+  const x = num(mask.x, 0);
+  const y = num(mask.y, 0);
+  const w = num(mask.width, 100);
+  const h = num(mask.height, 100);
+  const rect = linked
+    ? { x: ((x / 100) * aw - left) / fw * 100, y: ((y / 100) * ah - top) / fh * 100, width: (w / 100) * aw / fw * 100, height: (h / 100) * ah / fh * 100 }
+    : { x: (left + (x / 100) * fw) / aw * 100, y: (top + (y / 100) * fh) / ah * 100, width: (w / 100) * fw / aw * 100, height: (h / 100) * fh / ah * 100 };
+  return { ...mask, linked: !!linked, x: round2(rect.x), y: round2(rect.y), width: round2(rect.width), height: round2(rect.height) };
+}
+
+/** The mask over exactly its layer's box: Fit to Layer. */
+export function fitMaskToLayer(mask, frame, artboard) {
+  if (!mask) return mask;
+  if (maskLinked(mask)) return { ...mask, x: 0, y: 0, width: 100, height: 100 };
+  const aw = Math.max(1e-6, num(artboard?.width, 1));
+  const ah = Math.max(1e-6, num(artboard?.height, 1));
+  return {
+    ...mask,
+    x: round2(num(frame?.left, 0) / aw * 100),
+    y: round2(num(frame?.top, 0) / ah * 100),
+    width: round2(num(frame?.width, 0) / aw * 100),
+    height: round2(num(frame?.height, 0) / ah * 100),
+  };
+}
+
+/**
+ * Make an opaque picture a mask, in place: its brightness becomes how much shows (white shows,
+ * black hides), as Photoshop reads a picture pasted into a layer mask. `data` is RGBA bytes. A
+ * picture with any transparency of its own is left alone and false returned: its alpha already is
+ * the mask.
+ */
+export function brightnessToAlpha(data) {
+  if (!data || data.length < 4) return false;
+  for (let i = 3; i < data.length; i += 4) if (data[i] < 255) return false;
+  for (let i = 0; i < data.length; i += 4) {
+    const lum = Math.round(0.2126 * data[i] + 0.7152 * data[i + 1] + 0.0722 * data[i + 2]);
+    data[i] = 255; data[i + 1] = 255; data[i + 2] = 255; data[i + 3] = lum;
+  }
+  return true;
+}
 
 /** Whether a mask is there to draw. */
 export function maskActive(mask) {

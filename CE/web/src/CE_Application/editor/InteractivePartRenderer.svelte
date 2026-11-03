@@ -47,7 +47,7 @@
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
-  import { isPictureLayer, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
+  import { isPictureLayer, maskActive, maskLinked, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
   import SliderFamilyRenderer from './SliderFamilyRenderer.svelte';
   import ControlAnatomy from './ControlAnatomy.svelte';
@@ -230,8 +230,15 @@
   let pictureLayer = $derived(!shape.rendersOutline && !shape.rendersVectorShape && isPictureLayer(background));
   let shadowCSS = $derived(shape.rendersOutline || pictureLayer ? '' : buildShadowCSS(effects));
   let pictureShadows = $derived(pictureLayer ? pictureShadowFilters(effects) : '');
-  // The layer's mask, from its own picture (utils/partMask.js).
-  let maskCSS = $derived(partMaskCSS(part?.mask, frame.width, frame.height));
+  // The layer's mask, from its own picture (utils/partMask.js). Linked, it is the part's own and
+  // moves, turns and scales with it. Not linked, it is placed on the artboard and drawn by a wrapper
+  // the artboard's size, untransformed, so the part moves under it: a CSS mask on the part itself
+  // would turn with the part.
+  let maskFixed = $derived(maskActive(part?.mask) && !maskLinked(part?.mask));
+  let maskCSS = $derived(maskFixed ? '' : partMaskCSS(part?.mask, frame.width, frame.height));
+  let fixedMaskStyle = $derived(maskFixed
+    ? `width:${parentWidth}px; height:${parentHeight}px; z-index:${numberOr(part?.zIndex, 0)}; ${partMaskCSS(part?.mask, parentWidth, parentHeight)}`
+    : '');
   let blendCSS = $derived(buildBlendCSS(effects));
   // A lit material (utils/materialFilter.js) is an SVG filter this part owns; it goes first in the
   // filter list so the CSS blur / brightness that follow act on the lit surface.
@@ -643,7 +650,7 @@
   });
 </script>
 
-{#if part?.visible !== false || fadeHidden}
+{#snippet partElement()}
   <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} data-focus-ring={sliderControl?.domFocus === true ? '' : undefined} style={partStyle}>
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />
@@ -846,12 +853,29 @@
       <div class="part-debug-chip">{part?.name ?? part?.role ?? 'part'}</div>
     {/if}
   </div>
+{/snippet}
+
+{#if part?.visible !== false || fadeHidden}
+  {#if maskFixed}
+    <div class="interactive-part-fixed-mask" data-mask-for={partName || part?.name || undefined} style={fixedMaskStyle}>
+      {@render partElement()}
+    </div>
+  {:else}
+    {@render partElement()}
+  {/if}
 {/if}
 
 <style>
   .interactive-part {
     position: absolute;
     box-sizing: border-box;
+    pointer-events: none;
+  }
+
+  .interactive-part-fixed-mask {
+    position: absolute;
+    left: 0;
+    top: 0;
     pointer-events: none;
   }
 

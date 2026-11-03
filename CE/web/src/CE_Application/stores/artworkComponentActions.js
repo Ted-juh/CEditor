@@ -45,7 +45,7 @@ let readCounter = 0;
 const pendingReads = new Map();
 let listening = false;
 
-function readFileAsDataUrl(filePath) {
+export function readFileAsDataUrl(filePath) {
   if (!listening) {
     listening = true;
     onFileData((payload) => {

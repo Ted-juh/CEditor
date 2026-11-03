@@ -13,6 +13,7 @@
   import StickyNote from 'lucide-svelte/icons/sticky-note';
   import SwatchBook from 'lucide-svelte/icons/swatch-book';
   import Sparkles from 'lucide-svelte/icons/sparkles';
+  import Contrast from 'lucide-svelte/icons/contrast';
   import TypeIcon from 'lucide-svelte/icons/type';
   import Boxes from 'lucide-svelte/icons/boxes';
   import MonitorIcon from 'lucide-svelte/icons/monitor';
@@ -73,9 +74,10 @@
   // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
   // is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'mask', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
+    mask: () => import('../components/MaskTab.svelte').then((module) => ({ default: module.default })),
     type: () => import('../components/TextDock.svelte').then((module) => ({ default: module.default })),
     assets: () => import('../components/AssetsTab.svelte').then((module) => ({ default: module.default })),
     screen: () => import('../components/ScreenTab.svelte').then((module) => ({ default: module.default })),
@@ -113,6 +115,8 @@
     // Preview is intentionally not restored on startup because it mounts
     // a live interactive surface and should only run on demand.
     if (normalized === 'preview') return DEFAULT_DISPLAY_TAB;
+    // Mask edits a Component Designer layer, and the designer is never open at startup.
+    if (normalized === 'mask') return DEFAULT_DISPLAY_TAB;
     return normalized;
   }
 
@@ -950,16 +954,16 @@
   }
 
   function handleStudioTabKeydown(event, tabId) {
-    const index = tabs.findIndex((tab) => tab.id === tabId);
+    const index = railTabs.findIndex((tab) => tab.id === tabId);
     if (index < 0) return;
     let nextIndex = null;
-    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + tabs.length) % tabs.length;
-    if (event.key === 'ArrowRight') nextIndex = (index + 1) % tabs.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + railTabs.length) % railTabs.length;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % railTabs.length;
     if (event.key === 'Home') nextIndex = 0;
-    if (event.key === 'End') nextIndex = tabs.length - 1;
+    if (event.key === 'End') nextIndex = railTabs.length - 1;
     if (nextIndex === null) return;
     event.preventDefault();
-    handleTabClick(tabs[nextIndex].id);
+    handleTabClick(railTabs[nextIndex].id);
     event.currentTarget.parentElement?.querySelectorAll?.('[role="tab"]')?.[nextIndex]?.focus?.();
   }
 
@@ -985,6 +989,8 @@
     { id: 'colors',   label: 'Colors',   icon: Palette },
     { id: 'gradient', label: 'Gradient', icon: SwatchBook },
     { id: 'effects',  label: 'Effects',  icon: Sparkles },
+    // Only while the Component Designer is open: it edits the mask of the layer selected there.
+    { id: 'mask',     label: 'Mask',     icon: Contrast, designerOnly: true },
     { id: 'type',     label: 'Text',     icon: TypeIcon },
     { id: 'assets',   label: 'Assets',   icon: Boxes },
     { id: 'screen',   label: 'Screen',   icon: MonitorIcon },
@@ -1004,11 +1010,17 @@
     { id: 'preview',  label: 'Preview',  icon: Play },
     { id: 'console',  label: 'Console',  icon: Terminal },
   ];
+  // The rail shows a designer-only tab while the designer is open; leaving the designer on one
+  // goes back to Colors rather than to a tab the rail no longer shows.
+  let railTabs = $derived(tabs.filter((tab) => !tab.designerOnly || designerOpen));
+  $effect(() => {
+    if (!designerOpen && tabs.find((tab) => tab.id === activeTab)?.designerOnly) untrack(() => handleTabClick(DEFAULT_DISPLAY_TAB));
+  });
 </script>
 
 <div class="display-panel">
   <div class="studio-rail" role="tablist" aria-label="Display studios">
-    {#each tabs as tab (tab.id)}
+    {#each railTabs as tab (tab.id)}
       <button
         class="studio-tab"
         class:active={activeTab === tab.id}
@@ -1145,6 +1157,11 @@
       {@const EffectsTab = activeTabComponent.default}
       <div class="tab-pane">
         <EffectsTab />
+      </div>
+    {:else if activeTab === 'mask' && activeTabComponentId === activeTab && activeTabComponent?.default}
+      {@const MaskTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <MaskTab />
       </div>
     {:else if activeTab === 'type' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const TextDock = activeTabComponent.default}

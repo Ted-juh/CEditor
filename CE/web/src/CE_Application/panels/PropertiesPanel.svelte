@@ -50,6 +50,9 @@
   import ScrollText from 'lucide-svelte/icons/scroll-text';
   import Pentagon from 'lucide-svelte/icons/pentagon';
   import ListOrdered from 'lucide-svelte/icons/list-ordered';
+  import RectangleHorizontal from 'lucide-svelte/icons/rectangle-horizontal';
+  import ToggleRight from 'lucide-svelte/icons/toggle-right';
+  import { BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
   import { activePanel, selectedComponentId } from '../stores/panels.js';
   import { propertyHint } from '../stores/propertyHint.js';
   import { clearPropertyFilter } from '../stores/propertyFilter.js';
@@ -245,6 +248,8 @@
     { id: 'effects',    icon: Sparkles,      label: 'Effects',    section: 'Effects' },
     { id: 'behavior',   icon: Settings2,     label: 'Behavior',   section: 'Behavior' },
     { id: 'slider',     icon: SlidersHorizontal, label: 'Slider', section: 'Behavior', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
+    // A button's or a switch's own parts (models/buttonDeviceParts.js); called Switch on a toggle.
+    { id: 'button',     icon: RectangleHorizontal, label: 'Button', section: 'Parts', when: (control) => BUTTON_DEVICE_TYPES.has(String(getSection(control, 'Core')?.controlType ?? '')) && !!getSection(control, 'Parts')?._children?.key },
     { id: 'label',      icon: Type,          label: 'Label',      section: 'Parts', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
     // Custom components edit states/bindings/animations (and links) inside
     // the React tab; the standalone tabs remain for every other control.
@@ -281,7 +286,8 @@
         && tabAllowedForAudience(tab.id, audienceContext, selectedIsCustomComponent)
         && !(selectedIsCustomComponent && $creatorMode === 'simple' && CREATOR_SIMPLE_HIDDEN_TABS.has(tab.id))
       // A knob runs on the slider's engine and has its tab; it is called what it is.
-      )).map((tab) => (tab.id === 'slider' && getSection($selectedControl, 'Core')?.controlType === 'Knob' ? { ...tab, label: 'Knob' } : tab))
+      )).map((tab) => (tab.id === 'slider' && getSection($selectedControl, 'Core')?.controlType === 'Knob' ? { ...tab, label: 'Knob' }
+        : tab.id === 'button' && getSection($selectedControl, 'Core')?.controlType === 'ToggleButton' ? { ...tab, label: 'Switch', icon: ToggleRight } : tab))
       : allComponentTabs.filter(t => t.id === 'core' || t.id === 'transform')
   );
   let selectedControlId = $derived($selectedControl?._children?.Core?.id ?? '');

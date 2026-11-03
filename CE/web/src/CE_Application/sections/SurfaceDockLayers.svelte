@@ -17,6 +17,9 @@
   import Lock from 'lucide-svelte/icons/lock';
   import Unlock from 'lucide-svelte/icons/lock-open';
   import Trash2 from 'lucide-svelte/icons/trash-2';
+  import LinkIcon from 'lucide-svelte/icons/link';
+  import UnlinkIcon from 'lucide-svelte/icons/unlink';
+  import { maskLinked } from '../utils/partMask.js';
   import { generatorNameForEntry, layerKind, layerKindClass, layerKindLabel } from '../utils/customDesignSurfaceHelpers.js';
 
   let {
@@ -53,6 +56,10 @@
     editGeneratorForLayer = () => {},
     removeKitEntry = () => {},
     renameLayer = () => {},
+    // A layer's mask (utils/partMask.js): open it in the dock's Mask tab, turn it off and on, link it.
+    openLayerMask = () => {},
+    toggleLayerMask = () => {},
+    toggleLayerMaskLink = () => {},
     // A combined shape's operands, front first ([name, part]) — shown indented under it.
     operandEntriesFor = () => [],
   } = $props();
@@ -162,6 +169,28 @@
     renameDraft = name;
   }
 
+  // The mask beside the layer's thumbnail, as Photoshop shows it: white shows, black hides.
+  const hasMask = (part) => !!part?.mask && typeof part.mask === 'object' && typeof part.mask.src === 'string' && part.mask.src.length > 0;
+  function maskThumbStyle(part) {
+    const url = `url("${String(part.mask.src).replace(/"/g, '%22')}")`;
+    return [`-webkit-mask-image:${url}`, `mask-image:${url}`, '-webkit-mask-size:contain', 'mask-size:contain',
+      '-webkit-mask-position:center', 'mask-position:center', '-webkit-mask-repeat:no-repeat', 'mask-repeat:no-repeat'].join(';');
+  }
+
+  // A click on the mask thumbnail or its link, inside the row's button, is theirs and not the row's.
+  function rowClick(name, part, event) {
+    const onMask = event.target?.closest?.('.mask-thumb');
+    const onLink = event.target?.closest?.('.mask-link');
+    if (onLink && hasMask(part)) { event.stopPropagation(); toggleLayerMaskLink(name, part); return; }
+    if (onMask && hasMask(part)) {
+      event.stopPropagation();
+      if (event.shiftKey) toggleLayerMask(name, part);
+      else openLayerMask(name);
+      return;
+    }
+    selectLayer(name, event);
+  }
+
   function commitRename() {
     const from = renamingLayer;
     const to = renameDraft.trim();
@@ -220,12 +249,23 @@
         <span class="row-badge">{part?.generated === true || part?.meta?.generated === true ? 'GEN' : layerKindLabel(part)}</span>
       </div>
     {:else}
-      <button type="button" class="row-main" onclick={(event) => selectLayer(name, event)} ondblclick={() => beginRename(name)}>
+      <button type="button" class="row-main" class:has-mask={hasMask(part)} onclick={(event) => rowClick(name, part, event)} ondblclick={(event) => { if (!event.target?.closest?.('.mask-thumb, .mask-link')) beginRename(name); }}>
         <span class="layer-thumb" aria-hidden="true">
           <span class={`layer-thumb-shape ${layerKindClass(part)}`} style={layerThumbPartStyle(name, part)}>
             {#if layerKind(part) === 'text'}T{/if}
           </span>
         </span>
+        {#if hasMask(part)}
+          <span class="mask-link" class:unlinked={!maskLinked(part.mask)}
+            title={maskLinked(part.mask) ? 'The mask moves with the layer. Click to unlink it.' : 'The mask stays put while the layer moves. Click to link it.'}>
+            {#if maskLinked(part.mask)}<LinkIcon size={10} aria-hidden="true" />{:else}<UnlinkIcon size={10} aria-hidden="true" />{/if}
+          </span>
+          <span class="mask-thumb" class:off={part.mask.enabled === false} class:inverted={part.mask.invert === true}
+            data-mask-thumb={name}
+            title={part.mask.enabled === false ? 'Layer mask (off). Click to edit it; Shift-click to turn it on.' : 'Layer mask. Click to edit it; Shift-click to turn it off.'}>
+            <span class="mask-thumb-picture" style={maskThumbStyle(part)}></span>
+          </span>
+        {/if}
         <span class="row-text">
           <strong>{name}</strong>
           <!-- The kind is the badge's to say; the second line only for what the badge does not. -->
@@ -953,5 +993,79 @@
     font-size: 11px;
     font-weight: 600;
     outline: none;
+  }
+
+  /* The layer's thumbnail, the link and the mask's thumbnail side by side, then the name. */
+  .row-main.has-mask {
+    grid-template-columns: 32px 10px 20px minmax(0, 1fr) auto;
+    column-gap: 5px;
+  }
+
+  .mask-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 12px;
+    flex: none;
+    color: #8AA;
+    cursor: pointer;
+  }
+
+  .mask-link.unlinked {
+    color: #666;
+  }
+
+  .mask-link:hover {
+    color: #FFF;
+  }
+
+  .mask-thumb {
+    position: relative;
+    width: 20px;
+    height: 20px;
+    flex: none;
+    box-sizing: border-box;
+    border: 1px solid #888;
+    border-radius: 3px;
+    background: #000;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .mask-thumb:hover {
+    outline: 2px solid #4FC3F7;
+    outline-offset: 1px;
+  }
+
+  .mask-thumb-picture {
+    position: absolute;
+    inset: 1px;
+    background: #FFF;
+  }
+
+  /* Inverted: black where the picture is, white elsewhere. */
+  .mask-thumb.inverted {
+    background: #FFF;
+  }
+
+  .mask-thumb.inverted .mask-thumb-picture {
+    background: #000;
+  }
+
+  /* Off: dimmed and struck through, as Photoshop shows a disabled layer mask. */
+  .mask-thumb.off {
+    opacity: 0.55;
+  }
+
+  .mask-thumb.off::after {
+    content: '';
+    position: absolute;
+    left: -3px;
+    right: -3px;
+    top: 50%;
+    height: 2px;
+    margin-top: -1px;
+    background: #E33;
+    transform: rotate(-35deg);
   }
 </style>

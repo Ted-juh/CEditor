@@ -21,6 +21,7 @@
   import { displayTabRequest } from '../stores/displayTab.js';
   import { openFillGradientEditor } from '../stores/gradientTarget.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
+  import { maskLinked, relinkMask } from '../utils/partMask.js';
   import { clipPathForKind } from '../utils/shapeGeometry.js';
   import { getOrCreateScriptDocForPanel } from '../stores/scriptWorkspace.js';
   import { setActiveEditorTab } from '../stores/panels.js';
@@ -2702,6 +2703,26 @@
     commitLayerSelection([name], name);
   }
 
+  // A layer's mask, from its thumbnail in the Layers list (utils/partMask.js; the dock's Mask tab
+  // edits the rest). Opening it selects the layer, so the tab edits that one.
+  function openLayerMask(name) {
+    if (!core?.id || !name) return;
+    if (!(selectedLayerNames.length === 1 && selectedLayer === name)) commitLayerSelection([name], name);
+    revealDisplayDock('mask');
+  }
+
+  function toggleLayerMask(name, part) {
+    if (!core?.id || !part?.mask || !isEditablePart(authoredParts?._children?.[name])) return;
+    updateControlProperty(core.id, `Parts.${name}.mask`, { ...part.mask, enabled: part.mask.enabled === false });
+  }
+
+  function toggleLayerMaskLink(name, part) {
+    if (!core?.id || !part?.mask || !isEditablePart(authoredParts?._children?.[name])) return;
+    const linked = maskLinked(part.mask);
+    updateControlProperty(core.id, `Parts.${name}.mask`,
+      relinkMask(part.mask, partFrame(part), { width: artboardWidth, height: artboardHeight }, !linked));
+  }
+
   function toggleLayerMultiSelection(name, event = null) {
     event?.stopPropagation?.();
     if (!core?.id || !name) return;
@@ -4013,6 +4034,7 @@
             {moveLayer} {beginLayerDrag} {dropLayerOn}
             {addLayerAtCenter} {addHitZoneAtCenter} {editKitParts} {editGeneratedSource} {editGeneratorForLayer} {removeKitEntry}
             {renameLayer}
+            {openLayerMask} {toggleLayerMask} {toggleLayerMaskLink}
             operandEntriesFor={(name) => operandEntries(parts?._children, name)}
           />
           {:else if dockTab === 'generators'}
