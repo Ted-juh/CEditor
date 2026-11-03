@@ -11,6 +11,7 @@
   import PanelPreviewSurface from '../editor/PanelPreviewSurface.svelte';
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
   import ControlSetCard from './ControlSetCard.svelte';
+  import EffectPreview from '../components/effects/EffectPreview.svelte';
   import { SET_STYLES, groupControlSets } from '../utils/controlSetGroups.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
@@ -33,6 +34,8 @@
     DERIVED_ROLE_GROUP, ROLE_GROUPS, familyLabel, familySourceLabel, groupedFamilies, setLettering, withFamilyReset, withLamp, withLettering,
   } from '../models/setEditing.js';
   import { deepClone } from '../utils/deepClone.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { componentFit, fittingLibraryComponents, isSetComponentType, resolveSetComponent, setComponentFor, setComponentRef } from '../utils/setLibraryComponents.js';
 
   // Every colour role and every family a set holds (models/setEditing.js), grouped; the groups the
   // page opens on, the rest folded.
@@ -255,6 +258,33 @@
     familySources = { ...familySources, [family]: sourceId };
   }
 
+  /**
+   * A family that names a library component (utils/setLibraryComponents.js): applying the set
+   * places a linked copy of it for each control of the family. Choosing a design again, or Reset,
+   * takes it away.
+   */
+  function setFamilyComponent(type, entryId) {
+    const entry = ($customComponentLibrary ?? []).find((candidate) => candidate.id === entryId);
+    if (!entry) return;
+    edit((next) => ({ ...next, libraryComponents: { ...(next.libraryComponents ?? {}), [type]: setComponentRef(entry) } }));
+  }
+
+  function clearFamilyComponent(type) {
+    edit((next) => {
+      const { [type]: _, ...rest } = next.libraryComponents ?? {};
+      const out = { ...next, libraryComponents: rest };
+      if (!Object.keys(rest).length) delete out.libraryComponents;
+      return out;
+    });
+  }
+
+  function chooseFamilyDesign(type, value) {
+    if (!value || value === 'own') return;
+    if (value.startsWith('lib:')) { setFamilyComponent(type, value.slice(4)); return; }
+    if (setComponentFor(draft, type)) clearFamilyComponent(type);
+    setFamilySource(type, value);
+  }
+
   function downloadSelected() {
     const envelope = exportControlSetEnvelope(selectedId);
     if (!envelope) return;
@@ -462,15 +492,50 @@
               <div class="family-rows">
                 {#each group.types as type (type)}
                   {@const own = draft.chosenFamilies?.[type] === 'own'}
+                  {@const named = setComponentFor(draft, type)}
+                  {@const resolved = named ? resolveSetComponent(named, $customComponentLibrary) : null}
+                  {@const fitting = isSetComponentType(type) ? fittingLibraryComponents(type, $customComponentLibrary).filter((row) => row.fit.ok) : []}
                   <div class="family-row" data-family={type}>
                     <span class="family-name">{familyLabel(type)}</span>
-                    <select aria-label={`${familyLabel(type)} design`} value={own ? 'own' : (familySources[type] ?? '')} onchange={(event) => event.target.value && event.target.value !== 'own' && setFamilySource(type, event.target.value)}>
-                      {#if own}<option value="own">{familySourceLabel(draft, type)}</option>{:else}<option value="">Keep current design</option>{/if}
-                      {#each DESIGN_SOURCES as source (source.id)}<option value={source.id}>{source.name}</option>{/each}
+                    <select aria-label={`${familyLabel(type)} design`} value={named ? `lib:${resolved?.entry?.id ?? named.id}` : own ? 'own' : (familySources[type] ?? '')} onchange={(event) => chooseFamilyDesign(type, event.target.value)}>
+                      {#if named}<option value={`lib:${resolved?.entry?.id ?? named.id}`}>{named.name} {named.version} (library)</option>
+                      {:else if own}<option value="own">{familySourceLabel(draft, type)}</option>{:else}<option value="">Keep current design</option>{/if}
+                      {#if isSetComponentType(type)}
+                        <optgroup label="Library components">
+                          {#each fitting as row (row.entry.id)}{#if row.entry.id !== (resolved?.entry?.id ?? named?.id)}<option value={`lib:${row.entry.id}`}>{row.entry.name} {row.entry.version}</option>{/if}{/each}
+                          {#if !fitting.length}<option disabled>None in your library fits {familyLabel(type).toLowerCase()}</option>{/if}
+                        </optgroup>
+                      {/if}
+                      <optgroup label="Templates">
+                        {#each DESIGN_SOURCES as source (source.id)}<option value={source.id}>{source.name}</option>{/each}
+                      </optgroup>
                     </select>
-                    <button type="button" onclick={() => editOnPanel(type)} disabled={!targetPanel} title={targetPanel ? `Place one of ${draft.name}'s ${familyLabel(type).toLowerCase()} on ${panelName} to style, then Apply to Set` : 'Open a panel first'}>Edit on Panel</button>
-                    <button type="button" onclick={() => resetFamily(type)} disabled={!resetSource?.families?.[type]} title={resetSource ? `Back to ${resetSource.name}'s ${familyLabel(type).toLowerCase()}` : 'This set has nothing to go back to'}>Reset</button>
+                    {#if named}
+                      <button type="button" disabled title="A library component is edited in the Component Designer, from the Library">Edit on Panel</button>
+                      <button type="button" onclick={() => clearFamilyComponent(type)} title={`Back to ${draft.name}'s own ${familyLabel(type).toLowerCase()}`}>Reset</button>
+                    {:else}
+                      <button type="button" onclick={() => editOnPanel(type)} disabled={!targetPanel} title={targetPanel ? `Place one of ${draft.name}'s ${familyLabel(type).toLowerCase()} on ${panelName} to style, then Apply to Set` : 'Open a panel first'}>Edit on Panel</button>
+                      <button type="button" onclick={() => resetFamily(type)} disabled={!resetSource?.families?.[type]} title={resetSource ? `Back to ${resetSource.name}'s ${familyLabel(type).toLowerCase()}` : 'This set has nothing to go back to'}>Reset</button>
+                    {/if}
                   </div>
+                  {#if named}
+                    {@const fit = resolved ? componentFit(type, resolved.entry.component) : null}
+                    <div class="family-component" data-family-component={type}>
+                      <span class="thumb">{#if resolved?.entry?.component}<EffectPreview control={resolved.entry.component} boxWidth={44} boxHeight={44} padding={2} maxScale={1} label={resolved.entry.name} />{/if}</span>
+                      <p>
+                        {#if !resolved}
+                          <b>{named.name} {named.version}</b> is not in your library. Applying the set leaves {familyLabel(type).toLowerCase()} as they are until it is imported.
+                        {:else if !fit?.ok}
+                          <b>{resolved.entry.name} {resolved.entry.version}</b> no longer fits {familyLabel(type).toLowerCase()}: {fit?.reason}.
+                        {:else}
+                          Applying the set places a linked copy of <b>{resolved.entry.name} {resolved.entry.version}</b> for each of the panel's {familyLabel(type).toLowerCase()}.
+                          Each copy keeps the control's name, position, size, value, range, device bindings and plug-in parameter.
+                          {#if fit.caption}Its caption goes to the component's text.{:else}This component has no caption text, so captions are not shown.{/if}
+                          {#if !resolved.exact}Version {named.version} is gone from your library; {resolved.entry.version} is used.{/if}
+                        {/if}
+                      </p>
+                    </div>
+                  {/if}
                 {/each}
               </div>
             {/if}
@@ -580,6 +645,10 @@
   .family-rows { display:flex; flex-direction:column; }
   .family-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(0,1.4fr) auto auto; gap:6px; align-items:center; padding:4px 0; border-top:1px solid #2a2a2a; }
   .family-row:first-child { border-top:0; }
+  .family-component { display:flex; gap:9px; align-items:flex-start; margin:0 0 6px; padding:7px 9px; border:1px solid #2f4a5f; border-radius:5px; background:#1f262c; }
+  .family-component .thumb { width:44px; height:44px; flex:0 0 auto; border-radius:4px; background:#151515; border:1px solid #333; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .family-component p { margin:0; font-size:11px; line-height:1.45; color:#b8c3cc; }
+  .family-component b { color:#e6eef4; font-weight:600; }
   .family-row .family-name { color:#ddd; font-size:11.5px; }
   .family-row button { height:24px; padding:0 9px; border:1px solid #3b3b3b; border-radius:4px; background:#262626; color:#ddd; font:inherit; font-size:11px; cursor:pointer; white-space:nowrap; }
   .family-row button:hover:not(:disabled) { border-color:#5B9BD5; }

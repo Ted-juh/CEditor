@@ -30,8 +30,12 @@ import { meterFormFamily } from '../models/meterFormParts.js';
 import { createControl } from '../models/componentTypes.js';
 import { readControlPath } from '../models/controlSetFamilies.js';
 import { applyControlPatchesById, replaceControlsById } from './controls.js';
-import { findControlById } from '../utils/containment.js';
+import { findControlById, flatControls } from '../utils/containment.js';
 import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
+import { customComponentLibrary } from './customComponentLibrary.js';
+import { panelPreviewSessions } from './interactionPreview.js';
+import { SET_COMPONENT_KINDS, applySetComponentPlan, planSetComponents, repointSetComponentExports, setPlacementOf } from '../utils/setLibraryComponents.js';
+import { liveValuePatch, readLiveValue } from '../scripting/liveValue.js';
 
 export { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../models/controlSets.js';
 
@@ -107,6 +111,24 @@ export function applyControlSetWithChoices(panelId, setId, choices = {}) {
   const oldSet = getControlSet(oldSetId, { document: panel.controlSets, library });
   const newSet = getControlSet(newRef.id, { document: panel.controlSets, library });
   const applied = applyControlSetChoices(panel, newRef, choices, { oldSetId, oldSet, newSet, defaultPanelColour: DEFAULT_PANEL_COLOUR });
+  // The families the set names a library component for (utils/setLibraryComponents.js): copies
+  // placed where those controls are, and copies an earlier set placed put back, in the same write.
+  const sessions = get(panelPreviewSessions) ?? {};
+  const live = new Map(flatControls(panel.controls ?? []).map((control) => [String(control?._children?.Core?.id ?? ''), liveValueOfControl(control, sessions)]));
+  const plan = planSetComponents(panel, librarySet ?? newSet, customComponentLibrary.snapshot(), choices);
+  const components = applySetComponentPlan(applied.controls, plan, { skip: choices.skipComponents ?? new Set(), setId: newRef.id });
+  if (components.changed.length) {
+    // A copy's channel holds the value its control showed, as Create Component from Selection does,
+    // so it starts where the control was whatever reseeds its session.
+    const placedById = new Map(flatControls(components.controls).map((control) => [String(control?._children?.Core?.id ?? ''), control]));
+    for (const { id, type, to } of components.changed) {
+      const channel = to ? placedById.get(id)?._children?.ValueChannels?._children?.[to] : null;
+      if (channel && live.get(id) !== undefined && SET_COMPONENT_KINDS[type] !== 'display') channel.currentValue = live.get(id);
+    }
+    applied.controls = components.controls;
+    const exportParameters = repointSetComponentExports(panel.exportParameters, components.changed);
+    if (exportParameters) applied.exportParameters = exportParameters;
+  }
   const controlSets = librarySet
     ? [librarySet, ...(panel.controlSets ?? []).filter((set) => set.id !== librarySet.id)]
     : panel.controlSets;
@@ -120,7 +142,41 @@ export function applyControlSetWithChoices(panelId, setId, choices = {}) {
   // updatePanel merges, so a field the choices took away has to be written as gone.
   for (const key of ['bgFollowsSet', 'surfaceMaterial']) if (!(key in patch)) patch[key] = undefined;
   updatePanel(panel.id, patch);
+  // Each changed control keeps showing the value it showed: a copy holds it in its channel, a
+  // control put back in its own session value. Written straight to the sessions: the set is often
+  // applied from Settings › Control Sets, where the active tab is not this panel, and the session
+  // update that settles links looks its controls up in the active one.
+  if (components.changed.length) {
+    const byId = new Map(flatControls(components.controls).map((control) => [String(control?._children?.Core?.id ?? ''), control]));
+    const patches = components.changed.flatMap(({ id, type, to }) => {
+      const value = live.get(id);
+      const control = byId.get(id);
+      // A meter shows a value something else sends it; it has none of its own to carry.
+      if (value === undefined || !control || SET_COMPONENT_KINDS[type] === 'display') return [];
+      if (to) return [[id, { valueOverrideEnabled: false, currentValueOverrideEnabled: false, customValues: { [to]: value } }]];
+      return [[id, { customValues: {}, ...liveValuePatch(value, control) }]];
+    });
+    if (patches.length) {
+      panelPreviewSessions.update((sessions) => {
+        const next = { ...(sessions ?? {}) };
+        for (const [id, patch] of patches) next[id] = { ...(next[id] ?? {}), ...patch };
+        return next;
+      });
+    }
+  }
   return true;
+}
+
+/** What a control shows now: a copy a set placed, its channel's value; any other, its own value. */
+function liveValueOfControl(control, sessions) {
+  const placement = setPlacementOf(control);
+  try {
+    return placement
+      ? readLiveValue(sessions, control, `ValueChannels.${placement.channel}.currentValue`)
+      : readLiveValue(sessions, control);
+  } catch {
+    return undefined;
+  }
 }
 
 // --- A look the set decides, made the control's own, and handed back (models/controlSetOwnership.js)

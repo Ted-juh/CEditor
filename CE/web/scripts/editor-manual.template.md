@@ -439,6 +439,22 @@ The control then inherits the applied values from the set again. It is one undo 
 controls on the open panel, selected, with a banner above the status bar. Style it, then press **Apply
 to Set** in the banner, or **Cancel** to take it away.
 
+A family can also use a **library component** instead of a design. In Settings → Control Sets, the
+family's design list has a **Library components** group with the components in your library that can
+stand in for that kind of control: for knobs and sliders, one value that a drag moves, drawn from its
+position rather than its number, so that each copy can keep its own range; for buttons, an on/off value
+that a press holds; for switches, one that a click flips; for meters, one value and nothing that moves
+it. When the set is applied, each control of the family becomes a linked copy of the component, in the
+same place and at the same size, with the control's name, value, range, device bindings and plug-in
+parameter. A script that sets `Cutoff.value` still reaches it, and the control's caption goes into the
+component's caption text if it has one. Controls with a script of their own, with two handles or with
+bindings that drive other controls stay as they are, and the Apply window names them. Each copy
+remembers the control it replaced: applying a set that names no component (or another one) for the
+family puts the controls back, and the Apply window lists these changes with a tick for each. **Reset**
+on the family's row removes the component from the set. The copies are ordinary library copies: their
+**Component** tab offers newer versions, and an update keeps each copy's range. Exporting the set
+includes the components it names, and importing it adds them to your library.
+
 ### Colours
 
 Click any colour swatch — in the properties panel or the context bar — and the dock opens on **Colors**,

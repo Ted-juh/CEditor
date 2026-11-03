@@ -48,8 +48,13 @@ export function controlSetFileName(set) {
   return `${slugify(set?.name ?? set?.id)}.ceditor-controlset.json`;
 }
 
-/** A set, wrapped for the file. `metadata` overrides what the set itself says. */
-export function createControlSetEnvelope(set, metadata = {}) {
+/**
+ * A set, wrapped for the file. `metadata` overrides what the set itself says. `components` are the
+ * library component packages the set names for its families (utils/setLibraryComponents.js),
+ * carried whole so the set works where the library does not have them; a reader that does not know
+ * the key reads the set without them, as it reads the set without `libraryComponents`.
+ */
+export function createControlSetEnvelope(set, metadata = {}, components = []) {
   const normalized = normalizeControlSetDefinition(set);
   if (!normalized) return null;
   return {
@@ -68,6 +73,7 @@ export function createControlSetEnvelope(set, metadata = {}) {
     },
     fingerprint: fingerprintControlSet(normalized),
     set: deepClone(normalized),
+    ...(components.length ? { components: deepClone(components) } : {}),
   };
 }
 
@@ -104,5 +110,6 @@ export function normalizeControlSetEnvelope(value) {
     // file from an exported one.
     declaredFingerprint: typeof raw.fingerprint === 'string' ? raw.fingerprint : '',
     set,
+    components: Array.isArray(raw.components) ? raw.components.filter((entry) => entry && typeof entry === 'object') : [],
   };
 }

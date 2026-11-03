@@ -464,7 +464,11 @@ function channelizePath(control, path) {
   // Only when the shorthand landed nowhere: a control that genuinely has the section keeps it.
   if (node === undefined && path === SHORTHANDS.value) {
     const channels = control?._children?.ValueChannels?._children;
-    const main = channels && (channels.value ? 'value' : (channels.mainValue ? 'mainValue' : null));
+    // A copy a set placed where a knob was (utils/setLibraryComponents.js) answers for the knob's
+    // value through the channel it went to, so a script written for the knob still reaches it.
+    const placed = String(control?._children?.Designer?.setPlacement?.channel ?? '');
+    const main = channels && (placed && channels[placed] ? placed
+      : channels.value ? 'value' : (channels.mainValue ? 'mainValue' : null));
     if (main) return `ValueChannels._children.${main}.currentValue`;
   }
   return path;

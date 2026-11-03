@@ -4,13 +4,22 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { get } from 'svelte/store';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { getControlSet, normalizeControlSetDefinition } from '../src/CE_Application/models/controlSets.js';
 import { planComponentFromSelection } from '../src/CE_Application/utils/customComponentFromControls.js';
 import { panelSetSummary } from '../src/CE_Application/utils/controlSetApply.js';
 import {
-  componentFit, fittingLibraryComponents, planSetComponents, resolveSetComponent, setComponentRef,
+  applySetComponentPlan, componentFit, fittingLibraryComponents, placedCopy, planSetComponents, repointSetComponentExports,
+  resolveSetComponent, restoredControl, setComponentRef,
 } from '../src/CE_Application/utils/setLibraryComponents.js';
+import { createCustomComponentExportEnvelope } from '../src/CE_Application/utils/customComponentPackage.js';
+import { diffCustomComponentAgainstSource, rebaseCustomComponentOnSource } from '../src/CE_Application/utils/customComponentSourceLink.js';
+import { createControlSetEnvelope, normalizeControlSetEnvelope } from '../src/CE_Application/models/controlSetPackage.js';
+import { scriptApiForTesting } from '../src/CE_Application/scripting/panelRuntime.js';
+import { MODULES } from '../src/CE_Application/scripting/panelApi.js';
+import { panels, activePanelId } from '../src/CE_Application/stores/panels.js';
+import { panelPreviewSessions, syncPanelPreviewSessions } from '../src/CE_Application/stores/interactionPreview.js';
 
 const set = getControlSet('tolex');
 
@@ -144,4 +153,136 @@ test('copies a set placed go back when the next set names no component, and stay
 
   // The Apply window counts a placed copy as the knob it stands for.
   assert.deepEqual(panelSetSummary(panel).families, [{ label: 'Knobs', count: 1 }]);
+});
+
+/** A library entry as the library makes one, envelope and all. */
+function packaged(name, version, component) {
+  const envelope = createCustomComponentExportEnvelope(component, { name, version });
+  return { ...entry(name, version, component), envelope, component: envelope.component, fingerprint: envelope.fingerprint };
+}
+
+function boundKnob(name, props = {}) {
+  return control('Knob', name, {
+    'Behavior.min': 20, 'Behavior.max': 20000, 'Behavior.step': 1, 'Behavior.defaultCurrentValue': 8000, 'Behavior.unit': 'Hz',
+    'Core.layer': 'Synth', 'Transform.x': 140, 'Transform.y': 60,
+    'DeviceBindings.enabled': true,
+    'DeviceBindings.bindings': [{ kind: 'deviceParameter', parameterId: 'filter.cutoff' }],
+    ...props,
+  });
+}
+
+test('a copy stands where the knob was and carries what the knob was', () => {
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const fit = componentFit('Knob', studio.component);
+  const knob = boundKnob('Cutoff');
+  const copy = placedCopy(knob, studio, fit, { setId: 'mine', type: 'Knob' });
+  const c = copy._children;
+  assert.equal(c.Core.controlType, 'CustomComponent');
+  assert.equal(c.Core.id, 'id_Cutoff', 'the same id, so anything pointing at the knob finds the copy');
+  assert.equal(c.Core.name, 'Cutoff');
+  assert.equal(c.Core.layer, 'Synth');
+  assert.deepEqual([c.Transform.x, c.Transform.y, c.Transform.width, c.Transform.height], [140, 60, 100, 120]);
+  assert.equal(c.ExternalAPI.addressableName, 'Cutoff', 'not the package\'s id, which every copy would share');
+  const channel = c.ValueChannels._children[fit.channel];
+  assert.deepEqual([channel.min, channel.max, channel.step, channel.defaultValue, channel.format.unit], [20, 20000, 1, 8000, 'Hz']);
+  assert.deepEqual(c.DeviceBindings.bindings, [{ kind: 'deviceParameter', parameterId: 'filter.cutoff', port: fit.channel }]);
+  assert.deepEqual(c.Core.hostParameters, { [fit.channel]: { id: 'Cutoff.value', label: 'Cutoff' } }, 'the plug-in parameter keeps its id');
+  assert.equal(c.Designer.setPlacement.type, 'Knob');
+  assert.equal(c.Designer.setPlacement.replaced._children.Core.controlType, 'Knob');
+  assert.equal(c.Designer.sourcePackage.id, studio.id, 'linked to the library, as any placed copy');
+});
+
+test('the knob comes back from its copy as the copy left it', () => {
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const fit = componentFit('Knob', studio.component);
+  const knob = boundKnob('Cutoff');
+  const copy = placedCopy(knob, studio, fit, { setId: 'mine', type: 'Knob' });
+  copy._children.Transform.x = 300;
+  copy._children.Core.name = 'Brightness';
+  copy._children.ValueChannels._children[fit.channel].max = 12000;
+  copy._children.DeviceBindings.bindings.push({ kind: 'midiCc', cc: 74, port: fit.channel });
+  const back = restoredControl(copy);
+  const b = back._children;
+  assert.equal(b.Core.controlType, 'Knob');
+  assert.equal(b.Core.id, 'id_Cutoff');
+  assert.equal(b.Core.name, 'Brightness');
+  assert.equal(b.Transform.x, 300);
+  assert.equal(b.Behavior.max, 12000);
+  assert.equal(b.Behavior.min, 20);
+  assert.deepEqual(b.DeviceBindings.bindings, [{ kind: 'deviceParameter', parameterId: 'filter.cutoff' }, { kind: 'midiCc', cc: 74 }],
+    'on the knob\'s own value again');
+  assert.equal(b.Designer, undefined, 'nothing of the copy left on it');
+});
+
+test('carrying out a plan: place, swap to another component, put back; the export list follows', () => {
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const other = packaged('Other Knob', '1.0.0', componentFrom('Knob'));
+  const panel = { controls: [boundKnob('Cutoff'), control('Slider', 'Volume')], exportParameters: [{ id: 'p1', controlName: 'Cutoff', path: 'Cutoff.value' }] };
+
+  const toStudio = { ...set, id: 'studio-set', libraryComponents: { Knob: setComponentRef(studio) } };
+  const placed = applySetComponentPlan(panel.controls, planSetComponents(panel, toStudio, [studio, other]), { setId: toStudio.id });
+  assert.deepEqual(placed.changed.map((c) => `${c.name}:${c.type}:${c.from}>${c.to}`), ['Cutoff:Knob:>Source']);
+  assert.equal(placed.controls[1], panel.controls[1], 'the slider is the same object: untouched');
+  const exports = repointSetComponentExports(panel.exportParameters, placed.changed);
+  assert.deepEqual(exports, [{ id: 'p1', controlName: 'Cutoff', path: 'Cutoff.Source' }], 'the id the DAW knows stays');
+
+  const afterPlace = { controls: placed.controls };
+  const toOther = { ...set, id: 'other-set', libraryComponents: { Knob: setComponentRef(other) } };
+  const swapped = applySetComponentPlan(afterPlace.controls, planSetComponents(afterPlace, toOther, [studio, other]), { setId: toOther.id });
+  const swappedCopy = swapped.controls[0]._children;
+  assert.equal(swappedCopy.Designer.sourcePackage.id, other.id);
+  assert.equal(swappedCopy.Designer.setPlacement.replaced._children.Core.controlType, 'Knob', 'placed from the knob, not from the first copy');
+
+  const back = applySetComponentPlan(swapped.controls, planSetComponents({ controls: swapped.controls }, set, [studio, other]));
+  assert.equal(back.controls[0]._children.Core.controlType, 'Knob');
+  assert.deepEqual(repointSetComponentExports(exports, back.changed), [{ id: 'p1', controlName: 'Cutoff', path: 'Cutoff.value' }]);
+
+  // An unticked row in the Apply window changes nothing.
+  const skipped = applySetComponentPlan(panel.controls, planSetComponents(panel, toStudio, [studio]), { skip: new Set(['place:Knob']) });
+  assert.deepEqual(skipped.changed, []);
+});
+
+test('a copy\'s range is its own: not a design edit, and kept by an update', () => {
+  const component = componentFrom('Knob');
+  const studio = packaged('Studio Knob', '1.0.0', component);
+  const fit = componentFit('Knob', studio.component);
+  const copy = placedCopy(boundKnob('Cutoff'), studio, fit, { type: 'Knob' });
+  const report = diffCustomComponentAgainstSource(copy, [studio]);
+  assert.equal(report.localEdits, 0, 'the knob\'s range and the placement record are this copy\'s, as its position is');
+  assert.equal(report.status, 'current');
+
+  const newer = packaged('Studio Knob', '1.1.0', component);
+  const updated = rebaseCustomComponentOnSource(copy, newer, { report: diffCustomComponentAgainstSource(copy, [studio, newer]) });
+  const channel = updated.control._children.ValueChannels._children[fit.channel];
+  assert.deepEqual([channel.min, channel.max], [20, 20000]);
+  assert.equal(updated.control._children.Designer.setPlacement.type, 'Knob');
+  assert.equal(updated.control._children.Designer.sourcePackage.version, '1.1.0');
+});
+
+test('a script written for the knob reaches the copy\'s value', () => {
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const fit = componentFit('Knob', studio.component);
+  const copy = placedCopy(control('Knob', 'Cutoff', { 'Behavior.min': 0, 'Behavior.max': 127, 'Behavior.step': 1 }), studio, fit, { type: 'Knob' });
+  try {
+    panels.set([{ id: 'p', name: 'P', controls: [copy], scripting: { modules: MODULES.map((m) => m.id) } }]);
+    activePanelId.set('p');
+    panelPreviewSessions.set({});
+    syncPanelPreviewSessions([copy]);
+    const api = scriptApiForTesting('', 'set-placed-copy');
+    api.set('Cutoff.value', 100);
+    assert.equal(get(panelPreviewSessions).id_Cutoff?.customValues?.[fit.channel], 100);
+    assert.equal(api.get('Cutoff.value'), 100);
+    assert.equal(api.get('Cutoff'), 100, 'the bare name too');
+  } finally { panels.set([]); panelPreviewSessions.set({}); }
+});
+
+test('a set file carries the components it names', () => {
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const mine = { ...set, id: 'mine', name: 'Mine', libraryComponents: { Knob: setComponentRef(studio) } };
+  const file = createControlSetEnvelope(mine, {}, [studio.envelope]);
+  const read = normalizeControlSetEnvelope(JSON.stringify(file));
+  assert.equal(read.set.libraryComponents.Knob.id, studio.id);
+  assert.equal(read.components.length, 1);
+  assert.equal(read.components[0].metadata.name, 'Studio Knob');
+  assert.deepEqual(normalizeControlSetEnvelope(JSON.stringify(createControlSetEnvelope(set))).components, [], 'a set naming none carries none');
 });

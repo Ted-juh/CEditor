@@ -12,13 +12,32 @@
   import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
   import { aarrggbbToHex } from '../utils/colourHex.js';
   import { panelSetSummary } from '../utils/controlSetApply.js';
+  import EffectPreview from '../components/effects/EffectPreview.svelte';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { planSetComponents } from '../utils/setLibraryComponents.js';
 
   let request = $derived($controlSetApplyRequest);
   let panel = $derived(request ? $panels.find((entry) => entry.id === request.panelId) ?? null : null);
   let oldSet = $derived(panel ? getControlSet(panel.controlSet?.id ?? DEFAULT_CONTROL_SET_ID, { document: panel.controlSets, library: $controlSetLibrary }) : null);
-  let newSet = $derived(request ? getControlSet(request.setId, { document: panel?.controlSets, library: $controlSetLibrary }) : null);
+  // The library's copy of a set first: applying carries it into the document over the panel's older
+  // copy (stores/controlSets.js applyControlSetWithChoices), so it is what the panel will hold.
+  let newSet = $derived(request
+    ? ($controlSetLibrary.find((set) => set.id === request.setId) ?? getControlSet(request.setId, { document: panel?.controlSets, library: $controlSetLibrary }))
+    : null);
   let summary = $derived(panel ? panelSetSummary(panel) : { families: [], pinned: 0, pinnedSets: [] });
   let selectionCount = $derived($selectedComponentIds?.size ?? 0);
+  // What the new set's library components would place, and the copies an earlier set placed that go
+  // back to what they were (utils/setLibraryComponents.js).
+  let componentPlan = $derived(panel && newSet ? planSetComponents(panel, newSet, $customComponentLibrary, {
+    families, selected: onlySelected ? new Set($selectedComponentIds) : null, includePinned,
+  }) : { place: [], restore: [], missing: [] });
+  let skipComponents = $state(new Set());
+  function toggleComponent(key) {
+    const next = new Set(skipComponents);
+    if (next.has(key)) next.delete(key); else next.add(key);
+    skipComponents = next;
+  }
+  const plural = (count, one, many) => `${count} ${count === 1 ? one : many}`;
 
   let background = $state(true);
   let material = $state(true);
@@ -38,6 +57,7 @@
     families = new Set(summary.families.map((entry) => entry.label));
     onlySelected = false;
     includePinned = false;
+    skipComponents = new Set();
   });
 
   const bare = (colour) => String(colour ?? '').replace(/^#/, '');
@@ -67,6 +87,7 @@
       families,
       selected: onlySelected ? new Set($selectedComponentIds) : null,
       includePinned,
+      skipComponents,
     });
     close();
   }
@@ -110,6 +131,32 @@
       {#if selectionCount}
         <label class="choice"><input type="checkbox" bind:checked={onlySelected} />Selected controls only ({selectionCount})</label>
       {/if}
+      {#if componentPlan.place.length || componentPlan.restore.length || componentPlan.missing.length}
+        <div class="group">Library components</div>
+        {#each componentPlan.place as row (row.type)}
+          <div class="component-row" data-component-place={row.type}>
+            <label class="choice"><input type="checkbox" checked={!skipComponents.has(`place:${row.type}`)} disabled={!row.controls.length} onchange={() => toggleComponent(`place:${row.type}`)} />
+              <span class="thumb"><EffectPreview control={row.entry.component} boxWidth={30} boxHeight={30} padding={1} maxScale={1} label={row.entry.name} /></span>
+              <span>{row.family} become <b>{row.entry.name} {row.entry.version}</b> · {plural(row.controls.length, 'linked copy', 'linked copies')}</span>
+            </label>
+            <p class="detail">Each copy keeps the control's name, position, size, value, range, device bindings and plug-in parameter. Its look comes from the component; applying a set that names no component brings the control back.</p>
+            {#if row.stays.length}
+              <p class="detail stays">Stay as they are: {row.stays.map((stay) => `${stay.name} (${stay.reason})`).join('; ')}.</p>
+            {/if}
+          </div>
+        {/each}
+        {#each componentPlan.restore as row (row.type)}
+          <div class="component-row" data-component-restore={row.type}>
+            <label class="choice"><input type="checkbox" checked={!skipComponents.has(`restore:${row.type}`)} onchange={() => toggleComponent(`restore:${row.type}`)} />
+              <span>{plural(row.controls.length, `${row.from} copy`, `${row.from} copies`)} go back to {row.family.toLowerCase()}</span>
+            </label>
+            <p class="detail">{newSet?.name ?? 'The set'} names no component for {row.family.toLowerCase()}. Each goes back to the control it was placed for, keeping its name, position, size, value and bindings.</p>
+          </div>
+        {/each}
+        {#each componentPlan.missing as row (row.type)}
+          <p class="note warn" data-component-missing={row.type}>{row.family}: {row.ref.name} {row.ref.version} is not in your library, so they keep their current look. Import the component to place it.</p>
+        {/each}
+      {/if}
       {#if summary.pinned}
         <label class="note"><input type="checkbox" bind:checked={includePinned} />
           {summary.pinned} control{summary.pinned === 1 ? ' is' : 's are'} assigned to another set ({summary.pinnedSets.map((id) => getControlSet(id, { document: panel.controlSets, library: $controlSetLibrary })?.name ?? id).join(', ')}). Include them
@@ -140,6 +187,12 @@
   .families { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 12px; }
   .note { display: flex; gap: 8px; align-items: center; margin-top: 8px; padding: 7px 9px; border: 1px solid #3A3A3A; border-radius: 5px; background: #202020; font-size: 11px; cursor: pointer; }
   .link { border: none; background: none; padding: 0; color: #5B9BD5; font: inherit; font-size: 10px; text-transform: none; letter-spacing: 0; cursor: pointer; }
+  .component-row { display: flex; flex-direction: column; gap: 2px; padding: 4px 0 6px; border-bottom: 1px solid #2E2E2E; }
+  .component-row .thumb { width: 30px; height: 30px; flex: 0 0 auto; border-radius: 3px; background: #151515; border: 1px solid #333; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .component-row b { color: #EEE; font-weight: 600; }
+  .detail { margin: 0 0 0 24px; color: #8F8F8F; font-size: 11px; line-height: 1.4; }
+  .detail.stays { color: #C9A86A; }
+  .note.warn { cursor: default; color: #C9A86A; }
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
   .btn { height: 28px; padding: 0 14px; border: 1px solid #3A3A3A; border-radius: 4px; background: #2C2C2C; color: #DDD; font: inherit; font-weight: 600; cursor: pointer; }
   .btn.primary { background: #094771; border-color: #0B6EB5; color: #fff; }

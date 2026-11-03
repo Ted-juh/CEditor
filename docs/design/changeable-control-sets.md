@@ -336,9 +336,29 @@ components):
    (`stepCustomChannelValue`) and artwork bound to `.normalized` move by travel; Bipolar adds
    `channel.x.bipolar` (-1 to 1) and rests at its centre. The exported parameter carries the curve
    and `PanelParameters.h parameterRange` gives the host's range the same maths.
-4. Later: a family may name a library component ("this set's knobs are Studio Knob 1.2"), placed as
-   linked copies. The two models differ (Behavior on built-ins, channels on components), so this
-   is the largest piece and can wait.
+4. A family may name a library component ("this set's knobs are Studio Knob 1.2"), placed as
+   linked copies. **Built** (`utils/setLibraryComponents.js`). The two models differ (Behavior on
+   built-ins, channels on components), so the component is not drawn over the knob: applying the set
+   puts a linked copy where each knob was. The set holds `libraryComponents[type]`, the package as the
+   library knows it; the exact version is used when the library has it, else the newest of its
+   family. A component can stand for knobs and sliders with one value a drag moves, for buttons with
+   an on/off value a press holds, for switches with one a click flips, for meters with one value and
+   nothing that moves it; and the value's look must read it as travel (normalized, bipolar or its
+   printed text), because a binding that reads the number maps it through a fixed input range and a
+   copy carrying a knob of another range would turn past its end. A copy keeps the knob's id and
+   name, place and size, layer; its value takes the knob's range, start and format; its device
+   bindings move to the value; its plug-in parameter keeps the id the knob exported under; an export
+   list entry is pointed at the value; its caption goes to the first published text no binding
+   writes; and a script's `Cutoff.value` reaches it (panelRuntime's `value` shorthand names the
+   placed channel). `Designer.setPlacement` records the knob. Applying a set that names no component
+   for the family, or another one, puts the knob back from that record with what the copy has now
+   (name, place, size, range, bindings back on the knob's own value, the live value). A copy's
+   range, caption and placement record are classed as its own, as its position is
+   (`customComponentSourceLink.setPlacementPaths`), so they are not design edits and an update keeps
+   them. Knobs with a script of their own, two handles or bindings to other controls stay, as do
+   meters taking another control's value or reading decibels; the Apply window names each. A set
+   file carries the packages it names, and importing it adds those the library lacks.
+   Not drawn: the Control Sets page's live preview keeps showing the set's own knob.
 
 ### E. Realistic looks that stay changeable (medium to large)
 
@@ -579,4 +599,5 @@ Taken by the owner, 2026-11-03:
 
 4. **Rendered looks (E): live in the editor, baked into the plug-in at export**, as recommended. The
    plug-in needs no WebGL, and Linux, whose webview has no GPU, needs no JUCE patch.
-5. **A set that names a library component (D4): later.**
+5. **A set that names a library component (D4): later.** Taken up the same day and built as the
+   approved mock-up showed: chosen in the family's row, placed and put back by the Apply window.

@@ -81,8 +81,9 @@ test('the knob renderer draws the housing, the outlines, the needle, and hides w
   const renderer = source('editor/SliderFamilyRenderer.svelte');
   const housingAt = renderer.indexOf("{@render bodyPlate(bodyHousingPart, bodyHousingRadius, 'bodyHousing'");
   assert.ok(housingAt > 0 && housingAt < renderer.indexOf("maskIdFor('bodyTrackBaseCircle')"), 'the housing under the track');
-  // Every plate is drawn the one way: its shadow, its fill in its outline, its border.
-  assert.match(renderer, /\{#snippet bodyPlate\(part, r, mask, borderFallback, role = mask\)\}\s*\{@const shape = outlineShapeFor\(part, r\)\}/);
+  // Every plate is drawn the one way: its shadow, its fill in its outline, its border; or, when its
+  // look is rendered (utils/renderedLook.js), as the rendered image in its place.
+  assert.match(renderer, /\{#snippet bodyPlate\(part, r, mask, borderFallback, role = mask\)\}\s*\{@const rendered = renderedPlate\(part, r\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{role\}[\s\S]*?\{:else\}\s*\{@const shape = outlineShapeFor\(part, r\)\}/);
   assert.match(renderer, /\{@render bodyPlate\(bodyCapPart, bodyCapRadius, 'bodyCapCircle', 1, 'bodyCap'\)\}/);
   assert.match(renderer, /kind === 'needle'/);
   assert.match(renderer, /trackBasePart\?\.visible === false/);
