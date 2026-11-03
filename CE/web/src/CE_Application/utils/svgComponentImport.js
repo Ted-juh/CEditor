@@ -342,7 +342,7 @@ function svgPicture(svg) {
  * stay one vector, where without it the clip is the layer's mask.
  */
 export function planSvgComponentImport(text, { fileName = '', files = {}, geometry = null } = {}) {
-  const source = String(text ?? '').replace(/^﻿/, '');
+  const source = String(text ?? '').replace(/^\uFEFF/, '');
   let root;
   try {
     root = parseXml(source, { offsets: true, doctypeSubset: 'skip' });
