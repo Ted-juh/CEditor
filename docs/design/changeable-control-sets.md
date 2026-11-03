@@ -229,7 +229,13 @@ components):
 1. The designer's colour fields offer the set's roles (Accent, Knob cap, Panel surface...) beside a
    literal colour, so a component follows the panel's set.
 2. From selection turns a knob into editable layers once forms are parts (B), not a frozen copy.
-3. Channel curves (bipolar, exponential, stepped) take effect.
+3. Channel curves (bipolar, exponential, stepped) take effect. **Built:** `utils/channelCurves.js`
+   maps travel to value (Linear, Exponential and Logarithmic through a Centre value, S-Curve,
+   Stepped with Steps and Hysteresis, Bipolar, Dead Zone). `normalizeCustomChannelValue` is the
+   travel and `denormalizeCustomChannelValue` the value it gives, so the drag, the wheel and keys
+   (`stepCustomChannelValue`) and artwork bound to `.normalized` move by travel; Bipolar adds
+   `channel.x.bipolar` (-1 to 1) and rests at its centre. The exported parameter carries the curve
+   and `PanelParameters.h parameterRange` gives the host's range the same maths.
 4. Later: a family may name a library component ("this set's knobs are Studio Knob 1.2"), placed as
    linked copies. The two models differ (Behavior on built-ins, channels on components), so this
    is the largest piece and can wait.

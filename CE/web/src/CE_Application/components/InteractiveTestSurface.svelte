@@ -83,6 +83,7 @@
     resolveCustomNormalizedFromPoint,
     seedCustomValues,
     snapCustomChannelValue,
+    stepCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
 
   function getValueRows(control) {
@@ -700,7 +701,7 @@
     if (!channel) return;
     const currentValues = customSessionValues();
     const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
-    const nextValue = snapCustomChannelValue(channel, numberOr(currentValue, 0) + (direction * numberOr(channel?.step, 0.01)));
+    const nextValue = stepCustomChannelValue(channel, numberOr(currentValue, 0), direction);
     patchSession({
       customValues: {
         ...currentValues,

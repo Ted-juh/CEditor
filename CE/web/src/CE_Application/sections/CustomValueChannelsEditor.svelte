@@ -15,7 +15,8 @@
   import Share2 from 'lucide-svelte/icons/share-2';
   import Type from 'lucide-svelte/icons/type';
   import { createValueChannel } from '../utils/customComponentFactory.js';
-  import { normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
+  import { denormalizeCustomChannelValue, normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
+  import { CURVE_LABELS, CURVE_MODES, curveGraphPoints, curveSpec, defaultCurveCentre, defaultCurveSteps, travelToFraction } from '../utils/channelCurves.js';
 
   let { control = null } = $props();
 
@@ -60,6 +61,15 @@
   let selectedNormalized = $derived(selected ? normalizeCustomChannelValue(selected, selectedDefault) : 0);
   let selectedSnapped = $derived(selected ? snapCustomChannelValue(selected, selectedDefault) : 0);
   let selectedFormatted = $derived(formatChannelValue(selected, selectedSnapped));
+  // The channel's curve (utils/channelCurves.js), and what it does at half travel.
+  let selectedCurve = $derived(curveSpec(selected));
+  let curveTakesCentre = $derived(selectedCurve.mode === 'exponential' || selectedCurve.mode === 'logarithmic');
+  let curveTakesDeadZone = $derived(selectedCurve.mode === 'bipolar' || selectedCurve.mode === 'dead-zone');
+  let curveCentreValue = $derived(Number.isFinite(Number(selected?.curve?.centre)) ? Number(selected.curve.centre) : defaultCurveCentre(selected, selectedCurve.mode));
+  let curveGraph = $derived(curveGraphPoints(selectedCurve).map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' '));
+  let halfTravelFraction = $derived(travelToFraction(selectedCurve, 0.5));
+  let halfTravelValue = $derived(selected ? denormalizeCustomChannelValue(selected, 0.5) : 0);
+  let linearHalfValue = $derived(selected ? snapCustomChannelValue(selected, ((Number(selected.min ?? 0) + Number(selected.max ?? 1)) / 2)) : 0);
   let enumText = $derived((selected?.values ?? selected?.options ?? []).join(', '));
   let selectedNumeric = $derived(!['bool', 'enum', 'text', 'color', 'note'].includes(String(selected?.type ?? 'float')));
   let constraintChannelOptions = $derived(channelEntries
@@ -69,7 +79,6 @@
   let upperConstraintChannel = $derived(channelNameFromConstraint(selected?.constraints?.normalizedMax));
 
   const TYPE_OPTIONS = ['float', 'int', 'bool', 'enum', 'note', 'color', 'text'];
-  const CURVE_OPTIONS = ['linear', 'exponential', 'logarithmic', 's-curve', 'stepped', 'bipolar', 'dead-zone'];
   const CHANNEL_PRESETS = [
     { id: 'float', label: 'Float', type: 'float', min: 0, max: 1, step: 0.01, defaultValue: 0.5, format: { precision: 2 } },
     { id: 'bipolar', label: 'Bipolar', type: 'float', min: -1, max: 1, step: 0.01, defaultValue: 0, curve: { mode: 'bipolar' }, format: { precision: 2 } },
@@ -373,18 +382,43 @@
       <PropertyCell label="Unit" span={1} hint="Optional unit label.">
         <input class="val" type="text" value={selected.format?.unit ?? ''} onchange={(event) => set('format.unit', event.target.value)} />
       </PropertyCell>
-      <PropertyCell label="Curve" span={2} hint="Mapping curve used by bindings and future device scaling.">
-        <select class="val" value={selected.curve?.mode ?? 'linear'} onchange={(event) => set('curve.mode', event.target.value)}>
-          {#each CURVE_OPTIONS as option}
-            <option value={option}>{option}</option>
+      <PropertyCell label="Curve" span={2} hint="How the control's travel maps to the value: half way round an Exponential knob is near the bottom of its range.">
+        <select class="val" aria-label="Curve" value={selectedCurve.mode} onchange={(event) => set('curve.mode', event.target.value)}>
+          {#each CURVE_MODES as option (option)}
+            <option value={option}>{CURVE_LABELS[option]}</option>
           {/each}
         </select>
       </PropertyCell>
-      <PropertyCell label="Dead Zone" span={1} compact hint="Optional dead-zone amount for value mapping.">
-        <NumberCell label="DZ" value={selected.curve?.deadZone ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('curve.deadZone', value)} />
+      <PropertyCell label="Centre value" span={2} compact hint="The value at half travel: it sets how far the curve bends.">
+        <NumberCell label="Ctr" value={curveCentreValue} step={selected.step ?? 0.01} min={Math.min(selected.min ?? 0, selected.max ?? 1)} max={Math.max(selected.min ?? 0, selected.max ?? 1)}
+          defaultValue={defaultCurveCentre(selected, selectedCurve.mode)} disabled={!curveTakesCentre} onchange={(value) => set('curve.centre', value)} />
       </PropertyCell>
-      <PropertyCell label="Hysteresis" span={1} compact hint="Optional hysteresis amount for stable stepped controls.">
-        <NumberCell label="Hys" value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={1} defaultValue={0} onchange={(value) => set('curve.hysteresis', value)} />
+      <PropertyCell label="Dead Zone" span={1} compact hint="A band around the centre, as a share of the travel, that holds the centre value.">
+        <NumberCell label="DZ" value={selected.curve?.deadZone ?? (selectedCurve.mode === 'dead-zone' ? 0.1 : 0)} step={0.01} min={0} max={0.9} defaultValue={0}
+          disabled={!curveTakesDeadZone} onchange={(value) => set('curve.deadZone', value)} />
+      </PropertyCell>
+      <PropertyCell label="Hysteresis" span={1} compact hint="How far past a step's edge, as a share of a step, the travel goes before the step changes.">
+        <NumberCell label="Hys" value={selected.curve?.hysteresis ?? 0} step={0.01} min={0} max={0.49} defaultValue={0}
+          disabled={selectedCurve.mode !== 'stepped'} onchange={(value) => set('curve.hysteresis', value)} />
+      </PropertyCell>
+      <PropertyCell label="Steps" span={2} compact hint="How many positions a Stepped curve clicks into.">
+        <NumberCell label="Steps" value={selectedCurve.steps} step={1} min={2} max={128} defaultValue={defaultCurveSteps(selected)}
+          disabled={selectedCurve.mode !== 'stepped'} onchange={(value) => set('curve.steps', Math.max(2, Math.round(value)))} />
+      </PropertyCell>
+      <PropertyCell label="" span={4} hint="Travel across, value up.">
+        <div class="curve-view" data-testid="channel-curve">
+          <svg viewBox="-4 -4 108 108" width="110" height="96" aria-label={`${CURVE_LABELS[selectedCurve.mode]} curve`}>
+            <rect x="0" y="0" width="100" height="100" class="frame" />
+            <line x1="50" y1="0" x2="50" y2="100" class="mid" />
+            {#if curveTakesDeadZone && selectedCurve.deadZone > 0}
+              <rect x={50 - selectedCurve.deadZone * 50} y="0" width={selectedCurve.deadZone * 100} height="100" class="band" />
+            {/if}
+            <polyline points={curveGraph} class="line" />
+            <circle cx="50" cy={100 - halfTravelFraction * 100} r="3" class="dot" />
+          </svg>
+          <p>{selected.label || selectedName}, {formatChannelValue(selected, selected.min ?? 0)} to {formatChannelValue(selected, selected.max ?? 1)}.<br />
+            Half way round: <b>{formatChannelValue(selected, halfTravelValue)}</b>{#if selectedCurve.mode !== 'linear' && halfTravelValue !== linearHalfValue}<br /><span>(Linear would give {formatChannelValue(selected, linearHalfValue)})</span>{/if}</p>
+        </div>
       </PropertyCell>
     </PropertySection>
   {/if}
@@ -393,6 +427,16 @@
 <style>
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
+  .curve-view { display: flex; align-items: center; gap: 10px; }
+  .curve-view svg { flex: none; background: #141414; border: 1px solid #333; border-radius: 4px; }
+  .curve-view .frame { fill: none; stroke: #333; stroke-width: 1; vector-effect: non-scaling-stroke; }
+  .curve-view .mid { stroke: #555; stroke-dasharray: 3 3; vector-effect: non-scaling-stroke; }
+  .curve-view .band { fill: #2a2a1a; }
+  .curve-view .line { fill: none; stroke: #5B9BD5; stroke-width: 2; vector-effect: non-scaling-stroke; }
+  .curve-view .dot { fill: #F4D35E; }
+  .curve-view p { margin: 0; color: #aaa; font-size: 11px; line-height: 1.45; }
+  .curve-view p b { color: #eee; }
+  .curve-view p span { color: #888; }
   .signal-card,
   .published-chip {
     display: flex;

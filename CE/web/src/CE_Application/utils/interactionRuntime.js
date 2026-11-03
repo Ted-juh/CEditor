@@ -1,3 +1,4 @@
+import { curveIsIdentity, curveSpec, fractionToTravel } from './channelCurves.js';
 import { deepClone } from './deepClone.js';
 import { resolveRadioSelectedKeys } from './radioSegmentStyle.js';
 import { setNestedValue } from '../stores/controlTreeUtils.js';
@@ -690,7 +691,13 @@ function normalizeCustomChannelValue(channel = null, rawValue = 0) {
   const min = numberOr(channel?.min, 0);
   const max = Math.max(min, numberOr(channel?.max, min + 1));
   const numeric = numberOr(rawValue, numberOr(channel?.defaultValue, min));
-  return clamp(normalizeRange(numeric, min, max), 0, 1);
+  const fraction = clamp(normalizeRange(numeric, min, max), 0, 1);
+  // Where the control is drawn is its travel, through the channel's curve (utils/channelCurves.js):
+  // a pointer bound to `.normalized` turns as far as the knob was turned, not as far as the value went.
+  const mode = channel?.curve?.mode;
+  if (!mode || mode === 'linear') return fraction;
+  const spec = curveSpec(channel);
+  return curveIsIdentity(spec) ? fraction : fractionToTravel(spec, fraction);
 }
 
 function resolveCustomComponentInteractionContext(control, previewSession = {}) {
@@ -716,6 +723,10 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     const channelRaw = constrainedCustomValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
     channelSignals[`channel.${name}.raw`] = channelRaw;
     channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
+    // The travel from the centre, -1 to 1: what a Bipolar channel's artwork grows from (a value
+    // arc both ways from the top). Every scalar channel has it; the binding Source offers it for
+    // Bipolar ones (utils/bindingSourceOptions.js).
+    channelSignals[`channel.${name}.bipolar`] = (channelSignals[`channel.${name}.normalized`] * 2) - 1;
     // The channel's own formatting AND its display scale — a knob bound to a parameter stored
     // 61..67 and printed -3..+3 read 64 here where the instrument reads 0. String(raw) also threw
     // away the channel's prefix/suffix/unit/precision, which nothing had ever applied.

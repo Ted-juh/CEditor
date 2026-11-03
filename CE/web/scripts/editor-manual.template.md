@@ -957,6 +957,17 @@ the **Input** chips beside it on the Interact tab (and under **Interaction** in 
 plug-in. A new slider or dial starts with Wheel on, a button, toggle or pad with it off; turn it
 off on a control that should leave the wheel to scrolling the page.
 
+A channel's **Curve**, under **Formatting & Mapping**, maps how far the control is turned to the value
+it gives, as a small graph beside it shows. **Linear** follows the travel. **Exponential** and
+**Logarithmic** bend it, through the **Centre value**, the value at half travel: half way round an
+Exponential 20 Hz to 20 kHz knob is 632 Hz by default. **S-Curve** is slow at both ends. **Stepped**
+clicks into **Steps** positions, and **Hysteresis** holds a step until the control is that share of a
+step past its edge. **Bipolar** rests at its centre (a double-click returns there) and offers bindings
+**-1 to 1**, so artwork can grow both ways from the centre. **Dead Zone** holds the centre value over a
+band around the middle; Bipolar takes a dead zone too. The drag, the wheel and the keys move by travel,
+and so does artwork bound to the channel's **0 to 1**. An exported plug-in gives the parameter the same
+curve, so a DAW's automation lane drawn half way sits where the knob is at half travel.
+
 You can also turn existing artwork into a component: select some backgrounds, images, shapes,
 labels, knobs or sliders and choose **Edit → Create Component from Selection...**. CEditor saves
 them as a component in your library and puts a linked copy in their place. Each label's text becomes

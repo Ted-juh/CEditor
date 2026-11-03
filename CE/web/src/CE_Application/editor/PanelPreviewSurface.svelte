@@ -311,6 +311,7 @@
     resolveCustomInteractionPatch,
     seedCustomValues,
     snapCustomChannelValue,
+    stepCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
   import {
     firstSliderControlZone, hasSliderControlParts, sliderControlBlurPatch, sliderControlFocusZonePatch,
@@ -7403,7 +7404,7 @@
     if (!channel) return;
     const currentValues = customSessionValues(control);
     const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
-    const nextValue = snapCustomChannelValue(channel, numberOr(currentValue, 0) + (direction * numberOr(channel?.step, 0.01)));
+    const nextValue = stepCustomChannelValue(channel, numberOr(currentValue, 0), direction);
     patchControlSession(getControlId(control), {
       customValues: {
         ...currentValues,

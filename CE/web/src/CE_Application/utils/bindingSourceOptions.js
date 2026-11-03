@@ -65,6 +65,10 @@ export function bindingSourceGroups(control, current = '') {
       { value: `channel.${name}.normalized`, label: `${name}: 0 to 1` },
       { value: `channel.${name}.display`, label: `${name}: as shown` },
     );
+    // A Bipolar channel also reads from its centre: -1 to 1, 0 at rest (utils/channelCurves.js).
+    if (String(channel?.curve?.mode ?? '') === 'bipolar') {
+      channelOptions.push({ value: `channel.${name}.bipolar`, label: `${name}: -1 to 1` });
+    }
     if (String(channel?.type ?? '').trim().toLowerCase() === 'array') {
       channelOptions.push(
         { value: `channel.${name}.items`, label: `${name}: items` },

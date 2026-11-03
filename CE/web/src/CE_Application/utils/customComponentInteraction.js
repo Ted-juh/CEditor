@@ -10,6 +10,7 @@ import { DragScrub, presets } from '../scrub/dragScrub';
 import { appScrubOverrides } from './scrubRuntime.js';
 import { SLIDER_CONTROL_KIND, sliderControlValueFromPoint } from './sliderControlPart.js';
 import { hasPatternEditing } from './arpPatternLayouts.js';
+import { curveIsIdentity, curveMode, curveSpec, fractionToTravel, steppedFractionWithHysteresis, travelToFraction } from './channelCurves.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -129,7 +130,7 @@ export function resetCustomChannelToDefault(control, channelNames, values = {}) 
   for (const name of names) {
     const channel = channels?.[name];
     if (!channel) continue;
-    next[name] = customChannelResetValue(channel);
+    next[name] = customChannelRestValue(channel);
     changed = true;
   }
   return changed ? constrainCustomValues(control, next) : (values ?? {});
@@ -158,10 +159,26 @@ export function normalizeCustomChannelValue(channel, rawValue) {
   const max = numberOr(channel?.max, 1);
   const span = max - min;
   if (Math.abs(span) < 0.000001) return 0;
-  return clamp((numberOr(rawValue, customChannelDefaultValue(channel)) - min) / span, 0, 1);
+  const fraction = clamp((numberOr(rawValue, customChannelDefaultValue(channel)) - min) / span, 0, 1);
+  // The channel's curve (utils/channelCurves.js): "normalized" is where the control is drawn, its
+  // travel, and the value is what that travel gives.
+  const spec = curvedSpec(channel);
+  return spec ? fractionToTravel(spec, fraction) : fraction;
 }
 
-export function denormalizeCustomChannelValue(channel, normalized) {
+/** The channel's curve, or null when it maps travel straight to the value. */
+function curvedSpec(channel) {
+  const mode = channel?.curve?.mode;
+  if (!mode || mode === 'linear') return null;
+  const spec = curveSpec(channel);
+  return curveIsIdentity(spec) ? null : spec;
+}
+
+/**
+ * The value `normalized` travel gives. `previous`, the value before (a drag's), lets a Stepped
+ * curve's Hysteresis hold the step it was on.
+ */
+export function denormalizeCustomChannelValue(channel, normalized, { previous } = {}) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
   const clamped = clamp(numberOr(normalized, 0), 0, 1);
   if (type === 'bool') return clamped >= 0.5;
@@ -177,7 +194,44 @@ export function denormalizeCustomChannelValue(channel, normalized) {
 
   const min = numberOr(channel?.min, 0);
   const max = numberOr(channel?.max, 1);
-  return snapCustomChannelValue(channel, min + ((max - min) * clamped));
+  const spec = curvedSpec(channel);
+  let fraction = clamped;
+  if (spec?.mode === 'stepped' && previous !== undefined && Math.abs(max - min) > 0.000001) {
+    fraction = steppedFractionWithHysteresis(spec, clamped, (numberOr(previous, min) - min) / (max - min));
+  } else if (spec) {
+    fraction = travelToFraction(spec, clamped);
+  }
+  return snapCustomChannelValue(channel, min + ((max - min) * fraction));
+}
+
+/**
+ * The value one wheel notch or arrow key moves to from `current`: a step of the channel's own
+ * where travel and value agree, and the same distance of travel where a curve bends them, so a
+ * notch moves an Exponential knob as far at the bottom as at the top. A Stepped curve moves a step.
+ */
+export function stepCustomChannelValue(channel, current, direction = 1) {
+  const value = numberOr(current, numberOr(channel?.defaultValue, 0));
+  const spec = curvedSpec(channel);
+  if (!spec) return snapCustomChannelValue(channel, value + (direction * numberOr(channel?.step, 0.01)));
+  const span = Math.abs(numberOr(channel?.max, 1) - numberOr(channel?.min, 0)) || 1;
+  const travelStep = spec.mode === 'stepped'
+    ? 1 / (spec.steps - 1)
+    : Math.max(0.001, Math.abs(numberOr(channel?.step, 0.01)) / span);
+  const travel = clamp(normalizeCustomChannelValue(channel, value) + (Math.sign(direction || 1) * travelStep), 0, 1);
+  const next = denormalizeCustomChannelValue(channel, travel);
+  // A step too small to leave the snapped value where it was moves to the next one that does.
+  if (next === value && travel > 0 && travel < 1) {
+    return snapCustomChannelValue(channel, value + (direction * numberOr(channel?.step, 0.01)));
+  }
+  return next;
+}
+
+/** Where a double-click returns a channel: a Bipolar channel's centre, else its default. */
+export function customChannelRestValue(channel) {
+  if (curveMode(channel) === 'bipolar') {
+    return denormalizeCustomChannelValue(channel, 0.5);
+  }
+  return customChannelResetValue(channel);
 }
 
 function normalizedConstraintValue(spec, values = {}, channels = {}) {
@@ -1048,7 +1102,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         coarse: point.coarse === true,
       });
     }
-    nextValue = denormalizeCustomChannelValue(channelForBehaviorInput(channel, behaviorModule), normalized);
+    nextValue = denormalizeCustomChannelValue(channelForBehaviorInput(channel, behaviorModule), normalized, { previous: currentValue });
   }
   nextValues[channelName] = nextValue;
   const unsnapped = behaviorModule?.interaction?.snap === false
