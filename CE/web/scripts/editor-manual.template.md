@@ -962,9 +962,9 @@ buttons at its foot unfolds it with the group names, and it stays the way you le
 A selected layer is styled in the bar along the top of the designer (**Fill**, **Gradient**,
 **Stroke** with its width beside it, **Corners** for the corner radius, **Opacity**, and for text
 its colour, size and words) and in the dock's **Colors** and **Gradient** tools. The bar shows only
-what draws on the selected layer: an ellipse, a ring or a capsule is always round and one solid
-colour, so it has no **Corners** or **Gradient**; a polygon has no **Corners** or **Gradient** either;
-a line has only **Stroke**; and an arc takes its colour and thickness from its own settings on the
+what draws on the selected layer: an ellipse, a ring or a capsule is always round, so it has no
+**Corners**, and nor has a polygon (both take a **Gradient** over their fill); a line has only
+**Stroke**; and an arc takes its colour and thickness from its own settings on the
 inspector's **Display** tab, so the bar shows only its **Opacity**. Beside them are
 the layer's own buttons (duplicate, copy, paste, order, make interactive, lock, delete). On a
 narrower window those are under one **Layer** button, and on a laptop-sized one the style controls

@@ -8,6 +8,7 @@
   import { buildShadowCSS, buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
+  import { gradientToCSS } from '../utils/gradientCSS.js';
   import { materialActive } from '../utils/materialFilter.js';
   import { isPictureLayer, maskActive, maskLinked, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -420,6 +421,16 @@
     return { size, r, thickness, arcLength, circumference, rotation, cap, colour };
   });
 
+  // The gradient of a round shape or a polygon, which used to draw one solid colour (the designer
+  // review, item 14, hid the option; it draws now): the box's gradient layer as BackgroundRenderer
+  // draws it, over the solid colour, its opacity and blend mode kept.
+  let gradientLayerStyle = $derived.by(() => {
+    if (!shape.usesSimpleBackground && !(shape.rendersVectorShape && shape.polygonVerts && !shape.rendersOpenPath)) return '';
+    const fill = background?._children?.Fill ?? null;
+    if (fill?.gradientEnabled !== true || !(fill?.gradient?.stops?.length >= 2)) return '';
+    return `background: ${gradientToCSS(fill.gradient)}; opacity: ${(numberOr(fill.gradientOpacity, 100) / 100).toFixed(3)}; mix-blend-mode: ${fill.gradientBlend ?? 'normal'};`;
+  });
+
   let simpleBackgroundStyle = $derived.by(() => {
     if (!shape.usesSimpleBackground) return '';
     const backgroundFill = background?._children?.Fill ?? null;
@@ -504,6 +515,19 @@
       points: polygonToSvgPoints(shape.polygonVerts, width, height, inset),
       line: null,
     };
+  });
+
+  // A closed polygon's fill when it has a gradient (gradientLayerStyle): the solid colour on a box
+  // clipped to the same points the SVG polygon fills, so the two cannot drift apart.
+  let polygonFillStyle = $derived.by(() => {
+    if (!gradientLayerStyle || !shape.rendersVectorShape || !vectorShapeSvg?.points || vectorShapeSvg.open || vectorShapeSvg.line || vectorShapeSvg.d) return '';
+    const corners = String(vectorShapeSvg.points).trim().split(/\s+/)
+      .map((pair) => pair.split(',').map(Number))
+      .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
+      .map(([x, y]) => `${x}px ${y}px`);
+    if (corners.length < 3) return '';
+    const solid = vectorShapeSvg.fill && vectorShapeSvg.fill !== 'none' ? vectorShapeSvg.fill : 'transparent';
+    return `clip-path: polygon(${corners.join(', ')}); background: ${solid};`;
   });
 
   let envelopeSvg = $derived.by(() => {
@@ -672,7 +696,9 @@
         {/if}
       {/if}
     {:else if background && shape.usesSimpleBackground && !shape.rendersVectorShape}
-      <div class="interactive-simple-background ce-colour-anim" style={simpleBackgroundStyle}></div>
+      <div class="interactive-simple-background ce-colour-anim" style={simpleBackgroundStyle}>
+        {#if gradientLayerStyle}<div class="interactive-gradient-layer" style={gradientLayerStyle}></div>{/if}
+      </div>
     {:else if background && !shape.rendersVectorShape && !shape.rendersArcTrack}
       <!-- Not for an arc: it is drawn from its own Arc settings (arcSvgData below). Its Background
            holds the colour and thickness that fall back to, and drawn as a box it put a full ring,
@@ -681,6 +707,13 @@
       <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
     {/if}
 
+    {#if polygonFillStyle}
+      <!-- A polygon with a gradient: its fill, the solid colour and the gradient over it, on a box
+           clipped to the polygon's own points; the SVG below draws only its stroke. -->
+      <div class="interactive-polygon-fill" style={polygonFillStyle}>
+        <div class="interactive-gradient-layer" style={gradientLayerStyle}></div>
+      </div>
+    {/if}
     {#if shape.rendersVectorShape && vectorShapeSvg}
       <svg class="interactive-vector-shape ce-colour-anim" viewBox={`0 0 ${vectorShapeSvg.width} ${vectorShapeSvg.height}`} preserveAspectRatio="none" aria-hidden="true">
         {#if vectorShapeSvg.line}
@@ -717,7 +750,7 @@
         {:else}
           <polygon
             points={vectorShapeSvg.points}
-            fill={vectorShapeSvg.fill}
+            fill={polygonFillStyle ? 'none' : vectorShapeSvg.fill}
             stroke={vectorShapeSvg.stroke}
             stroke-width={vectorShapeSvg.strokeWidth}
             stroke-linejoin="round"
@@ -895,6 +928,19 @@
     width: 100%;
     height: 100%;
     overflow: visible;
+    pointer-events: none;
+  }
+
+  .interactive-polygon-fill {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  .interactive-gradient-layer {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
     pointer-events: none;
   }
 

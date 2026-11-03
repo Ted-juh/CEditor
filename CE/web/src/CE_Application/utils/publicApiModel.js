@@ -5,9 +5,9 @@
  * question "will a consumer actually see this row?" answered once. `docs/design/api-tab-design.md`
  * has the argument.
  *
- * THE CONTRACT IS ALREADY A TABLE, AND IT IS ALREADY LISTED. `CustomPublishedPropertiesEditor`'s
- * API Preview draws every enabled entry in three read-only lanes; the sections that EDIT them show
- * one entry at a time behind a `<select>`. Measured: growing a contract from 8 entries to 50 leaves
+ * THE CONTRACT IS ALREADY A TABLE, AND IT IS ALREADY LISTED. The Publish page's editor (since
+ * removed: the Settings tab replaced it) drew every enabled entry in three read-only lanes; the
+ * sections that EDITED them showed one entry at a time behind a `<select>`. Measured: growing a contract from 8 entries to 50 leaves
  * Published Inputs at 198px, Published Outputs at 198px and Editable Properties at 256px — not one
  * pixel, because the height does not depend on the contract. The list exists. It is just not the
  * thing you can edit.
@@ -16,7 +16,7 @@
  *
  *   path `Parts.background.Background.Fill.nonsenseKey`
  *     customComponentPackage.editablePropertyPathIssue  → no issue (it checks the FIRST segment)
- *     CustomPublishedPropertiesEditor (the author)      → fine (it checks only for empty)
+ *     the Publish page's editor (the author)            → fine (it checked only for empty)
  *     CustomPublicPropertiesEditor (the consumer)       → filtered out of the instance's panel
  *
  * The author is the only person who can fix it and the only one not told. `rowIssue()` gives the
@@ -36,7 +36,7 @@ export const API_KIND_META = {
   property: { label: 'Property', arrow: '·', one: 'property', many: 'properties', targetField: 'path', targetLabel: 'Path' },
 };
 
-/** Mirrored from `CustomPublishedPropertiesEditor`, which is where the vocabulary lives today. */
+/** The types an API entry can have. The Publish page's editor held them too, before it was removed. */
 export const API_TYPES = ['float', 'int', 'bool', 'enum', 'note', 'color', 'text', 'image'];
 export const NUMERIC_API_TYPES = new Set(['float', 'int', 'note']);
 

@@ -48,8 +48,8 @@ export function partShape(part) {
 /**
  * Which of the look bar's paint fields draw anything on this layer: `{ fill, gradient, stroke, corners }`.
  * The Component Designer review (item 14) found options offered where they do not apply. A round
- * shape (ellipse, ring, capsule) is drawn fully round in one solid colour, so Corners and Gradient
- * do nothing on it; a polygon fills in one solid colour and has no corners; a line or an open path
+ * shape (ellipse, ring, capsule) is always drawn fully round, so Corners do nothing on it; a polygon
+ * has no corners either (both take a gradient, over their solid colour); a line or an open path
  * has no inside, so it has a stroke only; an arc is drawn from its own Arc settings (the Display
  * tab), so no paint field draws on it. A box, the rest, takes all four. A combined shape takes every
  * fill and stroke but no corners.
@@ -60,7 +60,6 @@ export function layerPaintFields(part) {
   if (shape.rendersLine || shape.rendersOpenPath || (shape.compoundPathData && !shape.rendersOutline)) {
     return { fill: false, gradient: false, stroke: true, corners: false };
   }
-  if (shape.rendersOutline) return { fill: true, gradient: true, stroke: true, corners: false };
-  if (shape.usesSimpleBackground || shape.rendersVectorShape) return { fill: true, gradient: false, stroke: true, corners: false };
+  if (shape.rendersOutline || shape.usesSimpleBackground || shape.rendersVectorShape) return { fill: true, gradient: true, stroke: true, corners: false };
   return { fill: true, gradient: true, stroke: true, corners: true };
 }

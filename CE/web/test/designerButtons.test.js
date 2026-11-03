@@ -16,7 +16,6 @@ import { render } from 'svelte/server';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { stateTriggerLabel } from '../src/CE_Application/utils/customDesignSurfaceHelpers.js';
-import CustomPublishedPropertiesEditor from '../src/CE_Application/sections/CustomPublishedPropertiesEditor.svelte';
 
 const src = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
 const text = (html) => html.replace(/<!--[\s\S]*?-->/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ');
@@ -59,17 +58,6 @@ test('the look bar names the corner radius and puts the stroke width beside the 
   assert.match(bar, /<label class="paint-number" title="Corner radius, in pixels">\s*<span>Corners<\/span>/);
   // The stroke width follows the stroke's colour, before Corners.
   assert.ok(bar.indexOf('title="Pick stroke colour"') < bar.indexOf('stroke-width') && bar.indexOf('stroke-width') < bar.indexOf('<span>Corners</span>'));
-});
-
-test('External links are two switches by name, Inputs and Outputs', () => {
-  const component = createControl('CustomComponent');
-  component._children.ExternalAPI = { ...component._children.ExternalAPI, acceptsExternalLinks: true, emitsExternalLinks: false };
-  const html = render(CustomPublishedPropertiesEditor, { props: { control: component } }).body;
-  assert.match(text(html), /External links Inputs Outputs/);
-  const cell = html.slice(html.indexOf('class="external-links'), html.indexOf('</div>', html.indexOf('class="external-links')));
-  assert.match(cell, /role="switch" aria-checked="true"[^>]*>\s*Inputs/);
-  assert.match(cell, /role="switch" aria-checked="false"[^>]*>\s*Outputs/);
-  assert.doesNotMatch(src('sections/CustomPublishedPropertiesEditor.svelte'), /ArrowRightToLine|ArrowRightFromLine|FlagStrip/);
 });
 
 test('the inspector\'s tab rail names each tab under its icon, and keeps the title the checks find it by', async () => {

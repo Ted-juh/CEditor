@@ -11,7 +11,7 @@ import { layerPaintFields, partShape } from '../src/CE_Application/utils/partSha
 const source = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
 
 const ALL = { fill: true, gradient: true, stroke: true, corners: true };
-const ROUND = { fill: true, gradient: false, stroke: true, corners: false };
+const ROUND = { fill: true, gradient: true, stroke: true, corners: false };
 const STROKE_ONLY = { fill: false, gradient: false, stroke: true, corners: false };
 const NONE = { fill: false, gradient: false, stroke: false, corners: false };
 const background = { Background: { _type: 'Background', _children: {} } };
@@ -21,9 +21,9 @@ test('the look bar offers the paint fields that draw on each kind of layer', () 
   assert.deepEqual(layerPaintFields(layer('rectangle')), ALL, 'a box takes every field');
   assert.deepEqual(layerPaintFields(layer('roundedRectangle')), ALL);
   for (const kind of ['circle', 'ring', 'capsule']) {
-    assert.deepEqual(layerPaintFields(layer(kind)), ROUND, `${kind}: drawn fully round, in one solid colour`);
+    assert.deepEqual(layerPaintFields(layer(kind)), ROUND, `${kind}: always drawn fully round`);
   }
-  assert.deepEqual(layerPaintFields(layer('triangle')), ROUND, 'a polygon fills in one solid colour and has no corners');
+  assert.deepEqual(layerPaintFields(layer('triangle')), ROUND, 'a polygon has no corners');
   assert.deepEqual(layerPaintFields(layer('line')), STROKE_ONLY, 'a line has no inside');
   assert.deepEqual(layerPaintFields(layer('path', { closed: false, vectorPoints: [[0, 0], [1, 1]] })), STROKE_ONLY, 'nor has an open path');
   assert.deepEqual(layerPaintFields(layer('path', { closed: true, vectorPoints: [[0, 0], [1, 0], [0, 1]] })), ROUND);
@@ -78,4 +78,13 @@ test('the generated-names and hit-zone view toggles show only when there is some
   const inspector = source('sections/SurfaceDockInspector.svelte');
   assert.match(inspector, /\{#if hasGeneratedLayers\}\s*<span class="dock-field">\s*<span>Gen Names<\/span>/);
   assert.match(inspector, /\{#if hasHitZones\}\s*<span class="dock-field">\s*<span>Zones<\/span>/);
+});
+
+test('a round shape and a polygon draw their gradient, over their solid colour, as a box does', () => {
+  const renderer = source('editor/InteractivePartRenderer.svelte');
+  assert.match(renderer, /return `background: \$\{gradientToCSS\(fill\.gradient\)\}; opacity: \$\{\(numberOr\(fill\.gradientOpacity, 100\) \/ 100\)\.toFixed\(3\)\}; mix-blend-mode: \$\{fill\.gradientBlend \?\? 'normal'\};`;/);
+  assert.match(renderer, /<div class="interactive-simple-background ce-colour-anim" style=\{simpleBackgroundStyle\}>\s*\{#if gradientLayerStyle\}<div class="interactive-gradient-layer"/);
+  // The polygon's fill is a box clipped to the SVG polygon's own points; the SVG keeps the stroke.
+  assert.match(renderer, /return `clip-path: polygon\(\$\{corners\.join\(', '\)\}\); background: \$\{solid\};`;/);
+  assert.match(renderer, /fill=\{polygonFillStyle \? 'none' : vectorShapeSvg\.fill\}/);
 });
