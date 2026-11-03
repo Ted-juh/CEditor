@@ -320,11 +320,15 @@ test('the options strip holds snapping, View and ?, and wraps rather than hiding
   // View list, and the strip takes a second row when even that does not fit.
   const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
   const markup = strip.slice(strip.indexOf('</script>'), strip.indexOf('<style>'));
-  const list = markup.slice(markup.indexOf('<div class="view-list"'), markup.indexOf('{/if}', markup.indexOf('<div class="view-list"')));
+  // To the list's own end: the toggles inside it have conditions of their own.
+  const list = markup.slice(markup.indexOf('<div class="view-list"'), markup.indexOf('</div>\n      {/if}', markup.indexOf('<div class="view-list"')));
   for (const label of ['Measure', 'Bounds', 'Generated names', 'Hit zones', 'Rulers']) {
     assert.match(list, new RegExp(`label="${label}"`), `${label} is in the View list`);
   }
   assert.match(list, /aria-label="Which hit zones are drawn"/);
+  // Offered only when they draw something (the designer review, item 14).
+  assert.match(list, /\{#if hasGeneratedLayers\}\s*<PropertyToggle label="Generated names"/);
+  assert.match(list, /\{#if hasHitZones\}\s*<PropertyToggle label="Hit zones"/);
   assert.match(list, /<span>Zoom step<\/span>/);
   const outside = markup.replace(list, '');
   for (const label of ['Snap', 'Smart']) assert.match(outside, new RegExp(`label="${label}"`), `${label} stays on the strip`);

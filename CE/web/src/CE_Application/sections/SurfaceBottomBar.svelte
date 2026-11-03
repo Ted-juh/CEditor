@@ -32,6 +32,9 @@
     measureEnabled = false, setMeasureEnabled = () => {},
     showBounds = false,
     showGeneratedLabels = false,
+    // Whether there are generated (kit) layers and hit zones: their toggles show only then.
+    hasGeneratedLayers = true,
+    hasHitZones = true,
     showHitZones = false,
     setPreviewFlag = () => {},
     zoneDisplayMode = 'selected', setZoneDisplayMode = () => {},
@@ -102,14 +105,18 @@
         <div class="view-list" role="group" aria-label="View options" use:floating={{ anchor: 'parent', placement: 'top-start', fallbackPlacements: ['bottom-start'] }}>
           <PropertyToggle label="Measure" title="Show pixel gaps between two selected layers" value={measureEnabled} onchange={(next) => setMeasureEnabled(next)} />
           <PropertyToggle label="Bounds" value={showBounds} onchange={(next) => { setPreviewFlag('showBounds', next) }} />
-          <PropertyToggle label="Generated names" title="Show generated layer names on the canvas" value={showGeneratedLabels} onchange={(next) => { setPreviewFlag('showGeneratedLabels', next) }} />
-          <PropertyToggle label="Hit zones" value={showHitZones} onchange={(next) => { setPreviewFlag('showHitZones', next) }} />
-          <!-- Dimmed and All also switch hit zones on (the designer's setZoneDisplayMode). -->
-          <div class="zone-mode-control" role="radiogroup" aria-label="Which hit zones are drawn">
-            <button type="button" role="radio" aria-checked={zoneDisplayMode === 'selected'} class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')} title="Show only the selected hit zone">Selected</button>
-            <button type="button" role="radio" aria-checked={zoneDisplayMode === 'dim'} class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')} title="Show all hit zones dimmed">Dimmed</button>
-            <button type="button" role="radio" aria-checked={zoneDisplayMode === 'all'} class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')} title="Show all hit zones">All</button>
-          </div>
+          {#if hasGeneratedLayers}
+            <PropertyToggle label="Generated names" title="Show generated layer names on the canvas" value={showGeneratedLabels} onchange={(next) => { setPreviewFlag('showGeneratedLabels', next) }} />
+          {/if}
+          {#if hasHitZones}
+            <PropertyToggle label="Hit zones" value={showHitZones} onchange={(next) => { setPreviewFlag('showHitZones', next) }} />
+            <!-- Dimmed and All also switch hit zones on (the designer's setZoneDisplayMode). -->
+            <div class="zone-mode-control" role="radiogroup" aria-label="Which hit zones are drawn">
+              <button type="button" role="radio" aria-checked={zoneDisplayMode === 'selected'} class:active={zoneDisplayMode === 'selected'} onclick={() => setZoneDisplayMode('selected')} title="Show only the selected hit zone">Selected</button>
+              <button type="button" role="radio" aria-checked={zoneDisplayMode === 'dim'} class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')} title="Show all hit zones dimmed">Dimmed</button>
+              <button type="button" role="radio" aria-checked={zoneDisplayMode === 'all'} class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')} title="Show all hit zones">All</button>
+            </div>
+          {/if}
           <PropertyToggle label="Rulers" value={surfaceShowRulers} onchange={(next) => setSurfaceShowRulers(next)} />
           <label class="snap-size" title="How far − and + in the status bar zoom, in percent">
             <span>Zoom step</span>

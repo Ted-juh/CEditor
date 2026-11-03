@@ -19,6 +19,7 @@
   import { activeControlSet } from '../stores/controlSets.js';
   import { isTokenReference, resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { roleLabel } from '../models/setEditing.js';
+  import { layerPaintFields } from '../utils/partShape.js';
 
   // A layer colour linked to one of the set's colours (piece D1) is drawn as the panel's set gives
   // it, marked, and named in its tooltip, as the panel's properties show a role.
@@ -34,7 +35,6 @@
     selectedFill = null,
     selectedBorder = null,
     selectedCorners = null,
-    selectedIsArc = false,
     selectedText = null,
     selectedTextFill = null,
     selectedTextFont = null,
@@ -48,13 +48,18 @@
     notice = null,
     actions = null,
   } = $props();
+
+  // Only the paint fields that draw anything on this layer (utils/partShape.js): Corners on an
+  // ellipse, a Gradient on a polygon or a Fill on a line did nothing. An arc's colour and thickness
+  // are its Arc settings, on the Display tab.
+  let paint = $derived(layerPaintFields(selectedAuthoredPart ?? selectedPart));
 </script>
 
   <div class="surface-lookbar" aria-label="Component look bar">
     {#if activeSelectionKind === 'layer' && selectedPart}
     <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
       {#if selectedBackground}
-        {#if !selectedIsArc}
+        {#if paint.fill}
           <label class="paint-swatch">
             <span>Fill</span>
             <button
@@ -74,7 +79,7 @@
             >{#if isTokenReference(selectedFill?.colour)}<span class="link-mark" aria-hidden="true">🔗</span>{/if}</button>
           </label>
         {/if}
-        {#if selectedFill?.gradientEnabled}
+        {#if paint.gradient && selectedFill?.gradientEnabled}
           <label class="paint-swatch">
             <span>Grad</span>
             <button type="button" class="mini-gradient-btn"
@@ -85,6 +90,7 @@
             ></button>
           </label>
         {/if}
+        {#if paint.gradient}
         <label class="paint-swatch">
           <span>Gradient</span>
           <button type="button" class="fill-toggle"
@@ -94,6 +100,8 @@
             title={selectedFill?.gradientEnabled ? 'Disable gradient' : 'Enable gradient'}
           >G</button>
         </label>
+        {/if}
+        {#if paint.stroke}
         <label class="paint-swatch">
           <span>Stroke</span>
             <button type="button" class="mini-swatch-btn"
@@ -120,6 +128,8 @@
             />
           </span>
         </label>
+        {/if}
+        {#if paint.corners}
         <label class="paint-number" title="Corner radius, in pixels">
           <span>Corners</span>
           <span class="nc-wrap">
@@ -134,6 +144,7 @@
             />
           </span>
         </label>
+        {/if}
       {/if}
 
       {#if selectedText}

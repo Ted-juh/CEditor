@@ -50,6 +50,9 @@
     // Overlay flags
     showBounds = false,
     showGeneratedLabels = false,
+    // Whether the component has generated (kit) layers and hit zones: their view toggles show only then.
+    hasGeneratedLayers = true,
+    hasHitZones = true,
     showHitZones = false,
     zoneDisplayMode = 'selected',
     // Actions
@@ -318,18 +321,20 @@
             />
           </span>
         {/if}
-        {#if activeSelectionKind === 'layer'}
+        <!-- Only when there is an arc to turn around: a rectangle offered it beside "No arc found"
+             (the designer review, item 14). -->
+        {#if activeSelectionKind === 'layer' && selectedArcPivotTarget}
           <div class="dock-section-subtitle">Rotation Pivot</div>
           <div class="pivot-actions">
             <button
               type="button"
-              disabled={!selectedPartEditable || !selectedArcPivotTarget}
+              disabled={!selectedPartEditable}
               onclick={setSelectedPivotToArcCenter}
-              title={selectedArcPivotTarget ? `Set pivot to ${selectedArcPivotTarget.name} center` : 'No arc/value arc layer available'}
+              title={`Set the pivot to the centre of ${selectedArcPivotTarget.name}`}
             >
               Rotate around arc centre
             </button>
-            <span>{selectedArcPivotTarget ? selectedArcPivotTarget.name : 'No arc found'}</span>
+            <span>{selectedArcPivotTarget.name}</span>
           </div>
         {/if}
         <div class="dock-section-subtitle">Quick Positioning</div>
@@ -348,8 +353,9 @@
   {#if activeSelectionKind === 'layer' && selectedPart}
     <!-- A layer's fill, gradient, stroke, corners, text and opacity are styled in one place, the
          look bar above the canvas (SurfaceLookBar). This tab had a second copy of every one of them;
-         what only an arc has stays here. -->
-    <div class="dock-note">Fill, stroke, corners, text and opacity are in the bar above the canvas.</div>
+         what only an arc has stays here, and the tab is offered for an arc only (the designer's
+         inspectorTabHas). An arc's colour and thickness are these, not the bar's. -->
+    <div class="dock-note">The arc's colour and thickness are set here; its opacity is in the bar above the canvas.</div>
 
     {#if selectedIsArc}
       <div class="dock-section">
@@ -418,8 +424,6 @@
         <NumberCell value={numberOr(selectedZone?.priority, 0)} defaultValue={0} disabled={!selectedZoneEditable} onchange={(value) => setHitZoneProperty('priority', value)} />
       </label>
     </div>
-  {:else}
-    <div class="dock-empty">Select a layer to edit its styling.</div>
   {/if}
 {:else if inspectorTab === 'behavior'}
   <div class="dock-section">
@@ -441,8 +445,6 @@
           {/each}
         </select>
       </label>
-    {:else}
-      <div class="dock-note">Use hit zones to make artwork interactive.</div>
     {/if}
   </div>
 {:else if inspectorTab === 'states'}
@@ -455,6 +457,7 @@
       <PropertyToggle compact value={showBounds} onchange={(next) => setPreviewFlag('showBounds', next)} ariaLabel="Bounds" />
 
     </span>
+    {#if hasGeneratedLayers}
     <span class="dock-field">
 
       <span>Gen Names</span>
@@ -462,6 +465,8 @@
       <PropertyToggle compact value={showGeneratedLabels} onchange={(next) => setPreviewFlag('showGeneratedLabels', next)} ariaLabel="Gen Names" />
 
     </span>
+    {/if}
+    {#if hasHitZones}
     <span class="dock-field">
 
       <span>Zones</span>
@@ -474,6 +479,7 @@
       <button type="button" class:active={zoneDisplayMode === 'dim'} onclick={() => setZoneDisplayMode('dim')}>Dim</button>
       <button type="button" class:active={zoneDisplayMode === 'all'} onclick={() => setZoneDisplayMode('all')}>All</button>
     </div>
+    {/if}
   </div>
   <div class="dock-section">
     <div class="dock-section-title">States</div>

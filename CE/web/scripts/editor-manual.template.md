@@ -961,17 +961,28 @@ buttons at its foot unfolds it with the group names, and it stays the way you le
 
 A selected layer is styled in the bar along the top of the designer (**Fill**, **Gradient**,
 **Stroke** with its width beside it, **Corners** for the corner radius, **Opacity**, and for text
-its colour, size and words) and in the dock's **Colors** and **Gradient** tools. Beside them are
+its colour, size and words) and in the dock's **Colors** and **Gradient** tools. The bar shows only
+what draws on the selected layer: an ellipse, a ring or a capsule is always round and one solid
+colour, so it has no **Corners** or **Gradient**; a polygon has no **Corners** or **Gradient** either;
+a line has only **Stroke**; and an arc takes its colour and thickness from its own settings on the
+inspector's **Display** tab, so the bar shows only its **Opacity**. Beside them are
 the layer's own buttons (duplicate, copy, paste, order, make interactive, lock, delete). On a
 narrower window those are under one **Layer** button, and on a laptop-sized one the style controls
 have a row of their own, so all of them stay in sight.
 
 The strip under the canvas has **Snap**, **Grid** and **Smart** for snapping, **View** and **?** for
-the shortcuts. **View** lists what the canvas shows (**Measure**, **Bounds**, **Generated names**,
-**Hit zones** and which of them are drawn, **Rulers**) and the **Zoom step**, how far the status
+the shortcuts. **View** lists what the canvas shows (**Measure**, **Bounds**, **Generated names**
+when the component has generated layers, **Hit zones** and which of them are drawn when it has hit
+zones, **Rulers**) and the **Zoom step**, how far the status
 bar's **−** and **+** zoom. On a narrow window the strip takes a second row rather than hide
 anything. **Starters** replaces the component with a ready-made one, and its first entry, **Blank
 canvas**, clears it. Both ask first when there is a layer to lose, and undo takes either back.
+
+The inspector in the dock has four tabs. **Object** holds the selection's name, position, size and
+rotation, and **Rotate around arc centre** when the component has an arc to turn around. **Display**
+holds the settings of an arc and of a hit zone, and **Behavior** what a hit zone does and which value
+it drives; for anything else the two are greyed out, and pointing at one says why. **Preview** holds
+what the canvas shows while you work.
 
 While the designer is open, the dock's **Colors** tool colours the fill of the layer selected on its
 surface (several selected layers take the colour together; with none selected it changes nothing),

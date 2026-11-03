@@ -1,44 +1,6 @@
 <script module>
-  import { polygonPoints, polygonToSvgPoints } from '../utils/shapeGeometry.js';
-  import { hasCompoundPath, pathIsClosed, pathVectorPoints } from '../utils/penPath.js';
-  import { isBooleanGroup } from '../utils/booleanGroups.js';
-
-  function drawnAs(part, ...names) {
-    return names.includes(String(part?.kind ?? '').toLowerCase())
-      || names.includes(String(part?.meta?.renderer ?? '').toLowerCase());
-  }
-
-  function partShape(part) {
-    const kind = String(part?.kind ?? '').trim().toLowerCase();
-    const rendersArcTrack = drawnAs(part, 'arctrack', 'ringarc');
-    // Flat vector polygons (triangle, star, hexagon, …) render as a single SVG
-    // <polygon> using the part's fill + border, instead of the CSS background.
-    // A `path` part (the designer's Pen) carries its own points; see utils/penPath.js.
-    const polygonVerts = polygonPoints(part?.kind) ?? pathVectorPoints(part);
-    const rendersLine = kind === 'line';
-    // A combined or smoothed shape (utils/partBooleans.js): SVG path data in 0..1 of the box, with curves,
-    // holes and islands, so it cannot be a point list.
-    const compoundPathData = hasCompoundPath(part) ? part.meta.pathData : '';
-    // A combined shape (utils/booleanGroups.js) and a closed compound path paint through the outline
-    // pipeline — every fill layer, border style and effect, on their true shape. An OPEN compound path
-    // (a smoothed open Pen path) has no inside and is still a stroke, drawn by the vector branch.
-    const rendersBooleanGroup = isBooleanGroup(part);
-    const rendersOutline = rendersBooleanGroup || (!!compoundPathData && part?.meta?.closed !== false);
-    return {
-      rendersValueArc: drawnAs(part, 'valuearc'),
-      rendersArcTrack,
-      rendersEnvelopePath: drawnAs(part, 'envelopepath'),
-      rendersWaveformIcon: drawnAs(part, 'waveformicon'),
-      usesSimpleBackground: !!part?._children?.Background && !rendersArcTrack && ['circle', 'ring', 'capsule'].includes(kind),
-      polygonVerts,
-      rendersOpenPath: !!polygonVerts && String(part?.kind ?? '') === 'path' && !pathIsClosed(part),
-      rendersLine,
-      compoundPathData,
-      rendersBooleanGroup,
-      rendersOutline,
-      rendersVectorShape: !!polygonVerts || rendersLine || (!!compoundPathData && !rendersOutline),
-    };
-  }
+  import { polygonToSvgPoints } from '../utils/shapeGeometry.js';
+  import { partShape } from '../utils/partShape.js';
 </script>
 
 <script>
@@ -293,7 +255,7 @@
   // 2,821 of the GAIA panel's parts are static art already folded into one image per component,
   // and the 474 that are left over still wanted a div each just to hold a colour.
   let absorbedFillCSS = $derived(
-    background && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline
+    background && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -711,7 +673,11 @@
       {/if}
     {:else if background && shape.usesSimpleBackground && !shape.rendersVectorShape}
       <div class="interactive-simple-background ce-colour-anim" style={simpleBackgroundStyle}></div>
-    {:else if background && !shape.rendersVectorShape}
+    {:else if background && !shape.rendersVectorShape && !shape.rendersArcTrack}
+      <!-- Not for an arc: it is drawn from its own Arc settings (arcSvgData below). Its Background
+           holds the colour and thickness that fall back to, and drawn as a box it put a full ring,
+           radius 999 and the arc's own colour, under every arc the Arc pen made, so the arc's gap
+           never showed. -->
       <BackgroundRenderer {background} width={frame.width} height={frame.height} absorbFill={!!absorbedFillCSS} />
     {/if}
 
