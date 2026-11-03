@@ -14,7 +14,7 @@
   import { SET_STYLES, groupControlSets } from '../utils/controlSetGroups.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, isRetiredControlSet, normalizeControlSetDefinition, offeredControlSetsWith, resolveToken } from '../models/controlSets.js';
+  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, controlSetOptionLabel, getControlSet, illustratedKinds, illustratedValueNote, normalizeControlSetDefinition, offeredControlSetsWith, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -58,8 +58,9 @@
   let galleryOpen = $state(false);
   let familySources = $state({});
   let query = $state('');
-  // The mechanisms fold away by default: twelve odd ones out, opened when wanted.
-  let folded = $state(new Set(['mechanical']));
+  // Every group opens unfolded. The mechanisms used to fold away, twelve odd ones out; the two kept
+  // (Illustrated) show, with the line that says how they differ.
+  let folded = $state(new Set());
   let previewWidth = $state(376);
   let cardFamily = $state('Knob');
   let cardStyle = $state('');
@@ -81,6 +82,10 @@
   let builtInSets = $derived(allSets.filter((set) => set.origin === 'built-in'));
   let selectedSet = $derived(allSets.find((set) => set.id === selectedId) ?? allSets[0]);
   let isCustom = $derived(selectedSet?.origin === 'library');
+  // Iris, Satellite or a copy of one: the kinds it draws as whole illustrations, which its page names
+  // (models/controlSets.js ILLUSTRATED_CONTROL_SET_IDS). Empty for every other set.
+  let illustrated = $derived(draft ? illustratedKinds(draft) : []);
+  const listed = (words) => words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : (words[0] ?? '');
   let groups = $derived(groupControlSets({ librarySets: mySets, builtInSets, panelSetId, query, style: cardStyle }));
   let panelName = $derived(String(targetPanel?.name ?? ''));
 
@@ -325,6 +330,7 @@
             <span>{group.label}</span><small>{group.sets.length}</small>
           </button>
           {#if open}
+            {#if group.note}<p class="group-note">{group.note}</p>{/if}
             <!-- By era only while the whole Library shows: a style or a search leaves one or two per era. -->
             {#if group.eras && !cardStyle && !query.trim()}
               {#each group.eras as era (era.label)}
@@ -350,7 +356,7 @@
     <div class="column editor">
       <header class="editor-head">
         <div class="title">
-          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">In use</span>{/if}</h2>
+          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">In use</span>{/if}{#if illustrated.length}<span class="illustrated-tag">Illustrated set</span>{/if}</h2>
           <p>{isCustom ? 'User set. Save Set stores changes; Export writes it to a file.' : 'Built-in set. Editing creates a copy.'}</p>
         </div>
         <div class="actions">
@@ -360,6 +366,17 @@
           {#if isCustom}<button class="primary" onclick={saveDraft}>Save Set</button>{/if}
         </div>
       </header>
+      {#if illustrated.length}
+        <!-- How an illustrated set differs (the owner approved the mock-up). -->
+        <div class="illustrated-callout" data-illustrated-callout>
+          <b>{draft.name} works differently from the other sets.</b>
+          <ul>
+            <li>Its {listed(illustrated.map((kind) => kind.noun))} are drawn as whole illustrations. Colours, size and depth can be changed (Core › Control design); the parts on the {listed(illustrated.map((kind) => kind.tab))} {illustrated.length > 1 ? 'tabs' : 'tab'} do not apply, and Convert to Parts is not available.</li>
+            <li>The value moves the mechanism{illustratedValueNote(draft) ? `: ${illustratedValueNote(draft)}` : ' instead of a pointer over a scale'}.</li>
+            <li>Pads and Number steppers are ordinary parts and can be edited as in any other set.</li>
+          </ul>
+        </div>
+      {/if}
 
       <div class="scroll fields">
         <section>
@@ -481,9 +498,9 @@
         <label class="default"><span>Default for new panels</span>
           <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value, defaultControlSetChosen: true })}>
             {#if mySets.length}
-              <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+              <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{controlSetOptionLabel(set)}</option>{/each}</optgroup>
             {/if}
-            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}{isRetiredControlSet(set.id) ? ' (no longer offered)' : ''}</option>{/each}</optgroup>
+            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{controlSetOptionLabel(set)}</option>{/each}</optgroup>
             {#if !allSets.some((set) => set.id === defaultSetId)}
               <option value={defaultSetId}>{defaultSetId} (not installed; new panels use {BASE_CONTROL_SET.name})</option>
             {/if}
@@ -532,6 +549,11 @@
   .group-head[aria-expanded='false'] { color:#8a8a8a; }
   .group-head small { margin-left:auto; color:#777; font-weight:600; letter-spacing:0; }
   .era { padding:5px 14px 1px; color:#8a8a8a; font-size:10px; }
+  .group-note { margin:2px 10px 6px 24px; color:#B9B9B9; font-size:11px; line-height:1.45; }
+  .illustrated-tag { margin-left:8px; font-size:10px; font-weight:600; color:#E6C27A; border:1px solid #6B5A33; border-radius:9px; padding:1px 7px; vertical-align:middle; }
+  .illustrated-callout { margin:10px 14px 0; padding:9px 12px; border:1px solid #5A4C2E; border-left:3px solid #E6C27A; border-radius:5px; background:#2A2620; color:#DCD6C8; font-size:12px; line-height:1.5; }
+  .illustrated-callout b { color:#F0E3C2; }
+  .illustrated-callout ul { margin:4px 0 0; padding-left:18px; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:6px; padding:4px 10px 8px; }
   .empty { padding:14px; color:#888; font-size:11px; }
 

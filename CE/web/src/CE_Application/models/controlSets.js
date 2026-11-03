@@ -26,6 +26,7 @@
 import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 import { makeAdditionalControlSets } from './additionalControlSets.js';
+import { anatomyOptions, isIllustratedForm } from './controlAnatomy.js';
 import { extendControlSet } from './controlSetCoverage.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { withLabelDesign } from './labelDesigns.js';
@@ -394,6 +395,57 @@ export const OFFERED_CONTROL_SETS = BUILT_IN_CONTROL_SETS.filter((set) => !isRet
 export function offeredControlSetsWith(id) {
   const retired = isRetiredControlSet(id) ? BUILT_IN_CONTROL_SETS.find((set) => set.id === id) : null;
   return retired ? [...OFFERED_CONTROL_SETS, retired] : OFFERED_CONTROL_SETS;
+}
+
+// Iris and Satellite, the two kept of the twelve mechanical sets (models/additionalControlSets.js),
+// work unlike every other set. Their knobs, keys, switches and meters are whole drawings
+// (models/controlAnatomy.js isIllustratedForm), not parts: only their colours, size and depth
+// change. And the value moves the mechanism, not a pointer over a scale. The owner: "it should be
+// clear for those two that they do not work as the rest as a control set." So the Library calls
+// their style Illustrated and badges their cards, the set's page says what differs, a picker names
+// them "(illustrated)", and a part tab says when its control is one of these drawings.
+export const ILLUSTRATED_CONTROL_SET_IDS = Object.freeze(['iris', 'satellite']);
+/** Whether a set draws any of its controls as illustrations: an Iris, a Satellite, or a copy of one. */
+export function isIllustratedControlSet(set) {
+  return illustratedFamilies(set).length > 0;
+}
+/** The control types a set draws as illustrations, from the forms its families name. */
+export function illustratedFamilies(set) {
+  return Object.entries(set?.families ?? {})
+    .filter(([, family]) => isIllustratedForm(family?.component?.['Core.controlForm']))
+    .map(([type]) => type);
+}
+// How each one shows its value, for the set's page. A copy says what the set it came from says.
+const ILLUSTRATED_VALUE_NOTES = {
+  iris: 'the knob opens an aperture instead of turning a pointer over a scale, and the meter opens two shutters',
+  satellite: 'the knob tilts a dish instead of turning a pointer over a scale, and the switch joins its two pods with a bar',
+};
+/** The set's line on how its value shows, or '' when nothing is known for it. */
+export function illustratedValueNote(set) {
+  return ILLUSTRATED_VALUE_NOTES[set?.id] ?? ILLUSTRATED_VALUE_NOTES[set?.basedOn] ?? '';
+}
+// The kinds of control an illustrated set draws whole, as the set's page names them, with the tab
+// whose parts do not apply to them.
+const ILLUSTRATED_KINDS = [['Knob', 'knobs', 'Knob'], ['Button', 'keys', 'Button'], ['ToggleButton', 'switches', 'Switch'], ['Meter', 'meters', 'Meter']];
+/** `[{ noun, tab }]` for the kinds a set draws as illustrations, in that order. */
+export function illustratedKinds(set) {
+  const types = illustratedFamilies(set);
+  return ILLUSTRATED_KINDS.filter(([type]) => types.includes(type)).map(([, noun, tab]) => ({ noun, tab }));
+}
+/** A set's name as a picker shows it: "(no longer offered)" or "(illustrated)" after it where either applies. */
+export function controlSetOptionLabel(set) {
+  const name = String(set?.name ?? set?.id ?? '');
+  if (isRetiredControlSet(set?.id)) return `${name} (no longer offered)`;
+  return isIllustratedControlSet(set) ? `${name} (illustrated)` : name;
+}
+/**
+ * A control type's forms as Core › Control design offers them: a retired set's form only when it is
+ * the one chosen, so the picker still shows it. An illustration says so after its name.
+ */
+export function offeredAnatomyOptions(type, current = '') {
+  return anatomyOptions(type)
+    .filter(([id]) => id === current || !isRetiredControlSet(String(id).replace(/^new-/, '')))
+    .map(([id, name]) => [id, isIllustratedForm(id) ? `${name} (illustrated)` : name]);
 }
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';

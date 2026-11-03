@@ -2,25 +2,23 @@
 //
 // It was one horizontal strip of every set, 79 built-ins and your own, to scroll sideways through.
 // Grouped now: the panel's set and your own first, then the built-ins by kind: the materials and
-// moods (Graphite to Receiver), the mechanical ones (a ship's wheel, a kiln, a fan…), and the 36
-// synthesizer templates, by era as their gallery titles them ("1970s / analogue").
+// moods (Graphite to Receiver), the illustrated ones (Iris and Satellite, which work unlike the rest:
+// models/controlSets.js ILLUSTRATED_CONTROL_SET_IDS), and the 36 synthesizer templates, by era as
+// their gallery titles them ("1970s / analogue").
 //
 // Across those groups, a style: what a set looks like, whichever group it is in. The Library's
 // second row of buttons shows one style at a time (the owner: "family buttons for styles").
 
 import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
-import { isRetiredControlSet } from '../models/controlSets.js';
-
-/**
- * The built-ins that are mechanisms rather than finishes: an iris, a satellite dish. Listed: nothing
- * in a set says so. The other six were retired (models/controlSets.js RETIRED_CONTROL_SET_IDS).
- */
-export const MECHANICAL_SET_IDS = ['iris', 'satellite'];
+import { ILLUSTRATED_CONTROL_SET_IDS, isRetiredControlSet } from '../models/controlSets.js';
 
 /** The Library's styles, in the order of its buttons. */
-export const SET_STYLES = [['modern', 'Modern'], ['metal', 'Metal'], ['vintage', 'Vintage'], ['glow', 'Glow'], ['mechanical', 'Mechanical']];
+export const SET_STYLES = [['modern', 'Modern'], ['metal', 'Metal'], ['vintage', 'Vintage'], ['glow', 'Glow'], ['illustrated', 'Illustrated']];
 
-// Listed, as the mechanical ones are: nothing in a set says what it looks like. Every built-in is
+/** What the Library says under the Illustrated group, where the two sets are shown. */
+export const ILLUSTRATED_GROUP_NOTE = 'Drawn as whole illustrations. Colours, size and depth apply; the shapes cannot be edited part by part, and the value moves the mechanism instead of a pointer.';
+
+// Listed: nothing in a set says what it looks like. Every built-in is
 // here (but those no longer offered); a set of your own takes the style of the set it was copied from.
 const STYLE_IDS = {
   // Clean, flat, rubber and digital.
@@ -37,7 +35,8 @@ const STYLE_IDS = {
   // Light, glass and the future.
   glow: ['neon', 'phosphor', 'chrome', 'frost', 'backlit', 'obsidian',
     'gemstone', 'leatherbound', 'edge-light', 'touch-encoder', 'floating-halo', 'prism-cap'],
-  mechanical: MECHANICAL_SET_IDS,
+  // Iris and Satellite, which work unlike the rest. They were Mechanical, with ten more since retired.
+  illustrated: ILLUSTRATED_CONTROL_SET_IDS,
 };
 const STYLE_OF = new Map(Object.entries(STYLE_IDS).flatMap(([style, ids]) => ids.map((id) => [id, style])));
 
@@ -56,9 +55,9 @@ function matches(set, query, style = '') {
 }
 
 /**
- * The Library's groups: `[{ id, label, sets, eras? }]`, empty ones left out. `eras` sub-groups the
- * synthesizer templates: `[{ label, sets }]`. `style` (SET_STYLES) keeps that style only; the set
- * on the panel is shown whatever its style.
+ * The Library's groups: `[{ id, label, sets, eras?, note? }]`, empty ones left out. `note` is a line
+ * under the group's heading. `eras` sub-groups the synthesizer templates: `[{ label, sets }]`.
+ * `style` (SET_STYLES) keeps that style only; the set on the panel is shown whatever its style.
  */
 export function groupControlSets({ librarySets = [], builtInSets = [], panelSetId = '', query = '', style = '' } = {}) {
   const all = [...librarySets, ...builtInSets];
@@ -66,9 +65,9 @@ export function groupControlSets({ librarySets = [], builtInSets = [], panelSetI
   // A set no longer offered shows only as the panel's own.
   const fits = (set) => !isRetiredControlSet(set.id) && matches(set, query, style);
   const mine = librarySets.filter(fits);
-  const mechanical = builtInSets.filter((set) => MECHANICAL_SET_IDS.includes(set.id) && fits(set));
+  const illustrated = builtInSets.filter((set) => ILLUSTRATED_CONTROL_SET_IDS.includes(set.id) && fits(set));
   const templates = builtInSets.filter((set) => TEMPLATE_ERA.has(set.id) && fits(set));
-  const materials = builtInSets.filter((set) => !MECHANICAL_SET_IDS.includes(set.id) && !TEMPLATE_ERA.has(set.id) && fits(set));
+  const materials = builtInSets.filter((set) => !ILLUSTRATED_CONTROL_SET_IDS.includes(set.id) && !TEMPLATE_ERA.has(set.id) && fits(set));
   const eras = [];
   for (const set of templates) {
     const label = TEMPLATE_ERA.get(set.id);
@@ -80,7 +79,7 @@ export function groupControlSets({ librarySets = [], builtInSets = [], panelSetI
     { id: 'panel', label: 'On this panel', sets: onPanel },
     { id: 'mine', label: 'My sets', sets: mine },
     { id: 'materials', label: 'Materials & moods', sets: materials },
-    { id: 'mechanical', label: 'Mechanical', sets: mechanical },
+    { id: 'illustrated', label: 'Illustrated', note: ILLUSTRATED_GROUP_NOTE, sets: illustrated },
     { id: 'templates', label: 'Synthesizer templates', sets: templates, eras },
   ].filter((group) => group.sets.length);
 }

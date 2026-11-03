@@ -28,7 +28,8 @@
   import { resolveColourLiteral } from '../models/controlSets.js';
   import { BUTTON_DEVICE_PARTS } from '../models/buttonDeviceParts.js';
   import { DEVICE_SHADINGS } from '../models/buttonFormParts.js';
-  import { anatomyForm, anatomyOptions } from '../models/controlAnatomy.js';
+  import { anatomyForm, anatomyOptions, isIllustratedForm } from '../models/controlAnatomy.js';
+  import IllustratedFormNote from './IllustratedFormNote.svelte';
   import { DEVICE_SHAPES, DEVICE_PATTERNS } from '../utils/deviceShapes.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { numberOr } from '../utils/primitives.js';
@@ -60,6 +61,8 @@
   let pattern = $derived(String(part?.pattern ?? 'solid'));
   let form = $derived(anatomyForm(core?.controlType, core?.controlForm));
   let formName = $derived(anatomyOptions(core?.controlType).find(([id]) => id === form)?.[1] ?? form);
+  // Iris's and Satellite's forms are drawn whole: the parts below do not apply (IllustratedFormNote).
+  let illustrated = $derived(isIllustratedForm(form));
   let partsDrawn = $derived(String(core?.controlForm ?? '') !== 'original' && !form && parts.key?.visible === true);
 
   const partLabel = (name) => (name === 'key' ? (isSwitch ? 'Actuator' : 'Key') : word(name));
@@ -115,8 +118,10 @@
   const fraction = (value) => Math.max(0, Math.min(100, Number(value) || 0)) / 100;
 </script>
 
-<div class="button-parts">
-  {#if !partsDrawn}
+<div class="button-parts" class:dimmed={illustrated}>
+  {#if illustrated}
+    <IllustratedFormNote name={formName} />
+  {:else if !partsDrawn}
     <p class="note">
       {#if String(core?.controlForm ?? '') === 'original'}
         Core › Control design is Original parts, so this {noun} draws as a plain box and these parts are not drawn.
@@ -289,6 +294,7 @@
 
 <style>
   .button-parts { min-width: 0; }
+  .button-parts.dimmed > :global(:not([data-illustrated-note])) { opacity: 0.4; }
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .note { margin: 6px 8px; padding: 6px 8px; border: 1px solid #3A4A56; border-radius: 4px; background: #16222A; color: #B8C7D2; font-size: 11px; line-height: 1.4; }

@@ -11,7 +11,7 @@
   import { getSection, renameControl, updateControlProperty, updateSelectedProperty } from '../stores/controls.js';
   import { selectedComponentIds } from '../stores/panels.js';
   import { controlTypeLabel } from '../utils/authorWords.js';
-  import { offeredControlSetsWith } from '../models/controlSets.js';
+  import { controlSetOptionLabel, offeredAnatomyOptions, offeredControlSetsWith } from '../models/controlSets.js';
   import { anatomyOptions } from '../models/controlAnatomy.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import ControlSetOverridesCard from './ControlSetOverridesCard.svelte';
@@ -156,14 +156,14 @@
     <PropertyCell label="Set" span={4} hint="Follow the panel, or pin a built-in design to this control so it keeps its look when copied to another panel. Your property edits take precedence.">
       <select class="val" value={core.controlSetId ?? ''} onchange={(e) => set('controlSetId', e.target.value)}>
         <option value="">Follow panel</option>
-        {#each offeredControlSetsWith(core.controlSetId ?? '') as design (design.id)}<option value={design.id}>{design.name}</option>{/each}
+        {#each offeredControlSetsWith(core.controlSetId ?? '') as design (design.id)}<option value={design.id}>{controlSetOptionLabel(design)}</option>{/each}
       </select>
     </PropertyCell>
     {#if anatomyOptions(core.controlType).length}
       <PropertyCell label="Form" span={4} path="Core.controlForm" hint="Changes the control's physical construction. Uses the existing control's value, input and MIDI behavior. Choose Original parts to use the Parts editor.">
         <select class="val" value={core.controlForm ?? ''} onchange={(e) => chooseForm(e.target.value)}>
           <option value="">Follow set</option><option value="original">Original parts</option>
-          {#each anatomyOptions(core.controlType) as [id, name]}<option value={id}>{name}</option>{/each}
+          {#each offeredAnatomyOptions(core.controlType, core.controlForm ?? '') as [id, name]}<option value={id}>{name}</option>{/each}
         </select>
       </PropertyCell>
       {#if formIsParts(core.controlForm)}

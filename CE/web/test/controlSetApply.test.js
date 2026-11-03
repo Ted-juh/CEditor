@@ -11,11 +11,12 @@ import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
 import { readFileSync } from 'node:fs';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
-import { BUILT_IN_CONTROL_SETS, OFFERED_CONTROL_SETS, RETIRED_CONTROL_SET_IDS, getControlSet, offeredControlSetsWith } from '../src/CE_Application/models/controlSets.js';
+import { BUILT_IN_CONTROL_SETS, ILLUSTRATED_CONTROL_SET_IDS, OFFERED_CONTROL_SETS, RETIRED_CONTROL_SET_IDS, controlSetOptionLabel, getControlSet, illustratedKinds, illustratedValueNote, isIllustratedControlSet, offeredAnatomyOptions, offeredControlSetsWith } from '../src/CE_Application/models/controlSets.js';
+import { anatomyOptions, isIllustratedForm } from '../src/CE_Application/models/controlAnatomy.js';
 import { mergeControlSetLists } from '../src/CE_Application/stores/controlSetLibrary.js';
 import { SHIPPED_STARTER_IDS } from '../scripts/export-control-set-starters.mjs';
 import { applyControlSetChoices, controlFamily, panelSetSummary } from '../src/CE_Application/utils/controlSetApply.js';
-import { controlSetStyle, groupControlSets, MECHANICAL_SET_IDS, SET_STYLES } from '../src/CE_Application/utils/controlSetGroups.js';
+import { controlSetStyle, groupControlSets, ILLUSTRATED_GROUP_NOTE, SET_STYLES } from '../src/CE_Application/utils/controlSetGroups.js';
 import { DEFAULT_PANEL_COLOUR, buildSolidStyle } from '../src/CE_Application/utils/backgroundCSS.js';
 import { panels } from '../src/CE_Application/stores/panels.js';
 import { applyControlSetWithChoices, controlSetApplyRequest, requestControlSetApply } from '../src/CE_Application/stores/controlSets.js';
@@ -139,16 +140,18 @@ test('a control pinned to a set of your own keeps it: in the editor, the plug-in
   assert.match(preview, /setContext\(CONTROL_SET_SOURCES_CONTEXT_KEY, panelSetSources\)/);
 });
 
-test('the Library is grouped: the panel\'s set, your own, materials, mechanisms, templates by era', () => {
+test('the Library is grouped: the panel\'s set, your own, materials, the illustrated two, templates by era', () => {
   const mine = [{ id: 'my-set', name: 'My Set' }];
   const groups = groupControlSets({ librarySets: mine, builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'kiln' });
-  assert.deepEqual(groups.map((group) => group.id), ['panel', 'mine', 'materials', 'mechanical', 'templates']);
+  assert.deepEqual(groups.map((group) => group.id), ['panel', 'mine', 'materials', 'illustrated', 'templates']);
   assert.deepEqual(groups[0].sets.map((set) => set.id), ['kiln'], 'a set no longer offered still shows as the panel\'s own');
   const byId = Object.fromEntries(groups.map((group) => [group.id, group]));
-  assert.deepEqual(byId.mechanical.sets.map((set) => set.id).sort(), [...MECHANICAL_SET_IDS].sort());
+  assert.deepEqual(byId.illustrated.sets.map((set) => set.id).sort(), [...ILLUSTRATED_CONTROL_SET_IDS].sort());
+  assert.equal(byId.illustrated.label, 'Illustrated');
+  assert.equal(byId.illustrated.note, ILLUSTRATED_GROUP_NOTE, 'the group says how its sets differ');
   assert.equal(byId.templates.sets.length, 36);
   assert.ok(byId.templates.eras.length > 1, 'the templates are sub-grouped by era');
-  assert.equal(byId.materials.sets.length + byId.mechanical.sets.length + byId.templates.sets.length, OFFERED_CONTROL_SETS.length, 'every offered built-in is somewhere, and only those');
+  assert.equal(byId.materials.sets.length + byId.illustrated.sets.length + byId.templates.sets.length, OFFERED_CONTROL_SETS.length, 'every offered built-in is somewhere, and only those');
   const found = groupControlSets({ librarySets: mine, builtInSets: BUILT_IN_CONTROL_SETS, query: 'tolex' });
   assert.deepEqual(found.flatMap((group) => group.sets.map((set) => set.id)), ['tolex']);
 });
@@ -157,7 +160,7 @@ test('every offered built-in has a style, and a style keeps the Library to it', 
   const counts = {};
   for (const set of OFFERED_CONTROL_SETS) counts[controlSetStyle(set)] = (counts[controlSetStyle(set)] ?? 0) + 1;
   // Each listed by hand: an id misspelt in the list would fall to Modern and change these.
-  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 15, glow: 12, mechanical: 2 });
+  assert.deepEqual(counts, { modern: 20, metal: 17, vintage: 15, glow: 12, illustrated: 2 });
   assert.deepEqual(SET_STYLES.map(([id]) => id).sort(), Object.keys(counts).sort());
   assert.equal(controlSetStyle({ id: 'my-amp', basedOn: 'tolex' }), 'vintage', 'your own set takes the style it was copied from');
   const vintage = groupControlSets({ builtInSets: BUILT_IN_CONTROL_SETS, panelSetId: 'neon', style: 'vintage' });
@@ -172,7 +175,7 @@ test('sets no longer offered: still drawn where they are used, offered nowhere',
   // synths. Fun but not suitable for a panel." Then Tessera, Bellows, Helix, Balance, Fan and Crown:
   // "hardly usable for a synthesizer panel". Iris and Satellite stay.
   assert.deepEqual([...RETIRED_CONTROL_SET_IDS].sort(), ['arcade', 'atlas', 'balance', 'bellows', 'crown', 'fan', 'field', 'helix', 'kiln', 'saddle', 'spool', 'tessera', 'walnut']);
-  assert.deepEqual([...MECHANICAL_SET_IDS].sort(), ['iris', 'satellite']);
+  assert.deepEqual([...ILLUSTRATED_CONTROL_SET_IDS].sort(), ['iris', 'satellite']);
   for (const id of RETIRED_CONTROL_SET_IDS) {
     assert.ok(getControlSet(id), `${id} still resolves, so a panel drawn with it looks as it did`);
     assert.ok(!OFFERED_CONTROL_SETS.some((set) => set.id === id), `${id} is not offered`);
@@ -188,6 +191,53 @@ test('sets no longer offered: still drawn where they are used, offered nowhere',
   assert.doesNotMatch(core, /BUILT_IN_CONTROL_SETS/);
   const library = readFileSync(new URL('../src/CE_Application/stores/controlSetLibrary.js', import.meta.url), 'utf8');
   assert.match(library, /mergeControlSetLists\(\$document, \$library, offeredControlSetsWith\(/);
+});
+
+test('Iris and Satellite are marked as illustrated wherever a set or a form is chosen', () => {
+  // The owner: "it should be clear for those two that they do not work as the rest as a control set."
+  for (const id of ILLUSTRATED_CONTROL_SET_IDS) {
+    const set = getControlSet(id);
+    assert.ok(isIllustratedControlSet(set), `${id} draws its controls whole`);
+    assert.equal(controlSetOptionLabel(set), `${set.name} (illustrated)`);
+    assert.deepEqual(illustratedKinds(set).map((kind) => kind.tab), ['Knob', 'Button', 'Switch', 'Meter']);
+    assert.ok(illustratedValueNote(set), `${id} says how its value shows`);
+    assert.equal(controlSetStyle(set), 'illustrated');
+  }
+  for (const set of OFFERED_CONTROL_SETS.filter((entry) => !ILLUSTRATED_CONTROL_SET_IDS.includes(entry.id))) {
+    assert.ok(!isIllustratedControlSet(set), `${set.id} is made of parts`);
+    assert.equal(controlSetOptionLabel(set), set.name);
+  }
+  // A retired set says that, not "illustrated"; a copy of Iris is still one, with Iris's line.
+  assert.equal(controlSetOptionLabel(getControlSet('atlas')), 'Atlas (no longer offered)');
+  const copy = { ...structuredClone(getControlSet('iris')), id: 'my-iris', name: 'My Iris', basedOn: 'iris' };
+  assert.ok(isIllustratedControlSet(copy));
+  assert.equal(illustratedValueNote(copy), illustratedValueNote(getControlSet('iris')));
+  // A copy whose knobs took a template's design no longer names the knobs.
+  delete copy.families.Knob.component['Core.controlForm'];
+  assert.deepEqual(illustratedKinds(copy).map((kind) => kind.noun), ['keys', 'switches', 'meters']);
+
+  // Forms: only the twelve mechanical ones are illustrations; the 36 synth sets' forms are parts.
+  assert.ok(isIllustratedForm('new-iris') && isIllustratedForm('new-satellite') && isIllustratedForm('new-atlas'));
+  assert.ok(!isIllustratedForm('new-brassworks') && !isIllustratedForm('disc') && !isIllustratedForm(''));
+  for (const type of ['Knob', 'Button', 'ToggleButton', 'Meter']) {
+    const offered = offeredAnatomyOptions(type);
+    assert.equal(offered.length, anatomyOptions(type).length - 10, `${type}: the ten retired sets' forms are not offered`);
+    assert.deepEqual(offered.filter(([, name]) => name.endsWith(' (illustrated)')).map(([id]) => id), ['new-iris', 'new-satellite']);
+    assert.ok(offeredAnatomyOptions(type, 'new-atlas').some(([id]) => id === 'new-atlas'), 'the chosen form stays in sight');
+  }
+
+  // Where it shows: the pickers, the Library card and group, the set's page, and the part tabs.
+  assert.match(source('sections/CoreEditor.svelte'), /controlSetOptionLabel\(design\)/);
+  assert.match(source('sections/CoreEditor.svelte'), /offeredAnatomyOptions\(core\.controlType/);
+  assert.match(source('panels/PanelCardContent.svelte'), /controlSetOptionLabel\(set\)/);
+  const settings = source('settings/ControlSetsSettings.svelte');
+  assert.match(settings, /group\.note/);
+  assert.match(settings, /data-illustrated-callout/);
+  assert.match(settings, /Illustrated set/);
+  assert.match(source('settings/ControlSetCard.svelte'), /isIllustratedControlSet\(set\)/);
+  for (const tab of ['sections/KnobPartsEditor.svelte', 'sections/ButtonPartsEditor.svelte', 'sections/MeterPartsEditor.svelte']) {
+    assert.match(source(tab), /<IllustratedFormNote name=/, `${tab} says when its parts do not apply`);
+  }
 });
 
 test('every place a set is applied asks through the Apply window', () => {

@@ -393,7 +393,7 @@ pins that one control to a different design, form and size.
 **Settings → Control Sets** has three columns. On the left, the **Library**: each set shown by one of its
 controls, grouped (the panel's set, your own, the built-ins), searchable, with two rows of buttons above
 it: which control the cards show (Knobs, Sliders, Buttons, Switches, Meters, Pads) and which style
-(Modern, Metal, Vintage, Glow, Mechanical). In the middle, the chosen set itself: its colour roles in
+(Modern, Metal, Vintage, Glow, Illustrated). In the middle, the chosen set itself: its colour roles in
 groups (panel and borders, controls, buttons, fields and menus, text and accent, displays; the ten
 worked out from those are shown and not edited), its **Lettering** (typeface, weight and letter
 spacing for every family's text), its **Lamp** (where the light on finishes comes from), its surface
@@ -403,6 +403,16 @@ copied from, and **Edit on Panel** places one of the family's controls on the op
 Built-in sets are read-only, and editing one creates a copy. On the right,
 the live preview, **Apply to** the panel, the default for new panels, **Browse the 36 templates** and
 **Import a set…**.
+
+Two sets, **Iris** and **Satellite**, are **illustrated** and work differently from the others. Their
+knobs, keys, switches and meters are drawn as whole illustrations: their colours, size and depth can be
+changed in **Core → Control design**, but they cannot be edited part by part, the parts on the **Knob**,
+**Button**, **Switch** and **Meter** tabs do not apply to them, and **Convert to Parts** is not
+available. The value moves the mechanism (Iris's knob opens an aperture, Satellite's tilts a dish)
+rather than a pointer over a scale. Their pads and Number steppers are ordinary parts. The Library
+marks their cards **Illustration**, the set's page says what differs, and the set pickers and the
+**Form** list name them "(illustrated)". To edit such a control part by part, choose one of the other
+forms in **Core → Control design**.
 
 Applying a set opens the **Apply Control Set** window: the background colour, the surface material,
 each kind of control on the panel, or the selected controls only, and whether controls assigned to

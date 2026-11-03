@@ -22,6 +22,8 @@
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { getSection } from '../stores/controls.js';
   import { numberOr } from '../utils/primitives.js';
+  import { anatomyForm, anatomyOptions, isIllustratedForm } from '../models/controlAnatomy.js';
+  import IllustratedFormNote from './IllustratedFormNote.svelte';
 
   let { control = null, set = () => {}, setPatch = () => {} } = $props();
 
@@ -31,6 +33,9 @@
   const word = (text) => text.charAt(0).toUpperCase() + text.slice(1);
 
   let core = $derived(getSection(control, 'Core'));
+  // Iris's and Satellite's knobs are drawn whole: these parts do not apply to them (IllustratedFormNote).
+  let illustratedForm = $derived(isIllustratedForm(anatomyForm(core?.controlType, core?.controlForm)) ? core.controlForm : '');
+  let illustratedName = $derived(anatomyOptions(core?.controlType).find(([id]) => id === illustratedForm)?.[1] ?? illustratedForm);
   let parts = $derived(getSection(control, 'Parts')?._children ?? {});
   let housing = $derived(parts.bodyHousing ?? null);
   let skirt = $derived(parts.bodySkirt ?? null);
@@ -131,6 +136,8 @@
   </PropertySection>
 {/snippet}
 
+<div class="knob-parts" class:dimmed={!!illustratedForm}>
+{#if illustratedForm}<IllustratedFormNote name={illustratedName} />{/if}
 {@render plate('bodyHousing', 'Housing', Disc, housing)}
 {@render plate('bodySkirt', 'Skirt', Disc, skirt, { turns: true })}
 
@@ -184,8 +191,11 @@
     <PropertyColor value={shown(fillOf(pointer), 'FFFFFFFF')} onchange={(v) => set('Parts.pointerCurrent.Background.Fill.colour', v)} onswatchclick={() => pickColour('Parts.pointerCurrent.Background.Fill.colour', fillOf(pointer))} />
   </PropertyCell>
 </PropertySection>
+</div>
 
 <style>
+  .knob-parts { min-width: 0; }
+  .knob-parts.dimmed > :global(:not([data-illustrated-note])) { opacity: 0.4; }
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
 </style>
