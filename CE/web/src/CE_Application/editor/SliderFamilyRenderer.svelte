@@ -5,6 +5,8 @@
   import { knobOutlinePath, knobOutlineReach } from '../utils/knobOutlines.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
+  import { RENDERED_FRAME, renderedLookSpec, renderedLooks, renderedTurn, requestRenderedLook } from '../utils/renderedLook.js';
+  import { activeControlSet } from '../stores/controlSets.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
   import { numberOr, clamp } from '../utils/primitives.js';
@@ -643,6 +645,24 @@
   let majorTickKind = $derived(tickKindOf(tickMajorPart));
   let minorTickKind = $derived(tickKindOf(tickMinorPart));
 
+  // A plate whose look is 'rendered' (utils/renderedLook.js, piece E): its image, made from its own
+  // properties and lit by the set's lamp, or null while it is being made (the plain fill draws then).
+  function renderedPlate(part, r) {
+    if (String(part?.look ?? '') !== 'rendered' || r <= 0) return null;
+    const spec = renderedLookSpec(part, {
+      colour: part?._children?.Background?._children?.Fill?.colour,
+      topColour: part?.renderTopColour || null,
+      lamp: $activeControlSet?.lamp,
+    });
+    const side = 2 * r * RENDERED_FRAME;
+    const scale = typeof window !== 'undefined' ? Math.min(3, (window.devicePixelRatio || 1) * 1.5) : 1.5;
+    const turn = part?.turns === true ? sliderNormalizedToAngle(behavior, normalizedValues.current) + 90 : 0;
+    const url = requestRenderedLook($renderedLooks, spec, side * scale, renderedTurn(spec, turn));
+    if (!url) return null;
+    const { shift } = plateFrame(part);
+    return { url, x: circularCenter.x - side / 2, y: circularCenter.y + shift - side / 2, side };
+  }
+
   // Grooves on a plate (`grooves`, a count): fine lines in from its edge, `grooveLength` % of its
   // radius, `grooveWidth` px, `grooveColour`; Precision's knurling round its face. They turn with
   // the plate when it turns.
@@ -941,6 +961,11 @@
     <!-- A knob's plate (housing, skirt, cap, insert): its shadow, its fill in its outline, its
          border. `mask` names its fill's mask; `role` the part the pointer styles follow. -->
     {#snippet bodyPlate(part, r, mask, borderFallback, role = mask)}
+      {@const rendered = renderedPlate(part, r)}
+      {#if rendered}
+        <image data-rendered-look={role} href={rendered.url} x={rendered.x} y={rendered.y} width={rendered.side} height={rendered.side}
+          opacity={numberOr(part?.opacity, 1)} preserveAspectRatio="none" />
+      {:else}
       {@const shape = outlineShapeFor(part, r)}
       {@const shadow = plateShadow(part, r)}
       {@const op = numberOr(part?.opacity, 1)}
@@ -977,6 +1002,7 @@
         <line data-plate-groove={role} x1={groove.x1} y1={groove.y1} x2={groove.x2} y2={groove.y2}
           stroke={argbToCss(part?.grooveColour, '#253136')} stroke-width={Math.max(0.25, numberOr(part?.grooveWidth, 0.85))} opacity={op} />
       {/each}
+      {/if}
     {/snippet}
 
     {#snippet tickMark(kind, line, colour, strokeWidth, length, opacity, label)}

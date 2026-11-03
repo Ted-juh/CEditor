@@ -361,6 +361,19 @@ and every property stays editable.
 - The "Control Studio" of the mock-up becomes this part's properties, in the properties panel and
   the designer, not a separate screen.
 
+**Built, first slice** (`utils/renderedLook.js`): a knob plate (housing, skirt, cap, insert) whose
+`look` is `rendered` is drawn from `renderProfile` (smooth, knurled, fluted), `renderCount`,
+`renderDepth`, `renderTaper`, `renderHeight` (percentages of its radius), `renderTop` (flat, insert,
+dome), `renderMaterial` and `renderTopMaterial` (spun or brushed metal, gloss or satin plastic,
+rubber) and `renderTopColour`, its fill colour the body's, lit by the set's lamp. The prototype's
+shader, its painted indicator switched off: the pointer stays a part. Images are made one a frame,
+cached by spec, size and turn; a grooved plate that turns needs eight, through one groove's repeat,
+so the light stays put. Until one is ready, or without WebGL2, the plate draws its plain fill.
+Export bakes them (`bakeRenderedLooks` in `preparePanelForExport`), each distinct image once, into
+the document's `renderedLookImages`; the player loads them and draws them, no WebGL needed. Three
+knobs: three images, about 120 KB each. The Knob tab's fields follow, after a mock-up. A knob
+with a rendered plate is refused as layers by name. Fader caps and button faces come after.
+
 ### F. Filmstrips as their own category (small)
 
 Image controls (imported strips, KnobMan or Blender renders, vendor packs) in a category of their

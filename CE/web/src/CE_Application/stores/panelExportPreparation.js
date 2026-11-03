@@ -5,6 +5,8 @@ import { ensureTs, transpileTs } from '../scripting/tsService.js';
 import { packagePanelForSharing, openSharedPanel } from './panelSharing.js';
 import { exportFormDocument } from './panelModel.js';
 import { controlsInTree } from '../scripting/scriptPanelExport.js';
+import { bakeRenderedLooks } from '../utils/renderedLook.js';
+import { getControlSet } from '../models/controlSets.js';
 
 /**
  * Prepare the same document for either native exporter: assets carried, TypeScript compiled,
@@ -40,6 +42,14 @@ export async function preparePanelForExport(serialized) {
   panel.scripting = { ...(panel.scripting ?? {}), modules: modules.enabled, apiVersion: CE_API_VERSION };
   if (extensions.length) panel.scripting.extensions = extensions;
   else delete panel.scripting.extensions;
+  // Rendered looks (utils/renderedLook.js), baked here where WebGL is, so the plug-in carries their
+  // images and needs none: the owner's choice, live in the editor and baked at export.
+  const looks = await bakeRenderedLooks(controlsInTree(panel.controls), {
+    lamp: getControlSet(panel.controlSet?.id, { document: panel.controlSets })?.lamp ?? null,
+  });
+  if (Object.keys(looks.images).length) panel.renderedLookImages = looks.images;
+  else delete panel.renderedLookImages;
+  if (looks.failed) console.warn(`[export] ${looks.failed} rendered look image(s) could not be made; those parts draw their plain fill in the plug-in.`);
   panel.exportParameters = deriveExportParameters(panel);
   // Last, because everything above reads whole controls (exportFormDocument says why).
   return JSON.stringify(exportFormDocument(panel));

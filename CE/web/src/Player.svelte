@@ -6,6 +6,7 @@
   import { get } from 'svelte/store';
   import PanelPreviewSurface from './CE_Application/editor/PanelPreviewSurface.svelte';
   import { deserializePanel } from './CE_Application/stores/panelModel.js';
+  import { loadBakedRenderedLooks } from './CE_Application/utils/renderedLook.js';
   import { registerDocumentFonts } from './CE_Application/utils/documentFonts.js';
   import { setDocumentIcons } from './CE_Application/utils/documentIcons.js';
   import { updatePanelPreviewSession, updatePanelPreviewSessions, panelPreviewSessions, setPreviewModeEnabled, setInteractionPreviewPanelProvider } from './CE_Application/stores/interactionPreview.js';
@@ -484,6 +485,11 @@
   // Accepts a panel object, a JSON string, or a saved .cepanel document.
   function loadPanelDocument(input, filePath = null) {
     if (input == null) return null;
+    // The rendered looks the export baked (utils/renderedLook.js): drawn from these, no WebGL needed.
+    try {
+      const raw = typeof input === 'string' ? JSON.parse(input) : input;
+      loadBakedRenderedLooks(raw?.renderedLookImages);
+    } catch { /* not JSON: deserializePanel reports it */ }
     let next = null;
     if (typeof input === 'string') {
       next = deserializePanel(input, filePath, null);

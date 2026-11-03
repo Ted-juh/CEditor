@@ -110,6 +110,7 @@ export function valueLayersRefusal(resolved) {
   }
   for (const [name, label] of [['bodyHousing', 'housing'], ['bodySkirt', 'skirt'], ['bodyCap', 'cap'], ['bodyInsert', 'insert']]) {
     if (parts[name]?.visible === true && Number(parts[name]?.grooves) > 0) return `grooves round its ${label}, which a layer does not draw yet`;
+    if (parts[name]?.visible === true && String(parts[name]?.look ?? '') === 'rendered') return `a rendered ${label}, which a layer does not draw yet`;
   }
   if (Number(parts.pointerCurrent?.markTo) > Number(parts.pointerCurrent?.markFrom ?? 0) && Number(parts.pointerCurrent?.markWidth) > 0) {
     return 'a second bar on its pointer, which a layer does not draw yet';

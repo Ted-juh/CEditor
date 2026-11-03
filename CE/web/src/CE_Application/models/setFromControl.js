@@ -43,6 +43,8 @@ const PROPERTY_LABELS = {
   'Behavior.secondScaleRadius': 'Second Scale Radius', 'Behavior.secondScaleCount': 'Second Scale Divisions',
   grooves: 'Grooves', grooveLength: 'Groove Length', grooveWidth: 'Groove Width',
   markFrom: 'Second Bar From', markTo: 'Second Bar To', markWidth: 'Second Bar Width', markColour: 'Second Bar Colour',
+  look: 'Look', renderProfile: 'Profile', renderCount: 'Ridges', renderDepth: 'Ridge Depth', renderTaper: 'Taper',
+  renderHeight: 'Height', renderTop: 'Top', renderMaterial: 'Material', renderTopMaterial: 'Top Material', renderTopColour: 'Top Colour',
   'Behavior.scaleNumberTo': 'Numbers To',
 };
 

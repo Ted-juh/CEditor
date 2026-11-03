@@ -222,6 +222,8 @@ const FORM_PART_KEYS = [
   // (models/directionKnobParts.js).
   'shadowOffset', 'shadowBlur', 'shadowColour', 'taper', 'aspect', 'shiftY',
   'grooves', 'grooveLength', 'grooveWidth', 'grooveColour', 'markFrom', 'markTo', 'markWidth', 'markColour',
+  // A plate's rendered look (utils/renderedLook.js): off again under a form that does not render.
+  'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop', 'renderMaterial', 'renderTopMaterial', 'renderTopColour',
   // A meter's (models/meterDeviceParts.js).
   'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
   'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',
