@@ -699,6 +699,44 @@ function snapLinkedValue(control, target, value) {
   return channel ? snapCustomChannelValue(channel, value) : value;
 }
 
+/**
+ * `values` with each value that takes it from somewhere else (`channel.valueSource`) set from there,
+ * as far along its own range as its source is along its: `channel:<name>`, another value of the
+ * component (a meter made into layers with the knob it shows); or a panel control's id, read through
+ * `readControl` (id -> { value, min, max }), as the panel's meter reads its Value Source. Read each
+ * time the component is drawn, so the value follows its source however that moves. A source that
+ * cannot be read leaves the value as it is.
+ */
+export function sourcedCustomValues(control, values = {}, readControl = null) {
+  const channels = getCustomValueChannels(control) ?? {};
+  let next = null;
+  for (const [name, channel] of Object.entries(channels)) {
+    const source = String(channel?.valueSource ?? '').trim();
+    if (!source) continue;
+    let fraction = null;
+    if (source.startsWith('channel:')) {
+      const from = channels[source.slice('channel:'.length)];
+      if (from) {
+        const lo = numberOr(from.min, 0);
+        const span = numberOr(from.max, 1) - lo;
+        const raw = numberOr(values?.[source.slice('channel:'.length)], numberOr(customChannelDefaultValue(from), lo));
+        fraction = span ? clamp((raw - lo) / span, 0, 1) : 0;
+      }
+    } else if (typeof readControl === 'function') {
+      const range = readControl(source);
+      const value = Number(range?.value);
+      if (range && Number.isFinite(value)) {
+        const span = numberOr(range.max, 1) - numberOr(range.min, 0);
+        fraction = span ? clamp((value - numberOr(range.min, 0)) / span, 0, 1) : 0;
+      }
+    }
+    if (fraction == null) continue;
+    next ??= { ...(values ?? {}) };
+    next[name] = numberOr(channel.min, 0) + fraction * (numberOr(channel.max, 1) - numberOr(channel.min, 0));
+  }
+  return next ?? values;
+}
+
 export function applyCustomLinks(control, values = {}) {
   const linksRoot = control?._children?.Links;
   if (linksRoot?.enabled === false) return { values: { ...values }, targets: new Set() };

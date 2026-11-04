@@ -309,6 +309,7 @@
     behaviorTakesInput,
     channelForBehaviorInput,
     resolveCustomInteractionPatch,
+    sourcedCustomValues,
     seedCustomValues,
     snapCustomChannelValue,
     stepCustomChannelValue,
@@ -687,7 +688,11 @@
     // The keyframe pose rides in with the session: this surface resolves the control itself and
     // hands CanvasControl the result, so the overlay has to be applied here, not there.
     const keyframeOverlay = keyframeOverlayView.values.get(getControlId(rawControl)) ?? null;
-    const keyed = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
+    const posed = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
+    // A component's value that takes it from a panel control (`valueSource`, a meter made into
+    // layers that showed another control's value), read as the meter read its Value Source, before
+    // its peak is held from it.
+    const keyed = isCustomComponent(rawControl) ? withSourcedValues(rawControl, posed) : posed;
     // A component's held peaks (a meter made into layers: its clip lamp, a peak needle), kept as
     // a meter's are, below; the bindings read them as `channel.<name>.peak`.
     const customPeaks = componentPeaks(rawControl, keyed);
@@ -1737,6 +1742,12 @@
       meterAnimationFrame = requestAnimationFrame(loop);
     };
     meterAnimationFrame = requestAnimationFrame(loop);
+  }
+
+  function withSourcedValues(control, session) {
+    const values = session?.customValues ?? {};
+    const sourced = sourcedCustomValues(control, values, lcdRangeForSource);
+    return sourced === values ? session : { ...(session ?? {}), customValues: sourced };
   }
 
   // A component's channels that hold their peak (`peakHold`: a meter made into layers).

@@ -59,7 +59,7 @@ import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js'
 import { isDisplayOnly } from './displayMode.js';
 import { targetBuckets } from './interactionRuntime.js';
 import { surfaceShadows } from './surfaceEffects.js';
-import { getSliderDefaultValues, getSliderValueMode } from './sliderBehavior.js';
+import { getSliderDefaultValues, getSliderMax, getSliderMin, getSliderValueMode } from './sliderBehavior.js';
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
 
@@ -1117,7 +1117,7 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     const local = { ...rect, x: rect.x - bounds.x, y: rect.y - bounds.y };
     const turn = VALUE_TYPES.includes(String(placed._children.Core.controlType)) ? null : turnOf(placed);
     const control = turn ? upright(placed) : placed;
-    const resolved = turn ? upright(placedResolved) : placedResolved;
+    const resolved = meterFromItsSource(turn ? upright(placedResolved) : placedResolved, panel);
     let asLayers = false;
     if (valueControlsAs === 'layers' && VALUE_TYPES.includes(String(control._children.Core.controlType))) {
       const why = valueLayersRefusal(resolved);
@@ -1219,6 +1219,40 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
 }
 
 /**
+ * A meter that shows another control's value (Meter.valueSourceId, a knob or slider): over that
+ * control's range, as the panel's meter is while the source drives it (applyMeterValueSource), so
+ * its readout prints the source's value. Where nothing drives it (the editor's canvas) the panel's
+ * meter stands at its own test value, so it starts at the same place along the new range. Any other
+ * meter as it is.
+ */
+function meterFromItsSource(resolved, panel) {
+  const meter = resolved?._children?.Meter;
+  const sourceId = String(meter?.valueSourceId ?? '').trim();
+  if (!sourceId) return resolved;
+  const source = findPanelControl(panel?.controls ?? [], sourceId);
+  const behavior = source?._children?.Behavior;
+  if (!behavior || String(behavior.family ?? '') !== 'range') return resolved;
+  const min = getSliderMin(behavior);
+  const max = getSliderMax(behavior);
+  const ownMin = Number.isFinite(Number(meter.valueMin)) ? Number(meter.valueMin) : 0;
+  const ownMax = Number.isFinite(Number(meter.valueMax)) ? Number(meter.valueMax) : 1;
+  const own = Number.isFinite(Number(meter.value)) ? Number(meter.value) : ownMin;
+  const fraction = ownMax > ownMin ? Math.min(1, Math.max(0, (own - ownMin) / (ownMax - ownMin))) : 0;
+  const next = deepClone(resolved);
+  Object.assign(next._children.Meter, { valueMin: min, valueMax: max, value: min + fraction * (max - min) });
+  return next;
+}
+
+function findPanelControl(controls, id) {
+  for (const control of controls ?? []) {
+    if (String(control?._children?.Core?.id ?? '') === id) return control;
+    const inside = findPanelControl(Object.values(control?._children?.Children?._children ?? {}), id);
+    if (inside) return inside;
+  }
+  return null;
+}
+
+/**
  * The channel, behaviour, hit zone, binding and two states one knob needs inside the component.
  *
  *   channel    the knob's value model: range, step, default, unit.
@@ -1233,13 +1267,17 @@ function knobSections(values, bounds, allParts = {}) {
   const out = { channels: {}, behaviors: {}, hitZones: {}, bindings: {}, states: {}, animations: {}, published: {}, carried: [] };
   const width = Math.max(1, bounds.width);
   const height = Math.max(1, bounds.height);
+  // The knob or slider each control in the selection became: a meter that showed one of them shows
+  // its value inside the component (`channel:<name>`).
+  const converted = new Map(values.filter((entry) => !entry.buttoned && !entry.metered)
+    .map((entry) => [String(entry.control._children.Core.id ?? ''), entry.layered ? entry.layered.channel : entry.part.name]));
   for (const entry of values) {
     if (entry.buttoned) {
       buttonSections(out, entry, width, height, allParts);
       continue;
     }
     if (entry.metered) {
-      meterSections(out, entry);
+      meterSections(out, entry, converted);
       continue;
     }
     const { control, resolved, part, local, paintIndex, layered } = entry;
@@ -1565,7 +1603,7 @@ function valueGlideAnimation(resolved, channelName, bindings) {
  * bindings; no grab area, no behaviour, as a meter takes no input of its own. Its value arrives as a
  * knob's does: its device bindings, moved to the channel, and the host.
  */
-function meterSections(out, { control, resolved, metered }) {
+function meterSections(out, { control, resolved, metered }, converted = new Map()) {
   const cfg = resolved?._children?.Meter ?? control._children.Meter ?? {};
   const channelName = metered.channel;
   const min = Number.isFinite(Number(cfg.valueMin)) ? Number(cfg.valueMin) : 0;
@@ -1577,6 +1615,10 @@ function meterSections(out, { control, resolved, metered }) {
     format: { precision: Math.max(0, Math.min(6, Math.round(Number(cfg.valuePrecision) || 0))), prefix: String(cfg.valuePrefix ?? ''), suffix: String(cfg.valueSuffix ?? ''), unit: '' },
     snap: { enabled: false },
   });
+  // A meter that showed another control's value shows it still: the knob it came in with (the value
+  // that knob became), or the panel control, read where the component is drawn (sourcedCustomValues).
+  const sourceId = String(cfg.valueSourceId ?? control._children.Meter?.valueSourceId ?? '').trim();
+  if (sourceId) out.channels[channelName].valueSource = converted.has(sourceId) ? `channel:${converted.get(sourceId)}` : sourceId;
   // A meter that holds its peak (Peak Hold, a clip lamp, a part showing the peak) keeps it on its
   // value (interactionRuntime's `channel.<name>.peak`), held and falling as the meter's is. Where
   // nothing runs, a device meter shows its value as the peak and a plain one no marker.

@@ -2015,7 +2015,6 @@ export function figureLengths(min, max, precision) {
 /** Why a meter drawn with device parts cannot become layers, or ''. */
 export function meterDeviceLayersRefusal(resolved) {
   const meter = resolved?._children?.Meter ?? {};
-  if (String(meter.valueSourceId ?? '').trim()) return 'its value taken from another control';
   const parts = resolved?._children?.Parts?._children ?? {};
   for (const name of METER_DEVICE_PARTS) {
     const part = parts[name];
@@ -2613,7 +2612,6 @@ function edgeBackground(background, bw) {
 /** Why a plain meter (editor/MeterRenderer.svelte: a bar, segments or an arc) cannot become layers, or ''. */
 export function plainMeterLayersRefusal(resolved) {
   const cfg = resolved?._children?.Meter ?? {};
-  if (String(cfg.valueSourceId ?? '').trim()) return 'its value taken from another control';
   // A bar's fill shows up to the reading under a cover in the track's colour, which only hides the
   // fill if nothing shows through it. Segments and an arc draw their fill over the track instead.
   const track = String(cfg.trackColour ?? 'FF141414');

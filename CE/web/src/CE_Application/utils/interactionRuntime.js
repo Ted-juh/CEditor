@@ -34,7 +34,7 @@ import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
 import { attachBooleanInputs } from './booleanGroups.js';
 import { applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
-import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
+import { constrainCustomValues, customConditionMatches, sourcedCustomValues } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
 import { formatChannelValue } from './valueDisplayScale.js';
 import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
@@ -740,7 +740,9 @@ function normalizeCustomChannelValue(channel = null, rawValue = 0) {
 function resolveCustomComponentInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const channels = getValueChannels(control);
-  const constrainedCustomValues = constrainCustomValues(control, previewSession?.customValues ?? {});
+  // A value that takes it from another of the component's (`valueSource: 'channel:<name>'`) follows
+  // it here, wherever the component is drawn; the panel fills a panel control's in before this.
+  const constrainedCustomValues = constrainCustomValues(control, sourcedCustomValues(control, previewSession?.customValues ?? {}));
   const mainChannel = channels.mainValue
     ?? Object.values(channels).find((channel) => ! ['enum', 'array'].includes(String(channel?.type ?? '').trim().toLowerCase()))
     ?? Object.values(channels)[0]

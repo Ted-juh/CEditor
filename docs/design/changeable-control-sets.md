@@ -422,6 +422,15 @@ components):
      converted knob drew larger than the panel's, 4 to 19 % of its pixels apart). Run over every
      offered set, a band from 15 to 80 with its riding labels: knobs, sliders across and sliders
      upright, 256 of 256 rows each (strict).
+     The designer shows and edits what these use (approved from its mock-up): on the React tab, a
+     binding's **Combine** (Set the value, or Add to the bindings before it) and, in its Range Map,
+     **Scale** (Linear or Decibels, with **Floor dB** and **Ceil dB**); on the Interact card, a
+     behaviour's **Measured in** (its grab area or the whole component) and, on a grab area over
+     several values, **Takes** the nearest of them.
+     The behaviour of a knob or slider made into layers now measures a point against its own grab
+     area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
+     another turned about a point between them: pressing straight above the second of two knobs set
+     75.7 where the panel sets 50.
 
    - *Decibel scales* (R5): a meter on a decibel scale (`Meter.scale: 'db'`, `dbFloor` to `dbCeil`)
      comes in as layers. Every binding that places a part by the reading or the held peak reads it
@@ -458,15 +467,23 @@ components):
      through. Run over every offered set's own meter with three zones: as the set draws it, 256 of
      256; the indicator by level (stepped), 256 of 256; the indicator and the scale by position, 248
      of 256, the eight Neon's and Obsidian's scale, which is counter windows, refused by name.
-     The designer shows and edits what these use (approved from its mock-up): on the React tab, a
-     binding's **Combine** (Set the value, or Add to the bindings before it) and, in its Range Map,
-     **Scale** (Linear or Decibels, with **Floor dB** and **Ceil dB**); on the Interact card, a
-     behaviour's **Measured in** (its grab area or the whole component) and, on a grab area over
-     several values, **Takes** the nearest of them.
-     The behaviour of a knob or slider made into layers now measures a point against its own grab
-     area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
-     another turned about a point between them: pressing straight above the second of two knobs set
-     75.7 where the panel sets 50.
+
+   - *A value from another control* (R5): a meter that shows another control's value (Meter
+     `valueSourceId`, a knob or slider) comes in as layers. Its value names its source
+     (`channel.valueSource`): `channel:<name>` when the knob came into the same component (the value
+     that knob became), or the panel control's id when it stayed on the panel. Each time the
+     component is drawn the value is set as far along its range as its source is along its own
+     (`sourcedCustomValues`): the runtime does it for a source inside the component, wherever it is
+     drawn, and the panel's preview surface for a panel control (read as the meter reads its Value
+     Source, lcdRangeForSource), before its peak is held. So the value follows its source however
+     that moves: a drag, a host's automation, a message from the synth. The value is over the
+     source's range, as the panel's meter is while the source drives it, so its readout prints the
+     source's value; it starts at the meter's own test value, at the same place along that range, as
+     the panel's meter stands in the editor (where its readout prints the test value itself, the
+     layers' that place in the source's range). Checked: the plan and the runtime (unit tests); the
+     editor's canvas against the panel's on Graphite and Tolex, the place the same and only the
+     readout's words apart. A meter's value in the editor's Preview could not be driven from the
+     check (a value set there did not reach the canvas, for the panel's meter as for the layers).
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
