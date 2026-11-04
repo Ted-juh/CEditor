@@ -24,8 +24,8 @@ import { writable } from 'svelte/store';
 import { createRenderedLookRenderer, renderedBakeKey, renderedLookJobs, renderedLookKey } from './renderedLookCore.js';
 
 export {
-  RENDERED_BLOCK_TOPS, RENDERED_DEVICE_FRAME, RENDERED_FRAME, RENDERED_MARGIN, RENDERED_MATERIALS, RENDERED_PROFILES, RENDERED_TOPS,
-  lampDirection, renderedBakeKey, renderedBlockSpec, renderedCapSpec, renderedDevicePartSpec, renderedFrame, renderedLookJobs,
+  RENDERED_BLOCK_TOPS, RENDERED_DEVICE_FRAME, RENDERED_FRAME, RENDERED_MARGIN, RENDERED_MATERIALS, RENDERED_METER_FRAME, RENDERED_PROFILES, RENDERED_TOPS,
+  lampDirection, renderedBakeKey, renderedBlockSpec, renderedCapSpec, renderedDevicePartSpec, renderedFrame, renderedLookJobs, renderedMeterPartSpec,
   renderedLookKey, renderedLookSpec, renderedTurn, renderedTurns,
 } from './renderedLookCore.js';
 

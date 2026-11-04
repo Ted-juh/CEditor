@@ -12,6 +12,8 @@
   import { meterLitOffset, meterPartDrawing } from '../utils/meterParts.js';
   import { materialActive } from '../utils/materialFilter.js';
   import { numberOr } from '../utils/primitives.js';
+  import { renderedFrame, renderedLooks, renderedMeterPartSpec, requestRenderedLook } from '../utils/renderedLook.js';
+  import { activeControlSet } from '../stores/controlSets.js';
 
   let { parts = {}, p = 0, peak = null, figures = '0', meter = {}, uid = 'meter' } = $props();
 
@@ -90,8 +92,31 @@
         background,
         fontFamily: String(part.fontFamily ?? '').trim() || 'inherit',
         shadow: shadowOf(part),
+        rendered: renderedPart(name, part, drawing),
       };
     }));
+
+  // A housing or clip lamp whose look is 'rendered' (utils/renderedLook.js): a low block its box's
+  // size, or a turned body for a round lamp, as an image centred on its box, lit by the set's lamp. A
+  // lamp lit at its level is another image in its lit colour. Null while it is made, and the part
+  // draws as it always did; so does one the meter's zones colour, whose colour moves with the reading.
+  const RENDERED_PARTS = new Set(['housing', 'lamp']);
+  function renderedPart(name, part, drawing) {
+    if (!RENDERED_PARTS.has(name) || String(part?.look ?? '') !== 'rendered') return null;
+    if (String(part?.zoneColours ?? 'off') !== 'off' || drawing.paths.some((path) => path.colour)) return null;
+    const box = drawing.box;
+    if (!(box?.w > 0) || !(box?.h > 0)) return null;
+    const lit = drawing.paths.some((path) => path.role === 'lit') && String(part?.activeColour ?? '').trim();
+    const colour = lit ? part.activeColour : part?._children?.Background?._children?.Fill?.colour;
+    const spec = renderedMeterPartSpec(part, { colour, topColour: part?.renderTopColour || null, lamp: $activeControlSet?.lamp, name });
+    if (!spec) return null;
+    const big = Math.max(box.w, box.h);
+    const frame = renderedFrame(spec);
+    const w = frame.w * big;
+    const h = frame.h * big;
+    const url = requestRenderedLook($renderedLooks, spec, Math.max(w, h) * 3, 0);
+    return url ? { url, x: box.x + box.w / 2 - w / 2, y: box.y + box.h / 2 - h / 2, w, h } : null;
+  }
 
   // A drop shadow under a part (the sculpted synth set's cases): its outline again, `shadowOffset` %
   // of the frame's height lower, softened by `shadowBlur` %, in `shadowColour`. None unless asked.
@@ -104,7 +129,9 @@
 
 {#each drawn as item (item.name)}
   <g data-part={item.name} transform={item.drawing.transform || undefined}>
-    {#if item.drawing.zoneFill && item.base}
+    {#if item.rendered}
+      <image data-rendered-look={item.name} href={item.rendered.url} x={item.rendered.x} y={item.rendered.y} width={item.rendered.w} height={item.rendered.h} opacity={item.opacity} preserveAspectRatio="none" />
+    {:else if item.drawing.zoneFill && item.base}
       <!-- A fill coloured by position: the zones along its own direction, across its whole box. -->
       <defs>
         <linearGradient id={`${uid}-${item.name}-z`} gradientUnits="userSpaceOnUse" x1={item.drawing.zoneFill.x1} y1={item.drawing.zoneFill.y1} x2={item.drawing.zoneFill.x2} y2={item.drawing.zoneFill.y2}>
@@ -146,6 +173,7 @@
         <path d={item.base} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.opacity} />
       {/if}
     {/if}
+    {#if !item.rendered}
     {#each item.zoned as path, i (i)}
       <path d={path.d} fill={path.colour} fill-rule="evenodd" opacity={item.opacity} />
     {/each}
@@ -159,6 +187,7 @@
           {#if item.stroke}<path d={path.d} fill="none" stroke={item.stroke.colour} stroke-width={item.stroke.width} stroke-linejoin="round" opacity={item.activeOpacity} />{/if}
         {/each}
       </g>
+    {/if}
     {/if}
     {#each item.drawing.texts as text, i (i)}
       <text x={text.x} y={text.y} text-anchor="middle" fill={item.textColour} opacity={item.opacity} font-size={text.size} font-family={item.fontFamily}>{text.text}</text>

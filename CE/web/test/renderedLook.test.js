@@ -132,6 +132,18 @@ test('a button\'s part is a block its box\'s size, or a turned body when it is a
   assert.equal(renderedDevicePartSpec(part('rect', 0, 50)), null);
 });
 
+test('a meter\'s housing is a low block its box\'s size, and a round clip lamp a turned body', async () => {
+  const { RENDERED_METER_FRAME, renderedMeterPartSpec } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const { METER_FRAME, createMeterDeviceParts } = await import('../src/CE_Application/models/meterDeviceParts.js');
+  assert.deepEqual(RENDERED_METER_FRAME, { width: METER_FRAME.width, height: METER_FRAME.height });
+  const parts = createMeterDeviceParts()._children;
+  const housing = renderedMeterPartSpec(parts.housing, { name: 'housing' });
+  assert.deepEqual([housing.shape, housing.width, housing.length, housing.axis], ['block', 1, 0.625, 'x'], '80 % of 160 by 80 % of 100');
+  assert.ok(Math.abs(housing.height - 0.075) < 1e-9, 'a bezel: 12 % of its narrower side, where a key is 30');
+  assert.equal(renderedMeterPartSpec({ ...parts.housing, renderHeight: 30 }, { name: 'housing' }).height, 0.188, 'its own height wins (rounded, as the spec is)');
+  assert.equal(renderedMeterPartSpec(parts.lamp, { name: 'lamp' }).shape, 'smooth', 'the default lamp is 10 by 10');
+});
+
 test('the images a control needs: turns of a grooved plate, each cap, a key lit and unlit', async () => {
   const { renderedLookJobs } = await import('../src/CE_Application/utils/renderedLookCore.js');
   const control = (behavior, parts) => ({ _children: { Behavior: behavior, Parts: { _children: parts } } });
@@ -152,6 +164,27 @@ test('the images a control needs: turns of a grooved plate, each cap, a key lit 
   assert.deepEqual(renderedLookJobs(button).map(({ spec }) => spec.body), ['#202020', '#FF3300']);
 });
 
+test('a meter needs its housing, and its lamp unlit and lit; a part the zones colour needs none', async () => {
+  const { renderedLookJobs } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const { createMeterDeviceParts } = await import('../src/CE_Application/models/meterDeviceParts.js');
+  const parts = createMeterDeviceParts()._children;
+  const rendered = (part, fill, props = {}) => ({
+    ...part, visible: true, look: 'rendered', ...props,
+    _children: { ...part._children, Background: { _children: { Fill: { colour: fill } } } },
+  });
+  const meter = (lamp = {}) => ({ _children: { Meter: {}, Parts: { _children: {
+    housing: rendered(parts.housing, 'FF303030'),
+    lamp: rendered(parts.lamp, 'FF401010', { activeColour: 'FFFF2200', ...lamp }),
+  } } } });
+  assert.deepEqual(renderedLookJobs(meter()).map(({ spec }) => [spec.shape, spec.body]), [['block', '#303030'], ['smooth', '#401010'], ['smooth', '#FF2200']]);
+  assert.equal(renderedLookJobs(meter({ zoneColours: 'level' })).length, 1, 'only the housing');
+  // A button's housing keeps the button's 160 by 80 frame: the same box is 80 by 40 there.
+  const button = { _children: { Parts: { _children: { housing: rendered({ _children: { Layout: { width: 50, height: 50 } } }, 'FF303030') } } } };
+  assert.equal(renderedLookJobs(button)[0].spec.length, 0.5);
+  const inMeter = { _children: { Meter: {}, Parts: { _children: { housing: rendered({ _children: { Layout: { width: 50, height: 50 } } }, 'FF303030') } } } };
+  assert.equal(renderedLookJobs(inMeter)[0].spec.length, 0.625);
+});
+
 test('the export bakes each control as it is drawn, and the slider and the button draw rendered parts', async () => {
   // A colour role is resolved before the spec is made: the image the plug-in's part asks for.
   const role = { _children: { Behavior: { geometry: 'circular' }, Parts: { _children: { bodyCap: { look: 'rendered', _children: { Background: { _children: { Fill: { colour: '{control.cap}' } } } } } } } } };
@@ -166,6 +199,12 @@ test('the export bakes each control as it is drawn, and the slider and the butto
   const button = read('CE_Application/editor/ButtonDeviceParts.svelte');
   assert.match(button, /rendered: renderedPart\(name, part, box, lit \? part\.activeColour : fill\.colour\),/);
   assert.match(button, /\{#if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
+  const meter = read('CE_Application/editor/MeterDeviceParts.svelte');
+  assert.match(meter, /rendered: renderedPart\(name, part, drawing\),/);
+  assert.match(meter, /const spec = renderedMeterPartSpec\(part, \{ colour, topColour: part\?\.renderTopColour \|\| null, lamp: \$activeControlSet\?\.lamp, name \}\);/);
+  assert.match(meter, /\{#if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
+  // What the image draws, its cells and zone are not drawn again over it.
+  assert.match(meter, /\{#if !item\.rendered\}\s*\{#each item\.zoned as path, i \(i\)\}/);
 });
 
 test('a slider with a rendered cap and a button with a rendered part are not made into layers either', async () => {
@@ -177,6 +216,10 @@ test('a slider with a rendered cap and a button with a rendered part are not mad
   const button = createControl('Button');
   Object.assign(button._children.Parts._children.key, { visible: true, look: 'rendered' });
   assert.match(buttonDeviceLayersRefusal(button), /a rendered key/);
+  const { meterDeviceLayersRefusal } = await import('../src/CE_Application/utils/valueControlLayers.js');
+  const meter = createControl('Meter');
+  Object.assign(meter._children.Parts._children.housing, { visible: true, look: 'rendered' });
+  assert.match(meterDeviceLayersRefusal(meter), /a rendered housing/);
 });
 
 test('the Slider tab offers a cap\'s look, and the Button and Switch tabs a part\'s, with the render\'s own fields', async () => {

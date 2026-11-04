@@ -411,7 +411,14 @@ tools that start from a saved file (`prepare-export-panel.mjs`, `export-panel-vs
 `export-panel-template.mjs`) bake in headless Chromium with that same file
 (`tools/scripts/lib/bakeRenderedLooks.mjs`); without a browser they say so and those parts draw flat.
 The Slider tab edits a cap's look (**Cap Look**, its fields going to all three handles) and the
-Button and Switch tabs a part's (**Look** in its Appearance), as the approved mock-up showed. Fader caps and button faces come after.
+Button and Switch tabs a part's (**Look** in its Appearance), as the approved mock-up showed.
+
+A meter's housing and clip lamp render the same way (`renderedMeterPartSpec`): the housing a low
+block in the meter's 160 by 100 frame (a bezel, 12 % of its narrower side high where a key is 30, the
+face and scale drawn over it), a round lamp a turned body, and a lamp needs a second image in its lit
+colour. A part the meter's zones colour keeps its flat drawing, since its colour moves with the
+reading and no fixed set of images covers it. A meter with a rendered part is refused as layers by
+name. The Meter tab's fields for it wait on a mock-up.
 
 ### F. Filmstrips as their own category (small)
 

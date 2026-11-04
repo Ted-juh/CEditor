@@ -351,6 +351,8 @@ export const RENDERED_MARGIN = RENDERED_FRAME - 1;
 
 /** A button's or a switch's device frame, in its drawing's units (models/buttonDeviceParts.js DEVICE_FRAME). */
 export const RENDERED_DEVICE_FRAME = { width: 160, height: 80 };
+/** A meter's, as models/meterDeviceParts.js METER_FRAME. */
+export const RENDERED_METER_FRAME = { width: 160, height: 100 };
 
 const num = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
 const clamp = (value, lo, hi) => Math.min(hi, Math.max(lo, value));
@@ -450,16 +452,24 @@ export function renderedCapSpec(part, { vertical = true, colour, topColour = nul
  * ButtonDeviceParts places it): a circle is a turned body, anything else a block with the part's
  * corner radius.
  */
-export function renderedDevicePartSpec(part, { colour, topColour = null, lamp = null } = {}) {
+export function renderedDevicePartSpec(part, { colour, topColour = null, lamp = null, frame = RENDERED_DEVICE_FRAME, height = 30 } = {}) {
   const layout = part?._children?.Layout ?? {};
-  const w = (num(layout.width, 0) / 100) * RENDERED_DEVICE_FRAME.width;
-  const h = (num(layout.height, 0) / 100) * RENDERED_DEVICE_FRAME.height;
+  const w = (num(layout.width, 0) / 100) * frame.width;
+  const h = (num(layout.height, 0) / 100) * frame.height;
   if (w <= 0 || h <= 0) return null;
   const shape = String(part?.shape ?? 'rect');
   if (shape === 'ellipse' && Math.abs(w - h) / Math.max(w, h) < 0.08) return renderedLookSpec(part, { colour, topColour, lamp });
   const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
   const corner = shape === 'ellipse' ? 100 : Math.min(100, (radius / (Math.min(w, h) / 2)) * 100);
-  return renderedBlockSpec(part, { width: w, length: h, axis: w >= h ? 'x' : 'y', corner, height: 30, colour, topColour, lamp });
+  return renderedBlockSpec(part, { width: w, length: h, axis: w >= h ? 'x' : 'y', corner, height, colour, topColour, lamp });
+}
+
+/**
+ * A meter's housing or clip lamp, from its box in the meter's frame: a housing is a low block (a
+ * bezel, its face and scale drawn over it), a round lamp a turned body.
+ */
+export function renderedMeterPartSpec(part, { colour, topColour = null, lamp = null, name = 'housing' } = {}) {
+  return renderedDevicePartSpec(part, { colour, topColour, lamp, frame: RENDERED_METER_FRAME, height: name === 'housing' ? 12 : 30 });
 }
 
 /** The image's size in the shader's units (the part's larger side is 1), its shadow's room included. */
@@ -495,6 +505,7 @@ export function renderedBakeKey(spec, angle = 0) {
 const KNOB_PLATES = ['bodyHousing', 'bodySkirt', 'bodyCap', 'bodyInsert'];
 const FADER_CAPS = ['pointerStart', 'pointerCurrent', 'pointerEnd'];
 const DEVICE_PARTS = ['housing', 'guard', 'key', 'indicator'];
+const METER_PARTS = ['housing', 'lamp'];
 
 /**
  * Every image a control's rendered parts need, as `[{ spec, angle }]`: the control as it is DRAWN
@@ -518,6 +529,14 @@ export function renderedLookJobs(control, { lamp = null } = {}) {
     } else if (FADER_CAPS.includes(name) && !circular && children.Behavior) {
       const spec = renderedCapSpec(part, { vertical, colour: fillOf(part), topColour, lamp });
       if (spec) jobs.push({ spec, angle: 0 });
+    } else if (children.Meter && METER_PARTS.includes(name)) {
+      // A meter's housing and clip lamp; a lamp that lights needs its lit colour too. One the meter's
+      // zones colour draws as it always did (editor/MeterDeviceParts.svelte), so it needs none.
+      if (String(part?.zoneColours ?? 'off') !== 'off') continue;
+      for (const colour of [fillOf(part), name === 'lamp' ? String(part?.activeColour ?? '').trim() || null : null].filter(Boolean)) {
+        const spec = renderedMeterPartSpec(part, { colour, topColour, lamp, name });
+        if (spec) jobs.push({ spec, angle: 0 });
+      }
     } else if (DEVICE_PARTS.includes(name)) {
       for (const colour of [fillOf(part), String(part?.activeColour ?? '').trim() || null].filter(Boolean)) {
         const spec = renderedDevicePartSpec(part, { colour, topColour, lamp });

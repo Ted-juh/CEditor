@@ -1228,6 +1228,7 @@ export function meterDeviceLayersRefusal(resolved) {
   for (const name of METER_DEVICE_PARTS) {
     const part = parts[name];
     if (part?.visible !== true) continue;
+    if (String(part.look ?? '') === 'rendered') return `a rendered ${name}, which a layer does not draw yet`;
     const motion = String(part.motion ?? 'none');
     const pattern = String(part.pattern ?? 'solid');
     if (pattern === 'digits') return `counter digits on its ${name}, which a layer does not draw yet`;
