@@ -16,6 +16,10 @@
   import { storedIcons } from '../stores/appSettings.js';
   import { documentIcons, resolveIcon } from '../utils/documentIcons.js';
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
+  import { layerRenderedPlacement } from '../utils/layerRenderedLook.js';
+  import { renderedLooks, requestRenderedLook } from '../utils/renderedLook.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
   import { materialActive } from '../utils/materialFilter.js';
   import { isPictureLayer, maskActive, maskLinked, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -191,7 +195,26 @@
   // A path whose light stays put (`meta.fixedLight`): turned, only its outline turns, about its pivot,
   // and its fill, gradient, finish and shadows are drawn upright under it, as a knob's plate is drawn
   // on the panel: a gear turns under a fixed lamp, and its shadow still falls downward.
-  let fixedLight = $derived(shape.rendersOutline && part?.meta?.fixedLight === true);
+  // A rendered look (utils/layerRenderedLook.js): the image the panel draws for a part with the same
+  // properties, made from the layer's own and lit by the set's lamp, in place of its fill; its plain
+  // fill until the image is made, or where it cannot be. A round body whose light stays put picks the
+  // image of its turn rather than turning as a picture.
+  const setColour = (value, fallback) => (isTokenReference(value) ? resolveColourLiteral(value, $activeControlSet, fallback) : value);
+  let renderedPlacement = $derived(String(part?.look ?? '') === 'rendered'
+    ? layerRenderedPlacement(part, {
+      width: frame.width, height: frame.height, rotation: partRotation,
+      colour: setColour(part?._children?.Background?._children?.Fill?.colour, 'FFC9CCD0'),
+      topColour: part?.renderTopColour ? setColour(part.renderTopColour, null) : null,
+      lamp: $activeControlSet?.lamp,
+    })
+    : null);
+  let renderedImage = $derived.by(() => {
+    if (!renderedPlacement) return null;
+    const scale = typeof window !== 'undefined' ? Math.min(3, (window.devicePixelRatio || 1) * 1.5) : 1.5;
+    const url = requestRenderedLook($renderedLooks, renderedPlacement.spec, Math.max(renderedPlacement.w, renderedPlacement.h) * scale, renderedPlacement.angle);
+    return url ? { ...renderedPlacement, url } : null;
+  });
+  let fixedLight = $derived((shape.rendersOutline || !!renderedPlacement) && part?.meta?.fixedLight === true);
   let outlineTurn = $derived(fixedLight && Math.abs(partRotation) > 0.001 ? partRotation : 0);
 
   let outline = $derived.by(() => {
@@ -286,7 +309,7 @@
   // Not on a layer that casts a control's shadows: its fill must be inside the surface that casts
   // them, or only its border would.
   let absorbedFillCSS = $derived(
-    background && !surfaceEffects && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
+    background && !surfaceEffects && !renderedImage && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -809,7 +832,10 @@
 
 {#snippet partElement()}
   <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} data-focus-ring={sliderControl?.domFocus === true ? '' : undefined} style={partStyle}>
-    {#if surfaceEffects}
+    {#if renderedImage}
+      <img class="interactive-part-rendered" data-rendered-look={part?.name ?? ''} src={renderedImage.url} alt=""
+        style={`left:${renderedImage.x}px; top:${renderedImage.y}px; width:${renderedImage.w}px; height:${renderedImage.h}px;`} />
+    {:else if surfaceEffects}
       <EffectSurface {effects} width={frame.width} height={frame.height} shadowsOnly target="part">{@render partContent()}</EffectSurface>
     {:else}
       {@render partContent()}
@@ -1090,6 +1116,7 @@
   /* A text layer's underline, strikethrough or overline: under its glyphs, or over them (front). */
   .interactive-part-text-line { position: absolute; pointer-events: none; z-index: 1; }
   .interactive-part-icon { position: absolute; inset: 0; box-sizing: border-box; pointer-events: none; }
+  .interactive-part-rendered { position: absolute; display: block; max-width: none; pointer-events: none; }
   .interactive-part-icon-image { display: block; }
   .interactive-part-text-line.front { z-index: 3; }
 

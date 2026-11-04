@@ -69,12 +69,25 @@ test('the knob draws a rendered plate from its image, and export bakes them', ()
   assert.match(read('Player.svelte'), /loadBakedRenderedLooks\(raw\?\.renderedLookImages\)/);
 });
 
-test('a knob with a rendered plate is not made into layers that would draw it flat', async () => {
+test('a knob with a rendered plate is made into layers: one that draws the same image, turning under the lamp', async () => {
   const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
-  const { valueLayersRefusal } = await import('../src/CE_Application/utils/valueControlLayers.js');
+  const { valueLayersRefusal, knobLayers } = await import('../src/CE_Application/utils/valueControlLayers.js');
   const knob = createControl('Knob');
-  Object.assign(knob._children.Parts._children.bodyHousing, { visible: true, look: 'rendered' });
-  assert.match(valueLayersRefusal(knob), /a rendered housing/);
+  Object.assign(knob._children.Parts._children.bodyHousing, { visible: true, look: 'rendered', renderProfile: 'knurled', renderCount: 40, turns: true });
+  assert.equal(valueLayersRefusal(knob), '');
+  const taken = new Set();
+  const built = knobLayers({ resolved: knob, rect: { x: 0, y: 0, width: 120, height: 140 }, channel: 'v', prefix: 'k', zIndex: 0, uniqueName: (name) => { let n = name; let i = 2; while (taken.has(n)) n = `${name}${i++}`; taken.add(n); return n; } });
+  const housing = built.parts.filter((part) => built.partNames.bodyHousing?.includes(part.name));
+  assert.equal(housing.length, 1, 'the image alone: no shadow, edge or grooves of its own');
+  const [layer] = housing;
+  assert.equal(layer.look, 'rendered');
+  assert.equal(layer.renderShape, 'round');
+  assert.equal(layer.renderProfile, 'knurled');
+  assert.equal(layer.renderCount, 40);
+  assert.equal(layer._children.Layout.width, layer._children.Layout.height);
+  assert.equal(layer.meta.fixedLight, true, 'its light stays put while it turns');
+  assert.ok(Number.isFinite(layer.meta.renderTurn));
+  assert.ok(built.bindings[`${layer.name}Turn`], 'the value turns it');
 });
 
 test('the Knob tab offers a plate\'s look, and a rendered plate shows only what the render draws', () => {
@@ -207,19 +220,44 @@ test('the export bakes each control as it is drawn, and the slider and the butto
   assert.match(meter, /\{#if !item\.rendered\}\s*\{#each item\.zoned as path, i \(i\)\}/);
 });
 
-test('a slider with a rendered cap and a button with a rendered part are not made into layers either', async () => {
+test('a slider\'s rendered cap, a button\'s rendered key and a meter\'s rendered housing are made into layers too', async () => {
   const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
-  const { valueLayersRefusal, buttonDeviceLayersRefusal } = await import('../src/CE_Application/utils/valueControlLayers.js');
+  const { valueLayersRefusal, buttonDeviceLayersRefusal, meterDeviceLayersRefusal } = await import('../src/CE_Application/utils/valueControlLayers.js');
   const slider = createControl('Slider');
   Object.assign(slider._children.Parts._children.pointerCurrent, { visible: true, kind: 'block', look: 'rendered' });
-  assert.match(valueLayersRefusal(slider), /a rendered fader cap/);
+  assert.equal(valueLayersRefusal(slider), '');
   const button = createControl('Button');
   Object.assign(button._children.Parts._children.key, { visible: true, look: 'rendered' });
-  assert.match(buttonDeviceLayersRefusal(button), /a rendered key/);
-  const { meterDeviceLayersRefusal } = await import('../src/CE_Application/utils/valueControlLayers.js');
+  assert.equal(buttonDeviceLayersRefusal(button), '');
   const meter = createControl('Meter');
   Object.assign(meter._children.Parts._children.housing, { visible: true, look: 'rendered' });
-  assert.match(meterDeviceLayersRefusal(meter), /a rendered housing/);
+  assert.equal(meterDeviceLayersRefusal(meter), '');
+});
+
+test('a rendered layer draws the image its part draws, and a component\'s rendered layers are baked for export', async () => {
+  const core = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const lamp = { azimuth: 225, elevation: 48 };
+  // A key, a block 40 by 20 with a 30 % corner, 30 % high: the same spec the panel's part asks for.
+  const part = { look: 'rendered', renderShape: 'block', renderCorner: 30, renderHeight: 30, renderAxis: 'x', renderMaterial: 'gloss', _children: { Background: { _children: { Fill: { colour: 'FF2A2D31' } } } } };
+  const spec = core.layerRenderedSpec(part, { width: 40, height: 20, colour: 'FF2A2D31', lamp });
+  assert.deepEqual(spec, core.renderedBlockSpec(part, { width: 40, length: 20, axis: 'x', corner: 30, height: 30, colour: 'FF2A2D31', lamp }));
+  const placed = core.layerRenderedPlacement(part, { width: 40, height: 20, colour: 'FF2A2D31', lamp });
+  assert.ok(placed.w > 40 && placed.h > 20, 'the frame leaves room for its cast shadow');
+  assert.equal(placed.x, (40 - placed.w) / 2);
+  // A turning body picks the image of its turn; anything else turns as a picture.
+  const round = { look: 'rendered', renderShape: 'round', renderProfile: 'fluted', renderCount: 12, meta: { fixedLight: true, renderTurn: 90 } };
+  const turned = core.layerRenderedPlacement(round, { width: 50, height: 50, rotation: 7.5, colour: 'FFC9CCD0', lamp });
+  assert.equal(turned.angle, core.renderedTurn(turned.spec, 97.5));
+  const component = {
+    _children: {
+      Core: { controlType: 'CustomComponent' },
+      Parts: { _children: { key: { ...part, _children: { ...part._children, Layout: { width: 40, height: 20 } } }, dial: { ...round, _children: { Layout: { width: 50, height: 50 } } } } },
+      States: { _children: { On: { patches: { parts: { key: { 'Background.Fill.colour': '{control.accent}' } } } } } },
+    },
+  };
+  const jobs = core.renderedLookJobs(component, { lamp, resolveColour: (value) => (value === '{control.accent}' ? 'FFFF8800' : value) });
+  assert.equal(jobs.length, 2 + 8, 'the key unlit and lit; the turning dial at each step of a groove');
+  assert.ok(jobs.some((job) => job.spec.body === '#FF8800'), 'the lit colour, resolved');
 });
 
 test('the Slider tab offers a cap\'s look, and the Button and Switch tabs a part\'s, with the render\'s own fields', async () => {

@@ -1074,7 +1074,9 @@ Satellite aside (they are drawn whole): a plate in perspective, a skirt, an inse
 every fader cap, its sheen, glow and finish; a key's shadow, a switch's lamp or bat lever, a meter's counter and
 a fill drawn in a pattern. A plate that turns with the value turns its outline while its light and
 shadow stay put, as on the panel. What a layer does not draw yet (a control form that is not made
-of parts, a rendered look) comes in as one exact part, and the window names it and why. A counter's
+of parts) comes in as one exact part, and the window names it and why. A rendered plate, fader cap,
+key or meter housing comes in as a layer that draws the same lit picture, its ridges turning under a
+light that stays put. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the

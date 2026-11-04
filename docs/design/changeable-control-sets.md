@@ -287,7 +287,7 @@ components):
    interaction states written to its layers. `browser-checks/knobLayers.mjs` draws each built-in
    set's knob and slider, converts it and compares the pixels at four values (within 2.5 %, a
    one-pixel shift forgiven): all 79 sets' knobs match. What a layer cannot draw yet comes in as
-   one exact part, named: a control form not made of parts, and a rendered look.
+   one exact part, named: a control form not made of parts.
 
    **Every offered set converts** (Iris and Satellite, drawn whole, aside). Of the 64, 41 knobs and
    52 sliders used to come in as one exact part and 12 buttons, 13 switches and 17 meters were
@@ -362,6 +362,19 @@ components):
      state showing the one and hiding the other. The ball's highlight is a radial gradient over its
      box, as the SVG's is. Every set that names a bat draws its switches as devices, which draw no
      lamp; the bat shows on a plain button where an author chooses it, and comes in as layers there.
+
+   - *Rendered looks* (piece E's lit pictures): a layer can carry a part's rendered look
+     (`look: 'rendered'` and the part's render properties, with `renderShape` round or block, a
+     block's `renderCorner` and `renderAxis`), and draws the same picture through the same renderer
+     (utils/layerRenderedLook.js, its spec from renderedLookCore's): a turned body the size of its
+     larger side, or a block its box, centred, its fill colour the body's and its fill the fallback
+     while the picture is made. One whose light stays put (`meta.fixedLight`) picks the picture of its
+     turn (`meta.renderTurn` plus its rotation) rather than turning as a picture. A rendered knob
+     plate, fader cap (with its groove unless its top is ridged), key, housing, guard or indicator,
+     and a meter's housing and clip lamp (unlit and lit), come in as such layers; a part the meter's
+     zones colour draws flat, as on the panel. The static part bake keeps them live, and both export
+     bakers (the editor's and the tools') bake a component's rendered layers, a state's colour
+     resolved through the set, so a plug-in draws them without WebGL.
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned

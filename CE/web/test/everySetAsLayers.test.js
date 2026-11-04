@@ -176,7 +176,7 @@ test('a layer\'s shadow keeps its colour\'s alpha; a path\'s light stays put whi
   const effects = { _children: { Shadows: { items: [{ enabled: true, type: 'inner', offsetX: 0, offsetY: 1, blur: 2, spread: 0, colour: '99000000' }] } } };
   assert.equal(buildShadowCSS(effects), 'box-shadow: inset 0px 1px 2px 0px rgba(0, 0, 0, 0.600);');
   const renderer = read('editor/InteractivePartRenderer.svelte');
-  assert.match(renderer, /let fixedLight = \$derived\(shape\.rendersOutline && part\?\.meta\?\.fixedLight === true\);/);
+  assert.match(renderer, /let fixedLight = \$derived\(\(shape\.rendersOutline \|\| !!renderedPlacement\) && part\?\.meta\?\.fixedLight === true\);/);
   assert.match(renderer, /if \(Math\.abs\(partRotation\) > 0\.001 && !fixedLight\) transforms\.push/);
   assert.match(renderer, /const turn = \(d\) => \(d \? rotatePathData\(d, outlineTurn, px, py\) : d\);/);
 });

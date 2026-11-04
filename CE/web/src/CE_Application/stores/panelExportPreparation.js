@@ -6,7 +6,7 @@ import { packagePanelForSharing, openSharedPanel } from './panelSharing.js';
 import { exportFormDocument } from './panelModel.js';
 import { controlsInTree } from '../scripting/scriptPanelExport.js';
 import { bakeRenderedLooks } from '../utils/renderedLook.js';
-import { getControlSet } from '../models/controlSets.js';
+import { getControlSet, isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
 import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
 /**
@@ -52,6 +52,8 @@ export async function preparePanelForExport(serialized) {
   const looks = await bakeRenderedLooks(controlsInTree(panel.controls), {
     lamp: panelSet?.lamp ?? null,
     resolve: (control) => resolveControlForSet(control, panelSet, sources),
+    // A component's state may colour a rendered layer by a role; it draws in the set's colour.
+    resolveColour: (value) => (isTokenReference(value) ? resolveColourLiteral(value, panelSet, value) : value),
   });
   if (Object.keys(looks.images).length) panel.renderedLookImages = looks.images;
   else delete panel.renderedLookImages;

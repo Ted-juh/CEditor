@@ -110,7 +110,7 @@ export function renderedLooksAvailable() {
  * `{ images, plates, failed }`, `plates` the rendered parts: where WebGL2 is missing, nothing is
  * baked and those parts draw their plain fill in the plug-in, and `failed` says how many images.
  */
-export async function bakeRenderedLooks(controls, { lamp = null, size = 320, resolve = null } = {}) {
+export async function bakeRenderedLooks(controls, { lamp = null, size = 320, resolve = null, resolveColour = (value) => value } = {}) {
   const images = {};
   let plates = 0;
   let failed = 0;
@@ -118,7 +118,7 @@ export async function bakeRenderedLooks(controls, { lamp = null, size = 320, res
     const drawn = resolve ? resolve(control) : control;
     const parts = Object.values(drawn?._children?.Parts?._children ?? {});
     plates += parts.filter((part) => String(part?.look ?? '') === 'rendered' && part?.visible !== false).length;
-    for (const { spec, angle } of renderedLookJobs(drawn, { lamp })) {
+    for (const { spec, angle } of renderedLookJobs(drawn, { lamp, resolveColour })) {
       const key = renderedBakeKey(spec, angle);
       if (images[key]) continue;
       try {

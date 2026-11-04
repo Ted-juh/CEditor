@@ -513,8 +513,10 @@ const METER_PARTS = ['housing', 'lamp'];
  * resolveControlForSet), so the specs are the ones its renderer asks for and a baked image is found.
  * A key that lights up when on needs its lit colour too.
  */
-export function renderedLookJobs(control, { lamp = null } = {}) {
+export function renderedLookJobs(control, { lamp = null, resolveColour = (value) => value } = {}) {
   const children = control?._children ?? {};
+  // A component's parts are its layers: each draws its own (layerRenderedJobs), a state's colour too.
+  if (String(children.Core?.controlType ?? '') === 'CustomComponent') return layerRenderedJobs(control, { lamp, resolveColour });
   const parts = children.Parts?._children ?? {};
   const circular = String(children.Behavior?.geometry ?? '') === 'circular';
   const vertical = String(children.Behavior?.orientation ?? 'vertical') === 'vertical';
@@ -542,6 +544,81 @@ export function renderedLookJobs(control, { lamp = null } = {}) {
         const spec = renderedDevicePartSpec(part, { colour, topColour, lamp });
         if (spec) jobs.push({ spec, angle: 0 });
       }
+    }
+  }
+  return jobs;
+}
+
+// --- a component's layers drawn rendered (utils/layerRenderedLook.js says what a layer carries) -------
+
+/** Whether a layer draws a rendered look. */
+export function layerIsRendered(part) {
+  return String(part?.look ?? '') === 'rendered';
+}
+
+/**
+ * The spec of a rendered layer `width` by `height` pixels, its body `colour` (resolved), lit by `lamp`,
+ * or null when it draws none.
+ */
+export function layerRenderedSpec(part, { width, height, colour, topColour = null, lamp = null }) {
+  if (!layerIsRendered(part) || !(width > 0) || !(height > 0)) return null;
+  const top = topColour ?? (part?.renderTopColour || null);
+  if (String(part?.renderShape ?? 'round') === 'block') {
+    return renderedBlockSpec(part, {
+      width, length: height, axis: part?.renderAxis === 'x' || part?.renderAxis === 'y' ? part.renderAxis : (width >= height ? 'x' : 'y'),
+      corner: num(part?.renderCorner, 30), height: num(part?.renderHeight, 30), colour, topColour: top, lamp,
+    });
+  }
+  return renderedLookSpec(part, { colour, topColour: top, lamp });
+}
+
+/**
+ * Where a rendered layer's image goes in its `width` by `height` box, `{ spec, angle, x, y, w, h }`:
+ * centred on the box, the frame's room for its cast shadow about it; turned to `rotation` when its
+ * light stays put.
+ */
+export function layerRenderedPlacement(part, { width, height, rotation = 0, colour, topColour = null, lamp = null }) {
+  const spec = layerRenderedSpec(part, { width, height, colour, topColour, lamp });
+  if (!spec) return null;
+  let w;
+  let h;
+  if (spec.shape === 'block') {
+    const big = Math.max(width, height);
+    const frame = renderedFrame(spec);
+    w = frame.w * big;
+    h = frame.h * big;
+  } else {
+    // A turned body: the frame about the box's larger side, as the panel sizes a round part's image.
+    w = Math.max(width, height) * RENDERED_FRAME;
+    h = w;
+  }
+  const angle = part?.meta?.fixedLight === true ? renderedTurn(spec, num(part?.meta?.renderTurn, 0) + num(rotation, 0)) : 0;
+  return { spec, angle, x: (width - w) / 2, y: (height - h) / 2, w, h };
+}
+
+/**
+ * Every image a component's rendered layers need, `[{ spec, angle }]`, for an exported panel to bake:
+ * each layer at its box, in its colour and in each colour a state gives it, and at each step of a
+ * groove's repeat if it turns. `resolveColour` turns a role into the colour it draws.
+ */
+export function layerRenderedJobs(component, { lamp = null, resolveColour = (value) => value } = {}) {
+  const parts = component?._children?.Parts?._children ?? {};
+  const states = Object.values(component?._children?.States?._children ?? {});
+  const jobs = [];
+  for (const [name, part] of Object.entries(parts)) {
+    if (!layerIsRendered(part)) continue;
+    const layout = part?._children?.Layout ?? {};
+    const width = num(layout.width, 0);
+    const height = num(layout.height, 0);
+    const colours = new Set([part?._children?.Background?._children?.Fill?.colour]);
+    for (const state of states) {
+      const patch = state?.patches?.parts?.[name];
+      if (patch?.['Background.Fill.colour'] !== undefined) colours.add(patch['Background.Fill.colour']);
+    }
+    for (const colour of colours) {
+      const spec = layerRenderedSpec(part, { width, height, colour: resolveColour(colour), topColour: part?.renderTopColour ? resolveColour(part.renderTopColour) : null, lamp });
+      if (!spec) continue;
+      for (const angle of renderedTurns(spec, part?.meta?.fixedLight === true)) jobs.push({ spec, angle });
     }
   }
   return jobs;

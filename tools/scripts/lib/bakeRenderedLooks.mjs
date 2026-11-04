@@ -58,13 +58,15 @@ async function launch(chromium) {
 export async function bakeRenderedLookImages(panel, { size = 320 } = {}) {
   const { renderedBakeKey, renderedLookJobs } = await import(webSrc('utils/renderedLookCore.js'));
   const { resolveControlForSet } = await import(webSrc('models/controlSetFamilies.js'));
-  const { getControlSet } = await import(webSrc('models/controlSets.js'));
+  const { getControlSet, isTokenReference, resolveColourLiteral } = await import(webSrc('models/controlSets.js'));
   const { controlsInTree } = await import(webSrc('scripting/scriptPanelExport.js'));
   const sources = { document: panel?.controlSets ?? [] };
   const set = getControlSet(panel?.controlSet?.id, sources);
   const jobs = new Map();
   for (const control of controlsInTree(panel?.controls ?? [])) {
-    for (const job of renderedLookJobs(resolveControlForSet(control, set, sources), { lamp: set?.lamp ?? null })) {
+    // A component's state may colour a rendered layer by a role; it draws in the set's colour.
+    const resolveColour = (value) => (isTokenReference(value) ? resolveColourLiteral(value, set, value) : value);
+    for (const job of renderedLookJobs(resolveControlForSet(control, set, sources), { lamp: set?.lamp ?? null, resolveColour })) {
       jobs.set(renderedBakeKey(job.spec, job.angle), job);
     }
   }
