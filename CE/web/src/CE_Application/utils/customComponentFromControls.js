@@ -59,6 +59,7 @@ import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js'
 import { isDisplayOnly } from './displayMode.js';
 import { targetBuckets } from './interactionRuntime.js';
 import { surfaceShadows } from './surfaceEffects.js';
+import { getSliderDefaultValues, getSliderValueMode } from './sliderBehavior.js';
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
 
@@ -320,12 +321,18 @@ function overflows(resolved, measure) {
  * draws for it through SliderFamilyRenderer, so anything CanvasControl draws BESIDES that is refused,
  * and so is anything that would behave differently as one part of a larger control.
  */
-function whyNotValueConvertible(control, resolved) {
+function whyNotValueConvertible(control, resolved, layers = false) {
   const kids = control._children;
   const core = kids.Core ?? {};
   const behavior = kids.Behavior ?? {};
   if (String(behavior.family ?? '') !== 'range' || String(behavior.role ?? '') !== 'slider') return 'not drawn as a slider';
-  if (String(behavior.valueMode ?? 'single') !== 'single') return 'two handles (a range) — a component channel holds one value';
+  if (String(behavior.valueMode ?? 'single') !== 'single') {
+    // As layers a range's handles are values of their own (valueControlLayers' valueHandles); one
+    // exact part holds one value, so a range the layers cannot draw has nothing to fall back to.
+    if (!layers) return 'two handles (a range) — as one exact part a component holds one value; ask for layers';
+    const why = valueLayersRefusal(resolved);
+    if (why) return why;
+  }
   const form = anatomyForm(core.controlType, core.controlForm);
   if (form) return `drawn in the "${form}" control form, which a part does not draw`;
   if (isDisplayOnly(behavior)) return 'read-only';
@@ -407,7 +414,7 @@ export function whyNotConvertible(control, resolved, { measure = null, layers = 
     const transform = control._children.Transform ?? {};
     if (Number(transform.scale ?? 1) !== 1) return 'scaled';
     if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
-    return whyNotValueConvertible(control, resolved);
+    return whyNotValueConvertible(control, resolved, layers);
   }
   if (!ARTWORK_TYPES.includes(type)) {
     return `a ${type || 'control'} — only artwork (shapes, labels, images, backgrounds), knobs and sliders can become a component`;
@@ -932,7 +939,13 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
     const min = Number(behavior.min ?? 0);
     const max = Number(behavior.max ?? 1);
     const value = Number(behavior.defaultCurrentValue ?? behavior.defaultValue ?? min);
-    const travel = max > min && Number.isFinite(value) ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+    const travelOf = (raw) => (max > min && Number.isFinite(raw) ? Math.max(0, Math.min(1, (raw - min) / (max - min))) : 0);
+    // A range's or a band's handles each stand at their own value.
+    const handles = built.handles ?? [];
+    const defaults = handles.length > 1 ? getSliderDefaultValues(behavior) : null;
+    const travel = defaults
+      ? Object.fromEntries(handles.map((handle) => [handle.channel, travelOf(Number(defaults[handle.role]))]))
+      : travelOf(value);
     seedLayersAt(built.parts, built.bindings, travel);
     for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
     return Object.assign(built.parts, { layered: { channel, ...built } });
@@ -1248,14 +1261,54 @@ function knobSections(values, bounds, allParts = {}) {
       // the channel's display IS the readout, so it is formatted as the knob's readout was.
       format: layered ? knobChannelFormat(resolved?._children?.Behavior ?? behavior) : { suffix: unit, unit },
     });
+    // A range's or a band's handles: a value each beside the control's own, which keeps what the
+    // panel's range kept (the value it sends, and its host parameter), kept in order as the panel
+    // keeps them (normalizeHandleOrder): the start never past the value or the end.
+    const handles = layered?.handles ?? [];
+    const ranged = handles.length > 1;
+    if (ranged) {
+      const rangeBehavior = resolved?._children?.Behavior ?? behavior;
+      const defaults = getSliderDefaultValues(rangeBehavior);
+      const band = getSliderValueMode(rangeBehavior) === 'band';
+      const named = Object.fromEntries(handles.map((handle) => [handle.role, handle.channel]));
+      const bounds = {
+        start: { normalizedMax: `channel.${band ? named.current : named.end}.normalized` },
+        current: { normalizedMin: `channel.${named.start}.normalized`, normalizedMax: `channel.${named.end}.normalized` },
+        end: { normalizedMin: `channel.${band ? named.current : named.start}.normalized` },
+      };
+      for (const handle of handles) {
+        if (handle.role === 'current') {
+          out.channels[channelName].constraints = { ...out.channels[channelName].constraints, ...bounds.current };
+          continue;
+        }
+        out.channels[handle.channel] = createValueChannel(handle.channel, {
+          label: `${nameOf(control)} ${handle.role}`,
+          type: out.channels[channelName].type,
+          min,
+          max,
+          step: out.channels[channelName].step,
+          defaultValue: Math.min(max, Math.max(min, Number(defaults[handle.role]))),
+          format: deepClone(out.channels[channelName].format),
+          constraints: bounds[handle.role],
+        });
+        out.published[handle.channel] = {
+          channel: handle.channel, label: out.channels[handle.channel].label, type: out.channels[handle.channel].type, enabled: true,
+          min, max, defaultValue: out.channels[handle.channel].defaultValue,
+        };
+      }
+    }
     out.behaviors[channelName] = layered ? {
       ...createBehaviorModule(channelName, {
-        type: 'slider', role: 'slider', valueChannel: channelName, geometry: layered.behavior.geometry,
+        type: 'slider', role: 'slider', valueChannel: ranged ? handles[0].channel : channelName, geometry: layered.behavior.geometry,
         dragMode: layered.behavior.dragMode === 'relative' ? 'relative' : 'auto',
         interaction: { wheel: behavior.wheelEnabled !== false },
         // A slider that runs right to left, or top to bottom.
         reverseMouseDirection: layered.behavior.reversed === true,
       }),
+      // Its centre and its travel are in its own box, the grab area: measured there, not across the
+      // whole component, where a knob beside another turned about a point between them.
+      frame: 'zone',
+      ...(ranged ? { valueChannels: handles.map((handle) => handle.channel) } : {}),
       ...(layered.behavior.geometry === 'circular' ? {
         startAngle: layered.behavior.startAngle,
         sweepAngle: layered.behavior.sweepAngle,
@@ -1270,7 +1323,7 @@ function knobSections(values, bounds, allParts = {}) {
     out.hitZones[zoneName] = createHitZone(zoneName, {
       shape: 'rectangle',
       targetBehavior: channelName,
-      targetValueChannel: channelName,
+      targetValueChannel: ranged ? handles[0].channel : channelName,
       action: 'dragValue',
       cursor: String(control._children.Mouse?.cursor ?? 'pointer'),
       // A slider as layers is dragged along its track: the zone is the track's length, so a point
@@ -1289,12 +1342,21 @@ function knobSections(values, bounds, allParts = {}) {
     });
     // The knob painted last is on top, so it takes the pointer where two overlap, as on the panel.
     out.hitZones[zoneName].priority = paintIndex;
+    // A range's grab area takes the handle nearest where it is pressed, as the panel's does.
+    if (ranged) out.hitZones[zoneName].targetValueChannels = handles.map((handle) => handle.channel);
     if (layered) {
       // The knob as layers: its bindings, and its interaction states written to the layers its parts
       // became, when THIS knob's grab area is hovered, dragged or focused.
       Object.assign(out.bindings, layered.bindings);
-      const glide = valueGlideAnimation(resolved, channelName, layered.bindings);
-      if (glide) out.animations[glide.name] = glide;
+      // A range's handles glide each on its own value, over what that value moves, as the panel
+      // moves its start, value and end along one curve (SliderFamilyRenderer's glide).
+      for (const glideChannel of ranged ? handles.map((handle) => handle.channel) : [channelName]) {
+        const own = ranged
+          ? Object.fromEntries(Object.entries(layered.bindings).filter(([, binding]) => String(binding?.source ?? '').startsWith(`channel.${glideChannel}.`)))
+          : layered.bindings;
+        const glide = valueGlideAnimation(resolved, glideChannel, own);
+        if (glide) out.animations[glide.name] = glide;
+      }
       const states = resolved?._children?.States?._children ?? {};
       const when = {
         Hover: { hoveredCustomHitZone: zoneName },

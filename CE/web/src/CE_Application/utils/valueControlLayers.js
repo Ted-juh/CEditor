@@ -29,8 +29,8 @@ import {
   buildSliderLabelAnchors, buildSliderTickStops, resolveCircularTrackMetrics, resolveLinearPointerPoint, resolveLinearTrackFrame,
 } from './sliderGeometry.js';
 import {
-  formatSliderNumericValue, getSliderDirection, getSliderGeometry, getSliderMax, getSliderMin, getSliderOrientation, getSliderStartAngle,
-  getSliderSweepAngle, getSliderValueMode, sliderDisplayScale,
+  formatSliderNumericValue, getSliderAllowHandleCross, getSliderAllowWrapAround, getSliderDirection, getSliderGeometry, getSliderMax,
+  getSliderMin, getSliderOrientation, getSliderStartAngle, getSliderSweepAngle, getSliderValueMode, sliderDisplayScale,
 } from './sliderBehavior.js';
 import { knobOutlinePath, knobOutlineReach } from './knobOutlines.js';
 import { formatBehaviorDisplay } from './parameterDisplay.js';
@@ -84,7 +84,10 @@ export function valueLayersRefusal(resolved) {
   const core = resolved?._children?.Core ?? {};
   const form = anatomyForm(core.controlType, core.controlForm);
   if (form) return `drawn in the "${form}" control form, which is not made of parts`;
-  if (getSliderValueMode(behavior) !== 'single') return 'two handles';
+  // A range's or a band's handles are values of their own, kept in order (valueHandles); handles that
+  // may pass each other or wrap round the end would need a fill from whichever is lower.
+  if (getSliderValueMode(behavior) !== 'single' && getSliderAllowHandleCross(behavior)) return 'handles that may pass each other';
+  if (getSliderValueMode(behavior) !== 'single' && getSliderAllowWrapAround(behavior)) return 'handles that wrap round the end';
   if (getSliderGeometry(behavior) !== 'circular') return sliderLayersRefusal();
   // Plates (housing, skirt, cap, insert) of every outline, in perspective, turning under a light
   // that stays put, with shadows and grooves, and rendered ones, are layers now (plateLayers).
@@ -244,7 +247,7 @@ const CAP_DOME = {
  * outer edge too, under the border: right for an opaque border, which covers it, but a border you
  * can see through shows it. Such a part is two layers, its fill and its edge, as the panel draws it.
  */
-function outlineLayers(name, part, centre, r, origin, { zIndex, borderFallback, role }) {
+function outlineLayers(name, part, centre, r, origin, { zIndex, borderFallback, role, borderColourFallback = 'FF333333' }) {
   const kind = String(part?.outline ?? 'circle');
   const bw = borderWidth(part, borderFallback);
   let shape;
@@ -263,7 +266,7 @@ function outlineLayers(name, part, centre, r, origin, { zIndex, borderFallback, 
       count: part?.outlineCount, depth: part?.outlineDepth, rotation: num(part?.outlineRotation, 0),
     }));
   }
-  const background = backgroundFrom(part, { borderFallback, borderColourFallback: 'FF333333' });
+  const background = backgroundFrom(part, { borderFallback, borderColourFallback });
   const layerOf = (layerName, sectionBackground, grow) => {
     const box = { x: shape.box.x - grow / 2, y: shape.box.y - grow / 2, width: shape.box.width + grow, height: shape.box.height + grow };
     return createPartNode(layerName, {
@@ -505,6 +508,36 @@ function rangeBinding(name, source, target, outputMin, outputMax, inputMin = 0, 
 const designerAngle = (panelDegrees) => panelDegrees + 90;
 
 /**
+ * The handles a knob or slider has, by its value mode (Behavior.valueMode): one, the control's own
+ * value; a range's two, start and end; or a band's three, start, the value and end. Each is a value
+ * of its own, the value keeping the control's channel. `name` reserves a channel's name.
+ */
+function valueHandles(behavior, channel, name) {
+  const mode = getSliderValueMode(behavior);
+  const current = { role: 'current', channel, pointer: 'pointerCurrent', label: 'labelCurrent' };
+  if (mode === 'single') return [current];
+  const start = { role: 'start', channel: name(`${channel}Start`), pointer: 'pointerStart', label: 'labelStart' };
+  const end = { role: 'end', channel: name(`${channel}End`), pointer: 'pointerEnd', label: 'labelEnd' };
+  return mode === 'band' ? [start, current, end] : [start, end];
+}
+
+/** A binding that adds its result to what the bindings before it wrote (interactionRuntime's `add`). */
+function addingBinding(binding) {
+  return { ...binding, add: true };
+}
+
+/**
+ * Bindings lighting a layer between a range's start and end, as the panel's highlightStop lights a
+ * tick: `lit` while start <= t <= end, `unlit` outside. The end sets it, the start adds to it; the
+ * start never passes the end, so the sum is one or the other.
+ */
+function litBetween(out, layerName, label, sources, t, lit, unlit) {
+  const target = `Parts.${layerName}.opacity`;
+  out.bindings[`${layerName}${label}End`] = rangeBinding(`${layerName}${label}End`, sources.end, target, unlit, lit, t - 0.0005, t);
+  out.bindings[`${layerName}${label}Start`] = addingBinding(rangeBinding(`${layerName}${label}Start`, sources.start, target, 0, unlit - lit, t, t + 0.0005));
+}
+
+/**
  * The layers, bindings and state patches for one knob.
  *
  * `resolved`  the knob as the panel draws it (resolveControlForSet), for its geometry;
@@ -534,6 +567,12 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     return part;
   };
   const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
+  // A range's or a band's handles, each a value of its own (valueHandles).
+  const valueMode = getSliderValueMode(behavior);
+  const handles = valueHandles(behavior, channel, uniqueName);
+  const sourceOf = (role) => `channel.${(handles.find((handle) => handle.role === role) ?? handles[0]).channel}.normalized`;
+  const sources = { start: sourceOf('start'), end: sourceOf('end') };
+  out.handles = handles;
 
   // The renderer's derived values (SliderFamilyRenderer.svelte, the block from `trackThickness`).
   const g = (name) => geometryParts[name];
@@ -583,7 +622,10 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   const scaleNumberReach = scaleNumberCount >= 2 ? Math.max(0, num(numberPart?._children?.Layout?.offsetX, 122)) / 100 : 0;
   const metrics = resolveCircularTrackMetrics(width, height, {
     trackThickness,
-    pointerSize: tight ? (pointerKind === 'dot' ? pointerCurrentSize : 0) : maxPointerSize,
+    // Tight: the pointer it draws, and a range's handles, as SliderFamilyRenderer sizes it.
+    pointerSize: tight
+      ? Math.max(pointerKind === 'dot' ? pointerCurrentSize : 0, valueMode === 'single' ? 0 : Math.max(pointerStartSize, pointerEndSize))
+      : maxPointerSize,
     majorTickLength,
     hasTicks: showTicks,
     hasReadout: showReadout,
@@ -655,7 +697,21 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
 
   // Value arc: from the minimum, or both ways from the centre value.
   const fillColour = fillOf(parts.bodyTrackFill).colour ?? 'FF5B9BD5';
-  if (partVisible(g('bodyTrackFill'))) {
+  if (valueMode !== 'single' && partVisible(g('bodySelectedRange'))) {
+    // A range's arc, from the start to the end (bodySelectedRange): it begins where the start is, and
+    // its sweep is the end's travel less the start's, the start's added on (`add`).
+    const rangePart = g('bodySelectedRange');
+    const layer = add('bodySelectedRange', arcLayer(named('range'), {
+      centre, radius, thickness: trackThickness, start: angleAt(0), sweep: 0, direction,
+      colour: fillOf(parts.bodySelectedRange).colour ?? fillColour, opacity: num(rangePart?.opacity, 1), zIndex: depth, origin, role: 'fill',
+    }));
+    if (fillIsRich(rangePart)) paintThrough(layer, parts.bodySelectedRange);
+    const arcKey = `Parts.${layer.name}.meta.arcTrack`;
+    out.bindings[`${layer.name}From`] = rangeBinding(`${layer.name}From`, sources.start, `${arcKey}.startAngle`, angleAt(0), angleAt(1));
+    out.bindings[`${layer.name}Sweep`] = rangeBinding(`${layer.name}Sweep`, sources.end, `${arcKey}.sweepAngle`, 0, sweep);
+    out.bindings[`${layer.name}SweepFrom`] = addingBinding(rangeBinding(`${layer.name}SweepFrom`, sources.start, `${arcKey}.sweepAngle`, 0, -sweep));
+  }
+  if (valueMode === 'single' && partVisible(g('bodyTrackFill'))) {
     const fromCentre = String(behavior.fillOrigin ?? 'min').trim().toLowerCase() === 'center';
     const min = getSliderMin(behavior);
     const max = getSliderMax(behavior);
@@ -770,7 +826,18 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
               from * share, to * share, threshold[0], threshold[1]);
           }
         };
-        if (dimColour === litColour) {
+        if (valueMode !== 'single') {
+          // Lit between a range's start and end.
+          const between = (layers, lit, unlit, label) => {
+            for (const [layer, share] of layers) litBetween(out, layer.name, label, sources, t, lit * share, unlit * share);
+          };
+          if (dimColour === litColour) {
+            between(drawTick('', dimColour, dimOpacity), litOpacity, dimOpacity, 'Lit');
+          } else {
+            between(drawTick('', dimColour, dimOpacity), 0, dimOpacity, 'Dim');
+            between(drawTick('lit', litColour, litOpacity), litOpacity, 0, 'Lit');
+          }
+        } else if (dimColour === litColour) {
           fade(drawTick('', dimColour, dimOpacity), litWhenAbove ? dimOpacity : litOpacity, litWhenAbove ? litOpacity : dimOpacity, 'Lit');
         } else {
           fade(drawTick('', dimColour, dimOpacity), litWhenAbove ? dimOpacity : 0, litWhenAbove ? 0 : dimOpacity, 'Dim');
@@ -848,8 +915,59 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   const capRadius = plate('bodyCap', 'cap', 72, 1, 'cap');
   plate('bodyInsert', 'insert', 45, 1, 'cap');
 
+  // A dot on the track at the start of the travel, turned about the centre by the value: the panel's
+  // dot pointer, and a range's start and end. In a gradient, a picture or a finish, the panel paints
+  // its background over its circle's box and a pixel, upright wherever it is (SliderShapeFill), and
+  // strokes its border over it; its layers go round the knob upright (`meta.orbit`) rather than
+  // turning.
+  const dotLayers = (nameOf, part, geometry, size, borderColourFallback) => {
+    const point = { x: centre.x, y: centre.y - radius };
+    const r = size / 2;
+    const startAngle = designerAngle(startPanel);
+    if (!fillIsRich(geometry)) {
+      const layers = outlineLayers(nameOf, part, point, r, origin, { zIndex: depth, borderFallback: 1, role: 'handle', borderColourFallback });
+      for (const layer of layers) {
+        Object.assign(layer._children.Layout, pivotIn(boxOfLayout(layer._children.Layout, origin), centre));
+        layer._children.Layout.rotation = startAngle;
+      }
+      return layers;
+    }
+    const bw = borderWidth(part, 1);
+    const background = backgroundFrom(part, { borderFallback: 1, borderColourFallback });
+    const fill = deepClone(background);
+    fill._children.Border.enabled = false;
+    fill._children.Border.thickness = 0;
+    const dot = (layerName, sectionBackground, half, closed, grow = 0) => {
+      const box = { x: point.x - half - grow / 2, y: point.y - half - grow / 2, width: 2 * half + grow, height: 2 * half + grow };
+      const inner = { x: point.x - half, y: point.y - half, width: 2 * half, height: 2 * half };
+      return createPartNode(layerName, {
+        role: 'handle', kind: 'path', zIndex: depth, opacity: num(geometry?.opacity, 1),
+        layout: { ...pxBox(box, origin), ...pivotIn(box, centre), rotation: startAngle },
+        meta: { pathData: pathInBox(circlePath(point.x, point.y, r), inner), closed, orbit: true },
+        sections: { Background: sectionBackground },
+      });
+    };
+    const layers = [dot(nameOf(''), fill, r + 1, true)];
+    if (bw > 0) layers.push(dot(nameOf('Edge'), edgeBackground(background, bw), r, false, bw));
+    return layers;
+  };
+  // A range's start or end: always a circle, whatever kind the pointer is, as the panel draws them,
+  // each turned by its own value.
+  const handleDot = (role, borderColourFallback) => {
+    const handle = handles.find((each) => each.role === role);
+    const part = { ...(parts[handle.pointer] ?? {}), outline: 'circle' };
+    const startAngle = designerAngle(startPanel);
+    const layers = dotLayers((extra) => named(`${role}${extra}`), part, g(handle.pointer), num(g(handle.pointer)?._children?.Layout?.width, 18), borderColourFallback);
+    for (const each of layers) {
+      each.zIndex = depth;
+      add(handle.pointer, each);
+      out.bindings[`${each.name}Turn`] = rangeBinding(`${each.name}Turn`, `channel.${handle.channel}.normalized`, `Parts.${each.name}.Layout.rotation`, startAngle, startAngle + signed * sweep);
+    }
+  };
+  if (valueMode !== 'single') handleDot('start', 'FF000000');
+
   // Pointer, drawn at the start of the travel and turned about the centre by the value.
-  if (partVisible(g('pointerCurrent'))) {
+  if (valueMode !== 'range' && partVisible(g('pointerCurrent'))) {
     const reach = capRadius > 0 ? capRadius : radius * 0.7;
     const pointerPart = parts.pointerCurrent;
     const geometryPointer = g('pointerCurrent');
@@ -911,37 +1029,8 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     } else if (pointerKind === 'capdot') {
       const r = Math.max(1.5, reach * (num(geometryPointer?._children?.Layout?.width, 26) / 200));
       layer = tickDot(named('pointer'), { centre, angle: startAngle, at: tip, r, colour: colourOr('FFFFFFFF'), opacity: num(geometryPointer?.opacity, 1), zIndex: depth, origin });
-    } else if (pointerKind === 'dot' && fillIsRich(geometryPointer)) {
-      // A dot in a gradient, a picture or a finish: the panel paints its background over its circle's
-      // box and a pixel, upright wherever it is (SliderShapeFill), and strokes its border over it. Its
-      // layers go round the knob upright (`meta.orbit`) rather than turning.
-      const point = { x: centre.x, y: centre.y - radius };
-      const r = pointerCurrentSize / 2;
-      const bw = borderWidth(pointerPart, 1);
-      const background = backgroundFrom(pointerPart, { borderFallback: 1, borderColourFallback: 'FF333333' });
-      const fill = deepClone(background);
-      fill._children.Border.enabled = false;
-      fill._children.Border.thickness = 0;
-      const dot = (layerName, sectionBackground, half, closed, grow = 0) => {
-        const box = { x: point.x - half - grow / 2, y: point.y - half - grow / 2, width: 2 * half + grow, height: 2 * half + grow };
-        const inner = { x: point.x - half, y: point.y - half, width: 2 * half, height: 2 * half };
-        return createPartNode(layerName, {
-          role: 'handle', kind: 'path', zIndex: depth, opacity: num(geometryPointer?.opacity, 1),
-          layout: { ...pxBox(box, origin), ...pivotIn(box, centre), rotation: startAngle },
-          meta: { pathData: pathInBox(circlePath(point.x, point.y, r), inner), closed, orbit: true },
-          sections: { Background: sectionBackground },
-        });
-      };
-      pointerLayers = [dot(named('pointer'), fill, r + 1, true)];
-      if (bw > 0) pointerLayers.push(dot(named('pointerEdge'), edgeBackground(background, bw), r, false, bw));
     } else if (pointerKind === 'dot') {
-      const point = { x: centre.x, y: centre.y - radius };
-      const r = pointerCurrentSize / 2;
-      pointerLayers = outlineLayers((extra) => named(`pointer${extra}`), pointerPart, point, r, origin, { zIndex: depth, borderFallback: 1, role: 'handle' });
-      for (const dot of pointerLayers) {
-        Object.assign(dot._children.Layout, pivotIn(boxOfLayout(dot._children.Layout, origin), centre));
-        dot._children.Layout.rotation = startAngle;
-      }
+      pointerLayers = dotLayers((extra) => named(`pointer${extra}`), pointerPart, geometryPointer, pointerCurrentSize, 'FF333333');
     } else {
       // Needle or chicken-head: a polygon, its stroke as wide as the panel draws it.
       const points = pointerKind === 'needle'
@@ -970,6 +1059,7 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
       out.bindings[`${each.name}Turn`] = rangeBinding(`${each.name}Turn`, source, `Parts.${each.name}.Layout.rotation`, startAngle, startAngle + signed * sweep);
     }
   }
+  if (valueMode !== 'single') handleDot('end', 'FF202020');
 
   // Readout and title, where the panel's labels hang: centred on their anchor.
   const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
@@ -981,10 +1071,10 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     trackThickness, pointerSize: maxPointerSize, majorTickLength: num(behavior.majorTickLength, 12), hasTicks: behavior.showTicks !== false,
     hasReadout: showReadout, circularDiameter: behavior.circularDiameter, labelMetrics,
   });
-  const handle = behavior.showHandleLabels === true
-    ? { at: anchors.current, centre: { x: labelCircle.centerX, y: labelCircle.centerY }, turn: signed * sweep }
-    : null;
-  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handle }, anchors);
+  const riding = behavior.showHandleLabels === true
+    ? handles.map((each) => ({ ...each, at: anchors[each.role], centre: { x: labelCircle.centerX, y: labelCircle.centerY }, turn: signed * sweep }))
+    : [];
+  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handles, riding }, anchors);
 
   // The drag: the knob's own mode, about its centre, over its own sweep.
   out.behavior = {
@@ -1004,7 +1094,7 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
  * its labels (`anchors`, buildSliderLabelAnchors). The readout shows the channel's value as the
  * control's readout did, unless its text was written by hand.
  */
-function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf, out, channel, showReadout, handle = null }, anchors) {
+function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf, out, channel, showReadout, handles = [], riding = [] }, anchors) {
   const textLayer = (suffix, part, anchor, content, fallbackSize) => {
     const text = deepClone(part?._children?.Text ?? SECTION_DEFAULTS.Text);
     text.content = content;
@@ -1026,7 +1116,17 @@ function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, 
     const authored = String(parts.labelValue?._children?.Text?.content ?? '').trim();
     const layer = add('labelValue', textLayer('readout', parts.labelValue, anchors.value, authored || '', 12));
     if (!authored) {
-      out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
+      const target = `Parts.${layer.name}.Text.content`;
+      // A range's readout is its start, the range separator and its end; a band's its three values
+      // between the band separator (formatSliderReadout): the first written, the rest added on.
+      const shown = handles.length > 1 ? handles : [{ channel }];
+      const separator = String(handles.length === 3 ? (behavior.bandSeparator ?? ' | ') : (behavior.rangeSeparator ?? ' - '));
+      shown.forEach((each, index) => {
+        const name = index === 0 ? `${layer.name}Text` : `${layer.name}Text${index + 1}`;
+        out.bindings[name] = index === 0
+          ? { _type: 'Binding', name, enabled: true, source: `channel.${each.channel}.display`, mapMode: 'direct', target }
+          : addingBinding({ _type: 'Binding', name, enabled: true, source: `channel.${each.channel}.display`, mapMode: 'template', template: `${separator}{value}`, target });
+      });
     }
   }
   const title = String(parts.labelTitle?._children?.Text?.content ?? resolved?._children?.Text?.content ?? '').trim();
@@ -1038,13 +1138,14 @@ function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, 
     add('labelMin', textLayer('min', parts.labelMin, anchors.min, minText || formatSliderNumericValue(behavior, getSliderMin(behavior)), 11));
     add('labelMax', textLayer('max', parts.labelMax, anchors.max, maxText || formatSliderNumericValue(behavior, getSliderMax(behavior)), 11));
   }
-  // The label that rides the pointer or the cap (`showHandleLabels`): the value as the readout shows
-  // it, at the start of the travel, carried with the value: round the knob upright (`meta.orbit`,
-  // the turn its pointer makes), or along the slider's travel.
-  if (handle) {
-    const layer = add('labelCurrent', textLayer('handle', parts.labelCurrent, handle.at, '', 11));
-    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
-    const source = `channel.${channel}.normalized`;
+  // The label that rides each pointer or cap (`showHandleLabels`): its value as the readout shows it,
+  // at the start of the travel, carried with the value: round the knob upright (`meta.orbit`, the
+  // turn its pointer makes), or along the slider's travel.
+  for (const handle of riding) {
+    const suffix = handle.role === 'current' ? 'handle' : `${handle.role}Label`;
+    const layer = add(handle.label, textLayer(suffix, parts[handle.label], handle.at, '', 11));
+    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${handle.channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
+    const source = `channel.${handle.channel}.normalized`;
     if (handle.centre) {
       layer.meta = { ...(layer.meta ?? {}), orbit: true };
       Object.assign(layer._children.Layout, pivotIn(boxOfLayout(layer._children.Layout, origin), handle.centre));
@@ -1093,6 +1194,12 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   };
   const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
   const vertical = getSliderOrientation(behavior) === 'vertical';
+  // A range's or a band's handles, each a value of its own (valueHandles).
+  const valueMode = getSliderValueMode(behavior);
+  const handles = valueHandles(behavior, channel, uniqueName);
+  const sourceOf = (role) => `channel.${(handles.find((handle) => handle.role === role) ?? handles[0]).channel}.normalized`;
+  const sources = { start: sourceOf('start'), end: sourceOf('end') };
+  out.handles = handles;
 
   const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
   const labelMetrics = {
@@ -1163,9 +1270,35 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     add('bodyCenterMarker', barLayer(named('centre'), box, true, fillOf(parts.bodyCenterMarker).colour ?? 'FFFFFFFF', num(g('bodyCenterMarker')?.opacity, 0.6)));
   }
 
+  // A range's fill, from the start to the end (bodySelectedRange): a bar the track's thickness with
+  // round ends, as the panel strokes it. Its near edge goes where the start is; its length is the
+  // end's place less the start's, the start's added on (`add`). Each end stands where its own
+  // handle's travel puts it (the travel is laid out for each handle's size).
+  if (valueMode !== 'single') {
+    const startSize = num(g('pointerStart')?._children?.Layout?.width, 18);
+    const endSize = num(g('pointerEnd')?._children?.Layout?.width, 18);
+    const axis = vertical ? 'y' : 'x';
+    const [posKey, lengthKey] = vertical ? ['y', 'height'] : ['x', 'width'];
+    const startAt = (t) => pointAt(t, startSize)[axis];
+    const endAt = (t) => pointAt(t, endSize)[axis];
+    const rangePart = g('bodySelectedRange');
+    const paint = fillIsRich(rangePart) ? fillBackground(parts.bodySelectedRange, 0) : (fillOf(parts.bodySelectedRange).colour ?? 'FF5B9BD5');
+    const layer = add('bodySelectedRange', barLayer(named('range'), barBox(pointAt(0, startSize), pointAt(0, endSize), trackThickness, true), true, paint, num(rangePart?.opacity, 1)));
+    const lead = Math.sign(endAt(1) - startAt(0)) || 1;
+    const half = trackThickness / 2;
+    const at = origin[axis];
+    // The near edge: the start's, where the end lies further along the axis; else the end's.
+    const [nearSource, nearAt] = lead > 0 ? [sources.start, startAt] : [sources.end, endAt];
+    out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, nearSource, `Parts.${layer.name}.Layout.${posKey}`, at + nearAt(0) - half, at + nearAt(1) - half);
+    const lengthTarget = `Parts.${layer.name}.Layout.${lengthKey}`;
+    out.bindings[`${layer.name}Length`] = rangeBinding(`${layer.name}Length`, sources.end, lengthTarget,
+      lead * (endAt(0) - startAt(0)) + trackThickness, lead * (endAt(1) - startAt(0)) + trackThickness);
+    out.bindings[`${layer.name}LengthFrom`] = addingBinding(rangeBinding(`${layer.name}LengthFrom`, sources.start, lengthTarget, 0, -lead * (startAt(1) - startAt(0))));
+  }
+
   // Value fill, from its origin to the value: one bar growing each way it can.
   const fillPart = g('bodyTrackFill');
-  if (partVisible(fillPart)) {
+  if (valueMode === 'single' && partVisible(fillPart)) {
     const fromCentre = String(behavior.fillOrigin ?? 'min').trim().toLowerCase() === 'center';
     const o = fromCentre ? centreTravel : 0;
     const round = square === null;
@@ -1287,7 +1420,18 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
         };
         const dimColour = own ?? dimFallback;
         const litColour = String(parts[partName]?.activeColour ?? '').trim() || own || litFallback;
-        if (dimColour === litColour) {
+        if (valueMode !== 'single') {
+          // Lit between a range's start and end.
+          const between = (layers, lit, unlit, label) => {
+            for (const [layer, share] of layers) litBetween(out, layer.name, label, sources, t, lit * share, unlit * share);
+          };
+          if (dimColour === litColour) {
+            between(drawTick('', dimColour, dimOpacity), litOpacity, dimOpacity, 'Lit');
+          } else {
+            between(drawTick('', dimColour, dimOpacity), 0, dimOpacity, 'Dim');
+            between(drawTick('lit', litColour, litOpacity), litOpacity, 0, 'Lit');
+          }
+        } else if (dimColour === litColour) {
           fade(drawTick('', dimColour, dimOpacity), litWhenAbove ? dimOpacity : litOpacity, litWhenAbove ? litOpacity : dimOpacity, 'Lit');
         } else {
           fade(drawTick('', dimColour, dimOpacity), litWhenAbove ? dimOpacity : 0, litWhenAbove ? 0 : dimOpacity, 'Dim');
@@ -1298,13 +1442,21 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     }
   }
 
-  // The fader cap, drawn at the start of the travel and moved along the track by the value.
-  const capPart = parts.pointerCurrent;
-  const capGeometryPart = g('pointerCurrent');
-  if (partVisible(capGeometryPart)) {
+  const namedLayer = named;
+  // The fader cap, drawn at the start of the travel and moved along the track by the value; a range's
+  // start and end caps (and a band's value between them) by their own, each drawn as the panel draws
+  // a cap (its linearCap), on the travel its size lays out.
+  const addCap = (handle) => {
+    const capPart = parts[handle.pointer];
+    const capGeometryPart = g(handle.pointer);
+    if (!partVisible(capGeometryPart)) return;
+    const size = handle.role === 'current' ? pointerCurrentSize : num(capGeometryPart?._children?.Layout?.width, 18);
+    const source = `channel.${handle.channel}.normalized`;
+    // The value's cap keeps its names; a start or end cap's are `start…` and `end…`.
+    const named = (suffix) => namedLayer(handle.role === 'current' ? suffix : `${handle.role}${suffix[0].toUpperCase()}${suffix.slice(1)}`);
     const kind = String(capGeometryPart?.kind ?? 'dot').toLowerCase();
-    const at = pointAt(0, pointerCurrentSize);
-    const end = pointAt(1, pointerCurrentSize);
+    const at = pointAt(0, size);
+    const end = pointAt(1, size);
     const along = Math.max(2, num(capGeometryPart?._children?.Layout?.width, 20));
     const across = Math.max(2, num(capGeometryPart?._children?.Layout?.height, 20));
     const fill = fillOf(capPart).colour ?? 'FFFFFFFF';
@@ -1416,20 +1568,19 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     }
     const [key, from, to] = vertical ? ['offsetY', 0, end.y - at.y] : ['offsetX', 0, end.x - at.x];
     for (const layer of capLayers) {
-      add('pointerCurrent', layer);
+      add(handle.pointer, layer);
       out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, source, `Parts.${layer.name}.Layout.${key}`, from, to);
     }
-  }
+  };
+  for (const handle of handles) addCap(handle);
 
   const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
     trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics,
   });
-  // A label that rides the cap: beside it, or above it, from one end of the travel to the other.
-  const handle = behavior.showHandleLabels === true ? {
-    at: anchors.current,
-    to: buildSliderLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics }).current,
-  } : null;
-  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handle }, anchors);
+  // A label that rides each cap: beside it, or above it, from one end of the travel to the other.
+  const far = buildSliderLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics });
+  const riding = behavior.showHandleLabels === true ? handles.map((each) => ({ ...each, at: anchors[each.role], to: far[each.role] })) : [];
+  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handles, riding }, anchors);
 
   // The drag: across the track, from one end to the other.
   const lo = pointAt(0, pointerCurrentSize);
@@ -1451,15 +1602,21 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
  * binding on the held peak stands at `peak` (null: no peak, as the runtime reads one it lacks), and
  * one that writes only inside its range (`band`) writes as it does.
  */
-export function seedLayersAt(parts, bindings, travel, { peak = travel } = {}) {
+export function seedLayersAt(parts, bindings, travel, { peak = typeof travel === 'number' ? travel : null } = {}) {
   const byName = new Map(parts.map((part) => [part.name, part]));
+  // One travel for every binding, or each channel's own (a range's handles): { channel: travel }.
+  const travelOf = (source) => {
+    if (typeof travel === 'number') return travel;
+    const channel = /^channel\.(.+)\.[a-z]+$/.exec(String(source ?? ''))?.[1];
+    return num(travel?.[channel], 0);
+  };
   for (const binding of Object.values(bindings ?? {})) {
     if (binding?.mapMode !== 'range') continue;
     const match = /^Parts\.([^.]+)\.(.+)$/.exec(String(binding.target ?? ''));
     const part = match ? byName.get(match[1]) : null;
     if (!part) continue;
     const fromPeak = /\.peak$/.test(String(binding.source ?? ''));
-    const input = fromPeak ? (peak == null ? binding.inputMin : peak) : travel;
+    const input = fromPeak ? (peak == null ? binding.inputMin : peak) : travelOf(binding.source);
     const span = binding.inputMax - binding.inputMin;
     let value;
     if (binding.band === true) {
@@ -1476,7 +1633,9 @@ export function seedLayersAt(parts, bindings, travel, { peak = travel } = {}) {
       if (!next || typeof next !== 'object') { node = null; break; }
       node = next;
     }
-    if (node) node[path[path.length - 1]] = value;
+    // An adding binding (`add`) adds to what the binding before it wrote, as the runtime does.
+    const key = path[path.length - 1];
+    if (node) node[key] = binding.add === true ? r3(num(node[key], 0) + value) : value;
   }
   return parts;
 }

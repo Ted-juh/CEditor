@@ -261,3 +261,112 @@ test('a knob that shows a plus on positive values writes one on its channel too'
   assert.equal(formatChannelValue(channel, -3), '-3');
   assert.equal(formatChannelValue(channel, 0), '0');
 });
+
+// --- Ranges: a knob's or a slider's two handles (a band's three) -------------------------------------
+
+const rangeOf = (type, behavior) => createControl(type, {
+  Core: { id: 'r1', name: 'Range' },
+  Transform: { x: 40, y: 60, width: type === 'Knob' ? 120 : 240, height: type === 'Knob' ? 140 : 70 },
+  Behavior: { min: 0, max: 100, valueMode: 'range', defaultStartValue: 20, defaultEndValue: 70, ...behavior },
+});
+const rectOf = (component) => {
+  const { width, height } = component._children.Transform;
+  return { left: 0, top: 0, width, height, right: width, bottom: height };
+};
+const zonePoint = (component, zone, across, along = 0.5) => {
+  const { width, height } = component._children.Transform;
+  const b = zone.bounds;
+  return { x: ((b.x + b.width * across) / 100) * width, y: ((b.y + b.height * along) / 100) * height };
+};
+
+test('a range knob comes in as layers: a value for each handle, kept in order, its arc from one to the other', async () => {
+  const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
+  const result = plan([rangeOf('Knob', { showHandleLabels: true })]);
+  assert.ok(result.ok);
+  assert.equal(result.asParts.length, 0, result.asParts[0]?.reason);
+  const component = result.component;
+  const channels = component._children.ValueChannels._children;
+  // The start and the end are values of their own; the control's own keeps what the panel's sends.
+  assert.equal(channels.RangeStart.defaultValue, 20);
+  assert.equal(channels.RangeEnd.defaultValue, 70);
+  assert.ok(channels.Range, 'the control\'s own value');
+  assert.equal(channels.RangeStart.constraints.normalizedMax, 'channel.RangeEnd.normalized');
+  assert.equal(channels.RangeEnd.constraints.normalizedMin, 'channel.RangeStart.normalized');
+  const zone = Object.values(component._children.HitZones._children)[0];
+  assert.deepEqual(zone.targetValueChannels, ['RangeStart', 'RangeEnd']);
+  assert.equal(Object.values(component._children.Behaviors._children)[0].frame, 'zone');
+  // Drawn at its values: the arc from 20 to 70 of a 270-degree sweep, the readout the panel's.
+  const drawn = resolveInteractiveControl(component, { customValues: {} }).control._children.Parts._children;
+  assert.equal(drawn.Range_range.meta.arcTrack.sweepAngle, 135);
+  assert.equal(drawn.Range_readout._children.Text.content, '20.00 - 70.00');
+  assert.ok(drawn.Range_start && drawn.Range_end, 'a dot for each handle');
+  assert.equal(drawn.Range_startLabel._children.Text.content, '20.00');
+  // Moved: the arc follows both ends.
+  const moved = resolveInteractiveControl(component, { customValues: { RangeStart: 40, RangeEnd: 60 } }).control._children.Parts._children;
+  assert.equal(moved.Range_range.meta.arcTrack.sweepAngle, 54);
+  assert.equal(moved.Range_readout._children.Text.content, '40.00 - 60.00');
+});
+
+test('a band slider comes in with three caps; a press takes the nearest and a drag stops at the next', async () => {
+  const { resolveCustomHitZoneAtPoint, resolveCustomInteractionPatch } = await import('../src/CE_Application/utils/customComponentInteraction.js');
+  const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
+  const result = plan([rangeOf('Slider', { valueMode: 'band', defaultCurrentValue: 40 })]);
+  assert.ok(result.ok);
+  assert.equal(result.asParts.length, 0, result.asParts[0]?.reason);
+  const component = result.component;
+  const channels = component._children.ValueChannels._children;
+  assert.equal(channels.Range.constraints.normalizedMin, 'channel.RangeStart.normalized');
+  assert.equal(channels.Range.constraints.normalizedMax, 'channel.RangeEnd.normalized');
+  const parts = component._children.Parts._children;
+  for (const name of ['Range_startCap', 'Range_cap', 'Range_endCap']) assert.ok(parts[name], name);
+  const zone = Object.values(component._children.HitZones._children)[0];
+  const rect = rectOf(component);
+  const at = (across) => zonePoint(component, zone, across);
+  assert.equal(resolveCustomHitZoneAtPoint(component, rect, at(0.1).x, at(0.1).y, {}).zone.targetValueChannel, 'RangeStart');
+  assert.equal(resolveCustomHitZoneAtPoint(component, rect, at(0.45).x, at(0.45).y, {}).zone.targetValueChannel, 'Range');
+  assert.equal(resolveCustomHitZoneAtPoint(component, rect, at(0.9).x, at(0.9).y, {}).zone.targetValueChannel, 'RangeEnd');
+  // The end, dragged far to the left, stops at the value.
+  const pressed = resolveCustomHitZoneAtPoint(component, rect, at(0.7).x, at(0.7).y, {});
+  const patch = resolveCustomInteractionPatch(component, {}, pressed, {
+    rect, clientX: at(0).x - 200, clientY: at(0).y, startClientX: at(0.7).x, startClientY: at(0.7).y, startValues: {},
+  });
+  assert.equal(patch.customValues.RangeEnd, 40);
+  // The fill runs from the start to the end, its length moved by both.
+  const fill = (values) => resolveInteractiveControl(component, { customValues: values }).control._children.Parts._children.Range_range._children.Layout;
+  const wide = fill({ RangeStart: 0, RangeEnd: 100 });
+  const narrow = fill({ RangeStart: 50, RangeEnd: 100 });
+  assert.ok(Math.abs((wide.width - narrow.width) - (narrow.x - wide.x)) < 0.01, 'the start moves the near edge and shortens it as much');
+  assert.equal(resolveInteractiveControl(component, { customValues: {} }).control._children.Parts._children.Range_readout._children.Text.content, '20.00 | 40.00 | 70.00');
+});
+
+test('handles that may pass each other or wrap round are refused by name; as one exact part a range is refused', () => {
+  assert.match(plan([rangeOf('Slider', { allowHandleCross: true })]).refused?.[0]?.reason ?? '', /pass each other/);
+  assert.match(plan([rangeOf('Knob', { allowWrapAround: true })]).refused?.[0]?.reason ?? '', /wrap round/);
+  assert.match(plan([rangeOf('Knob', {})], 'graphite', 'part').refused?.[0]?.reason ?? '', /two handles/);
+});
+
+test('two knobs in one component each turn about their own centre', async () => {
+  const { resolveCustomHitZoneAtPoint, resolveCustomInteractionPatch } = await import('../src/CE_Application/utils/customComponentInteraction.js');
+  const a = knob({ Core: { id: 'k1', name: 'A' }, Behavior: { min: 0, max: 100 } });
+  const b = knob({ Core: { id: 'k2', name: 'B' }, Transform: { x: 200, y: 60, width: 120, height: 140 }, Behavior: { min: 0, max: 100 } });
+  const component = plan([a, b]).component;
+  const behaviour = component._children.Behaviors._children.B;
+  const zone = component._children.HitZones._children.BZone;
+  const rect = rectOf(component);
+  // Straight above the second knob's centre: half way round its sweep.
+  const centre = zonePoint(component, zone, behaviour.centerX / 100, behaviour.centerY / 100);
+  const hit = resolveCustomHitZoneAtPoint(component, rect, centre.x, centre.y - 30, {});
+  assert.equal(hit.name, 'BZone');
+  const patch = resolveCustomInteractionPatch(component, {}, hit, { rect, clientX: centre.x, clientY: centre.y - 30 });
+  assert.equal(Math.round(patch.customValues.B), 50);
+});
+
+test('each handle of a range glides to a value it is given, as the panel moves all three on one curve', () => {
+  const component = plan([rangeOf('Slider', { valueMode: 'band', defaultCurrentValue: 40 })]).component;
+  const animations = Object.values(component._children.Animations._children);
+  const sources = animations.map((animation) => animation.trigger.source).sort();
+  assert.deepEqual(sources, ['channel.Range.normalized', 'channel.RangeEnd.normalized', 'channel.RangeStart.normalized']);
+  const start = animations.find((animation) => animation.trigger.source === 'channel.RangeStart.normalized');
+  assert.ok(start.targets.some((target) => target.path === 'Parts.Range_startCap.Layout.offsetX'));
+  assert.ok(!start.targets.some((target) => target.path === 'Parts.Range_endCap.Layout.offsetX'), 'only what the start moves');
+});

@@ -398,6 +398,33 @@ components):
      pan, with a plus sign, and with a cleared display range 24 of 24; a slider's riding label 8 of 8
      each way (at most 0.21 % of pixels apart).
 
+   - *Ranges* (R5): a knob's or slider's range (`valueMode: 'range'`, a start and an end) or band
+     (the value between them) comes in as layers, a value for each handle (`valueHandles`): the
+     control's own channel keeps the value the panel's range sends and its host parameter, and
+     `<name>Start` and `<name>End` are values beside it, published, kept in order by the channel
+     constraints the runtime already enforces (`normalizedMax: 'channel.<end>.normalized'`, the
+     panel's normalizeHandleOrder). The fill from start to end (bodySelectedRange) is one layer moved
+     by both: its near edge (or an arc's start angle) by the start, its length (or sweep) by the end,
+     less the start's travel. That takes a binding that **adds** (`add: true`,
+     interactionRuntime's `addedBindingValue`): its result added to what the bindings before it
+     wrote, numbers summed and text joined, so the readout is the start, the separator and the end
+     (`rangeSeparator`, a band's `bandSeparator`), as formatSliderReadout writes it. Ticks light
+     between the handles as highlightStop lights them, the end setting the opacity and the start
+     adding to it, which never comes out below nothing since the start never passes the end. Each
+     handle is drawn as the panel draws it (a knob's start and end as circles, a slider's as caps of
+     their own kind on the travel their size lays out) with its riding label. One grab area takes the
+     handle nearest the press (`targetValueChannels`, `resolveCustomHitZoneAtPoint`), as the panel
+     takes its nearest handle. Handles that may pass each other or wrap round the end are refused by
+     name; as one exact part a range is still refused, as a part holds one value. Each handle glides
+     to a value it is given other than by a drag, on the control's glide timing, as the panel moves
+     its start, value and end along one curve (SliderFamilyRenderer's glide). A knob in the
+     tight fit leaves room for a range's start and end dots, as the panel sizes it (without them the
+     converted knob drew larger than the panel's, 4 to 19 % of its pixels apart).
+     The behaviour of a knob or slider made into layers now measures a point against its own grab
+     area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
+     another turned about a point between them: pressing straight above the second of two knobs set
+     75.7 where the panel sets 50.
+
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
    25 degrees and scaled 1.1, a knob of each kind 120 of 120 and a slider of each kind 40 of 40 (the

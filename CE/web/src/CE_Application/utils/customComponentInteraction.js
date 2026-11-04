@@ -893,11 +893,55 @@ export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY, val
 
   for (const [name, zone] of entries) {
     if (isPointInZone(zone, rect, localX, localY, parts)) {
+      // A grab area over several values (`targetValueChannels`, a range's handles): the press takes
+      // the one whose value is nearest the point, as the panel's slider takes its nearest handle,
+      // and the drag moves that one.
+      const choices = Array.isArray(zone?.targetValueChannels) ? zone.targetValueChannels.filter(Boolean) : [];
+      if (choices.length > 1) {
+        const chosen = nearestValueChannel(control, zone, choices, rect, clientX, clientY, conditionValues, parts);
+        return { name, zone: { ...zone, targetValueChannel: chosen } };
+      }
       return { name, zone };
     }
   }
 
   return null;
+}
+
+/**
+ * The box a behaviour measures a point against: its grab area's (`frame: 'zone'`), or the
+ * component's. A knob made into layers states its centre in its own box, and a slider its travel
+ * along its track; measured against the whole component, a knob beside another turned about a
+ * point between them.
+ */
+function behaviorFrameRect(behaviorModule, hitZone, rect, parts = null) {
+  if (!rect || String(behaviorModule?.frame ?? '').trim().toLowerCase() !== 'zone' || !hitZone) return rect;
+  const box = customHitZoneRect(hitZone, rect, parts);
+  if (!box || !(box.width > 0) || !(box.height > 0)) return rect;
+  const left = rect.left + box.x;
+  const top = rect.top + box.y;
+  return { left, top, width: box.width, height: box.height, right: left + box.width, bottom: top + box.height };
+}
+
+/** Of `choices`, the channel whose value is nearest the value at the point (the first, on a tie). */
+function nearestValueChannel(control, zone, choices, rect, clientX, clientY, values, parts) {
+  const channels = getCustomValueChannels(control);
+  const behaviorModule = getCustomBehaviors(control)?.[zone?.targetBehavior] ?? null;
+  // Where the point is on the travel, by position: a relative drag still picks by where you press.
+  const frame = behaviorFrameRect(behaviorModule, zone, rect, parts);
+  const at = resolveCustomNormalizedFromPoint({ ...(behaviorModule ?? {}), dragMode: 'auto' }, frame, clientX, clientY);
+  let chosen = choices[0];
+  let nearest = Number.POSITIVE_INFINITY;
+  for (const name of choices) {
+    const channel = channels?.[name];
+    if (!channel) continue;
+    const distance = Math.abs(normalizeCustomChannelValue(channel, values?.[name] ?? customChannelDefaultValue(channel)) - at);
+    if (distance < nearest) {
+      nearest = distance;
+      chosen = name;
+    }
+  }
+  return chosen;
 }
 
 // Translates a behavior module's drag config into DragScrubOptions. Weights
@@ -1109,15 +1153,16 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   } else if (point?.rect) {
     const geometry = String(behaviorModule?.geometry ?? '').trim().toLowerCase();
     const type = String(behaviorModule?.type ?? '').trim().toLowerCase();
+    const frame = behaviorFrameRect(behaviorModule, hitZone, point.rect, control?._children?.Parts?._children ?? null);
     if (geometry === 'grid' || geometry === 'xy' || type.includes('xy')) {
-      const xy = resolveCustomXYNormalizedFromPoint(point.rect, point.clientX, point.clientY);
+      const xy = resolveCustomXYNormalizedFromPoint(frame, point.clientX, point.clientY);
       normalized = xy.x;
       const secondaryChannelName = resolveSecondaryChannelName(hitZone, behaviorModule, channelName);
       if (secondaryChannelName && channels?.[secondaryChannelName]) {
         nextValues[secondaryChannelName] = denormalizeCustomChannelValue(channelForBehaviorInput(channels[secondaryChannelName], behaviorModule), xy.y);
       }
     } else {
-      normalized = resolveCustomNormalizedFromPoint(behaviorModule, point.rect, point.clientX, point.clientY, {
+      normalized = resolveCustomNormalizedFromPoint(behaviorModule, frame, point.clientX, point.clientY, {
         startClientX: point.startClientX,
         startClientY: point.startClientY,
         startNormalized: point.startNormalized ?? normalizeCustomChannelValue(channel, point.startValues?.[channelName] ?? currentValue),

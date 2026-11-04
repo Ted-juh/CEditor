@@ -992,9 +992,22 @@ export function applyCustomBindings(control, signals = {}) {
     const sourceValue = evaluateBindingSource(binding, signals);
     const resolvedValue = resolveBindingValue(binding, sourceValue);
     if (resolvedValue === undefined) continue;
-    setTreeValueAtPath(control, binding.target, resolvedValue);
+    setTreeValueAtPath(control, binding.target, binding.add === true
+      ? addedBindingValue(treeValueAtPath(control, binding.target), resolvedValue)
+      : resolvedValue);
   }
   return control;
+}
+
+/**
+ * A binding that adds (`add`): its result added to the property as the bindings before it left it,
+ * or as the layer has it. One property moved by two values: a range's fill as long as its end less
+ * its start, a sweep from one handle to the other, a readout that is the start, a dash and the end.
+ * Numbers add; text is joined.
+ */
+export function addedBindingValue(previous, value) {
+  if (typeof value === 'string' || typeof previous === 'string') return `${previous ?? ''}${value}`;
+  return numberOr(previous, 0) + numberOr(value, 0);
 }
 
 /**

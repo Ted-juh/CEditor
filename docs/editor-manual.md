@@ -1097,7 +1097,12 @@ key or meter housing comes in as a layer that draws the same lit picture, its ri
 light that stays put. A track, value arc or dot pointer in a gradient, a picture or a finish keeps
 it. A label that rides the pointer or the fader cap moves with the value, upright. A readout or
 label that shows the value as the synth does (a frequency, a pan position, a note name, a table
-entry) reads the same as a layer, and so does a plus sign on positive values. A counter's
+entry) reads the same as a layer, and so does a plus sign on positive values. A range (two
+handles) or a band (a value between them) comes in with a value for each handle, kept in order: the
+fill runs from one to the other, the ticks light between them, and a press on the track takes the
+handle nearest to it, as on the panel. Handles that may pass each other or wrap round the end are
+not converted yet. A knob made into layers now turns about its own centre when the component holds
+several. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the
