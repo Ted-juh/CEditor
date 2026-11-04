@@ -208,3 +208,56 @@ test('the knob\'s value glide comes with its layers: its pointer and its arc eas
   assert.match(renderer, /let arcTiming = \$derived\(transitionBucket\?\.size \? parseTiming\(transitionBucket\.size\) : null\);/);
   assert.match(renderer, /const angles = arcGlide \?\? arcTarget;/);
 });
+
+test('a knob\'s track, value arc and dot pointer in a gradient, a riding label and a synth readout come in as layers', () => {
+  const gradient = { type: 'linear', angle: 45, stops: [{ color: 'FFFF3030', position: 0 }, { color: 'FF3060FF', position: 100 }] };
+  const rich = knob();
+  for (const name of ['bodyTrackBase', 'bodyTrackFill', 'pointerCurrent']) {
+    Object.assign(rich._children.Parts._children[name]._children.Background._children.Fill, { gradientEnabled: true, gradient });
+  }
+  rich._children.Parts._children.pointerCurrent.kind = 'dot';
+  Object.assign(rich._children.Behavior, { showHandleLabels: true, displayFormat: 'pan', min: 0, max: 127 });
+  const result = plan([rich], 'graphite');
+  assert.ok(result.ok);
+  assert.equal(result.asParts.length, 0, result.asParts[0]?.reason);
+  const parts = Object.values(result.component._children.Parts._children);
+  // The arcs paint their gradient through themselves, over their box and a pixel, as the panel does.
+  const arcs = parts.filter((part) => part.kind === 'arcTrack' && part.meta.arcTrack.paint === 'background');
+  assert.ok(arcs.length >= 2, 'the track and the value arc');
+  for (const arc of arcs) {
+    assert.equal(arc.meta.arcTrack.paintPad, 1);
+    assert.equal(arc._children.Background._children.Fill.gradientEnabled, true);
+  }
+  // The dot goes round upright; so does the riding label, which reads the channel's display text.
+  assert.ok(parts.some((part) => part.meta?.orbit === true && part._children.Background?._children?.Fill?.gradientEnabled === true));
+  const label = parts.find((part) => part._children.Text && part.meta?.orbit === true);
+  assert.ok(label, 'a riding label');
+  const bindings = Object.values(result.component._children.Bindings._children);
+  assert.ok(bindings.some((binding) => binding.target === `Parts.${label.name}.Text.content` && /\.display$/.test(binding.source)));
+  assert.ok(bindings.some((binding) => binding.target === `Parts.${label.name}.Layout.rotation`));
+  // The channel writes its value as the synth does.
+  const channel = Object.values(result.component._children.ValueChannels._children)[0];
+  assert.equal(channel.format.display.displayFormat, 'pan');
+});
+
+test('a knob whose display range was cleared to null gets no display scale on its channel', () => {
+  // Both writers store a cleared bound as null; Number(null) is 0, and a 0..0 display range would
+  // read every value as 0 (utils/valueDisplayScale.js).
+  const cleared = knob();
+  Object.assign(cleared._children.Behavior, { displayMin: null, displayMax: null });
+  const result = plan([cleared], 'graphite');
+  assert.ok(result.ok);
+  const channel = Object.values(result.component._children.ValueChannels._children)[0];
+  assert.equal(channel.format.displayMin, undefined);
+  assert.equal(channel.format.displayMax, undefined);
+});
+
+test('a knob that shows a plus on positive values writes one on its channel too', async () => {
+  const { formatChannelValue } = await import('../src/CE_Application/utils/valueDisplayScale.js');
+  const signed = knob();
+  Object.assign(signed._children.Behavior, { showSign: true, min: -10, max: 10, precision: 0 });
+  const channel = Object.values(plan([signed], 'graphite').component._children.ValueChannels._children)[0];
+  assert.equal(formatChannelValue(channel, 3), '+3');
+  assert.equal(formatChannelValue(channel, -3), '-3');
+  assert.equal(formatChannelValue(channel, 0), '0');
+});

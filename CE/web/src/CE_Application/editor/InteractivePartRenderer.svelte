@@ -268,9 +268,21 @@
     return list ? `filter: ${list};` : '';
   });
   let hiddenForFade = $derived(fadeHidden && part?.visible === false);
+  // A layer that orbits (`meta.orbit`): turned, it goes round its pivot and stays upright, as the
+  // panel moves a knob's dot or a label that rides its pointer round the knob without turning them.
+  let orbits = $derived(part?.meta?.orbit === true);
   let partStyle = $derived.by(() => {
     const transforms = [];
-    if (Math.abs(partRotation) > 0.001 && !fixedLight) transforms.push(`rotate(${partRotation}deg)`);
+    if (Math.abs(partRotation) > 0.001 && orbits) {
+      const px = (frame.width * numberOr(layout?.pivotX, 50)) / 100;
+      const py = (frame.height * numberOr(layout?.pivotY, 50)) / 100;
+      const vx = frame.width / 2 - px;
+      const vy = frame.height / 2 - py;
+      const a = (partRotation * Math.PI) / 180;
+      const dx = px + vx * Math.cos(a) - vy * Math.sin(a) - frame.width / 2;
+      const dy = py + vx * Math.sin(a) + vy * Math.cos(a) - frame.height / 2;
+      transforms.push(`translate(${Math.round(dx * 1000) / 1000}px, ${Math.round(dy * 1000) / 1000}px)`);
+    } else if (Math.abs(partRotation) > 0.001 && !fixedLight) transforms.push(`rotate(${partRotation}deg)`);
     if (Math.abs(partScale - 1) > 0.001) transforms.push(`scale(${partScale})`);
 
     return [
@@ -582,6 +594,27 @@
     const zones = Array.isArray(arcTrack?.zones) ? arcTrack.zones.filter((zone) => zone && zone.colour) : [];
     const zoneSweep = clampNumber(arcTrack?.zoneSweep ?? sweepAngle, 0, 360);
     return { size, r, thickness, arcLength, circumference, rotation, cap, colour, zones, zoneSweep, sweepAngle, direction, renderedStartAngle, blend: arcTrack?.blend !== false };
+  });
+
+  // An arc that paints its own background (`meta.arcTrack.paint: 'background'`: a gradient, a picture,
+  // a finish) through its stroke, as the panel paints a knob's track and value arc: the background
+  // over the arc's box grown by `paintPad` each side, masked to the arc.
+  let arcPaintPad = $derived(Math.max(0, numberOr(part?.meta?.arcTrack?.paintPad, 0)));
+  let arcPaintStyle = $derived.by(() => {
+    const arc = arcSvgData;
+    if (!arc || part?.meta?.arcTrack?.paint !== 'background' || !background || arc.sweepAngle <= 0) return '';
+    const pad = arcPaintPad;
+    const side = arc.size + 2 * pad;
+    const c = side / 2;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${side}" height="${side}" viewBox="0 0 ${side} ${side}">`
+      + `<circle cx="${c}" cy="${c}" r="${arc.r}" fill="none" stroke="#fff" stroke-width="${arc.thickness}" stroke-linecap="${arc.cap}" `
+      + `stroke-dasharray="${arc.arcLength} ${arc.circumference}" transform="rotate(${arc.rotation} ${c} ${c})"/></svg>`;
+    const url = `url("data:image/svg+xml;utf8,${encodeURIComponent(svg)}")`;
+    return [
+      'position:absolute', `left:${-pad}px`, `top:${-pad}px`, `width:${side}px`, `height:${side}px`,
+      `-webkit-mask-image:${url}`, `mask-image:${url}`, '-webkit-mask-size:100% 100%', 'mask-size:100% 100%',
+      '-webkit-mask-repeat:no-repeat', 'mask-repeat:no-repeat', 'pointer-events:none',
+    ].join('; ');
   });
 
   let arcZoneStyle = $derived.by(() => {
@@ -988,7 +1021,11 @@
       <div class="interactive-value-arc" style={valueArcStyle}></div>
     {/if}
 
-    {#if arcZoneStyle}
+    {#if arcPaintStyle}
+      <div class="interactive-arc-paint" style={arcPaintStyle}>
+        <BackgroundRenderer {background} width={arcSvgData.size + 2 * arcPaintPad} height={arcSvgData.size + 2 * arcPaintPad} />
+      </div>
+    {:else if arcZoneStyle}
       <div class="interactive-arc-zones" style={arcZoneStyle}></div>
     {:else if arcSvgData}
       <svg class="interactive-arc-svg" viewBox="0 0 {arcSvgData.size} {arcSvgData.size}" aria-hidden="true">

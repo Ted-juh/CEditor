@@ -85,19 +85,11 @@ export function valueLayersRefusal(resolved) {
   const form = anatomyForm(core.controlType, core.controlForm);
   if (form) return `drawn in the "${form}" control form, which is not made of parts`;
   if (getSliderValueMode(behavior) !== 'single') return 'two handles';
-  if (getSliderGeometry(behavior) !== 'circular') return sliderLayersRefusal(resolved);
-  const parts = resolveSliderSemanticParts(resolved?._children?.Parts ?? null)._children;
+  if (getSliderGeometry(behavior) !== 'circular') return sliderLayersRefusal();
   // Plates (housing, skirt, cap, insert) of every outline, in perspective, turning under a light
   // that stays put, with shadows and grooves, and rendered ones, are layers now (plateLayers).
-  if (partVisible(parts.bodyTrackBase) && fillIsRich(parts.bodyTrackBase)) return 'a gradient along its track, which a layer does not draw yet';
-  if (partVisible(parts.bodyTrackFill) && fillIsRich(parts.bodyTrackFill)) return 'a gradient along its value arc, which a layer does not draw yet';
-  if (behavior.showHandleLabels === true) return 'a label that rides the pointer';
-  const min = getSliderMin(behavior);
-  const max = getSliderMax(behavior);
-  if (formatBehaviorDisplay(behavior, min, max, min) !== null) return 'a readout written as the synth writes it';
-  if (String(parts.pointerCurrent?.kind ?? 'dot').toLowerCase() === 'dot' && fillIsRich(parts.pointerCurrent)) {
-    return 'a gradient on its pointer, which a layer does not draw yet';
-  }
+  // A track or value arc in a gradient, a picture or a finish paints it through the arc (an arc
+  // layer's `paint: 'background'`), and a dot pointer in one goes round upright (`meta.orbit`).
   return '';
 }
 
@@ -632,11 +624,20 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
 
   // Track.
   const trackColour = fillOf(parts.bodyTrackBase).colour ?? 'FF2C2C2C';
+  // A track or value arc in a gradient, a picture or a finish: its background painted through the
+  // arc over the arc's box and a pixel, as the panel paints it (SliderShapeFill).
+  const paintThrough = (layer, part) => {
+    layer.meta.arcTrack.paint = 'background';
+    layer.meta.arcTrack.paintPad = 1;
+    layer._children.Background = fillBackground(part);
+    return layer;
+  };
   if (partVisible(g('bodyTrackBase'))) {
-    add('bodyTrackBase', arcLayer(named('track'), {
+    const track = add('bodyTrackBase', arcLayer(named('track'), {
       centre, radius, thickness: trackThickness, start: designerAngle(startPanel), sweep: Math.min(360, sweep), direction,
       colour: trackColour, opacity: num(g('bodyTrackBase')?.opacity, 1), zIndex: depth, origin, role: 'track',
     }));
+    if (fillIsRich(g('bodyTrackBase'))) paintThrough(track, parts.bodyTrackBase);
   }
 
   // Centre marker.
@@ -668,6 +669,7 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
         centre, radius, thickness: trackThickness, start: angleAt(o), sweep: 0, direction: way,
         colour: fillColour, opacity: num(g('bodyTrackFill')?.opacity, 1), zIndex: depth, origin, role: 'fill',
       }));
+      if (fillIsRich(g('bodyTrackFill'))) paintThrough(layer, parts.bodyTrackFill);
       const reach = sweep * (to - from);
       // Up from the origin the arc grows as the travel goes past it; down, as it falls below it.
       const outputs = suffix === 'valueDown' ? [reach, 0] : [0, reach];
@@ -909,6 +911,29 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     } else if (pointerKind === 'capdot') {
       const r = Math.max(1.5, reach * (num(geometryPointer?._children?.Layout?.width, 26) / 200));
       layer = tickDot(named('pointer'), { centre, angle: startAngle, at: tip, r, colour: colourOr('FFFFFFFF'), opacity: num(geometryPointer?.opacity, 1), zIndex: depth, origin });
+    } else if (pointerKind === 'dot' && fillIsRich(geometryPointer)) {
+      // A dot in a gradient, a picture or a finish: the panel paints its background over its circle's
+      // box and a pixel, upright wherever it is (SliderShapeFill), and strokes its border over it. Its
+      // layers go round the knob upright (`meta.orbit`) rather than turning.
+      const point = { x: centre.x, y: centre.y - radius };
+      const r = pointerCurrentSize / 2;
+      const bw = borderWidth(pointerPart, 1);
+      const background = backgroundFrom(pointerPart, { borderFallback: 1, borderColourFallback: 'FF333333' });
+      const fill = deepClone(background);
+      fill._children.Border.enabled = false;
+      fill._children.Border.thickness = 0;
+      const dot = (layerName, sectionBackground, half, closed, grow = 0) => {
+        const box = { x: point.x - half - grow / 2, y: point.y - half - grow / 2, width: 2 * half + grow, height: 2 * half + grow };
+        const inner = { x: point.x - half, y: point.y - half, width: 2 * half, height: 2 * half };
+        return createPartNode(layerName, {
+          role: 'handle', kind: 'path', zIndex: depth, opacity: num(geometryPointer?.opacity, 1),
+          layout: { ...pxBox(box, origin), ...pivotIn(box, centre), rotation: startAngle },
+          meta: { pathData: pathInBox(circlePath(point.x, point.y, r), inner), closed, orbit: true },
+          sections: { Background: sectionBackground },
+        });
+      };
+      pointerLayers = [dot(named('pointer'), fill, r + 1, true)];
+      if (bw > 0) pointerLayers.push(dot(named('pointerEdge'), edgeBackground(background, bw), r, false, bw));
     } else if (pointerKind === 'dot') {
       const point = { x: centre.x, y: centre.y - radius };
       const r = pointerCurrentSize / 2;
@@ -950,7 +975,16 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
     trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics,
   });
-  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout }, anchors);
+  // A label that rides the pointer: 22 px out from the track, upright, round the centre the panel's
+  // label anchors use (buildSliderLabelAnchors' own track metrics, not the knob's drawn centre).
+  const labelCircle = resolveCircularTrackMetrics(width, height, {
+    trackThickness, pointerSize: maxPointerSize, majorTickLength: num(behavior.majorTickLength, 12), hasTicks: behavior.showTicks !== false,
+    hasReadout: showReadout, circularDiameter: behavior.circularDiameter, labelMetrics,
+  });
+  const handle = behavior.showHandleLabels === true
+    ? { at: anchors.current, centre: { x: labelCircle.centerX, y: labelCircle.centerY }, turn: signed * sweep }
+    : null;
+  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handle }, anchors);
 
   // The drag: the knob's own mode, about its centre, over its own sweep.
   out.behavior = {
@@ -970,7 +1004,7 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
  * its labels (`anchors`, buildSliderLabelAnchors). The readout shows the channel's value as the
  * control's readout did, unless its text was written by hand.
  */
-function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf, out, channel, showReadout }, anchors) {
+function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf, out, channel, showReadout, handle = null }, anchors) {
   const textLayer = (suffix, part, anchor, content, fallbackSize) => {
     const text = deepClone(part?._children?.Text ?? SECTION_DEFAULTS.Text);
     text.content = content;
@@ -1000,8 +1034,27 @@ function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, 
   if (behavior.showMinMaxLabels !== false) {
     const minText = String(parts.labelMin?._children?.Text?.content ?? '').trim();
     const maxText = String(parts.labelMax?._children?.Text?.content ?? '').trim();
-    add('labelMin', textLayer('min', parts.labelMin, anchors.min, minText || formatPlain(behavior, getSliderMin(behavior)), 11));
-    add('labelMax', textLayer('max', parts.labelMax, anchors.max, maxText || formatPlain(behavior, getSliderMax(behavior)), 11));
+    // Written as the panel writes them (formatSliderNumericValue): as the synth writes the value too.
+    add('labelMin', textLayer('min', parts.labelMin, anchors.min, minText || formatSliderNumericValue(behavior, getSliderMin(behavior)), 11));
+    add('labelMax', textLayer('max', parts.labelMax, anchors.max, maxText || formatSliderNumericValue(behavior, getSliderMax(behavior)), 11));
+  }
+  // The label that rides the pointer or the cap (`showHandleLabels`): the value as the readout shows
+  // it, at the start of the travel, carried with the value: round the knob upright (`meta.orbit`,
+  // the turn its pointer makes), or along the slider's travel.
+  if (handle) {
+    const layer = add('labelCurrent', textLayer('handle', parts.labelCurrent, handle.at, '', 11));
+    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
+    const source = `channel.${channel}.normalized`;
+    if (handle.centre) {
+      layer.meta = { ...(layer.meta ?? {}), orbit: true };
+      Object.assign(layer._children.Layout, pivotIn(boxOfLayout(layer._children.Layout, origin), handle.centre));
+      out.bindings[`${layer.name}Turn`] = rangeBinding(`${layer.name}Turn`, source, `Parts.${layer.name}.Layout.rotation`, 0, handle.turn);
+    } else {
+      const dx = handle.to.x - handle.at.x;
+      const dy = handle.to.y - handle.at.y;
+      if (Math.abs(dx) > 1e-6) out.bindings[`${layer.name}MoveX`] = rangeBinding(`${layer.name}MoveX`, source, `Parts.${layer.name}.Layout.offsetX`, 0, dx);
+      if (Math.abs(dy) > 1e-6) out.bindings[`${layer.name}MoveY`] = rangeBinding(`${layer.name}MoveY`, source, `Parts.${layer.name}.Layout.offsetY`, 0, dy);
+    }
   }
 }
 
@@ -1009,13 +1062,10 @@ function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, 
 
 
 /** Why this slider cannot become layers that look as it does, or ''. */
-function sliderLayersRefusal(resolved) {
-  const behavior = resolved?._children?.Behavior ?? {};
-  const parts = resolveSliderSemanticParts(resolved?._children?.Parts ?? null)._children;
-  const cap = parts.pointerCurrent ?? {};
+function sliderLayersRefusal() {
   // Every cap kind (dot, bar, console, block, lens, glass, ring, line), its glow, sheen, gradient and
-  // finish, a shaded track and fill, a glowing fill and a rendered cap are layers now.
-  if (behavior.showHandleLabels === true) return 'a label that rides the cap';
+  // finish, a shaded track and fill, a glowing fill, a rendered cap and a label riding the cap are
+  // layers now.
   return '';
 }
 
@@ -1374,7 +1424,12 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
     trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics,
   });
-  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout }, anchors);
+  // A label that rides the cap: beside it, or above it, from one end of the travel to the other.
+  const handle = behavior.showHandleLabels === true ? {
+    at: anchors.current,
+    to: buildSliderLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics }).current,
+  } : null;
+  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handle }, anchors);
 
   // The drag: across the track, from one end to the other.
   const lo = pointAt(0, pointerCurrentSize);
@@ -2546,18 +2601,6 @@ function numeralFor(behavior, stop) {
   return text.replace(/(\.\d*?[1-9])0+(?!\d)|\.0+(?!\d)/g, '$1');
 }
 
-/** A value as the min and max labels print it. */
-function formatPlain(behavior, value) {
-  const scale = sliderDisplayScale(behavior);
-  const shown = scale ? scale.displayMin + ((value - scale.min) / (scale.max - scale.min)) * (scale.displayMax - scale.displayMin) : value;
-  const step = num(behavior?.step, 0.01);
-  const precision = Number.isFinite(Number(behavior?.precision))
-    ? Math.max(0, Math.min(6, Math.round(Number(behavior.precision))))
-    : (step <= 0 || step >= 1 ? (String(behavior?.valueType ?? '') === 'int' ? 0 : 2) : Math.min(6, (String(step).split('.')[1] ?? '').length));
-  const unit = String(behavior?.unit ?? '');
-  return `${behavior?.prefix ?? ''}${Number(shown).toFixed(precision)}${behavior?.suffix ?? ''}${unit ? ` ${unit}` : ''}`.trim();
-}
-
 /** The format a knob's channel needs for its readout to print as the knob's did. */
 export function knobChannelFormat(behavior) {
   const step = num(behavior?.step, 0.01);
@@ -2570,9 +2613,21 @@ export function knobChannelFormat(behavior) {
     suffix: String(behavior?.suffix ?? ''),
     unit: String(behavior?.unit ?? '').trim(),
   };
-  if (Number.isFinite(Number(behavior?.displayMin)) && Number.isFinite(Number(behavior?.displayMax))) {
-    format.displayMin = Number(behavior.displayMin);
-    format.displayMax = Number(behavior.displayMax);
+  // The knob's own display scale, by the panel's rule: a bound cleared to null is no bound
+  // (utils/valueDisplayScale.js), where Number(null) would have made it 0 and every value read 0.
+  const scale = sliderDisplayScale(behavior);
+  if (scale) {
+    format.displayMin = scale.displayMin;
+    format.displayMax = scale.displayMax;
+  }
+  if (behavior?.showSign === true) format.showSign = true;
+  // How the synth writes the value (a frequency, a pan, a note, a table: utils/parameterDisplay.js),
+  // as the knob's readout wrote it: the channel's display text is the same (formatChannelValue).
+  if (formatBehaviorDisplay(behavior, getSliderMin(behavior), getSliderMax(behavior), getSliderMin(behavior)) !== null) {
+    format.display = {};
+    for (const key of ['displayFormat', 'displayTable', 'displayMin', 'displayMax', 'precision', 'displayMiddleC']) {
+      if (behavior[key] !== undefined && behavior[key] !== null && behavior[key] !== '') format.display[key] = deepClone(behavior[key]);
+    }
   }
   return format;
 }

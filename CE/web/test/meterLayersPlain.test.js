@@ -87,7 +87,7 @@ test('an arc meter is its track, one fill arc in the zones\' colours whose sweep
 test('the layers draw what the meter draws: zone colours on an arc, text shadows and outlines', () => {
   const renderer = source('editor/InteractivePartRenderer.svelte');
   assert.match(renderer, /background:conic-gradient\(from \$\{arc\.renderedStartAngle\}deg, \$\{stops\.join\(', '\)\}\)/);
-  assert.match(renderer, /\{#if arcZoneStyle\}\s*<div class="interactive-arc-zones" style=\{arcZoneStyle\}><\/div>\s*\{:else if arcSvgData\}/);
+  assert.match(renderer, /\{(?:#if|:else if) arcZoneStyle\}\s*<div class="interactive-arc-zones" style=\{arcZoneStyle\}><\/div>\s*\{:else if arcSvgData\}/);
   assert.match(renderer, /const shadow = buildTextShadowValue\(effects\);/);
   assert.match(renderer, /-webkit-text-stroke:\$\{width\}px/);
   // The meter's blended arc had a seam at each of its 128 joins; each span now runs into the next.

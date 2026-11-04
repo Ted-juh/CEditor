@@ -28,6 +28,9 @@
 // toggle still showing "Off". 591 controls on the committed QA-06 sheet were in that state.
 
 import { numberOr } from './primitives.js';
+// A cycle (parameterDisplay reads this file's scale), used only when a value is written, never as
+// either module loads.
+import { formatBehaviorDisplay } from './parameterDisplay.js';
 
 /**
  * A display bound, or NaN for "there isn't one".
@@ -102,6 +105,12 @@ export function formatChannelValue(channel, raw) {
   if (!Number.isFinite(numeric)) return String(raw);
 
   const format = channel?.format ?? {};
+  // Written as the synth writes it (a knob's display format, carried to its channel: valueControlLayers'
+  // knobChannelFormat), as the knob's readout wrote it; the author's prefix and suffix round it.
+  if (format.display && typeof format.display === 'object') {
+    const described = formatBehaviorDisplay(format.display, channel?.min, channel?.max, numeric);
+    if (described !== null) return `${String(format.prefix ?? '')}${described}${String(format.suffix ?? '')}`.trim();
+  }
   const scale = displayScale(format, channel?.min, channel?.max);
   const shown = toDisplay(scale, numeric);
   const base = Number.isFinite(Number(format.precision))
@@ -116,7 +125,9 @@ export function formatChannelValue(channel, raw) {
   // number a person types back, and toLocaleString on a comma-decimal locale made the two directions
   // disagree by a factor of a thousand.
   const text = shown.toFixed(precision);
-  return `${prefix}${text}${suffix}${unit ? ` ${unit}` : ''}`.trim();
+  // A plus on a positive value, as formatSliderNumericValue writes it for a knob that asks for one.
+  const sign = format.showSign === true && shown > 0 ? '+' : '';
+  return `${prefix}${sign}${text}${suffix}${unit ? ` ${unit}` : ''}`.trim();
 }
 
 /**

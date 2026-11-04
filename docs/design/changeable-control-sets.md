@@ -380,6 +380,24 @@ components):
      Button and Meter tabs show for a part's: Look, Shape (turned body or block), Light Stays Put,
      profile, ridges, depth, taper, height, corner, top, ridge direction, materials and colours.
 
+   - *Track gradients, riding labels and synth readouts* (R5): a knob's track or value arc in a
+     gradient, a picture or a finish is an arc layer that paints its background through the arc
+     (`meta.arcTrack.paint: 'background'`, over its box and `paintPad` pixels, as SliderShapeFill
+     paints it), and a dot pointer in one is a path layer, with its edge, that goes round the knob
+     upright (`meta.orbit`: its rotation applied as a move round its pivot). A label that rides the
+     pointer (`showHandleLabels`) is a text layer bound to the channel's display text, orbiting the
+     centre the panel's label anchors use (the label metrics' circle, which is not quite the knob's
+     drawn centre), or moved along a slider's travel between its two end anchors. A value written as
+     the synth writes it (`displayFormat`, a table: utils/parameterDisplay.js) is carried on the
+     channel (`format.display`) and printed by `formatChannelValue` through the same
+     `formatBehaviorDisplay`; the min and max labels use `formatSliderNumericValue`, as the panel's.
+     The channel's display range follows the panel's rule for a cleared bound (`null` is no bound;
+     `Number(null)` had made it 0, and every value read 0), and a plus on positive values
+     (`showSign`) is carried too. Checked against the panel on Graphite and Ceramic at four values:
+     a knob with a gradient track, value arc and dot pointer 8 of 8; its riding label written as a
+     pan, with a plus sign, and with a cleared display range 24 of 24; a slider's riding label 8 of 8
+     each way (at most 0.21 % of pixels apart).
+
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
    25 degrees and scaled 1.1, a knob of each kind 120 of 120 and a slider of each kind 40 of 40 (the

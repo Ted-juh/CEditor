@@ -1094,7 +1094,10 @@ a fill drawn in a pattern. A plate that turns with the value turns its outline w
 shadow stay put, as on the panel. What a layer does not draw yet (a control form that is not made
 of parts) comes in as one exact part, and the window names it and why. A rendered plate, fader cap,
 key or meter housing comes in as a layer that draws the same lit picture, its ridges turning under a
-light that stays put. A counter's
+light that stays put. A track, value arc or dot pointer in a gradient, a picture or a finish keeps
+it. A label that rides the pointer or the fader cap moves with the value, upright. A readout or
+label that shows the value as the synth does (a frequency, a pan position, a note name, a table
+entry) reads the same as a layer, and so does a plus sign on positive values. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the
