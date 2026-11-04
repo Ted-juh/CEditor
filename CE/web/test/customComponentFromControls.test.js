@@ -277,3 +277,15 @@ test('a name already in the library is never overwritten', () => {
   assert.equal(unusedPackageName('', []), 'Artwork');
   assert.ok(customComponentPackageId(createCustomComponentExportEnvelope(existing, { name: 'Plate 3' })).startsWith('plate-3@'));
 });
+
+test('an empty label keeps its text layer, so its text stays a setting a copy can fill; a label showing only its icon has none', () => {
+  const empty = at('Label', 'e', 0, 0, 100, 20, { Text: { content: '' } });
+  const plan = planComponentFromSelection({ id: 'p', controls: [empty], scripts: [] }, ['e']);
+  assert.ok(plan.ok, plan.refused?.[0]?.reason);
+  assert.ok(Object.values(plan.component._children.Parts._children).some((part) => part.role === 'label'));
+  assert.ok(Object.keys(plan.component._children.PublishedProperties.editableProperties).length === 1);
+  const iconOnly = at('Label', 'i', 0, 0, 40, 40, { Text: { content: 'X' }, Icon: { assetId: 'any' }, ContentLayout: { mode: 'icon_only' } });
+  const parts = Object.values(planComponentFromSelection({ id: 'p', controls: [iconOnly], scripts: [] }, ['i']).component._children.Parts._children);
+  assert.ok(!parts.some((part) => part.role === 'label'));
+  assert.ok(parts.some((part) => part._children.Icon));
+});

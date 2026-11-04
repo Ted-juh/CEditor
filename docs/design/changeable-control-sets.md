@@ -355,6 +355,11 @@ components):
      and blur, beside the text in the layout's mode, which makes room for it. `CE_KNOB_LAYERS_ICON=1`
      puts a test icon in the library for the pixel check.
 
+   Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
+   turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
+   25 degrees and scaled 1.1, a knob of each kind 120 of 120 and a slider of each kind 40 of 40 (the
+   text layers they share changed), and the text, icon and effect cases above.
+
    `knobLayers.mjs` with `CE_KNOB_LAYERS_STRICT=1` checks every offered set but the two illustrated
    ones, and fails a control that comes in as one exact part or is refused. Run over all of them:
    knobs 256 of 256 rows (four readings each, at most 1.4 % of pixels apart), sliders 256 of 256 each

@@ -1086,7 +1086,11 @@ with its caption; a switch flips its value on a click, a button holds it on whil
 parts move and light up as they did. A meter comes in as its track and its zones' colours covered past
 the reading, its segments each lighting as the reading reaches them, or, drawn as a device, as its
 housing, face, scale, needle or bar and readout, moving with its value; it takes no input, and its
-value arrives as a knob's does. Buttons and meters come in as layers only. CEditor saves
+value arrives as a knob's does. A button's or a label's text keeps where it is placed, its lines,
+its baseline shift and a line under, through or over it; its icon comes in as a layer of its own.
+A button, switch, meter or piece of artwork that is turned or scaled comes in turned and scaled, and
+a button is pressed where it is drawn. A control's shadow, bevel and colour filters come with it,
+the shadow cast by its plate. Buttons and meters come in as layers only. CEditor saves
 the result as a component in your library and puts a linked copy in their place. Each label's text
 becomes a setting, so every copy can have its own.
 

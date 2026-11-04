@@ -11,7 +11,7 @@
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
-  import { buildIconTintStyle, buildTextShadowValue, lineColourFor, lineGeometry, lineLayerFor, textEffectColor, usesIconTint } from './canvasControlStyles.js';
+  import { buildIconTintStyle, buildTextShadowValue, lineColourFor, lineGeometry, lineLayerFor, textAlignFor, textEffectColor, usesIconTint } from './canvasControlStyles.js';
   import { iconImageStyle } from './iconLook.js';
   import { storedIcons } from '../stores/appSettings.js';
   import { documentIcons, resolveIcon } from '../utils/documentIcons.js';
@@ -374,7 +374,8 @@
       // Font.baselineShift raises the text by that many pixels, as the panel's does.
       shift ? `transform:translateY(${-shift}px)` : '',
       `padding:0 ${multiline ? 2 : 8}px`,
-      'text-align:center',
+      // Lines of their own line up as the panel's do (its textAlignFor): left, centred or right.
+      `text-align:${textAlignFor(String(textPosition?.justification ?? 'centred'))}`,
       // Single-line text keeps its spaces, as the label renderer's does (white-space:pre there too):
       // "A  ·  B" is spaced on purpose. No text part in the QA sheets has a run of spaces to change.
       `white-space:${multiline ? 'normal' : 'pre'}`,

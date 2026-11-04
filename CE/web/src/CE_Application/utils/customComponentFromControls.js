@@ -949,7 +949,10 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
       icon.layer.zIndex = zIndex + (icon.above ? 3 : 1);
       parts.push(icon.layer);
     }
-    if (showsText(resolved)) parts.push(labelTextPart(uniquePartName(name, taken), resolved, resolved, rect, transform, { ...common, zIndex: zIndex + 2 }));
+    // A label keeps its text layer when it is empty, so its text stays a setting a copy can fill.
+    if (String(resolved._children.ContentLayout?.mode ?? 'text_only') !== 'icon_only') {
+      parts.push(labelTextPart(uniquePartName(name, taken), resolved, resolved, rect, transform, { ...common, zIndex: zIndex + 2 }));
+    }
     return parts;
   }
   if (type === 'Shape') {
