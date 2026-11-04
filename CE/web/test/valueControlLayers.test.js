@@ -521,10 +521,16 @@ test('a control in a classic form comes in as layers: a knob as its drawing, the
   assert.equal(knobInForm._children.Core.controlForm, 'disc');
   // A form whose parts draw it otherwise than its drawing is refused by name, pointing to Convert
   // to Parts, which gives a control that converts exactly.
-  for (const [type, form] of [['Button', 'cushion'], ['MomentaryButton', 'hexkey'], ['ToggleButton', 'rocker'], ['Knob', 'new-brassworks']]) {
+  for (const [type, form] of [['Button', 'cushion'], ['MomentaryButton', 'hexkey'], ['ToggleButton', 'rocker'], ['Knob', 'new-brassworks'], ['Meter', 'new-pinstripe']]) {
     const differs = plan([inForm(type, form, type === 'Knob' ? knobBox : undefined)]);
     assert.equal(differs.ok, false, `${type} ${form}`);
     assert.match(differs.refused?.[0]?.reason ?? '', new RegExp(`"${form}" control form, which its parts do not draw exactly; Core › Control design › Convert to Parts first`));
+  }
+  // A synth set's form whose parts draw it as its drawing does comes in as those parts.
+  for (const [type, form, size] of [['Button', 'new-hi-fi'], ['ToggleButton', 'new-diesel'], ['Meter', 'new-gimbal-ring', { width: 200, height: 125 }]]) {
+    const matches = plan([inForm(type, form, size)]);
+    assert.ok(matches.ok, `${type} ${form}: ${JSON.stringify(matches.refused)}`);
+    assert.ok(Object.keys(matches.component._children.Parts._children).length > 1, `${type} ${form}: layers`);
   }
   // An illustrated form is a whole drawing with no parts, and stays refused by name.
   const illustrated = plan([inForm('Knob', 'new-iris', knobBox)]);

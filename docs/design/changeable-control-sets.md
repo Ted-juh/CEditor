@@ -513,12 +513,18 @@ components):
      that converts exactly: the forms whose parts draw them otherwise than their drawings. The
      cushion and hexagonal keys (a pillow and a hexagon where the drawings curve their own way; 5 to
      17 %), the rocker, latch and strap switches (a key the drawing redraws or skews when on; 2.5 to
-     16 %), and the synth sets' forms (`new-<set>`), whose parts are a little smaller than their
-     drawings and keep their light still where the drawings turn it (8 to 16 % for knobs).
+     16 %), and the synth sets' forms (`new-<set>`) whose parts differ from their drawings: every
+     knob (a little smaller than its drawing, its light kept still where the drawing turns it, a
+     ring or a line left out; 6 to 16 %), and the buttons, switches and meters the parts draw with
+     a different well, edge or scale (2.5 to 17 %). The synth forms that match are listed by kind
+     (`SYNTH_PARTS_MATCH`), any other synth form counting as one that differs.
      Checked against the panel on Graphite: the twelve knobs 48 of 48 (four readings, at most 0.27 %
      of pixels apart), the base buttons 10 of 12, switches 9 of 12 off and on, meters 12 of 12 at
      four readings (0.26 %), the five others refused; a cushion and a rocker drawn in their parts
-     against their layers, 0.00 %.
+     against their layers, 0.00 %. The synth sets' forms: buttons 19 of 36 (unpressed, 1.7 %),
+     switches 16 of 36 (off and on, 2 %), meters 22 of 36 (four readings, 1.9 %), knobs none; the
+     rest refused. Every offered set's own devices, drawn in their parts, after the gradient change
+     (strict): buttons 64 of 64 in both sizes, switches 128 of 128, meters 256 of 256.
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned

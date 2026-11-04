@@ -174,14 +174,24 @@ function formFamily(type) {
 }
 
 // The synth sets' forms (`new-<set id>`, drawn by PhysicalAnatomy and the two series after it) whose
-// parts draw them as their drawings do, by kind and set id; measured as above. Any other synth form's
+// parts draw them as their drawings do, by kind and set id; measured as above (2026-11-04, on Graphite
+// in the form's own colours: the sets' default ones). Any other synth form's
 // parts differ: the sets' knobs as parts are a little smaller in the box than their drawings and
 // keep their light still where the drawings turn it (models/directionKnobParts.js), and their
 // devices leave out a line or a lit border here and there (models/directionDeviceParts.js).
 const SYNTH_PARTS_MATCH = {
-  Button: new Set(),
-  ToggleButton: new Set(),
-  Meter: new Set(),
+  // Unpressed (a button holds its value only while pressed): 19 of 36, at most 1.7 % of pixels apart.
+  Button: new Set(['brassworks', 'bakelite', 'hi-fi', 'porcelain', 'flightdeck', 'stompbox', 'switchboard', 'chronograph',
+    'cassette-deck', 'diesel', 'gemstone', 'leatherbound', 'heritage', 'compact-rack', 'valve-console', 'deep-flute',
+    'concave-studio', 'coin-edge', 'castellated']),
+  // Off and on: 16 of 36, at most 2 %.
+  ToggleButton: new Set(['hi-fi', 'porcelain', 'stompbox', 'switchboard', 'chronograph', 'cassette-deck', 'diesel', 'gemstone',
+    'leatherbound', 'heritage', 'compact-rack', 'valve-console', 'deep-flute', 'concave-studio', 'coin-edge', 'castellated']),
+  // At four readings: 22 of 36, at most 1.9 %.
+  Meter: new Set(['bakelite', 'porcelain', 'flightdeck', 'stompbox', 'switchboard', 'chronograph', 'cassette-deck', 'diesel',
+    'gemstone', 'leatherbound', 'valve-console', 'chicken-head', 'turret-stack', 'deep-flute', 'concave-studio', 'hex-drive',
+    'coin-edge', 'gimbal-ring', 'lever-dial', 'castellated', 'floating-halo', 'prism-cap']),
+  // None: 8 to 16 % apart.
   Knob: new Set(),
 };
 
