@@ -375,6 +375,10 @@ components):
      zones colour draws flat, as on the panel. The static part bake keeps them live, and both export
      bakers (the editor's and the tools') bake a component's rendered layers, a state's colour
      resolved through the set, so a plug-in draws them without WebGL.
+     The dock's **Render** tab (components/RenderTab.svelte, in the designer only, beside Mask;
+     approved from its mock-up) edits a layer's rendered look with the fields the Knob, Slider,
+     Button and Meter tabs show for a part's: Look, Shape (turned body or block), Light Stays Put,
+     profile, ridges, depth, taper, height, corner, top, ridge direction, materials and colours.
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned

@@ -660,6 +660,24 @@ In the **Mask** tab:
   uses another layer's outline, as a clipping mask does; that layer stays as it is, so hide it when
   it should only mask. **Delete Mask** removes it.
 
+### Rendered layers
+
+A layer can be drawn as a lit object instead of from its fill and stroke: the picture a knob's
+rendered plate, a fader cap, a key or a meter's housing draws on the panel, lit by the set's lamp.
+Select the layer and open the dock's **Render** tab (in the Component Designer only):
+
+- **Look**: Flat, or Rendered. Rendered turns the layer's fill on: its colour is the body's.
+- **Shape**: a **Turned Body**, round, the size of the layer's larger side (a knob, a lamp), or a
+  **Block** the layer's box (a key, a fader cap, a housing).
+- A turned body's **Profile** (smooth, knurled, fluted), **Ridges**, **Depth**, **Taper**, **Height**
+  and **Top**; **Light Stays Put** makes its ridges turn with its rotation while its highlight stays
+  where the lamp is, as a knob's plate turns with its value.
+- A block's **Corner %**, **Height %**, **Taper %** and **Top** (flat, insert, ridged, dome, dish),
+  and for a ridged top its **Ridges**, their **Depth** and which way they run.
+- **Material**, **Top Material**, **Body Colour** (the layer's fill) and **Top Colour**.
+
+Until its picture is made the layer shows its fill. An exported plug-in carries the pictures.
+
 What moves is wired: a dial, a fader, a switch or a button, with its value, the area that takes the
 mouse, and the layers that follow the value. A drawing with nothing named to move comes in as
 layers only. The Console says what each name made, and what was drawn close to rather than exactly:
@@ -1474,6 +1492,7 @@ an open panel the items are greyed out.
 | **Gradient** | Edits a gradient fill. |
 | **Effects** | The selected control's effects: shadows, glows, blur and more, and saved looks. |
 | **Mask** | In the Component Designer only: the selected layer's mask; see [Layer masks](#layer-masks). |
+| **Render** | In the Component Designer only: the selected layer's rendered look; see [Rendered layers](#rendered-layers). |
 | **Text** | Every text setting of the selected control: font, size, spacing, alignment and more. |
 | **Assets** | A control's images, including filmstrips (one image holding every frame of a knob). |
 | **Screen** | Editors for LCD and pixel display controls. |

@@ -310,3 +310,20 @@ test('the Meter tab offers a Look on the housing and the clip lamp, and says whe
   assert.equal(renderedMeterPartSpec(box, { name: 'housing' }).height, 0.075, '12 % of the 50 narrower side, of 80');
   assert.equal(renderedMeterPartSpec(box, { name: 'lamp' }).height, 0.188, '30 % of it');
 });
+
+test('the dock\'s Render tab edits the selected designer layer\'s rendered look, only while the designer is open', () => {
+  const dock = readFileSync(new URL('../src/CE_Application/panels/DisplayPanel.svelte', import.meta.url), 'utf8');
+  assert.match(dock, /\{ id: 'render',\s+label: 'Render',\s+icon: Cylinder, designerOnly: true \}/);
+  assert.match(dock, /render: \(\) => import\('\.\.\/components\/RenderTab\.svelte'\)/);
+  assert.match(dock, /normalized === 'mask' \|\| normalized === 'render'/, 'never restored at startup, when no designer is open');
+  const tab = readFileSync(new URL('../src/CE_Application/components/RenderTab.svelte', import.meta.url), 'utf8');
+  // The layer the Mask tab edits, written through the same store; the fields the Knob, Slider, Button and Meter tabs show.
+  assert.match(tab, /designerMaskTarget\(\$componentDesignerStatus/);
+  assert.match(tab, /updateControlProperty\(target\.controlId, `Parts\.\$\{target\.layer\}\.\$\{key\}`, value\)/);
+  for (const key of ['renderShape', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop', 'renderCorner', 'renderAxis', 'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'meta.fixedLight']) {
+    assert.ok(tab.includes(`'${key}'`), key);
+  }
+  // Choosing Rendered turns the fill on (the body's colour) and picks a shape from the layer's box.
+  assert.match(tab, /set\('Background\.Fill\.solidEnabled', true\)/);
+  assert.match(tab, /set\('renderShape', square \? 'round' : 'block'\)/);
+});
