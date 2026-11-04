@@ -76,3 +76,22 @@ test('a knob with a rendered plate is not made into layers that would draw it fl
   Object.assign(knob._children.Parts._children.bodyHousing, { visible: true, look: 'rendered' });
   assert.match(valueLayersRefusal(knob), /a rendered housing/);
 });
+
+test('the Knob tab offers a plate\'s look, and a rendered plate shows only what the render draws', () => {
+  const tab = readFileSync(new URL('../src/CE_Application/sections/KnobPartsEditor.svelte', import.meta.url), 'utf8');
+  assert.match(tab, /\{@const rendered = String\(part\?\.look \?\? ''\) === 'rendered'\}/);
+  assert.match(tab, /<PropertyCell label="Look" span=\{1\} path=\{`\$\{prefix\}\.look`\}/);
+  assert.match(tab, /set\(`\$\{prefix\}\.look`, e\.target\.value === 'rendered' \? 'rendered' : ''\)/, 'Flat clears the key: the factory value');
+  for (const key of ['renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop', 'renderMaterial', 'renderTopMaterial', 'renderTopColour']) {
+    assert.ok(tab.includes(`path={\`\${prefix}.${key}\`}`), key);
+  }
+  for (const list of ['RENDERED_PROFILES', 'RENDERED_TOPS', 'RENDERED_MATERIALS']) assert.match(tab, new RegExp(`\\{#each ${list} as \\[id, label\\] \\(id\\)\\}`));
+  // The flat look's fields (outline, border, finish, shadow, grooves) sit in the other branch.
+  const branch = tab.slice(tab.indexOf('{#if rendered}'), tab.indexOf('{:else}', tab.indexOf('{#if rendered}')));
+  assert.ok(branch.includes('label="Body Colour"') && branch.includes('label="Top Colour"'));
+  for (const flat of ['label="Outline"', 'label="Grooves"', 'label="Shadow %"']) assert.ok(!branch.includes(flat), flat);
+  // The defaults it shows are the ones the render uses.
+  assert.match(tab, /part\?\.renderProfile === 'fluted' \? 18 : 72/);
+  assert.equal(renderedLookSpec({ look: 'rendered' }, {}).count, 72);
+  assert.equal(renderedLookSpec({ look: 'rendered', renderProfile: 'fluted' }, {}).count, 18);
+});

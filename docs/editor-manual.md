@@ -346,7 +346,15 @@ grip of a synth knob, a **Chicken-head**, or a ring), a size, a fill and a borde
 **Softness %** (with no drop and a bright colour, a glow). **Height %** makes a plate an oval, a
 round part seen at an angle, and **Offset Y %** moves it down or up: a side wall under a top, a cap
 lifted off it. An oval that turns turns as a gimbal does. An insert with no fill and a border is a
-ring engraved in the cap. The **Pointer** can be a **Bar**, a painted bar with square ends: **Taper
+ring engraved in the cap. A plate's **Look** is **Flat**, drawn from those fields, or **Rendered**:
+drawn as a lit, three-dimensional object, lit from the set's **Lamp**. A rendered plate has its own
+fields instead: **Size**, **Turns**, a **Profile** (smooth, knurled or fluted) with its **Ridges** and
+their **Depth**, a **Taper**, a **Height**, a **Top** (flat, with an insert, or a dome), a
+**Material** and a **Top Material** (spun or brushed metal, gloss or satin plastic, rubber), and a
+**Body Colour** and **Top Colour**. Its ridges turn with the value while the light stays where the
+lamp is. The images are made in the editor and stored in the plug-in when the panel is exported, so
+the plug-in renders nothing itself; until an image is ready, or on a computer that cannot render it,
+the plate shows its plain fill. The **Pointer** can be a **Bar**, a painted bar with square ends: **Taper
 %** narrows its tip into a wedge (below 0 the tip is the wider end) and **Edge** draws a rim round
 it, or two fine lines when the bar has no fill; a gradient on its fill makes it a brushed lever. Under
 the ticks, **Scale Radius %** sets the scale on a radius of its own, outside a value arc that runs

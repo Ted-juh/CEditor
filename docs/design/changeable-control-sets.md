@@ -391,7 +391,9 @@ cached by spec, size and turn; a grooved plate that turns needs eight, through o
 so the light stays put. Until one is ready, or without WebGL2, the plate draws its plain fill.
 Export bakes them (`bakeRenderedLooks` in `preparePanelForExport`), each distinct image once, into
 the document's `renderedLookImages`; the player loads them and draws them, no WebGL needed. Three
-knobs: three images, about 120 KB each. The Knob tab's fields follow, after a mock-up. A knob
+knobs: three images, about 120 KB each. The Knob tab edits it (approved mock-up): each plate's
+**Look**, Flat or Rendered, and a rendered plate shows only what the render draws (size, turns,
+profile, ridges and their depth, taper, height, top, the two materials and colours). A knob
 with a rendered plate is refused as layers by name. Fader caps and button faces come after.
 
 ### F. Filmstrips as their own category (small)

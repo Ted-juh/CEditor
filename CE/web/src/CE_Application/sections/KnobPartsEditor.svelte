@@ -22,6 +22,7 @@
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { getSection } from '../stores/controls.js';
   import { numberOr } from '../utils/primitives.js';
+  import { RENDERED_MATERIALS, RENDERED_PROFILES, RENDERED_TOPS } from '../utils/renderedLook.js';
   import { anatomyForm, anatomyOptions, isIllustratedForm } from '../models/controlAnatomy.js';
   import IllustratedFormNote from './IllustratedFormNote.svelte';
 
@@ -76,10 +77,64 @@
   {@const outline = String(part?.outline ?? 'circle')}
   {@const material = materialOf(part)}
   {@const border = borderOf(part)}
+  {@const rendered = String(part?.look ?? '') === 'rendered'}
   <PropertySection title={title} icon={icon}>
     <PropertyCell label="Visible" span={1} path={`${prefix}.visible`} hint={`Draw the ${title.toLowerCase()}.`}>
       <PropertyToggle value={part?.visible === true} onchange={(next) => set(`${prefix}.visible`, next)} />
     </PropertyCell>
+    <PropertyCell label="Look" span={1} path={`${prefix}.look`} hint="Flat: drawn from its outline, fill, border and finish. Rendered: drawn as a lit object, a turned body with its ridges, top and materials, lit by the set's lamp; the fields below are its own.">
+      <select class="val" value={rendered ? 'rendered' : 'flat'} onchange={(e) => set(`${prefix}.look`, e.target.value === 'rendered' ? 'rendered' : '')}>
+        <option value="flat">Flat</option><option value="rendered">Rendered</option>
+      </select>
+    </PropertyCell>
+    {#if rendered}
+      <!-- A rendered plate (utils/renderedLook.js, piece E): only what the render draws. Its outline,
+           border, finish, shadow and grooves are the flat look's and do not apply. -->
+      <PropertyCell label="Size %" span={1} compact path={`${prefix}.Layout.width`} hint="Its size, as a percentage of the track's radius.">
+        <NumberCell label="Size" value={numberOr(part?._children?.Layout?.width, SIZES[name] ?? 100)} defaultValue={SIZES[name] ?? 100} step={1} min={1} max={200} onchange={(v) => setSize(prefix, v)} />
+      </PropertyCell>
+      <PropertyCell label="Turns" span={1} path={`${prefix}.turns`} hint="Its ridges turn with the value; the light stays where the lamp is.">
+        <PropertyToggle value={part?.turns === true} onchange={(next) => set(`${prefix}.turns`, next)} />
+      </PropertyCell>
+      <PropertyCell label="Profile" span={2} path={`${prefix}.renderProfile`} hint="Its side: smooth, knurled (fine ridges, a machined grip) or fluted (broad grooves).">
+        <select class="val" value={part?.renderProfile ?? 'smooth'} onchange={(e) => set(`${prefix}.renderProfile`, e.target.value)}>
+          {#each RENDERED_PROFILES as [id, label] (id)}<option value={id}>{label}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Ridges" span={1} compact path={`${prefix}.renderCount`} hint="How many ridges or flutes round its side.">
+        <NumberCell label="Ridges" value={numberOr(part?.renderCount, part?.renderProfile === 'fluted' ? 18 : 72)} defaultValue={part?.renderProfile === 'fluted' ? 18 : 72} step={1} min={3} max={160} onchange={(v) => set(`${prefix}.renderCount`, Math.round(Number(v) || 0))} />
+      </PropertyCell>
+      <PropertyCell label="Ridge Depth %" span={1} compact path={`${prefix}.renderDepth`} hint="How deep the ridges cut, as a percentage of its radius.">
+        <NumberCell label="Depth" value={numberOr(part?.renderDepth, part?.renderProfile === 'fluted' ? 10 : 4)} defaultValue={part?.renderProfile === 'fluted' ? 10 : 4} step={0.5} min={0} max={30} onchange={(v) => set(`${prefix}.renderDepth`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Taper %" span={1} compact path={`${prefix}.renderTaper`} hint="How much narrower its top is than its foot, as a percentage of its radius.">
+        <NumberCell label="Taper" value={numberOr(part?.renderTaper, 8)} defaultValue={8} step={1} min={0} max={40} onchange={(v) => set(`${prefix}.renderTaper`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Height %" span={1} compact path={`${prefix}.renderHeight`} hint="How tall it stands, as a percentage of its radius: its shadow grows with it.">
+        <NumberCell label="Height" value={numberOr(part?.renderHeight, 80)} defaultValue={80} step={1} min={20} max={160} onchange={(v) => set(`${prefix}.renderHeight`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Top" span={2} path={`${prefix}.renderTop`} hint="Its top: flat, with an insert set into it, or a dome.">
+        <select class="val" value={part?.renderTop ?? 'flat'} onchange={(e) => set(`${prefix}.renderTop`, e.target.value)}>
+          {#each RENDERED_TOPS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Material" span={2} path={`${prefix}.renderMaterial`} hint="What its body is made of.">
+        <select class="val" value={part?.renderMaterial ?? 'metal'} onchange={(e) => set(`${prefix}.renderMaterial`, e.target.value)}>
+          {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Top Material" span={2} path={`${prefix}.renderTopMaterial`} hint="What its top is made of.">
+        <select class="val" value={part?.renderTopMaterial ?? 'spun'} onchange={(e) => set(`${prefix}.renderTopMaterial`, e.target.value)}>
+          {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Body Colour" span={2} path={`${prefix}.Background.Fill.colour`} hint="Its body's colour. The swatch opens it in the Colors dock.">
+        <PropertyColor value={shown(fillOf(part))} onchange={(v) => set(`${prefix}.Background.Fill.colour`, v)} onswatchclick={() => pickColour(`${prefix}.Background.Fill.colour`, fillOf(part))} />
+      </PropertyCell>
+      <PropertyCell label="Top Colour" span={2} path={`${prefix}.renderTopColour`} hint="Its top's colour; empty, the body's.">
+        <PropertyColor value={shown(part?.renderTopColour || fillOf(part))} onchange={(v) => set(`${prefix}.renderTopColour`, v)} onswatchclick={() => pickColour(`${prefix}.renderTopColour`, part?.renderTopColour)} />
+      </PropertyCell>
+    {:else}
     <PropertyCell label="Outline" span={1} path={`${prefix}.outline`} hint="The shape of its edge: a circle, a polygon, a rounded square, a scallop (a star), flutes (a round grip), a gear (a ribbed grip), a chicken-head or a ring.">
       <select class="val" value={outline} onchange={(e) => set(`${prefix}.outline`, e.target.value)}>
         {#each OUTLINES as [id, label] (id)}<option value={id}>{label}</option>{/each}
@@ -142,6 +197,7 @@
     <PropertyCell label="Groove Colour" span={2} path={`${prefix}.grooveColour`} hint="The grooves' colour; its alpha is how deep they look.">
       <PropertyColor value={shown(part?.grooveColour, 'BF253136')} onchange={(v) => set(`${prefix}.grooveColour`, v)} onswatchclick={() => pickColour(`${prefix}.grooveColour`, part?.grooveColour)} />
     </PropertyCell>
+    {/if}
   </PropertySection>
 {/snippet}
 
