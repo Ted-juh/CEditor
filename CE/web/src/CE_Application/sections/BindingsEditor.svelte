@@ -166,6 +166,12 @@
           {@render choices(unitGroups)}
         </select>
       </PropertyCell>
+      <PropertyCell label="Combine" span={4} hint="Set the target to this binding's value, or add it to what the bindings before it wrote: a range's fill moved by both its ends, a readout joined from several values.">
+        <select class="val" aria-label="Combine" value={selectedBinding.add === true ? 'add' : 'set'} onchange={(e) => setBindingProp('add', e.target.value === 'add')}>
+          <option value="set">Set the value</option>
+          <option value="add">Add to the bindings before it</option>
+        </select>
+      </PropertyCell>
       <PropertyCell label="Target" span={4} hint="Control or part path that receives the resolved output value.">
         <!-- What the path reaches, in words, over the path that edits it: the field alone read
              Parts.Cutoff.meta.sliderControl.value. -->
@@ -205,6 +211,20 @@
         <PropertyCell label="Inside Only" span={1} hint="Write Out Max while the source is inside In Min to In Max, and Out Min outside it, instead of a ramp between them.">
           <PropertyToggle value={selectedBinding.band === true} onchange={() => setBindingProp('band', !(selectedBinding.band === true))} />
         </PropertyCell>
+        <PropertyCell label="Scale" span={1} hint="How the source is read: as it is, or placed on a decibel scale from Floor dB to Ceil dB, as a meter on a decibel scale places its reading.">
+          <select class="val" aria-label="Scale" value={selectedBinding.scale === 'db' ? 'db' : 'linear'} onchange={(e) => setBindingProp('scale', e.target.value === 'db' ? 'db' : '')}>
+            <option value="linear">Linear</option>
+            <option value="db">Decibels</option>
+          </select>
+        </PropertyCell>
+        {#if selectedBinding.scale === 'db'}
+          <PropertyCell label="Floor dB" span={1} compact hint="The level in decibels at the start of the scale.">
+            <NumberCell label="Floor dB" value={selectedBinding.dbFloor ?? -60} step={1} defaultValue={-60} onchange={(value) => setBindingProp('dbFloor', value)} />
+          </PropertyCell>
+          <PropertyCell label="Ceil dB" span={1} compact hint="The level in decibels at the end of the scale.">
+            <NumberCell label="Ceil dB" value={selectedBinding.dbCeil ?? 6} step={1} defaultValue={6} onchange={(value) => setBindingProp('dbCeil', value)} />
+          </PropertyCell>
+        {/if}
         <PropertyCell label="" span={1} hint="Send the selected binding payload to the Debug panel." compact>
           <button class="action-btn" onclick={dumpBindingDebug}>Debug</button>
         </PropertyCell>

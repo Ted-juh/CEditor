@@ -425,3 +425,18 @@ test('a meter part coloured by the zones comes in as layers: by position each ce
   // Still refused, by name: blended level colour on lit cells.
   assert.match(withZones('ember', 'indicator', 'level').refused?.[0]?.reason ?? '', /blended/);
 });
+
+test('the designer shows and edits what ranges and decibel meters made as layers use', () => {
+  const read = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
+  const bindings = read('sections/BindingsEditor.svelte');
+  // Combine: a binding sets its target or adds to what the bindings before it wrote.
+  assert.match(bindings, /label="Combine"[\s\S]*?value=\{selectedBinding\.add === true \? 'add' : 'set'\}[\s\S]*?setBindingProp\('add', e\.target\.value === 'add'\)/);
+  // Scale: linear or decibels, with the decibel scale's floor and ceiling.
+  assert.match(bindings, /label="Scale"[\s\S]*?setBindingProp\('scale', e\.target\.value === 'db' \? 'db' : ''\)/);
+  assert.match(bindings, /\{#if selectedBinding\.scale === 'db'\}[\s\S]*?setBindingProp\('dbFloor', value\)[\s\S]*?setBindingProp\('dbCeil', value\)/);
+  const interact = read('sections/CustomInteractEditor.svelte');
+  // Measured in: the behaviour's frame, its grab area or the whole component.
+  assert.match(interact, /<em>Measured in<\/em>[\s\S]*?setBehaviorField\(behaviorName, 'frame', event\.currentTarget\.value === 'zone' \? 'zone' : ''\)/);
+  // Takes: a grab area over several values names them.
+  assert.match(interact, /\(zone\.targetValueChannels \?\? \[\]\)\.filter\(Boolean\)\.length > 1[\s\S]*?<em>Takes<\/em>/);
+});

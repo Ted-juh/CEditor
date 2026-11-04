@@ -251,6 +251,14 @@
                         {#each DRAG_MODES as option (option)}<option value={option}>{option}</option>{/each}
                       </select>
                     </label>
+                    <!-- What a press is measured against: its grab area (a knob's centre and a slider's
+                         travel in its own box), or the whole component. -->
+                    <label title="Measure where the pointer is against this behaviour's grab area, or against the whole component."><em>Measured in</em>
+                      <select aria-label="Measured in" value={behavior.frame === 'zone' ? 'zone' : 'component'} onchange={(event) => setBehaviorField(behaviorName, 'frame', event.currentTarget.value === 'zone' ? 'zone' : '')}>
+                        <option value="zone">its grab area</option>
+                        <option value="component">the whole component</option>
+                      </select>
+                    </label>
                   {/if}
                   <div class="ro-field input-flags"><em>Input</em>
                     <FlagStrip flags={inputFlags(behavior)} ontoggle={(key, next) => setBehaviorField(behaviorName, `interaction.${key}`, next)} />
@@ -272,6 +280,10 @@
                   <span class="tag">generated</span>
                 {:else if zone}
                   <span class="readout wide">{zoneSourceLabel(zone)}</span>
+                  {#if (zone.targetValueChannels ?? []).filter(Boolean).length > 1}
+                    <!-- One grab area over several values (a range's handles): the press takes the nearest. -->
+                    <div class="ro-field" title="A press takes the value nearest to where it lands, and the drag moves that one."><em>Takes</em><span class="readout">the nearest of {zone.targetValueChannels.filter(Boolean).join(', ')}</span></div>
+                  {/if}
                   <label title="Inflate the grab area (px each side)"><em>Grow</em><span class="nc-wrap"><NumberCell value={numberOr(zone.inflate?.x, 0)} defaultValue={0} onchange={(v) => setZoneField(entry.name, 'inflate', { x: v, y: v, unit: 'px' })} /></span></label>
                   <label title="Minimum touch size (finger floor)"><em>Min px</em><span class="nc-wrap"><NumberCell value={numberOr(zone.minTouch, 0)} defaultValue={0} onchange={(v) => setZoneField(entry.name, 'minTouch', v)} /></span></label>
                 {/if}

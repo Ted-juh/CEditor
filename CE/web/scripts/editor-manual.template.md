@@ -1100,10 +1100,14 @@ label that shows the value as the synth does (a frequency, a pan position, a not
 entry) reads the same as a layer, and so does a plus sign on positive values. A range (two
 handles) or a band (a value between them) comes in with a value for each handle, kept in order: the
 fill runs from one to the other, the ticks light between them, and a press on the track takes the
-handle nearest to it, as on the panel. Handles that may pass each other or wrap round the end are
-not converted yet. A knob made into layers now turns about its own centre when the component holds
-several. A meter on a decibel scale comes in as layers that place the reading, and the held peak,
-on that scale, as the meter does. A meter part coloured by the zones keeps them: lit cells, scale
+handle nearest to it, as on the panel. The fill is moved by both ends: on the **React** tab, the
+start's binding has **Combine** set to **Add to the bindings before it**, so its value is added to
+what the end's binding wrote. The grab area's row on the **Interact** card says it **Takes** the
+nearest of the handles. Handles that may pass each other or wrap round the end are not converted
+yet. A knob made into layers turns about its own centre when the component holds several: its
+behaviour is **Measured in** its grab area, not the whole component. A meter on a decibel scale
+comes in as layers that place the reading, and the held peak, on that scale, as the meter does: its
+bindings' **Scale** is **Decibels**, from **Floor dB** to **Ceil dB**. A meter part coloured by the zones keeps them: lit cells, scale
 marks and a fill by where they sit, a needle, lamp or legend by the zone the reading is in. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak

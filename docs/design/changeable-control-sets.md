@@ -458,6 +458,11 @@ components):
      through. Run over every offered set's own meter with three zones: as the set draws it, 256 of
      256; the indicator by level (stepped), 256 of 256; the indicator and the scale by position, 248
      of 256, the eight Neon's and Obsidian's scale, which is counter windows, refused by name.
+     The designer shows and edits what these use (approved from its mock-up): on the React tab, a
+     binding's **Combine** (Set the value, or Add to the bindings before it) and, in its Range Map,
+     **Scale** (Linear or Decibels, with **Floor dB** and **Ceil dB**); on the Interact card, a
+     behaviour's **Measured in** (its grab area or the whole component) and, on a grab area over
+     several values, **Takes** the nearest of them.
      The behaviour of a knob or slider made into layers now measures a point against its own grab
      area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
      another turned about a point between them: pressing straight above the second of two knobs set
