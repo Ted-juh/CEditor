@@ -36,12 +36,15 @@ import { knobOutlinePath, knobOutlineReach } from './knobOutlines.js';
 import { formatBehaviorDisplay } from './parameterDisplay.js';
 import { deepClone } from './deepClone.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
+import { DRAWN_KNOB_FORMS } from './formDrawingLayers.js';
+import { formLayersRefusal } from '../models/formAsParts.js';
 import { BUTTON_DEVICE_PARTS, DEVICE_FRAME } from '../models/buttonDeviceParts.js';
 import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
 import { meterLitOffset, meterPartDrawing, meterZoneColour } from './meterParts.js';
 import { REVEAL_ALL_MASK_SRC } from './partMask.js';
 import { decibelPosition, meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, meterTicks, meterZones } from './meterLayout.js';
 import { normalLineHeight } from './textLineHeight.js';
+import { unpremultipliedStops } from './gradientStops.js';
 import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { buttonAnatomyLayout } from './anatomyLayout.js';
 import { scalePathData, transformPathData } from './svgPathScale.js';
@@ -84,7 +87,11 @@ export function valueLayersRefusal(resolved) {
   const behavior = resolved?._children?.Behavior ?? {};
   const core = resolved?._children?.Core ?? {};
   const form = anatomyForm(core.controlType, core.controlForm);
-  if (form) return `drawn in the "${form}" control form, which is not made of parts`;
+  // A knob in a base form comes in as its drawing (formDrawingLayers.js), which shows one value.
+  if (form && core.controlType === 'Knob' && DRAWN_KNOB_FORMS.includes(form)) {
+    return getSliderValueMode(behavior) === 'single' ? '' : `two handles drawn in the "${form}" control form, which shows one value`;
+  }
+  if (form) return formLayersRefusal(core.controlType, form);
   // A range's or a band's handles are values of their own, kept in order (valueHandles); handles that
   // may pass each other or wrap round the end would need a fill from whichever is lower.
   if (getSliderValueMode(behavior) !== 'single' && getSliderAllowHandleCross(behavior)) return 'handles that may pass each other';
@@ -1831,6 +1838,8 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       background._children[key] = { ...deepClone(SECTION_DEFAULTS.Background._children[key]), ...(background._children[key] ?? {}) };
     }
     const fill = background._children.Fill;
+    // Painted in SVG on the panel, which blends a gradient's colours and opacities apart.
+    if (fill.gradientEnabled === true && Array.isArray(fill.gradient?.stops)) fill.gradient = { ...fill.gradient, stops: unpremultipliedStops(fill.gradient.stops) };
     const own = motion(part);
     // A part that rides the key moves as the key does, then as itself; where the key turns, the part
     // (which then does not turn itself: refused) turns with it, about the key's pivot.
@@ -2110,6 +2119,9 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       background._children.Fill.solidEnabled = true;
       background._children.Fill.gradientEnabled = false;
     }
+    // Painted in SVG on the panel, which blends a gradient's colours and opacities apart.
+    const fill = background._children.Fill;
+    if (fill.gradientEnabled === true && Array.isArray(fill.gradient?.stops)) fill.gradient = { ...fill.gradient, stops: unpremultipliedStops(fill.gradient.stops) };
     const border = part?._children?.Background?._children?.Border ?? {};
     const bw = border.enabled === true && num(border.thickness, 0) > 0 ? num(border.thickness, 0) * S : 0;
     background._children.Border.enabled = bw > 0;

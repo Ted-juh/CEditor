@@ -11,6 +11,7 @@ import { BUILT_IN_CONTROL_SETS, getControlSet } from '../src/CE_Application/mode
 import { resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
 import { planComponentFromSelection } from '../src/CE_Application/utils/customComponentFromControls.js';
 import { valueLayersRefusal } from '../src/CE_Application/utils/valueControlLayers.js';
+import { unpremultipliedStops } from '../src/CE_Application/utils/gradientStops.js';
 
 const panelWith = (controls, setId = 'graphite') => ({ id: 'p', controlSet: { id: setId }, controlSets: [], controls });
 const knob = (patch = {}) => createControl('Knob', { Core: { id: 'k1', name: 'Cutoff' }, Transform: { x: 40, y: 60, width: 120, height: 140 }, ...patch });
@@ -474,4 +475,76 @@ test('a meter that shows another control\'s value shows it as layers: the knob i
   assert.equal(sourcedCustomValues(outside.component, {}, read).Level, 30);
   // A source that cannot be read leaves the value as it is.
   assert.equal(sourcedCustomValues(outside.component, { Level: 70 }, () => null).Level, 70);
+});
+
+test('a control in a classic form comes in as layers: a knob as its drawing, the rest as its parts', () => {
+  const inForm = (type, form, size = { width: 160, height: 100 }, core = {}) => createControl(type, {
+    Core: { id: 'f1', name: 'Formed', controlForm: form, ...core }, Transform: { x: 0, y: 0, ...size },
+  });
+  const knobBox = { width: 120, height: 140 };
+  for (const [type, form, size] of [['Knob', 'disc', knobBox], ['Knob', 'scallop', knobBox], ['Button', 'piano'], ['ToggleButton', 'lever'], ['Meter', 'vu', { width: 200, height: 125 }]]) {
+    const result = plan([inForm(type, form, size)]);
+    assert.ok(result.ok, `${type} ${form}: ${JSON.stringify(result.refused)}`);
+    assert.equal(result.asParts?.length ?? 0, 0, `${type} ${form}: ${result.asParts?.[0]?.reason}`);
+    assert.ok(Object.keys(result.component._children.Parts._children).length > 1, `${type} ${form}: layers`);
+  }
+  // A knob's drawing, shape by shape in its own colours: the disc's face, its track and value arc,
+  // its pointer turning with the value about the knob's centre, and the readout showing the value.
+  const disc = plan([inForm('Knob', 'disc', knobBox, { formFaceColour: 'FF102030', formAccentColour: '{accent}' })]).component;
+  const parts = disc._children.Parts._children;
+  const bindings = Object.values(disc._children.Bindings?._children ?? disc.bindings ?? {});
+  assert.equal(parts.Formed_face.kind, 'path');
+  assert.equal(parts.Formed_face._children.Background._children.Fill.colour, 'FF102030');
+  assert.equal(parts.Formed_arc.meta.arcTrack.colour, '{accent}', 'a colour role stays a role');
+  const turn = bindings.find((b) => b.target === 'Parts.Formed_pointer.Layout.rotation');
+  assert.deepEqual([turn.outputMin, turn.outputMax], [-135, 135]);
+  assert.ok(bindings.some((b) => b.target === 'Parts.Formed_arc.meta.arcTrack.sweepAngle'));
+  assert.ok(bindings.some((b) => b.target === 'Parts.Formed_readout.Text.content' && /\.display$/.test(b.source)));
+  // Drawn in the frame the SVG fits in the box: the 160 by 170 frame, 0.75 of a 120 by 140 box,
+  // the face's radius 43 of it.
+  assert.ok(Math.abs(parts.Formed_face._children.Layout.width - 2 * 43 * 0.75) < 0.01);
+  // The roller's ribs scroll a rib's spacing; the twelfth goes back to the top at the very end.
+  const roller = plan([inForm('Knob', 'roller', knobBox)]).component;
+  const rollerBindings = Object.values(roller._children.Bindings?._children ?? roller.bindings ?? {});
+  assert.ok(rollerBindings.some((b) => b.target === 'Parts.Formed_rib12.Layout.offsetY' && b.add === true && b.inputMin > 0.99));
+  // The encoder's segments light from their own point of the travel.
+  const encoder = plan([inForm('Knob', 'encoder', knobBox)]).component;
+  const lit = Object.values(encoder._children.Bindings?._children ?? encoder.bindings ?? {}).filter((b) => /Formed_segment\d+\.opacity$/.test(b.target));
+  assert.equal(lit.length, 12);
+  // A drawing shows one value, and one exact part holds one: a range drawn in a form is refused, saying why.
+  const ranged = plan([createControl('Knob', { Core: { id: 'f1', name: 'Formed', controlForm: 'disc' }, Behavior: { valueMode: 'range' }, Transform: { x: 0, y: 0, ...knobBox } })]);
+  assert.equal(ranged.ok, false);
+  assert.match(ranged.refused?.[0]?.reason ?? '', /two handles drawn in the "disc" control form/);
+  // The control on the panel is not changed.
+  const knobInForm = inForm('Knob', 'disc', knobBox);
+  plan([knobInForm]);
+  assert.equal(knobInForm._children.Core.controlForm, 'disc');
+  // A form whose parts draw it otherwise than its drawing is refused by name, pointing to Convert
+  // to Parts, which gives a control that converts exactly.
+  for (const [type, form] of [['Button', 'cushion'], ['MomentaryButton', 'hexkey'], ['ToggleButton', 'rocker'], ['Knob', 'new-brassworks']]) {
+    const differs = plan([inForm(type, form, type === 'Knob' ? knobBox : undefined)]);
+    assert.equal(differs.ok, false, `${type} ${form}`);
+    assert.match(differs.refused?.[0]?.reason ?? '', new RegExp(`"${form}" control form, which its parts do not draw exactly; Core › Control design › Convert to Parts first`));
+  }
+  // An illustrated form is a whole drawing with no parts, and stays refused by name.
+  const illustrated = plan([inForm('Knob', 'new-iris', knobBox)]);
+  assert.match(illustrated.asParts?.[0]?.reason ?? illustrated.refused?.[0]?.reason ?? '', /"new-iris" control form/);
+});
+
+test('a gradient painted in SVG is sampled for a layer, which CSS paints premultiplied', () => {
+  // All opaque: the two blend alike, and the stops come back as they were.
+  const opaque = [{ color: 'FF102030', position: 0 }, { color: 'FFF0E0D0', position: 100 }];
+  assert.equal(unpremultipliedStops(opaque), opaque);
+  // A colour role has no colour to blend until it is drawn.
+  const role = [{ color: '{surface}', position: 0 }, { color: '80000000', position: 100 }];
+  assert.equal(unpremultipliedStops(role), role);
+  // A face fading to a half-clear black: SVG takes the colour half way at half the opacity change,
+  // where CSS would hold the colour near the face; each sample is the SVG blend at its position.
+  const sampled = unpremultipliedStops([{ color: 'FFDEDBD2', position: 0 }, { color: '5C000000', position: 100 }]);
+  assert.equal(sampled.length, 41);
+  assert.deepEqual(sampled[0], { color: 'FFDEDBD2', position: 0 });
+  assert.deepEqual(sampled[20], { color: 'AE6F6E69', position: 50 });
+  assert.deepEqual(sampled.at(-1), { color: '5C000000', position: 100 });
+  // A stop off the sampling grid is kept at its own position.
+  assert.ok(unpremultipliedStops([{ color: '00FFFFFF', position: 0 }, { color: 'FFDEDBD2', position: 42 }, { color: 'FF000000', position: 100 }]).some((stop) => stop.position === 42));
 });

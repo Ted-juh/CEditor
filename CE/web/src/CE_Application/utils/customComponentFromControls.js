@@ -60,6 +60,8 @@ import { isDisplayOnly } from './displayMode.js';
 import { targetBuckets } from './interactionRuntime.js';
 import { surfaceShadows } from './surfaceEffects.js';
 import { getSliderDefaultValues, getSliderMax, getSliderMin, getSliderValueMode } from './sliderBehavior.js';
+import { formLayersRefusal, formPartsDiffer, withFormAsParts } from '../models/formAsParts.js';
+import { DRAWN_KNOB_FORMS, knobFormDrawingLayers } from './formDrawingLayers.js';
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
 
@@ -334,7 +336,11 @@ function whyNotValueConvertible(control, resolved, layers = false) {
     if (why) return why;
   }
   const form = anatomyForm(core.controlType, core.controlForm);
-  if (form) return `drawn in the "${form}" control form, which a part does not draw`;
+  // A base knob form comes in as its drawing, shape by shape (utils/formDrawingLayers.js). The
+  // drawing shows one value.
+  if (form && layers && core.controlType === 'Knob' && DRAWN_KNOB_FORMS.includes(form)) {
+    if (String(behavior.valueMode ?? 'single') !== 'single') return `two handles drawn in the "${form}" control form, which shows one value`;
+  } else if (form) return layers ? formLayersRefusal(core.controlType, form) : `drawn in the "${form}" control form, which a part does not draw`;
   if (isDisplayOnly(behavior)) return 'read-only';
   if (core.enabled === false) return 'disabled';
   if (core.visible === false) return 'hidden';
@@ -373,7 +379,7 @@ function whyNotButtonLayers(control, resolved, measure) {
   if (kind !== 'toggle' && kind !== 'momentary') return `a ${kind.replace(/_/g, '-')} button, which comes in as a toggle or a momentary button only`;
   if (behavior.repeating === true || behavior.pressToTalk === true || behavior.press_to_talk === true) return 'a repeating or press-to-talk button';
   const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
-  if (form) return `drawn in the "${form}" control form, which is not made of parts`;
+  if (form) return formLayersRefusal(core.controlType, form);
   // Drawn as a device, the control's own plate, text, icon and lamp are not drawn: its parts are.
   if (buttonDeviceDrawn(resolved)) return buttonDeviceLayersRefusal(resolved);
   // An LED, a jewel or a lit window beside the legend is a layer (buttonLampLayer); a bat lever not yet.
@@ -394,7 +400,7 @@ function whyNotMeterLayers(control, resolved) {
   const core = kids.Core ?? {};
   if (core.visible === false) return 'hidden';
   const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
-  if (form) return `drawn in the "${form}" control form, which is not made of parts`;
+  if (form) return formLayersRefusal(core.controlType, form);
   if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
   return meterDeviceDrawn(resolved) ? meterDeviceLayersRefusal(resolved) : plainMeterLayersRefusal(resolved);
 }
@@ -932,10 +938,13 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
     // value. The channel is named as the one exact part would have been.
     const channel = uniquePartName(name, taken);
     const circular = String(resolved?._children?.Behavior?.geometry ?? (type === 'Knob' ? 'circular' : 'linear')) === 'circular';
-    const built = (circular ? knobLayers : sliderLayers)({
-      resolved, styled, rect, channel, prefix: channel, zIndex,
-      uniqueName: (wanted) => uniquePartName(wanted, taken),
-    });
+    const layersOf = { resolved, styled, rect, channel, prefix: channel, zIndex, uniqueName: (wanted) => uniquePartName(wanted, taken) };
+    // A knob in a base form: its drawing, turned as the same knob in parts turns (the drag of the
+    // knob's own parts, worked out without taking their names).
+    const drawnForm = circular && type === 'Knob' ? anatomyForm('Knob', resolved?._children?.Core?.controlForm) : '';
+    const built = DRAWN_KNOB_FORMS.includes(drawnForm)
+      ? knobFormDrawingLayers({ ...layersOf, drag: knobLayers({ ...layersOf, uniqueName: (wanted) => wanted }).behavior })
+      : (circular ? knobLayers : sliderLayers)(layersOf);
     // Standing at the knob's value, as the panel drew it: the designer draws what is authored.
     const behavior = resolved?._children?.Behavior ?? {};
     const min = Number(behavior.min ?? 0);
@@ -1038,14 +1047,18 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
       refused.push({ id, name: id, reason: 'inside a container — move it out, or select the container\'s contents' });
       continue;
     }
-    const { control } = entry;
+    // As layers, a control drawn in a classic form is first drawn in that form's own parts, as
+    // Core › Control design › Convert to Parts draws it (models/formAsParts.js), on a copy: its
+    // layers are then the parts', which every set's control already comes in as. An illustrated
+    // form has no parts, and stays refused by name.
+    const control = valueControlsAs === 'layers' ? formAsLayers(entry.control, set) : entry.control;
     const resolved = resolveControlForSet(control, set);
     const why = whyNotConvertible(control, resolved, { measure, layers: valueControlsAs === 'layers' })
       || (scriptReference(scripts, control) ? `used by ${scriptReference(scripts, control)}` : '')
       || references.get(id)
       || '';
     if (why) refused.push({ id, name: nameOf(control), reason: why });
-    else chosen.push({ ...entry, resolved });
+    else chosen.push({ ...entry, control, resolved });
   }
 
   if (!wanted.length) return { ok: false, refused: [{ id: '', name: '', reason: 'nothing is selected' }] };
@@ -1216,6 +1229,30 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     // Knobs asked for as layers that came in as one exact part, and why.
     asParts,
   };
+}
+
+/**
+ * `control` with the classic form it is drawn in turned into its parts: its own form, or the one its
+ * set draws it in (a set's family names a form, as Atlas's knob), the form's parts pinned so the set
+ * does not draw the form over them, in the form's own colours. The control as it is when it names
+ * no form, an illustrated one, a base knob form (it comes in as its drawing) or a form whose parts
+ * draw it otherwise (refused by name).
+ */
+function formAsLayers(control, set) {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  // A base knob form stays named, its own or its set's: it comes in as its drawing
+  // (formDrawingLayers.js), which its parts are not.
+  // A form whose parts draw it otherwise stays named too, and is refused by name (formPartsDiffer).
+  const kept = (form) => (type === 'Knob' && DRAWN_KNOB_FORMS.includes(form)) || formPartsDiffer(type, form);
+  if (kept(anatomyForm(type, control?._children?.Core?.controlForm))) return control;
+  const own = withFormAsParts(control, set);
+  if (own !== control) return own;
+  const setForm = anatomyForm(type, resolveControlForSet(control, set)?._children?.Core?.controlForm);
+  if (!setForm || kept(setForm)) return control;
+  const named = deepClone(control);
+  named._children.Core.controlForm = setForm;
+  const parts = withFormAsParts(named, set);
+  return parts === named ? control : parts;
 }
 
 /**

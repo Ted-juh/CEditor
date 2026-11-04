@@ -22,13 +22,7 @@ import { controlSetLibrary, carryControlSetInDocument, documentControlSets } fro
 import { DEFAULT_CONTROL_SET_ID, controlSetForPanel, getControlSet, normalizeControlSet, resolveColourLiteral } from '../models/controlSets.js';
 import { applyControlSetChoices } from '../utils/controlSetApply.js';
 import { ownLookControl, resetToSetPatch } from '../models/controlSetOwnership.js';
-import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../models/knobFormParts.js';
-import { buttonFormFamily } from '../models/buttonFormParts.js';
-import { BUTTON_DEVICE_PARTS, BUTTON_DEVICE_TYPES } from '../models/buttonDeviceParts.js';
-import { METER_DEVICE_PARTS, METER_DEVICE_TYPES } from '../models/meterDeviceParts.js';
-import { meterFormFamily } from '../models/meterFormParts.js';
-import { createControl } from '../models/componentTypes.js';
-import { readControlPath } from '../models/controlSetFamilies.js';
+import { formAsPartsPatch, formAsPartsRecipe } from '../models/formAsParts.js';
 import { applyControlPatchesById, replaceControlsById } from './controls.js';
 import { findControlById, flatControls } from '../utils/containment.js';
 import { DEFAULT_PANEL_COLOUR } from '../utils/backgroundCSS.js';
@@ -237,70 +231,14 @@ export function applyFormAsParts(ids, form) {
   const patches = new Map();
   for (const id of ids ?? []) {
     const control = findControlById(context.panel.controls, id);
-    const recipe = formAsPartsRecipe(control?._children?.Core?.controlType, form, context.set);
-    if (!recipe) continue;
-    const type = String(control._children.Core.controlType);
-    const patch = { 'Core.controlForm': '', ...recipe.component };
-    const deviceParts = BUTTON_DEVICE_TYPES.has(type) ? BUTTON_DEVICE_PARTS : METER_DEVICE_TYPES.has(type) ? METER_DEVICE_PARTS : [];
-    for (const name of deviceParts) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
-    // A knob's plates and scale that only the synth sets' knobs draw (models/directionKnobParts.js):
-    // off again under a form that does not.
-    if (type === 'Knob') {
-      for (const name of ['bodySkirt', 'bodyInsert']) if (!recipe.parts[name]) patch[`Parts.${name}.visible`] = false;
-      for (const [path, value] of [['Behavior.tickRadius', 0], ['Behavior.scaleNumberCount', 0], ['Behavior.secondScaleRadius', 0], ['Behavior.secondScaleCount', 0]]) {
-        if (!(path in recipe.component)) patch[path] = value;
-      }
-    }
-    // What a form shapes and moves, back to the factory's unless this form says: a switch made a
-    // lever and then a slide must not still swing, a knob made scalloped and then a disc must not
-    // keep its scallop.
-    const factory = createControl(type);
-    for (const [part, values] of Object.entries(recipe.parts)) {
-      for (const key of FORM_PART_KEYS) {
-        if (!(key in values)) patch[`Parts.${part}.${key}`] = readControlPath(factory, `Parts.${part}.${key}`);
-      }
-      for (const [path, value] of Object.entries(values)) patch[`Parts.${part}.${path}`] = value;
-    }
-    patches.set(id, patch);
+    const patch = formAsPartsPatch(control, form, context.set);
+    if (patch) patches.set(id, patch);
   }
   applyControlPatchesById(patches, context.panel.id, { pin: true });
   return patches.size;
 }
 
-// The part properties a form decides beyond the ones every recipe writes: its outline or shape,
-// its pattern, its motion, its finish.
-const FORM_PART_KEYS = [
-  'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
-  'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
-  'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
-  'Background.Effects.Material.enabled',
-  // A knob plate's shadow, perspective and grooves, a bar pointer's taper and second bar
-  // (models/directionKnobParts.js).
-  'shadowOffset', 'shadowBlur', 'shadowColour', 'taper', 'aspect', 'shiftY',
-  'grooves', 'grooveLength', 'grooveWidth', 'grooveColour', 'markFrom', 'markTo', 'markWidth', 'markColour',
-  // A plate's rendered look (utils/renderedLook.js): off again under a form that does not render.
-  'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop', 'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'renderCorner',
-  // A meter's (models/meterDeviceParts.js).
-  'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
-  'majorCount', 'minorCount', 'majorLength', 'minorLength', 'majorWidth', 'minorWidth', 'numerals', 'numeralSize', 'numeralPlacement', 'numeralUnits',
-];
-
-/** The recipe that draws `form` on a control of `type` with its own parts, or null. `set`, where
- * known, gives a meter's sheen and a synth knob's glass their face colour. */
-export function formAsPartsRecipe(type, form, set = null) {
-  if (type === 'Knob') {
-    // A synth set's tinted glass is its face and track colours with an alpha: literals, from the set.
-    const face = set ? resolveColourLiteral('{surface}', set, '') : '';
-    const housing = set ? resolveColourLiteral('{control.track}', set, '') : '';
-    return KNOB_FORMS_AS_PARTS.includes(String(form ?? '')) ? knobFormFamily(form, { ink: '{text.primary}', divisions: 12, ...(face ? { face } : {}), ...(housing ? { housing } : {}) }) : null;
-  }
-  const face = set ? resolveColourLiteral('{surface}', set, '') : '';
-  const housing = set ? resolveColourLiteral('{control.track}', set, '') : '';
-  if (type === 'Meter' || type === 'ProgressBar') {
-    return meterFormFamily(type, form, { ink: '{text.primary}', divisions: 12, face, housing });
-  }
-  return buttonFormFamily(type, form, { ink: '{text.primary}', face, housing });
-}
+export { formAsPartsRecipe };
 
 /** The knob form as parts: applyFormAsParts, kept by its first name. */
 export const applyKnobFormAsParts = applyFormAsParts;

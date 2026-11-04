@@ -485,6 +485,41 @@ components):
      readout's words apart. A meter's value in the editor's Preview could not be driven from the
      check (a value set there did not reach the canvas, for the panel's meter as for the layers).
 
+   - *Classic designs* (R5): a control drawn in a classic form (Core › Control design names one:
+     Flat disc, Moulded pebble, Studio needle…) comes in as layers that draw what the panel draws. A knob in one
+     of the twelve base forms comes in as its drawing (`utils/formDrawingLayers.js`): shape by shape
+     as ControlAnatomy draws it in its 160 by 170 frame, fitted to the box as the SVG fits its
+     viewBox, the form's Size scaling it about the knob's centre. Each shape is a filled path layer;
+     a stroke is the band it paints, a path of its own (square ends, mitred corners, bevelled past a
+     mitre of four, a dashed ring its dashes), so its opacity lies over the fill as the drawing's
+     did; the dome and metal shading sit on the shape's own box, as strong as the form's Depth; the
+     readout and the tuning dial's ends are text layers. What moves is bound to the value: the
+     turning group about its centre (the tuning dial's small knob about its own), the disc's arc,
+     the roller's ribs (the twelfth back to the top at the very end, an adding binding) and its
+     marker, the tuning needle, the encoder's segments each lit from its own point of the travel over
+     the faint ring of all of them. Its drag is the drag the same knob in parts has, as the panel's
+     is. A form's parts (Convert to Parts) are close in spirit and not in pixels (the tab's card
+     square where the drawing's is askew, the parts filling the box where the drawing keeps to its
+     frame: 10 to 53 % of pixels apart), so a knob's drawing is not made from its parts.
+     A button, switch or meter in a base form comes in as its parts, made on a copy
+     (`withFormAsParts`) in the form's own colours: Core's Face, Housing, Ink, Legends and Indicator,
+     a role kept a role, where Convert to Parts writes the set's roles. The drawing shows the
+     control's colours, which a set fills from its roles and an author may since have changed.
+     A gradient painted in SVG (the drawings, and every device part) is sampled for its layer
+     (`unpremultipliedStops`, every 2.5 % and at each stop): SVG blends a stop's colour and its
+     opacity apart, CSS premultiplied, and between a clear white and an opaque face the two part by
+     a fifth of the shading (the pebble, lens, roller and scallop 2.4 to 7.9 % apart before).
+     Refused by name, pointing to Convert to Parts first (`formPartsDiffer`), which gives a control
+     that converts exactly: the forms whose parts draw them otherwise than their drawings. The
+     cushion and hexagonal keys (a pillow and a hexagon where the drawings curve their own way; 5 to
+     17 %), the rocker, latch and strap switches (a key the drawing redraws or skews when on; 2.5 to
+     16 %), and the synth sets' forms (`new-<set>`), whose parts are a little smaller than their
+     drawings and keep their light still where the drawings turn it (8 to 16 % for knobs).
+     Checked against the panel on Graphite: the twelve knobs 48 of 48 (four readings, at most 0.27 %
+     of pixels apart), the base buttons 10 of 12, switches 9 of 12 off and on, meters 12 of 12 at
+     four readings (0.26 %), the five others refused; a cushion and a rocker drawn in their parts
+     against their layers, 0.00 %.
+
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
    25 degrees and scaled 1.1, a knob of each kind 120 of 120 and a slider of each kind 40 of 40 (the

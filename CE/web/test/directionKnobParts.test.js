@@ -227,8 +227,8 @@ test('Dual Scale draws its second scale and its dark bar, Precision its knurling
   assert.match(renderer, /\{#each plateGrooves\(part, r\) as groove, i \(i\)\}/);
   assert.match(renderer, /\{#each secondScale as tick, i \(i\)\}/);
   assert.match(renderer, /<polygon data-pointer-mark points=\{pointerMark\.points\}/);
-  // Another form takes them off again (stores/controlSets.js applyFormAsParts).
-  const store = readFileSync(new URL('../src/CE_Application/stores/controlSets.js', import.meta.url), 'utf8');
+  // Another form takes them off again (models/formAsParts.js, which Convert to Parts applies).
+  const store = readFileSync(new URL('../src/CE_Application/models/formAsParts.js', import.meta.url), 'utf8');
   assert.match(store, /\['Behavior\.secondScaleRadius', 0\], \['Behavior\.secondScaleCount', 0\]/);
   assert.match(store, /'grooves', 'grooveLength', 'grooveWidth', 'grooveColour', 'markFrom', 'markTo', 'markWidth', 'markColour',/);
 });

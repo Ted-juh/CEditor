@@ -1110,7 +1110,12 @@ comes in as layers that place the reading, and the held peak, on that scale, as 
 bindings' **Scale** is **Decibels**, from **Floor dB** to **Ceil dB**. A meter part coloured by the zones keeps them: lit cells, scale
 marks and a fill by where they sit, a needle, lamp or legend by the zone the reading is in. A meter
 that shows another control's value keeps showing it: the knob that came into the component with it,
-or the control that stayed on the panel. A counter's
+or the control that stayed on the panel. A control drawn in a classic design (**Core › Control
+design**: Flat disc, Moulded pebble, Studio needle and the rest) comes in as layers that draw that design in its
+own colours: a knob as the drawing itself, shape by shape, its pointer or cap turning with the value;
+a button, switch or meter as the design's parts. A few designs whose parts differ from their
+drawing, the synth sets' among them, are refused by name; **Convert to Parts** on the control first
+gives one that converts exactly. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the
