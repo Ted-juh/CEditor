@@ -35,7 +35,7 @@
   } from '../models/setEditing.js';
   import { deepClone } from '../utils/deepClone.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
-  import { componentFit, fittingLibraryComponents, isSetComponentType, resolveSetComponent, setComponentFor, setComponentRef } from '../utils/setLibraryComponents.js';
+  import { componentFit, controlsWithSetComponents, fittingLibraryComponents, isSetComponentType, resolveSetComponent, setComponentFor, setComponentRef } from '../utils/setLibraryComponents.js';
 
   // Every colour role and every family a set holds (models/setEditing.js), grouped; the groups the
   // page opens on, the rest folded.
@@ -115,7 +115,10 @@
     // ever showed in its preview.
     const layoutId = isBuiltIn(draft.id) ? draft.id : (isBuiltIn(draft.basedOn) ? draft.basedOn : NEW_PANEL_CONTROL_SET_ID);
     const sample = createControlSetStarter(layoutId, { set });
-    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [set] };
+    // A family the set names a library component for draws it, as applying the set would place it
+    // (utils/setLibraryComponents.js): its knobs as copies of the component, not the set's own knob.
+    const controls = controlsWithSetComponents(sample, set, $customComponentLibrary);
+    return { ...sample, controls, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [set] };
   });
 
   function choose(id) {

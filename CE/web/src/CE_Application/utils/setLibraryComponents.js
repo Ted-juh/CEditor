@@ -265,8 +265,10 @@ export function planSetComponents(panel, newSet, entries = [], choices = {}) {
     const placement = typeOf(control) === 'CustomComponent' ? setPlacementOf(control) : null;
     const familyType = placement ? String(placement.type) : type;
     if (!isSetComponentType(familyType)) return;
+    // A control pinned to another set keeps it unless the window lets pinned controls in; one pinned
+    // to the set being applied is drawn with it already, so it takes the set's component too.
     const pin = String(sections(control).Core?.controlSetId ?? '').trim();
-    if (pin && !(includePinned && pin !== String(newSet?.id ?? ''))) return;
+    if (pin && pin !== String(newSet?.id ?? '') && !includePinned) return;
     if (!wanted(control, familyType)) return;
     const ref = setComponentFor(newSet, familyType);
     if (placement) {
@@ -309,6 +311,8 @@ function copyKeys(from, to, keys) {
   if (!from || !to) return;
   for (const key of keys) if (key in from) to[key] = deepClone(from[key]);
 }
+
+const round2 = (value) => Math.round(value * 100) / 100;
 
 function definedOnly(object) {
   return Object.fromEntries(Object.entries(object).filter(([, value]) => value !== undefined && value !== null));
@@ -373,6 +377,24 @@ export function placedCopy(control, entry, fit, { setId = '', type = typeOf(cont
   const copy = instantiateCustomComponentPackageControl(entry.envelope ?? entry, { id: idOf(control), name, Transform: transform });
   if (!copy) return null;
   const out = copy._children;
+  // The copy takes the control's place at the component's proportions: the largest box of the
+  // component's design shape inside the control's, centred in it, its layers scaled to that
+  // (customComponentScale.js). A component designed at 110 by 130 standing in for an 84 by 84 knob
+  // is drawn whole and round, about 71 by 84, not squashed into the square or cut off by it.
+  const box = {
+    x: numberOr(children.Transform?.x, 0), y: numberOr(children.Transform?.y, 0),
+    width: numberOr(children.Transform?.width, 0), height: numberOr(children.Transform?.height, 0),
+  };
+  const designWidth = numberOr(out.Designer?.designWidth, 0);
+  const designHeight = numberOr(out.Designer?.designHeight, 0);
+  if (designWidth > 0 && designHeight > 0 && box.width > 0 && box.height > 0) {
+    const scale = Math.min(box.width / designWidth, box.height / designHeight);
+    const width = round2(designWidth * scale);
+    const height = round2(designHeight * scale);
+    Object.assign(out.Transform, { x: round2(box.x + (box.width - width) / 2), y: round2(box.y + (box.height - height) / 2), width, height });
+  }
+  out.Transform.contentScaleMode = 'scaleInternals';
+  const fitted = { x: out.Transform.x, y: out.Transform.y, width: out.Transform.width, height: out.Transform.height };
   copyKeys(children.Core, out.Core, INSTANCE_CORE_KEYS);
   out.Core.id = idOf(control);
   out.Core.controlType = 'CustomComponent';
@@ -414,7 +436,7 @@ export function placedCopy(control, entry, fit, { setId = '', type = typeOf(cont
 
   const caption = controlCaption(control, kind);
   const captionPath = fit.caption && caption && writePath(copy, fit.caption, caption) ? fit.caption : '';
-  out.Designer.setPlacement = { setId: String(setId ?? ''), type, channel: fit.channel, caption: captionPath, replaced: deepClone(control) };
+  out.Designer.setPlacement = { setId: String(setId ?? ''), type, channel: fit.channel, caption: captionPath, box, fitted, replaced: deepClone(control) };
   return copy;
 }
 
@@ -433,6 +455,19 @@ export function restoredControl(copy) {
   copyKeys(mine.Core, out.Core, INSTANCE_CORE_KEYS);
   out.Core.id = String(mine.Core?.id ?? out.Core.id);
   copyKeys(mine.Transform, out.Transform, INSTANCE_TRANSFORM_KEYS);
+  // The copy was fitted inside the control's box: undo that fit on where the copy is now, so the
+  // control comes back at its own size, moved or resized as the copy was since.
+  const box = placement.box;
+  const fitted = placement.fitted;
+  if (box && fitted && fitted.width > 0 && fitted.height > 0 && mine.Transform) {
+    const t = mine.Transform;
+    const sx = numberOr(t.width, fitted.width) / fitted.width;
+    const sy = numberOr(t.height, fitted.height) / fitted.height;
+    out.Transform.width = round2(box.width * sx);
+    out.Transform.height = round2(box.height * sy);
+    out.Transform.x = round2(numberOr(t.x, fitted.x) - (fitted.x - box.x) * sx);
+    out.Transform.y = round2(numberOr(t.y, fitted.y) - (fitted.y - box.y) * sy);
+  }
 
   const channel = mine.ValueChannels?._children?.[placement.channel];
   if (channel && kind === 'value' && out.Behavior) {
@@ -520,6 +555,34 @@ export function applySetComponentPlan(controls, plan, { skip = new Set(), setId 
     return result;
   });
   return { controls: next, changed };
+}
+
+/**
+ * `control` as a set that names a library component for its family draws it: a linked copy of the
+ * component where the control would be, or the control itself when the set names none, the library
+ * does not hold it, it does not fit or the control would stay. What Settings › Control Sets' cards
+ * draw, so a set's card shows what applying it gives.
+ */
+export function drawnWithSetComponent(control, set, entries = []) {
+  const type = typeOf(control);
+  const ref = setComponentFor(set, type);
+  if (!ref) return control;
+  const resolved = resolveSetComponent(ref, entries);
+  if (!resolved) return control;
+  const fit = componentFit(type, resolved.entry.component);
+  if (!fit.ok || controlStaysReason(control, fit, resolved.entry.component)) return control;
+  return placedCopy(control, resolved.entry, fit, { setId: String(set?.id ?? ''), type }) ?? control;
+}
+
+/**
+ * A panel's controls as `set` draws them with its library components placed, as applying it would:
+ * the live preview of Settings › Control Sets. The controls themselves when the set names none.
+ */
+export function controlsWithSetComponents(panel, set, entries = []) {
+  if (!Object.keys(set?.libraryComponents ?? {}).length) return panel?.controls ?? [];
+  const plan = planSetComponents(panel, set, entries);
+  if (!plan.place.length) return panel?.controls ?? [];
+  return applySetComponentPlan(panel?.controls ?? [], plan, { setId: String(set?.id ?? '') }).controls;
 }
 
 /**

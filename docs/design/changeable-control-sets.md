@@ -358,7 +358,13 @@ components):
    them. Knobs with a script of their own, two handles or bindings to other controls stay, as do
    meters taking another control's value or reading decibels; the Apply window names each. A set
    file carries the packages it names, and importing it adds those the library lacks.
-   Not drawn: the Control Sets page's live preview keeps showing the set's own knob.
+   The Control Sets page draws the component too: its live preview runs its sample through the same
+   plan (`controlsWithSetComponents`), and a set's card draws its one control as a copy
+   (`drawnWithSetComponent`), its colour roles resolved for the set. A copy is fitted at the
+   component's proportions into the control's box, centred, its layers scaled to it
+   (`contentScaleMode: 'scaleInternals'`); the placement records both boxes, so the control comes
+   back at its own size, following the copy if it was moved or resized. A control pinned to the
+   set being applied takes its component as well.
 
 ### E. Realistic looks that stay changeable (medium to large)
 

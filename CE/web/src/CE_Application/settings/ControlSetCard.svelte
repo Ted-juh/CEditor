@@ -12,6 +12,8 @@
   import { resolveControlForSet } from '../models/controlSetFamilies.js';
   import { isIllustratedControlSet, resolveToken } from '../models/controlSets.js';
   import { aarrggbbToHex } from '../utils/colourHex.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { drawnWithSetComponent } from '../utils/setLibraryComponents.js';
 
   let { set = null, family = 'Knob', active = false, onPanel = false, onselect = () => {} } = $props();
 
@@ -41,7 +43,11 @@
     try {
       const [width, height] = DRAWN[family] ?? DRAWN.Knob;
       const control = createControl(DRAWN[family] ? family : 'Knob', { Core: { controlSetId: set.id }, Transform: { x: 0, y: 0, width, height } });
-      return resolveControlForSet(control, set);
+      // A family the set names a library component for shows the component, as applying it would,
+      // its colour roles resolved for this set: the card draws outside any panel.
+      const resolved = resolveControlForSet(control, set);
+      const drawn = drawnWithSetComponent(resolved, set, $customComponentLibrary);
+      return drawn === resolved ? resolved : resolveControlForSet(drawn, set);
     } catch {
       return null;
     }

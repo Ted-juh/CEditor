@@ -70,7 +70,8 @@ export function setPlacementPaths(control) {
   const placement = control?._children?.Designer?.setPlacement;
   const channel = String(placement?.channel ?? '').trim();
   if (!channel) return [];
-  const paths = ['Designer.setPlacement', ...PLACED_CHANNEL_KEYS.map((key) => `ValueChannels.${channel}.${key}`)];
+  // Its layers scaled to the control's size (setLibraryComponents.js placedCopy) are its placement too.
+  const paths = ['Designer.setPlacement', 'Transform.contentScaleMode', ...PLACED_CHANNEL_KEYS.map((key) => `ValueChannels.${channel}.${key}`)];
   for (const [name, entry] of Object.entries(control._children.PublishedProperties?.inputs ?? {})) {
     if (String(entry?.channel || name) !== channel) continue;
     paths.push(...PLACED_PUBLISHED_KEYS.map((key) => `PublishedProperties.inputs.${name}.${key}`));

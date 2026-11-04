@@ -4,13 +4,14 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { get } from 'svelte/store';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { getControlSet, normalizeControlSetDefinition } from '../src/CE_Application/models/controlSets.js';
 import { planComponentFromSelection } from '../src/CE_Application/utils/customComponentFromControls.js';
 import { panelSetSummary } from '../src/CE_Application/utils/controlSetApply.js';
 import {
-  applySetComponentPlan, componentFit, fittingLibraryComponents, placedCopy, planSetComponents, repointSetComponentExports,
+  applySetComponentPlan, componentFit, controlsWithSetComponents, drawnWithSetComponent, fittingLibraryComponents, placedCopy, planSetComponents, repointSetComponentExports,
   resolveSetComponent, restoredControl, setComponentRef,
 } from '../src/CE_Application/utils/setLibraryComponents.js';
 import { createCustomComponentExportEnvelope } from '../src/CE_Application/utils/customComponentPackage.js';
@@ -183,6 +184,7 @@ test('a copy stands where the knob was and carries what the knob was', () => {
   assert.equal(c.Core.layer, 'Synth');
   assert.deepEqual([c.Transform.x, c.Transform.y, c.Transform.width, c.Transform.height], [140, 60, 100, 120]);
   assert.equal(c.ExternalAPI.addressableName, 'Cutoff', 'not the package\'s id, which every copy would share');
+  assert.equal(c.Transform.contentScaleMode, 'scaleInternals', 'drawn at the knob\'s size, not the component\'s');
   const channel = c.ValueChannels._children[fit.channel];
   assert.deepEqual([channel.min, channel.max, channel.step, channel.defaultValue, channel.format.unit], [20, 20000, 1, 8000, 'Hz']);
   assert.deepEqual(c.DeviceBindings.bindings, [{ kind: 'deviceParameter', parameterId: 'filter.cutoff', port: fit.channel }]);
@@ -285,4 +287,58 @@ test('a set file carries the components it names', () => {
   assert.equal(read.components.length, 1);
   assert.equal(read.components[0].metadata.name, 'Studio Knob');
   assert.deepEqual(normalizeControlSetEnvelope(JSON.stringify(createControlSetEnvelope(set))).components, [], 'a set naming none carries none');
+});
+
+test('the set page draws a set\'s library component where applying it would place one: its preview and its card', async () => {
+  const { createControlSetStarter } = await import('../src/CE_Application/models/controlSetStarter.js');
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const mine = { ...set, id: 'mine', name: 'Mine', libraryComponents: { Knob: setComponentRef(studio) } };
+
+  // A control pinned to the set being applied is drawn with it already, so it takes its component;
+  // one pinned to another set keeps that set unless pinned controls are let in.
+  const pinnedHere = control('Knob', 'Here', { 'Core.controlSetId': 'mine' });
+  const pinnedThere = control('Knob', 'There', { 'Core.controlSetId': 'soft' });
+  assert.deepEqual(planSetComponents({ controls: [pinnedHere, pinnedThere] }, mine, [studio]).place[0].controls.map((c) => c.name), ['Here']);
+
+  // The live preview: the starter sample's knobs, all pinned to the set, become copies.
+  const sample = createControlSetStarter('tolex', { set: mine });
+  const knobs = sample.controls.filter((c) => c._children.Core.controlType === 'Knob').length;
+  assert.ok(knobs >= 2);
+  const drawn = controlsWithSetComponents(sample, mine, [studio]);
+  assert.equal(drawn.filter((c) => c._children.Designer?.setPlacement?.type === 'Knob').length, knobs);
+  assert.equal(drawn.filter((c) => c._children.Core.controlType === 'Knob').length, 0);
+  assert.equal(controlsWithSetComponents(sample, set, [studio]), sample.controls, 'a set naming none: the sample as it is');
+  assert.equal(controlsWithSetComponents(sample, mine, []), sample.controls, 'nor when the library lacks it');
+
+  // The card's one control.
+  const knob = control('Knob', 'Card');
+  assert.equal(drawnWithSetComponent(knob, mine, [studio])._children.Designer.setPlacement.type, 'Knob');
+  assert.equal(drawnWithSetComponent(knob, set, [studio]), knob);
+  assert.equal(drawnWithSetComponent(control('Slider', 'Card'), mine, [studio])._children.Core.controlType, 'Slider', 'a family the set names nothing for');
+
+  const page = readFileSync(new URL('../src/CE_Application/settings/ControlSetsSettings.svelte', import.meta.url), 'utf8');
+  assert.match(page, /const controls = controlsWithSetComponents\(sample, set, \$customComponentLibrary\);\s*return \{ \.\.\.sample, controls,/);
+  const card = readFileSync(new URL('../src/CE_Application/settings/ControlSetCard.svelte', import.meta.url), 'utf8');
+  assert.match(card, /const drawn = drawnWithSetComponent\(resolved, set, \$customComponentLibrary\);\s*return drawn === resolved \? resolved : resolveControlForSet\(drawn, set\);/);
+});
+
+test('a copy takes the control\'s place at the component\'s proportions, and the control comes back at its own size', () => {
+  // The component is a knob designed at 100 by 120 (componentFrom); this knob is 84 by 84.
+  const studio = packaged('Studio Knob', '1.0.0', componentFrom('Knob'));
+  const fit = componentFit('Knob', studio.component);
+  const knob = control('Knob', 'Small', { 'Transform.x': 200, 'Transform.y': 50, 'Transform.width': 84, 'Transform.height': 84 });
+  const copy = placedCopy(knob, studio, fit, { type: 'Knob' });
+  const t = copy._children.Transform;
+  assert.deepEqual([t.x, t.y, t.width, t.height], [207, 50, 70, 84], 'the largest 100:120 box in 84 by 84, centred');
+  assert.equal(t.contentScaleMode, 'scaleInternals', 'its layers drawn at that size, whole and in proportion');
+  assert.deepEqual(copy._children.Designer.setPlacement.box, { x: 200, y: 50, width: 84, height: 84 });
+
+  const back = restoredControl(copy)._children.Transform;
+  assert.deepEqual([back.x, back.y, back.width, back.height], [200, 50, 84, 84], 'unmoved: exactly where it was');
+  assert.equal(back.contentScaleMode, undefined);
+
+  // Moved 30 to the right and made twice the size: the knob follows, at its own proportions.
+  Object.assign(t, { x: 237, width: 140, height: 168 });
+  const moved = restoredControl(copy)._children.Transform;
+  assert.deepEqual([moved.x, moved.y, moved.width, moved.height], [223, 50, 168, 168]);
 });

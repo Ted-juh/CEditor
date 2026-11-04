@@ -470,7 +470,10 @@ parameter. A script that sets `Cutoff.value` still reaches it, and the control's
 component's caption text if it has one. Controls with a script of their own, with two handles or with
 bindings that drive other controls stay as they are, and the Apply window names them. Each copy
 remembers the control it replaced: applying a set that names no component (or another one) for the
-family puts the controls back, and the Apply window lists these changes with a tick for each. **Reset**
+family puts the controls back, and the Apply window lists these changes with a tick for each. The
+set's live preview and its card in the Library show the component where applying the set would place
+it. A copy keeps the component's proportions: it takes the largest box of the component's shape that
+fits where the control was, centred there, and the control comes back at its own size. **Reset**
 on the family's row removes the component from the set. The copies are ordinary library copies: their
 **Component** tab offers newer versions, and an update keeps each copy's range. Exporting the set
 includes the components it names, and importing it adds them to your library.
