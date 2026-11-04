@@ -23,6 +23,7 @@
   import { booleanShapeFor, booleanShapeRevision, compoundShapeFor } from '../utils/booleanGroups.js';
   import { outlineInsetDepths } from '../utils/outlineBorder.js';
   import { outlineShadows } from '../utils/outlineShadows.js';
+  import { rotatePathData } from '../utils/svgPathScale.js';
   import { transitionDeclaration, colourTransitionVar, rootTransitionDeclaration } from '../utils/transitionCss.js';
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
@@ -181,16 +182,27 @@
     return compoundShapeFor(part, frame.width, frame.height, { insetDepths: outlineDepths, identity: partUid });
   });
 
+  let partScale = $derived(Math.max(0.01, numberOr(layout?.scale, 1)));
+  let partRotation = $derived(numberOr(layout?.rotation, 0));
+  // A path whose light stays put (`meta.fixedLight`): turned, only its outline turns, about its pivot,
+  // and its fill, gradient, finish and shadows are drawn upright under it, as a knob's plate is drawn
+  // on the panel: a gear turns under a fixed lamp, and its shadow still falls downward.
+  let fixedLight = $derived(shape.rendersOutline && part?.meta?.fixedLight === true);
+  let outlineTurn = $derived(fixedLight && Math.abs(partRotation) > 0.001 ? partRotation : 0);
+
   let outline = $derived.by(() => {
     const traced = outlineState?.shape;
     if (!traced || traced.empty || !traced.pathData) return null;
-    return { d: traced.pathData, fillRule: 'evenodd', insets: traced.insets ?? {} };
+    if (!outlineTurn) return { d: traced.pathData, fillRule: 'evenodd', insets: traced.insets ?? {} };
+    const px = (frame.width * numberOr(layout?.pivotX, 50)) / 100;
+    const py = (frame.height * numberOr(layout?.pivotY, 50)) / 100;
+    const turn = (d) => (d ? rotatePathData(d, outlineTurn, px, py) : d);
+    const insets = Object.fromEntries(Object.entries(traced.insets ?? {}).map(([depth, d]) => [depth, turn(d)]));
+    return { d: turn(traced.pathData), fillRule: 'evenodd', insets };
   });
 
   let shadowLayers = $derived(shape.rendersOutline ? outlineShadows(effects) : null);
 
-  let partScale = $derived(Math.max(0.01, numberOr(layout?.scale, 1)));
-  let partRotation = $derived(numberOr(layout?.rotation, 0));
   // On an outline the shadows are drawn from the outline (utils/outlineShadows.js), not the box; on a
   // picture, from its pixels (utils/partMask.js), as filters below.
   let pictureLayer = $derived(!shape.rendersOutline && !shape.rendersVectorShape && isPictureLayer(background));
@@ -222,7 +234,7 @@
   let hiddenForFade = $derived(fadeHidden && part?.visible === false);
   let partStyle = $derived.by(() => {
     const transforms = [];
-    if (Math.abs(partRotation) > 0.001) transforms.push(`rotate(${partRotation}deg)`);
+    if (Math.abs(partRotation) > 0.001 && !fixedLight) transforms.push(`rotate(${partRotation}deg)`);
     if (Math.abs(partScale - 1) > 0.001) transforms.push(`scale(${partScale})`);
 
     return [

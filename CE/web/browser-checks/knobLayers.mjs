@@ -12,6 +12,9 @@
  * passes, its reason shown.
  *
  * CE_KNOB_LAYERS_SETS="graphite,tolex" checks those sets only; CE_KNOB_LAYERS_ALL=1 checks every set.
+ * CE_KNOB_LAYERS_STRICT=1 checks every set the editor offers but the two illustrated ones (Iris and
+ * Satellite), and a control that comes in as one exact part, or is refused, fails: every one of those
+ * sets' controls must become layers that draw as it did.
  * CE_KNOB_LAYERS_PROPS='{"Meter.orientation":"arc","Meter.showValue":true}' sets those properties on
  * the control as well, to check what a set's own control does not use (a meter's readout, its label).
  */
@@ -44,18 +47,20 @@ const SIZE = TYPE === 'Knob'
 // was 12 %, a ring outline read as points 6 %.
 const MAX_SHARE = Number(process.env.CE_KNOB_LAYERS_MAX ?? 0.025);
 const EXTRA = JSON.parse(process.env.CE_KNOB_LAYERS_PROPS || '{}');
+const STRICT = process.env.CE_KNOB_LAYERS_STRICT === '1';
 
 const kit = await boot({ width: 1400, height: 1000 });
 const page = kit.page;
 const failures = [];
 const rows = [];
 
-const sets = await page.evaluate(async ({ only, all, type }) => {
-  const { BUILT_IN_CONTROL_SETS } = await window.__ceImport('/src/CE_Application/models/controlSets.js');
+const sets = await page.evaluate(async ({ only, all, type, strict }) => {
+  const { BUILT_IN_CONTROL_SETS, OFFERED_CONTROL_SETS, isIllustratedControlSet } = await window.__ceImport('/src/CE_Application/models/controlSets.js');
   const { createControl } = await window.__ceImport('/src/CE_Application/models/componentTypes.js');
   const { resolveControlForSet } = await window.__ceImport('/src/CE_Application/models/controlSetFamilies.js');
   const { resolveSliderSemanticParts } = await window.__ceImport('/src/CE_Application/utils/sliderEntityFactory.js');
   if (only.length) return only;
+  if (strict) return OFFERED_CONTROL_SETS.filter((set) => !isIllustratedControlSet(set)).map((set) => set.id);
   const seen = new Map();
   for (const set of BUILT_IN_CONTROL_SETS) {
     const knob = resolveControlForSet(createControl(type), set);
@@ -81,7 +86,7 @@ const sets = await page.evaluate(async ({ only, all, type }) => {
     if (all || !seen.has(signature)) seen.set(all ? set.id : signature, set.id);
   }
   return [...seen.values()];
-}, { only: (process.env.CE_KNOB_LAYERS_SETS ?? '').split(',').map((s) => s.trim()).filter(Boolean), all: process.env.CE_KNOB_LAYERS_ALL === '1', type: TYPE });
+}, { only: (process.env.CE_KNOB_LAYERS_SETS ?? '').split(',').map((s) => s.trim()).filter(Boolean), all: process.env.CE_KNOB_LAYERS_ALL === '1', type: TYPE, strict: STRICT });
 
 async function compare(a, b) {
   return page.evaluate(async ([pa, pb]) => {
@@ -180,7 +185,8 @@ try {
       const label = `${TYPE === 'Slider' ? `slider-${ORIENTATION}-` : (BUTTON ? `${TYPE}${SMALL ? '-small' : ''}-` : (METER ? 'meter-' : ''))}${setId}-${Math.round(value * 100)}`;
       // A knob a layer cannot draw yet comes in as one exact part, by design: it must still match. A
       // button a layer cannot draw is refused, named, and left as it was.
-      const ok = (result.ok || Boolean(result.refused)) && share <= MAX_SHARE;
+      // Strict: neither, it must have become layers.
+      const ok = (STRICT ? result.ok && !result.asParts.length : result.ok || Boolean(result.refused)) && share <= MAX_SHARE;
       rows.push({ label, layers: result.parts, share: Math.round(share * 10000) / 100, ok, asPart: result.asParts[0]?.reason ?? '' });
       if (!ok) {
         failures.push(label);

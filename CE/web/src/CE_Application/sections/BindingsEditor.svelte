@@ -248,6 +248,32 @@
           <NumberCell label="Decimals" value={selectedBinding.precision ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(value) => setBindingProp('precision', value)} />
         </PropertyCell>
       </PropertySection>
+    {:else if selectedBinding.mapMode === 'figures'}
+      <!-- The source as a counter shows it (utils/interactionRuntime.js 'figures'): one figure of it
+           for one digit's window, or a window's opacity while the reading has that many figures.
+           Create Component from Selection writes these for a meter's counter. -->
+      <PropertySection title="Counter Figures" icon={ArrowRightLeft}>
+        <PropertyCell label="Times" span={1} compact hint="The source is multiplied by this first: 100 for a percentage of a normalized source.">
+          <NumberCell label="Times" value={selectedBinding.multiplier ?? 1} step={0.01} defaultValue={1} onchange={(value) => setBindingProp('multiplier', value)} />
+        </PropertyCell>
+        <PropertyCell label="Decimals" span={1} compact hint="Digits after the decimal point, 0 to 3, as a meter's counter writes them.">
+          <NumberCell label="Decimals" value={selectedBinding.precision ?? 0} min={0} max={3} step={1} defaultValue={0} onchange={(value) => setBindingProp('precision', value)} />
+        </PropertyCell>
+        <PropertyCell label="Figure" span={1} compact hint="Which character to write, counted from 0 at the left. Empty writes them all.">
+          <NumberCell label="Figure" value={selectedBinding.character ?? ''} allowEmpty min={0} max={12} step={1} onchange={(value) => setBindingProp('character', value === '' ? null : value)} />
+        </PropertyCell>
+        <PropertyCell label="Only At" span={1} compact hint="Write only while the figures are this many characters long; empty for always. With no Figure, it writes Shown or Hidden instead, for a window's opacity.">
+          <NumberCell label="Only At" value={selectedBinding.length ?? ''} allowEmpty min={1} max={16} step={1} onchange={(value) => setBindingProp('length', value === '' ? null : value)} />
+        </PropertyCell>
+        {#if selectedBinding.length != null && selectedBinding.length !== '' && (selectedBinding.character == null || selectedBinding.character === '')}
+          <PropertyCell label="Shown" span={1} compact hint="Written while the figures are that long.">
+            <NumberCell label="Shown" value={selectedBinding.outputMax ?? 1} step={0.05} defaultValue={1} onchange={(value) => setBindingProp('outputMax', value)} />
+          </PropertyCell>
+          <PropertyCell label="Hidden" span={1} compact hint="Written while they are not.">
+            <NumberCell label="Hidden" value={selectedBinding.outputMin ?? 0} step={0.05} defaultValue={0} onchange={(value) => setBindingProp('outputMin', value)} />
+          </PropertyCell>
+        {/if}
+      </PropertySection>
     {:else}
       <PropertySection title="Direct Map" icon={ArrowRightLeft}>
         <PropertyCell label="Pass-Through" span={4} hint="Write the source value directly to the target property without remapping.">

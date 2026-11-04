@@ -5,6 +5,20 @@
  * '' when there is nothing to apply.
  */
 
+/**
+ * A shadow's colour as CSS: AARRGGBB keeps its alpha (it was cut to its last six digits, so a soft
+ * 60 % shadow drew solid), RRGGBB is opaque.
+ */
+function shadowColourCSS(colour) {
+  const raw = String(colour ?? '').replace(/^#/, '');
+  if (/^[0-9a-f]{8}$/i.test(raw)) {
+    const alpha = parseInt(raw.slice(0, 2), 16) / 255;
+    if (alpha >= 1) return `#${raw.slice(2)}`;
+    return `rgba(${parseInt(raw.slice(2, 4), 16)}, ${parseInt(raw.slice(4, 6), 16)}, ${parseInt(raw.slice(6, 8), 16)}, ${alpha.toFixed(3)})`;
+  }
+  return `#${raw.slice(-6)}`;
+}
+
 export function buildShadowCSS(effects) {
   const shadows = effects?._children?.Shadows;
   if (!shadows?.items?.length) return '';
@@ -14,7 +28,7 @@ export function buildShadowCSS(effects) {
       const inset = (s.type === 'inner' || s.type === 'inner-glow') ? 'inset ' : '';
       const ox = (s.type === 'outer-glow' || s.type === 'inner-glow') ? 0 : s.offsetX;
       const oy = (s.type === 'outer-glow' || s.type === 'inner-glow') ? 0 : s.offsetY;
-      return `${inset}${ox}px ${oy}px ${s.blur}px ${s.spread}px #${s.colour.slice(-6)}`;
+      return `${inset}${ox}px ${oy}px ${s.blur}px ${s.spread}px ${shadowColourCSS(s.colour)}`;
     });
   return parts.length ? `box-shadow: ${parts.join(', ')};` : '';
 }

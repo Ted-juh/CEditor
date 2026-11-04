@@ -83,7 +83,8 @@ test('the renderer draws a plate in perspective by a transform of its outline, a
   }
   const tab = source('sections/KnobPartsEditor.svelte');
   for (const words of ['label="Height %"', 'label="Offset Y %"', "['chicken', 'Chicken-head']"]) assert.ok(tab.includes(words), words);
-  assert.match(valueLayersRefusal(knobOf('turret-stack')), /a skirt|perspective/);
+  // Seen in perspective, it still becomes layers (plateLayers squashes and moves its outline).
+  assert.equal(valueLayersRefusal(knobOf('turret-stack')), '');
 });
 
 
@@ -170,12 +171,8 @@ test('the tight fit leaves room for the numbers round the scale', () => {
   assert.ok(numbered.radius * 1.19 + 4.5 <= numbered.centerY, 'the top number inside the box');
 });
 
-test('as layers, a knob with a skirt, an insert, a shadow or a bar comes in as one exact part, named', () => {
-  assert.match(valueLayersRefusal(knobOf('brassworks')), /an insert in its cap/);
-  assert.match(valueLayersRefusal(knobOf('switchboard')), /a shadow under its housing/);
-  assert.match(valueLayersRefusal(knobOf('bakelite')), /a housing that turns under a fixed light/);
-  assert.match(valueLayersRefusal(knobOf('hi-fi')), /a skirt/);
-  assert.match(valueLayersRefusal(knobOf('diesel')), /a bar for a pointer/);
+test('as layers, a knob with a skirt, an insert, a shadow, a turning gear or a bar becomes layers too', () => {
+  for (const id of ['brassworks', 'switchboard', 'bakelite', 'hi-fi', 'diesel']) assert.equal(valueLayersRefusal(knobOf(id)), '', id);
 });
 
 test('the Knob tab edits the skirt, the insert, the shadows, the gear and the bar; the ticks their radius and numbers', () => {

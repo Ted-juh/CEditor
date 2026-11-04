@@ -43,7 +43,7 @@ import { meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, m
 import { normalLineHeight } from './textLineHeight.js';
 import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { buttonAnatomyLayout } from './anatomyLayout.js';
-import { scalePathData } from './svgPathScale.js';
+import { scalePathData, transformPathData } from './svgPathScale.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 
 const num = (value, fallback) => {
@@ -87,41 +87,12 @@ export function valueLayersRefusal(resolved) {
   if (getSliderValueMode(behavior) !== 'single') return 'two handles';
   if (getSliderGeometry(behavior) !== 'circular') return sliderLayersRefusal(resolved);
   const parts = resolveSliderSemanticParts(resolved?._children?.Parts ?? null)._children;
-  // A part that turns with the value turns its outline under a light that stays put. A layer turns
-  // whole, its gradient or finish with it, so the light would turn too.
-  for (const [name, label] of [['bodyHousing', 'housing'], ['bodyCap', 'cap']]) {
-    if (parts[name]?.visible === true && parts[name]?.turns === true && fillIsRich(parts[name])) {
-      return `a ${label} that turns under a fixed light (a gradient or finish), which a turning layer would turn with it`;
-    }
-  }
-  // The synth sets' knobs (models/directionKnobParts.js) draw with parts no layer draws yet.
-  if (parts.bodySkirt?.visible === true) return 'a skirt, which a layer does not draw yet';
-  if (parts.bodyInsert?.visible === true) return 'an insert in its cap, which a layer does not draw yet';
-  for (const [name, label] of [['bodyHousing', 'housing'], ['bodyCap', 'cap']]) {
-    if (parts[name]?.visible === true && (Number(parts[name]?.shadowOffset) > 0 || Number(parts[name]?.shadowBlur) > 0)) {
-      return `a shadow under its ${label}, which a layer does not draw yet`;
-    }
-  }
-  for (const [name, label] of [['bodyHousing', 'housing'], ['bodyCap', 'cap']]) {
-    if (parts[name]?.visible === true && (Number(parts[name]?.aspect ?? 100) !== 100 || Number(parts[name]?.shiftY ?? 0) !== 0)) {
-      return `a ${label} drawn in perspective (an oval, or moved off the centre), which a layer does not draw yet`;
-    }
-    if (parts[name]?.visible === true && String(parts[name]?.outline ?? '') === 'chicken') return `a chicken-head ${label}, which a layer does not draw yet`;
-  }
+  // Plates (housing, skirt, cap, insert) of every outline, in perspective, turning under a light
+  // that stays put, with shadows and grooves, are layers now (plateLayers); a rendered one is an
+  // image the layers do not make.
   for (const [name, label] of [['bodyHousing', 'housing'], ['bodySkirt', 'skirt'], ['bodyCap', 'cap'], ['bodyInsert', 'insert']]) {
-    if (parts[name]?.visible === true && Number(parts[name]?.grooves) > 0) return `grooves round its ${label}, which a layer does not draw yet`;
     if (parts[name]?.visible === true && String(parts[name]?.look ?? '') === 'rendered') return `a rendered ${label}, which a layer does not draw yet`;
   }
-  if (Number(parts.pointerCurrent?.markTo) > Number(parts.pointerCurrent?.markFrom ?? 0) && Number(parts.pointerCurrent?.markWidth) > 0) {
-    return 'a second bar on its pointer, which a layer does not draw yet';
-  }
-  if (behavior.showTicks !== false && Number(behavior.secondScaleRadius) > 0 && Number(behavior.secondScaleCount) > 0) {
-    return 'a second scale, which a layer does not draw yet';
-  }
-  if (String(parts.pointerCurrent?.kind ?? '').toLowerCase() === 'bar') return 'a bar for a pointer, which a layer does not draw yet';
-  if (behavior.showTicks !== false && Number(behavior.tickRadius) > 0) return 'a scale on a radius of its own, which a layer does not draw yet';
-  if (Number(behavior.scaleNumberCount) >= 2) return 'numbers round its scale, which a layer does not draw yet';
-  if (behavior.showTicks !== false && (parts.tickMajor?.activeColour || parts.tickMinor?.activeColour)) return 'ticks that light up to the value, which a layer does not draw yet';
   if (partVisible(parts.bodyTrackBase) && fillIsRich(parts.bodyTrackBase)) return 'a gradient along its track, which a layer does not draw yet';
   if (partVisible(parts.bodyTrackFill) && fillIsRich(parts.bodyTrackFill)) return 'a gradient along its value arc, which a layer does not draw yet';
   if (behavior.showHandleLabels === true) return 'a label that rides the pointer';
@@ -152,6 +123,36 @@ function normalisePoints(points) {
   box.height = Math.max(0.001, Math.max(...ys) - box.y);
   const d = `${points.map(([x, y], i) => `${i ? 'L' : 'M'}${r3((x - box.x) / box.width)} ${r3((y - box.y) / box.height)}`).join(' ')} Z`;
   return { d, box };
+}
+
+/**
+ * A convex polygon's outline moved out by `distance` (in by a negative one), its corners mitred as an
+ * SVG stroke's are: each corner where its two moved edges meet. Clockwise or not, out is out.
+ */
+function offsetPolygon(points, distance) {
+  const pts = points.filter((p, i) => {
+    const q = points[(i + 1) % points.length];
+    return Math.hypot(q[0] - p[0], q[1] - p[1]) > 1e-6;
+  });
+  const n = pts.length;
+  let area = 0;
+  for (let i = 0; i < n; i += 1) area += pts[i][0] * pts[(i + 1) % n][1] - pts[(i + 1) % n][0] * pts[i][1];
+  const outward = area > 0 ? 1 : -1;
+  const lines = pts.map((p, i) => {
+    const q = pts[(i + 1) % n];
+    const len = Math.hypot(q[0] - p[0], q[1] - p[1]);
+    // The edge's normal pointing out of the polygon (y down: clockwise on screen is a positive area).
+    const nx = (outward * (q[1] - p[1])) / len;
+    const ny = (outward * -(q[0] - p[0])) / len;
+    return { p: [p[0] + nx * distance, p[1] + ny * distance], d: [q[0] - p[0], q[1] - p[1]] };
+  });
+  return lines.map((line, i) => {
+    const prev = lines[(i - 1 + n) % n];
+    const cross = prev.d[0] * line.d[1] - prev.d[1] * line.d[0];
+    if (Math.abs(cross) < 1e-9) return line.p;
+    const t = ((line.p[0] - prev.p[0]) * line.d[1] - (line.p[1] - prev.p[1]) * line.d[0]) / cross;
+    return [prev.p[0] + prev.d[0] * t, prev.p[1] + prev.d[1] * t];
+  });
 }
 
 /** A circle as path data in 0..1 of its box. */
@@ -198,6 +199,54 @@ function solidBackground(colour, { borderColour = null, borderThickness = 0 } = 
   background._children.Corners.radius = 0;
   return background;
 }
+
+/** A fill that is a gradient alone (the panel's sheen and dome over a cap), as a Background. */
+function gradientBackground(gradient) {
+  const background = solidBackground('00000000');
+  const fill = background._children.Fill;
+  fill.solidEnabled = false;
+  fill.gradientEnabled = true;
+  fill.gradientOpacity = 100;
+  fill.gradient = { edge: 0, angle: 90, centerX: 50, centerY: 50, radiusX: 50, radiusY: 50, ...gradient };
+  return background;
+}
+
+/** An edge alone, `thickness` wide in `colour`, banded in from the box's edge, as a Background. */
+function borderOnlyBackground(colour, thickness, radius = 0) {
+  const background = solidBackground('00000000', { borderColour: colour, borderThickness: thickness });
+  background._children.Fill.solidEnabled = false;
+  background._children.Corners.radius = radius;
+  return background;
+}
+
+/** A part's own Background without its border (drawn as a layer of its own), its corners `radius`. */
+function fillBackground(part, radius = 0) {
+  const background = backgroundFrom(part, { borderFallback: 0 });
+  background._children.Border.enabled = false;
+  background._children.Border.thickness = 0;
+  if (background._children.Corners) background._children.Corners.radius = radius;
+  return background;
+}
+
+/** `layer` softened as an SVG feGaussianBlur of deviation `deviation` is (a CSS blur takes it as is). */
+function blurred(layer, deviation) {
+  const effects = deepClone(SECTION_DEFAULTS.Effects);
+  effects._children.Shadows.items = [];
+  effects._children.Filters.blur = r3(deviation);
+  layer._children.Effects = effects;
+  return layer;
+}
+
+// The panel's light over a fader cap (SliderFamilyRenderer's defs): the cylinder sheen across it,
+// light along the near edge and shade along the far one, and a dome lit from the top left.
+const capSheen = (vertical) => ({
+  type: 'linear', angle: vertical ? 90 : 180,
+  stops: [{ color: '61FFFFFF', position: 0 }, { color: '00FFFFFF', position: 45 }, { color: '00000000', position: 60 }, { color: '66000000', position: 100 }],
+});
+const CAP_DOME = {
+  type: 'radial', centerX: 35, centerY: 30, radiusX: 70, radiusY: 70,
+  stops: [{ color: 'BFFFFFFF', position: 0 }, { color: '00FFFFFF', position: 50 }, { color: '59000000', position: 100 }],
+};
 
 /**
  * A filled outline (a circle, a ring, or a scallop, flutes, a polygon) centred on `centre`, radius
@@ -252,6 +301,154 @@ function outlineLayers(name, part, centre, r, origin, { zIndex, borderFallback, 
   edge._children.Fill.textureEnabled = false;
   delete edge._children.Effects;
   return [layerOf(name(''), fill, 0), layerOf(name('Edge'), edge, bw)];
+}
+
+/** A circle as absolute path data. */
+function circlePath(cx, cy, r) {
+  return `M${r3(cx - r)} ${r3(cy)} a${r3(r)} ${r3(r)} 0 1 0 ${r3(2 * r)} 0 a${r3(r)} ${r3(r)} 0 1 0 ${r3(-2 * r)} 0 Z`;
+}
+
+/** Absolute path data in 0..1 of `box`. */
+function pathInBox(d, box) {
+  return transformPathData(d, [1 / box.width, 0, 0, 1 / box.height, -box.x / box.width, -box.y / box.height]);
+}
+
+/** The turn (the designer's degrees, clockwise) and squash and shift of `d` about (cx, cy), in that order of drawing. */
+function plateTransform(d, { cx, cy, aspect = 1, turn = 0, shift = 0 }) {
+  const t = (turn * Math.PI) / 180;
+  const cos = Math.cos(t);
+  const sin = Math.sin(t);
+  // translate(0 shift) · rotate(turn about c) · scale(1 aspect about c), as SliderFamilyRenderer's
+  // outlineShapeFor writes it.
+  const a = cos;
+  const b = sin;
+  const c = -sin * aspect;
+  const dd = cos * aspect;
+  const e = cx - a * cx - c * cy;
+  const f = cy - b * cx - dd * cy + shift;
+  return transformPathData(d, [a, b, c, dd, e, f]);
+}
+
+/**
+ * A knob's plate (housing, skirt, cap, insert) as the panel draws it (SliderFamilyRenderer's
+ * bodyPlate), as layers:
+ *
+ *   shadow   its outline again, lower and softened, in the shadow's colour: a layer of its own under
+ *            it, so it shows through a plate you can see through, as it does on the panel;
+ *   plate    its outline (a circle, a ring, a gear, a scallop, flutes, a polygon, a chicken-head),
+ *            seen in perspective when it has an `aspect` or a `shiftY` (squashed, then moved), its
+ *            fill and border; one that `turns` turns its outline with the value while its light
+ *            stays put (meta.fixedLight), as a gear turns under the set's lamp;
+ *   grooves  fine lines in from its edge, turning with it.
+ *
+ * Its box is the panel's fill box (the circle's or the oval's bounds and a pixel), so a gradient runs
+ * across it as the panel's does.
+ */
+function plateLayers(named, part, geometry, r, ctx) {
+  const { centre, origin, trackRadius, startPanel, signed, sweep, source, borderFallback, role, knobPart, add, out, depthOf } = ctx;
+  if (!(r > 0)) return;
+  const kind = String(geometry?.outline ?? 'circle');
+  const aspect = Math.max(5, Math.min(400, num(geometry?.aspect, 100))) / 100;
+  const shift = (trackRadius * num(geometry?.shiftY, 0)) / 100;
+  const turns = geometry?.turns === true;
+  const perspective = aspect !== 1 || shift !== 0;
+  const op = num(geometry?.opacity, 1);
+  const cx = centre.x;
+  const cy = centre.y;
+  const pivot = { x: cx, y: cy + shift };
+  const rest = turns ? designerAngle(startPanel) : 0;
+  const options = { count: geometry?.outlineCount, depth: geometry?.outlineDepth, rotation: num(geometry?.outlineRotation, 0) };
+  const unturned = (radius) => (kind === 'circle' ? circlePath(cx, cy, radius) : knobOutlinePath(kind, cx, cy, radius, options));
+  const placed = (radius, dy = 0) => plateTransform(unturned(radius), { cx, cy, aspect, turn: rest, shift: shift + dy });
+  const bw = borderWidth(part, borderFallback);
+  // The panel's fill box, grown where the border's outer half would leave it.
+  const grown = r + bw / 2;
+  const boxFor = (dy = 0) => {
+    if (turns) {
+      const half = Math.max(r * Math.max(1, aspect) + 1, grown * Math.max(1, aspect));
+      return { x: cx - half, y: cy + shift + dy - half, width: 2 * half, height: 2 * half };
+    }
+    const hw = Math.max(r + 1, grown);
+    const hh = perspective ? Math.max(r * aspect + 1, grown * aspect) : hw;
+    return { x: cx - hw, y: cy + shift + dy - hh, width: 2 * hw, height: 2 * hh };
+  };
+  const turnBinding = (layer) => {
+    if (!turns) return;
+    // Drawn as it stands at the start of the travel; the binding turns it from there.
+    out.bindings[`${layer.name}Turn`] = rangeBinding(`${layer.name}Turn`, source, `Parts.${layer.name}.Layout.rotation`, 0, signed * sweep);
+  };
+  const pathLayer = (name, d, box, background, { pivotPoint = pivot, extraMeta = {}, sections = {} } = {}) => createPartNode(name, {
+    role, kind: 'path', zIndex: depthOf(), opacity: op,
+    layout: { ...pxBox(box, origin), ...pivotIn(box, pivotPoint) },
+    meta: { pathData: pathInBox(d, box), closed: true, ...(turns ? { fixedLight: true } : {}), ...extraMeta },
+    sections: { Background: background, ...sections },
+  });
+
+  // Its shadow: `shadowOffset` % of its radius lower, softened by `shadowBlur` % (the panel's
+  // feGaussianBlur takes half of that as its deviation, as a layer's blur does).
+  const offset = num(geometry?.shadowOffset, 0);
+  const softness = Math.max(0, num(geometry?.shadowBlur, 0));
+  if (offset > 0 || softness > 0) {
+    const dy = (r * offset) / 100;
+    const effects = deepClone(SECTION_DEFAULTS.Effects);
+    effects._children.Shadows.items = [];
+    effects._children.Filters.blur = r3((r * softness) / 200);
+    const shadow = pathLayer(named('Shadow'), placed(r, dy), boxFor(dy), solidBackground(String(part?.shadowColour ?? geometry?.shadowColour ?? '') || '99000000'), {
+      pivotPoint: { x: cx, y: cy + shift + dy }, sections: { Effects: effects },
+    });
+    add(knobPart, shadow);
+    turnBinding(shadow);
+  }
+
+  // The plate. A border you can see through, or one over a lit finish, is a layer of its own, as
+  // outlineLayers has it: the panel strokes it over the fill, unlit.
+  const background = backgroundFrom(part, { borderFallback, borderColourFallback: 'FF333333' });
+  const borderColour = String(background._children.Border.colour ?? '');
+  const seeThrough = bw > 0 && /^[0-9a-f]{8}$/i.test(borderColour) && borderColour.slice(0, 2).toUpperCase() !== 'FF';
+  const lit = bw > 0 && Object.keys(background._children.Effects?._children ?? {}).some((key) => background._children.Effects._children[key]?.enabled === true);
+  const box = boxFor();
+  if (!seeThrough && !lit) {
+    const plate = add(knobPart, pathLayer(named(''), placed(grown), box, background));
+    turnBinding(plate);
+  } else {
+    const fill = deepClone(background);
+    fill._children.Border.enabled = false;
+    fill._children.Border.thickness = 0;
+    const edge = deepClone(background);
+    edge._children.Fill.solidEnabled = false;
+    edge._children.Fill.gradientEnabled = false;
+    edge._children.Fill.imageEnabled = false;
+    edge._children.Fill.textureEnabled = false;
+    delete edge._children.Effects;
+    turnBinding(add(knobPart, pathLayer(named(''), placed(r), box, fill)));
+    turnBinding(add(knobPart, pathLayer(named('Edge'), placed(grown), box, edge)));
+  }
+
+  // Its grooves: in from its edge (on the unsquashed circle, as the panel draws them), each a thin
+  // bar, all one layer in the groove colour.
+  const count = Math.max(0, Math.round(num(geometry?.grooves, 0)));
+  if (count) {
+    const inner = r * (1 - Math.max(0, Math.min(100, num(geometry?.grooveLength, 15))) / 100);
+    const half = Math.max(0.25, num(geometry?.grooveWidth, 0.85)) / 2;
+    const gy = cy + shift;
+    const quads = Array.from({ length: count }, (_, i) => {
+      const a = (((i * 360) / count + rest) * Math.PI) / 180;
+      const ux = Math.sin(a);
+      const uy = -Math.cos(a);
+      const corners = [[r, -half], [r, half], [inner, half], [inner, -half]]
+        .map(([along, across]) => `${r3(cx + ux * along - uy * across)} ${r3(gy + uy * along + ux * across)}`);
+      return `M${corners.join(' L')} Z`;
+    }).join(' ');
+    const grooveBox = { x: cx - r - 1, y: gy - r - 1, width: 2 * r + 2, height: 2 * r + 2 };
+    const grooves = createPartNode(named('Grooves'), {
+      role, kind: 'path', zIndex: depthOf(), opacity: op,
+      layout: { ...pxBox(grooveBox, origin), ...pivotIn(grooveBox, { x: cx, y: gy }) },
+      meta: { pathData: pathInBox(quads, grooveBox), closed: true },
+      sections: { Background: solidBackground(String(part?.grooveColour ?? geometry?.grooveColour ?? '') || 'FF253136') },
+    });
+    add(knobPart, grooves);
+    turnBinding(grooves);
+  }
 }
 
 /** An arc of the track's circle as an arc layer: `start` in the designer's degrees (0 at 12 o'clock). */
@@ -322,22 +519,35 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   const pointerEndSize = num(g('pointerEnd')?._children?.Layout?.width, 18);
   const maxPointerSize = Math.max(pointerCurrentSize, pointerStartSize, pointerEndSize);
   const kindOfPointer = String(g('pointerCurrent')?.kind ?? 'dot').toLowerCase();
-  const pointerKind = ['line', 'chicken', 'capdot', 'needle'].includes(kindOfPointer) ? kindOfPointer : 'dot';
+  const pointerKind = ['line', 'bar', 'chicken', 'capdot', 'needle'].includes(kindOfPointer) ? kindOfPointer : 'dot';
   const majorTickLength = num(g('tickMajor')?._children?.Layout?.height, num(behavior.majorTickLength, 12));
   const minorTickLength = num(g('tickMinor')?._children?.Layout?.height, num(behavior.minorTickLength, 7));
   const tickStrokeWidth = num(g('tickMajor')?._children?.Layout?.width, 2);
   const minorTickStrokeWidth = num(g('tickMinor')?._children?.Layout?.width, 1);
   const tight = String(behavior.circularFit ?? 'auto') === 'tight';
   const housingVisible = g('bodyHousing')?.visible === true;
-  const housingReach = (() => {
-    if (!housingVisible) return 0;
-    const layout = g('bodyHousing')?._children?.Layout ?? {};
+  const tickRadiusShare = Math.max(0, num(behavior.tickRadius, 0)) / 100;
+  // How far the housing and the skirt reach, as SliderFamilyRenderer's plateReach has it: their size
+  // and outline, their shadow below, an oval taller than wide, a plate moved off the centre; and a
+  // scale on a radius of its own, in the tight fit.
+  const plateReach = (part, fallback) => {
+    if (part?.visible !== true) return 0;
+    const layout = part?._children?.Layout ?? {};
     if (String(layout.widthUnit ?? 'percent') === 'px') return 0;
-    const reach = knobOutlineReach(String(g('bodyHousing')?.outline ?? 'circle'), {
-      count: g('bodyHousing')?.outlineCount, depth: g('bodyHousing')?.outlineDepth, rotation: num(g('bodyHousing')?.outlineRotation, 0),
+    const reach = knobOutlineReach(String(part?.outline ?? 'circle'), {
+      count: part?.outlineCount, depth: part?.outlineDepth, rotation: num(part?.outlineRotation, 0),
     });
-    return (Math.max(0, num(layout.width, 100)) / 100) * reach;
-  })();
+    const shadow = 1 + Math.max(0, num(part?.shadowOffset, 0) + num(part?.shadowBlur, 0)) / 100;
+    const tall = Math.max(1, Math.max(5, num(part?.aspect, 100)) / 100);
+    return (Math.max(0, num(layout.width, fallback)) / 100) * reach * shadow * tall + Math.abs(num(part?.shiftY, 0)) / 100;
+  };
+  const housingReach = Math.max(plateReach(g('bodyHousing'), 100), plateReach(g('bodySkirt'), 90),
+    showTicks && tickRadiusShare > 0 && tight ? tickRadiusShare + (String(behavior.tickPlacement ?? 'outside') === 'outside' ? 0.1 : 0.02) : 0);
+  // The scale's numbers (tickNumber): how many, their size, how far out.
+  const numberPart = g('tickNumber');
+  const scaleNumberCount = numberPart?.visible !== false ? Math.max(0, Math.min(41, Math.round(num(behavior.scaleNumberCount, 0)))) : 0;
+  const scaleNumberSize = labelFontSize(numberPart, 7);
+  const scaleNumberReach = scaleNumberCount >= 2 ? Math.max(0, num(numberPart?._children?.Layout?.offsetX, 122)) / 100 : 0;
   const metrics = resolveCircularTrackMetrics(width, height, {
     trackThickness,
     pointerSize: tight ? (pointerKind === 'dot' ? pointerCurrentSize : 0) : maxPointerSize,
@@ -351,6 +561,8 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     readoutBelow: showReadout && String(behavior.labelReadoutPlacement ?? 'auto') === 'bottom',
     outerReach: housingReach,
     readoutGap: num(behavior.labelReadoutGap, 14),
+    numberReach: scaleNumberReach,
+    numberSize: scaleNumberSize,
   });
   const centre = { x: metrics.centerX, y: metrics.centerY };
   const radius = metrics.radius;
@@ -364,22 +576,18 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     const size = Math.max(0, num(layout.width, fallbackPercent));
     return String(layout.widthUnit ?? 'percent') === 'px' ? size / 2 : radius * (size / 100);
   };
-  const turnBinding = (layer, part) => {
-    if (part?.turns !== true) return;
-    // The outline is drawn as it stands at the start of the travel; the binding turns it from there.
-    out.bindings[`${layer.name}Turn`] = rangeBinding(`${layer.name}Turn`, source, `Parts.${layer.name}.Layout.rotation`, 0, signed * sweep);
+  // The plates: the housing and the skirt under the track, the cap and its insert over the scale.
+  const plateContext = {
+    centre, origin, trackRadius: radius, startPanel, signed, sweep, source, add, out, depthOf: () => depth,
   };
-
-  // Housing.
-  if (housingVisible) {
-    const r = radiusOf(g('bodyHousing'), 100);
-    if (r > 0) {
-      for (const layer of outlineLayers((extra) => named(`housing${extra}`), withTurnStart(parts.bodyHousing, startPanel), centre, r, origin, { zIndex: depth, borderFallback: 0, role: 'background' })) {
-        add('bodyHousing', layer);
-        turnBinding(layer, g('bodyHousing'));
-      }
-    }
-  }
+  const plate = (partName, label, fallback, borderFallback, role) => {
+    if (g(partName)?.visible !== true) return 0;
+    const r = radiusOf(g(partName), fallback);
+    plateLayers((extra) => named(`${label}${extra}`), parts[partName], g(partName), r, { ...plateContext, borderFallback, role, knobPart: partName });
+    return r;
+  };
+  plate('bodyHousing', 'housing', 100, 0, 'background');
+  plate('bodySkirt', 'skirt', 90, 0, 'background');
 
   // Track.
   const trackColour = fillOf(parts.bodyTrackBase).colour ?? 'FF2C2C2C';
@@ -457,14 +665,18 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
       const kind = String(g(partName)?.kind ?? 'line').toLowerCase();
       const own = fillOf(part).colour;
       const dimColour = own ?? dimFallback;
-      const litColour = own ?? litFallback;
+      // Lit, a tick takes its active colour where it has one (the panel's highlightStop colour).
+      const litColour = String(part?.activeColour ?? '').trim() || own || litFallback;
       const dimOpacity = num(g(partName)?.opacity, dimOpacityFallback);
+      // On the track, either side of its width; or on a radius of its own (Behavior.tickRadius).
+      const base = tickRadiusShare > 0 ? radius * tickRadiusShare : radius;
+      const halfTrack = tickRadiusShare > 0 ? 0 : trackThickness / 2;
       for (const stop of list) {
         const t = num(stop.normalized, 0);
-        let r1 = radius + trackThickness / 2;
+        let r1 = base + halfTrack;
         let r2 = r1 + length;
-        if (placement === 'inside') { r1 = radius - trackThickness / 2; r2 = r1 - length; }
-        if (placement === 'cross') { r1 = radius - length / 2; r2 = radius + length / 2; }
+        if (placement === 'inside') { r1 = base - halfTrack; r2 = r1 - length; }
+        if (placement === 'cross') { r1 = base - length / 2; r2 = base + length / 2; }
         const angle = angleAt(t);
         // Lit while the travel is on the far side of the stop from the origin, as highlightStop has it.
         const litWhenAbove = t >= o;
@@ -524,17 +736,74 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
         n += 1;
       }
     }
-  }
 
-  // Cap.
-  const capVisible = g('bodyCap')?.visible === true;
-  const capRadius = capVisible ? radiusOf(g('bodyCap'), 72) : 0;
-  if (capRadius > 0) {
-    for (const layer of outlineLayers((extra) => named(`cap${extra}`), withTurnStart(parts.bodyCap, startPanel), centre, capRadius, origin, { zIndex: depth, borderFallback: 1, role: 'cap' })) {
-      add('bodyCap', layer);
-      turnBinding(layer, g('bodyCap'));
+    // A second scale (Behavior.secondScaleRadius, % of the track's radius; secondScaleCount, its
+    // divisions): long and short ticks in turn, in from that radius, in the scale's own colours and
+    // not lit, as the panel draws Dual Scale's inner ring.
+    const share = Math.max(0, num(behavior.secondScaleRadius, 0)) / 100;
+    const divisions = Math.max(0, Math.round(num(behavior.secondScaleCount, 0)));
+    if (share > 0 && divisions > 0) {
+      const base = radius * share;
+      for (let i = 0; i <= divisions; i += 1) {
+        const major = i % 2 === 0;
+        const partName = major ? 'tickMajor' : 'tickMinor';
+        const kind = String(g(partName)?.kind ?? 'line').toLowerCase();
+        const length = major ? majorTickLength : minorTickLength;
+        const stroke = major ? tickStrokeWidth : minorTickStrokeWidth;
+        const colour = fillOf(parts[partName]).colour ?? (major ? 'FFD0D0D0' : 'FFB0B0B0');
+        const opacity = num(g(partName)?.opacity, major ? 0.95 : 0.55);
+        const angle = angleAt(i / divisions);
+        const line = { centre, angle, from: base - length, to: base, width: stroke, colour, zIndex: depth, origin };
+        const tickName = (extra = '') => named(`scale2Tick${i}${extra}`);
+        if (kind === 'dot') {
+          add(partName, tickDot(tickName(), { centre, angle, at: base - length / 2, r: Math.max(1.5, length * 0.45), colour, opacity, zIndex: depth, origin }));
+        } else if (kind === 'engraved') {
+          const turn = (-angle * Math.PI) / 180;
+          const dx = 0.6 * Math.cos(turn) - 0.8 * Math.sin(turn);
+          const dy = 0.6 * Math.sin(turn) + 0.8 * Math.cos(turn);
+          const light = radialBar(tickName('light'), { ...line, colour: 'FFFFFFFF', opacity: opacity * 0.35, round: true });
+          light._children.Layout.x = r3(light._children.Layout.x + dx);
+          light._children.Layout.y = r3(light._children.Layout.y + dy);
+          Object.assign(light._children.Layout, pivotIn(boxOfLayout(light._children.Layout, origin), { x: centre.x - dx, y: centre.y - dy }));
+          add(partName, light);
+          add(partName, radialBar(tickName(), { ...line, opacity, round: true }));
+        } else if (kind !== 'numeral') {
+          // A numeral tick on the second scale prints nothing: the panel gives it no label.
+          add(partName, radialBar(tickName(), { ...line, opacity, round: false }));
+        }
+      }
     }
   }
+
+  // The scale's numbers (tickNumber; Behavior.scaleNumberCount, From, To): evenly round the sweep,
+  // `Layout.offsetX` % of the track's radius out from the centre, centred on their point.
+  if (scaleNumberCount >= 2) {
+    const styledNumber = parts.tickNumber;
+    const font = numberPart?._children?.Text?._children?.Font ?? {};
+    const from = num(behavior.scaleNumberFrom, 0);
+    const to = num(behavior.scaleNumberTo, 10);
+    for (let i = 0; i < scaleNumberCount; i += 1) {
+      const a = ((angleAt(i / (scaleNumberCount - 1)) - 90) * Math.PI) / 180;
+      const point = { x: centre.x + Math.cos(a) * radius * scaleNumberReach, y: centre.y + Math.sin(a) * radius * scaleNumberReach };
+      const text = deepClone(SECTION_DEFAULTS.Text);
+      text.content = String(Math.round((from + ((to - from) * i) / (scaleNumberCount - 1)) * 100) / 100);
+      text._children.Fill.colour = styledNumber?._children?.Text?._children?.Fill?.colour ?? 'FFD0D0D0';
+      text._children.Font.size = scaleNumberSize;
+      text._children.Font.family = font.family ?? 'Arial';
+      text._children.Font.weightValue = num(font.weightValue, 400);
+      if (num(font.weightValue, 400) >= 600) text._children.Font.weight = 'Bold';
+      text._children.Position.justification = 'centred';
+      const size = scaleNumberSize;
+      const box = { x: point.x - size * 2, y: point.y - size, width: size * 4, height: size * 2 };
+      add('tickNumber', createPartNode(named(`number${i}`), {
+        role: 'label', kind: 'rectangle', zIndex: depth, opacity: num(numberPart?.opacity, 1), layout: pxBox(box, origin), sections: { Text: text },
+      }));
+    }
+  }
+
+  // The cap, and the insert set into it.
+  const capRadius = plate('bodyCap', 'cap', 72, 1, 'cap');
+  plate('bodyInsert', 'insert', 45, 1, 'cap');
 
   // Pointer, drawn at the start of the travel and turned about the centre by the value.
   if (partVisible(g('pointerCurrent'))) {
@@ -550,6 +819,52 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     if (pointerKind === 'line') {
       const r0 = reach * (num(geometryPointer?._children?.Layout?.offsetX, 30) / 100);
       layer = radialBar(named('pointer'), { centre, angle: startAngle, from: r0, to: tip, width: thick, round: true, colour: colourOr('FFFFFFFF'), opacity: num(geometryPointer?.opacity, 1), zIndex: depth, origin });
+    } else if (pointerKind === 'bar') {
+      // A painted bar with square ends (the panel's radialPointerShape), pointing up and turned to the
+      // start: from Layout.offsetX to Layout.height out, its width a % of the reach, narrowed at the
+      // tip by `taper`. Its border is an edge outside it, a layer of its own under it; a shaded bar is
+      // its Background, a flat one its colour.
+      const r0 = reach * (num(geometryPointer?._children?.Layout?.offsetX, 30) / 100);
+      const halfBase = Math.max(0.5, (reach * num(geometryPointer?._children?.Layout?.width, 12)) / 200);
+      const halfTip = halfBase * (1 - Math.max(-300, Math.min(100, num(geometryPointer?.taper, 0))) / 100);
+      const quad = (grow) => [[r0 - grow, -halfBase - grow], [tip + grow, -halfTip - grow], [tip + grow, halfTip + grow], [r0 - grow, halfBase + grow]]
+        .map(([along, across]) => [centre.x + across, centre.y - along]);
+      const edge = borderWidth(pointerPart, 0);
+      const opacity = num(geometryPointer?.opacity, 1);
+      const polygonLayer = (layerName, rings, background) => {
+        const all = rings.flat();
+        const shape = normalisePoints(all);
+        const d = rings.map((ring) => `M${ring.map(([x, y]) => `${r3(x)} ${r3(y)}`).join(' L')} Z`).join(' ');
+        return createPartNode(layerName, {
+          role: 'handle', kind: 'path', zIndex: depth, opacity,
+          layout: { ...pxBox(shape.box, origin), ...pivotIn(shape.box, centre), rotation: startAngle },
+          meta: { pathData: pathInBox(d, shape.box), closed: true },
+          sections: { Background: background },
+        });
+      };
+      pointerLayers = [];
+      if (edge > 0) {
+        // The panel strokes quad(edge / 2), `edge` wide with mitred corners: the band between its
+        // outline pushed out and pulled in by half the edge.
+        const middle = quad(edge / 2);
+        const colour = String(pointerPart?._children?.Background?._children?.Border?.colour ?? '') || 'FF202020';
+        pointerLayers.push(polygonLayer(named('pointerEdge'), [offsetPolygon(middle, edge / 2), offsetPolygon(middle, -edge / 2).reverse()], solidBackground(colour)));
+      }
+      const shaded = fillOf(pointerPart).gradientEnabled === true;
+      const fillBackground = shaded ? backgroundFrom(pointerPart, { borderFallback: 0 }) : solidBackground(colourOr('FFFFFFFF'));
+      if (shaded) { fillBackground._children.Border.enabled = false; fillBackground._children.Border.thickness = 0; }
+      pointerLayers.push(polygonLayer(named('pointer'), [quad(0)], fillBackground));
+      // A second bar on it (markFrom, markTo, markWidth: % of the reach; markColour), Dual Scale's.
+      const markTo = num(geometryPointer?.markTo, 0);
+      const markFrom = num(geometryPointer?.markFrom, 0);
+      const markWidth = num(geometryPointer?.markWidth, 0);
+      if (markTo > markFrom && markWidth > 0) {
+        const half = Math.max(0.25, (reach * markWidth) / 200);
+        const m0 = (reach * markFrom) / 100;
+        const m1 = (reach * markTo) / 100;
+        const mark = [[m0, -half], [m1, -half], [m1, half], [m0, half]].map(([along, across]) => [centre.x + across, centre.y - along]);
+        pointerLayers.push(polygonLayer(named('pointerMark'), [mark], solidBackground(String(pointerPart?.markColour ?? '') || 'FF1C2226')));
+      }
     } else if (pointerKind === 'capdot') {
       const r = Math.max(1.5, reach * (num(geometryPointer?._children?.Layout?.width, 26) / 200));
       layer = tickDot(named('pointer'), { centre, angle: startAngle, at: tip, r, colour: colourOr('FFFFFFFF'), opacity: num(geometryPointer?.opacity, 1), zIndex: depth, origin });
@@ -584,6 +899,7 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
       });
     }
     for (const each of pointerLayers ?? (layer ? [layer] : [])) {
+      each.zIndex = depth;
       add('pointerCurrent', each);
       out.bindings[`${each.name}Turn`] = rangeBinding(`${each.name}Turn`, source, `Parts.${each.name}.Layout.rotation`, startAngle, startAngle + signed * sweep);
     }
@@ -650,24 +966,16 @@ function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, 
 
 // --- sliders ---------------------------------------------------------------------------------------
 
-const LINEAR_LAYER_CAPS = new Set(['dot', 'bar', 'ring', 'line']);
 
 /** Why this slider cannot become layers that look as it does, or ''. */
 function sliderLayersRefusal(resolved) {
   const behavior = resolved?._children?.Behavior ?? {};
   const parts = resolveSliderSemanticParts(resolved?._children?.Parts ?? null)._children;
   const cap = parts.pointerCurrent ?? {};
-  const capKind = String(cap.kind ?? 'dot').toLowerCase();
+  // Every cap kind (dot, bar, console, block, lens, glass, ring, line), its glow, sheen, gradient and
+  // finish, a shaded track and fill and a glowing fill are layers now; a rendered cap is an image
+  // the layers do not make.
   if (partVisible(cap) && String(cap.look ?? '') === 'rendered') return 'a rendered fader cap, which a layer does not draw yet';
-  if (partVisible(cap) && !LINEAR_LAYER_CAPS.has(capKind)) return `a "${capKind}" fader cap, which a layer does not draw yet`;
-  // `shadow` is a drop shadow filtering a shape drawn at 0.001 opacity (SliderFamilyRenderer's
-  // linearCap): next to nothing reaches the screen, so a layer draws nothing for it.
-  if (cap.glow === true) return 'a glow round its fader cap, which a layer does not draw yet';
-  if (capKind === 'bar' && cap.sheen === true) return 'a sheen on its fader cap, which a layer does not draw yet';
-  if (partVisible(parts.bodyTrackFill) && parts.bodyTrackFill?.glow === true) return 'a glowing value fill, which a layer does not draw yet';
-  if (partVisible(parts.bodyTrackBase) && fillIsRich(parts.bodyTrackBase)) return 'a gradient along its track, which a layer does not draw yet';
-  if (partVisible(parts.bodyTrackFill) && fillIsRich(parts.bodyTrackFill)) return 'a gradient along its value fill, which a layer does not draw yet';
-  if (partVisible(cap) && capKind !== 'line' && fillIsRich(cap)) return 'a gradient or finish on its fader cap, which a layer does not draw yet';
   if (behavior.showHandleLabels === true) return 'a label that rides the cap';
   return '';
 }
@@ -723,7 +1031,8 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     ? { x: a.x - thickness / 2, y: Math.min(a.y, b.y) - (round ? thickness / 2 : 0), width: thickness, height: Math.abs(b.y - a.y) + (round ? thickness : 0) }
     : { x: Math.min(a.x, b.x) - (round ? thickness / 2 : 0), y: a.y - thickness / 2, width: Math.abs(b.x - a.x) + (round ? thickness : 0), height: thickness });
   const barLayer = (name, box, round, colour, opacity, rx = 0) => {
-    const background = solidBackground(colour);
+    // A colour, or a whole Background (a shaded track, a lit fill).
+    const background = typeof colour === 'object' && colour ? colour : solidBackground(colour);
     if (!round) background._children.Corners.radius = rx;
     return createPartNode(name, { role: 'track', kind: round ? 'capsule' : 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(box, origin), sections: { Background: background } });
   };
@@ -738,8 +1047,10 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
       if (!round) Object.assign(box, vertical ? { y: box.y - edge, height: box.height + edge * 2 } : { x: box.x - edge, width: box.width + edge * 2 });
       add('bodyTrackBase', barLayer(named('trackEdge'), box, round, parts.bodyTrackBase?._children?.Background?._children?.Border?.colour ?? 'FF000000', num(trackPart?.opacity, 1), (square ?? 0) + edge));
     }
+    // Its own fill: a colour, or a gradient or finish along it.
+    const trackFill = fillIsRich(trackPart) ? fillBackground(parts.bodyTrackBase, square ?? 0) : fillOf(parts.bodyTrackBase).colour ?? 'FF2C2C2C';
     add('bodyTrackBase', barLayer(named('track'), barBox({ x: frame.x1, y: frame.y1 }, { x: frame.x2, y: frame.y2 }, trackThickness, round),
-      round, fillOf(parts.bodyTrackBase).colour ?? 'FF2C2C2C', num(trackPart?.opacity, 1), square ?? 0));
+      round, trackFill, num(trackPart?.opacity, 1), square ?? 0));
     if (trackPart?.slot === true) {
       const q = trackThickness / 4;
       const along = round ? q : 0;
@@ -775,16 +1086,22 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     for (const [suffix, from, to] of segments) {
       if (to - from <= 0) continue;
       const far = pointAt(suffix === 'valueDown' ? 0 : 1, pointerCurrentSize);
-      const layer = add('bodyTrackFill', barLayer(named(suffix), barBox(po, po, fillThickness, round), round, colour, num(fillPart?.opacity, 1), square ?? 0));
       const [lengthKey, posKey, a, b] = vertical ? ['height', 'y', po.y, far.y] : ['width', 'x', po.x, far.x];
-      const base = round ? fillThickness : 0;
       // Longer as the travel leaves the origin; where it grows up or left, its box moves with its end.
       const growing = suffix === 'valueDown' ? [to, from] : [from, to];
-      out.bindings[`${layer.name}Length`] = rangeBinding(`${layer.name}Length`, source, `Parts.${layer.name}.Layout.${lengthKey}`, base, Math.abs(b - a) + base, growing[0], growing[1]);
-      if (b < a) {
-        const start = layer._children.Layout[posKey];
-        out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, source, `Parts.${layer.name}.Layout.${posKey}`, start, start - (a - b), growing[0], growing[1]);
-      }
+      const grow = (layer, base) => {
+        out.bindings[`${layer.name}Length`] = rangeBinding(`${layer.name}Length`, source, `Parts.${layer.name}.Layout.${lengthKey}`, base, Math.abs(b - a) + base, growing[0], growing[1]);
+        if (b < a) {
+          const start = layer._children.Layout[posKey];
+          out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, source, `Parts.${layer.name}.Layout.${posKey}`, start, start - (a - b), growing[0], growing[1]);
+        }
+      };
+      // A glowing fill (`glow`) draws nothing on the panel: its blur's region is a share of the
+      // line's own box, which has no width across a straight line, so the filtered line is not
+      // drawn. The layers draw what the panel shows.
+      const fillPaint = fillIsRich(fillPart) ? fillBackground(parts.bodyTrackFill, square ?? 0) : colour;
+      const layer = add('bodyTrackFill', barLayer(named(suffix), barBox(po, po, fillThickness, round), round, fillPaint, num(fillPart?.opacity, 1), square ?? 0));
+      grow(layer, round ? fillThickness : 0);
       if (fromCentre) {
         // Only the side the value is on: the other stays at the origin, where the panel draws one.
         const edge = suffix === 'valueDown' ? [o - 0.0005, o] : [o, o + 0.0005];
@@ -880,7 +1197,7 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
           }
         };
         const dimColour = own ?? dimFallback;
-        const litColour = own ?? litFallback;
+        const litColour = String(parts[partName]?.activeColour ?? '').trim() || own || litFallback;
         if (dimColour === litColour) {
           fade(drawTick('', dimColour, dimOpacity), litWhenAbove ? dimOpacity : litOpacity, litWhenAbove ? litOpacity : dimOpacity, 'Lit');
         } else {
@@ -904,19 +1221,35 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     const fill = fillOf(capPart).colour ?? 'FFFFFFFF';
     const opacity = num(capGeometryPart?.opacity, 1);
     const capLayers = [];
-    if (kind === 'dot') {
-      capLayers.push(...outlineLayers((extra) => named(`cap${extra}`), capPart, at, along / 2, origin, { zIndex: depth, borderFallback: 1, role: 'handle' }));
-    } else if (kind === 'ring') {
+    const bw = borderWidth(capGeometryPart, 1);
+    const borderColour = capPart?._children?.Background?._children?.Border?.colour ?? 'FF333333';
+    const grooveColour = capPart?.grooveColour ?? borderColour;
+    const node = (name, kindOf, box, background, layerOpacity = opacity, extra = {}) => createPartNode(name, {
+      role: 'handle', kind: kindOf, zIndex: depth, opacity: layerOpacity, layout: pxBox(box, origin), sections: { Background: background }, ...extra,
+    });
+    const circleBox = (r, pad = 0) => ({ x: at.x - r - pad, y: at.y - r - pad, width: 2 * (r + pad), height: 2 * (r + pad) });
+    // A disc as a path in the panel's fill box (its circle's bounds and a pixel), so a gradient on
+    // it runs as the panel's does.
+    const disc = (name, r, background, layerOpacity = opacity) => {
+      const box = circleBox(r, 1);
+      return createPartNode(name, {
+        role: 'handle', kind: 'path', zIndex: depth, opacity: layerOpacity, layout: pxBox(box, origin),
+        meta: { pathData: pathInBox(circlePath(at.x, at.y, r), box), closed: true }, sections: { Background: background },
+      });
+    };
+    const roundKinds = ['dot', 'lens', 'glass'];
+    const rectKinds = ['bar', 'console', 'block'];
+    if (kind === 'ring') {
       const ring = Math.max(2, across / 4);
       const r = Math.max(2, (along / 2) - (ring / 2));
       const outer = r + ring / 2;
       const inner = Math.max(0.5, r - ring / 2) / (2 * outer);
-      const background = solidBackground(fill);
+      if (capGeometryPart?.glow === true) capLayers.push(blurred(node(named('capGlow'), 'circle', circleBox(r * 1.5), solidBackground(fill), 0.5 * opacity), 4));
       capLayers.push(createPartNode(named('cap'), {
         role: 'handle', kind: 'path', zIndex: depth, opacity,
         layout: pxBox({ x: at.x - outer, y: at.y - outer, width: 2 * outer, height: 2 * outer }, origin),
         meta: { pathData: `${UNIT_CIRCLE} M${r3(0.5 - inner)} 0.5 a${r3(inner)} ${r3(inner)} 0 1 1 ${r3(inner * 2)} 0 a${r3(inner)} ${r3(inner)} 0 1 1 ${r3(-inner * 2)} 0 Z`, closed: true },
-        sections: { Background: background },
+        sections: { Background: fillIsRich(capGeometryPart) ? fillBackground(capPart) : solidBackground(fill) },
       }));
     } else if (kind === 'line') {
       const w = vertical ? across : along;
@@ -925,30 +1258,54 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
         ? { x: at.x - w / 2 - along / 2, y: at.y - along / 2, width: w + along, height: along }
         : { x: at.x - along / 2, y: at.y - h / 2 - along / 2, width: along, height: h + along };
       capLayers.push(barLayer(named('cap'), box, true, fill, opacity));
+    } else if (roundKinds.includes(kind) || !rectKinds.includes(kind)) {
+      // A dot, a lens (a dome lit from inside) or a glass dot (a dot in a halo), as the panel draws
+      // them: its glow, a glass dot's halo, the fill, a lens's dome (or any cap's sheen), its edge,
+      // and a lens's light, blurred, with its core and its spark.
+      const r = along / 2;
+      if (capGeometryPart?.glow === true) capLayers.push(blurred(node(named('capGlow'), 'circle', circleBox(r * 1.5), solidBackground(fill), 0.5 * opacity), 4));
+      if (kind === 'glass') capLayers.push(node(named('capHalo'), 'circle', circleBox(r * 1.5), solidBackground(fill), 0.18 * opacity));
+      capLayers.push(disc(named('cap'), r, fillBackground(capPart)));
+      if (kind === 'lens' || capGeometryPart?.sheen === true) capLayers.push(node(named('capDome'), 'circle', circleBox(r), gradientBackground(CAP_DOME)));
+      if (bw > 0) capLayers.push(node(named('capEdge'), 'circle', circleBox(r + bw / 2), borderOnlyBackground(borderColour, bw)));
+      if (kind === 'lens') {
+        capLayers.push(blurred(node(named('capLight'), 'circle', circleBox(r * 0.6), solidBackground(grooveColour), 0.9 * opacity), 4));
+        capLayers.push(node(named('capLightCore'), 'circle', circleBox(r * 0.42), solidBackground(grooveColour)));
+        capLayers.push(node(named('capSpark'), 'circle', circleBox(r * 0.16), solidBackground('FFFFFFFF'), 0.9 * opacity));
+      }
     } else {
-      // A fader cap ('bar'): a rounded rectangle, its border, and a groove across the travel.
+      // A fader cap: a bar (a rectangle with a groove), a console cap (the bar with the cylinder
+      // sheen), or a billet block (the sheen and an inset top plate), as capGeometry lays them out:
+      // its glow, the fill, the sheen, a block's plate and the plate's sheen, its edge, the groove.
       const w = vertical ? across : along;
       const h = vertical ? along : across;
       const box = { x: at.x - w / 2, y: at.y - h / 2, width: w, height: h };
-      const rx = Math.min(w, h) * 0.18;
-      const bw = borderWidth(capGeometryPart, 1);
-      const background = backgroundFrom(capPart, { borderFallback: 1, borderColourFallback: 'FF333333' });
-      background._children.Corners = { ...(background._children.Corners ?? deepClone(SECTION_DEFAULTS.Background._children.Corners)), radius: rx };
-      // The panel strokes the border centred on the edge; a box draws it inside.
-      capLayers.push(createPartNode(named('cap'), {
-        role: 'handle', kind: 'roundedRectangle', zIndex: depth, opacity,
-        layout: pxBox({ x: box.x - bw / 2, y: box.y - bw / 2, width: box.width + bw, height: box.height + bw }, origin),
-        sections: { Background: background },
-      }));
-      const stroke = Math.max(1.5, Math.min(w, h) * 0.18);
-      const margin = 3;
+      const small = Math.min(w, h);
+      const rx = kind === 'block' ? small * 0.15 : small * 0.18;
+      const rounded = (name, b, background, radius, layerOpacity = opacity) => {
+        background._children.Corners.radius = radius;
+        return node(name, 'roundedRectangle', b, background, layerOpacity);
+      };
+      if (capGeometryPart?.glow === true) {
+        capLayers.push(blurred(rounded(named('capGlow'), { x: box.x - 4, y: box.y - 4, width: w + 8, height: h + 8 }, solidBackground(fill), rx + 4, 0.45 * opacity), 4));
+      }
+      capLayers.push(rounded(named('cap'), box, fillBackground(capPart, rx), rx));
+      if (kind !== 'bar' || capGeometryPart?.sheen === true) capLayers.push(rounded(named('capSheen'), box, gradientBackground(capSheen(vertical)), rx));
+      if (kind === 'block') {
+        const inset = Math.max(2, small * 0.15);
+        const plate = { x: box.x + inset, y: box.y + inset, width: w - inset * 2, height: h - inset * 2 };
+        const plateRadius = Math.max(1, rx - 1);
+        capLayers.push(rounded(named('capPlate'), plate, solidBackground(capPart?.plateColour ?? '38FFFFFF'), plateRadius));
+        capLayers.push(rounded(named('capPlateSheen'), plate, gradientBackground(capSheen(vertical)), plateRadius, 0.6 * opacity));
+      }
+      // The panel strokes the edge centred on the outline; a layer bands it in from its box.
+      if (bw > 0) capLayers.push(rounded(named('capEdge'), { x: box.x - bw / 2, y: box.y - bw / 2, width: w + bw, height: h + bw }, borderOnlyBackground(borderColour, bw), rx + bw / 2));
+      const stroke = Math.max(1, kind === 'block' ? 2 : Math.max(1.5, small * 0.18));
+      const margin = kind === 'block' ? Math.max(6, small * 0.4) : 3;
       const groove = vertical
-        ? { x: box.x + margin, y: at.y, width: w - margin * 2, height: 0 }
-        : { x: at.x, y: box.y + margin, width: 0, height: h - margin * 2 };
-      const grooveColour = capPart?.grooveColour ?? capPart?._children?.Background?._children?.Border?.colour ?? 'FF333333';
-      capLayers.push(barLayer(named('capGroove'), vertical
-        ? { x: groove.x - stroke / 2, y: groove.y - stroke / 2, width: groove.width + stroke, height: stroke }
-        : { x: groove.x - stroke / 2, y: groove.y - stroke / 2, width: stroke, height: groove.height + stroke }, true, grooveColour, opacity * 0.85));
+        ? { x: box.x + margin - stroke / 2, y: at.y - stroke / 2, width: w - margin * 2 + stroke, height: stroke }
+        : { x: at.x - stroke / 2, y: box.y + margin - stroke / 2, width: stroke, height: h - margin * 2 + stroke };
+      capLayers.push(barLayer(named('capGroove'), groove, true, grooveColour, opacity * (kind === 'block' ? 1 : 0.85)));
     }
     const [key, from, to] = vertical ? ['offsetY', 0, end.y - at.y] : ['offsetX', 0, end.x - at.x];
     for (const layer of capLayers) {
@@ -1014,7 +1371,6 @@ export function buttonDeviceLayersRefusal(resolved) {
   const keyTurns = Boolean(Number(key?.swing ?? 0) || Number(key?._children?.Layout?.rotation ?? 0));
   // A drop shadow under a part (the sculpted synth set's), which a layer does not draw yet.
   for (const name of BUTTON_DEVICE_PARTS) {
-    if (parts[name]?.visible === true && (Number(parts[name]?.shadowOffset) > 0 || Number(parts[name]?.shadowBlur) > 0)) return `a shadow under its ${name}, which a layer does not draw yet`;
     if (parts[name]?.visible === true && String(parts[name]?.look ?? '') === 'rendered') return `a rendered ${name}, which a layer does not draw yet`;
   }
   for (const name of BUTTON_DEVICE_PARTS) {
@@ -1113,6 +1469,7 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
     }
     let layer;
     let extra = null;
+    let shadow = null;
     if (name === 'legend') {
       const size = num(part.fontSize, 11) * S;
       const text = deepClone(SECTION_DEFAULTS.Text);
@@ -1158,6 +1515,17 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       const fillOnly = deepClone(background);
       fillOnly._children.Border.enabled = false;
       fillOnly._children.Border.thickness = 0;
+      // A drop shadow (the sculpted sets' keys): its outline again, `shadowOffset` % of the frame's
+      // height lower, softened by `shadowBlur` %, in `shadowColour`, under it and moving with it, as
+      // ButtonDeviceParts draws it inside the part's own motion.
+      const shadowDy = (num(part.shadowOffset, 0) / 100) * H;
+      const shadowBlur = (num(part.shadowBlur, 0) / 100) * H;
+      if (shadowDy > 0 || shadowBlur > 0) {
+        shadow = blurred(pathLayerOf(named(`${name}Shadow`), solidBackground(String(styledPart.shadowColour ?? part.shadowColour ?? '') || '99000000'), 0, true), (shadowBlur / 2) * S);
+        shadow._children.Layout.y = r3(shadow._children.Layout.y + shadowDy * S);
+        Object.assign(shadow._children.Layout, pivotIn(boxOfLayout(shadow._children.Layout, origin), pivot));
+        if (part.activeOpacity != null) out.onPatches[shadow.name] = { opacity: num(part.activeOpacity, 1) };
+      }
       layer = pathLayerOf(named(name), bw > 0 ? fillOnly : background, 0, true);
       if (bw > 0) extra = pathLayerOf(named(`${name}Edge`), edgeBackground(background, bw), bw, false);
       const on = {};
@@ -1166,7 +1534,8 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       if (Object.keys(on).length) out.onPatches[layer.name] = on;
       if (extra && part.activeOpacity != null) out.onPatches[extra.name] = { opacity: num(part.activeOpacity, 1) };
     }
-    for (const each of [layer, extra].filter(Boolean)) {
+    for (const each of [shadow, layer, extra].filter(Boolean)) {
+      each.zIndex = depth;
       add(name, each);
       const dx = own.dx + rides.dx;
       const dy = own.dy + rides.dy;
@@ -1219,6 +1588,29 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
 
 // --- meters drawn as a device ------------------------------------------------------------------------
 
+/**
+ * How many characters a counter's figures can have for a reading between `min` and `max` at
+ * `precision` places (utils/meterParts.js meterFigures, `toFixed`): one more past each power of ten,
+ * and one for a minus sign, each where `toFixed` first rounds up to it.
+ */
+export function figureLengths(min, max, precision) {
+  const places = Math.max(0, Math.min(3, Math.round(Number(precision) || 0)));
+  const lo = Math.min(min, max);
+  const hi = Math.max(min, max);
+  const half = 0.5 * 10 ** -places;
+  const samples = [lo, hi];
+  for (let k = 0; k <= 15; k += 1) {
+    for (const sign of [1, -1]) {
+      const edge = sign * (10 ** k - half);
+      for (const v of [edge - 1e-9 * Math.max(1, Math.abs(edge)), edge + 1e-9 * Math.max(1, Math.abs(edge))]) samples.push(v);
+    }
+  }
+  samples.push(-1e-12, 1e-12);
+  const lengths = new Set();
+  for (const v of samples) if (v >= lo && v <= hi) lengths.add(v.toFixed(places).length);
+  return [...lengths].sort((a, b) => a - b);
+}
+
 /** Why a meter drawn with device parts cannot become layers, or ''. */
 export function meterDeviceLayersRefusal(resolved) {
   const meter = resolved?._children?.Meter ?? {};
@@ -1231,12 +1623,11 @@ export function meterDeviceLayersRefusal(resolved) {
     if (String(part.look ?? '') === 'rendered') return `a rendered ${name}, which a layer does not draw yet`;
     const motion = String(part.motion ?? 'none');
     const pattern = String(part.pattern ?? 'solid');
-    if (pattern === 'digits') return `counter digits on its ${name}, which a layer does not draw yet`;
-    if (Number(part.shadowOffset) > 0 || Number(part.shadowBlur) > 0) return `a shadow under its ${name}, which a layer does not draw yet`;
+    // Counter digits, shadows, a legend that shows the reading and a fill in a pattern or a shape are
+    // layers now (meterDeviceLayers).
+    if (pattern === 'digits' && (motion === 'fill' || motion === 'light')) return `counter digits that ${motion === 'fill' ? 'fill' : 'light'}, which a layer does not draw yet`;
     if (String(part.zoneColours ?? 'off') !== 'off') return `its ${name} coloured by the meter's zones, which a layer does not do yet`;
     if (String(part.source ?? 'reading') === 'peak' || motion === 'clip') return `its ${name} follows the held peak, which a layer does not keep`;
-    if (name === 'legend' && String(part.textSource ?? 'fixed') !== 'fixed') return 'a legend that shows the reading';
-    if (motion === 'fill' && (pattern !== 'solid' || String(part.shape ?? 'rect') !== 'rect')) return `a ${name} that fills in a pattern or shape, which a layer does not draw yet`;
   }
   return '';
 }
@@ -1343,9 +1734,71 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     const pivot = { x: box.x + (num(part.pivotX, 50) / 100) * box.w, y: box.y + (num(part.pivotY, 50) / 100) * box.h };
     const restTurn = num(part?._children?.Layout?.rotation, 0);
     if (name === 'legend') {
+      // Its own words, or the reading (Text Source 'value', as the counter writes it) or its
+      // percentage, one text or one figure to a column (pattern 'digits'), as meterPartDrawing lays
+      // them out: written by a Counter Figures binding, column by column for each count of figures.
+      const textSource = String(part.textSource ?? 'fixed');
+      const family = String(part.fontFamily ?? '').trim();
+      const size = Math.max(1, num(part.fontSize, 10));
+      const precision = Math.max(0, Math.min(3, Math.round(num(meter.valuePrecision, 0))));
+      const figuresBinding = (layer, extra) => {
+        out.bindings[`${layer.name}Text`] = {
+          _type: 'Binding', name: `${layer.name}Text`, enabled: true, mapMode: 'figures', target: `Parts.${layer.name}.Text.content`,
+          ...(textSource === 'percent'
+            ? { source: `channel.${channel}.normalized`, multiplier: 100, precision: 0 }
+            : { source: `channel.${channel}.raw`, multiplier: 1, precision }),
+          ...extra,
+        };
+      };
+      const baseline = box.y + box.h;
+      if (String(part.pattern ?? 'solid') === 'digits') {
+        const fixedText = textSource === 'fixed' ? String(part.legendText ?? '') : null;
+        const lengths = fixedText !== null ? [fixedText.length]
+          : textSource === 'percent' ? figureLengths(0, 100, 0) : figureLengths(num(meter.valueMin, 0), num(meter.valueMax, 1), precision);
+        for (const length of lengths.filter((n) => n > 0)) {
+          for (const cell of devicePatternCells('columns', box.x, box.y, box.w, box.h, { count: length, cellWidth: part.cellWidth ?? 92 })) {
+            const pitch = cell.cols > 1 ? (box.w - cell.w) / (cell.cols - 1) : box.w;
+            const point = at(cell.x + cell.w / 2, baseline);
+            const layer = add(name, textLayer(`legend${lengths.length > 1 ? length : ''}Figure${cell.col}`, fixedText !== null ? fixedText[cell.col] : '',
+              point.x, point.y, Math.min(size, pitch) * S, textColour, { family, opacity }));
+            if (fixedText === null) figuresBinding(layer, { character: cell.col, ...(lengths.length > 1 ? { length } : {}) });
+          }
+        }
+        continue;
+      }
+      if (textSource !== 'fixed') {
+        const point = at(box.x + box.w / 2, baseline);
+        figuresBinding(add(name, textLayer('legend', '', point.x, point.y, size * S, textColour, { family, opacity })), {});
+        continue;
+      }
       for (const [i, t] of rest.texts.entries()) {
         const point = at(t.x, t.y);
-        add(name, textLayer(`legend${i || ''}`, t.text, point.x, point.y, t.size * S, textColour, { family: String(part.fontFamily ?? '').trim(), opacity }));
+        add(name, textLayer(`legend${i || ''}`, t.text, point.x, point.y, t.size * S, textColour, { family, opacity }));
+      }
+      continue;
+    }
+    // A counter's windows (pattern 'digits'): one cell to a figure of the reading, so as many as it
+    // has figures; for each count, its windows, shown while the reading has that many.
+    if (String(part.pattern ?? 'solid') === 'digits' && motion !== 'fill' && motion !== 'light') {
+      const precision = Math.max(0, Math.min(3, Math.round(num(meter.valuePrecision, 0))));
+      const lengths = figureLengths(num(meter.valueMin, 0), num(meter.valueMax, 1), precision);
+      const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
+      const { background, bw } = backgroundOf(styledPart, part);
+      for (const length of lengths) {
+        const d = devicePatternCells('columns', box.x, box.y, box.w, box.h, { count: length, cellWidth: part.cellWidth ?? 92 })
+          .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius }))
+          .filter(Boolean)
+          .join(' ');
+        if (!d) continue;
+        for (const layer of pathLayers(`${name}${lengths.length > 1 ? length : ''}`, d, box, background, { opacity, bw, pivot, rotation: restTurn })) {
+          add(name, layer);
+          if (lengths.length > 1) {
+            out.bindings[`${layer.name}Shown`] = {
+              _type: 'Binding', name: `${layer.name}Shown`, enabled: true, mapMode: 'figures', source: `channel.${channel}.raw`,
+              target: `Parts.${layer.name}.opacity`, precision, length, outputMin: 0, outputMax: opacity,
+            };
+          }
+        }
       }
       continue;
     }
@@ -1384,6 +1837,47 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       });
       continue;
     }
+    if (motion === 'fill' && (String(part.pattern ?? 'solid') !== 'solid' || String(part.shape ?? 'rect') !== 'rect')) {
+      // A fill drawn in a pattern or a shape: its cells laid out across the area the fill has
+      // reached, so each moves and grows straight with the reading (devicePatternCells is linear in
+      // its area): each a layer, from where it stands at the start to where it stands full.
+      const { background, bw } = backgroundOf(styledPart, part);
+      const from = String(part.fillFrom ?? 'left');
+      const areaAt = (r) => (from === 'bottom' ? { x: box.x, y: box.y + box.h * (1 - r), w: box.w, h: box.h * r }
+        : from === 'top' ? { x: box.x, y: box.y, w: box.w, h: box.h * r }
+          : from === 'right' ? { x: box.x + box.w * (1 - r), y: box.y, w: box.w * r, h: box.h }
+            : { x: box.x, y: box.y, w: box.w * r, h: box.h });
+      const pattern = String(part.pattern ?? 'solid');
+      const options = { count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight };
+      const cellsAt = (r) => { const a = areaAt(r); return devicePatternCells(pattern, a.x, a.y, a.w, a.h, options); };
+      const full = cellsAt(1);
+      const half = cellsAt(0.5);
+      const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
+      const rect = String(part.shape ?? 'rect') === 'rect';
+      full.forEach((cell, i) => {
+        const start = { x: 2 * half[i].x - cell.x, y: 2 * half[i].y - cell.y, w: Math.max(0, 2 * half[i].w - cell.w), h: Math.max(0, 2 * half[i].h - cell.h) };
+        const pxOf = (c) => { const p = at(c.x, c.y); return { x: p.x - bw / 2, y: p.y - bw / 2, width: c.w * S + bw, height: c.h * S + bw }; };
+        const end = pxOf(cell);
+        const begin = pxOf(start);
+        const cellBackground = deepClone(background);
+        let layer;
+        if (rect) {
+          cellBackground._children.Corners.radius = r3(radius * S);
+          layer = createPartNode(named(`${name}${i}`), { role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(end, origin), sections: { Background: cellBackground } });
+        } else {
+          const d = deviceShapePath(part.shape, 0, 0, cell.w, cell.h, { depth: part.shapeDepth, radius });
+          layer = createPartNode(named(`${name}${i}`), {
+            role: 'fill', kind: 'path', zIndex: depth, opacity, layout: pxBox(end, origin),
+            meta: { pathData: scalePathData(d, 1 / Math.max(0.001, cell.w), 1 / Math.max(0.001, cell.h)), closed: true }, sections: { Background: cellBackground },
+          });
+        }
+        add(name, layer);
+        for (const [key, a, b] of [['x', begin.x + origin.x, end.x + origin.x], ['y', begin.y + origin.y, end.y + origin.y], ['width', begin.width, end.width], ['height', begin.height, end.height]]) {
+          if (Math.abs(a - b) > 1e-6) out.bindings[`${layer.name}${key}`] = rangeBinding(`${layer.name}${key}`, source, `Parts.${layer.name}.Layout.${key}`, a, b);
+        }
+      });
+      continue;
+    }
     if (motion === 'fill') {
       // A rectangle growing from its edge; its corners keep their radius as it grows.
       const { background, bw } = backgroundOf(styledPart, part);
@@ -1402,11 +1896,24 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       }
       continue;
     }
-    // A part that stands, swings or slides: its marks or its shape, and a scale's numerals.
+    // A part that stands, swings or slides: its shadow, its marks or its shape, and a scale's numerals.
     const d = rest.paths.map((path) => path.d).filter(Boolean).join(' ');
+    // Its drop shadow (the sculpted sets' cases): its outline again, `shadowOffset` % of the frame's
+    // height lower, softened by `shadowBlur` %, in `shadowColour`, at full strength (MeterDeviceParts
+    // draws it without the part's opacity), turning and sliding with it.
+    const shadowDy = (num(part.shadowOffset, 0) / 100) * H;
+    const shadowBlur = (num(part.shadowBlur, 0) / 100) * H;
+    const baseD = rest.paths.filter((path) => path.role === 'base' && !path.colour).map((path) => path.d).filter(Boolean).join(' ');
+    const shadows = [];
+    if (baseD && (shadowDy > 0 || shadowBlur > 0)) {
+      for (const layer of pathLayers(`${name}Shadow`, translatePathData(baseD, 0, shadowDy), { ...box, y: box.y + shadowDy }, solidBackground(String(styledPart.shadowColour ?? part.shadowColour ?? '') || '99000000'), { opacity: 1, pivot, rotation: restTurn })) {
+        shadows.push(blurred(layer, (shadowBlur / 2) * S));
+      }
+    }
     if (d) {
       const { background, bw } = backgroundOf(styledPart, part);
-      for (const layer of pathLayers(name, d, box, background, { opacity, bw, pivot, rotation: restTurn })) {
+      for (const layer of [...shadows, ...pathLayers(name, d, box, background, { opacity, bw, pivot, rotation: restTurn })]) {
+        layer.zIndex = depth;
         add(name, layer);
         if (motion === 'swing' && num(part.swing, 0)) {
           out.bindings[`${layer.name}Swing`] = rangeBinding(`${layer.name}Swing`, source, `Parts.${layer.name}.Layout.rotation`, restTurn, restTurn + num(part.swing, 0));
@@ -1759,11 +2266,6 @@ function plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, sour
 }
 
 /** A part's outline as drawn at the start of the travel, for a part that turns with the value. */
-function withTurnStart(part, startPanel) {
-  if (part?.turns !== true) return part;
-  return { ...part, outlineRotation: num(part?.outlineRotation, 0) + designerAngle(startPanel) };
-}
-
 /** The box a px layout describes, back in the knob's own coordinates. */
 function boxOfLayout(layout, origin) {
   return { x: layout.x - origin.x, y: layout.y - origin.y, width: layout.width, height: layout.height };

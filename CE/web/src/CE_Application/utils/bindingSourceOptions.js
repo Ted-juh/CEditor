@@ -34,6 +34,7 @@ export const MAP_MODES = [
   ['boolean', 'On / off'],
   ['enum', 'Choice'],
   ['format', 'Text'],
+  ['figures', 'Counter figures'],
   ['direct', 'Direct'],
 ];
 

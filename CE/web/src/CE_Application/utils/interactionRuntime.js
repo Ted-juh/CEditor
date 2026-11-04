@@ -241,6 +241,23 @@ function resolveBindingValue(binding, sourceValue) {
     return `${binding?.prefix ?? ''}${formatted}${binding?.suffix ?? ''}`;
   }
 
+  if (binding?.mapMode === 'figures') {
+    // The source as a counter shows it (utils/meterParts.js meterFigures): times `multiplier`, to
+    // `precision` decimals (0 to 3). With `character` set, that one figure ('' past the end); with
+    // `length` set, only while the figures are that many characters long ('' otherwise). With
+    // `length` and no `character`, a number instead: `outputMax` (1) while they are, `outputMin` (0)
+    // while not, for a window that shows only for that many figures.
+    const numeric = Number(sourceValue);
+    const precision = Math.max(0, Math.min(3, Math.round(numberOr(binding?.precision, 0))));
+    const figures = (Number.isFinite(numeric) ? numeric * numberOr(binding?.multiplier, 1) : 0).toFixed(precision);
+    const length = binding?.length == null || binding.length === '' ? null : Math.round(numberOr(binding.length, 0));
+    const matches = length === null || figures.length === length;
+    const character = binding?.character == null || binding.character === '' ? null : Math.round(numberOr(binding.character, 0));
+    if (character === null && length !== null) return matches ? numberOr(binding?.outputMax, 1) : numberOr(binding?.outputMin, 0);
+    if (!matches) return '';
+    return character === null ? figures : (figures[character] ?? '');
+  }
+
   if (binding?.mapMode === 'template') {
     const template = String(binding?.template ?? '{value}');
     return template.replaceAll('{value}', String(sourceValue ?? ''));

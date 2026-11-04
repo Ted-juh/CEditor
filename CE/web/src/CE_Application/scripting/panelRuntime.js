@@ -7536,8 +7536,9 @@ const DEFINE_SPECS = {
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],
     // mapMode "format" and "template" (utils/interactionRuntime.js resolveBindingValue); the app's
-    // own readouts are format bindings (utils/customComponentFactory.js).
-    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template'],
+    // own readouts are format bindings (utils/customComponentFactory.js). "figures": one figure of a
+    // counter, or its windows' opacity for a count of figures.
+    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template', 'character', 'length'],
   },
   Parts: {
     templates: [createPartNode('')],

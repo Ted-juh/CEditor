@@ -69,8 +69,8 @@ agree (the base sets' gradients run straight down and draw as they did). Compare
 drawings off and on, empty and full: the same controls. Left out: the faint lines across the console
 keys, a border that lights (Edge Light, Floating Halo), the slant of the guard keys' bars, Gimbal
 Ring's frame in metal, the lens keys' highlight line, the second VU's ticks on Studio Console, and
-the paper meters' curved tick lines (an arc of ticks instead). As layers, the series 1 and 2
-controls convert; the sculpted ones, on their shadow, come in refused, named. The twelve classic
+the paper meters' curved tick lines (an arc of ticks instead). As layers, every one of them
+converts, the sculpted ones' shadows a layer of their own under each part (see piece D2). The twelve classic
 sets' buttons, switches and meters are illustrations like their knobs and stay drawn by code.
 SVG and Photoshop
 drawings import as layered components (Bringing designs in, below).
@@ -287,9 +287,42 @@ components):
    interaction states written to its layers. `browser-checks/knobLayers.mjs` draws each built-in
    set's knob and slider, converts it and compares the pixels at four values (within 2.5 %, a
    one-pixel shift forgiven): all 79 sets' knobs match. What a layer cannot draw yet comes in as
-   one exact part, named: the 48 sets whose knob is a control form not made of parts, six with a
-   cap turning under a fixed light (a turning layer turns its light with it), and fader caps with
-   a block, console, lens or glass body, a glow or a sheen, and gradients along a track or fill.
+   one exact part, named: a control form not made of parts, and a rendered look.
+
+   **Every offered set converts** (Iris and Satellite, drawn whole, aside). Of the 64, 41 knobs and
+   52 sliders used to come in as one exact part and 12 buttons, 13 switches and 17 meters were
+   refused; now none is. What it took:
+
+   - *A path layer whose light stays put* (`meta.fixedLight`, InteractivePartRenderer): turned, only
+     its outline turns about its pivot (`rotatePathData`), its fill, gradient, finish and shadows
+     drawn upright under it, as the panel draws a plate through a mask of its turned outline. A gear,
+     a scallop, flutes or a chicken-head turn under the set's lamp.
+   - *Plates as the panel draws them* (`plateLayers`): any outline, curves kept
+     (`transformPathData` maps a path, arcs included, under any affine map); in perspective, squashed
+     then moved; a skirt and an insert; a drop shadow as a layer of its own under the plate (a blurred
+     path, so it shows through a plate you can see through); grooves; the box the panel's fill box,
+     so a gradient runs as it does. The metrics take the skirt, the shadows, the ovals, the scale's
+     radius and its numbers, as the renderer's do.
+   - *Knob pointers and scales*: a bar with its taper and its edge (a mitred band, `offsetPolygon`),
+     a shaded bar, a second bar on it, a second scale, numbers round the scale, ticks on a radius of
+     their own, and ticks lit in their own colour.
+   - *Fader caps*: block, console, lens and glass, the sheen and the dome as gradient layers, a glow
+     as a blurred layer, a ring's glow, gradients and finishes on caps, tracks and fills. The panel's
+     glowing fill draws nothing (its blur's region is a share of a straight line's box, which has no
+     width), so its layers draw none either.
+   - *Buttons, switches and meters*: a part's shadow a blurred layer moving with it; a plain
+     switch's lamp (an LED, a jewel or a window, lit by a state); a legend that shows the reading; a
+     fill drawn in a pattern or a shape, each cell bound to where it stands; a counter, its digits a
+     **Counter Figures** binding (`mapMode: 'figures'`, utils/interactionRuntime.js: the reading to N
+     places, one character of it, only at a given count of figures) and its windows shown for each
+     count (`figureLengths`).
+   - A layer's box shadow keeps its colour's alpha (it was cut to six digits, so a soft shadow drew
+     solid).
+
+   `knobLayers.mjs` with `CE_KNOB_LAYERS_STRICT=1` checks every offered set but the two illustrated
+   ones, and fails a control that comes in as one exact part or is refused;
+   `test/everySetAsLayers.test.js` plans each set's six controls (a knob, a slider each way, a button,
+   a switch, a meter) through the real path.
    Value glide is carried: the knob's value-change animation (`pointerSlide`, 140 ms) becomes one on
    its channel over every layer property its bindings move that can ease, an arc's sweep included,
    which the part renderer eases in JS as the slider renderer eases a knob (CSS cannot ease an SVG

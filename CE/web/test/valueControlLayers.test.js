@@ -47,9 +47,11 @@ test('colours keep the set\'s colour roles, so the component follows the panel\'
 });
 
 test('a knob a layer cannot draw yet comes in as one exact part, named with the reason', () => {
-  // Soft's cap turns under a fixed light; Atlas is drawn in a control form, not parts.
-  for (const [setId, words] of [['soft', 'turns under a fixed light'], ['atlas', 'control form']]) {
-    const result = plan([knob()], setId);
+  // A rendered cap is an image the layers do not make; Atlas is drawn in a control form, not parts.
+  const rendered = knob();
+  Object.assign(rendered._children.Parts._children.bodyCap, { visible: true, look: 'rendered' });
+  for (const [setId, words, control] of [['graphite', 'a rendered cap', rendered], ['atlas', 'control form', knob()]]) {
+    const result = plan([control], setId);
     assert.ok(result.ok, setId);
     assert.equal(result.asParts.length, 1);
     assert.match(result.asParts[0].reason, new RegExp(words));

@@ -1068,9 +1068,15 @@ meters, how they come in. **As layers** makes each part a
 layer you can select, move, restyle and recolour (housing, track, value arc, cap, pointer, ticks,
 readout; a slider's track, fill and fader cap), wired to the value by bindings the **React** tab
 shows, with their colours still linked to the set's colour roles. **As one exact part** keeps the
-knob as it was, drawn by the panel's own knob code. A knob a layer does not draw yet (a control form
-that is not made of parts, a cap that turns under a fixed light, a gradient along the track, some
-fader caps) comes in as one exact part either way, and the window names it and why. A button comes in
+knob as it was, drawn by the panel's own knob code. Every set's controls come in as layers, Iris and
+Satellite aside (they are drawn whole): a plate in perspective, a skirt, an insert, a drop shadow
+(a layer of its own under its part), grooves, a bar pointer, a second scale and the scale's numbers;
+every fader cap, its sheen, glow and finish; a key's shadow, a switch's lamp, a meter's counter and
+a fill drawn in a pattern. A plate that turns with the value turns its outline while its light and
+shadow stay put, as on the panel. What a layer does not draw yet (a control form that is not made
+of parts, a rendered look) comes in as one exact part, and the window names it and why. A counter's
+digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
+to each window, and each count of figures its own windows. A button comes in
 as its plate and its text, or, drawn as a device, as its housing, key, symbol, indicator and legend
 with its caption; a switch flips its value on a click, a button holds it on while pressed, and the
 parts move and light up as they did. A meter comes in as its track and its zones' colours covered past
