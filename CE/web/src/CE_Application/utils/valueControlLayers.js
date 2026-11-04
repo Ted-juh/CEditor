@@ -38,7 +38,8 @@ import { deepClone } from './deepClone.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
 import { BUTTON_DEVICE_PARTS, DEVICE_FRAME } from '../models/buttonDeviceParts.js';
 import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
-import { meterLitOffset, meterPartDrawing } from './meterParts.js';
+import { meterLitOffset, meterPartDrawing, meterZoneColour } from './meterParts.js';
+import { REVEAL_ALL_MASK_SRC } from './partMask.js';
 import { decibelPosition, meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, meterTicks, meterZones } from './meterLayout.js';
 import { normalLineHeight } from './textLineHeight.js';
 import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
@@ -2024,7 +2025,24 @@ export function meterDeviceLayersRefusal(resolved) {
     // Counter digits, shadows, a legend that shows the reading and a fill in a pattern or a shape are
     // layers now (meterDeviceLayers).
     if (pattern === 'digits' && (motion === 'fill' || motion === 'light')) return `counter digits that ${motion === 'fill' ? 'fill' : 'light'}, which a layer does not draw yet`;
-    if (String(part.zoneColours ?? 'off') !== 'off') return `its ${name} coloured by the meter's zones, which a layer does not do yet`;
+    // Coloured by the meter's zones: by position, each lit cell, each scale mark and a plain fill along
+    // its length; by the reading's zone, a copy of its paint for each zone (zoneLevelCopies).
+    const zoneMode = String(part.zoneColours ?? 'off');
+    if (zoneMode !== 'off') {
+      const scaled = pattern === 'ticks' || pattern === 'arc';
+      const byLevel = zoneMode === 'level' || (zoneMode === 'position' && !scaled && motion !== 'fill' && motion !== 'light');
+      const rounded = num(part?._children?.Background?._children?.Corners?.radius, 0) > 0;
+      if (zoneMode === 'position' && motion === 'fill' && (pattern !== 'solid' || String(part.shape ?? 'rect') !== 'rect' || rounded)) {
+        return `its ${name} filled in the zones' colours with a pattern, a shape or rounded corners, which a layer does not draw yet`;
+      }
+      if (byLevel && pattern === 'digits') return `its ${name}'s counter windows coloured by the reading's zone, which a layer does not draw yet`;
+      if (byLevel && meter.gradient !== false && (motion === 'light' || motion === 'clip')) {
+        return `its ${name} lit in the reading's zone colour, blended between zones, which a layer does not draw yet`;
+      }
+      if (byLevel && meter.gradient !== false && num(part.opacity, 1) < 1) {
+        return `its ${name} in the reading's zone colour, blended between zones and see-through, which a layer does not draw yet`;
+      }
+    }
     // A part that follows the held peak, and a clip lamp, read the peak the component's value holds
     // (`channel.<name>.peak`).
   }
@@ -2120,6 +2138,9 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
   const drawn = METER_DEVICE_PARTS
     .filter((name) => geometry[name]?.visible === true)
     .sort((a, b) => num(geometry[a].zIndex, 0) - num(geometry[b].zIndex, 0));
+  // Parts the meter's zones colour by the reading (`zoneColours` 'level'; 'position' on a part with no
+  // positions of its own): their layers, given a copy for each zone after the parts are drawn.
+  const zoneMarks = [];
   for (const name of drawn) {
     const part = geometry[name];
     const styledPart = colours[name] ?? part;
@@ -2127,6 +2148,12 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     const opacity = num(part.opacity, 1);
     // A part that shows the held peak, or a clip lamp, follows the peak the meter holds.
     const partSource = String(part.source ?? 'reading') === 'peak' || motion === 'clip' ? `channel.${channel}.peak` : source;
+    const zoneMode = String(part.zoneColours ?? 'off');
+    const scaled = ['ticks', 'arc'].includes(String(part.pattern ?? 'solid'));
+    const byLevel = zoneMode === 'level' || (zoneMode === 'position' && !scaled && motion !== 'fill' && motion !== 'light');
+    // The layers whose paint the reading's zone decides, and a lit layer's own level (`gate`).
+    const mark = { name, source: partSource, paint: [] };
+    if (byLevel) zoneMarks.push(mark);
     const fill = styledPart?._children?.Background?._children?.Fill ?? {};
     const textColour = fill.colour ?? 'FFFFFFFF';
     const rest = meterPartDrawing(name, part, { p: 0, meter });
@@ -2181,6 +2208,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
             const point = at(cell.x + cell.w / 2, baseline);
             const layer = add(name, textLayer(`legend${lengths.length > 1 ? length : ''}Figure${cell.col}`, fixedText !== null ? fixedText[cell.col] : '',
               point.x, point.y, Math.min(size, pitch) * S, textColour, { family, opacity }));
+            mark.paint.push({ layer, opacity });
             if (fixedText === null) figuresBinding(layer, { character: cell.col, ...(lengths.length > 1 ? { length } : {}) });
           }
         }
@@ -2188,12 +2216,14 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       }
       if (textSource !== 'fixed') {
         const point = at(box.x + box.w / 2, baseline);
-        figuresBinding(add(name, textLayer('legend', '', point.x, point.y, size * S, textColour, { family, opacity })), {});
+        const layer = add(name, textLayer('legend', '', point.x, point.y, size * S, textColour, { family, opacity }));
+        figuresBinding(layer, {});
+        mark.paint.push({ layer, opacity });
         continue;
       }
       for (const [i, t] of rest.texts.entries()) {
         const point = at(t.x, t.y);
-        add(name, textLayer(`legend${i || ''}`, t.text, point.x, point.y, t.size * S, textColour, { family, opacity }));
+        mark.paint.push({ layer: add(name, textLayer(`legend${i || ''}`, t.text, point.x, point.y, t.size * S, textColour, { family, opacity })), opacity });
       }
       continue;
     }
@@ -2241,7 +2271,8 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         if (!d) return;
         const cellBox = { x: cell.x, y: cell.y, w: cell.w, h: cell.h };
         const base = backgroundOf(styledPart, part);
-        const lit = backgroundOf(styledPart, part, litColour);
+        // Lit, in its own colour; or, coloured by position, in the zone the cell sits in.
+        const lit = backgroundOf(styledPart, part, zoneMode === 'position' ? meterZoneColour((index + 0.5) / count, meter) : litColour);
         // Lit, the cell stands where the part's lit offset moves it.
         const litBox = { ...cellBox, x: cellBox.x + offset.x, y: cellBox.y + offset.y };
         const litD = deviceShapePath(part.shape, litBox.x, litBox.y, litBox.w, litBox.h, { depth: part.shapeDepth, radius });
@@ -2250,9 +2281,10 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
           add(name, plain);
           out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, partSource, `Parts.${plain.name}.opacity`, opacity, 0, t - 0.0005, t);
         }
-        for (const lighted of pathLayers(`${name}${i}lit`, litD, litBox, lit.background, { opacity: 0, bw: lit.bw })) {
+        for (const [k, lighted] of pathLayers(`${name}${i}lit`, litD, litBox, lit.background, { opacity: 0, bw: lit.bw }).entries()) {
           add(name, lighted);
           out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, partSource, `Parts.${lighted.name}.opacity`, 0, litOpacity, t - 0.0005, t);
+          if (k === 0) mark.paint.push({ layer: lighted, gate: t, opacity: litOpacity });
         }
       });
       continue;
@@ -2292,10 +2324,52 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
           });
         }
         add(name, layer);
+        mark.paint.push({ layer, opacity });
         for (const [key, a, b] of [['x', begin.x + origin.x, end.x + origin.x], ['y', begin.y + origin.y, end.y + origin.y], ['width', begin.width, end.width], ['height', begin.height, end.height]]) {
           if (Math.abs(a - b) > 1e-6) out.bindings[`${layer.name}${key}`] = rangeBinding(`${layer.name}${key}`, partSource, `Parts.${layer.name}.Layout.${key}`, a, b);
         }
       });
+      continue;
+    }
+    if (motion === 'fill' && zoneMode === 'position') {
+      // Coloured by position: the zones along the fill's own direction across its whole box, shown as
+      // far as the reading has reached (MeterDeviceParts' zoneFill): the box in that gradient, under a
+      // mask as wide as the reading; its outline, where it has one, a rectangle growing over it.
+      const { background, bw } = backgroundOf(styledPart, part);
+      const from = String(part.fillFrom ?? 'left');
+      const topLeft = at(box.x, box.y);
+      const exact = { x: topLeft.x, y: topLeft.y, width: box.w * S, height: box.h * S };
+      const zones = meterZones(meter);
+      const stops = [];
+      zones.forEach((zone, i) => {
+        stops.push({ color: zone.colour, position: r3(zone.from * 100) });
+        if (meter.gradient === false && zones[i + 1]) stops.push({ color: zone.colour, position: r3(zones[i + 1].from * 100) });
+      });
+      const painted = solidBackground(zones[0]?.colour ?? 'FF39D98A');
+      Object.assign(painted._children.Fill, { gradientEnabled: true, gradient: { type: 'linear', angle: { left: 90, right: 270, bottom: 0, top: 180 }[from] ?? 90, stops } });
+      const layer = add(name, createPartNode(named(name), {
+        role: 'fill', kind: 'rectangle', zIndex: depth, opacity, layout: pxBox(exact, origin), sections: { Background: painted },
+      }));
+      layer.mask = { enabled: true, src: REVEAL_ALL_MASK_SRC, x: 0, y: 0, width: 100, height: 100, invert: false, linked: true };
+      const along = from === 'left' || from === 'right' ? 'width' : 'height';
+      out.bindings[`${layer.name}Reveal`] = rangeBinding(`${layer.name}Reveal`, partSource, `Parts.${layer.name}.mask.${along}`, 0, 100);
+      if (from === 'right' || from === 'bottom') {
+        const key = from === 'right' ? 'x' : 'y';
+        out.bindings[`${layer.name}RevealEdge`] = rangeBinding(`${layer.name}RevealEdge`, partSource, `Parts.${layer.name}.mask.${key}`, 100, 0);
+      }
+      if (bw > 0) {
+        const edge = add(name, createPartNode(named(`${name}Edge`), {
+          role: 'fill', kind: 'rectangle', zIndex: depth, opacity,
+          layout: pxBox({ x: exact.x - bw / 2, y: exact.y - bw / 2, width: exact.width + bw, height: exact.height + bw }, origin),
+          sections: { Background: edgeBackground(background, bw) },
+        }));
+        const full = edge._children.Layout[along];
+        out.bindings[`${edge.name}Grow`] = rangeBinding(`${edge.name}Grow`, partSource, `Parts.${edge.name}.Layout.${along}`, bw, full);
+        if (from === 'right' || from === 'bottom') {
+          const key = from === 'right' ? 'x' : 'y';
+          out.bindings[`${edge.name}Edge`] = rangeBinding(`${edge.name}Edge`, partSource, `Parts.${edge.name}.Layout.${key}`, edge._children.Layout[key] + full - bw, edge._children.Layout[key]);
+        }
+      }
       continue;
     }
     if (motion === 'fill') {
@@ -2308,6 +2382,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       const layer = add(name, createPartNode(named(name), {
         role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(full, origin), sections: { Background: background },
       }));
+      mark.paint.push({ layer, opacity });
       const lengthKey = from === 'left' || from === 'right' ? 'width' : 'height';
       out.bindings[`${layer.name}Grow`] = rangeBinding(`${layer.name}Grow`, partSource, `Parts.${layer.name}.Layout.${lengthKey}`, 0, full[lengthKey]);
       if (from === 'right' || from === 'bottom') {
@@ -2333,15 +2408,25 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
           add(name, plain);
           out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, partSource, `Parts.${plain.name}.opacity`, opacity, 0, clipFrom - 0.0005, clipFrom);
         }
-        for (const lighted of renderable ? [renderedOf(`${name}Lit`, litColour, 0)] : pathLayers(`${name}Lit`, d, box, lit.background, { opacity: 0, bw: lit.bw, pivot, rotation: restTurn })) {
+        for (const [k, lighted] of (renderable ? [renderedOf(`${name}Lit`, litColour, 0)] : pathLayers(`${name}Lit`, d, box, lit.background, { opacity: 0, bw: lit.bw, pivot, rotation: restTurn })).entries()) {
           add(name, lighted);
           out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, partSource, `Parts.${lighted.name}.opacity`, 0, litOpacity, clipFrom - 0.0005, clipFrom);
+          if (k === 0) mark.paint.push({ layer: lighted, gate: clipFrom, opacity: litOpacity });
         }
       }
       continue;
     }
     // A part that stands, swings or slides: its shadow, its marks or its shape, and a scale's numerals.
-    const d = rest.paths.map((path) => path.d).filter(Boolean).join(' ');
+    // Its own paths in its paint and outline; those the meter's zones colour, each colour a layer with
+    // no outline; and a scale's marks past Zone From in its lit colour (MeterDeviceParts' zoned, zone).
+    const d = rest.paths.filter((path) => path.role === 'base' && !path.colour).map((path) => path.d).filter(Boolean).join(' ');
+    const colouredGroups = [];
+    for (const path of rest.paths.filter((each) => each.role === 'base' && each.colour && each.d)) {
+      const group = colouredGroups.find((each) => each.colour === path.colour);
+      if (group) group.d += ` ${path.d}`;
+      else colouredGroups.push({ colour: path.colour, d: path.d });
+    }
+    const pastZoneD = rest.paths.filter((path) => path.role === 'zone').map((path) => path.d).filter(Boolean).join(' ');
     // Its drop shadow (the sculpted sets' cases): its outline again, `shadowOffset` % of the frame's
     // height lower, softened by `shadowBlur` %, in `shadowColour`, at full strength (MeterDeviceParts
     // draws it without the part's opacity), turning and sliding with it.
@@ -2354,9 +2439,22 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         shadows.push(blurred(layer, (shadowBlur / 2) * S));
       }
     }
+    const standing = [];
     if (d) {
       const { background, bw } = backgroundOf(styledPart, part);
-      for (const layer of [...shadows, ...(renderable ? [renderedOf(name, fill.colour, opacity)] : pathLayers(name, d, box, background, { opacity, bw, pivot, rotation: restTurn }))]) {
+      standing.push(...shadows, ...(renderable ? [renderedOf(name, fill.colour, opacity)] : pathLayers(name, d, box, background, { opacity, bw, pivot, rotation: restTurn })));
+    }
+    colouredGroups.forEach((group, i) => {
+      const [layer] = pathLayers(`${name}Colour${colouredGroups.length > 1 ? i : ''}`, group.d, box, solidBackground(group.colour), { opacity, pivot, rotation: restTurn });
+      standing.push(layer);
+      mark.paint.push({ layer, opacity });
+    });
+    if (pastZoneD) {
+      const litColour = String(styledPart.activeColour ?? part.activeColour ?? '').trim() || fill.colour;
+      standing.push(...pathLayers(`${name}Zone`, pastZoneD, box, solidBackground(litColour ?? 'FFFF3030'), { opacity, pivot, rotation: restTurn }));
+    }
+    if (standing.length) {
+      for (const layer of standing) {
         layer.zIndex = depth;
         add(name, layer);
         if (motion === 'swing' && num(part.swing, 0)) {
@@ -2378,6 +2476,8 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     }
   }
 
+  zoneLevelCopies(out, zoneMarks, meter, uniqueName);
+
   // The readout under the frame, as the meter prints its value.
   const core = resolved?._children?.Core ?? {};
   if (core.formShowValue !== false) {
@@ -2387,6 +2487,59 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
   }
   return out;
+}
+
+/**
+ * A meter part coloured by the reading's zone (`zoneColours` 'level'): each layer whose paint the zone
+ * decides becomes a copy in each zone's colour. Stepped zones: the copy shows while the reading is in
+ * its zone (and, for a lit cell or a clip lamp, at or past its own level), so one shows at a time.
+ * Blended: the copies stand in order, each fading in across the span from the zone before it to its
+ * own, which composites to the meter's blend of the two colours (meterFillColourAt), an opaque part
+ * being the only kind that refusal lets through.
+ */
+function zoneLevelCopies(out, marks, meter, uniqueName) {
+  const zones = meterZones(meter);
+  if (!marks.length || !zones.length) return;
+  const stepped = meter?.gradient === false;
+  for (const mark of marks) {
+    for (const { layer, gate = null, opacity } of mark.paint) {
+      const index = out.parts.indexOf(layer);
+      if (index < 0) continue;
+      const own = Object.entries(out.bindings).filter(([, binding]) => String(binding?.target ?? '').startsWith(`Parts.${layer.name}.`));
+      // A lit layer's own lighting gives way to the zones' bands, which start no lower than its level.
+      if (gate != null) for (const [key, binding] of own) if (binding.target === `Parts.${layer.name}.opacity`) delete out.bindings[key];
+      const copies = [];
+      zones.forEach((zone, k) => {
+        const lo = stepped || gate != null ? Math.max(zone.from, gate ?? 0) : (k === 0 ? 0 : zones[k - 1].from);
+        const hi = zones[k + 1]?.from ?? 1.0001;
+        if ((stepped || gate != null) && lo >= hi) return;
+        const copy = k === 0 ? layer : deepClone(layer);
+        if (k > 0) copy.name = uniqueName(`${layer.name}Zone${k}`);
+        const paint = copy._children.Text ? copy._children.Text._children.Fill : copy._children.Background._children.Fill;
+        Object.assign(paint, { colour: zone.colour, ...(copy._children.Text ? {} : { solidEnabled: true, gradientEnabled: false }) });
+        if (k > 0) {
+          for (const [key, binding] of own) {
+            if (gate != null && binding.target === `Parts.${layer.name}.opacity`) continue;
+            const name = `${key}Zone${k}`;
+            out.bindings[name] = { ...deepClone(binding), name, target: binding.target.replace(`Parts.${layer.name}.`, `Parts.${copy.name}.`) };
+          }
+        }
+        const target = `Parts.${copy.name}.opacity`;
+        if (stepped || gate != null) {
+          copy.opacity = 0;
+          out.bindings[`${copy.name}InZone`] = { ...rangeBinding(`${copy.name}InZone`, mark.source, target, 0, opacity, lo, hi), band: true };
+        } else if (k > 0) {
+          copy.opacity = 0;
+          out.bindings[`${copy.name}Blend`] = rangeBinding(`${copy.name}Blend`, mark.source, target, 0, opacity, lo, zone.from);
+        }
+        copies.push(copy);
+      });
+      out.parts.splice(index + 1, 0, ...copies.filter((copy) => copy !== layer));
+      // Each copy is the panel part's, so its interaction states reach it.
+      const named = out.partNames[mark.name] ?? [];
+      out.partNames[mark.name] = [...named, ...copies.filter((copy) => copy !== layer).map((copy) => copy.name)];
+    }
+  }
 }
 
 /** Path data moved by (dx, dy): absolute coordinates shifted, relative ones as they are. */

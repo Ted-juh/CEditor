@@ -394,3 +394,34 @@ test('each handle of a range glides to a value it is given, as the panel moves a
   assert.ok(start.targets.some((target) => target.path === 'Parts.Range_startCap.Layout.offsetX'));
   assert.ok(!start.targets.some((target) => target.path === 'Parts.Range_endCap.Layout.offsetX'), 'only what the start moves');
 });
+
+test('a meter part coloured by the zones comes in as layers: by position each cell and the fill, by level a copy per zone', () => {
+  const zones = [{ from: 0, colour: 'FF39D98A' }, { from: 0.6, colour: 'FFFFC107' }, { from: 0.85, colour: 'FFFF3B30' }];
+  // A set's meter, its part coloured by the zones as the Meter tab sets it.
+  const withZones = (set, part, mode, extra = {}) => {
+    const control = createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 125 } });
+    Object.assign(control._children.Meter, { zones, ...extra });
+    control._children.Parts._children[part] = { ...(control._children.Parts._children[part] ?? {}), zoneColours: mode };
+    return plan([control], set);
+  };
+  // Lit cells by position: each lit cell in the zone it sits in (Ember's ladder; stepped zones, so
+  // each cell takes its zone's own colour).
+  const lit = withZones('ember', 'indicator', 'position', { gradient: false });
+  assert.ok(lit.ok, JSON.stringify(lit.refused));
+  const litColours = new Set(Object.values(lit.component._children.Parts._children)
+    .filter((part) => /indicator\d+lit$/.test(part.name)).map((part) => part._children.Background._children.Fill.colour));
+  for (const zone of zones) assert.ok(litColours.has(zone.colour), `a lit cell in ${zone.colour}`);
+  // A fill by position: the box in the zones' gradient, shown through a mask as wide as the reading.
+  const fill = withZones('graphite-studio', 'indicator', 'position');
+  assert.ok(fill.ok, JSON.stringify(fill.refused));
+  const fillLayer = Object.values(fill.component._children.Parts._children).find((part) => part.mask);
+  assert.ok(fillLayer?._children.Background._children.Fill.gradientEnabled);
+  assert.ok(Object.values(fill.component._children.Bindings._children).some((binding) => binding.target === `Parts.${fillLayer.name}.mask.width`));
+  // A needle by level, stepped: a copy in each zone's colour, each shown inside its zone.
+  const needle = withZones('tolex', 'indicator', 'level', { gradient: false });
+  assert.ok(needle.ok, JSON.stringify(needle.refused));
+  const bands = Object.values(needle.component._children.Bindings._children).filter((binding) => /InZone$/.test(binding.name));
+  assert.deepEqual(bands.map((binding) => [binding.inputMin, binding.band]), [[0, true], [0.6, true], [0.85, true]]);
+  // Still refused, by name: blended level colour on lit cells.
+  assert.match(withZones('ember', 'indicator', 'level').refused?.[0]?.reason ?? '', /blended/);
+});

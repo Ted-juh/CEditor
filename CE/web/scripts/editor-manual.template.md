@@ -1103,7 +1103,8 @@ fill runs from one to the other, the ticks light between them, and a press on th
 handle nearest to it, as on the panel. Handles that may pass each other or wrap round the end are
 not converted yet. A knob made into layers now turns about its own centre when the component holds
 several. A meter on a decibel scale comes in as layers that place the reading, and the held peak,
-on that scale, as the meter does. A counter's
+on that scale, as the meter does. A meter part coloured by the zones keeps them: lit cells, scale
+marks and a fill by where they sit, a needle, lamp or legend by the zone the reading is in. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the

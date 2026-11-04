@@ -437,6 +437,22 @@ components):
      apart); the track now comes only without segments. Run over every offered set's own meter on
      a -40 to +6 dB scale: with peak hold, 256 of 256 rows; turned 25 degrees and scaled 1.1, 256 of
      256 (strict).
+
+   - *Zone colours* (R5): a device meter's part coloured by the meter's zones (`zoneColours`) comes
+     in as layers. By position: each lit cell in the zone it sits in, each scale mark in its own
+     (the marks grouped by colour, a layer each, drawn without an outline as the panel draws them),
+     and a plain fill as the box painted in the zones' gradient along its direction, shown through a
+     mask (the reveal-all picture) whose width or height is bound to the reading, with its outline a
+     rectangle growing over it. By the reading's zone ('level', or 'position' on a part with no
+     positions of its own: a needle, a lamp, a legend): each layer whose paint the zone decides
+     becomes a copy in each zone's colour (`zoneLevelCopies`). Stepped zones show one copy at a time,
+     an Inside Only binding on its zone (and, for a lit cell or a clip lamp, no lower than its own
+     level); blended zones stack the copies, each fading in across the span from the zone before,
+     which composites to the meter's own blend of the two colours. The part's other paths come apart
+     as the panel draws them: its own in its paint and outline, the zoned ones without, and a scale's
+     marks past Zone From in its lit colour (they had been drawn in the part's own paint). Refused by
+     name: a fill by position that is patterned, shaped or rounded, counter windows by level, and
+     blended level colour on lit cells, a clip lamp or a part you can see through.
      The behaviour of a knob or slider made into layers now measures a point against its own grab
      area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
      another turned about a point between them: pressing straight above the second of two knobs set
