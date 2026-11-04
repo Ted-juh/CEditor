@@ -419,7 +419,9 @@ components):
      to a value it is given other than by a drag, on the control's glide timing, as the panel moves
      its start, value and end along one curve (SliderFamilyRenderer's glide). A knob in the
      tight fit leaves room for a range's start and end dots, as the panel sizes it (without them the
-     converted knob drew larger than the panel's, 4 to 19 % of its pixels apart).
+     converted knob drew larger than the panel's, 4 to 19 % of its pixels apart). Run over every
+     offered set, a band from 15 to 80 with its riding labels: knobs, sliders across and sliders
+     upright, 256 of 256 rows each (strict).
      The behaviour of a knob or slider made into layers now measures a point against its own grab
      area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
      another turned about a point between them: pressing straight above the second of two knobs set
