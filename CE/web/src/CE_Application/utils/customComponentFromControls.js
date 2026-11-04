@@ -48,7 +48,7 @@ import { createControl } from '../models/componentTypes.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
 import {
-  buttonDeviceLayers, buttonDeviceLayersRefusal, knobChannelFormat, knobLayers, layerStatePatches, meterDeviceLayers, meterDeviceLayersRefusal,
+  batLampLayers, buttonDeviceLayers, buttonDeviceLayersRefusal, knobChannelFormat, knobLayers, layerStatePatches, meterDeviceLayers, meterDeviceLayersRefusal,
   plainMeterLayers, plainMeterLayersRefusal, seedLayersAt, sliderLayers, valueLayersRefusal,
 } from './valueControlLayers.js';
 import { getControlLayer, sortControlsForRender } from './controlOrder.js';
@@ -371,7 +371,6 @@ function whyNotButtonLayers(control, resolved, measure) {
   if (buttonDeviceDrawn(resolved)) return buttonDeviceLayersRefusal(resolved);
   // An LED, a jewel or a lit window beside the legend is a layer (buttonLampLayer); a bat lever not yet.
   const lamp = String(resolved?._children?.ContentLayout?.lamp ?? 'none').toLowerCase();
-  if (lamp === 'bat') return 'a bat-lever lamp';
   const layout = nonDefault(resolved, 'ContentLayout', (key) => LAYOUT_KEYS.has(key) || key.startsWith('lamp'));
   if (layout.length) return `the text layout setting ${layout[0]}`;
   const textWhy = textRefusal(resolved, resolved, measure);
@@ -675,13 +674,15 @@ function labelTextPart(name, resolved, styled, rect, transform, common) {
 function buttonLampGeometry(resolved, rect) {
   const layout = resolved?._children?.ContentLayout ?? {};
   const kind = String(layout.lamp ?? 'none').toLowerCase();
-  if (!['led', 'jewel', 'window'].includes(kind)) return null;
+  if (!['led', 'jewel', 'window', 'bat'].includes(kind)) return null;
   const size = Math.max(3, Number.isFinite(Number(layout.lampSize)) ? Number(layout.lampSize) : 9);
   const gap = Math.max(0, Number.isFinite(Number(layout.lampGap)) ? Number(layout.lampGap) : 8);
   const onRight = String(layout.lampSide ?? 'left') === 'right';
   const width = kind === 'window' ? size * 2 : size;
+  // A bat's lever reaches a bezel above and below it: three bezels tall.
+  const height = kind === 'bat' ? size * 3 : size;
   const inset = Number.isFinite(Number(layout[onRight ? 'paddingRight' : 'paddingLeft'])) ? Number(layout[onRight ? 'paddingRight' : 'paddingLeft']) : 8;
-  return { kind, size, gap, onRight, width, x: onRight ? rect.width - inset - width : inset, y: (rect.height - size) / 2 };
+  return { kind, size, gap, onRight, width, height, x: onRight ? rect.width - inset - width : inset, y: (rect.height - height) / 2 };
 }
 
 /** Whether the control shows its text: not when its layout shows the icon alone (CanvasControl). */
@@ -801,7 +802,7 @@ function carryControlEffects(control, resolved, built, rect) {
  * that lights it (the lit colour and its glow), as CanvasControl's lampStyle draws the two; a jewel
  * has its highlight over its colour.
  */
-function buttonLampLayer(name, resolved, styled, rect, common) {
+function buttonLampLayer(name, resolved, styled, rect, common, uniqueName = (wanted) => wanted) {
   const lamp = buttonLampGeometry(resolved, rect);
   if (!lamp) return null;
   const layout = styled?._children?.ContentLayout ?? resolved._children.ContentLayout ?? {};
@@ -812,6 +813,17 @@ function buttonLampLayer(name, resolved, styled, rect, common) {
   const lit = colourOf(layout.lampColour, 'FF5B9BD5');
   const off = colourOf(layout.lampOffColour, 'FF2C2C2C');
   const bezel = colourOf(layout.lampBezelColour, '66FFFFFF');
+  if (lamp.kind === 'bat') {
+    // A bat switch: its bezel, hub and lever as layers, the lever thrown up while lit.
+    const resolvedLayout = resolved._children.ContentLayout ?? {};
+    const hex = (value, fallback) => { const c = colourOf(value, fallback); return String(c).startsWith('{') ? fallback : c; };
+    const bat = batLampLayers({
+      name, box: { x: rect.x + lamp.x, y: rect.y + lamp.y, width: lamp.width, height: lamp.height },
+      colours: { lit, off, bezel }, tints: { lit: hex(resolvedLayout.lampColour, 'FF5B9BD5'), off: hex(resolvedLayout.lampOffColour, 'FF2C2C2C') },
+      zIndex: common.zIndex, opacity: common.opacity ?? 1, uniqueName,
+    });
+    return { layers: bat.layers, on: bat.on, depth: bat.depth };
+  }
   const background = deepClone(SECTION_DEFAULTS.Background);
   background._children.Fill.colour = off;
   background._children.Fill.solidEnabled = true;
@@ -841,7 +853,7 @@ function buttonLampLayer(name, resolved, styled, rect, common) {
     'Effects.Shadows.items': [shadow('outer-glow', 0, Math.max(4, lamp.size * 0.8), lit), shadow('outer-glow', 0, Math.max(2, lamp.size * 0.25), lit)],
   };
   if (lamp.kind === 'jewel') on['Background.Fill.gradient'] = highlight('BF');
-  return { layer, on };
+  return { layers: [layer], on: { [layer.name]: on }, depth: common.zIndex + 1 };
 }
 
 function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, asLayers = false } = {}) {
@@ -893,14 +905,18 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
         ...common, role: 'background', kind: 'rectangle', sections: { Background: deepClone(styled?._children?.Background ?? resolved._children.Background) },
       })
       : null;
-    const lamp = buttonLampLayer(uniquePartName(`${channel}_lamp`, taken), resolved, styled, rect, { ...common, zIndex: zIndex + 1 });
+    // Over the plate its lamp (a bat switch takes a depth for each of its layers), then its icon and
+    // text, the icon under or over the text as their depths say.
+    const lamp = buttonLampLayer(uniquePartName(`${channel}_lamp`, taken), resolved, styled, rect, { ...common, zIndex: zIndex + 1 }, (wanted) => uniquePartName(wanted, taken));
+    let next = lamp ? lamp.depth : zIndex + 1;
     const icon = iconLayer(uniquePartName(`${channel}_icon`, taken), resolved, styled, rect, common);
-    if (icon) icon.layer.zIndex = zIndex + (icon.above ? 3 : 1);
+    if (icon && !icon.above) { icon.layer.zIndex = next; next += 1; }
     const textPart = showsText(resolved)
-      ? labelTextPart(uniquePartName(`${channel}_text`, taken), resolved, styled, rect, transform, { ...common, zIndex: zIndex + 2 })
+      ? labelTextPart(uniquePartName(`${channel}_text`, taken), resolved, styled, rect, transform, { ...common, zIndex: next })
       : null;
-    const built = [plate, lamp?.layer, icon?.layer, textPart].filter(Boolean);
-    return Object.assign(built, { buttoned: { channel, plate: plate?.name ?? '', text: textPart?.name ?? '', lamp: lamp ? { name: lamp.layer.name, on: lamp.on } : null } });
+    if (icon?.above) icon.layer.zIndex = next + 1;
+    const built = [plate, ...(lamp?.layers ?? []), icon?.layer, textPart].filter(Boolean);
+    return Object.assign(built, { buttoned: { channel, plate: plate?.name ?? '', text: textPart?.name ?? '', lamp: lamp ? { on: lamp.on } : null } });
   }
   if (VALUE_TYPES.includes(type) && asLayers) {
     // Layers the designer edits (utils/valueControlLayers.js): one per part of the knob, wired to its
@@ -1402,7 +1418,7 @@ function buttonSections(out, { control, resolved, local, paintIndex, buttoned },
     out.states[`${channelName}Lamp`] = {
       _type: 'State', name: `${channelName}Lamp`, group: 'interaction', enabled: true,
       description: `${nameOf(control)}: ${toggle ? 'on' : 'pressed'}, its lamp lit.`,
-      when: {}, rule: on, patches: { component: {}, parts: { [buttoned.lamp.name]: deepClone(buttoned.lamp.on) } },
+      when: {}, rule: on, patches: { component: {}, parts: deepClone(buttoned.lamp.on) },
     };
   }
   // Drawn as a device: pressed or on, its parts move (bindings) and light up (a state).

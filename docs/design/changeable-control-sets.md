@@ -355,6 +355,14 @@ components):
      and blur, beside the text in the layout's mode, which makes room for it. `CE_KNOB_LAYERS_ICON=1`
      puts a test icon in the library for the pixel check.
 
+   - *A bat switch* (ContentLayout `lamp: 'bat'`, a lever in a round bezel beside the legend):
+     the panel draws it as SVG in a box a lamp wide and three tall; each circle and round-capped
+     line of it is a path layer, its strokes edge layers (`batLampLayers`), and the lever, its
+     shadow and its ball are drawn twice, down in the off colour and up in the lit one, the lamp's
+     state showing the one and hiding the other. The ball's highlight is a radial gradient over its
+     box, as the SVG's is. Every set that names a bat draws its switches as devices, which draw no
+     lamp; the bat shows on a plain button where an author chooses it, and comes in as layers there.
+
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
    25 degrees and scaled 1.1, a knob of each kind 120 of 120 and a slider of each kind 40 of 40 (the
@@ -380,8 +388,8 @@ components):
    or a lost pointer, on the panel and in the designer's Preview). Pressed or on, a part's travel and swing are bindings, its lit
    colour, opacity and legend a state (`rule: '<channel> == true'`); the button's own hover,
    focus, pressed and selected looks are states on its layers. The pixel check compares them in
-   Preview, off and on. Refused by name: control forms not made of parts, a bat-lever lamp, a part
-   that moves on a key that turns, timed and one-shot buttons. A device part with a border is two layers, its
+   Preview, off and on. Refused by name: control forms not made of parts, a part that moves on a key
+   that turns, timed and one-shot buttons. A device part with a border is two layers, its
    fill and its edge, the edge an open path the part renderer strokes as the panel does (round
    joins, half outside the outline).
    **Meters** come in as layers only, with a display-only channel (no grab area) printed as the

@@ -1395,6 +1395,87 @@ export function buttonDeviceLayersRefusal(resolved) {
   return '';
 }
 
+/** `colour` (AARRGGBB) with its alpha multiplied by `share`; a role or a malformed colour as `fallback`. */
+function withAlpha(colour, share, fallback = 'FF000000') {
+  const raw = String(colour ?? '').replace(/^#/, '').trim();
+  const hex = /^[0-9a-f]{8}$/i.test(raw) ? raw : (/^[0-9a-f]{6}$/i.test(raw) ? `FF${raw}` : fallback);
+  const alpha = Math.round(parseInt(hex.slice(0, 2), 16) * share);
+  return `${alpha.toString(16).padStart(2, '0').toUpperCase()}${hex.slice(2).toUpperCase()}`;
+}
+
+/**
+ * A button's bat switch (CanvasControl's lamp `bat`, an amp's or a tape deck's toggle) as layers.
+ * The panel draws it as SVG in a box a lamp wide and three tall, a 10 by 30 view: a bezel ring at the
+ * centre with a dark hub, and a lever from the hub to the top when lit and to the bottom when not,
+ * its shadow under it, a ball on its end with a highlight. Each circle and each round-capped line is
+ * a path layer, a stroke an edge layer over it (stroked as the panel strokes, half outside); the lever
+ * is drawn twice, thrown up in the lit colour and down in the off colour, and `on` shows the one and
+ * hides the other.
+ *
+ * `box` is the lamp's box in the component; `colours` `{ lit, off, bezel }` the lamp's colours (roles
+ * kept), `tints` `{ lit, off }` the same as hex, for the highlight's tinted stop. Returns
+ * `{ layers, on }`, `on` the patches by layer name for while the button is on or pressed.
+ */
+export function batLampLayers({ name, box, colours, tints, zIndex, opacity = 1, uniqueName = (wanted) => wanted }) {
+  const k = box.width / 10;
+  const layers = [];
+  const on = {};
+  let depth = zIndex;
+  const place = (x, y, w, h, grow = 0) => ({ x: box.x + x * k - grow / 2, y: box.y + y * k - grow / 2, width: w * k + grow, height: h * k + grow });
+  // A closed shape `d` (view units) in its own box, and its stroke over it as an edge layer.
+  const shape = (wanted, d, x, y, w, h, background, stroke = null, layerOpacity = opacity) => {
+    const pathData = transformPathData(d, [1 / w, 0, 0, 1 / h, -x / w, -y / h]);
+    const made = [createPartNode(uniqueName(wanted), {
+      role: 'indicator', kind: 'path', zIndex: depth, opacity: layerOpacity,
+      layout: pxBox(place(x, y, w, h), { x: 0, y: 0 }), meta: { pathData, closed: true }, sections: { Background: background },
+    })];
+    depth += 1;
+    if (stroke) {
+      const bw = stroke.width * k;
+      made.push(createPartNode(uniqueName(`${wanted}Edge`), {
+        role: 'indicator', kind: 'path', zIndex: depth, opacity: layerOpacity,
+        layout: pxBox(place(x, y, w, h, bw), { x: 0, y: 0 }), meta: { pathData, closed: false },
+        sections: { Background: edgeBackground(solidBackground('00000000'), bw) },
+      }));
+      made[1]._children.Background._children.Border.colour = stroke.colour;
+      depth += 1;
+    }
+    layers.push(...made);
+    return made;
+  };
+  const circle = (wanted, cx, cy, r, background, stroke) => shape(wanted, circlePath(cx, cy, r), cx - r, cy - r, 2 * r, 2 * r, background, stroke);
+  // A line from (5, 15) to (5, y) of width `w` with round caps, moved by (dx, dy).
+  const lever = (wanted, y, w, background, dx, dy, layerOpacity) => {
+    const h = w / 2;
+    const top = Math.min(15, y);
+    const bottom = Math.max(15, y);
+    const d = `M${r3(5 - h + dx)} ${r3(top + dy)} A${r3(h)} ${r3(h)} 0 0 1 ${r3(5 + h + dx)} ${r3(top + dy)} L${r3(5 + h + dx)} ${r3(bottom + dy)} A${r3(h)} ${r3(h)} 0 0 1 ${r3(5 - h + dx)} ${r3(bottom + dy)} Z`;
+    return shape(wanted, d, 5 - h + dx, top - h + dy, w, bottom - top + w, background, null, layerOpacity);
+  };
+  const edge = (colour, width) => ({ colour, width });
+  circle(`${name}Bezel`, 5, 15, 4.6, solidBackground(colours.bezel), edge('73000000', 0.6));
+  circle(`${name}Hub`, 5, 15, 1.8, solidBackground('8C000000'));
+  for (const lit of [false, true]) {
+    const tip = lit ? 4.5 : 25.5;
+    const ballY = lit ? 4 : 26;
+    const colour = lit ? colours.lit : colours.off;
+    const shown = lit ? 0 : opacity;
+    const part = lit ? 'Up' : 'Down';
+    const made = [
+      ...lever(`${name}${part}Shadow`, tip, 3.4, solidBackground('80000000'), 0.6, 0.8, shown),
+      ...lever(`${name}${part}Lever`, tip, 2.8, solidBackground(colour), 0, 0, shown),
+    ];
+    const ball = shape(`${name}${part}Ball`, circlePath(5, ballY, 3.4), 1.6, ballY - 3.4, 6.8, 6.8, solidBackground(colour), edge('73000000', 0.5), shown);
+    // Its highlight: SVG's radial gradient over the ball's box, centred at 35 % 30 %, 70 % out.
+    const gloss = shape(`${name}${part}Gloss`, circlePath(5, ballY, 3.4), 1.6, ballY - 3.4, 6.8, 6.8, gradientBackground({
+      type: 'radial', edge: 0, centerX: 35, centerY: 30, radiusX: 70, radiusY: 70,
+      stops: [{ color: 'D9FFFFFF', position: 0 }, { color: withAlpha(lit ? tints.lit : tints.off, 0.15), position: 45 }, { color: '59000000', position: 100 }],
+    }), null, shown);
+    for (const layer of [...made, ...ball, ...gloss]) on[layer.name] = { opacity: lit ? opacity : 0 };
+  }
+  return { layers, on, depth };
+}
+
 /** Where the device frame's units land in the control's box: `{ x, y, scale }`, and the caption. */
 function deviceFrameIn(width, height, caption, letterSpacing) {
   const lay = buttonAnatomyLayout(width, height, caption, { letterSpacing });

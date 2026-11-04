@@ -1071,7 +1071,7 @@ shows, with their colours still linked to the set's colour roles. **As one exact
 knob as it was, drawn by the panel's own knob code. Every set's controls come in as layers, Iris and
 Satellite aside (they are drawn whole): a plate in perspective, a skirt, an insert, a drop shadow
 (a layer of its own under its part), grooves, a bar pointer, a second scale and the scale's numbers;
-every fader cap, its sheen, glow and finish; a key's shadow, a switch's lamp, a meter's counter and
+every fader cap, its sheen, glow and finish; a key's shadow, a switch's lamp or bat lever, a meter's counter and
 a fill drawn in a pattern. A plate that turns with the value turns its outline while its light and
 shadow stay put, as on the panel. What a layer does not draw yet (a control form that is not made
 of parts, a rendered look) comes in as one exact part, and the window names it and why. A counter's

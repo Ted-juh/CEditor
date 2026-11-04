@@ -289,3 +289,31 @@ test('an empty label keeps its text layer, so its text stays a setting a copy ca
   assert.ok(!parts.some((part) => part.role === 'label'));
   assert.ok(parts.some((part) => part._children.Icon));
 });
+
+test('a bat switch beside the legend comes in as layers: its bezel and hub, and its lever down, thrown up while on', () => {
+  const toggle = at('ToggleButton', 't', 0, 0, 160, 100, {
+    Text: { content: 'PLAY' }, ContentLayout: { lamp: 'bat', lampSize: 10, paddingLeft: 12 },
+    Background: { _children: { Fill: { solidEnabled: true, colour: 'FF303030' } } },
+  });
+  assert.equal(whyNotConvertible(toggle, toggle, { layers: true }), '');
+  const plan = planComponentFromSelection({ id: 'p', controls: [toggle], scripts: [] }, ['t'], { valueControlsAs: 'layers' });
+  assert.ok(plan.ok, plan.refused?.[0]?.reason);
+  const parts = plan.component._children.Parts._children;
+  // The panel's 10 by 30 view in a box a lamp wide and three tall, centred down the button: one unit a pixel.
+  const bezel = parts.t_lampBezel ?? Object.values(parts).find((part) => /lampBezel$/.test(part.name));
+  assert.deepEqual([bezel._children.Layout.x, bezel._children.Layout.y, bezel._children.Layout.width], [12.4, 45.4, 9.2]);
+  const down = Object.values(parts).filter((part) => /lampDown/.test(part.name));
+  const up = Object.values(parts).filter((part) => /lampUp/.test(part.name));
+  assert.equal(down.length, 5);
+  assert.equal(up.length, 5);
+  assert.ok(down.every((part) => part.opacity === 1) && up.every((part) => part.opacity === 0));
+  const lit = Object.values(plan.component._children.States._children).find((state) => /Lamp$/.test(state.name));
+  for (const part of up) assert.equal(lit.patches.parts[part.name].opacity, 1);
+  for (const part of down) assert.equal(lit.patches.parts[part.name].opacity, 0);
+  // Every layer of it its own depth, under the text, which makes room for it.
+  const depths = Object.values(parts).map((part) => part.zIndex);
+  assert.equal(new Set(depths).size, depths.length);
+  const text = Object.values(parts).find((part) => part.role === 'label');
+  assert.ok(text.zIndex > Math.max(...[...down, ...up].map((part) => part.zIndex)));
+  assert.equal(text._children.Layout.x, 12 + 10 + 8 - 8);
+});
