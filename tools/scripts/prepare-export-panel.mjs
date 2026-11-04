@@ -5,7 +5,8 @@
 // For building the player by hand with -DCE_VST_PANEL_PATH (CLAUDE.md, "Validating the plug-in"):
 // a saved .cepanel stores controls as differences from their defaults and carries no defaults to
 // rebuild them from, which the payload does (tools/scripts/lib/exportDocument.mjs). The exporters
-// do this themselves.
+// do this themselves. Rendered looks are baked too, in headless Chromium (lib/bakeRenderedLooks.mjs:
+// Playwright's browser, CHROMIUM_PATH, or Edge on Windows); without one they are not, and it says so.
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { exportFormFor } from './lib/exportDocument.mjs';

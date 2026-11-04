@@ -394,7 +394,16 @@ the document's `renderedLookImages`; the player loads them and draws them, no We
 knobs: three images, about 120 KB each. The Knob tab edits it (approved mock-up): each plate's
 **Look**, Flat or Rendered, and a rendered plate shows only what the render draws (size, turns,
 profile, ridges and their depth, taper, height, top, the two materials and colours). A knob
-with a rendered plate is refused as layers by name. Fader caps and button faces come after.
+with a rendered plate is refused as layers by name.
+
+Fader caps and button parts are rendered too: a block (a rounded box the part's size, its top flat,
+with an insert, ridged across the travel, a dome or a dish), or a turned body for a round cap or a
+circular key. The shader, the specs and the drawing are in `utils/renderedLookCore.js`, which imports
+nothing; `renderedLookJobs` lists the images a control needs, and the bake runs it over each control
+as its set draws it (roles resolved), so the keys are the ones the plug-in's parts ask for. The export
+tools that start from a saved file (`prepare-export-panel.mjs`, `export-panel-vst3.mjs`,
+`export-panel-template.mjs`) bake in headless Chromium with that same file
+(`tools/scripts/lib/bakeRenderedLooks.mjs`); without a browser they say so and those parts draw flat. Fader caps and button faces come after.
 
 ### F. Filmstrips as their own category (small)
 
