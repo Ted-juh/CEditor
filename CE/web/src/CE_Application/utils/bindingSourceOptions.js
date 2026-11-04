@@ -70,6 +70,8 @@ export function bindingSourceGroups(control, current = '') {
     if (String(channel?.curve?.mode ?? '') === 'bipolar') {
       channelOptions.push({ value: `channel.${name}.bipolar`, label: `${name}: -1 to 1` });
     }
+    // A channel that holds its peak (a meter's) also reads its held peak, 0 to 1.
+    if (channel?.peakHold) channelOptions.push({ value: `channel.${name}.peak`, label: `${name}: held peak` });
     if (String(channel?.type ?? '').trim().toLowerCase() === 'array') {
       channelOptions.push(
         { value: `channel.${name}.items`, label: `${name}: items` },

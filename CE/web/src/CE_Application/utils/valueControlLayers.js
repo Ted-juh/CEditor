@@ -1335,18 +1335,28 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
 
 /**
  * The layers as they stand at `travel`: each range binding's value written into its layer, so the
- * designer, which draws what is authored, shows the control at its value and not at its start.
+ * designer, which draws what is authored, shows the control at its value and not at its start. A
+ * binding on the held peak stands at `peak` (null: no peak, as the runtime reads one it lacks), and
+ * one that writes only inside its range (`band`) writes as it does.
  */
-export function seedLayersAt(parts, bindings, travel) {
+export function seedLayersAt(parts, bindings, travel, { peak = travel } = {}) {
   const byName = new Map(parts.map((part) => [part.name, part]));
   for (const binding of Object.values(bindings ?? {})) {
     if (binding?.mapMode !== 'range') continue;
     const match = /^Parts\.([^.]+)\.(.+)$/.exec(String(binding.target ?? ''));
     const part = match ? byName.get(match[1]) : null;
     if (!part) continue;
+    const fromPeak = /\.peak$/.test(String(binding.source ?? ''));
+    const input = fromPeak ? (peak == null ? binding.inputMin : peak) : travel;
     const span = binding.inputMax - binding.inputMin;
-    const t = span === 0 ? (travel >= binding.inputMax ? 1 : 0) : Math.max(0, Math.min(1, (travel - binding.inputMin) / span));
-    const value = r3(binding.outputMin + (binding.outputMax - binding.outputMin) * t);
+    let value;
+    if (binding.band === true) {
+      const inside = !(fromPeak && peak == null) && input >= Math.min(binding.inputMin, binding.inputMax) && input < Math.max(binding.inputMin, binding.inputMax);
+      value = inside ? binding.outputMax : binding.outputMin;
+    } else {
+      const t = span === 0 ? (input >= binding.inputMax ? 1 : 0) : Math.max(0, Math.min(1, (input - binding.inputMin) / span));
+      value = r3(binding.outputMin + (binding.outputMax - binding.outputMin) * t);
+    }
     const path = match[2].split('.');
     let node = part;
     for (const key of path.slice(0, -1)) {
@@ -1627,7 +1637,8 @@ export function meterDeviceLayersRefusal(resolved) {
     // layers now (meterDeviceLayers).
     if (pattern === 'digits' && (motion === 'fill' || motion === 'light')) return `counter digits that ${motion === 'fill' ? 'fill' : 'light'}, which a layer does not draw yet`;
     if (String(part.zoneColours ?? 'off') !== 'off') return `its ${name} coloured by the meter's zones, which a layer does not do yet`;
-    if (String(part.source ?? 'reading') === 'peak' || motion === 'clip') return `its ${name} follows the held peak, which a layer does not keep`;
+    // A part that follows the held peak, and a clip lamp, read the peak the component's value holds
+    // (`channel.<name>.peak`).
   }
   return '';
 }
@@ -1726,6 +1737,8 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     const styledPart = colours[name] ?? part;
     const motion = String(part.motion ?? 'none');
     const opacity = num(part.opacity, 1);
+    // A part that shows the held peak, or a clip lamp, follows the peak the meter holds.
+    const partSource = String(part.source ?? 'reading') === 'peak' || motion === 'clip' ? `channel.${channel}.peak` : source;
     const fill = styledPart?._children?.Background?._children?.Fill ?? {};
     const textColour = fill.colour ?? 'FFFFFFFF';
     const rest = meterPartDrawing(name, part, { p: 0, meter });
@@ -1828,11 +1841,11 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         // A cell is lit when its level (its index over the count) is at or under the reading.
         for (const plain of pathLayers(`${name}${i}`, d, cellBox, base.background, { opacity, bw: base.bw })) {
           add(name, plain);
-          out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, source, `Parts.${plain.name}.opacity`, opacity, 0, t - 0.0005, t);
+          out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, partSource, `Parts.${plain.name}.opacity`, opacity, 0, t - 0.0005, t);
         }
         for (const lighted of pathLayers(`${name}${i}lit`, litD, litBox, lit.background, { opacity: 0, bw: lit.bw })) {
           add(name, lighted);
-          out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, source, `Parts.${lighted.name}.opacity`, 0, litOpacity, t - 0.0005, t);
+          out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, partSource, `Parts.${lighted.name}.opacity`, 0, litOpacity, t - 0.0005, t);
         }
       });
       continue;
@@ -1873,7 +1886,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         }
         add(name, layer);
         for (const [key, a, b] of [['x', begin.x + origin.x, end.x + origin.x], ['y', begin.y + origin.y, end.y + origin.y], ['width', begin.width, end.width], ['height', begin.height, end.height]]) {
-          if (Math.abs(a - b) > 1e-6) out.bindings[`${layer.name}${key}`] = rangeBinding(`${layer.name}${key}`, source, `Parts.${layer.name}.Layout.${key}`, a, b);
+          if (Math.abs(a - b) > 1e-6) out.bindings[`${layer.name}${key}`] = rangeBinding(`${layer.name}${key}`, partSource, `Parts.${layer.name}.Layout.${key}`, a, b);
         }
       });
       continue;
@@ -1889,10 +1902,34 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(full, origin), sections: { Background: background },
       }));
       const lengthKey = from === 'left' || from === 'right' ? 'width' : 'height';
-      out.bindings[`${layer.name}Grow`] = rangeBinding(`${layer.name}Grow`, source, `Parts.${layer.name}.Layout.${lengthKey}`, 0, full[lengthKey]);
+      out.bindings[`${layer.name}Grow`] = rangeBinding(`${layer.name}Grow`, partSource, `Parts.${layer.name}.Layout.${lengthKey}`, 0, full[lengthKey]);
       if (from === 'right' || from === 'bottom') {
         const posKey = from === 'right' ? 'x' : 'y';
-        out.bindings[`${layer.name}Edge`] = rangeBinding(`${layer.name}Edge`, source, `Parts.${layer.name}.Layout.${posKey}`, layer._children.Layout[posKey] + full[lengthKey], layer._children.Layout[posKey]);
+        out.bindings[`${layer.name}Edge`] = rangeBinding(`${layer.name}Edge`, partSource, `Parts.${layer.name}.Layout.${posKey}`, layer._children.Layout[posKey] + full[lengthKey], layer._children.Layout[posKey]);
+      }
+      continue;
+    }
+    if (motion === 'clip') {
+      // A clip lamp: its own look until the held peak reaches its level (`clipFrom`), then lit in its
+      // lit colour and opacity, and held lit while the peak holds (meterParts' 'clip').
+      const clipFrom = Math.max(0, Math.min(1, num(part.clipFrom, 0.9)));
+      const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
+      const d = devicePatternCells(String(part.pattern ?? 'solid'), box.x, box.y, box.w, box.h, {
+        count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight,
+      }).map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius })).filter(Boolean).join(' ');
+      if (d) {
+        const litColour = String(styledPart.activeColour ?? part.activeColour ?? '').trim() || fill.colour;
+        const litOpacity = part.activeOpacity != null ? num(part.activeOpacity, 1) : opacity;
+        const base = backgroundOf(styledPart, part);
+        const lit = backgroundOf(styledPart, part, litColour);
+        for (const plain of pathLayers(name, d, box, base.background, { opacity, bw: base.bw, pivot, rotation: restTurn })) {
+          add(name, plain);
+          out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, partSource, `Parts.${plain.name}.opacity`, opacity, 0, clipFrom - 0.0005, clipFrom);
+        }
+        for (const lighted of pathLayers(`${name}Lit`, d, box, lit.background, { opacity: 0, bw: lit.bw, pivot, rotation: restTurn })) {
+          add(name, lighted);
+          out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, partSource, `Parts.${lighted.name}.opacity`, 0, litOpacity, clipFrom - 0.0005, clipFrom);
+        }
       }
       continue;
     }
@@ -1916,13 +1953,13 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         layer.zIndex = depth;
         add(name, layer);
         if (motion === 'swing' && num(part.swing, 0)) {
-          out.bindings[`${layer.name}Swing`] = rangeBinding(`${layer.name}Swing`, source, `Parts.${layer.name}.Layout.rotation`, restTurn, restTurn + num(part.swing, 0));
+          out.bindings[`${layer.name}Swing`] = rangeBinding(`${layer.name}Swing`, partSource, `Parts.${layer.name}.Layout.rotation`, restTurn, restTurn + num(part.swing, 0));
         }
         if (motion === 'slide') {
           const dx = (num(part.travelX, 0) / 100) * W * S;
           const dy = (num(part.travelY, 0) / 100) * H * S;
-          if (dx) out.bindings[`${layer.name}SlideX`] = rangeBinding(`${layer.name}SlideX`, source, `Parts.${layer.name}.Layout.offsetX`, 0, dx);
-          if (dy) out.bindings[`${layer.name}SlideY`] = rangeBinding(`${layer.name}SlideY`, source, `Parts.${layer.name}.Layout.offsetY`, 0, dy);
+          if (dx) out.bindings[`${layer.name}SlideX`] = rangeBinding(`${layer.name}SlideX`, partSource, `Parts.${layer.name}.Layout.offsetX`, 0, dx);
+          if (dy) out.bindings[`${layer.name}SlideY`] = rangeBinding(`${layer.name}SlideY`, partSource, `Parts.${layer.name}.Layout.offsetY`, 0, dy);
         }
       }
     }
@@ -1986,7 +2023,6 @@ export function plainMeterLayersRefusal(resolved) {
   const cfg = resolved?._children?.Meter ?? {};
   if (String(cfg.scale ?? 'linear') === 'db') return 'a decibel scale, which a layer does not follow yet';
   if (String(cfg.valueSourceId ?? '').trim()) return 'its value taken from another control';
-  if (cfg.peakHold === true) return 'peak hold, which a layer does not keep';
   // A bar's fill shows up to the reading under a cover in the track's colour, which only hides the
   // fill if nothing shows through it. Segments and an arc draw their fill over the track instead.
   const track = String(cfg.trackColour ?? 'FF141414');
@@ -2018,6 +2054,8 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
   const height = Math.max(1, rect.height);
   const origin = { x: rect.x, y: rect.y };
   const source = `channel.${channel}.normalized`;
+  // The peak the value holds (Peak Hold; interactionRuntime's `channel.<name>.peak`).
+  const peakSource = `channel.${channel}.peak`;
   const out = { parts: [], bindings: {}, partNames: {} };
   let depth = zIndex;
   const add = (part) => { out.parts.push(part); depth += 1; return part; };
@@ -2130,6 +2168,15 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
         ? { x: track.x, y: track.y + along - offset - size, width: track.width, height: size }
         : { x: track.x + offset, y: track.y, width: size, height: track.height };
       const plain = rectLayer(`segment${idx}`, box, solid(trackColour));
+      if (cfg.peakHold === true) {
+        // Peak Hold marks the segment the held peak is in with an inset line in the peak colour,
+        // under the lit segment, so a segment the reading lights shows no mark (MeterRenderer).
+        const ring = solid('00000000');
+        ring._children.Fill.solidEnabled = false;
+        Object.assign(ring._children.Border, { enabled: true, thickness: 1, colour: styledCfg.peakColour ?? 'FFF2F2F2' });
+        const mark = rectLayer(`segment${idx}peak`, box, ring, 0);
+        out.bindings[`${mark.name}Peak`] = { ...rangeBinding(`${mark.name}Peak`, peakSource, `Parts.${mark.name}.opacity`, 0, 1, (idx + 0.5) / segments, (idx + 1.5) / segments), band: true };
+      }
       const lit = rectLayer(`segment${idx}lit`, box, solid(meterFillColourAt(meterSegmentCenter(idx, segments), styledCfg)), 0);
       // Lit once the reading reaches the segment's middle (meterSegmentsLit rounds).
       const t = (idx + 0.5) / segments;
@@ -2166,6 +2213,18 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
     const near = vertical ? ['bottomLeft', 'bottomRight'] : ['topLeft', 'bottomLeft'];
     for (const corner of near) {
       out.bindings[`${name}${corner}`] = rangeBinding(`${name}${corner}`, source, `Parts.${name}.Background.Corners.${corner}.radius`, radius, 0, 0, 0.0005);
+    }
+    // Peak Hold's marker: a 2 px line across the track at the held peak, shown while there is one.
+    if (cfg.peakHold === true) {
+      const box = vertical
+        ? { x: track.x, y: track.y + track.height - 1, width: track.width, height: 2 }
+        : { x: track.x - 1, y: track.y, width: 2, height: track.height };
+      const marker = add(createPartNode(named('peak'), {
+        role: 'custom', kind: 'rectangle', zIndex: depth, opacity: 0, layout: pxBox(box, origin), sections: { Background: solidBackground(styledCfg.peakColour ?? 'FFF2F2F2') },
+      }));
+      const [key, from, to] = vertical ? ['y', box.y + origin.y, box.y + origin.y - track.height] : ['x', box.x + origin.x, box.x + origin.x + track.width];
+      out.bindings[`${marker.name}Move`] = rangeBinding(`${marker.name}Move`, peakSource, `Parts.${marker.name}.Layout.${key}`, from, to);
+      out.bindings[`${marker.name}Shown`] = rangeBinding(`${marker.name}Shown`, peakSource, `Parts.${marker.name}.opacity`, 0, 1, 0, 0.0005);
     }
   }
   if (cfg.showTicks === true) {
@@ -2247,6 +2306,16 @@ function plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, sour
     });
     out.bindings[`${fillArc.name}Sweep`] = rangeBinding(`${fillArc.name}Sweep`, source, `Parts.${fillArc.name}.meta.arcTrack.sweepAngle`, 0, r3(sweep));
   }
+  // Peak Hold's marker: a 2-unit line across the arc at the held peak, shown while there is one.
+  if (cfg.peakHold === true) {
+    const peakSource = source.replace(/\.normalized$/, '.peak');
+    const marker = add(radialBar(named('peak'), {
+      centre, angle: designer(0), from: (r - stroke / 2) * fit, to: (r + stroke / 2) * fit, width: 2 * fit, round: false,
+      colour: styledCfg.peakColour ?? 'FFF2F2F2', opacity: 0, zIndex: depthOf(), origin,
+    }));
+    out.bindings[`${marker.name}Turn`] = rangeBinding(`${marker.name}Turn`, peakSource, `Parts.${marker.name}.Layout.rotation`, designer(0), designer(1));
+    out.bindings[`${marker.name}Shown`] = rangeBinding(`${marker.name}Shown`, peakSource, `Parts.${marker.name}.opacity`, 0, 1, 0, 0.0005);
+  }
   if (cfg.showTicks === true) {
     for (const [i, tick] of ticks.entries()) {
       add(radialBar(named(`tick${i}`), {
@@ -2265,7 +2334,6 @@ function plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, sour
   }
 }
 
-/** A part's outline as drawn at the start of the travel, for a part that turns with the value. */
 /** The box a px layout describes, back in the knob's own coordinates. */
 function boxOfLayout(layout, origin) {
   return { x: layout.x - origin.x, y: layout.y - origin.y, width: layout.width, height: layout.height };

@@ -184,7 +184,7 @@ test('a meter comes in as layers: a needle swings, a bar\'s gradient is covered 
   const leds = plan([meter({ Transform: { x: 0, y: 0, width: 200, height: 40 } })], 'saddle');
   assert.ok(Object.keys(leds.component._children.Bindings._children).filter((name) => /segment\d+litLit$/.test(name)).length >= 8);
   // What a layer does not draw yet is named.
-  assert.match(plan([meter({ Meter: { peakHold: true } })], 'graphite').refused[0].reason, /peak hold/);
+  assert.match(plan([meter({ Meter: { scale: 'db' } })], 'graphite').refused[0].reason, /decibel/);
 });
 
 test('the knob\'s value glide comes with its layers: its pointer and its arc ease when the value changes', () => {

@@ -16,7 +16,7 @@ import { resolveControlForSet } from '../src/CE_Application/models/controlSetFam
 import { planComponentFromSelection } from '../src/CE_Application/utils/customComponentFromControls.js';
 import { figureLengths, knobLayers, meterDeviceLayers, sliderLayers } from '../src/CE_Application/utils/valueControlLayers.js';
 import { rotatePathData, transformPathData } from '../src/CE_Application/utils/svgPathScale.js';
-import { applyCustomBindings } from '../src/CE_Application/utils/interactionRuntime.js';
+import { applyCustomBindings, resolveInteractiveControl } from '../src/CE_Application/utils/interactionRuntime.js';
 import { buildShadowCSS } from '../src/CE_Application/utils/effectsCSS.js';
 import { MAP_MODES } from '../src/CE_Application/utils/bindingSourceOptions.js';
 
@@ -179,4 +179,56 @@ test('a layer\'s shadow keeps its colour\'s alpha; a path\'s light stays put whi
   assert.match(renderer, /let fixedLight = \$derived\(shape\.rendersOutline && part\?\.meta\?\.fixedLight === true\);/);
   assert.match(renderer, /if \(Math\.abs\(partRotation\) > 0\.001 && !fixedLight\) transforms\.push/);
   assert.match(renderer, /const turn = \(d\) => \(d \? rotatePathData\(d, outlineTurn, px, py\) : d\);/);
+});
+
+test('a meter that holds its peak keeps it on its value: a clip lamp, a peak needle and Peak Hold\'s marker read it', () => {
+  const meterIn = (setId, edit) => {
+    const meter = control('Meter');
+    edit(meter._children);
+    return plan([meter], setId).component;
+  };
+  // A device meter's clip lamp: its own look, then lit, at its level of the held peak.
+  const lamp = meterIn('brassworks', (k) => Object.assign(k.Parts._children.lamp, { visible: true }));
+  const channel = lamp._children.ValueChannels._children.Part;
+  assert.deepEqual(channel.peakHold, { holdMs: 1200, decayPerSec: 0.4, idle: 'value' });
+  const lampBindings = lamp._children.Bindings._children;
+  assert.equal(lampBindings.Part_lampLitLit.source, 'channel.Part.peak');
+  assert.equal(lampBindings.Part_lampLitLit.inputMax, 0.9, 'at its level');
+  assert.equal(lampBindings.Part_lampDim.source, 'channel.Part.peak');
+  // A needle that shows the peak swings with it.
+  const needle = meterIn('brassworks', (k) => Object.assign(k.Parts._children.indicator, { visible: true, source: 'peak', motion: 'swing', swing: 90 }));
+  assert.ok(Object.values(needle._children.Bindings._children).some((b) => /indicatorSwing$/.test(b.name) && b.source === 'channel.Part.peak'));
+  // A plain meter's Peak Hold: a line on a bar, an outline on the segment the peak is in, a mark on an arc.
+  const bar = meterIn('graphite', (k) => { k.Meter.peakHold = true; });
+  assert.equal(bar._children.ValueChannels._children.Part.peakHold.idle, 'none', 'no marker where nothing runs');
+  assert.equal(bar._children.Bindings._children.Part_peakMove.source, 'channel.Part.peak');
+  const segments = meterIn('graphite', (k) => { k.Meter.peakHold = true; k.Meter.segments = 10; });
+  const band = segments._children.Bindings._children.Part_segment3peakPeak;
+  assert.equal(band.band, true);
+  assert.deepEqual([band.inputMin, band.inputMax], [0.35, 0.45], 'the peak rounds to the fourth segment');
+  const arc = meterIn('graphite', (k) => { k.Meter.peakHold = true; k.Meter.orientation = 'arc'; });
+  assert.equal(arc._children.Bindings._children.Part_peakTurn.source, 'channel.Part.peak');
+});
+
+test('the held peak as a signal, an inside-only range, the preview keeping each component\'s peak', () => {
+  const run = (channel, session, binding) => {
+    const node = {
+      _children: {
+        Core: { controlType: 'CustomComponent' },
+        ValueChannels: { _children: { v: { _type: 'ValueChannel', name: 'v', type: 'float', min: 0, max: 1, currentValue: 0.3, defaultValue: 0.3, ...channel } } },
+        Parts: { _children: { o: { opacity: 0.5, _children: {} } } },
+        Bindings: { _children: { b: { enabled: true, mapMode: 'range', source: 'channel.v.peak', target: 'Parts.o.opacity', inputMin: 0, inputMax: 1, outputMin: 0, outputMax: 1, ...binding } } },
+      },
+    };
+    return resolveInteractiveControl(node, session).control._children.Parts._children.o.opacity;
+  };
+  assert.equal(run({ peakHold: { idle: 'value' } }, {}, {}), 0.3, 'where nothing runs, the value');
+  assert.equal(run({ peakHold: { idle: 'none' } }, {}, {}), 0, 'or none');
+  assert.equal(run({ peakHold: { idle: 'none' } }, { customPeaks: { v: 0.8 } }, {}), 0.8, 'the preview\'s held peak');
+  assert.equal(run({ peakHold: {} }, { customPeaks: { v: 0.8 } }, { band: true, inputMin: 0.75, inputMax: 0.85 }), 1, 'inside');
+  assert.equal(run({ peakHold: {} }, { customPeaks: { v: 0.9 } }, { band: true, inputMin: 0.75, inputMax: 0.85 }), 0, 'outside');
+  const surface = read('editor/PanelPreviewSurface.svelte');
+  assert.match(surface, /const customPeaks = componentPeaks\(rawControl, keyed\);/);
+  assert.match(surface, /holdMs: numberOr\(channel\.peakHold\.holdMs, 1200\), decayPerSec: numberOr\(channel\.peakHold\.decayPerSec, 0\.4\)/);
+  assert.match(read('sections/BindingsEditor.svelte'), /<PropertyCell label="Inside Only"/);
 });

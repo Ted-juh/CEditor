@@ -32,7 +32,8 @@ test('a readout, a label, scale labels and an arc no longer refuse; what a layer
     assert.equal(plainMeterLayersRefusal(meter(props)), '', JSON.stringify(props));
   }
   assert.match(plainMeterLayersRefusal(meter({ scale: 'db' })), /decibel/);
-  assert.match(plainMeterLayersRefusal(meter({ peakHold: true })), /peak hold/);
+  // Peak Hold is a marker on the held peak the value keeps (channel.<name>.peak).
+  assert.equal(plainMeterLayersRefusal(meter({ peakHold: true })), '');
   assert.match(plainMeterLayersRefusal(meter({ trackColour: '80141414' })), /see through/, 'a bar covers its fill with the track');
   assert.equal(plainMeterLayersRefusal(meter({ trackColour: '80141414', segments: 8 })), '', 'segments draw over the track');
   assert.equal(plainMeterLayersRefusal(meter({ trackColour: '80141414', orientation: 'arc' })), '', 'so does an arc');

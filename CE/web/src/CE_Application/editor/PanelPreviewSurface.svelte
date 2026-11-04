@@ -687,7 +687,11 @@
     // The keyframe pose rides in with the session: this surface resolves the control itself and
     // hands CanvasControl the result, so the overlay has to be applied here, not there.
     const keyframeOverlay = keyframeOverlayView.values.get(getControlId(rawControl)) ?? null;
-    const previewOverrides = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
+    const keyed = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
+    // A component's held peaks (a meter made into layers: its clip lamp, a peak needle), kept as
+    // a meter's are, below; the bindings read them as `channel.<name>.peak`.
+    const customPeaks = componentPeaks(rawControl, keyed);
+    const previewOverrides = customPeaks ? { ...(keyed ?? {}), customPeaks } : keyed;
     // Host automation of a field on the component's OWN section (an Arp's rate, a joystick's x)
     // lands here first, so every apply*ValueSource below and the renderer itself read the section
     // as they always do. It has to happen before the chain rather than inside it: several of those
@@ -1727,12 +1731,44 @@
     meterTickerRunning = true;
     const loop = () => {
       const anyPeak = flatControls(orderedControls ?? []).some((c) =>
-        isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
+        (isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true) || peakChannels(c).length > 0);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       if (hostShown) meterClock = Date.now();   // the peak decays by the time, seen or not
       meterAnimationFrame = requestAnimationFrame(loop);
     };
     meterAnimationFrame = requestAnimationFrame(loop);
+  }
+
+  // A component's channels that hold their peak (`peakHold`: a meter made into layers).
+  function peakChannels(control) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'CustomComponent') return [];
+    return Object.entries(getCustomValueChannels(control) ?? {}).filter(([, channel]) => channel?.peakHold);
+  }
+
+  // Each such channel's held peak, 0 to 1, as a meter's peak is kept (meterPeak: held for its hold
+  // time, then falling at its rate), from the channel's value as the session has it; null for a
+  // component with none.
+  function componentPeaks(control, session) {
+    const channels = peakChannels(control);
+    if (!channels.length) return null;
+    ensureMeterTicker();
+    void meterClock; // re-evaluate as the peaks fall
+    const id = getControlId(control);
+    const now = Date.now();
+    const peaks = {};
+    for (const [name, channel] of channels) {
+      const raw = session?.customValues?.[name] ?? channel.currentValue ?? channel.defaultValue;
+      const pos = normalizeCustomChannelValue(channel, raw);
+      const key = `${id}:${name}`;
+      const prev = meterPeakState[key] ?? { peak: pos, peakAt: now };
+      const next = meterPeak({
+        prevPeak: prev.peak, prevPeakAt: prev.peakAt, prevUpdatedAt: prev.updatedAt, pos, now,
+        holdMs: numberOr(channel.peakHold.holdMs, 1200), decayPerSec: numberOr(channel.peakHold.decayPerSec, 0.4),
+      });
+      meterPeakState[key] = { ...next, updatedAt: now };
+      peaks[name] = next.peak;
+    }
+    return peaks;
   }
 
   // Inject the meter's live value + peak-hold onto the resolved Meter section:

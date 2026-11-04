@@ -16,7 +16,8 @@
  * Satellite), and a control that comes in as one exact part, or is refused, fails: every one of those
  * sets' controls must become layers that draw as it did.
  * CE_KNOB_LAYERS_PROPS='{"Meter.orientation":"arc","Meter.showValue":true}' sets those properties on
- * the control as well, to check what a set's own control does not use (a meter's readout, its label).
+ * the control as well, whatever its type, to check what a set's own control does not use (a meter's
+ * readout, its label, a button's icon or its turn).
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
@@ -152,11 +153,11 @@ try {
         setPanelControlSet(pid, id);
       }, setId);
       const knob = await kit.make(TYPE, BUTTON
-        ? { 'Core.name': 'Play', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Text.content': 'PLAY', 'Behavior.defaultValue': value === 1 }
+        ? { 'Core.name': 'Play', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Text.content': 'PLAY', 'Behavior.defaultValue': value === 1, ...EXTRA }
         : METER ? { 'Core.name': 'Level', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Meter.value': value, 'Meter.valueMin': 0, 'Meter.valueMax': 1, ...EXTRA }
         : {
           'Core.name': 'Cutoff', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, ...(TYPE === 'Slider' ? { 'Behavior.orientation': ORIENTATION } : {}),
-          'Behavior.min': 0, 'Behavior.max': 100, 'Behavior.step': 1, 'Behavior.defaultValue': value * 100, 'Behavior.defaultCurrentValue': value * 100,
+          'Behavior.min': 0, 'Behavior.max': 100, 'Behavior.step': 1, 'Behavior.defaultValue': value * 100, 'Behavior.defaultCurrentValue': value * 100, ...EXTRA,
         });
       // Buttons in Preview: the edit canvas draws a switch off whatever its value, a component its value.
       if (BUTTON) { await kit.preview(true); await kit.settle(500); }

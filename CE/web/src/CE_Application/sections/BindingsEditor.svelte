@@ -202,6 +202,9 @@
         <PropertyCell label="Invert" span={1} hint="Invert the input range before output mapping.">
           <PropertyToggle value={selectedBinding.invert === true} onchange={() => setBindingProp('invert', !(selectedBinding.invert === true))} />
         </PropertyCell>
+        <PropertyCell label="Inside Only" span={1} hint="Write Out Max while the source is inside In Min to In Max, and Out Min outside it, instead of a ramp between them.">
+          <PropertyToggle value={selectedBinding.band === true} onchange={() => setBindingProp('band', !(selectedBinding.band === true))} />
+        </PropertyCell>
         <PropertyCell label="" span={1} hint="Send the selected binding payload to the Debug panel." compact>
           <button class="action-btn" onclick={dumpBindingDebug}>Debug</button>
         </PropertyCell>

@@ -278,6 +278,15 @@ function resolveBindingValue(binding, sourceValue) {
   let numeric = Number(sourceValue);
   if (!Number.isFinite(numeric)) numeric = numberOr(binding?.inputMin, 0);
 
+  // Only inside (`band`): Out Max while the source is inside In Min to In Max (the upper end left
+  // out), Out Min outside it. A meter's segment marked while its peak is in it.
+  if (binding?.band === true) {
+    const lo = Math.min(numberOr(binding?.inputMin, 0), numberOr(binding?.inputMax, 1));
+    const hi = Math.max(numberOr(binding?.inputMin, 0), numberOr(binding?.inputMax, 1));
+    const inside = Number.isFinite(Number(sourceValue)) && numeric >= lo && numeric < hi;
+    return inside !== (binding?.invert === true) ? numberOr(binding?.outputMax, 100) : numberOr(binding?.outputMin, 0);
+  }
+
   let inputMin = numberOr(binding?.inputMin, 0);
   let inputMax = numberOr(binding?.inputMax, 1);
   if (binding?.invert) {
@@ -749,6 +758,16 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     // arc both ways from the top). Every scalar channel has it; the binding Source offers it for
     // Bipolar ones (utils/bindingSourceOptions.js).
     channelSignals[`channel.${name}.bipolar`] = (channelSignals[`channel.${name}.normalized`] * 2) - 1;
+    // A channel that holds its peak (`peakHold`, a meter's: hold time, fall rate): the peak the
+    // preview has held (PanelPreviewSurface), or, where nothing is running, what the meter it came
+    // from shows then: the value itself (a device meter's clip lamp), or nothing (a plain meter's
+    // marker, `idle: 'none'`).
+    if (channel?.peakHold) {
+      const held = Number(previewSession?.customPeaks?.[name]);
+      channelSignals[`channel.${name}.peak`] = Number.isFinite(held)
+        ? held
+        : (String(channel.peakHold.idle ?? 'value') === 'none' ? undefined : channelSignals[`channel.${name}.normalized`]);
+    }
     // The channel's own formatting AND its display scale — a knob bound to a parameter stored
     // 61..67 and printed -3..+3 read 64 here where the instrument reads 0. String(raw) also threw
     // away the channel's prefix/suffix/unit/precision, which nothing had ever applied.

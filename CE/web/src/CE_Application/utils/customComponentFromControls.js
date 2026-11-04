@@ -55,7 +55,7 @@ import { getControlLayer, sortControlsForRender } from './controlOrder.js';
 import { SLIDER_CONTROL_KIND, SLIDER_SEMANTIC_PARTS, sliderControlSnapshot } from './sliderControlPart.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
 import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
-import { meterDeviceDrawn } from '../models/meterDeviceParts.js';
+import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js';
 import { isDisplayOnly } from './displayMode.js';
 import { targetBuckets } from './interactionRuntime.js';
 
@@ -607,7 +607,9 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
     const lo = Number(cfg.valueMin ?? 0);
     const hi = Number(cfg.valueMax ?? 1);
     const value = Number(cfg.value ?? lo);
-    seedLayersAt(built.parts, built.bindings, hi > lo ? Math.max(0, Math.min(1, (value - lo) / (hi - lo))) : 0);
+    const travel = hi > lo ? Math.max(0, Math.min(1, (value - lo) / (hi - lo))) : 0;
+    // The held peak where nothing runs: the value on a device meter, none on a plain one.
+    seedLayersAt(built.parts, built.bindings, travel, { peak: meterDeviceDrawn(resolved) ? travel : null });
     for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
     return Object.assign(built.parts, { metered: { channel, ...built } });
   }
@@ -1179,6 +1181,16 @@ function meterSections(out, { control, resolved, metered }) {
     format: { precision: Math.max(0, Math.min(6, Math.round(Number(cfg.valuePrecision) || 0))), prefix: String(cfg.valuePrefix ?? ''), suffix: String(cfg.valueSuffix ?? ''), unit: '' },
     snap: { enabled: false },
   });
+  // A meter that holds its peak (Peak Hold, a clip lamp, a part showing the peak) keeps it on its
+  // value (interactionRuntime's `channel.<name>.peak`), held and falling as the meter's is. Where
+  // nothing runs, a device meter shows its value as the peak and a plain one no marker.
+  if (cfg.peakHold === true || meterNeedsPeak(resolved)) {
+    out.channels[channelName].peakHold = {
+      holdMs: Number.isFinite(Number(cfg.peakHoldMs)) ? Number(cfg.peakHoldMs) : 1200,
+      decayPerSec: Number.isFinite(Number(cfg.peakDecayPerSec)) ? Number(cfg.peakDecayPerSec) : 0.4,
+      idle: meterDeviceDrawn(resolved) ? 'value' : 'none',
+    };
+  }
   Object.assign(out.bindings, metered.bindings);
   out.published[channelName] = { channel: channelName, label: nameOf(control), type: 'float', enabled: true, min, max, defaultValue: value };
   const deviceBindings = control._children.DeviceBindings ?? {};

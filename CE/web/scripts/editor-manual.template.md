@@ -1076,7 +1076,11 @@ a fill drawn in a pattern. A plate that turns with the value turns its outline w
 shadow stay put, as on the panel. What a layer does not draw yet (a control form that is not made
 of parts, a rendered look) comes in as one exact part, and the window names it and why. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
-to each window, and each count of figures its own windows. A button comes in
+to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
+Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the
+meter's is, and its layers read it as the value's **held peak**: the lamp lights at its level and
+stays lit while the peak holds; a range binding with **Inside Only** marks the segment the peak is
+in. A button comes in
 as its plate and its text, or, drawn as a device, as its housing, key, symbol, indicator and legend
 with its caption; a switch flips its value on a click, a button holds it on while pressed, and the
 parts move and light up as they did. A meter comes in as its track and its zones' colours covered past

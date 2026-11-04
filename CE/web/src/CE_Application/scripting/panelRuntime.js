@@ -7538,7 +7538,7 @@ const DEFINE_SPECS = {
     // mapMode "format" and "template" (utils/interactionRuntime.js resolveBindingValue); the app's
     // own readouts are format bindings (utils/customComponentFactory.js). "figures": one figure of a
     // counter, or its windows' opacity for a count of figures.
-    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template', 'character', 'length'],
+    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template', 'character', 'length', 'band'],
   },
   Parts: {
     templates: [createPartNode('')],
@@ -7569,8 +7569,8 @@ const DEFINE_SPECS = {
     // An array channel's size, items and itemFields come from its own maker.
     templates: [ENTRY_BASELINES.ValueChannels, createValueChannel(''), createArrayChannel('', { itemFields: {} })],
     // An enum channel's choices, and `constraint`, the older spelling of constraints, still read
-    // in its place (utils/customComponentInteraction.js).
-    extra: ['values', 'options', 'constraint'],
+    // in its place (utils/customComponentInteraction.js); a meter's held peak (`peakHold`).
+    extra: ['values', 'options', 'constraint', 'peakHold'],
   },
   Behaviors: {
     templates: [ENTRY_BASELINES.Behaviors, createBehaviorModule('')],

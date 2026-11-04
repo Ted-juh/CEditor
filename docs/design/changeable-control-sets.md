@@ -318,6 +318,14 @@ components):
      count (`figureLengths`).
    - A layer's box shadow keeps its colour's alpha (it was cut to six digits, so a soft shadow drew
      solid).
+   - *A held peak*: a value channel can hold its peak (`peakHold`: hold time, fall rate, and what
+     it reads where nothing runs, `idle`), kept by the preview surface as a meter's is (`meterPeak`,
+     on the same ticker) and read by bindings as `channel.<name>.peak`. A meter with Peak Hold, a
+     clip lamp or a part showing the peak carries it, so the clip lamp (lit at `clipFrom`, held
+     while the peak holds), a peak needle and Peak Hold's marker convert; where nothing runs a
+     device meter reads its value as the peak and a plain one has none, as each renderer draws
+     them. A range binding can write only inside its range (`band`, **Inside Only**): the segment
+     the peak rounds to.
 
    `knobLayers.mjs` with `CE_KNOB_LAYERS_STRICT=1` checks every offered set but the two illustrated
    ones, and fails a control that comes in as one exact part or is refused. Run over all of them:
