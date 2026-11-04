@@ -11,6 +11,8 @@
   import { deviceShapePath, devicePatternCells } from '../utils/deviceShapes.js';
   import { materialActive } from '../utils/materialFilter.js';
   import { numberOr } from '../utils/primitives.js';
+  import { renderedDevicePartSpec, renderedFrame, renderedLooks, requestRenderedLook } from '../utils/renderedLook.js';
+  import { activeControlSet } from '../stores/controlSets.js';
 
   let { parts = {}, active = false, uid = 'device' } = $props();
 
@@ -125,8 +127,26 @@
         full: !lit && needsFullFill(background),
         background,
         shadow: shadowOf(part),
+        rendered: renderedPart(name, part, box, lit ? part.activeColour : fill.colour),
       };
     }));
+
+  // A housing, guard, key or indicator whose look is 'rendered' (utils/renderedLook.js): a block its
+  // box's size, or a turned body for a circle, as an image centred on its box, lit by the set's lamp;
+  // its lit colour is another image. Null while it is made, and the part draws as it always did.
+  const RENDERED_PARTS = new Set(['housing', 'guard', 'key', 'indicator']);
+  function renderedPart(name, part, box, colour) {
+    if (!RENDERED_PARTS.has(name) || String(part?.look ?? '') !== 'rendered') return null;
+    const spec = renderedDevicePartSpec(part, { colour, topColour: part?.renderTopColour || null, lamp: $activeControlSet?.lamp });
+    if (!spec) return null;
+    const big = Math.max(box.w, box.h);
+    const frame = renderedFrame(spec);
+    const w = frame.w * big;
+    const h = frame.h * big;
+    // The frame's units are drawn at about two to three pixels each on a panel; enough for both.
+    const url = requestRenderedLook($renderedLooks, spec, Math.max(w, h) * 3, 0);
+    return url ? { url, x: box.x + box.w / 2 - w / 2, y: box.y + box.h / 2 - h / 2, w, h } : null;
+  }
 
   // A drop shadow under a part (the sculpted synth set's keys): its outline again, `shadowOffset` %
   // of the frame's height lower, softened by `shadowBlur` %, in `shadowColour`. None unless asked.
@@ -140,7 +160,9 @@
 {#each drawn as item (item.name)}
   <g data-part={item.name} transform={item.follow || undefined}>
     <g transform={item.motion} opacity={item.opacity}>
-      {#if item.name === 'legend'}
+      {#if item.rendered}
+        <image data-rendered-look={item.name} href={item.rendered.url} x={item.rendered.x} y={item.rendered.y} width={item.rendered.w} height={item.rendered.h} preserveAspectRatio="none" />
+      {:else if item.name === 'legend'}
         <text x={item.box.x + item.box.w / 2} y={item.box.y + item.box.h / 2} text-anchor="middle" dominant-baseline="central"
           fill={item.colour} font-size={numberOr(item.part.fontSize, 11)} font-family="inherit">{active ? (item.part.onText ?? '') : (item.part.offText ?? '')}</text>
       {:else if item.d}

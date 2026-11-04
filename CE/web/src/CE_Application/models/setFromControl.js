@@ -44,7 +44,7 @@ const PROPERTY_LABELS = {
   grooves: 'Grooves', grooveLength: 'Groove Length', grooveWidth: 'Groove Width',
   markFrom: 'Second Bar From', markTo: 'Second Bar To', markWidth: 'Second Bar Width', markColour: 'Second Bar Colour',
   look: 'Look', renderProfile: 'Profile', renderCount: 'Ridges', renderDepth: 'Ridge Depth', renderTaper: 'Taper',
-  renderHeight: 'Height', renderTop: 'Top', renderMaterial: 'Material', renderTopMaterial: 'Top Material', renderTopColour: 'Top Colour',
+  renderHeight: 'Height', renderTop: 'Top', renderMaterial: 'Material', renderTopMaterial: 'Top Material', renderTopColour: 'Top Colour', renderCorner: 'Corner',
   'Behavior.scaleNumberTo': 'Numbers To',
 };
 

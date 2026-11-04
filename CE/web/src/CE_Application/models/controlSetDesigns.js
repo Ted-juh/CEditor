@@ -441,7 +441,7 @@ export const EDITOR_PATHS = [
   // A plate's grooves (Precision's knurling) and a second bar on the pointer (Dual Scale's).
   /^(grooves|grooveLength|grooveWidth|markFrom|markTo|markWidth|markColour)$/,
   // A plate drawn as a rendered object (utils/renderedLook.js, piece E).
-  /^(look|renderProfile|renderCount|renderDepth|renderTaper|renderHeight|renderTop|renderMaterial|renderTopMaterial|renderTopColour)$/,
+  /^(look|renderProfile|renderCount|renderDepth|renderTaper|renderHeight|renderTop|renderMaterial|renderTopMaterial|renderTopColour|renderCorner)$/,
   // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
   /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   // A meter's parts (models/meterDeviceParts.js), the meter forms as parts.

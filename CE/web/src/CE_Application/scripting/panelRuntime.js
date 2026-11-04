@@ -7550,6 +7550,11 @@ const DEFINE_SPECS = {
       'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
       // A knob plate's shadow and perspective, a bar pointer's taper (models/directionKnobParts.js).
       'shadowOffset', 'shadowColour', 'shadowBlur', 'taper', 'aspect', 'shiftY',
+      // A plate's grooves and a bar pointer's second bar (models/directionKnobParts.js).
+      'grooves', 'grooveLength', 'grooveWidth', 'markFrom', 'markTo', 'markWidth', 'markColour',
+      // A plate's, a fader cap's or a button part's rendered look (utils/renderedLookCore.js).
+      'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop',
+      'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'renderCorner',
       // A button's or a switch's device parts (models/buttonDeviceParts.js).
       'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
       'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize',

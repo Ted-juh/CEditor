@@ -64,7 +64,7 @@ test('the knob draws a rendered plate from its image, and export bakes them', ()
   assert.match(knob, /\{@const rendered = renderedPlate\(part, r\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{role\} href=\{rendered\.url\}/);
   assert.match(knob, /if \(String\(part\?\.look \?\? ''\) !== 'rendered' \|\| r <= 0\) return null;/);
   const prep = read('CE_Application/stores/panelExportPreparation.js');
-  assert.match(prep, /const looks = await bakeRenderedLooks\(controlsInTree\(panel\.controls\)/);
+  assert.match(prep, /const looks = await bakeRenderedLooks\(controlsInTree\(panel\.controls\), \{\s*lamp: panelSet\?\.lamp \?\? null,\s*resolve: \(control\) => resolveControlForSet\(control, panelSet, sources\),/);
   assert.match(prep, /panel\.renderedLookImages = looks\.images/);
   assert.match(read('Player.svelte'), /loadBakedRenderedLooks\(raw\?\.renderedLookImages\)/);
 });
@@ -94,4 +94,87 @@ test('the Knob tab offers a plate\'s look, and a rendered plate shows only what 
   assert.match(tab, /part\?\.renderProfile === 'fluted' \? 18 : 72/);
   assert.equal(renderedLookSpec({ look: 'rendered' }, {}).count, 72);
   assert.equal(renderedLookSpec({ look: 'rendered', renderProfile: 'fluted' }, {}).count, 18);
+});
+
+test('the core imports nothing, so a bare page can draw with it', () => {
+  const core = readFileSync(new URL('../src/CE_Application/utils/renderedLookCore.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(core, /^\s*import\s/m);
+  assert.match(core, /export function createRenderedLookRenderer\(canvas\)/);
+});
+
+test('a fader cap is a block the cap\'s size, its ridges along the travel; a round cap is a turned body', async () => {
+  const { renderedCapSpec, renderedFrame } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const cap = (kind, props = {}) => ({ kind, look: 'rendered', ...props, _children: { Layout: { width: 22, height: 44 } } });
+  // Layout.width runs along the travel and Layout.height across it, as capGeometry has it.
+  const upright = renderedCapSpec(cap('block'), { vertical: true });
+  assert.deepEqual([upright.shape, upright.width, upright.length, upright.axis], ['block', 1, 0.5, 'y']);
+  const lying = renderedCapSpec(cap('block'), { vertical: false });
+  assert.deepEqual([lying.width, lying.length, lying.axis], [0.5, 1, 'x']);
+  assert.deepEqual(renderedFrame(upright), { w: 1 + 0.3, h: 0.5 + 0.3 }, 'the shadow\'s room on each side');
+  assert.equal(renderedCapSpec(cap('dot')).shape, 'smooth');
+  assert.equal(renderedCapSpec(cap('line')), null);
+  assert.equal(renderedCapSpec(cap('ring')), null);
+  // Its height and corner are its narrower side's: 60 % of 22 is 13.2 of the larger 44.
+  assert.equal(upright.height, 0.3);
+  assert.equal(renderedCapSpec(cap('block', { renderTop: 'ridged', renderCount: 7 })).topKind, 'ridged');
+  assert.equal(renderedCapSpec(cap('block', { renderTop: 'nonsense' })).topKind, 'flat');
+});
+
+test('a button\'s part is a block its box\'s size, or a turned body when it is a circle', async () => {
+  const { RENDERED_DEVICE_FRAME, renderedDevicePartSpec } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const { DEVICE_FRAME } = await import('../src/CE_Application/models/buttonDeviceParts.js');
+  assert.deepEqual(RENDERED_DEVICE_FRAME, { width: DEVICE_FRAME.width, height: DEVICE_FRAME.height });
+  const part = (shape, w, h, radius = 0) => ({ shape, look: 'rendered', _children: { Layout: { width: w, height: h }, Background: { _children: { Corners: { radius } } } } });
+  const key = renderedDevicePartSpec(part('rect', 50, 50, 8));
+  assert.deepEqual([key.shape, key.width, key.length, key.axis], ['block', 1, 0.5, 'x'], 'a 80 by 40 box');
+  assert.equal(key.corner, 0.1, 'its 8 corner is 40 % of its half height, 20');
+  assert.equal(renderedDevicePartSpec(part('ellipse', 25, 50)).shape, 'smooth', 'a 40 by 40 circle');
+  assert.equal(renderedDevicePartSpec(part('rect', 0, 50)), null);
+});
+
+test('the images a control needs: turns of a grooved plate, each cap, a key lit and unlit', async () => {
+  const { renderedLookJobs } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const control = (behavior, parts) => ({ _children: { Behavior: behavior, Parts: { _children: parts } } });
+  const knob = control({ geometry: 'circular' }, {
+    bodyCap: plate({ renderProfile: 'knurled', turns: true }),
+    bodyHousing: { ...plate(), visible: false },
+    pointerCurrent: { look: 'rendered', kind: 'block', _children: { Layout: { width: 10, height: 10 } } },
+  });
+  assert.equal(renderedLookJobs(knob).length, 8, 'eight turns of the cap; an invisible plate and a knob\'s pointer, none');
+  const slider = control({ geometry: 'linear', orientation: 'horizontal' }, {
+    pointerCurrent: { look: 'rendered', kind: 'console', _children: { Layout: { width: 20, height: 40 } } },
+  });
+  assert.deepEqual(renderedLookJobs(slider).map(({ spec, angle }) => [spec.shape, spec.axis, angle]), [['block', 'x', 0]]);
+  const button = { _children: { Parts: { _children: {
+    key: { look: 'rendered', shape: 'rect', activeColour: 'FFFF3300', _children: { Layout: { width: 50, height: 50 }, Background: { _children: { Fill: { colour: 'FF202020' } } } } },
+    legend: { look: 'rendered' },
+  } } } };
+  assert.deepEqual(renderedLookJobs(button).map(({ spec }) => spec.body), ['#202020', '#FF3300']);
+});
+
+test('the export bakes each control as it is drawn, and the slider and the button draw rendered parts', async () => {
+  // A colour role is resolved before the spec is made: the image the plug-in's part asks for.
+  const role = { _children: { Behavior: { geometry: 'circular' }, Parts: { _children: { bodyCap: { look: 'rendered', _children: { Background: { _children: { Fill: { colour: '{control.cap}' } } } } } } } } };
+  const resolved = { _children: { Behavior: { geometry: 'circular' }, Parts: { _children: { bodyCap: { look: 'rendered', _children: { Background: { _children: { Fill: { colour: 'FF112233' } } } } } } } } };
+  let asked = 0;
+  const baked = await bakeRenderedLooks([role], { resolve: (control) => { asked += 1; return control === role ? resolved : control; } });
+  assert.equal(asked, 1);
+  assert.equal(baked.plates, 1);
+  const slider = read('CE_Application/editor/SliderFamilyRenderer.svelte');
+  assert.match(slider, /\{@const rendered = g\.kind === 'ring' \|\| g\.kind === 'line' \? null : renderedCap\(part, point, g\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{name\}/);
+  assert.match(slider, /const spec = renderedCapSpec\(part, \{\s*vertical: orientation === 'vertical',/);
+  const button = read('CE_Application/editor/ButtonDeviceParts.svelte');
+  assert.match(button, /rendered: renderedPart\(name, part, box, lit \? part\.activeColour : fill\.colour\),/);
+  assert.match(button, /\{#if item\.rendered\}\s*<image data-rendered-look=\{item\.name\}/);
+});
+
+test('a slider with a rendered cap and a button with a rendered part are not made into layers either', async () => {
+  const { createControl } = await import('../src/CE_Application/models/componentTypes.js');
+  const { valueLayersRefusal, buttonDeviceLayersRefusal } = await import('../src/CE_Application/utils/valueControlLayers.js');
+  const slider = createControl('Slider');
+  Object.assign(slider._children.Parts._children.pointerCurrent, { visible: true, kind: 'block', look: 'rendered' });
+  assert.match(valueLayersRefusal(slider), /a rendered fader cap/);
+  const button = createControl('Button');
+  Object.assign(button._children.Parts._children.key, { visible: true, look: 'rendered' });
+  assert.match(buttonDeviceLayersRefusal(button), /a rendered key/);
 });

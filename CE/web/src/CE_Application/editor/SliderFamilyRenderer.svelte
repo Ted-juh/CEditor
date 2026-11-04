@@ -5,7 +5,7 @@
   import { knobOutlinePath, knobOutlineReach } from '../utils/knobOutlines.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
-  import { RENDERED_FRAME, renderedLookSpec, renderedLooks, renderedTurn, requestRenderedLook } from '../utils/renderedLook.js';
+  import { RENDERED_FRAME, renderedCapSpec, renderedFrame, renderedLookSpec, renderedLooks, renderedTurn, requestRenderedLook } from '../utils/renderedLook.js';
   import { activeControlSet } from '../stores/controlSets.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { resolveSliderSemanticParts } from '../utils/sliderEntityFactory.js';
@@ -663,6 +663,28 @@
     return { url, x: circularCenter.x - side / 2, y: circularCenter.y + shift - side / 2, side };
   }
 
+  // A fader cap whose look is 'rendered' (utils/renderedLook.js): a block the cap's size, or a turned
+  // body for a round cap, as an image centred where the cap is; null while it is made, and the cap is
+  // drawn as it always was meanwhile.
+  function renderedCap(part, point, g) {
+    if (String(part?.look ?? '') !== 'rendered') return null;
+    const spec = renderedCapSpec(part, {
+      vertical: orientation === 'vertical',
+      colour: part?._children?.Background?._children?.Fill?.colour,
+      topColour: part?.renderTopColour || null,
+      lamp: $activeControlSet?.lamp,
+    });
+    if (!spec) return null;
+    const big = g.r !== undefined ? 2 * g.r : Math.max(g.w, g.h);
+    const frame = renderedFrame(spec);
+    const w = frame.w * big;
+    const h = frame.h * big;
+    const scale = typeof window !== 'undefined' ? Math.min(3, (window.devicePixelRatio || 1) * 1.5) : 1.5;
+    const url = requestRenderedLook($renderedLooks, spec, Math.max(w, h) * scale, 0);
+    if (!url) return null;
+    return { url, x: point.x - w / 2, y: point.y - h / 2, w, h, ridged: spec.topKind === 'ridged' };
+  }
+
   // Grooves on a plate (`grooves`, a count): fine lines in from its edge, `grooveLength` % of its
   // radius, `grooveWidth` px, `grooveColour`; Precision's knurling round its face. They turn with
   // the plate when it turns.
@@ -1059,6 +1081,19 @@
       {@const styledFill = pointerStyleFor(name, 'fill')}
       <!-- data-pointer: which handle this is (start / current / end), on the element that outlines it. -->
       {@const handle = name.replace(/^pointer/, '').toLowerCase()}
+      {@const rendered = g.kind === 'ring' || g.kind === 'line' ? null : renderedCap(part, point, g)}
+      {#if rendered}
+        <image data-rendered-look={name} href={rendered.url} x={rendered.x} y={rendered.y} width={rendered.w} height={rendered.h} opacity={op} preserveAspectRatio="none" style={styled} />
+        {#if g.r !== undefined}
+          <circle data-pointer={handle} cx={point.x} cy={point.y} r={g.r} fill="none" stroke="none" />
+        {:else}
+          <rect data-pointer={handle} x={g.x} y={g.y} width={g.w} height={g.h} rx={g.rx} fill="none" stroke="none" />
+          <!-- The cap's line, where the value is, unless its top is ridged. -->
+          {#if !rendered.ridged}
+            <line x1={g.groove.x1} y1={g.groove.y1} x2={g.groove.x2} y2={g.groove.y2} stroke={groove} stroke-width={Math.max(1, g.kind === 'block' ? 2 : g.stroke)} stroke-linecap="round" opacity={op * (g.kind === 'block' ? 1 : 0.85)} style={styled} />
+          {/if}
+        {/if}
+      {:else}
       {#if part?.glow === true}
         {#if g.r !== undefined}
           <circle cx={point.x} cy={point.y} r={g.r * 1.5} fill={fill} opacity={0.5 * op} filter={`url(#${capGlowId})`} style={styledFill} />
@@ -1130,6 +1165,7 @@
         {/if}
         <rect data-pointer={handle} x={g.x} y={g.y} width={g.w} height={g.h} rx={g.rx} fill="none" stroke={border} stroke-width={borderWidth} opacity={op} style={styled} />
         <line x1={g.groove.x1} y1={g.groove.y1} x2={g.groove.x2} y2={g.groove.y2} stroke={groove} stroke-width={Math.max(1, g.kind === 'block' ? 2 : g.stroke)} stroke-linecap="round" opacity={op * (g.kind === 'block' ? 1 : 0.85)} style={styled} />
+      {/if}
       {/if}
     {/snippet}
     {#if geometry === 'linear'}

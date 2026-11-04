@@ -658,6 +658,7 @@ function sliderLayersRefusal(resolved) {
   const parts = resolveSliderSemanticParts(resolved?._children?.Parts ?? null)._children;
   const cap = parts.pointerCurrent ?? {};
   const capKind = String(cap.kind ?? 'dot').toLowerCase();
+  if (partVisible(cap) && String(cap.look ?? '') === 'rendered') return 'a rendered fader cap, which a layer does not draw yet';
   if (partVisible(cap) && !LINEAR_LAYER_CAPS.has(capKind)) return `a "${capKind}" fader cap, which a layer does not draw yet`;
   // `shadow` is a drop shadow filtering a shape drawn at 0.001 opacity (SliderFamilyRenderer's
   // linearCap): next to nothing reaches the screen, so a layer draws nothing for it.
@@ -1014,6 +1015,7 @@ export function buttonDeviceLayersRefusal(resolved) {
   // A drop shadow under a part (the sculpted synth set's), which a layer does not draw yet.
   for (const name of BUTTON_DEVICE_PARTS) {
     if (parts[name]?.visible === true && (Number(parts[name]?.shadowOffset) > 0 || Number(parts[name]?.shadowBlur) > 0)) return `a shadow under its ${name}, which a layer does not draw yet`;
+    if (parts[name]?.visible === true && String(parts[name]?.look ?? '') === 'rendered') return `a rendered ${name}, which a layer does not draw yet`;
   }
   for (const name of BUTTON_DEVICE_PARTS) {
     const part = parts[name];
