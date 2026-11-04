@@ -320,7 +320,10 @@ components):
      solid).
 
    `knobLayers.mjs` with `CE_KNOB_LAYERS_STRICT=1` checks every offered set but the two illustrated
-   ones, and fails a control that comes in as one exact part or is refused;
+   ones, and fails a control that comes in as one exact part or is refused. Run over all of them:
+   knobs 256 of 256 rows (four readings each, at most 1.4 % of pixels apart), sliders 256 of 256 each
+   way (0.1 %), meters 256 of 256 (1.0 %), buttons 64 of 64 in both sizes (1.9 %), switches 128 of
+   128, off and on (0.7 %);
    `test/everySetAsLayers.test.js` plans each set's six controls (a knob, a slider each way, a button,
    a switch, a meter) through the real path.
    Value glide is carried: the knob's value-change animation (`pointerSlide`, 140 ms) becomes one on
