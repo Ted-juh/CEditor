@@ -441,9 +441,11 @@ components):
    - *Zone colours* (R5): a device meter's part coloured by the meter's zones (`zoneColours`) comes
      in as layers. By position: each lit cell in the zone it sits in, each scale mark in its own
      (the marks grouped by colour, a layer each, drawn without an outline as the panel draws them),
-     and a plain fill as the box painted in the zones' gradient along its direction, shown through a
-     mask (the reveal-all picture) whose width or height is bound to the reading, with its outline a
-     rectangle growing over it. By the reading's zone ('level', or 'position' on a part with no
+     and a fill as the box painted in the zones' gradient along its direction, one layer to each of
+     its cells (one, for a plain fill), each shown through a mask of the cell's shape placed where the
+     cell stands and bound to the reading as the cell moves and grows: a rectangle with the part's
+     corner in pixels (an SVG with no view box, so the corner keeps its size however the mask is
+     sized) or an ellipse. Its outline is a rectangle growing over it. By the reading's zone ('level', or 'position' on a part with no
      positions of its own: a needle, a lamp, a legend): each layer whose paint the zone decides
      becomes a copy in each zone's colour (`zoneLevelCopies`). Stepped zones show one copy at a time,
      an Inside Only binding on its zone (and, for a lit cell or a clip lamp, no lower than its own
@@ -451,8 +453,11 @@ components):
      which composites to the meter's own blend of the two colours. The part's other paths come apart
      as the panel draws them: its own in its paint and outline, the zoned ones without, and a scale's
      marks past Zone From in its lit colour (they had been drawn in the part's own paint). Refused by
-     name: a fill by position that is patterned, shaped or rounded, counter windows by level, and
-     blended level colour on lit cells, a clip lamp or a part you can see through.
+     name: a fill by position in cells of another shape, or patterned and outlined; counter windows
+     by the reading's zone; and blended level colour on lit cells, a clip lamp or a part you can see
+     through. Run over every offered set's own meter with three zones: as the set draws it, 256 of
+     256; the indicator by level (stepped), 256 of 256; the indicator and the scale by position, 248
+     of 256, the eight Neon's and Obsidian's scale, which is counter windows, refused by name.
      The behaviour of a knob or slider made into layers now measures a point against its own grab
      area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
      another turned about a point between them: pressing straight above the second of two knobs set

@@ -2031,9 +2031,10 @@ export function meterDeviceLayersRefusal(resolved) {
     if (zoneMode !== 'off') {
       const scaled = pattern === 'ticks' || pattern === 'arc';
       const byLevel = zoneMode === 'level' || (zoneMode === 'position' && !scaled && motion !== 'fill' && motion !== 'light');
-      const rounded = num(part?._children?.Background?._children?.Corners?.radius, 0) > 0;
-      if (zoneMode === 'position' && motion === 'fill' && (pattern !== 'solid' || String(part.shape ?? 'rect') !== 'rect' || rounded)) {
-        return `its ${name} filled in the zones' colours with a pattern, a shape or rounded corners, which a layer does not draw yet`;
+      const shaped = !['rect', 'ellipse'].includes(String(part.shape ?? 'rect'));
+      const outlined = part?._children?.Background?._children?.Border?.enabled === true && num(part?._children?.Background?._children?.Border?.thickness, 0) > 0;
+      if (zoneMode === 'position' && motion === 'fill' && (shaped || (pattern !== 'solid' && outlined))) {
+        return `its ${name} filled in the zones' colours in cells shaped other than a rectangle or an ellipse, or outlined, which a layer does not draw yet`;
       }
       if (byLevel && pattern === 'digits') return `its ${name}'s counter windows coloured by the reading's zone, which a layer does not draw yet`;
       if (byLevel && meter.gradient !== false && (motion === 'light' || motion === 'clip')) {
@@ -2289,7 +2290,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       });
       continue;
     }
-    if (motion === 'fill' && (String(part.pattern ?? 'solid') !== 'solid' || String(part.shape ?? 'rect') !== 'rect')) {
+    if (motion === 'fill' && zoneMode !== 'position' && (String(part.pattern ?? 'solid') !== 'solid' || String(part.shape ?? 'rect') !== 'rect')) {
       // A fill drawn in a pattern or a shape: its cells laid out across the area the fill has
       // reached, so each moves and grows straight with the reading (devicePatternCells is linear in
       // its area): each a layer, from where it stands at the start to where it stands full.
@@ -2332,11 +2333,23 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       continue;
     }
     if (motion === 'fill' && zoneMode === 'position') {
-      // Coloured by position: the zones along the fill's own direction across its whole box, shown as
-      // far as the reading has reached (MeterDeviceParts' zoneFill): the box in that gradient, under a
-      // mask as wide as the reading; its outline, where it has one, a rectangle growing over it.
+      // Coloured by position: the zones along the fill's own direction across its whole box, shown
+      // only where the fill has reached (MeterDeviceParts' zoneFill). Each cell of it (one, for a
+      // plain fill) is the box painted in that gradient, shown through a mask of the cell's shape
+      // (a rectangle with the part's corner in pixels, or an ellipse) placed where the cell stands:
+      // from where it starts to where it stands full, as the reading goes. Its outline, where it has
+      // one, a rectangle growing over it.
       const { background, bw } = backgroundOf(styledPart, part);
       const from = String(part.fillFrom ?? 'left');
+      const pattern = String(part.pattern ?? 'solid');
+      const areaAt = (r) => (from === 'bottom' ? { x: box.x, y: box.y + box.h * (1 - r), w: box.w, h: box.h * r }
+        : from === 'top' ? { x: box.x, y: box.y, w: box.w, h: box.h * r }
+          : from === 'right' ? { x: box.x + box.w * (1 - r), y: box.y, w: box.w * r, h: box.h }
+            : { x: box.x, y: box.y, w: box.w * r, h: box.h });
+      const options = { count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight };
+      const cellsAt = (r) => { const a = areaAt(r); return devicePatternCells(pattern, a.x, a.y, a.w, a.h, options); };
+      const full = cellsAt(1);
+      const half = cellsAt(0.5);
       const topLeft = at(box.x, box.y);
       const exact = { x: topLeft.x, y: topLeft.y, width: box.w * S, height: box.h * S };
       const zones = meterZones(meter);
@@ -2347,27 +2360,34 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       });
       const painted = solidBackground(zones[0]?.colour ?? 'FF39D98A');
       Object.assign(painted._children.Fill, { gradientEnabled: true, gradient: { type: 'linear', angle: { left: 90, right: 270, bottom: 0, top: 180 }[from] ?? 90, stops } });
-      const layer = add(name, createPartNode(named(name), {
-        role: 'fill', kind: 'rectangle', zIndex: depth, opacity, layout: pxBox(exact, origin), sections: { Background: painted },
-      }));
-      layer.mask = { enabled: true, src: REVEAL_ALL_MASK_SRC, x: 0, y: 0, width: 100, height: 100, invert: false, linked: true };
-      const along = from === 'left' || from === 'right' ? 'width' : 'height';
-      out.bindings[`${layer.name}Reveal`] = rangeBinding(`${layer.name}Reveal`, partSource, `Parts.${layer.name}.mask.${along}`, 0, 100);
-      if (from === 'right' || from === 'bottom') {
-        const key = from === 'right' ? 'x' : 'y';
-        out.bindings[`${layer.name}RevealEdge`] = rangeBinding(`${layer.name}RevealEdge`, partSource, `Parts.${layer.name}.mask.${key}`, 100, 0);
-      }
+      const maskSrc = cellMaskSrc(String(part.shape ?? 'rect'), num(part?._children?.Background?._children?.Corners?.radius, 0) * S);
+      const percent = (cell) => ({ x: ((cell.x - box.x) / box.w) * 100, y: ((cell.y - box.y) / box.h) * 100, width: (cell.w / box.w) * 100, height: (cell.h / box.h) * 100 });
+      full.forEach((cell, i) => {
+        // Where the cell starts: cells move and grow straight with the area (devicePatternCells).
+        const start = { x: 2 * half[i].x - cell.x, y: 2 * half[i].y - cell.y, w: Math.max(0, 2 * half[i].w - cell.w), h: Math.max(0, 2 * half[i].h - cell.h) };
+        const end = percent(cell);
+        const begin = percent(start);
+        const layer = add(name, createPartNode(named(full.length > 1 ? `${name}${i}` : name), {
+          role: 'fill', kind: 'rectangle', zIndex: depth, opacity, layout: pxBox(exact, origin), sections: { Background: deepClone(painted) },
+        }));
+        layer.mask = { enabled: true, src: maskSrc, x: r3(end.x), y: r3(end.y), width: r3(end.width), height: r3(end.height), invert: false, linked: true };
+        for (const key of ['x', 'y', 'width', 'height']) {
+          if (Math.abs(begin[key] - end[key]) > 1e-6) out.bindings[`${layer.name}Mask${key}`] = rangeBinding(`${layer.name}Mask${key}`, partSource, `Parts.${layer.name}.mask.${key}`, begin[key], end[key]);
+        }
+      });
       if (bw > 0) {
+        const along = from === 'left' || from === 'right' ? 'width' : 'height';
         const edge = add(name, createPartNode(named(`${name}Edge`), {
-          role: 'fill', kind: 'rectangle', zIndex: depth, opacity,
+          role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity,
           layout: pxBox({ x: exact.x - bw / 2, y: exact.y - bw / 2, width: exact.width + bw, height: exact.height + bw }, origin),
           sections: { Background: edgeBackground(background, bw) },
         }));
-        const full = edge._children.Layout[along];
-        out.bindings[`${edge.name}Grow`] = rangeBinding(`${edge.name}Grow`, partSource, `Parts.${edge.name}.Layout.${along}`, bw, full);
+        edge._children.Background._children.Corners.radius = r3(num(part?._children?.Background?._children?.Corners?.radius, 0) * S);
+        const length = edge._children.Layout[along];
+        out.bindings[`${edge.name}Grow`] = rangeBinding(`${edge.name}Grow`, partSource, `Parts.${edge.name}.Layout.${along}`, bw, length);
         if (from === 'right' || from === 'bottom') {
           const key = from === 'right' ? 'x' : 'y';
-          out.bindings[`${edge.name}Edge`] = rangeBinding(`${edge.name}Edge`, partSource, `Parts.${edge.name}.Layout.${key}`, edge._children.Layout[key] + full - bw, edge._children.Layout[key]);
+          out.bindings[`${edge.name}Edge`] = rangeBinding(`${edge.name}Edge`, partSource, `Parts.${edge.name}.Layout.${key}`, edge._children.Layout[key] + length - bw, edge._children.Layout[key]);
         }
       }
       continue;
@@ -2487,6 +2507,18 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
   }
   return out;
+}
+
+/**
+ * A mask picture of a meter cell's shape at any size: a rectangle with a corner of `radius` pixels
+ * (no view box, so the corner stays in pixels however the mask is sized), or an ellipse.
+ */
+function cellMaskSrc(shape, radius) {
+  if (shape !== 'ellipse' && !(radius > 0)) return REVEAL_ALL_MASK_SRC;
+  const body = shape === 'ellipse'
+    ? "<ellipse cx='50%' cy='50%' rx='50%' ry='50%' fill='#fff'/>"
+    : `<rect width='100%' height='100%' rx='${r3(radius)}' ry='${r3(radius)}' fill='#fff'/>`;
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'>${body}</svg>`)}`;
 }
 
 /**
