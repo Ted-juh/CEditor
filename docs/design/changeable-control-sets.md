@@ -434,7 +434,9 @@ components):
      so a binding reads the peak as it reads the value. The static layers are seeded through the
      same curve. Found on the way: an arc meter of segments drew the whole track arc behind them,
      where the panel draws only the segments and leaves the gaps open (Ceramic, 3 % of pixels
-     apart); the track now comes only without segments.
+     apart); the track now comes only without segments. Run over every offered set's own meter on
+     a -40 to +6 dB scale: with peak hold, 256 of 256 rows; turned 25 degrees and scaled 1.1, 256 of
+     256 (strict).
      The behaviour of a knob or slider made into layers now measures a point against its own grab
      area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
      another turned about a point between them: pressing straight above the second of two knobs set
