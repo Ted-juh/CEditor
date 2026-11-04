@@ -39,7 +39,7 @@ import { anatomyForm } from '../models/controlAnatomy.js';
 import { BUTTON_DEVICE_PARTS, DEVICE_FRAME } from '../models/buttonDeviceParts.js';
 import { METER_DEVICE_PARTS, METER_FRAME } from '../models/meterDeviceParts.js';
 import { meterLitOffset, meterPartDrawing } from './meterParts.js';
-import { meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, meterTicks, meterZones } from './meterLayout.js';
+import { decibelPosition, meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, meterTicks, meterZones } from './meterLayout.js';
 import { normalLineHeight } from './textLineHeight.js';
 import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { buttonAnatomyLayout } from './anatomyLayout.js';
@@ -1602,6 +1602,22 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
  * binding on the held peak stands at `peak` (null: no peak, as the runtime reads one it lacks), and
  * one that writes only inside its range (`band`) writes as it does.
  */
+/**
+ * A meter on a decibel scale (Meter.scale 'db', dbFloor to dbCeil): every binding that places a part
+ * by its reading or its held peak reads them on that scale (interactionRuntime's `scale: 'db'`), as
+ * the meter places them (meterPosition). Its raw reading, printed, stays as it is.
+ */
+export function readOnDecibelScale(bindings, channel, meter) {
+  if (String(meter?.scale ?? 'linear') !== 'db') return bindings;
+  const scale = { scale: 'db', dbFloor: num(meter.dbFloor, -60), dbCeil: num(meter.dbCeil, 6) };
+  for (const binding of Object.values(bindings ?? {})) {
+    const source = String(binding?.source ?? '');
+    if (source !== `channel.${channel}.normalized` && source !== `channel.${channel}.peak`) continue;
+    if (binding.mapMode === 'range' || binding.mapMode === 'figures') Object.assign(binding, scale);
+  }
+  return bindings;
+}
+
 export function seedLayersAt(parts, bindings, travel, { peak = typeof travel === 'number' ? travel : null } = {}) {
   const byName = new Map(parts.map((part) => [part.name, part]));
   // One travel for every binding, or each channel's own (a range's handles): { channel: travel }.
@@ -1616,7 +1632,10 @@ export function seedLayersAt(parts, bindings, travel, { peak = typeof travel ===
     const part = match ? byName.get(match[1]) : null;
     if (!part) continue;
     const fromPeak = /\.peak$/.test(String(binding.source ?? ''));
-    const input = fromPeak ? (peak == null ? binding.inputMin : peak) : travelOf(binding.source);
+    const read = fromPeak ? peak : travelOf(binding.source);
+    // No peak: the binding's own minimum, already where it places things. A decibel scale places the
+    // reading as the runtime does.
+    const input = read == null ? binding.inputMin : (binding.scale === 'db' ? decibelPosition(read, binding.dbFloor, binding.dbCeil) : read);
     const span = binding.inputMax - binding.inputMin;
     let value;
     if (binding.band === true) {
@@ -1995,7 +2014,6 @@ export function figureLengths(min, max, precision) {
 /** Why a meter drawn with device parts cannot become layers, or ''. */
 export function meterDeviceLayersRefusal(resolved) {
   const meter = resolved?._children?.Meter ?? {};
-  if (String(meter.scale ?? 'linear') === 'db') return 'a decibel scale, which a layer does not follow yet';
   if (String(meter.valueSourceId ?? '').trim()) return 'its value taken from another control';
   const parts = resolved?._children?.Parts?._children ?? {};
   for (const name of METER_DEVICE_PARTS) {
@@ -2410,7 +2428,6 @@ function edgeBackground(background, bw) {
 /** Why a plain meter (editor/MeterRenderer.svelte: a bar, segments or an arc) cannot become layers, or ''. */
 export function plainMeterLayersRefusal(resolved) {
   const cfg = resolved?._children?.Meter ?? {};
-  if (String(cfg.scale ?? 'linear') === 'db') return 'a decibel scale, which a layer does not follow yet';
   if (String(cfg.valueSourceId ?? '').trim()) return 'its value taken from another control';
   // A bar's fill shows up to the reading under a cover in the track's colour, which only hides the
   // fill if nothing shows through it. Segments and an arc draw their fill over the track instead.
@@ -2676,7 +2693,9 @@ function plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, sour
     colour, opacity, zIndex: depthOf(), origin, role: 'custom', cap, extra,
   }));
 
-  arcOf('track', 0, 1, trackColour, { cap: num(cfg.rounded, 3) > 0 ? 'round' : 'butt' });
+  // The track behind, only where there are no segments: segments are drawn each in the track's
+  // colour, with the gaps between them showing what is behind the meter (MeterRenderer).
+  if (segments <= 0) arcOf('track', 0, 1, trackColour, { cap: num(cfg.rounded, 3) > 0 ? 'round' : 'butt' });
   if (segments > 0) {
     const gap = Math.min(0.8 / segments, Math.max(0, num(cfg.segmentGap, 2)) / Math.max(1, r * sweep * Math.PI / 180));
     for (let i = 0; i < segments; i += 1) {

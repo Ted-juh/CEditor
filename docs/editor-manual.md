@@ -1102,7 +1102,8 @@ handles) or a band (a value between them) comes in with a value for each handle,
 fill runs from one to the other, the ticks light between them, and a press on the track takes the
 handle nearest to it, as on the panel. Handles that may pass each other or wrap round the end are
 not converted yet. A knob made into layers now turns about its own centre when the component holds
-several. A counter's
+several. A meter on a decibel scale comes in as layers that place the reading, and the held peak,
+on that scale, as the meter does. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the

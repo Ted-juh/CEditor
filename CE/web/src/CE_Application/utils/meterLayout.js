@@ -31,11 +31,24 @@ export function meterLinearFraction(value, min, max) {
 export function meterPosition(value, cfg = {}) {
   const frac = meterLinearFraction(value, cfg.valueMin ?? 0, cfg.valueMax ?? 1);
   if (String(cfg.scale) !== 'db') return frac;
-  const floor = num(cfg.dbFloor, -60);
-  const ceil = num(cfg.dbCeil, 6);
-  if (ceil === floor) return 0;
-  const db = 20 * Math.log10(Math.max(frac, 1e-4));
-  return clamp01((db - floor) / (ceil - floor));
+  return decibelPosition(frac, cfg.dbFloor, cfg.dbCeil);
+}
+
+// Where a linear fraction (0..1) stands on a decibel scale from `floor` to `ceil` dB (0..1): the
+// one curve a meter, a binding on a decibel scale and a held peak all read through.
+export function decibelPosition(fraction, floor = -60, ceil = 6) {
+  const lo = num(floor, -60);
+  const hi = num(ceil, 6);
+  if (hi === lo) return 0;
+  const db = 20 * Math.log10(Math.max(num(fraction, 0), 1e-4));
+  return clamp01((db - lo) / (hi - lo));
+}
+
+// The linear fraction at a place on that scale: decibelPosition's inverse.
+export function decibelFraction(position, floor = -60, ceil = 6) {
+  const lo = num(floor, -60);
+  const hi = num(ceil, 6);
+  return 10 ** ((lo + clamp01(num(position, 0)) * (hi - lo)) / 20);
 }
 
 // Normalized zone thresholds sorted low→high, each { from (0..1), colour }.

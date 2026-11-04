@@ -422,6 +422,19 @@ components):
      converted knob drew larger than the panel's, 4 to 19 % of its pixels apart). Run over every
      offered set, a band from 15 to 80 with its riding labels: knobs, sliders across and sliders
      upright, 256 of 256 rows each (strict).
+
+   - *Decibel scales* (R5): a meter on a decibel scale (`Meter.scale: 'db'`, `dbFloor` to `dbCeil`)
+     comes in as layers. Every binding that places a part by the reading or the held peak reads it
+     on that scale (`scale: 'db'` on a range or Counter Figures binding: interactionRuntime places
+     the source with meterLayout's `decibelPosition`, the curve meterPosition uses), so the needle,
+     the bar and its cover, lit cells, segments, an arc's sweep, the peak marker and a percentage
+     legend stand where the meter puts them; the printed reading stays the raw value, as the meter
+     prints it. The held peak falls on the same scale (`peakHold.scale`): the preview surface holds
+     and drops it in dB, as the meter does, and hands it on as a fraction again (`decibelFraction`),
+     so a binding reads the peak as it reads the value. The static layers are seeded through the
+     same curve. Found on the way: an arc meter of segments drew the whole track arc behind them,
+     where the panel draws only the segments and leaves the gaps open (Ceramic, 3 % of pixels
+     apart); the track now comes only without segments.
      The behaviour of a knob or slider made into layers now measures a point against its own grab
      area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
      another turned about a point between them: pressing straight above the second of two knobs set

@@ -49,7 +49,7 @@ import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
 import {
   batLampLayers, buttonDeviceLayers, buttonDeviceLayersRefusal, knobChannelFormat, knobLayers, layerStatePatches, meterDeviceLayers, meterDeviceLayersRefusal,
-  plainMeterLayers, plainMeterLayersRefusal, seedLayersAt, sliderLayers, valueLayersRefusal,
+  plainMeterLayers, plainMeterLayersRefusal, readOnDecibelScale, seedLayersAt, sliderLayers, valueLayersRefusal,
 } from './valueControlLayers.js';
 import { getControlLayer, sortControlsForRender } from './controlOrder.js';
 import { SLIDER_CONTROL_KIND, SLIDER_SEMANTIC_PARTS, sliderControlSnapshot } from './sliderControlPart.js';
@@ -881,6 +881,8 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
       uniqueName: (wanted) => uniquePartName(wanted, taken),
     });
     const cfg = resolved?._children?.Meter ?? {};
+    // On a decibel scale its layers read the value on that scale, as the meter places it.
+    readOnDecibelScale(built.bindings, channel, cfg);
     const lo = Number(cfg.valueMin ?? 0);
     const hi = Number(cfg.valueMax ?? 1);
     const value = Number(cfg.value ?? lo);
@@ -1583,6 +1585,10 @@ function meterSections(out, { control, resolved, metered }) {
       holdMs: Number.isFinite(Number(cfg.peakHoldMs)) ? Number(cfg.peakHoldMs) : 1200,
       decayPerSec: Number.isFinite(Number(cfg.peakDecayPerSec)) ? Number(cfg.peakDecayPerSec) : 0.4,
       idle: meterDeviceDrawn(resolved) ? 'value' : 'none',
+      // On a decibel scale the peak falls on that scale, as the meter's does.
+      ...(String(cfg.scale ?? 'linear') === 'db'
+        ? { scale: 'db', dbFloor: Number.isFinite(Number(cfg.dbFloor)) ? Number(cfg.dbFloor) : -60, dbCeil: Number.isFinite(Number(cfg.dbCeil)) ? Number(cfg.dbCeil) : 6 }
+        : {}),
     };
   }
   Object.assign(out.bindings, metered.bindings);

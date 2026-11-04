@@ -31,7 +31,7 @@ test('a readout, a label, scale labels and an arc no longer refuse; what a layer
   for (const props of [{ showValue: true }, { label: 'LEVEL', labelPosition: 'above' }, { showScaleLabels: true }, { orientation: 'arc' }, { orientation: 'arc', segments: 12 }]) {
     assert.equal(plainMeterLayersRefusal(meter(props)), '', JSON.stringify(props));
   }
-  assert.match(plainMeterLayersRefusal(meter({ scale: 'db' })), /decibel/);
+  assert.equal(plainMeterLayersRefusal(meter({ scale: 'db' })), '', 'a decibel scale: its bindings read on it');
   // Peak Hold is a marker on the held peak the value keeps (channel.<name>.peak).
   assert.equal(plainMeterLayersRefusal(meter({ peakHold: true })), '');
   assert.match(plainMeterLayersRefusal(meter({ trackColour: '80141414' })), /see through/, 'a bar covers its fill with the track');

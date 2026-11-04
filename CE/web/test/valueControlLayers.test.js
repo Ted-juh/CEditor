@@ -181,8 +181,32 @@ test('a meter comes in as layers: a needle swings, a bar\'s gradient is covered 
   // Saddle: segments, each lit from its middle.
   const leds = plan([meter({ Transform: { x: 0, y: 0, width: 200, height: 40 } })], 'saddle');
   assert.ok(Object.keys(leds.component._children.Bindings._children).filter((name) => /segment\d+litLit$/.test(name)).length >= 8);
-  // What a layer does not draw yet is named.
-  assert.match(plan([meter({ Meter: { scale: 'db' } })], 'graphite').refused[0].reason, /decibel/);
+});
+
+test('a meter on a decibel scale comes in as layers that read its value on that scale', async () => {
+  const { decibelPosition, meterPosition } = await import('../src/CE_Application/utils/meterLayout.js');
+  const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
+  const cfg = { scale: 'db', dbFloor: -40, dbCeil: 6, value: 0.5, valueMin: 0, valueMax: 1, peakHold: true };
+  const result = plan([createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 125 }, Meter: cfg })], 'graphite');
+  assert.ok(result.ok, JSON.stringify(result.refused));
+  const component = result.component;
+  const bindings = Object.values(component._children.Bindings._children);
+  const placing = bindings.filter((binding) => binding.mapMode === 'range' && /\.(normalized|peak)$/.test(binding.source));
+  assert.ok(placing.length > 0);
+  for (const binding of placing) assert.deepEqual([binding.scale, binding.dbFloor, binding.dbCeil], ['db', -40, 6], binding.name);
+  // The held peak falls on the same scale.
+  const channel = Object.values(component._children.ValueChannels._children)[0];
+  assert.equal(channel.peakHold.scale, 'db');
+  // Half the range is -6 dB: on a -40..+6 scale, 34/46 of the way along, as the meter places it.
+  assert.ok(Math.abs(decibelPosition(0.5, -40, 6) - meterPosition(0.5, cfg)) < 1e-12);
+  const one = placing.find((binding) => binding.mapMode === 'range' && !binding.band && binding.inputMin === 0 && binding.inputMax === 1);
+  assert.ok(one, 'a binding over the whole travel');
+  const drawn = resolveInteractiveControl(component, { customValues: { [channel.name]: 0.5 } }).control;
+  const [, part, ...path] = one.target.split('.');
+  let node = drawn._children.Parts._children[part];
+  for (const key of path) node = node?._children?.[key] ?? node?.[key];
+  const expected = one.outputMin + (one.outputMax - one.outputMin) * meterPosition(0.5, cfg);
+  assert.ok(Math.abs(Number(node) - expected) < 0.01, `${one.target}: ${node} where the meter puts ${expected}`);
 });
 
 test('the knob\'s value glide comes with its layers: its pointer and its arc ease when the value changes', () => {

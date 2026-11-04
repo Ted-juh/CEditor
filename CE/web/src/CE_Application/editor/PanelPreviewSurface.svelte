@@ -78,7 +78,7 @@
   import { applySectionValues } from '../utils/sectionValueOverrides.js';
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl, sortDependentControls } from '../utils/dependentChoices.js';
-  import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
+  import { decibelFraction, decibelPosition, meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
   import { meterNeedsPeak } from '../models/meterDeviceParts.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
@@ -1758,7 +1758,11 @@
     const peaks = {};
     for (const [name, channel] of channels) {
       const raw = session?.customValues?.[name] ?? channel.currentValue ?? channel.defaultValue;
-      const pos = normalizeCustomChannelValue(channel, raw);
+      // A meter on a decibel scale holds its peak, and lets it fall, on that scale (`peakHold.scale`);
+      // the peak is handed on as a fraction again, so a binding reads it as it reads the value.
+      const db = channel.peakHold.scale === 'db';
+      const fraction = normalizeCustomChannelValue(channel, raw);
+      const pos = db ? decibelPosition(fraction, channel.peakHold.dbFloor, channel.peakHold.dbCeil) : fraction;
       const key = `${id}:${name}`;
       const prev = meterPeakState[key] ?? { peak: pos, peakAt: now };
       const next = meterPeak({
@@ -1766,7 +1770,7 @@
         holdMs: numberOr(channel.peakHold.holdMs, 1200), decayPerSec: numberOr(channel.peakHold.decayPerSec, 0.4),
       });
       meterPeakState[key] = { ...next, updatedAt: now };
-      peaks[name] = next.peak;
+      peaks[name] = db ? decibelFraction(next.peak, channel.peakHold.dbFloor, channel.peakHold.dbCeil) : next.peak;
     }
     return peaks;
   }

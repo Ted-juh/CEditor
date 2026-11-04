@@ -29,6 +29,7 @@ import {
   isSliderDirty,
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
+import { decibelPosition } from './meterLayout.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
 import { attachBooleanInputs } from './booleanGroups.js';
@@ -247,7 +248,9 @@ function resolveBindingValue(binding, sourceValue) {
     // `length` set, only while the figures are that many characters long ('' otherwise). With
     // `length` and no `character`, a number instead: `outputMax` (1) while they are, `outputMin` (0)
     // while not, for a window that shows only for that many figures.
-    const numeric = Number(sourceValue);
+    const read = Number(sourceValue);
+    // A meter's percentage on a decibel scale is of where the reading stands on it.
+    const numeric = binding?.scale === 'db' && Number.isFinite(read) ? decibelPosition(read, binding?.dbFloor, binding?.dbCeil) : read;
     const precision = Math.max(0, Math.min(3, Math.round(numberOr(binding?.precision, 0))));
     const figures = (Number.isFinite(numeric) ? numeric * numberOr(binding?.multiplier, 1) : 0).toFixed(precision);
     const length = binding?.length == null || binding.length === '' ? null : Math.round(numberOr(binding.length, 0));
@@ -277,6 +280,9 @@ function resolveBindingValue(binding, sourceValue) {
 
   let numeric = Number(sourceValue);
   if (!Number.isFinite(numeric)) numeric = numberOr(binding?.inputMin, 0);
+  // On a decibel scale (`scale: 'db'`, from `dbFloor` to `dbCeil`): the source, a fraction 0..1, is
+  // first placed where a meter on that scale places it (meterLayout's decibelPosition).
+  if (binding?.scale === 'db') numeric = decibelPosition(numeric, binding?.dbFloor, binding?.dbCeil);
 
   // Only inside (`band`): Out Max while the source is inside In Min to In Max (the upper end left
   // out), Out Min outside it. A meter's segment marked while its peak is in it.
