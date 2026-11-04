@@ -403,7 +403,9 @@ nothing; `renderedLookJobs` lists the images a control needs, and the bake runs 
 as its set draws it (roles resolved), so the keys are the ones the plug-in's parts ask for. The export
 tools that start from a saved file (`prepare-export-panel.mjs`, `export-panel-vst3.mjs`,
 `export-panel-template.mjs`) bake in headless Chromium with that same file
-(`tools/scripts/lib/bakeRenderedLooks.mjs`); without a browser they say so and those parts draw flat. Fader caps and button faces come after.
+(`tools/scripts/lib/bakeRenderedLooks.mjs`); without a browser they say so and those parts draw flat.
+The Slider tab edits a cap's look (**Cap Look**, its fields going to all three handles) and the
+Button and Switch tabs a part's (**Look** in its Appearance), as the approved mock-up showed. Fader caps and button faces come after.
 
 ### F. Filmstrips as their own category (small)
 

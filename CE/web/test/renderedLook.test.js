@@ -178,3 +178,34 @@ test('a slider with a rendered cap and a button with a rendered part are not mad
   Object.assign(button._children.Parts._children.key, { visible: true, look: 'rendered' });
   assert.match(buttonDeviceLayersRefusal(button), /a rendered key/);
 });
+
+test('the Slider tab offers a cap\'s look, and the Button and Switch tabs a part\'s, with the render\'s own fields', async () => {
+  const { renderedBlockSpec, renderedCapSpec } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const slider = read('CE_Application/sections/SliderEditor.svelte');
+  assert.match(slider, /<PropertyCell label="Cap Look" span=\{2\} path="Parts\.pointerCurrent\.look" disabled=\{capKind === 'ring' \|\| capKind === 'line'\}/);
+  assert.match(slider, /setCaps\('look', event\.target\.value === 'rendered' \? 'rendered' : ''\)/, 'Flat clears the key');
+  // A cap's fields go to its three handles, as its kind does.
+  assert.match(slider, /setPatch\(\{ \[`Parts\.pointerCurrent\.\$\{key\}`\]: value, \[`Parts\.pointerStart\.\$\{key\}`\]: value, \[`Parts\.pointerEnd\.\$\{key\}`\]: value \}\);/);
+  for (const key of ['renderTop', 'renderCount', 'renderDepth', 'renderHeight', 'renderTaper', 'renderCorner', 'renderMaterial', 'renderTopMaterial', 'renderTopColour']) {
+    assert.ok(slider.includes(`path="Parts.pointerCurrent.${key}"`), key);
+  }
+  assert.match(slider, /\{#each \(capRound \? RENDERED_TOPS : RENDERED_BLOCK_TOPS\) as \[id, label\] \(id\)\}/);
+  const button = read('CE_Application/sections/ButtonPartsEditor.svelte');
+  assert.match(button, /const RENDERABLE = new Set\(\['housing', 'guard', 'key', 'indicator'\]\);/);
+  assert.match(button, /\{#if renderable\}\s*<PropertyCell label="Look" path=\{`\$\{prefix\}\.look`\}/);
+  // A rendered part shows only what the render draws; the flat look's fields are the other branch.
+  const branch = button.slice(button.indexOf('{#if rendered}'), button.indexOf('{:else}', button.indexOf('{#if rendered}')));
+  for (const key of ['renderTop', 'renderCount', 'renderDepth', 'renderHeight', 'renderTaper', 'renderMaterial', 'renderTopMaterial', 'renderTopColour']) {
+    assert.ok(branch.includes(`path={\`\${prefix}.${key}\`}`), key);
+  }
+  for (const flat of ['label="Finish"', 'label="Border"', 'label="Shading"', 'label="Shadow %"']) assert.ok(!branch.includes(flat), flat);
+  // The defaults the fields show are the ones the render uses.
+  const cap = renderedCapSpec({ kind: 'block', _children: { Layout: { width: 20, height: 40 } } }, { vertical: true });
+  assert.equal(cap.count, 5);
+  assert.match(slider, /value=\{cap\.renderCount \?\? 5\}/);
+  assert.match(slider, /value=\{cap\.renderHeight \?\? \(capRound \? 80 : 60\)\}/);
+  assert.match(slider, /value=\{cap\.renderCorner \?\? \(capKind === 'block' \? 30 : 36\)\}/);
+  const key = renderedBlockSpec({}, { width: 2, length: 1, height: 30 });
+  assert.equal(key.height, 0.15, '30 % of the narrower side, which is half the larger');
+  assert.match(button, /value=\{numberOr\(part\?\.renderHeight, renderedRound \? 80 : 30\)\}/);
+});

@@ -9,6 +9,11 @@
   import { DISPLAY_FORMATS } from '../utils/parameterDisplay.js';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import PropertyColor from '../properties/PropertyColor.svelte';
+  import { activateInspectorColorTarget } from '../stores/colorTarget.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { resolveColourLiteral } from '../models/controlSets.js';
+  import { RENDERED_BLOCK_TOPS, RENDERED_MATERIALS, RENDERED_TOPS } from '../utils/renderedLook.js';
   import Cloud from 'lucide-svelte/icons/cloud';
   import Sun from 'lucide-svelte/icons/sun';
   import Layers from 'lucide-svelte/icons/layers';
@@ -238,6 +243,21 @@
     ? 'table'
     : (typeof behavior?.displayFormat === 'string' && behavior.displayFormat ? behavior.displayFormat : 'number'));
   let parts = $derived(getSection(control, 'Parts'));
+  // A fader cap can be rendered (utils/renderedLookCore.js): a block the cap's size, or a turned body
+  // for a round one. Its fields go to all three handles, as the Cap's kind does.
+  let cap = $derived(parts?._children?.pointerCurrent ?? {});
+  let capKind = $derived(String(cap.kind ?? 'dot'));
+  let capRendered = $derived(String(cap.look ?? '') === 'rendered');
+  let capRound = $derived(['dot', 'lens', 'glass'].includes(capKind));
+  function setCaps(key, value) {
+    setPatch({ [`Parts.pointerCurrent.${key}`]: value, [`Parts.pointerStart.${key}`]: value, [`Parts.pointerEnd.${key}`]: value });
+  }
+  const shownColour = (colour, fallback = 'FF3A3A3A') => resolveColourLiteral(colour, $activeControlSet, fallback);
+  function pickCapColour(key, current) {
+    const controlId = getSection(control, 'Core')?.id;
+    if (!controlId) return;
+    activateInspectorColorTarget({ type: 'control', controlId, path: `Parts.pointerCurrent.${key}` }, current || shownColour(current));
+  }
   let geometry = $derived(String(behavior?.geometry ?? 'linear'));
   let valueMode = $derived(String(behavior?.valueMode ?? 'single'));
   let styleTargets = $derived(isKnob ? [...KNOB_STYLE_TARGETS, ...STYLE_TARGETS] : STYLE_TARGETS);
@@ -508,6 +528,46 @@
           }}
         />
       </PropertyCell>
+      <PropertyCell label="Cap Look" span={2} path="Parts.pointerCurrent.look" disabled={capKind === 'ring' || capKind === 'line'} hint="Flat: drawn from its kind, colour and finish. Rendered: drawn as a lit object, a block the cap's size (a turned body for a round cap), lit by the set's lamp; the fields below are its own. A ring or a line cap is not rendered.">
+        <select class="val" value={capRendered ? 'rendered' : 'flat'} onchange={(event) => setCaps('look', event.target.value === 'rendered' ? 'rendered' : '')}>
+          <option value="flat">Flat</option><option value="rendered">Rendered</option>
+        </select>
+      </PropertyCell>
+      {#if capRendered}
+        <PropertyCell label="Cap Top" span={2} path="Parts.pointerCurrent.renderTop" hint="Its top: flat, with an insert, ridged across the travel, a dome or a dish.">
+          <select class="val" value={cap.renderTop ?? 'flat'} onchange={(event) => setCaps('renderTop', event.target.value)}>
+            {#each (capRound ? RENDERED_TOPS : RENDERED_BLOCK_TOPS) as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Ridges" span={1} compact path="Parts.pointerCurrent.renderCount" disabled={capRound || cap.renderTop !== 'ridged'} hint="How many ridges across its top.">
+          <NumberCell label="Ridges" value={cap.renderCount ?? 5} defaultValue={5} step={1} min={1} max={40} onchange={(value) => setCaps('renderCount', Math.round(Number(value) || 0))} />
+        </PropertyCell>
+        <PropertyCell label="Depth %" span={1} compact path="Parts.pointerCurrent.renderDepth" disabled={capRound} hint="How deep its ridges or dish go, or how high its dome stands, as a percentage of half its narrower side.">
+          <NumberCell label="Depth" value={cap.renderDepth ?? 12} defaultValue={12} step={1} min={0} max={60} onchange={(value) => setCaps('renderDepth', value)} />
+        </PropertyCell>
+        <PropertyCell label="Height %" span={1} compact path="Parts.pointerCurrent.renderHeight" hint={capRound ? 'How tall it stands, as a percentage of its radius.' : 'How tall it stands, as a percentage of its narrower side.'}>
+          <NumberCell label="Height" value={cap.renderHeight ?? (capRound ? 80 : 60)} defaultValue={capRound ? 80 : 60} step={1} min={10} max={200} onchange={(value) => setCaps('renderHeight', value)} />
+        </PropertyCell>
+        <PropertyCell label="Taper %" span={1} compact path="Parts.pointerCurrent.renderTaper" hint="How much narrower its top is than its foot.">
+          <NumberCell label="Taper" value={cap.renderTaper ?? (capRound ? 8 : 6)} defaultValue={capRound ? 8 : 6} step={1} min={0} max={40} onchange={(value) => setCaps('renderTaper', value)} />
+        </PropertyCell>
+        <PropertyCell label="Corner %" span={1} compact path="Parts.pointerCurrent.renderCorner" disabled={capRound} hint="How round its corners are seen from above, as a percentage of half its narrower side: 100 rounds its ends.">
+          <NumberCell label="Corner" value={cap.renderCorner ?? (capKind === 'block' ? 30 : 36)} defaultValue={capKind === 'block' ? 30 : 36} step={1} min={0} max={100} onchange={(value) => setCaps('renderCorner', value)} />
+        </PropertyCell>
+        <PropertyCell label="Cap Material" span={2} path="Parts.pointerCurrent.renderMaterial" hint="What its body is made of.">
+          <select class="val" value={cap.renderMaterial ?? (capRound ? 'metal' : 'satin')} onchange={(event) => setCaps('renderMaterial', event.target.value)}>
+            {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Top Material" span={2} path="Parts.pointerCurrent.renderTopMaterial" hint="What its top is made of.">
+          <select class="val" value={cap.renderTopMaterial ?? (capRound ? 'spun' : 'satin')} onchange={(event) => setCaps('renderTopMaterial', event.target.value)}>
+            {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Top Colour" span={2} path="Parts.pointerCurrent.renderTopColour" hint="Its top's colour; empty, the cap's own. The cap's colour is the Current Handle's fill, under Style.">
+          <PropertyColor value={shownColour(cap.renderTopColour || cap?._children?.Background?._children?.Fill?.colour)} onchange={(value) => setCaps('renderTopColour', value)} onswatchclick={() => pickCapColour('renderTopColour', cap.renderTopColour)} />
+        </PropertyCell>
+      {/if}
     {/if}
     <!-- How a tick is drawn, and which major stops draw. A control set usually chooses these;
          this is where an author overrides it. Numerals are for the majors, so the minors between

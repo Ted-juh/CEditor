@@ -153,10 +153,10 @@ test('the Button tab, Switch on a toggle, edits every part; each field names its
   assert.equal((editor.match(/<PropertyCell [^>]*path=/g) ?? []).length, cells, 'every cell names its path');
   // Colours go through the Colors dock, never a picker of their own.
   assert.doesNotMatch(editor, /type="color"/);
-  // Fill, border and shadow colours.
-  assert.equal((editor.match(/onswatchclick=/g) ?? []).length, 4);
+  // Fill, border, shadow and lit colours, and a rendered part's body and top colours.
+  assert.equal((editor.match(/onswatchclick=/g) ?? []).length, 6);
   // Device parts write only keys a set may write too.
-  for (const key of ['shape', 'shapeDepth', 'pattern', 'travelX', 'swing', 'activeColour', 'follows', 'Layout.rotation', 'Background.Fill.gradient']) {
+  for (const key of ['shape', 'shapeDepth', 'pattern', 'travelX', 'swing', 'activeColour', 'follows', 'Layout.rotation', 'Background.Fill.gradient', 'look', 'renderTop', 'renderTopColour']) {
     assert.ok(EDITOR_PATHS.some((pattern) => pattern.test(key)), key);
   }
 });

@@ -368,7 +368,19 @@ then its **Shape** (outline, depth, corner, and a pattern that repeats it in lin
 colour) and what it does **When On** or **When Pressed**: how far
 it moves and swings, its opacity and colour then, and whether it follows the actuator, as the ball on
 a lever does. The Legend part has its text as well. Choosing a form under **Core → Control design**
-fills the parts in, to change from there.
+fills the parts in, to change from there. The Housing, Guard, Actuator and Indicator also have a
+**Look** at the top of **Appearance**: **Rendered** draws the part as a lit object its box's size (a
+turned body if it is a circle), with a **Top** (flat, with an insert, ridged, a dome or a dish), its
+**Ridges**, **Depth**, **Height** and **Taper**, two materials and a **Body Colour** and **Top
+Colour**, in place of the border, finish, shading and shadow; its corners are the Shape section's
+**Corner**. A part that lights up when pressed or on is rendered in its lit colour then.
+
+On a slider's tab, a fader cap of the bar, console, block, dot, lens or glass kind has a **Cap
+Look** under **Cap** and **Cap Finish**: **Rendered** draws it as a lit block the cap's size (a turned
+body for a round cap), with its own **Cap Top**, **Ridges** (across its travel), **Depth**,
+**Height**, **Taper**, **Corner**, **Cap Material**, **Top Material** and **Top Colour**; the cap's
+own colour is the Current Handle's fill under **Style**. The fields apply to all of a slider's
+handles. Rendered caps and parts are made and exported as rendered plates are.
 
 A meter's parts are on its **Meter** tab, below its value, **Colour Zones** and peak hold. Pick
 **Housing**, **Face**, **Track**, **Scale**, **Indicator**, **Marker**, **Cover**, **Legend** or
