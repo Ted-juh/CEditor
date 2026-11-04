@@ -49,6 +49,10 @@ const SIZE = TYPE === 'Knob'
 const MAX_SHARE = Number(process.env.CE_KNOB_LAYERS_MAX ?? 0.025);
 const EXTRA = JSON.parse(process.env.CE_KNOB_LAYERS_PROPS || '{}');
 const STRICT = process.env.CE_KNOB_LAYERS_STRICT === '1';
+// CE_KNOB_LAYERS_ICON=1 puts an icon in the library ('check-icon', a two-colour glyph) for a control
+// to name in CE_KNOB_LAYERS_PROPS ("Icon.assetId": "check-icon"), so an icon's layer is checked too.
+const ICON = process.env.CE_KNOB_LAYERS_ICON === '1';
+const ICON_URL = `data:image/svg+xml;base64,${Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24"><path d="M3 12l6 6L21 5" fill="none" stroke="#d04020" stroke-width="3"/><circle cx="18" cy="18" r="4" fill="#2060d0"/></svg>').toString('base64')}`;
 
 const kit = await boot({ width: 1400, height: 1000 });
 const page = kit.page;
@@ -146,6 +150,12 @@ try {
   for (const setId of sets) {
     for (const value of VALUES) {
       await kit.fresh();
+      if (ICON) {
+        await page.evaluate(async (url) => {
+          const { appSettings } = await window.__ceImport('/src/CE_Application/stores/appSettings.js');
+          appSettings.update((current) => ({ ...current, icons: [{ id: 'check-icon', name: 'Check icon', dataUrl: url, mimeType: 'image/svg+xml', isVector: true, width: 24, height: 24 }] }));
+        }, ICON_URL);
+      }
       await page.evaluate(async (id) => {
         const { setPanelControlSet } = await window.__ceImport('/src/CE_Application/stores/controlSets.js');
         const { activePanelId } = await window.__ceImport('/src/CE_Application/stores/panels.js');

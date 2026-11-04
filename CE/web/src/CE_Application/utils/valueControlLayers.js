@@ -1560,10 +1560,17 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
   const captionColour = resolved?._children?.Text?._children?.Fill?.colour;
   if (words) {
     const text = deepClone(styled?._children?.Text ?? resolved?._children?.Text ?? SECTION_DEFAULTS.Text);
-    text.content = words;
+    // The caption is one line of svg text in the colour, family, size, weight and spacing the
+    // control's text sets, and nothing else of it: lines run together, no case, slant, shift,
+    // decoration or effect.
+    text.content = words.replace(/\s+/g, ' ');
     text._children ??= {};
     text._children.Fill = { ...(text._children.Fill ?? {}), colour: text._children.Fill?.colour ?? captionColour ?? 'FF20282C' };
-    text._children.Font = { ...(text._children.Font ?? {}) };
+    text._children.Font = {
+      ...(text._children.Font ?? {}), style: 'Normal', caseMode: 'normal', scriptMode: 'normal', baselineShift: 0, wordSpacing: 0,
+      underline: false, strikethrough: false, overline: false,
+    };
+    text._children.Effects = deepClone(SECTION_DEFAULTS.Text?._children?.Effects ?? { outlineEnabled: false });
     text._children.Position = { ...(text._children.Position ?? {}), justification: 'centred', offsetX: 0, offsetY: 0 };
     let box;
     if (frame.inFrame) {
@@ -1582,7 +1589,7 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       const weight = num(font.weightValue, /bold/i.test(String(font.weight ?? '')) ? 700 : 400);
       text._children.Font.weightValue = weight;
       text._children.Font.weight = weight >= 600 ? 'Bold' : 'Regular';
-      text.content = frame.caption.text;
+      text.content = String(frame.caption.text ?? '').replace(/\s+/g, ' ').trim();
       const middle = frame.caption.y - size * 0.36;
       if (frame.caption.anchor === 'start') {
         text._children.Position.justification = 'left';

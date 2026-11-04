@@ -11,7 +11,11 @@
   import { numberOr } from '../utils/primitives.js';
   import { plainFillCSS } from '../utils/plainFillCSS.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
-  import { buildTextShadowValue, textEffectColor } from './canvasControlStyles.js';
+  import { buildIconTintStyle, buildTextShadowValue, lineColourFor, lineGeometry, lineLayerFor, textEffectColor, usesIconTint } from './canvasControlStyles.js';
+  import { iconImageStyle } from './iconLook.js';
+  import { storedIcons } from '../stores/appSettings.js';
+  import { documentIcons, resolveIcon } from '../utils/documentIcons.js';
+  import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { materialActive } from '../utils/materialFilter.js';
   import { isPictureLayer, maskActive, maskLinked, partMaskCSS, pictureShadowFilters } from '../utils/partMask.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -201,13 +205,22 @@
     return { d: turn(traced.pathData), fillRule: 'evenodd', insets };
   });
 
-  let shadowLayers = $derived(shape.rendersOutline ? outlineShadows(effects) : null);
+  // A layer that draws a control's own shadows and bevel (`meta.surfaceEffects`, made from a panel
+  // control by Create Component from Selection): cast through its pixels by the same surface the
+  // canvas wraps a control's content in (EffectSurface), not as a box shadow, so the layer is the
+  // same picture.
+  let surfaceEffects = $derived(part?.meta?.surfaceEffects === true && !!effects);
+  let shadowLayers = $derived(shape.rendersOutline && !surfaceEffects ? outlineShadows(effects) : null);
 
   // On an outline the shadows are drawn from the outline (utils/outlineShadows.js), not the box; on a
   // picture, from its pixels (utils/partMask.js), as filters below.
   let pictureLayer = $derived(!shape.rendersOutline && !shape.rendersVectorShape && isPictureLayer(background));
-  let shadowCSS = $derived(shape.rendersOutline || pictureLayer ? '' : buildShadowCSS(effects));
-  let pictureShadows = $derived(pictureLayer ? pictureShadowFilters(effects) : '');
+  let shadowCSS = $derived(shape.rendersOutline || pictureLayer || surfaceEffects ? '' : buildShadowCSS(effects));
+  let pictureShadows = $derived(surfaceEffects ? '' : (pictureLayer ? pictureShadowFilters(effects) : ''));
+  // An icon, drawn as a control draws its own (CanvasControl): the picture fitted in the layer's
+  // box, tinted, turned, flipped, with its shadow, glow and blur.
+  let partIcon = $derived(part?._children?.Icon ?? null);
+  let partIconUrl = $derived(partIcon && partIcon.source !== 'none' ? (resolveIcon(partIcon, $storedIcons, $documentIcons)?.dataUrl ?? '') : '');
   // The layer's mask, from its own picture (utils/partMask.js). Linked, it is the part's own and
   // moves, turns and scales with it. Not linked, it is placed on the artboard and drawn by a wrapper
   // the artboard's size, untransformed, so the part moves under it: a CSS mask on the part itself
@@ -270,8 +283,10 @@
 
   // 2,821 of the GAIA panel's parts are static art already folded into one image per component,
   // and the 474 that are left over still wanted a div each just to hold a colour.
+  // Not on a layer that casts a control's shadows: its fill must be inside the surface that casts
+  // them, or only its border would.
   let absorbedFillCSS = $derived(
-    background && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
+    background && !surfaceEffects && !shape.usesSimpleBackground && !shape.rendersVectorShape && !shape.rendersOutline && !shape.rendersArcTrack
       ? plainFillCSS(background, frame.width, frame.height)
       : null,
   );
@@ -279,9 +294,13 @@
   function justifyContentFor(value) {
     switch (String(value ?? 'centred').toLowerCase()) {
       case 'left':
+      case 'topleft':
+      case 'bottomleft':
       case 'near':
         return 'flex-start';
       case 'right':
+      case 'topright':
+      case 'bottomright':
       case 'far':
         return 'flex-end';
       default:
@@ -289,15 +308,50 @@
     }
   }
 
+  // How the panel's label places its text block (CanvasControl's textPlacement): left, centred or
+  // right, and at the top, the middle or the bottom of its box, nine ways; and the block's line
+  // height, a share of the font size (Multiline.lineHeight, 1.2 unless the text says).
+  function textVertical(justification) {
+    const value = String(justification ?? 'centred');
+    if (value === 'top' || value === 'topLeft' || value === 'topRight') return 'top';
+    if (value === 'bottom' || value === 'bottomLeft' || value === 'bottomRight') return 'bottom';
+    return 'middle';
+  }
+  let textLines = $derived(Math.max(1, String(text?.content ?? '').split('\n').length));
+  let textLineHeight = $derived(Math.max(0.5, numberOr(text?._children?.Multiline?.lineHeight, 1.2)));
+
+  // Its underline, strikethrough and overline, as the panel draws them (canvasControlStyles'
+  // lineGeometry): across the text's whole width, about the block's centre, under or over the
+  // glyphs (their `Layer`), in their own colour or the text's.
+  let textDecorations = $derived.by(() => {
+    const font = text?._children?.Font ?? null;
+    if (!font || (!font.underline && !font.strikethrough && !font.overline)) return [];
+    const size = numberOr(font.size, 12);
+    const block = Math.round(size * textLineHeight * textLines);
+    const vertical = textVertical(text?._children?.Position?.justification);
+    const centreY = (vertical === 'top' ? block / 2 : vertical === 'bottom' ? frame.height - block / 2 : frame.height / 2) - numberOr(font.baselineShift, 0);
+    return ['underline', 'strikethrough', 'overline'].filter((kind) => font[kind] === true).map((kind) => {
+      const g = lineGeometry(kind, font, text?._children?.Fill, { inlineExtent: Math.max(0, frame.width - 16), centerX: frame.width / 2, centerY: centreY });
+      return { kind, left: g.left, top: g.top, width: Math.max(0, g.right - g.left), height: g.thickness, colour: lineColourFor(kind, font, text?._children?.Fill), front: lineLayerFor(kind, font) === 'front' };
+    });
+  });
+
   let textStyle = $derived.by(() => {
     if (!text) return '';
     const textFill = text._children?.Fill ?? null;
     const textFont = text._children?.Font ?? null;
     const textPosition = text._children?.Position ?? null;
     const multiline = Number(text._children?.Multiline?.maxLines) > 1;
+    const vertical = textVertical(textPosition?.justification);
+    // Lines of their own, or a block set to the top or the bottom, take the panel's line height: the
+    // block's height then decides where its glyphs sit. A single line in the middle is centred
+    // whatever its line box, as it always was.
+    const lineHeight = multiline || textLines > 1 || vertical !== 'middle' ? textLineHeight : 1;
+    const shift = numberOr(textFont?.baselineShift, 0);
 
     return [
-      `color:#${String(textFill?.colour ?? 'FFFFFFFF').slice(-6)}`,
+      // AARRGGBB keeps its alpha: semi-transparent text draws as the panel's.
+      `color:${cssColour(textFill?.colour ?? 'FFFFFFFF', '#FFFFFF')}`,
       `font-family:${textFont?.family ?? 'Arial'}`,
       `font-size:${numberOr(textFont?.size, 12)}px`,
       `font-weight:${numberOr(textFont?.weightValue, 400)}`,
@@ -307,7 +361,7 @@
       `letter-spacing:${numberOr(textFont?.letterSpacing, 0)}px`,
       `word-spacing:${numberOr(textFont?.wordSpacing, 0)}px`,
       `justify-content:${justifyContentFor(textPosition?.justification)}`,
-      'align-items:center',
+      `align-items:${vertical === 'top' ? 'flex-start' : (vertical === 'bottom' ? 'flex-end' : 'center')}`,
       'display:flex',
       // The part Background renders as position:absolute fill layers, which are
       // positioned descendants. A non-positioned text block would be painted
@@ -316,7 +370,9 @@
       'position:relative',
       'z-index:2',
       'height:100%',
-      `line-height:${multiline ? numberOr(text._children.Multiline.lineHeight, 1.1) : 1}`,
+      `line-height:${multiline ? numberOr(text._children.Multiline.lineHeight, 1.1) : lineHeight}`,
+      // Font.baselineShift raises the text by that many pixels, as the panel's does.
+      shift ? `transform:translateY(${-shift}px)` : '',
       `padding:0 ${multiline ? 2 : 8}px`,
       'text-align:center',
       // Single-line text keeps its spaces, as the label renderer's does (white-space:pre there too):
@@ -330,7 +386,7 @@
       'pointer-events:none',
       `text-transform:${String(textFont?.caseMode ?? 'normal').toLowerCase() === 'uppercase' ? 'uppercase' : (String(textFont?.caseMode ?? 'normal').toLowerCase() === 'lowercase' ? 'lowercase' : 'none')}`,
       ...textEffectRules(text._children?.Effects),
-    ].join('; ');
+    ].filter(Boolean).join('; ');
   });
 
   // A text layer's soft shadow and glow, and an outline outside its glyphs, as the panel's text draws
@@ -752,6 +808,15 @@
 
 {#snippet partElement()}
   <div class="interactive-part" class:debug={debug} data-part-name={partName || part?.name || undefined} data-focus-ring={sliderControl?.domFocus === true ? '' : undefined} style={partStyle}>
+    {#if surfaceEffects}
+      <EffectSurface {effects} width={frame.width} height={frame.height} shadowsOnly target="part">{@render partContent()}</EffectSurface>
+    {:else}
+      {@render partContent()}
+    {/if}
+  </div>
+{/snippet}
+
+{#snippet partContent()}
     {#if materialLit}
       <MaterialFilter id={materialId} {material} />
     {/if}
@@ -936,10 +1001,26 @@
       </svg>
     {/if}
 
+    {#if partIconUrl}
+      <div class="interactive-part-icon">
+        {#if usesIconTint(partIcon?.tint)}
+          <div class="interactive-part-icon-image" style={`${iconImageStyle(partIcon)}; ${buildIconTintStyle(partIcon.tint, partIconUrl, partIcon?.fit)}`} aria-hidden="true"></div>
+        {:else}
+          <img class="interactive-part-icon-image" style={iconImageStyle(partIcon)} src={partIconUrl} alt="" />
+        {/if}
+      </div>
+    {/if}
+
     {#if text && !editableInput}
+      {#each textDecorations.filter((line) => !line.front) as line (line.kind)}
+        <div class="interactive-part-text-line" style={`left:${line.left}px; top:${line.top}px; width:${line.width}px; height:${line.height}px; background:${line.colour};`}></div>
+      {/each}
       <div class="interactive-part-text ce-colour-anim" style={textStyle}>
         {text?.content ?? ''}
       </div>
+      {#each textDecorations.filter((line) => line.front) as line (line.kind)}
+        <div class="interactive-part-text-line front" style={`left:${line.left}px; top:${line.top}px; width:${line.width}px; height:${line.height}px; background:${line.colour};`}></div>
+      {/each}
     {:else if editableInput}
       <input
         class="interactive-part-input"
@@ -967,7 +1048,6 @@
     {#if debug}
       <div class="part-debug-chip">{part?.name ?? part?.role ?? 'part'}</div>
     {/if}
-  </div>
 {/snippet}
 
 {#if part?.visible !== false || fadeHidden}
@@ -1006,6 +1086,11 @@
   .interactive-vector-shape :global(polygon) { animation: var(--ce-kf-shape, none); }
   .interactive-vector-shape :global(line) { animation: var(--ce-kf-stroke, none); }
   .interactive-part-text { animation: var(--ce-kf-text, none); }
+  /* A text layer's underline, strikethrough or overline: under its glyphs, or over them (front). */
+  .interactive-part-text-line { position: absolute; pointer-events: none; z-index: 1; }
+  .interactive-part-icon { position: absolute; inset: 0; box-sizing: border-box; pointer-events: none; }
+  .interactive-part-icon-image { display: block; }
+  .interactive-part-text-line.front { z-index: 3; }
 
   /* Editable value field — make editing visually obvious (caret + focus highlight). */
   .interactive-part-input {

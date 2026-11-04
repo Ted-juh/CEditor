@@ -326,6 +326,34 @@ components):
      device meter reads its value as the peak and a plain one has none, as each renderer draws
      them. A range binding can write only inside its range (`band`, **Inside Only**): the segment
      the peak rounds to.
+   - *A button's or a label's text*: a text layer draws what the label draws: its colour's alpha,
+     the nine placements, lines of its own at their line height, a baseline shift, and an
+     underline, strikethrough or overline (thickness, offset, colour, insets, in front or behind)
+     across centred text. Still refused by name: such a line across text not centred, one that
+     leaves gaps round the letters, and an outline inside the text. A device's caption is one line
+     of SVG text in the text's colour, family, size, weight and spacing and nothing else, so its
+     layer takes only those.
+   - *Turned and scaled*: the panel turns and scales a whole control about its box's centre; each
+     layer of a button, switch, meter or piece of artwork, built upright, turns by the same angle and
+     scales by the same factor about its own pivot, its box moved so the pivot lands where the
+     control's turn puts it (`turnControlLayers`). A layer a binding moves or sizes is placed so at
+     both ends of the binding, one place binding per axis, so it travels along the turned direction;
+     one moved by two readings is refused. A button's grab area follows a layer of its box that draws
+     nothing (`source: 'part:…'`), turned with the rest. A component clips to its own box (the
+     canvas's `.control-content`), so it holds the box as drawn, turned and scaled. Knobs and
+     sliders turned or scaled are still refused.
+   - *Effects*: every set gives its buttons, switches and meters a drop shadow, and one drawn as a
+     device does not draw it (the canvas skips a device's effect surface); a plain one does, and its
+     layers used to drop it. Now a control's shadows and bevel are cast through the canvas's own
+     surface (EffectSurface) by the layer that holds its shape (`meta.surfaceEffects`): its plate,
+     when the plate is opaque and the rest lies on it, or its only layer; the component's box grows
+     by the shadows' reach, since the canvas draws them past the control's. Its colour filters
+     change each pixel by itself, so every layer takes them. A blur or a blend over a control of
+     several layers, and shadows with no one layer to cast them, are refused by name.
+   - *Icons*: an icon is a layer of its own (an `Icon` section), drawn and placed by the same code
+     as the canvas's (`editor/iconLook.js`): fitted, tinted, turned, flipped, with its shadow, glow
+     and blur, beside the text in the layout's mode, which makes room for it. `CE_KNOB_LAYERS_ICON=1`
+     puts a test icon in the library for the pixel check.
 
    `knobLayers.mjs` with `CE_KNOB_LAYERS_STRICT=1` checks every offered set but the two illustrated
    ones, and fails a control that comes in as one exact part or is refused. Run over all of them:
@@ -347,8 +375,8 @@ components):
    or a lost pointer, on the panel and in the designer's Preview). Pressed or on, a part's travel and swing are bindings, its lit
    colour, opacity and legend a state (`rule: '<channel> == true'`); the button's own hover,
    focus, pressed and selected looks are states on its layers. The pixel check compares them in
-   Preview, off and on. Refused by name: control forms not made of parts, a lamp, a part that moves
-   on a key that turns, timed and one-shot buttons. A device part with a border is two layers, its
+   Preview, off and on. Refused by name: control forms not made of parts, a bat-lever lamp, a part
+   that moves on a key that turns, timed and one-shot buttons. A device part with a border is two layers, its
    fill and its edge, the edge an open path the part renderer strokes as the panel does (round
    joins, half outside the outline).
    **Meters** come in as layers only, with a display-only channel (no grab area) printed as the

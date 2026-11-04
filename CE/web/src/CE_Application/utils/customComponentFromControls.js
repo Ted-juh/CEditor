@@ -58,6 +58,9 @@ import { buttonDeviceDrawn } from '../models/buttonDeviceParts.js';
 import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js';
 import { isDisplayOnly } from './displayMode.js';
 import { targetBuckets } from './interactionRuntime.js';
+import { surfaceShadows } from './surfaceEffects.js';
+import { resolveContentBox } from '../editor/canvasControlContentBox.js';
+import { iconPlacement } from '../editor/iconLook.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
 /** Controls with a value that convert: drawn by SliderFamilyRenderer, one value each. */
@@ -81,18 +84,50 @@ const TEXT_KEYS = new Set([
 ]);
 
 /**
- * The ContentLayout leaves that are pure geometry, and so become the text part's box. The rest of the
- * section positions an icon, which a convertible label does not have (the Icon check refuses one).
+ * The ContentLayout leaves a layer draws as the canvas does: the paddings, offsets and gap that place
+ * the text, and the mode, alignment, offsets and depths that place an icon beside it (iconLayer).
  */
 const LAYOUT_KEYS = new Set([
   'paddingLeft', 'paddingRight', 'paddingTop', 'paddingBottom', 'textOffsetX', 'textOffsetY',
-  'horizontalAlign', 'verticalAlign', 'gap', 'iconOffsetX', 'iconOffsetY', 'iconZIndex', 'textZIndex', 'textAboveIcon',
+  'horizontalAlign', 'verticalAlign', 'gap', 'iconOffsetX', 'iconOffsetY', 'iconZIndex', 'textZIndex', 'textAboveIcon', 'mode',
 ]);
 
-/** Justifications the part renderer places the same way: vertically centred, left/centre/right. */
-const JUSTIFICATIONS = new Set(['centred', 'left', 'right']);
+/**
+ * The text settings a text layer draws as the panel's label does (InteractivePartRenderer's text): its
+ * colour (alpha too), the nine placements, lines of its own at their line height, a baseline shift,
+ * an underline, strikethrough or overline (their thickness, offset, colour, insets and layer), and a
+ * soft shadow, a glow and an outline outside the glyphs.
+ */
+const DECORATIONS = ['underline', 'strikethrough', 'overline'];
+function textKeyDrawn(key) {
+  if (TEXT_KEYS.has(key)) return true;
+  if (key === 'Font.baselineShift' || key === 'Multiline.lineHeight') return true;
+  const [section, field] = key.split('.');
+  if (section === 'Font') return DECORATIONS.some((kind) => field === kind || (field.startsWith(kind) && !field.endsWith('Gap')));
+  if (section === 'Effects') return /^(shadow|glow)/.test(field) || (/^outline/.test(field) && !/^outlineDash/.test(field));
+  return false;
+}
+
+/** Why a label's or a button's text would not draw as the panel's does as a text layer, or ''. */
+function textRefusal(resolved, control, measure) {
+  const text = nonDefault(control, 'Text', textKeyDrawn);
+  if (text.length) return TEXT_LABELS[text[0]] ?? `the text setting ${text[0]}`;
+  const section = resolved?._children?.Text?._children ?? {};
+  const effects = section.Effects ?? {};
+  if (effects.outlineEnabled === true && String(effects.outlinePlacement ?? 'outer') !== 'outer') return 'an outline inside the text';
+  const font = section.Font ?? {};
+  const justification = String(section.Position?.justification ?? 'centred');
+  // A decoration runs across the text's whole width about its centre; the layer centres it.
+  if (DECORATIONS.some((kind) => font[kind] === true) && !['centred', 'top', 'bottom'].includes(justification)) return 'an underline, strikethrough or overline on text that is not centred';
+  if (DECORATIONS.some((kind) => font[kind] === true && Number(font[`${kind}Gap`]) > 0)) return 'an underline that leaves gaps round the letters';
+  if (overflows(resolved, measure)) return 'text wider than its box — the panel wraps it, a component would not';
+  return '';
+}
 
 const TEXT_LABELS = {
+  'Font.underlineGap': 'an underline that leaves gaps round the letters',
+  'Font.strikethroughGap': 'a strikethrough that leaves gaps round the letters',
+  'Font.overlineGap': 'an overline that leaves gaps round the letters',
   'Font.letterSpacing': 'letter spacing',
   'Font.wordSpacing': 'word spacing',
   'Font.underline': 'underline',
@@ -322,11 +357,9 @@ function whyNotButtonLayers(control, resolved, measure) {
   const kids = control._children;
   const core = kids.Core ?? {};
   const behavior = resolved?._children?.Behavior ?? kids.Behavior ?? {};
-  const transform = kids.Transform ?? {};
-  if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
-  if (Number(transform.scale ?? 1) !== 1) return 'scaled';
-  if (Number(transform.rotation ?? 0)) return 'rotated';
-  if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
+  // An anchor only places a control inside a container, and one in a container is refused; a turn
+  // and a scale turn and scale its layers (turnControlLayers), and its effects go to its layers
+  // (carryControlEffects).
   if (core.enabled === false) return 'disabled';
   if (core.visible === false) return 'hidden';
   const kind = String(behavior.buttonType ?? 'momentary');
@@ -336,20 +369,13 @@ function whyNotButtonLayers(control, resolved, measure) {
   if (form) return `drawn in the "${form}" control form, which is not made of parts`;
   // Drawn as a device, the control's own plate, text, icon and lamp are not drawn: its parts are.
   if (buttonDeviceDrawn(resolved)) return buttonDeviceLayersRefusal(resolved);
-  if (nonDefault(resolved, 'Icon').length) return 'an icon';
   // An LED, a jewel or a lit window beside the legend is a layer (buttonLampLayer); a bat lever not yet.
   const lamp = String(resolved?._children?.ContentLayout?.lamp ?? 'none').toLowerCase();
   if (lamp === 'bat') return 'a bat-lever lamp';
   const layout = nonDefault(resolved, 'ContentLayout', (key) => LAYOUT_KEYS.has(key) || key.startsWith('lamp'));
   if (layout.length) return `the text layout setting ${layout[0]}`;
-  const text = nonDefault(resolved, 'Text', (key) => TEXT_KEYS.has(key));
-  if (text.length) return TEXT_LABELS[text[0]] ?? `the text setting ${text[0]}`;
-  const justification = String(resolved?._children?.Text?._children?.Position?.justification ?? 'centred');
-  if (!JUSTIFICATIONS.has(justification)) return `text aligned ${justification.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
-  const colour = String(resolved?._children?.Text?._children?.Fill?.colour ?? 'FFFFFFFF');
-  if (/^[0-9a-f]{8}$/i.test(colour) && !/^ff/i.test(colour)) return 'semi-transparent text';
-  if (String(resolved?._children?.Text?.content ?? '').includes('\n')) return 'text on more than one line';
-  if (overflows(resolved, measure)) return 'text wider than its box — the panel wraps it, a component would not';
+  const textWhy = textRefusal(resolved, resolved, measure);
+  if (textWhy) return textWhy;
   if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
   const ports = (kids.DeviceBindings?.bindings ?? []).map((binding) => String(binding?.port ?? 'value')).filter((port) => port !== 'value');
   if (ports.length) return `a device binding on its ${ports[0]} port`;
@@ -360,11 +386,6 @@ function whyNotButtonLayers(control, resolved, measure) {
 function whyNotMeterLayers(control, resolved) {
   const kids = control._children;
   const core = kids.Core ?? {};
-  const transform = kids.Transform ?? {};
-  if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
-  if (Number(transform.scale ?? 1) !== 1) return 'scaled';
-  if (Number(transform.rotation ?? 0)) return 'rotated';
-  if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
   if (core.visible === false) return 'hidden';
   const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
   if (form) return `drawn in the "${form}" control form, which is not made of parts`;
@@ -385,7 +406,6 @@ export function whyNotConvertible(control, resolved, { measure = null, layers = 
   }
   if (VALUE_TYPES.includes(type)) {
     const transform = control._children.Transform ?? {};
-    if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
     if (Number(transform.scale ?? 1) !== 1) return 'scaled';
     if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
     return whyNotValueConvertible(control, resolved);
@@ -393,23 +413,12 @@ export function whyNotConvertible(control, resolved, { measure = null, layers = 
   if (!ARTWORK_TYPES.includes(type)) {
     return `a ${type || 'control'} — only artwork (shapes, labels, images, backgrounds), knobs and sliders can become a component`;
   }
-  const transform = control._children.Transform ?? {};
-  if (String(transform.anchor ?? 'topLeft') !== 'topLeft') return 'anchored to a corner other than top-left';
-  if (Number(transform.scale ?? 1) !== 1) return 'scaled';
-  if (nonDefault(control, 'Effects').length) return 'effects (shadow, bevel, glow…)';
   if (type === 'Shape' && Number(control._children.Shape?.rotation ?? 0)) return 'a shape rotated inside its own box';
   if (type === 'Label') {
-    if (nonDefault(control, 'Icon').length) return 'an icon';
     const layout = nonDefault(control, 'ContentLayout', (key) => LAYOUT_KEYS.has(key));
     if (layout.length) return layout[0].startsWith('lamp') ? 'a lamp' : `the text layout setting ${layout[0]}`;
-    const text = nonDefault(control, 'Text', (key) => TEXT_KEYS.has(key));
-    if (text.length) return TEXT_LABELS[text[0]] ?? `the text setting ${text[0]}`;
-    const justification = String(control._children.Text?._children?.Position?.justification ?? 'centred');
-    if (!JUSTIFICATIONS.has(justification)) return `text aligned ${justification.replace(/([A-Z])/g, ' $1').toLowerCase()}`;
-    const colour = String(resolved?._children?.Text?._children?.Fill?.colour ?? 'FFFFFFFF');
-    if (/^[0-9a-f]{8}$/i.test(colour) && !/^ff/i.test(colour)) return 'semi-transparent text';
-    if (String(resolved?._children?.Text?.content ?? '').includes('\n')) return 'text on more than one line';
-    if (overflows(resolved, measure)) return 'text wider than its box — the panel wraps it, a component would not';
+    const textWhy = textRefusal(resolved, control, measure);
+    if (textWhy) return textWhy;
   }
   return '';
 }
@@ -424,6 +433,137 @@ function pxLayout(rect, transform) {
     anchorX: 'left', anchorY: 'top', align: 'left',
     rotation: Number(transform?.rotation ?? 0) || 0,
   };
+}
+
+/** A control's turn and scale, `{ rotation, scale }`, or null when it has neither. */
+function turnOf(control) {
+  const transform = control?._children?.Transform ?? {};
+  const rotation = Number(transform.rotation ?? 0) || 0;
+  const scale = Number(transform.scale ?? 1);
+  const s = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  return Math.abs(rotation) > 1e-9 || Math.abs(s - 1) > 1e-9 ? { rotation, scale: s } : null;
+}
+
+/** The control upright and full size: its layers are built so, then turned (turnControlLayers). */
+function upright(control) {
+  if (!control?._children?.Transform) return control;
+  const copy = { ...control, _children: { ...control._children, Transform: { ...control._children.Transform, rotation: 0, scale: 1 } } };
+  return copy;
+}
+
+const LAYOUT_MOVES = ['x', 'y', 'width', 'height', 'offsetX', 'offsetY'];
+const sameReading = (a, b) => String(a?.source ?? '') === String(b?.source ?? '')
+  && Number(a?.inputMin ?? 0) === Number(b?.inputMin ?? 0) && Number(a?.inputMax ?? 1) === Number(b?.inputMax ?? 1)
+  && (a?.clamp !== false) === (b?.clamp !== false) && (a?.invert === true) === (b?.invert === true);
+// A straight line from the reading (interactionRuntime's range): no band, no rounding.
+const plainRange = (binding) => String(binding?.mapMode ?? 'range') === 'range' && binding?.band !== true && binding?.round !== true;
+const at3 = (n) => Math.round(n * 1000) / 1000;
+
+/**
+ * A turned or scaled control's layers, drawn as the panel draws it. The panel turns and scales the
+ * whole control about its box's centre (CanvasControl: rotate, then scale, from the centre); each
+ * layer, built upright and full size, turns by the same angle and scales by the same factor about
+ * its own pivot, and its box moves so that the pivot lands where the control's turn puts it, which
+ * is the same picture. A layer a binding moves or sizes (a key that travels, a bar that grows, a
+ * marker that slides) is placed so at both ends of the binding, so it travels along the turned
+ * direction: one place binding per axis, from the same reading. A layer moved by two readings, or
+ * through a curve, cannot be, and is refused; so is a state that moves one. Every layer ends in
+ * pixels from the top left. `turned`: `{ names, rect, rotation, scale }`, `rect` the control's box
+ * in the component. Returns why not, or ''.
+ */
+function turnControlLayers(turned, { parts, bindings, states, width: W, height: H }) {
+  const { names, rect, rotation, scale } = turned;
+  const cx = rect.x + rect.width / 2;
+  const cy = rect.y + rect.height / 2;
+  const angle = (rotation * Math.PI) / 180;
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const own = new Set(names);
+  for (const state of Object.values(states ?? {})) {
+    for (const [layer, patch] of Object.entries(state?.patches?.parts ?? {})) {
+      if (own.has(layer) && Object.keys(patch ?? {}).some((path) => path.startsWith('Layout.'))) return `a state that moves its ${layer} layer, turned`;
+    }
+  }
+  const anchorOffset = (anchor, size) => (['left', 'top'].includes(String(anchor ?? 'center')) ? 0 : (['right', 'bottom'].includes(String(anchor ?? 'center')) ? size : size / 2));
+  for (const name of names) {
+    const part = parts[name];
+    if (!part) continue;
+    const layout = (part._children.Layout ??= { _type: 'PartLayout' });
+    const prefix = `Parts.${name}.Layout.`;
+    const keyOf = (binding) => String(binding?.target ?? '').slice(prefix.length);
+    const mine = Object.entries(bindings).filter(([, binding]) => String(binding?.target ?? '').startsWith(prefix) && binding?.enabled !== false);
+    const moving = mine.filter(([, binding]) => LAYOUT_MOVES.includes(keyOf(binding)));
+    const strange = mine.find(([, binding]) => !LAYOUT_MOVES.includes(keyOf(binding)) && !['rotation', 'scale'].includes(keyOf(binding)));
+    if (strange) return `its ${name} layer's ${keyOf(strange[1])}, bound, turned`;
+    if (moving.some(([, binding]) => !plainRange(binding) || !sameReading(binding, moving[0][1]))) return `its ${name} layer, moved by more than one reading, turned`;
+    if (mine.some(([, binding]) => !plainRange(binding))) return `its ${name} layer, bound in steps, turned`;
+    const fill = String(layout.mode ?? 'absolute') === 'fill';
+    const unit = (value, key, total) => (String(layout[`${key}Unit`] ?? 'px') === 'percent' ? (total * Number(value || 0)) / 100 : Number(value || 0));
+    const sizeUnit = (key) => (key === 'x' || key === 'width' ? W : H);
+    const unitKey = (key) => (key === 'width' || key === 'height' ? key : (key === 'x' || key === 'y' ? key : ''));
+    // The layer's fields in pixels, at the reading's start (0), its end (1) or as it stands (null).
+    const fields = (end) => {
+      const f = fill
+        ? { x: 0, y: 0, width: W, height: H, offsetX: 0, offsetY: 0 }
+        : {
+          x: unit(layout.x, 'x', W), y: unit(layout.y, 'y', H), width: unit(layout.width, 'width', W), height: unit(layout.height, 'height', H),
+          offsetX: Number(layout.offsetX ?? 0) || 0, offsetY: Number(layout.offsetY ?? 0) || 0,
+        };
+      if (end === null) return f;
+      for (const [, binding] of moving) {
+        const key = keyOf(binding);
+        const out = Number(end ? binding.outputMax : binding.outputMin) || 0;
+        f[key] = unitKey(key) ? unit(out, key, sizeUnit(key)) : out;
+      }
+      return f;
+    };
+    const pivotX = Number(layout.pivotX ?? 50);
+    const pivotY = Number(layout.pivotY ?? 50);
+    const anchorX = fill ? 'left' : layout.anchorX;
+    const anchorY = fill ? 'top' : layout.anchorY;
+    const place = (f) => {
+      const left = f.x - anchorOffset(anchorX, f.width) + f.offsetX;
+      const top = f.y - anchorOffset(anchorY, f.height) + f.offsetY;
+      const px = left + (f.width * pivotX) / 100;
+      const py = top + (f.height * pivotY) / 100;
+      const dx = px - cx;
+      const dy = py - cy;
+      return { x: at3(left + cx + scale * (cos * dx - sin * dy) - px), y: at3(top + cy + scale * (sin * dx + cos * dy) - py) };
+    };
+    const now = fields(null);
+    const there = place(now);
+    // Where a moving layer is at either end of its reading, from its layout as built.
+    const from = moving.length ? place(fields(0)) : null;
+    const to = moving.length ? place(fields(1)) : null;
+    Object.assign(layout, {
+      mode: 'absolute', x: there.x, y: there.y, width: at3(now.width), height: at3(now.height),
+      xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top', offsetX: 0, offsetY: 0,
+      rotation: at3((Number(layout.rotation ?? 0) || 0) + rotation),
+      scale: at3(Math.max(0.01, Number(layout.scale ?? 1) || 1) * scale),
+    });
+    for (const [, binding] of mine) {
+      if (keyOf(binding) === 'rotation') Object.assign(binding, { outputMin: at3(Number(binding.outputMin) + rotation), outputMax: at3(Number(binding.outputMax) + rotation) });
+      if (keyOf(binding) === 'scale') Object.assign(binding, { outputMin: at3(Number(binding.outputMin) * scale), outputMax: at3(Number(binding.outputMax) * scale) });
+    }
+    if (!moving.length) continue;
+    const template = moving[0][1];
+    for (const [key, binding] of moving) {
+      const field = keyOf(binding);
+      if (field === 'width' || field === 'height') {
+        // A size keeps its binding, in pixels.
+        Object.assign(binding, { outputMin: at3(unit(binding.outputMin, field, sizeUnit(field))), outputMax: at3(unit(binding.outputMax, field, sizeUnit(field))) });
+      } else {
+        delete bindings[key];
+      }
+    }
+    for (const axis of ['x', 'y']) {
+      if (Math.abs(from[axis] - to[axis]) < 1e-6) continue;
+      let bindingName = `${name}Turned${axis.toUpperCase()}`;
+      for (let n = 2; bindings[bindingName]; n += 1) bindingName = `${name}Turned${axis.toUpperCase()}${n}`;
+      bindings[bindingName] = { ...deepClone(template), name: bindingName, target: `${prefix}${axis}`, outputMin: from[axis], outputMax: to[axis] };
+    }
+  }
+  return '';
 }
 
 function svgColour(hex) {
@@ -503,7 +643,13 @@ function labelTextPart(name, resolved, styled, rect, transform, common) {
   // A button's lamp takes its room on its side, as the canvas's content box gives it.
   const lamp = buttonLampGeometry(resolved, rect);
   const lampRoom = (side) => (lamp && lamp.onRight === (side === 'paddingRight') ? lamp.width + lamp.gap : 0);
-  const pad = (key) => (Number.isFinite(Number(layout[key])) ? Number(layout[key]) : 0) + lampRoom(key);
+  // And an icon beside it its size and the gap (resolveContentBox).
+  const room = resolveContentBox(layout, position, String(layout.mode ?? 'text_only'), resolved._children.Icon ?? null, null);
+  const iconRoom = {
+    paddingLeft: room.textPaddingLeft - room.paddingLeft, paddingRight: room.textPaddingRight - room.paddingRight,
+    paddingTop: room.textPaddingTop - room.paddingTop, paddingBottom: room.textPaddingBottom - room.paddingBottom,
+  };
+  const pad = (key) => (Number.isFinite(Number(layout[key])) ? Number(layout[key]) : 0) + lampRoom(key) + iconRoom[key];
   const offsetX = (Number(layout.textOffsetX) || 0) + (Number(position.offsetX) || 0);
   const offsetY = (Number(layout.textOffsetY) || 0) + (Number(position.offsetY) || 0);
   const textBox = {
@@ -536,6 +682,118 @@ function buttonLampGeometry(resolved, rect) {
   const width = kind === 'window' ? size * 2 : size;
   const inset = Number.isFinite(Number(layout[onRight ? 'paddingRight' : 'paddingLeft'])) ? Number(layout[onRight ? 'paddingRight' : 'paddingLeft']) : 8;
   return { kind, size, gap, onRight, width, x: onRight ? rect.width - inset - width : inset, y: (rect.height - size) / 2 };
+}
+
+/** Whether the control shows its text: not when its layout shows the icon alone (CanvasControl). */
+function showsText(resolved) {
+  return String(resolved?._children?.ContentLayout?.mode ?? 'text_only') !== 'icon_only'
+    && Boolean(String(resolved?._children?.Text?.content ?? '').trim());
+}
+
+/**
+ * A label's or a button's icon as a layer: its Icon section, drawn as the canvas draws a control's
+ * icon (editor/iconLook.js), in the box the canvas gives it, `{ layer, above }`, `above` when it is
+ * stacked over the text. Null when the layout shows no icon.
+ */
+function iconLayer(name, resolved, styled, rect, common) {
+  const layout = resolved?._children?.ContentLayout ?? {};
+  const mode = String(layout.mode ?? 'text_only');
+  const icon = styled?._children?.Icon ?? resolved?._children?.Icon;
+  if (mode === 'text_only' || !icon || icon.source === 'none') return null;
+  const lamp = buttonLampGeometry(resolved, rect);
+  const box = resolveContentBox(layout, resolved._children.Text?._children?.Position ?? {}, mode, icon, lamp ? { onRight: lamp.onRight, width: lamp.width, gap: lamp.gap } : null);
+  const at = iconPlacement(layout, box, mode, icon, rect.width, rect.height);
+  const layer = createPartNode(name, {
+    ...common, role: 'custom', kind: 'rectangle',
+    layout: pxLayout({ x: rect.x + at.left, y: rect.y + at.top, width: at.size, height: at.size }, null),
+    sections: { Icon: deepClone(icon) },
+  });
+  const textZ = Number.isFinite(Number(layout.textZIndex)) ? Number(layout.textZIndex) : 2;
+  return { layer, above: at.zIndex > textZ };
+}
+
+/**
+ * The shadows and bevel a control casts (surfaceShadows): none when it is drawn as a device, whose
+ * effects the canvas does not draw, or is a knob or slider, which keeps its own.
+ */
+function castShadows(control, resolved) {
+  const type = String(control?._children?.Core?.controlType ?? '');
+  if (VALUE_TYPES.includes(type)) return [];
+  const device = Boolean(anatomyForm(type, resolved?._children?.Core?.controlForm ?? control._children.Core.controlForm))
+    || buttonDeviceDrawn(resolved) || meterDeviceDrawn(resolved);
+  return device ? [] : surfaceShadows(resolved?._children?.Effects);
+}
+
+/** How far past its box a control's cast shadows can reach (EffectSurface's filter region). */
+function castReach(control, resolved) {
+  const shadows = castShadows(control, resolved);
+  return shadows.length ? Math.ceil(Math.max(...shadows.map((s) => Math.abs(s.x) + Math.abs(s.y) + Math.abs(s.spread) + s.blur * 3))) : 0;
+}
+
+const opaqueColour = (value) => /^ff[0-9a-f]{6}$/i.test(String(value ?? '').replace(/^#/, '').trim());
+
+/** Whether a Background paints its whole box opaque: an opaque colour, or a gradient opaque throughout. */
+function paintsOpaque(background) {
+  const fill = background?._children?.Fill ?? {};
+  if (fill.solidEnabled === true && opaqueColour(fill.colour) && Number(fill.solidOpacity ?? 100) >= 100) return true;
+  const stops = fill.gradient?.stops ?? [];
+  return fill.gradientEnabled === true && stops.length > 0 && stops.every((stop) => opaqueColour(stop?.color ?? stop?.colour))
+    && Number(fill.gradientOpacity ?? 100) >= 100;
+}
+
+/**
+ * A control's own effects, carried to its layers so they draw as the canvas draws them
+ * (CanvasControl). Its shadows and bevel are cast through what the control draws (EffectSurface
+ * over its content), though not by one drawn as a device; here the layer that holds the control's
+ * shape casts them through the same surface (`meta.surfaceEffects`): its plate, when the plate is
+ * opaque and the rest lies on it, or its only layer. Its colour filters (brightness, contrast,
+ * saturation, hue, greyscale, sepia, invert) change each pixel by itself, so every layer takes them
+ * and the picture is the same. A blur and a blend act on the control as a whole: with one layer they
+ * are that layer's, with more they are refused. Returns why not, or ''.
+ */
+function carryControlEffects(control, resolved, built, rect) {
+  const effects = resolved?._children?.Effects;
+  if (!effects) return '';
+  const cast = castShadows(control, resolved);
+  const defaults = SECTION_DEFAULTS.Effects._children.Filters;
+  const filters = Object.fromEntries(Object.entries(effects._children?.Filters ?? {})
+    .filter(([key, value]) => !key.startsWith('_') && value != null && value !== defaults[key]));
+  const blend = String(effects._children?.Blend?.mode ?? 'normal');
+  if (!cast.length && !Object.keys(filters).length && blend === 'normal') return '';
+  const layers = [...built];
+  const only = layers.length === 1 ? layers[0] : null;
+  if (blend !== 'normal' && !only) return `a ${blend} blend over the whole control, which its layers would each blend alone`;
+  if (Number(filters.blur) > 0 && !only) return 'a blur over the whole control, which its layers would each blur alone';
+  const effectsOf = (layer) => (layer._children.Effects ??= deepClone(SECTION_DEFAULTS.Effects));
+  if (cast.length) {
+    const within = (inner, outer) => inner.x >= outer.x - 0.5 && inner.y >= outer.y - 0.5
+      && inner.x + inner.width <= outer.x + outer.width + 0.5 && inner.y + inner.height <= outer.y + outer.height + 0.5;
+    const boxOf = (layer) => {
+      const l = layer._children.Layout ?? {};
+      // A text layer is widened 8px either side of where its glyphs go (labelTextPart).
+      const inset = layer.role === 'label' ? 8 : 0;
+      return { x: Number(l.x) + inset, y: Number(l.y), width: Number(l.width) - 2 * inset, height: Number(l.height) };
+    };
+    // The plate: a layer the control's own background paints, over its whole box.
+    const plate = layers.find((layer) => layer._children.Background && layer.role !== 'label' && within(rect, boxOf(layer)) && within(boxOf(layer), rect));
+    const caster = only ?? (plate && paintsOpaque(resolved?._children?.Background) && layers.every((layer) => layer === plate || within(boxOf(layer), rect)) ? plate : null);
+    if (!caster) return 'shadows or a bevel cast by the whole control, which has no one layer that holds its shape (an opaque plate under the rest)';
+    const own = effectsOf(caster);
+    if (surfaceShadows(own).length) return `shadows on its ${caster.name} layer as well as on the whole control`;
+    own._children.Shadows = deepClone(effects._children.Shadows);
+    own._children.Bevel = deepClone(effects._children.Bevel);
+    caster.meta = { ...(caster.meta ?? {}), surfaceEffects: true };
+  }
+  for (const layer of Object.keys(filters).length ? layers : []) {
+    const own = effectsOf(layer)._children;
+    own.Filters = { ...(own.Filters ?? deepClone(defaults)) };
+    for (const [key, value] of Object.entries(filters)) {
+      if (own.Filters[key] != null && own.Filters[key] !== defaults[key] && own.Filters[key] !== value) return `its ${layer.name} layer's own ${key} filter as well as the control's`;
+      own.Filters[key] = value;
+    }
+  }
+  if (blend !== 'normal') effectsOf(only)._children.Blend = deepClone(effects._children.Blend);
+  return '';
 }
 
 /**
@@ -636,10 +894,12 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
       })
       : null;
     const lamp = buttonLampLayer(uniquePartName(`${channel}_lamp`, taken), resolved, styled, rect, { ...common, zIndex: zIndex + 1 });
-    const textPart = String(resolved._children.Text?.content ?? '').trim()
+    const icon = iconLayer(uniquePartName(`${channel}_icon`, taken), resolved, styled, rect, common);
+    if (icon) icon.layer.zIndex = zIndex + (icon.above ? 3 : 1);
+    const textPart = showsText(resolved)
       ? labelTextPart(uniquePartName(`${channel}_text`, taken), resolved, styled, rect, transform, { ...common, zIndex: zIndex + 2 })
       : null;
-    const built = [plate, lamp?.layer, textPart].filter(Boolean);
+    const built = [plate, lamp?.layer, icon?.layer, textPart].filter(Boolean);
     return Object.assign(built, { buttoned: { channel, plate: plate?.name ?? '', text: textPart?.name ?? '', lamp: lamp ? { name: lamp.layer.name, on: lamp.on } : null } });
   }
   if (VALUE_TYPES.includes(type) && asLayers) {
@@ -684,7 +944,12 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
         ...common, role: 'background', kind: 'rectangle', sections: { Background: deepClone(resolved._children.Background) },
       }));
     }
-    parts.push(labelTextPart(uniquePartName(name, taken), resolved, resolved, rect, transform, { ...common, zIndex: zIndex + 1 }));
+    const icon = iconLayer(uniquePartName(`${name}_icon`, taken), resolved, resolved, rect, common);
+    if (icon) {
+      icon.layer.zIndex = zIndex + (icon.above ? 3 : 1);
+      parts.push(icon.layer);
+    }
+    if (showsText(resolved)) parts.push(labelTextPart(uniquePartName(name, taken), resolved, resolved, rect, transform, { ...common, zIndex: zIndex + 2 }));
     return parts;
   }
   if (type === 'Shape') {
@@ -759,12 +1024,27 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     return { x: Number(t.x) || 0, y: Number(t.y) || 0, width: Math.max(1, Number(t.width) || 0), height: Math.max(1, Number(t.height) || 0) };
   };
   const rects = chosen.map(({ control }) => rectOf(control));
+  // A component clips to its own box (CanvasControl's .control-content), while the canvas draws a
+  // turned or scaled control, and a control's cast shadows, past its box: the component holds the
+  // box as drawn, its shadows' reach about it, turned and scaled about its centre.
+  const drawnRects = chosen.map(({ control, resolved }, i) => {
+    const reach = castReach(control, resolved);
+    const r = reach ? { x: rects[i].x - reach, y: rects[i].y - reach, width: rects[i].width + 2 * reach, height: rects[i].height + 2 * reach } : rects[i];
+    const turn = VALUE_TYPES.includes(String(control._children.Core.controlType)) ? null : turnOf(control);
+    if (!turn) return r;
+    const angle = (turn.rotation * Math.PI) / 180;
+    const w = turn.scale * (Math.abs(Math.cos(angle)) * r.width + Math.abs(Math.sin(angle)) * r.height);
+    const h = turn.scale * (Math.abs(Math.sin(angle)) * r.width + Math.abs(Math.cos(angle)) * r.height);
+    const cx = r.x + r.width / 2;
+    const cy = r.y + r.height / 2;
+    return { x: Math.floor(cx - w / 2), y: Math.floor(cy - h / 2), width: Math.ceil(cx + w / 2) - Math.floor(cx - w / 2), height: Math.ceil(cy + h / 2) - Math.floor(cy - h / 2) };
+  });
   const bounds = {
-    x: Math.min(...rects.map((r) => r.x)),
-    y: Math.min(...rects.map((r) => r.y)),
+    x: Math.min(...drawnRects.map((r) => r.x)),
+    y: Math.min(...drawnRects.map((r) => r.y)),
   };
-  bounds.width = Math.max(...rects.map((r) => r.x + r.width)) - bounds.x;
-  bounds.height = Math.max(...rects.map((r) => r.y + r.height)) - bounds.y;
+  bounds.width = Math.max(...drawnRects.map((r) => r.x + r.width)) - bounds.x;
+  bounds.height = Math.max(...drawnRects.map((r) => r.y + r.height)) - bounds.y;
 
   // One component paints at one depth. An unselected control painted BETWEEN two selected ones, and
   // overlapping them, is sandwiched — no single depth keeps it where it was, so it is refused, by name.
@@ -797,8 +1077,13 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   const values = [];
   // Knobs asked for as layers that a layer cannot draw yet, and come in as one exact part.
   const asParts = [];
-  order.forEach(({ control, resolved, rect }, i) => {
+  // Turned or scaled buttons, switches, meters and artwork: built upright, then turned (turnControlLayers).
+  const turnedControls = [];
+  order.forEach(({ control: placed, resolved: placedResolved, rect }, i) => {
     const local = { ...rect, x: rect.x - bounds.x, y: rect.y - bounds.y };
+    const turn = VALUE_TYPES.includes(String(placed._children.Core.controlType)) ? null : turnOf(placed);
+    const control = turn ? upright(placed) : placed;
+    const resolved = turn ? upright(placedResolved) : placedResolved;
     let asLayers = false;
     if (valueControlsAs === 'layers' && VALUE_TYPES.includes(String(control._children.Core.controlType))) {
       const why = valueLayersRefusal(resolved);
@@ -810,6 +1095,23 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     const styled = asLayers || isButton ? resolveControlFamily(control, set, { document: panel?.controlSets ?? [] }) : resolved;
     // A knob's layers take ten depths each and more; the next control paints above all of them.
     const built = partsFor(control, resolved, local, (i + 1) * 1000, taken, { styled, asLayers });
+    if (!VALUE_TYPES.includes(String(control._children.Core.controlType))) {
+      const why = carryControlEffects(control, resolved, built, local);
+      if (why) refused.push({ id: String(placed._children.Core.id), name: nameOf(placed), reason: why });
+    }
+    if (turn) {
+      const names = built.map((part) => part.name);
+      // A turned button is pressed where it is drawn: its zone follows a layer the size of its box
+      // (drawing nothing), turned with the rest.
+      const channel = built.buttoned?.channel;
+      let area = '';
+      if (channel) {
+        area = uniquePartName(`${channel}Area`, taken);
+        built.push(createPartNode(area, { role: 'custom', kind: 'rectangle', zIndex: (i + 1) * 1000, layout: pxLayout(local, null) }));
+        names.push(area);
+      }
+      turnedControls.push({ id: String(placed._children.Core.id), name: nameOf(placed), names, rect: local, ...turn, zone: channel ? `${channel}Zone` : '', area });
+    }
     if (built.layered) values.push({ control, resolved, local, paintIndex: i, layered: built.layered });
     if (built.buttoned) values.push({ control, resolved, local, paintIndex: i, buttoned: built.buttoned });
     if (built.metered) values.push({ control, resolved, local, paintIndex: i, metered: built.metered });
@@ -827,6 +1129,9 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
       }
     }
   });
+
+  // A control whose effects its layers could not carry (carryControlEffects).
+  if (refused.length) return { ok: false, refused };
 
   const component = createControl('CustomComponent');
   const children = component._children;
@@ -850,6 +1155,14 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     outputs: valueSections.published,
     editableProperties: published,
   };
+  for (const turned of turnedControls) {
+    const why = turnControlLayers(turned, {
+      parts, bindings: valueSections.bindings, states: valueSections.states, width: bounds.width, height: bounds.height,
+    });
+    if (why) return { ok: false, refused: [{ id: turned.id, name: turned.name, reason: why }] };
+    const zone = valueSections.hitZones[turned.zone];
+    if (zone && turned.area) zone.source = `part:${turned.area}`;
+  }
   const firstChannel = Object.keys(valueSections.channels)[0] ?? '';
   children.Designer = { ...children.Designer, selectedLayer: Object.keys(parts)[0] ?? '', selectedValueChannel: firstChannel, selectedBehavior: firstChannel };
 

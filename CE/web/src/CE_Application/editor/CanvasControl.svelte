@@ -73,6 +73,7 @@
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { documentIcons, resolveIcon } from '../utils/documentIcons.js';
+  import { iconImageStyle, iconPlacement } from './iconLook.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { onDestroy } from 'svelte';
@@ -3128,73 +3129,20 @@
   });
   let hasIcon = $derived(!hasAnatomy && !isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
   let iconIsTinted = $derived(usesIconTint(icon?.tint));
-  let iconEffects = $derived(icon?._children?.Effects ?? null);
-  let iconSizeValue = $derived(Math.max(4, Number(icon?.size ?? 16)));
+  // Where the icon sits and how it is drawn: editor/iconLook.js, which a component's icon layer
+  // draws with too.
   let iconContainerStyle = $derived.by(() => {
     if (!hasIcon) return '';
-
-    const horizontalAlign = String(contentLayout?.horizontalAlign ?? 'center');
-    const verticalAlign = String(contentLayout?.verticalAlign ?? 'center');
-    const contentLeft = contentBox.paddingLeft;
-    const contentRight = Math.max(contentLeft, displayW - contentBox.paddingRight);
-    const contentTop = contentBox.paddingTop;
-    const contentBottom = Math.max(contentTop, displayH - contentBox.paddingBottom);
-
-    const alignAxis = (min, max, size, align, startValue, endValue) => {
-      if (align === startValue) return min + (size / 2);
-      if (align === endValue) return max - (size / 2);
-      return (min + max) / 2;
-    };
-
-    let centerX = alignAxis(contentLeft, contentRight, iconSizeValue, horizontalAlign, 'left', 'right');
-    let centerY = alignAxis(contentTop, contentBottom, iconSizeValue, verticalAlign, 'top', 'bottom');
-
-    if (contentLayoutMode === 'icon_left_text_right') {
-      centerX = contentLeft + (iconSizeValue / 2);
-    } else if (contentLayoutMode === 'text_left_icon_right') {
-      centerX = contentRight - (iconSizeValue / 2);
-    } else if (contentLayoutMode === 'icon_above_text_below') {
-      centerY = contentTop + (iconSizeValue / 2);
-    } else if (contentLayoutMode === 'text_above_icon_below') {
-      centerY = contentBottom - (iconSizeValue / 2);
-    }
-
-    centerX += numberOr(contentLayout?.iconOffsetX, 0);
-    centerY += numberOr(contentLayout?.iconOffsetY, 0);
-
+    const box = iconPlacement(contentLayout, contentBox, contentLayoutMode, icon, displayW, displayH);
     return [
-      `left:${centerX - (iconSizeValue / 2)}px`,
-      `top:${centerY - (iconSizeValue / 2)}px`,
-      `width:${iconSizeValue}px`,
-      `height:${iconSizeValue}px`,
-      `z-index:${numberOr(contentLayout?.iconZIndex, 1)}`,
+      `left:${box.left}px`,
+      `top:${box.top}px`,
+      `width:${box.size}px`,
+      `height:${box.size}px`,
+      `z-index:${box.zIndex}`,
     ].join('; ');
   });
-  let iconStyle = $derived.by(() => {
-    const fit = icon?.fit === 'cover' ? 'cover' : 'contain';
-    const transforms = [];
-    if (icon?.flipH === true) transforms.push('scaleX(-1)');
-    if (icon?.flipV === true) transforms.push('scaleY(-1)');
-    if (Math.abs(numberOr(icon?.rotation, 0)) > 0.001) transforms.push(`rotate(${numberOr(icon?.rotation, 0)}deg)`);
-    const filters = [];
-    if (iconEffects?.shadowEnabled === true) {
-      filters.push(`drop-shadow(${numberOr(iconEffects?.shadowOffsetX, 0)}px ${numberOr(iconEffects?.shadowOffsetY, 2)}px ${Math.max(0, numberOr(iconEffects?.shadowBlur, 4))}px ${cssColor(iconEffects?.shadowColour ?? '66000000')})`);
-    }
-    if (iconEffects?.glowEnabled === true) {
-      filters.push(`drop-shadow(0 0 ${Math.max(0, numberOr(iconEffects?.glowSize, 4))}px ${cssColor(iconEffects?.glowColour ?? '66FFFFFF')})`);
-    }
-    if (iconEffects?.blurEnabled === true && numberOr(iconEffects?.blurAmount, 0) > 0) {
-      filters.push(`blur(${numberOr(iconEffects?.blurAmount, 0)}px)`);
-    }
-    return [
-      'width:100%',
-      'height:100%',
-      `object-fit:${fit}`,
-      `opacity:${Math.max(0, Math.min(1, numberOr(icon?.opacity, 1)))}`,
-      transforms.length ? `transform:${transforms.join(' ')}` : '',
-      filters.length ? `filter:${filters.join(' ')}` : '',
-    ].join('; ');
-  });
+  let iconStyle = $derived(iconImageStyle(icon));
   let iconTintStyle = $derived(buildIconTintStyle(
     icon?.tint,
     resolvedStoredIcon?.dataUrl,

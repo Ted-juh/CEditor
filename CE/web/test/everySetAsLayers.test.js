@@ -232,3 +232,28 @@ test('the held peak as a signal, an inside-only range, the preview keeping each 
   assert.match(surface, /holdMs: numberOr\(channel\.peakHold\.holdMs, 1200\), decayPerSec: numberOr\(channel\.peakHold\.decayPerSec, 0\.4\)/);
   assert.match(read('sections/BindingsEditor.svelte'), /<PropertyCell label="Inside Only"/);
 });
+
+test('a turned or scaled button, switch or meter of every set turns its layers, and each moving layer starts where it is drawn', () => {
+  for (const set of SETS) {
+    for (const type of ['Button', 'ToggleButton', 'Meter']) {
+      const result = plan([control(type, { Transform: { rotation: 20, scale: 0.9 } })], set.id);
+      const label = `${set.id} ${type}`;
+      assert.ok(result.ok, `${label}: ${result.refused?.[0]?.reason ?? ''}`);
+      const parts = partsOf(result);
+      const bindings = result.component._children.Bindings._children;
+      for (const binding of Object.values(bindings)) {
+        const [, layer, , key] = String(binding.target).split('.');
+        if (!/^Turned[XY]\d*$/.test(String(binding.name).slice(layer.length))) continue;
+        // A button's reading starts at 0, off; a meter's layers are seeded at its reading, so only the axis is checked.
+        assert.ok(['x', 'y'].includes(key), `${label} ${binding.name}`);
+        assert.equal(parts[layer]._children.Layout.offsetX, 0);
+        assert.equal(parts[layer]._children.Layout.offsetY, 0);
+        if (type !== 'Meter') assert.ok(Math.abs(binding.outputMin - parts[layer]._children.Layout[key]) < 0.01, `${label} ${binding.name}: starts at ${binding.outputMin}, drawn at ${parts[layer]._children.Layout[key]}`);
+      }
+      for (const part of Object.values(parts)) {
+        assert.equal(part._children.Layout.anchorX, 'left', `${label} ${part.name}`);
+        assert.equal(part._children.Layout.xUnit, 'px', `${label} ${part.name}`);
+      }
+    }
+  }
+});
