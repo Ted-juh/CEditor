@@ -396,6 +396,12 @@ reading's zone. The zones themselves are rows of a level in % and a colour, with
 ticks in their own colour, and **Numerals** on the long ticks in the reading's units, dB or
 percent. **Fill Type** makes any part a gradient, edited in the Gradient tab of the dock; a part can
 cast a drop **Shadow**, as a button's can. A **Bow** is the curved line of a paper meter's scale.
+The **Housing** and the **Clip Lamp** also have a **Look** at the top of **Appearance**, with the
+same fields as a button's part: **Rendered** draws the housing as a low lit block (a bezel, the face
+and scale drawn over it; its **Height** starts at 12) and a round lamp as a lit dome, in its **Body
+Colour** when unlit and its **Lit Colour** (under **Reading**) when lit. A part coloured by **Zone
+Colours** is drawn flat while they are on, since its colour changes with the reading; the tab says
+so, and keeps its rendered fields for when they are off.
 While
 the parts draw the meter, the plain meter's own fill, arc and tick settings are hidden.
 

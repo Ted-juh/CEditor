@@ -418,7 +418,9 @@ block in the meter's 160 by 100 frame (a bezel, 12 % of its narrower side high w
 face and scale drawn over it), a round lamp a turned body, and a lamp needs a second image in its lit
 colour. A part the meter's zones colour keeps its flat drawing, since its colour moves with the
 reading and no fixed set of images covers it. A meter with a rendered part is refused as layers by
-name. The Meter tab's fields for it wait on a mock-up.
+name. The Meter tab edits it (approved mock-up): **Look** in the Housing's and the Clip Lamp's
+Appearance, with the Button tab's fields; the housing's Height starts at 12, and a part with Zone
+Colours on says it is drawn flat while they are.
 
 ### F. Filmstrips as their own category (small)
 

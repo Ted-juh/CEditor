@@ -252,3 +252,23 @@ test('the Slider tab offers a cap\'s look, and the Button and Switch tabs a part
   assert.equal(key.height, 0.15, '30 % of the narrower side, which is half the larger');
   assert.match(button, /value=\{numberOr\(part\?\.renderHeight, renderedRound \? 80 : 30\)\}/);
 });
+
+test('the Meter tab offers a Look on the housing and the clip lamp, and says when zones keep it flat', async () => {
+  const { renderedMeterPartSpec } = await import('../src/CE_Application/utils/renderedLookCore.js');
+  const meter = read('CE_Application/sections/MeterPartsEditor.svelte');
+  assert.match(meter, /const RENDERABLE = new Set\(\['housing', 'lamp'\]\);/);
+  assert.match(meter, /\{#if renderable\}\s*<PropertyCell label="Look" path=\{`\$\{prefix\}\.look`\}/);
+  const branch = meter.slice(meter.indexOf('{#if rendered}'), meter.indexOf('{:else}', meter.indexOf('{#if rendered}')));
+  for (const key of ['renderTop', 'renderCount', 'renderDepth', 'renderHeight', 'renderTaper', 'renderMaterial', 'renderTopMaterial', 'renderTopColour']) {
+    assert.ok(branch.includes(`\${prefix}.${key}`), key);
+  }
+  for (const flat of ['label="Finish"', 'label="Border"', 'label="Shading"', 'label="Shadow %"', 'label="Fill Type"']) assert.ok(!branch.includes(flat), flat);
+  assert.match(branch, /\{#if zoned\}\s*<p class="note span">Drawn flat while Zone Colours is on/);
+  // A round part's box is its width in 160ths and its height in 100ths of the meter's frame.
+  assert.match(meter, /const w = \(Number\(layout\.width\) \|\| 0\) \* 1\.6;\s*const h = Number\(layout\.height\) \|\| 0;/);
+  // The heights the field shows are the ones the render uses: 12 for a housing, 30 for a square lamp.
+  assert.match(meter, /let renderedHeight = \$derived\(renderedRound \? 80 : partName === 'housing' \? 12 : 30\);/);
+  const box = { _children: { Layout: { width: 50, height: 50 } } };
+  assert.equal(renderedMeterPartSpec(box, { name: 'housing' }).height, 0.075, '12 % of the 50 narrower side, of 80');
+  assert.equal(renderedMeterPartSpec(box, { name: 'lamp' }).height, 0.188, '30 % of it');
+});
