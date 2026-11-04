@@ -1419,7 +1419,8 @@
           opacity={numberOr(pointerStartPart?.opacity, 1)}
           style={pointerStyleFor('pointerStart')}
         />
-        <circle
+        <!-- data-pointer: the handle it is, as a linear cap's outline says it. -->
+        <circle data-pointer="start"
           cx={startPoint.x}
           cy={startPoint.y}
           r={pointerStartSize / 2}
@@ -1526,7 +1527,8 @@
           opacity={numberOr(pointerEndPart?.opacity, 1)}
           style={pointerStyleFor('pointerEnd')}
         />
-        <circle
+        <!-- data-pointer: the handle it is, as a linear cap's outline says it. -->
+        <circle data-pointer="end"
           cx={endPoint.x}
           cy={endPoint.y}
           r={pointerEndSize / 2}
