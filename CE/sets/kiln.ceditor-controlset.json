@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c5eefe8a",
+  "fingerprint": "62c4415b",
   "set": {
     "id": "kiln",
     "name": "Kiln",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": false,
           "Core.controlForm": "new-kiln",
           "Core.formFaceColour": "{surface}",
@@ -271,9 +269,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

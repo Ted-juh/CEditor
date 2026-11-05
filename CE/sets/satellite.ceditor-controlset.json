@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a8d10782",
+  "fingerprint": "20b15901",
   "set": {
     "id": "satellite",
     "name": "Satellite",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": false,
           "Core.controlForm": "new-satellite",
           "Core.formFaceColour": "{surface}",
@@ -334,9 +332,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

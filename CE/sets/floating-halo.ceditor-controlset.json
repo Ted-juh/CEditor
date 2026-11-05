@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "07172984",
+  "fingerprint": "1807471f",
   "set": {
     "id": "floating-halo",
     "name": "Floating Halo",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 9,
           "Behavior.minorTickCount": 1,
@@ -889,9 +887,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 18,
           "Behavior.minorTickCount": 0,

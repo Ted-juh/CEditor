@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "279a38b8",
+  "fingerprint": "0b99a4f0",
   "set": {
     "id": "eurorack",
     "name": "Eurorack",
@@ -80,13 +80,12 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "center",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 24,
           "Behavior.minorTickCount": 0,
           "Behavior.majorTickLength": 5,
           "Behavior.circularFit": "tight",
+          "Behavior.valueLabelPlacement": "center",
           "Behavior.tickPlacement": "cross"
         },
         "parts": {
@@ -635,9 +634,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,

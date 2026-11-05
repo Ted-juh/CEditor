@@ -583,7 +583,7 @@ try {
   });
   await check('Slider and Knob readout accessible value and output match authored defaults and navigation',async()=>{
     for(const type of ['Slider','Knob']){
-      const id=await fixture(type,{Behavior:{min:-10,max:10,step:0.5,precision:1,defaultCurrentValue:2.5,showValueReadout:true},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const id=await fixture(type,{Behavior:{min:-10,max:10,step:0.5,precision:1,defaultCurrentValue:2.5},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
       const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();assert.equal(Number(await valueText(id)),2.5);assert.equal(Number(await node(id).getAttribute('aria-valuenow')),2.5,'accessible value must match the displayed default');await node(id).focus();await page.keyboard.press('ArrowUp');await settle();assert.equal(Number(await valueText(id)),3);assert.equal(Number(await node(id).getAttribute('aria-valuenow')),3);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),3);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
     }
   });
@@ -799,7 +799,7 @@ try {
       {mode:'knob',sensitivity:2,direction:'cw',reverse:false,want:.9},
       ...['cw','ccw'].flatMap(direction=>[false,true].map(reverse=>({mode:'rotary',sensitivity:1,direction,reverse,want:(direction==='cw')!==reverse?.75:.25}))),
     ]){
-      const id=await fixture('Knob',{Transform:{width:240,height:240},Behavior:{min:0,max:1,step:.001,precision:3,defaultCurrentValue:.5,startAngle:0,sweepAngle:360,circularDiameter:120,showValueReadout:false,circularDragMode:config.mode,circularDragSensitivity:config.sensitivity,direction:config.direction,reverseMouseDirection:config.reverse},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
+      const id=await fixture('Knob',{Transform:{width:240,height:240},Behavior:{min:0,max:1,step:.001,precision:3,defaultCurrentValue:.5,startAngle:0,sweepAngle:360,circularDiameter:120,circularDragMode:config.mode,circularDragSensitivity:config.sensitivity,direction:config.direction,reverseMouseDirection:config.reverse},DeviceBindings:{enabled:true,bindings:[{kind:'deviceParameter',port:'value',deviceRole:'mainSynth',parameterId:'cutoff',dryRun:true}]}});
       const verify=async()=>{
         await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();
         const b=await node(id).boundingBox(),pointer=node(id).locator('.slider-svg > [data-pointer="current"]').first(),p=await pointer.boundingBox();

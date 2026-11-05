@@ -263,8 +263,9 @@ step or a row by number now reaches the one before the one it meant: add 1 to ea
 - `ce.components.pixel.gamma` takes 0.2 to 4 and `transitionMs` 0 to 2000, as the inspector does:
   a gamma of 0.1 was stored and drawn as 0.2, and a transition up to 5000 ms could be set that the
   inspector could not show.
-- `ce.components.meter.labelPosition` sets where a Meter's caption sits, "above", "below" or
-  "none"; a caption is drawn only there, so `label()` on a new meter showed nothing.
+- A Meter's reading and caption are Labels of their own, as a knob's name and value are, and a
+  script addresses them as Labels: `ce.components.meter` no longer has `label()`,
+  `labelPosition()` or `showValue()`.
 - `ce.components.chordpad.key` takes a note's name, `key("ChordPad", "Eb")`, and a number goes round
   the octave, 14 is D, as the Arpeggiator's does; 12 and above were stored as 11, B.
 - `ce.components.noteribbon.key` reads the same way, and `bendRange` takes whole semitones, as the

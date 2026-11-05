@@ -121,9 +121,10 @@ const RIBBON_ACROSS = (low) => `${low} at the bottom edge to 127 at the top; a v
 // A Chord Pad an Arp takes its notes from sounds nothing itself (the preview's chordNoteOn).
 const CHORDPAD_TO_ARP = 'While an Arp plays its chords (`arp.link()`), the pads sound nothing themselves.';
 // A Meter (its review): a linked control drives the value and its range in the preview
-// (PanelPreviewSurface.applyMeterValueSource), and the readout's settings.
+// (PanelPreviewSurface.applyMeterValueSource). Its reading and caption are Labels of their own
+// (utils/labelShows.js), addressed as Labels.
 const METER_SOURCE_WINS = 'While `source()` links a control, that control sets the value and its range.';
-const METER_READOUT = 'The readout shows while `showValue()` is on.';
+const METER_READING = 'The meter prints no reading itself: a Label showing its value does, as this says.';
 // A Pixel Display element's position and size (item 2 of the owner's review of the pixel).
 const PIXEL_RANGE = (min) => `Range: ${min} ↔ 4096, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.`;
 const PIXEL_OFF_SCREEN = 'Off the screen, wholly or in part: that part is not drawn. The grid is set in the inspector, under Grid: 128 × 64 by default.';
@@ -1338,32 +1339,23 @@ export const COMPONENT_FAMILIES = [
       v('gradient', 'gradient', BOOL, { toggle: true, doc: 'Blend the zone colours into each other, or step from one to the next.',
         argDocs: { gradient: `true: blended.\nfalse: each zone in its own colour.\nLeft out: toggles.\n${OFF_RULE}` },
         notes: ['Default: on; a Progress Bar\'s: off.'] }),
-      v('label', 'label', STR, { doc: 'Set the caption shown with the meter.', ex: ['"OUT"', 'captions the meter OUT'],
-        argDocs: { label: 'The caption.\nShown above or below the meter, as `labelPosition()` says.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
-      // The caption is drawn only where this says, and it was the inspector's alone: a script's
-      // label() on a new meter showed nothing (labelPosition "none").
-      v('labelPosition', 'labelPosition', ENUM, { doc: 'Set where the caption sits.', ex: ['"below"', 'puts the caption under the meter'],
-        argDocs: { labelPosition: '"none": hidden.\n"above": above the meter.\n"below": below it.\nCase-insensitive.\nInvalid: rejected with a console error.' },
-        notes: ['Default: "none".'] }),
-      v('valuePrecision', 'valuePrecision', INT, { ...FIELD('Meter', 'valuePrecision'), doc: 'Set how many decimal places the readout shows.', ex: ['2', 'shows the readout with two decimal places'],
+      v('valuePrecision', 'valuePrecision', INT, { ...FIELD('Meter', 'valuePrecision'), doc: 'Set how many decimal places a Label showing the reading prints.', ex: ['2', 'prints the reading with two decimal places'],
         argDocs: { valuePrecision: 'Decimal places.\nRange: 0 ↔ 6, whole.\nA fraction: rounded.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
-        notes: [METER_READOUT, 'Default: 0.'] }),
-      v('valuePrefix', 'valuePrefix', STR, { doc: 'Set the text before the number in the readout and the scale labels.', ex: ['"Gain "', 'shows the readout as Gain 1'],
+        notes: [METER_READING, 'Default: 0.'] }),
+      v('valuePrefix', 'valuePrefix', STR, { doc: 'Set the text before the number in the reading and the scale labels.', ex: ['"Gain "', 'prints the reading as Gain 1'],
         argDocs: { valuePrefix: 'The text.\nOn a dB scale, the scale labels say "dB" instead.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
-      v('valueSuffix', 'valueSuffix', STR, { doc: 'Set the text after the number in the readout and the scale labels.', ex: ['" ms"', 'writes ms after the number'],
+      v('valueSuffix', 'valueSuffix', STR, { doc: 'Set the text after the number in the reading and the scale labels.', ex: ['" ms"', 'writes ms after the number'],
         argDocs: { valueSuffix: 'The text.\nOn a dB scale, the scale labels say "dB" instead.\nA number: written as text.\nLeft out: rejected with a console error.' } }),
       v('zoneAt', 'zones', ITEM, { item: 'from', kind: NUM, ...UNIT, doc: 'Set where a colour zone starts along the meter, by its number.', ex: ['2, 0.8', 'starts zone 2 at 80% of the meter'],
         argDocs: { from: 'Part of the meter\'s length: 0 the empty end, 1 the full end.\nRange: 0 ↔ 1.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.' },
         notes: ['A zone colours the fill from its start up to the next zone\'s; the lowest also from 0.', 'Their colours are set in the inspector, under Zones.'] }),
       v('source', 'valueSourceId', LINK, { sourceKind: 'range', doc: 'Name the control that drives the level.', ex: ['"Volume"', 'makes the control called Volume drive the meter'],
         linkRule: 'Its value and range are the meter\'s.' }),
-      // The three flags, declared rather than derived (derivedFlagVerbs), for what each draws.
+      // The two flags, declared rather than derived (derivedFlagVerbs), for what each draws.
       v('showTicks', 'showTicks', BOOL, { toggle: true, doc: 'Show or hide the tick marks along the meter.',
-        notes: ['How many divisions: set in the inspector, under Scale & readout. Default: 4.', 'Default: hidden.'] }),
+        notes: ['How many divisions: set in the inspector, under Scale & reading. Default: 4.', 'Default: hidden.'] }),
       v('showScaleLabels', 'showScaleLabels', BOOL, { toggle: true, doc: 'Show or hide the values at the tick marks.',
         notes: ['On a dB scale in decibels; otherwise with `valuePrefix()` and `valueSuffix()`.', 'Default: hidden.'] }),
-      v('showValue', 'showValue', BOOL, { toggle: true, doc: 'Show or hide the readout: the value as a number.',
-        notes: ['Written with `valuePrecision()`, `valuePrefix()` and `valueSuffix()`, as the value is: not in decibels.', 'Default: hidden; a Progress Bar\'s: shown.'] }),
     ],
   },
 
@@ -1828,8 +1820,8 @@ const FAMILY_VERBS = [
  * So they are DERIVED from the model. A component added later with a `showFoo` gets its verb
  * without anybody remembering to add one, and componentCoverage.test.js holds every family to that.
  *
- * Only booleans: `labelPosition` is a display setting and an enum, so it belongs to whichever
- * family declares it by hand with its own value table.
+ * Only booleans: a display setting that is an enum belongs to whichever family declares it by hand
+ * with its own value table.
  */
 function derivedFlagVerbs(fam) {
   const defaults = SECTION_DEFAULTS[fam.section] ?? {};

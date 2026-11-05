@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "2eea3a83",
+  "fingerprint": "30323dec",
   "set": {
     "id": "hi-fi",
     "name": "Studio Console",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 1,
@@ -947,9 +945,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 1,

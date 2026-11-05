@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "648b2d3b",
+  "fingerprint": "b39a8630",
   "set": {
     "id": "dual-scale",
     "name": "Dual Scale",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 1,
           "Behavior.majorTickLength": 5,
@@ -285,9 +283,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 24,
           "Behavior.minorTickCount": 0,

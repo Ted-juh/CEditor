@@ -15,9 +15,9 @@
  * CE_KNOB_LAYERS_STRICT=1 checks every set the editor offers but the two illustrated ones (Iris and
  * Satellite), and a control that comes in as one exact part, or is refused, fails: every one of those
  * sets' controls must become layers that draw as it did.
- * CE_KNOB_LAYERS_PROPS='{"Meter.orientation":"arc","Meter.showValue":true}' sets those properties on
- * the control as well, whatever its type, to check what a set's own control does not use (a meter's
- * readout, its label, a button's icon or its turn).
+ * CE_KNOB_LAYERS_PROPS='{"Meter.orientation":"arc","Meter.showScaleLabels":true}' sets those
+ * properties on the control as well, whatever its type, to check what a set's own control does not
+ * use (a meter's arc or its scale's labels, a button's icon or its turn).
  */
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';

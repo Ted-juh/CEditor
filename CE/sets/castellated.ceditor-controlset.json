@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "bd7cf87b",
+  "fingerprint": "6697406a",
   "set": {
     "id": "castellated",
     "name": "Castellated",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 7,
           "Behavior.minorTickCount": 1,
@@ -901,9 +899,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 9,
           "Behavior.minorTickCount": 0,

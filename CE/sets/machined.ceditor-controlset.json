@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "0b3e6bf9",
+  "fingerprint": "eaa72ff4",
   "set": {
     "id": "machined",
     "name": "Machined",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.majorTickCount": 9,
           "Behavior.minorTickCount": 2,
           "Behavior.majorTickLength": 5,
@@ -163,9 +161,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,

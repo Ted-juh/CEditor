@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "32d93b16",
+  "fingerprint": "517e6f61",
   "set": {
     "id": "hex-drive",
     "name": "Hex Drive",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.majorTickCount": 7,
           "Behavior.minorTickCount": 1,
           "Behavior.majorTickLength": 5,
@@ -276,9 +274,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 7,
           "Behavior.minorTickCount": 0,

@@ -938,23 +938,13 @@ export const SECTION_DEFAULTS = {
     secondScaleCount: 0,
     scaleNumberFrom: 0,
     scaleNumberTo: 10,
-    showMinMaxLabels: true,
+    // The labels riding the handles: the only text a knob or slider draws itself. Its name, value
+    // and range ends are Labels of their own beside it (utils/labelShows.js).
     showHandleLabels: false,
-    showValueReadout: true,
     showCenterMarker: false,
-    labelMinMaxPlacement: 'auto',
-    labelMinMaxGap: 22,
-    labelMinMaxOffsetX: 0,
-    labelMinMaxOffsetY: 0,
-    // auto / top / center / bottom, or a corner (topLeft, topRight, bottomLeft, bottomRight) that
-    // hangs the label from the track's end. The title takes the same set; a title top-left and a
-    // readout top-right is the row above the track the control-set boards drew. Both share the
-    // readout gap: they are one row.
-    labelReadoutPlacement: 'auto',
-    labelTitlePlacement: 'auto',
-    labelReadoutGap: 14,
-    labelReadoutOffsetX: 0,
-    labelReadoutOffsetY: 0,
+    // Where the Labels tab puts a Label showing the value (utils/attachedLabels.js): 'below' the
+    // knob or slider, or in the 'center' of its face, as a set whose knobs read there says.
+    valueLabelPlacement: 'below',
     precision: 2,
     prefix: '',
     suffix: '',
@@ -1062,14 +1052,10 @@ export const SECTION_DEFAULTS = {
     showTicks: false,
     tickCount: 4,
     showScaleLabels: false,       // print value/dB at the ticks
-    // Numeric readout.
-    showValue: false,
+    // How a Label showing the reading prints it (utils/labelShows.js), and the scale's labels.
     valuePrecision: 0,
     valuePrefix: '',
     valueSuffix: '',
-    // Caption.
-    label: '',
-    labelPosition: 'none',        // none | above | below
     // Arc geometry (orientation = arc): clockwise from 3 o'clock in SVG space.
     arcStart: 135,
     arcSweep: 270,

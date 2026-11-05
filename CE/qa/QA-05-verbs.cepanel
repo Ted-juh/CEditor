@@ -16,12 +16,12 @@
   "scriptId": "qa_05_verbs",
   "author": "",
   "version": "1.0.0",
-  "description": "QA-05 — 23 verb families, 459 verbs",
+  "description": "QA-05 — 23 verb families, 456 verbs",
   "enabled": true,
   "locked": false,
   "filePath": null,
   "width": 1600,
-  "height": 6322,
+  "height": 6309,
   "resizable": false,
   "panicShortcut": "Escape",
   "minWidth": 0,
@@ -115,7 +115,7 @@
     "notes": [
       {
         "name": "How to read this sheet",
-        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 459 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
+        "content": "WHAT THIS SHEET IS\n\nOne group per verb family. Each shows the component the family drives, and beside it every\nverb that can be called on it — 456 across 23 families.\n\nHOW TO RUN THE PASS\n\n  1. Open the Console (Display panel → Console) and pick a component.\n  2. Call verbs off the card beside it and watch the component, not the console. A verb\n     that returns cleanly and changes nothing on screen is the failure this sheet exists\n     to find — the reducer tests already prove the return value.\n  3. Work down a family before moving on. Families are independent; a broken one is usually\n     broken throughout.\n\nWHAT A FAILURE LOOKS LIKE\n\n  - a verb that throws, or that reports success and moves nothing\n  - a toggle verb that only ever turns on\n  - a group headed \"NO COMPONENT carries section ...\" — an orphaned family, which means the\n    section was renamed or moved and the verbs now address nothing\n  - a component that renders but ignores its whole family\n\nWHAT IT CANNOT PROVE\n\nThat a verb does the RIGHT thing — only that it does something visible. Correctness of the\nreducers is componentVerbs.test.js and componentScriptPatches.test.js; this sheet is where\nthe two halves meet, and it is the only place the component and its API are on screen\ntogether."
       }
     ]
   },
@@ -1364,7 +1364,7 @@
         "Core": {"name":"caption_qa_cap_37","id":"qa_cap_37","controlType":"Label"},
         "Transform": {"x":272,"y":4992,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
-        "Text": {"content":"26 verbs","_children":{"Font":{"size":11}}},
+        "Text": {"content":"23 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
       },
       "_type": "Control"
@@ -1372,9 +1372,9 @@
     {
       "_children": {
         "Core": {"name":"verbs_meter","id":"qa05_meter_verbs","controlType":"Label"},
-        "Transform": {"x":272,"y":5014,"width":470,"height":185},
+        "Transform": {"x":272,"y":5014,"width":470,"height":172},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
-        "Text": {"content":"meter.value(num)              meter.valuePrecision(int)\nmeter.scale(enum)             meter.valuePrefix(str)\nmeter.peakHold[on]            meter.valueSuffix(str)\nmeter.holdMs(num)             meter.zoneAt(item)\nmeter.decay(num)              meter.source(link)\nmeter.valueMin(num)           meter.showTicks[on]\nmeter.valueMax(num)           meter.showScaleLabels[on]\nmeter.dbFloor(num)            meter.showValue[on]\nmeter.dbCeil(num)             meter.read(read)\nmeter.orientation(enum)       meter.size(size)\nmeter.gradient[on]            meter.fill(fill)\nmeter.label(str)              meter.insert(insert)\nmeter.labelPosition(enum)     meter.remove(remove)","_children":{"Font":{"family":"monospace","size":10}}},
+        "Text": {"content":"meter.value(num)              meter.valuePrefix(str)\nmeter.scale(enum)             meter.valueSuffix(str)\nmeter.peakHold[on]            meter.zoneAt(item)\nmeter.holdMs(num)             meter.source(link)\nmeter.decay(num)              meter.showTicks[on]\nmeter.valueMin(num)           meter.showScaleLabels[on]\nmeter.valueMax(num)           meter.read(read)\nmeter.dbFloor(num)            meter.size(size)\nmeter.dbCeil(num)             meter.fill(fill)\nmeter.orientation(enum)       meter.insert(insert)\nmeter.gradient[on]            meter.remove(remove)\nmeter.valuePrecision(int)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
       },
       "_type": "Control"
@@ -1382,7 +1382,7 @@
     {
       "_children": {
         "Core": {"name":"group_Transport_transport_Set_the_panel_s_clock_its_tempo_swing_time_signature_loop_and_count_in_where_it_follows_and_its_MIDI_clock_out_Reading_it_is_ce_time_","id":"qa_group_19","controlType":"Label"},
-        "Transform": {"x":28,"y":5233,"width":1544,"height":26},
+        "Transform": {"x":28,"y":5220,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"Transport — transport.*  (Set the panel's clock: its tempo, swing, time signature, loop and count-in, where it follows, and its MIDI clock out. Reading it is ce.time.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
@@ -1392,7 +1392,7 @@
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_38","id":"qa_cap_38","controlType":"Label"},
-        "Transform": {"x":28,"y":5269,"width":230,"height":18},
+        "Transform": {"x":28,"y":5256,"width":230,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"Transport — the component these drive","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1402,14 +1402,14 @@
     {
       "_children": {
         "Core": {"name":"qa05_transport","id":"qa05_transport_component","controlType":"Transport"},
-        "Transform": {"x":28,"y":5291}
+        "Transform": {"x":28,"y":5278}
       },
       "_type": "Control"
     },
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_39","id":"qa_cap_39","controlType":"Label"},
-        "Transform": {"x":282,"y":5269,"width":470,"height":18},
+        "Transform": {"x":282,"y":5256,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"16 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1419,7 +1419,7 @@
     {
       "_children": {
         "Core": {"name":"verbs_transport","id":"qa05_transport_verbs","controlType":"Label"},
-        "Transform": {"x":282,"y":5291,"width":470,"height":120},
+        "Transform": {"x":282,"y":5278,"width":470,"height":120},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"transport.bpm(num)            transport.countIn(int)\ntransport.swing(num)          transport.clockOut[on]\ntransport.source(enum)        transport.clockDevice(str)\ntransport.beatsPerBar(int)    transport.runOnLoad[on]\ntransport.beatUnit(int)       transport.editable[on]\ntransport.loop[on]            transport.showPosition[on]\ntransport.loopStart(int)      transport.showTap[on]\ntransport.loopBars(num)       transport.read(read)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
@@ -1429,7 +1429,7 @@
     {
       "_children": {
         "Core": {"name":"group_Panic_panicSet_Set_what_a_Panic_button_sends_when_pressed_which_channels_and_whether_it_also_resets_the_controllers_centres_pitch_bend_and_stops_the_panel_s_own_notes_","id":"qa_group_20","controlType":"Label"},
-        "Transform": {"x":28,"y":5445,"width":1544,"height":26},
+        "Transform": {"x":28,"y":5432,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"Panic — panicSet.*  (Set what a Panic button sends when pressed: which channels, and whether it also resets the controllers, centres pitch bend and stops the panel's own notes.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
@@ -1439,7 +1439,7 @@
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_40","id":"qa_cap_40","controlType":"Label"},
-        "Transform": {"x":28,"y":5481,"width":132,"height":18},
+        "Transform": {"x":28,"y":5468,"width":132,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"Panic — the component these drive","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1449,14 +1449,14 @@
     {
       "_children": {
         "Core": {"name":"qa05_panic","id":"qa05_panic_component","controlType":"Panic"},
-        "Transform": {"x":28,"y":5503}
+        "Transform": {"x":28,"y":5490}
       },
       "_type": "Control"
     },
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_41","id":"qa_cap_41","controlType":"Label"},
-        "Transform": {"x":184,"y":5481,"width":470,"height":18},
+        "Transform": {"x":184,"y":5468,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"9 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1466,7 +1466,7 @@
     {
       "_children": {
         "Core": {"name":"verbs_panic","id":"qa05_panic_verbs","controlType":"Label"},
-        "Transform": {"x":184,"y":5503,"width":470,"height":81},
+        "Transform": {"x":184,"y":5490,"width":470,"height":81},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"panicSet.scope(enum)          panicSet.label(str)\npanicSet.channel(int)         panicSet.editable[on]\npanicSet.resetControllers[on] panicSet.showSummary[on]\npanicSet.centreBend[on]       panicSet.read(read)\npanicSet.clearLocal[on]","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
@@ -1476,7 +1476,7 @@
     {
       "_children": {
         "Core": {"name":"group_LCD_Display_lcd_Write_to_a_character_LCD_by_layout_row_and_column_plus_backlight_brightness_and_scrolling_","id":"qa_group_21","controlType":"Label"},
-        "Transform": {"x":28,"y":5618,"width":1544,"height":26},
+        "Transform": {"x":28,"y":5605,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"LCD Display — lcd.*  (Write to a character LCD by layout, row and column, plus backlight, brightness and scrolling.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
@@ -1486,7 +1486,7 @@
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_42","id":"qa_cap_42","controlType":"Label"},
-        "Transform": {"x":28,"y":5654,"width":260,"height":18},
+        "Transform": {"x":28,"y":5641,"width":260,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"LcdDisplay — the component these drive","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1496,14 +1496,14 @@
     {
       "_children": {
         "Core": {"name":"qa05_lcd","id":"qa05_lcd_component","controlType":"LcdDisplay"},
-        "Transform": {"x":28,"y":5676}
+        "Transform": {"x":28,"y":5663}
       },
       "_type": "Control"
     },
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_43","id":"qa_cap_43","controlType":"Label"},
-        "Transform": {"x":312,"y":5654,"width":470,"height":18},
+        "Transform": {"x":312,"y":5641,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"44 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1513,7 +1513,7 @@
     {
       "_children": {
         "Core": {"name":"verbs_lcd","id":"qa05_lcd_verbs","controlType":"Label"},
-        "Transform": {"x":312,"y":5676,"width":470,"height":302},
+        "Transform": {"x":312,"y":5663,"width":470,"height":302},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"lcd.text(line)                lcd.valuePrecision(int)\nlcd.clear(line)               lcd.valuePrefix(str)\nlcd.backlight[on]             lcd.valueSuffix(str)\nlcd.brightness(num)           lcd.valueSource(link)\nlcd.contrast(num)             lcd.brightnessSource(link)\nlcd.scroll(enum)              lcd.backlightSource(link)\nlcd.scrollSpeed(num)          lcd.glyph(item)\nlcd.blink[on]                 lcd.editText(str)\nlcd.cursor(enum)              lcd.zoneText(elem)\nlcd.cursorAt(xy)              lcd.zoneLabel(elem)\nlcd.value(num)                lcd.zoneShow(elem)\nlcd.anim(enum)                lcd.zoneAt(elem)\nlcd.animPreset(enum)          lcd.zoneSource(elem)\nlcd.animSpeed(num)            lcd.zoneKind(elem)\nlcd.animFps(num)              lcd.layout(layout)\nlcd.animLoop[on]              lcd.showGlass[on]\nlcd.scrollMode(enum)          lcd.showGhost[on]\nlcd.scrollRepeat(int)         lcd.showScanlines[on]\nlcd.blinkRate(num)            lcd.showGrid[on]\nlcd.cursorBlink[on]           lcd.read(read)\nlcd.valueMin(num)             lcd.size(size)\nlcd.valueMax(num)             lcd.fill(fill)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}
@@ -1523,7 +1523,7 @@
     {
       "_children": {
         "Core": {"name":"group_Pixel_Display_pixel_Draw_on_a_pixel_screen_by_named_elements_what_each_is_shows_and_where_plus_its_layouts_backlight_brightness_and_animation_","id":"qa_group_22","controlType":"Label"},
-        "Transform": {"x":28,"y":6012,"width":1544,"height":26},
+        "Transform": {"x":28,"y":5999,"width":1544,"height":26},
         "Background": {"_children":{"Fill":{"colour":"FF23282D"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"Pixel Display — pixel.*  (Draw on a pixel screen by named elements: what each is, shows and where, plus its layouts, backlight, brightness and animation.)","_children":{"Font":{"size":13,"bold":true}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":10,"paddingRight":10,"paddingTop":3,"paddingBottom":3}
@@ -1533,7 +1533,7 @@
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_44","id":"qa_cap_44","controlType":"Label"},
-        "Transform": {"x":28,"y":6048,"width":260,"height":18},
+        "Transform": {"x":28,"y":6035,"width":260,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"PixelDisplay — the component these drive","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1543,14 +1543,14 @@
     {
       "_children": {
         "Core": {"name":"qa05_pixel","id":"qa05_pixel_component","controlType":"PixelDisplay"},
-        "Transform": {"x":28,"y":6070}
+        "Transform": {"x":28,"y":6057}
       },
       "_type": "Control"
     },
     {
       "_children": {
         "Core": {"name":"caption_qa_cap_45","id":"qa_cap_45","controlType":"Label"},
-        "Transform": {"x":312,"y":6048,"width":470,"height":18},
+        "Transform": {"x":312,"y":6035,"width":470,"height":18},
         "Background": {"_children":{"Fill":{"colour":"00000000"}}},
         "Text": {"content":"31 verbs","_children":{"Font":{"size":11}}},
         "ContentLayout": {"horizontalAlign":"left","paddingLeft":2,"paddingRight":2,"paddingTop":0,"paddingBottom":0}
@@ -1560,7 +1560,7 @@
     {
       "_children": {
         "Core": {"name":"verbs_pixel","id":"qa05_pixel_verbs","controlType":"Label"},
-        "Transform": {"x":312,"y":6070,"width":470,"height":224},
+        "Transform": {"x":312,"y":6057,"width":470,"height":224},
         "Background": {"_children":{"Fill":{"colour":"FF181D22"},"Border":{"thickness":1,"colour":"3389C2FF"},"Corners":{"radius":4}}},
         "Text": {"content":"pixel.text(elem)              pixel.anim(enum)\npixel.label(elem)             pixel.animPreset(enum)\npixel.show(elem)              pixel.animSpeed(num)\npixel.blink(elem)             pixel.animLoop[on]\npixel.x(elem)                 pixel.animFps(num)\npixel.y(elem)                 pixel.layoutTransition(enum)\npixel.w(elem)                 pixel.transitionMs(int)\npixel.h(elem)                 pixel.brightnessSource(link)\npixel.kind(elem)              pixel.backlightSource(link)\npixel.source(elem)            pixel.layout(layout)\npixel.editText(str)           pixel.showGlass[on]\npixel.backlight[on]           pixel.showGhost[on]\npixel.brightness(num)         pixel.showScanlines[on]\npixel.contrast(num)           pixel.showGrid[on]\npixel.gamma(num)              pixel.read(read)\npixel.glow(num)","_children":{"Font":{"family":"monospace","size":10}}},
         "ContentLayout": {"horizontalAlign":"left","verticalAlign":"top","paddingTop":6}

@@ -31,7 +31,7 @@
     : isSlider ? ['name', 'value', 'min', 'max', 'unit', ...(ranged ? ['start', 'end'] : [])]
       : ['text', 'name']);
   const addLabel = (shows) => (shows === 'caption'
-    ? addAttachedLabel(core.id, '', { content: String(getSection(control, 'Meter')?.label ?? '').trim() || 'Caption' })
+    ? addAttachedLabel(core.id, '', { content: 'Caption' })
     : addAttachedLabel(core.id, shows));
 
   const shownWords = (label) => {

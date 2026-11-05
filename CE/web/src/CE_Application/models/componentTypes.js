@@ -1402,7 +1402,6 @@ export const COMPONENT_TYPES = {
         valueMin: 0,
         valueMax: 1,
         value: 0.35,
-        showValue: true,
       },
       Background: {
         _children: {

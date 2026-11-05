@@ -195,7 +195,7 @@ export function attachedLabelRect(owner, shows, { size = 11, width = 0 } = {}) {
 
   if (shows === 'name') return centred(middle, y - line - gap, fit(w));
   if (shows === 'value') {
-    return String(behavior.labelReadoutPlacement ?? '').trim().toLowerCase() === 'center'
+    return String(behavior.valueLabelPlacement ?? '').trim().toLowerCase() === 'center'
       ? centred(middle, y + (h - line) / 2, fit(w * 0.6))
       : centred(middle, y + h + gap, fit(circular || vertical ? w * 0.6 : 40));
   }

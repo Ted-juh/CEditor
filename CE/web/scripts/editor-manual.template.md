@@ -1187,7 +1187,8 @@ firing on release and then disabled (or locked for its lockout), a repeating one
 while held. A button that fires sends its value on for a moment, and a switch flips; a held timed
 button looks pressed while it is held. Radio, cyclic and combo-box buttons do not come in yet. A meter comes in as its track and its zones' colours covered past
 the reading, its segments each lighting as the reading reaches them, or, drawn as a device, as its
-housing, face, scale, needle or bar and readout, moving with its value; it takes no input, and its
+housing, face, scale, needle or bar, moving with its value (its reading is a Label of its own, which
+comes in as a text layer when it is selected with it); it takes no input, and its
 value arrives as a knob's does. A button's or a label's text keeps where it is placed, its lines,
 its baseline shift and a line under, through or over it; its icon comes in as a layer of its own.
 A button, switch, meter or piece of artwork that is turned or scaled comes in turned and scaled, and

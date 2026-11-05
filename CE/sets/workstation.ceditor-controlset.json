@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "e5b67b77",
+  "fingerprint": "a13079c6",
   "set": {
     "id": "cassette-deck",
     "name": "Workstation",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 9,
           "Behavior.minorTickCount": 1,
@@ -852,9 +850,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,

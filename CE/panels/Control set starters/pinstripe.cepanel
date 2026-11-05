@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1747361086911","controlSetId":"pinstripe","id":"ctrl_1747361086911","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":13,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":13,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"circularFit":"tight"},
         "Parts": {
           "_drawing": "f12a5065"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1747361086912","controlSetId":"pinstripe","id":"ctrl_1747361086912","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":13,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":13,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"circularFit":"tight"},
         "Parts": {
           "_drawing": "f12a5065"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1747361086917","controlSetId":"pinstripe","id":"ctrl_1747361086917","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "cd6c16f0"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1747361086919","controlSetId":"pinstripe","id":"ctrl_1747361086919","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "cd6c16f0"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1747361086921","controlSetId":"pinstripe","id":"ctrl_1747361086921","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "cd6c16f0"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1747361086923","controlSetId":"pinstripe","id":"ctrl_1747361086923","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":20,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "cd6c16f0"
         },

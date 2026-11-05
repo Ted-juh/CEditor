@@ -1064,12 +1064,9 @@ test('the Meter\'s verbs say what MeterRenderer draws for each', () => {
     meterDbCeil: 'Set the level in decibels at which the meter is full, on a dB scale.',
     meterOrientation: 'Set which way the meter runs: across, up, or round an arc.',
     meterGradient: 'Blend the zone colours into each other, or step from one to the next.',
-    meterLabel: 'Set the caption shown with the meter.',
-    meterLabelPosition: 'Set where the caption sits.',
-    meterValuePrecision: 'Set how many decimal places the readout shows.',
+    meterValuePrecision: 'Set how many decimal places a Label showing the reading prints.',
     meterZoneAt: 'Set where a colour zone starts along the meter, by its number.',
     meterSource: 'Name the control that drives the level.',
-    meterShowValue: 'Show or hide the readout: the value as a number.',
   };
   for (const [id, summary] of Object.entries(summaries)) assert.equal(MEMBER_BY_ID[id].summary, summary, id);
   assert.equal(MEMBER_BY_ID.meterValue.example, '`ce.components.meter.value("Meter", 0.5)` fills the meter halfway while its range is 0 to 1.');
@@ -1077,9 +1074,8 @@ test('the Meter\'s verbs say what MeterRenderer draws for each', () => {
   assert.equal(text('meterDecay', 'decay'), 'Lengths of the meter per second.\n0: it does not fall.\nRange: 0 ↔ 100.\nOutside the range: the nearest end.\nInvalid: rejected with a console error.');
   assert.equal(MEMBER_BY_ID.meterValue.notes[0], 'While `source()` links a control, that control sets the value and its range.');
   assert.deepEqual(MEMBER_BY_ID.meterGradient.notes.slice(0, 1), ['Default: on; a Progress Bar\'s: off.']);
-  // The caption's position is new: the caption is drawn only where it says, and only the inspector could.
-  assert.deepEqual(byId('meterLabelPosition').values, ['none', 'above', 'below']);
-  assert.deepEqual(componentScriptPatch(byId('meterLabelPosition'), { labelPosition: 'none' }, ['Below']), { labelPosition: 'below' });
+  // Its reading and caption are Labels of their own, addressed as Labels: no verb draws them on it.
+  for (const gone of ['meterLabel', 'meterLabelPosition', 'meterShowValue']) assert.equal(MEMBER_BY_ID[gone], undefined, gone);
 });
 
 // ce.components.chordpad, done in one pass at the owner's word.

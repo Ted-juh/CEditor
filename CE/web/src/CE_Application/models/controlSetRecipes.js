@@ -63,21 +63,13 @@ function tickSettings(ticks, parts) {
 export function knobFamily({
   cap = 0, capFill = '{control.body}', capEdge = '{control.cap.edge}', capEdgeWidth = 1, capMaterial = null,
   pointer = 'dot', pointerWidth = 2, pointerLength = 88, pointerStart = 30, pointerFill = '{control.marker}', dotSize = 0,
-  track = 0, trackOpacity = 1, readoutFill = null,
-  // The boards put the value UNDER the knob and drew no min/max; `labels: 'board'` says so.
+  track = 0, trackOpacity = 1,
   // `ticks`: false for none, or { count, length, width, minor } for the board's ring of marks.
-  labels = 'board', ticks = null,
+  ticks = null,
 } = {}) {
   const parts = {};
   const component = {};
-  if (labels === 'board') {
-    component['Behavior.showMinMaxLabels'] = false;
-    component['Behavior.labelReadoutPlacement'] = 'bottom';
-  }
   Object.assign(component, tickSettings(ticks, parts));
-  // The value readout sits in the middle of the knob when the labels are left alone, which with
-  // a cap on is the middle of the cap; `readoutFill` names an ink that reads there.
-  if (cap > 0 && readoutFill && labels !== 'board') parts.labelValue = { 'Text.Fill.colour': readoutFill };
   if (cap > 0) {
     parts.bodyCap = {
       visible: true,
@@ -164,17 +156,11 @@ export function sliderFamily({
   // (an inner shadow along its upper edge), the fill inset from the slot's edge in px each
   // side, and a glow under the fill for a lit board.
   track = 0, trackRadius = null, slot = false, fillInset = 0, fillGlow = false,
-  // The boards drew a clean track with no ticks and no min/max, the title at the left end of
-  // the row above the track and the value at its right end; `labels: 'board'` says so.
-  labels = 'board', ticks = false,
+  // The boards drew a clean track with no ticks.
+  ticks = false,
 } = {}) {
   const parts = {};
   const component = {};
-  if (labels === 'board') {
-    component['Behavior.showMinMaxLabels'] = false;
-    component['Behavior.labelTitlePlacement'] = 'topLeft';
-    component['Behavior.labelReadoutPlacement'] = 'topRight';
-  }
   Object.assign(component, tickSettings(ticks, parts));
   const pointer = {
     'Layout.width': capAlong,

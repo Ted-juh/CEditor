@@ -35,7 +35,7 @@ const GEOMETRY = new Set([
   'padRadius', 'trackSize',
   'rowHeaderW', 'colHeaderH', 'charSpacing', 'lineSpacing', 'padding', 'fontScale',
   'dotMatrix', 'dotShape', 'dotPitch', 'snapGrid', 'gridDiv', 'gridX', 'gridY',
-  'scrollGap', 'segments', 'labelPosition', 'arcStart', 'arcSweep',
+  'scrollGap', 'segments', 'arcStart', 'arcSweep',
 ]);
 
 /**

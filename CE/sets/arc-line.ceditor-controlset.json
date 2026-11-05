@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "c679f724",
+  "fingerprint": "5c5f8983",
   "set": {
     "id": "arc-line",
     "name": "Arc Line",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": false,
           "Behavior.circularFit": "tight",
           "Behavior.scaleNumberCount": 0,
@@ -512,9 +510,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 5,
           "Behavior.minorTickCount": 0,

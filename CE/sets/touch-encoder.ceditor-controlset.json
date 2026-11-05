@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "477e37c4",
+  "fingerprint": "cc7c2d9a",
   "set": {
     "id": "touch-encoder",
     "name": "Touch Encoder",
@@ -80,12 +80,11 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "center",
           "Behavior.showTicks": false,
           "Behavior.circularFit": "tight",
           "Behavior.scaleNumberCount": 0,
-          "Behavior.tickRadius": 0
+          "Behavior.tickRadius": 0,
+          "Behavior.valueLabelPlacement": "center"
         },
         "parts": {
           "bodyCap": {
@@ -524,9 +523,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 8,
           "Behavior.minorTickCount": 0,

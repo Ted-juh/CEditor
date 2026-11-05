@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1703992633567","controlSetId":"floating-halo","formDepth":92,"id":"ctrl_1703992633567","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":9,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":9,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","circularFit":"tight"},
         "Parts": {
           "_drawing": "b6882b97"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1703992633568","controlSetId":"floating-halo","formDepth":92,"id":"ctrl_1703992633568","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":9,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":9,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","circularFit":"tight"},
         "Parts": {
           "_drawing": "b6882b97"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1703992633573","controlSetId":"floating-halo","id":"ctrl_1703992633573","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62da38cc"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1703992633575","controlSetId":"floating-halo","id":"ctrl_1703992633575","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62da38cc"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1703992633577","controlSetId":"floating-halo","id":"ctrl_1703992633577","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62da38cc"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1703992633579","controlSetId":"floating-halo","id":"ctrl_1703992633579","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":18,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62da38cc"
         },

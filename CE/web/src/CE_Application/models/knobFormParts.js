@@ -44,10 +44,10 @@ const ticks = (divisions, { placement = 'outside', major = 5, minor = 2.5 } = {}
   };
 };
 const noTicks = { component: { 'Behavior.showTicks': false }, parts: {} };
-// The value under the knob, and no min/max labels: what every form drew. A value Label the Labels tab
-// adds goes there (utils/attachedLabels.js; 'center' puts it in the face). The track fitted tight to
-// the box (utils/sliderGeometry.js), as the drawings filled it.
-const board = { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.circularFit': 'tight' };
+// The track fitted tight to the box (utils/sliderGeometry.js), as the drawings filled it. A value
+// Label the Labels tab adds goes under the knob, as every form printed its value, or in its face
+// where the form read it there (Behavior.valueLabelPlacement, utils/attachedLabels.js).
+const board = { 'Behavior.circularFit': 'tight' };
 // The value as the forms lettered it: small, monospaced, in the legend colour. A Label showing the
 // knob's value takes it (models/controlSetFamilies.js patchShownLabel).
 const readout = (colour = '{text.primary}') => ({ labelValue: { 'Text.Fill.colour': colour, 'Text.Font.family': 'JetBrains Mono', 'Text.Font.weight': 'normal' } });
@@ -166,7 +166,7 @@ const RECIPES = {
   }),
   // An optical lens in an octagonal housing, the value read in its centre.
   lens: ({ ink }) => merge(noTicks, {
-    component: { ...board, 'Behavior.labelReadoutPlacement': 'center' },
+    component: { ...board, 'Behavior.valueLabelPlacement': 'center' },
     parts: {
       ...noTrack,
       bodyHousing: { visible: true, ...size(117), ...outline('polygon', 8, 0, { outlineRotation: 22.5 }), ...edged(ROLES.housing, ink) },
@@ -210,7 +210,7 @@ const RECIPES = {
   encoder: ({ divisions }) => ({
     component: {
       ...board,
-      'Behavior.labelReadoutPlacement': 'center',
+      'Behavior.valueLabelPlacement': 'center',
       'Behavior.showTicks': true,
       'Behavior.majorTickCount': Math.max(4, Math.min(48, Math.round(divisions) || 12)),
       'Behavior.minorTickCount': 0,

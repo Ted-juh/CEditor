@@ -353,7 +353,7 @@
       "_children": {
         "Core": {"name":"Knob_1753399751292","controlSetId":"frost","id":"ctrl_1753399751292","controlType":"Knob"},
         "Transform": {"x":36,"y":112,"width":170,"height":170},
-        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":5,"minorTickCount":2,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":5,"minorTickCount":2,"circularFit":"tight"},
         "Parts": {
           "_drawing": "cc97489e"
         },
@@ -365,7 +365,7 @@
       "_children": {
         "Core": {"name":"Knob_1753399751293","controlSetId":"frost","id":"ctrl_1753399751293","controlType":"Knob"},
         "Transform": {"x":228,"y":132,"width":112,"height":112},
-        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":5,"minorTickCount":2,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":5,"minorTickCount":2,"circularFit":"tight"},
         "Parts": {
           "_drawing": "cc97489e"
         },
@@ -397,7 +397,7 @@
       "_children": {
         "Core": {"name":"Slider_1753399751296","controlSetId":"frost","id":"ctrl_1753399751296","controlType":"Slider"},
         "Transform": {"x":364,"y":150,"width":190},
-        "Behavior": {"defaultCurrentValue":0.66,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"defaultCurrentValue":0.66,"showTicks":false},
         "Parts": {
           "_children": {
             "bodyHousing": {"_children":{"Background":{"_children":{"Fill":{"colour":"55FFFFFF"}}}}},

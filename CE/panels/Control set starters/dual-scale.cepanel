@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1762121479777","controlSetId":"dual-scale","id":"ctrl_1762121479777","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"secondScaleRadius":64.71,"secondScaleCount":10,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"secondScaleRadius":64.71,"secondScaleCount":10,"circularFit":"tight"},
         "Parts": {
           "_drawing": "06717687"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1762121479778","controlSetId":"dual-scale","id":"ctrl_1762121479778","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"secondScaleRadius":64.71,"secondScaleCount":10,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"secondScaleRadius":64.71,"secondScaleCount":10,"circularFit":"tight"},
         "Parts": {
           "_drawing": "06717687"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1762121479783","controlSetId":"dual-scale","id":"ctrl_1762121479783","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62fcbf5a"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1762121479785","controlSetId":"dual-scale","id":"ctrl_1762121479785","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62fcbf5a"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1762121479787","controlSetId":"dual-scale","id":"ctrl_1762121479787","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62fcbf5a"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1762121479789","controlSetId":"dual-scale","id":"ctrl_1762121479789","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":24,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "62fcbf5a"
         },

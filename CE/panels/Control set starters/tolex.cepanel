@@ -353,7 +353,7 @@
       "_children": {
         "Core": {"name":"Knob_1719767988124","controlSetId":"tolex","id":"ctrl_1719767988124","controlType":"Knob"},
         "Transform": {"x":36,"y":112,"width":170,"height":170},
-        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":5,"minorTickCount":2,"majorTickLength":5,"tickPlacement":"inside","showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":5,"minorTickCount":2,"majorTickLength":5,"tickPlacement":"inside","circularFit":"tight"},
         "Parts": {
           "_drawing": "8a048443"
         },
@@ -365,7 +365,7 @@
       "_children": {
         "Core": {"name":"Knob_1719767988125","controlSetId":"tolex","id":"ctrl_1719767988125","controlType":"Knob"},
         "Transform": {"x":228,"y":132,"width":112,"height":112},
-        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":5,"minorTickCount":2,"majorTickLength":5,"tickPlacement":"inside","showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":5,"minorTickCount":2,"majorTickLength":5,"tickPlacement":"inside","circularFit":"tight"},
         "Parts": {
           "_drawing": "8a048443"
         },
@@ -397,7 +397,7 @@
       "_children": {
         "Core": {"name":"Slider_1719767988128","controlSetId":"tolex","id":"ctrl_1719767988128","controlType":"Slider"},
         "Transform": {"x":364,"y":150,"width":190},
-        "Behavior": {"defaultCurrentValue":0.66,"minorTickCount":0,"majorTickLength":4,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"defaultCurrentValue":0.66,"minorTickCount":0,"majorTickLength":4},
         "Parts": {
           "_children": {
             "bodyHousing": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFB8892E"}}}}},

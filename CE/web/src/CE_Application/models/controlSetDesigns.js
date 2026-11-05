@@ -80,8 +80,6 @@ function outerGlow(blur, colour) {
   return { enabled: true, type: 'outer-glow', offsetX: 0, offsetY: 0, blur, spread: 0, colour };
 }
 
-/** The labels every board drew: title left and value right above the track, no min/max. */
-const BOARD_LABELS = { 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' };
 function ticks({ count = 11, minor = 0, length = 5, kind = 'line', placement = 'outside', stops = null, numerals = null, width = 1.5, colour = null, minorColour = null } = {}) {
   const component = { 'Behavior.showTicks': true, 'Behavior.majorTickCount': count, 'Behavior.minorTickCount': minor, 'Behavior.majorTickLength': length, 'Behavior.tickPlacement': placement };
   if (stops) component['Behavior.tickStops'] = stops;
@@ -105,7 +103,7 @@ function handles(cap, { start = '{control.cap.start}', end = '{control.cap.end}'
   };
 }
 function slider(scale, parts, component = {}) {
-  return { Slider: { component: { ...BOARD_LABELS, ...scale.component, ...component }, parts: { ...scale.parts, ...parts } } };
+  return { Slider: { component: { ...scale.component, ...component }, parts: { ...scale.parts, ...parts } } };
 }
 
 // ---- sliders ----------------------------------------------------------------------------------
@@ -425,7 +423,7 @@ export const EDITOR_PATHS = [
   /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY|rotation)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
-  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit|tickRadius|secondScaleRadius|secondScaleCount|scaleNumberCount|scaleNumberFrom|scaleNumberTo)$/,
+  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|valueLabelPlacement|circularFit|tickRadius|secondScaleRadius|secondScaleCount|scaleNumberCount|scaleNumberFrom|scaleNumberTo)$/,
   /^Text\.Fill\.colour$/,
   /^Text\.Font\.(family|weight|weightValue|letterSpacing|size)$/,
   /^Text\.Effects\.(shadowEnabled|shadowStyle|shadowOffsetX|shadowOffsetY|shadowBlur|shadowColour|glowEnabled|glowSize|glowIntensity|glowColour)$/,

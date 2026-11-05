@@ -380,7 +380,7 @@ try {
     const short = (y, extra) => kit.make('Slider', { 'Transform.x': 70, 'Transform.y': y,
       'Transform.width': 320, 'Transform.height': 46, 'Behavior.min': 0, 'Behavior.max': 100,
       'Behavior.step': 5, 'Behavior.precision': 0, 'Behavior.defaultCurrentValue': 40,
-      'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': false, ...extra });
+      'Behavior.showTicks': false, ...extra });
     const noArrows = await short(110, { 'Behavior.arrowKeyAdjust': false });
     const noPage = await short(165, { 'Behavior.pageKeyAdjust': false });
     const noHomeEnd = await short(220, { 'Behavior.homeEndAdjust': false });

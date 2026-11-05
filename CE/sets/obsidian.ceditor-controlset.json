@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "a0c08c36",
+  "fingerprint": "f611b0d0",
   "set": {
     "id": "obsidian",
     "name": "Obsidian",
@@ -80,13 +80,12 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "center",
           "Behavior.showTicks": false,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 0,
           "Behavior.majorTickLength": 6,
-          "Behavior.circularFit": "tight"
+          "Behavior.circularFit": "tight",
+          "Behavior.valueLabelPlacement": "center"
         },
         "parts": {
           "tickMinor": {
@@ -558,9 +557,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": false
         },
         "parts": {

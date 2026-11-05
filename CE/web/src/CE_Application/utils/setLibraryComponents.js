@@ -339,12 +339,14 @@ export function controlValueSpec(control, kind) {
   return { defaultValue: kind === 'toggle' ? (behavior.defaultValue === true || Number(behavior.defaultCurrentValue) === 1) : false };
 }
 
-/** The text a control shows as its caption: a knob's title, a button's label, a meter's label. */
+/**
+ * The text a control shows as its caption: a button's label. A knob, a slider or a meter has none
+ * of its own: its name and its caption are Labels attached to it (utils/attachedLabels.js), and they
+ * stay attached to the copy, which takes the control's id.
+ */
 export function controlCaption(control, kind) {
-  const children = sections(control);
-  if (kind === 'value') return String(children.Parts?._children?.labelTitle?._children?.Text?.content ?? '').trim();
-  if (kind === 'display') return String(children.Meter?.label ?? '').trim();
-  return String(children.Text?.content ?? '').trim();
+  if (kind === 'value' || kind === 'display') return '';
+  return String(sections(control).Text?.content ?? '').trim();
 }
 
 /** Write `value` at a dotted path whose `_children` levels are transparent. False when it leads nowhere. */
@@ -479,13 +481,10 @@ export function restoredControl(copy) {
     out.Meter.valueMin = numberOr(channel.min, out.Meter.valueMin);
     out.Meter.valueMax = numberOr(channel.max, out.Meter.valueMax);
   }
+  // A button's caption, as the copy holds it now (a knob or a meter has none: controlCaption).
   if (placement.caption) {
     const shown = readPath(copy, placement.caption);
-    if (typeof shown === 'string') {
-      if (kind === 'value' && out.Parts?._children?.labelTitle?._children?.Text) out.Parts._children.labelTitle._children.Text.content = shown;
-      else if (kind === 'display' && out.Meter) out.Meter.label = shown;
-      else if (out.Text) out.Text.content = shown;
-    }
+    if (typeof shown === 'string' && out.Text) out.Text.content = shown;
   }
   if (mine.DeviceBindings) {
     const before = placement.replaced._children.DeviceBindings?.bindings ?? [];

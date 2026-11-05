@@ -27,8 +27,8 @@ function layersOf(control, rect = { x: 0, y: 0, width: 200, height: 125 }) {
 
 const named = (out, suffix) => out.parts.find((part) => part.name === `level_${suffix}`);
 
-test('a readout, a label, scale labels, an arc and a track you can see through no longer refuse', () => {
-  for (const props of [{ showValue: true }, { label: 'LEVEL', labelPosition: 'above' }, { showScaleLabels: true }, { orientation: 'arc' }, { orientation: 'arc', segments: 12 }]) {
+test('scale labels, an arc and a track you can see through no longer refuse', () => {
+  for (const props of [{ showScaleLabels: true }, { orientation: 'arc' }, { orientation: 'arc', segments: 12 }]) {
     assert.equal(plainMeterLayersRefusal(meter(props)), '', JSON.stringify(props));
   }
   assert.equal(plainMeterLayersRefusal(meter({ scale: 'db' })), '', 'a decibel scale: its bindings read on it');
@@ -44,11 +44,10 @@ test('a readout, a label, scale labels, an arc and a track you can see through n
 });
 
 test('a meter comes in with no reading or caption of its own: those are Labels, and its body fills its box', () => {
-  const plain = layersOf(meter({}));
-  const old = layersOf(meter({ showValue: true, label: 'LEVEL', labelPosition: 'above' }));
-  assert.ok(!named(old, 'readout') && !named(old, 'label'), 'a reading or caption left on the meter from before draws nothing');
-  const track = (out) => named(out, 'track')._children.Layout;
-  assert.deepEqual([track(old).y, track(old).height], [track(plain).y, track(plain).height], 'the body is the box less its padding');
+  const out = layersOf(meter({}));
+  assert.ok(!named(out, 'readout') && !named(out, 'label'));
+  const track = named(out, 'track')._children.Layout;
+  assert.deepEqual([track.x, track.y, track.width, track.height], [4, 4, 192, 117], 'the body is the box less its padding');
 });
 
 test('an arc meter is its track and one fill arc in the zones\' colours whose sweep is the reading', () => {

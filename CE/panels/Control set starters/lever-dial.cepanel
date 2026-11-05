@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1761215344946","controlSetId":"lever-dial","formDepth":92,"id":"ctrl_1761215344946","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","scaleNumberCount":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","scaleNumberCount":6,"circularFit":"tight"},
         "Parts": {
           "_drawing": "0c8dc14a"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1761215344947","controlSetId":"lever-dial","formDepth":92,"id":"ctrl_1761215344947","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","scaleNumberCount":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":6,"tickPlacement":"inside","scaleNumberCount":6,"circularFit":"tight"},
         "Parts": {
           "_drawing": "0c8dc14a"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1761215344952","controlSetId":"lever-dial","id":"ctrl_1761215344952","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "bc924594"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1761215344954","controlSetId":"lever-dial","id":"ctrl_1761215344954","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "bc924594"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1761215344956","controlSetId":"lever-dial","id":"ctrl_1761215344956","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "bc924594"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1761215344958","controlSetId":"lever-dial","id":"ctrl_1761215344958","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":9,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "bc924594"
         },

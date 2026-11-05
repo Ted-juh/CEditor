@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1719771023517","controlSetId":"gemstone","id":"ctrl_1719771023517","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":7,"minorTickCount":1,"tickPlacement":"inside","tickRadius":121.82,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":7,"minorTickCount":1,"tickPlacement":"inside","tickRadius":121.82,"circularFit":"tight"},
         "Parts": {
           "_drawing": "0ff01ec8"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1719771023518","controlSetId":"gemstone","id":"ctrl_1719771023518","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":7,"minorTickCount":1,"tickPlacement":"inside","tickRadius":121.82,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":7,"minorTickCount":1,"tickPlacement":"inside","tickRadius":121.82,"circularFit":"tight"},
         "Parts": {
           "_drawing": "0ff01ec8"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1719771023523","controlSetId":"gemstone","id":"ctrl_1719771023523","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":1,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
           "_drawing": "3c978558"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1719771023525","controlSetId":"gemstone","id":"ctrl_1719771023525","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":1,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
           "_drawing": "3c978558"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1719771023527","controlSetId":"gemstone","id":"ctrl_1719771023527","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":1,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
           "_drawing": "3c978558"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1719771023529","controlSetId":"gemstone","id":"ctrl_1719771023529","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5},
         "Parts": {
           "_drawing": "3c978558"
         },

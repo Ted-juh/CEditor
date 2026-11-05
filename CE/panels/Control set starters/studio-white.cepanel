@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1742412342893","controlSetId":"studio-white","id":"ctrl_1742412342893","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":4,"minorTickCount":1,"tickPlacement":"inside","tickRadius":109.23,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"majorTickCount":4,"minorTickCount":1,"tickPlacement":"inside","tickRadius":109.23,"circularFit":"tight"},
         "Parts": {
           "_drawing": "f9d4b5d6"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1742412342894","controlSetId":"studio-white","id":"ctrl_1742412342894","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":4,"minorTickCount":1,"tickPlacement":"inside","tickRadius":109.23,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"majorTickCount":4,"minorTickCount":1,"tickPlacement":"inside","tickRadius":109.23,"circularFit":"tight"},
         "Parts": {
           "_drawing": "f9d4b5d6"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1742412342899","controlSetId":"studio-white","id":"ctrl_1742412342899","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "9e45331d"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1742412342901","controlSetId":"studio-white","id":"ctrl_1742412342901","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "9e45331d"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1742412342903","controlSetId":"studio-white","id":"ctrl_1742412342903","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "9e45331d"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1742412342905","controlSetId":"studio-white","id":"ctrl_1742412342905","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"majorTickCount":6,"minorTickCount":0,"majorTickLength":5},
         "Parts": {
           "_drawing": "9e45331d"
         },

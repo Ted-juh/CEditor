@@ -421,7 +421,7 @@
       "_children": {
         "Core": {"name":"Knob_1735513508404","controlSetId":"flightdeck","id":"ctrl_1735513508404","controlType":"Knob"},
         "Transform": {"x":26,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.63,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"circularFit":"tight"},
         "Parts": {
           "_drawing": "e65f7270"
         },
@@ -433,7 +433,7 @@
       "_children": {
         "Core": {"name":"Knob_1735513508405","controlSetId":"flightdeck","id":"ctrl_1735513508405","controlType":"Knob"},
         "Transform": {"x":194,"y":120,"width":150,"height":150},
-        "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom","circularFit":"tight"},
+        "Behavior": {"defaultCurrentValue":0.35,"minorTickCount":1,"majorTickLength":5,"tickPlacement":"inside","scaleNumberCount":6,"circularFit":"tight"},
         "Parts": {
           "_drawing": "e65f7270"
         },
@@ -485,7 +485,7 @@
       "_children": {
         "Core": {"name":"Slider_1735513508410","controlSetId":"flightdeck","id":"ctrl_1735513508410","controlType":"Slider"},
         "Transform": {"x":356,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.2,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "847170b8"
         },
@@ -507,7 +507,7 @@
       "_children": {
         "Core": {"name":"Slider_1735513508412","controlSetId":"flightdeck","id":"ctrl_1735513508412","controlType":"Slider"},
         "Transform": {"x":406,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.55,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "847170b8"
         },
@@ -529,7 +529,7 @@
       "_children": {
         "Core": {"name":"Slider_1735513508414","controlSetId":"flightdeck","id":"ctrl_1735513508414","controlType":"Slider"},
         "Transform": {"x":456,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.7,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "847170b8"
         },
@@ -551,7 +551,7 @@
       "_children": {
         "Core": {"name":"Slider_1735513508416","controlSetId":"flightdeck","id":"ctrl_1735513508416","controlType":"Slider"},
         "Transform": {"x":506,"y":120,"width":44,"height":155},
-        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":6,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
+        "Behavior": {"orientation":"vertical","direction":"btt","defaultCurrentValue":0.35,"minorTickCount":0,"majorTickLength":6},
         "Parts": {
           "_drawing": "847170b8"
         },

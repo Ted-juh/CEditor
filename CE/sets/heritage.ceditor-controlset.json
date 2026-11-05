@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "47f7ae66",
+  "fingerprint": "0a7ef9f1",
   "set": {
     "id": "heritage",
     "name": "Heritage",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.majorTickCount": 6,
           "Behavior.minorTickCount": 1,
           "Behavior.majorTickLength": 5,
@@ -265,9 +263,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 10,
           "Behavior.minorTickCount": 0,
