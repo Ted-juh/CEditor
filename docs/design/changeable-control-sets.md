@@ -777,6 +777,36 @@ cards filters **All**, **Made of parts**, **Image strips**; and the detail colum
 cannot do and that it tints per layer through Effects › Filters (brightness and hue rotation, which
 parts already had).
 
+### G. A knob's text as Labels of its own (medium)
+
+A knob or a slider drew its name, its value and the ends of its range itself, from a Label section
+of its own that took only part of the Text properties, so most of them did nothing on a set's knob.
+The owner asked for the text to be separate: a knob is a knob, as a Label is a Label.
+
+**Built** in three steps (the owner chose option B, then: placement by rule, Alt+click, convert):
+
+- **Shows** (`utils/labelShows.js`). A Label shows its own words, or the name, value, min, max,
+  unit, start or end of a control: the one it names, else the one it is attached to. The words
+  are the control's own printing (its readout format, a meter's prefix and suffix); the canvas reads
+  the control as authored, Preview, the player and the plug-in its live value. A set letters a
+  shown Label as it letters that part of a knob, where the author has not.
+- **Attached to** (`utils/attachedLabels.js`). A Label attached to a control moves with it however
+  it is moved (every store write that moves a control goes through `withAttachedFollowing`), is
+  copied with it and attached to the copy, goes into a container with it, and is deleted with it.
+  Alt+click selects a control with its Labels; the tree lists them under it. The knob's **Labels**
+  tab lists them and adds them (`utils/attachedLabelFactory.js`): the name above, the value below
+  (in the middle when the knob reads it there), min and max beside the ends of the arc or under the
+  ends of the track.
+- **The knob draws no text.** The renderer, Preview's and the Test Bench's hit-testing, and Create
+  Component from Selection all lay the track out with no room kept for text
+  (`sliderTextRoom`), so they agree; only the labels riding the handles are still the control's.
+  A value Label selected with its knob comes in as a text layer bound to the knob's channel.
+
+The starters were re-exported with value Labels and attached titles; a panel generated from a
+profile attaches each caption to its control and gives a knob a value Label. The example panels in
+`CE/panels` have no knob of this kind, so there was nothing to convert. Not yet: a meter's reading
+and a button's caption are still drawn by the control.
+
 ## Bringing designs in: Photoshop and Blender
 
 The owner: "Call it KnobMan on steroids but without the filmstrips. The usage of filmstrips is for
@@ -971,3 +1001,11 @@ Taken by the owner, 2026-11-03:
    plug-in needs no WebGL, and Linux, whose webview has no GPU, needs no JUCE patch.
 5. **A set that names a library component (D4): later.** Taken up the same day and built as the
    approved mock-up showed: chosen in the family's row, placed and put back by the Apply window.
+
+Taken by the owner, 2026-11-05:
+
+6. **A knob's text is Labels of its own (G).** "A label is a label as a slider is a slider." Option
+   B: a Label shows a control's name, value or range, and can be attached to it; a knob inserted
+   new comes with none. The Labels tab places a new one by rule; Alt+click selects a control with
+   its Labels; the example panels are converted once by a script (there turned out to be nothing
+   in them to convert).

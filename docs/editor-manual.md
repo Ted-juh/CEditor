@@ -266,6 +266,34 @@ clicked. **Ctrl+D** duplicates the selection, a little offset. **Delete** remove
 **Copy Style** (Ctrl+Alt+C) and **Paste Style** (Ctrl+Alt+V) copy the look of one control — its
 background, border, text styling, icon and effects — onto others, without changing what they do.
 
+### A knob's name, value and range
+
+A knob or a slider draws no text of its own. Its name, its value and the ends of its range are
+Labels of their own beside it, so every text setting applies to them and they go wherever you put
+them. A knob you insert comes without any; add the ones you want.
+
+Select the knob and open its **Labels** tab. It lists the Labels attached to the knob, each with
+what it reads and a **Select** button, and adds one with **+ Name**, **+ Value**, **+ Min**, **+ Max**
+or **+ Unit** (and **+ Start** and **+ End** for a range): the name above the knob, the value below
+it, min and max beside the ends of the arc or under the ends of the track, each as wide as its
+words. The control set letters it as it letters that part of a knob.
+
+On any Label's **Text** tab, **Shows** chooses what it reads: its own text, or the value, name, min,
+max, unit, start or end of a control. On the canvas it reads the control as it is set up; in
+Preview, the player and the plug-in it follows the live value, printed as the control prints it (a
+frequency, a note name, a plus sign). **Attached to** names the control the Label belongs to;
+**Detach** sets it free, and it goes on showing that control.
+
+An attached Label moves with its control however the control is moved (a drag, the arrow keys, the
+X and Y fields, Align, a script), is copied with it by Copy and Paste, Duplicate and Alt+drag and
+attached to the copy, goes into a container with it, and is deleted with it. Moved on its own, it
+stays where you put it. **Alt+click** selects a control together with its Labels, and the component
+tree lists them under it. Selected with the knob for **Create Component from Selection**, they come
+in too, the value as a layer that follows the knob's value.
+
+The labels that ride a knob's or slider's handles as they move are still its own: **Handle Labels**
+on its Labels tab.
+
 ### Containers and grouping
 
 A **container** holds other controls, so that they move together. **Ctrl+G** (Edit → Group into
@@ -1085,8 +1113,8 @@ You can also turn existing artwork into a component: select some backgrounds, im
 labels, knobs, sliders, buttons, switches or meters and choose **Edit → Create Component from
 Selection...**. A window asks for the component's name and, for knobs, sliders, buttons, switches and
 meters, how they come in. **As layers** makes each part a
-layer you can select, move, restyle and recolour (housing, track, value arc, cap, pointer, ticks,
-readout; a slider's track, fill and fader cap), wired to the value by bindings the **React** tab
+layer you can select, move, restyle and recolour (housing, track, value arc, cap, pointer, ticks;
+a slider's track, fill and fader cap), wired to the value by bindings the **React** tab
 shows, with their colours still linked to the set's colour roles. **As one exact part** keeps the
 knob as it was, drawn by the panel's own knob code. Every set's controls come in as layers, Iris and
 Satellite aside (they are drawn whole): a plate in perspective, a skirt, an insert, a drop shadow
@@ -1097,9 +1125,10 @@ shadow stay put, as on the panel. What a layer does not draw yet (a control form
 of parts) comes in as one exact part, and the window names it and why. A rendered plate, fader cap,
 key or meter housing comes in as a layer that draws the same lit picture, its ridges turning under a
 light that stays put. A track, value arc or dot pointer in a gradient, a picture or a finish keeps
-it. A label that rides the pointer or the fader cap moves with the value, upright. A readout or
-label that shows the value as the synth does (a frequency, a pan position, a note name, a table
-entry) reads the same as a layer, and so does a plus sign on positive values. A range (two
+it. A label that rides the pointer or the fader cap moves with the value, upright. A knob's name,
+value and range ends are Labels of their own: selected with it (**Alt+click** takes them all), they
+come in too, a value Label as a layer that reads the knob's value as the synth does (a frequency, a
+pan position, a note name, a table entry, a plus sign on positive values). A range (two
 handles) or a band (a value between them) comes in with a value for each handle, kept in order: the
 fill runs from one to the other, the ticks light between them, and a press on the track takes the
 handle nearest to it, as on the panel. The fill is moved by both ends: on the **React** tab, the
