@@ -177,6 +177,8 @@ const arc = (width, base, fill = ROLES.accent) => ({
   bodyTrackBase: base ? { visible: true, 'Layout.height': px(width), opacity: 1, 'Background.Fill.colour': base, 'Background.Fill.gradientEnabled': false, 'Background.Border.enabled': false } : { visible: false, 'Layout.height': px(width) },
   bodyTrackFill: { visible: true, 'Layout.height': px(width), opacity: 1, 'Background.Fill.colour': fill, 'Background.Fill.gradientEnabled': false, 'Background.Border.enabled': false },
 });
+// As the knob forms (models/knobFormParts.js): the value under the knob, lettered small and
+// monospaced in the legend colour, which a Label showing the value takes; the track fitted tight.
 const board = { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.circularFit': 'tight' };
 const readout = { labelValue: { 'Text.Fill.colour': ROLES.legend, 'Text.Font.family': 'JetBrains Mono', 'Text.Font.weight': 'Regular', 'Text.Font.weightValue': 400 } };
 

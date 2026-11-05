@@ -1,6 +1,6 @@
 // labelShows.js — a Label that shows something of another control instead of its own words.
 //
-// A knob or a slider draws no text of its own (a meter still prints its reading): its name, its
+// A knob, a slider or a meter draws no text of its own: its name, its
 // value, the ends of its range are Labels beside it, each a Label like any other (every Text
 // property applies), told what to show (`Text.shows`) and of which control (`Text.showsControl`, or
 // else the control it is attached to, `Core.attachedTo`; utils/attachedLabels.js keeps the two
@@ -114,7 +114,7 @@ export function shownText(source, shows, session = null) {
   const type = String(kids.Core?.controlType ?? '');
   if (shows === 'name') return String(kids.Core?.name ?? '');
   if (shows === 'text') return String(kids.Text?.content ?? '');
-  // A meter prints its value as its readout does (MeterRenderer): prefix, figures, suffix.
+  // A meter's value as its readout printed it: prefix, figures, suffix.
   if (kids.Meter && (type === 'Meter' || type === 'ProgressBar')) {
     const meter = kids.Meter;
     const places = Math.min(6, Math.max(0, Math.round(num(meter.valuePrecision, 0))));

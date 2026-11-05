@@ -4,7 +4,7 @@
 // edited and its colours were five fields. The owner decided that forms become parts
 // (docs/design/changeable-control-sets.md, piece B): each form here is a family patch of the
 // meter's parts (models/meterDeviceParts.js), so every shape, colour and motion of it is a
-// property, and the form frame still places it, readout and all.
+// property, and the form frame still places it. Its reading is a Label of its own.
 //
 // The colours are the form's five, as set colour roles: face {surface}, housing {control.track},
 // legends {text.primary}, indicator {accent}, and the ink, which the set works out against its
@@ -161,9 +161,9 @@ export function meterFormFamily(type, form, { ink = 'FF20282C', divisions = 12, 
   if (!recipe) {
     // A synth set's meter (models/directionDeviceParts.js).
     const parts = directionDeviceParts(type, form, { ink, ...(face ? { face } : {}), ...(housing ? { housing } : {}) });
-    // Its readout monospaced, as the synth sets printed it.
+    // Its text monospaced, as the synth sets lettered it.
     return parts ? { component: { 'Text.Fill.colour': ROLES.legend, 'Text.Font.family': 'JetBrains Mono' }, parts } : null;
   }
-  // The readout in the legend colour, as the forms set it.
+  // Its text in the legend colour, as the forms set it.
   return { component: { 'Text.Fill.colour': ROLES.legend }, parts: recipe({ ink, face, divisions: Math.max(4, Math.min(48, Math.round(Number(divisions) || 12))) }) };
 }

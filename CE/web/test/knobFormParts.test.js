@@ -158,23 +158,20 @@ test('the Knob tab has a section per part, each field naming a property a set ma
   assert.match(slider, /id: 'bodyHousing', path: 'Parts\.bodyHousing\.Background', label: 'Housing'/);
 });
 
-test('the tight fit keeps a knob above a readout under it, its housing and all', () => {
-  const base = { trackThickness: 2, pointerSize: 0, majorTickLength: 5, hasTicks: true, hasReadout: true, tight: true, showsMinMax: false, labelMetrics: { readoutSize: 12 } };
-  // As before without the readout below: a knob that exists keeps its size.
-  const before = resolveCircularTrackMetrics(120, 128, base);
-  assert.equal(before.centerY, 72);
-  // Below: centred in the room above the readout, and the housing's reach fits in it.
-  const below = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 1.4 });
-  const readoutTop = 128 - 14 - 12 * 0.6;
-  assert.ok(below.centerY < 72);
-  assert.ok(below.centerY + below.radius * 1.4 <= readoutTop, 'the housing clears the readout');
-  assert.ok(below.centerY - below.radius * 1.4 >= 0, 'and the top');
-  // A housing within the track does not shrink it.
-  const small = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 0.9 });
-  assert.ok(small.radius > below.radius);
-  // A knob draws no readout of its own now (its value is a Label beside it, utils/labelShows.js):
-  // it keeps no room for one, and the tight fit fills its box, housing and all.
+test('the tight fit keeps a knob\'s housing inside its box', () => {
+  const base = { trackThickness: 2, pointerSize: 0, majorTickLength: 5, hasTicks: true, tight: true };
+  // A housing within the track's reach: the knob keeps its size.
+  const plain = resolveCircularTrackMetrics(120, 128, base);
+  assert.deepEqual([plain.centerX, plain.centerY], [60, 64], 'centred: it keeps no room for a readout of its own');
+  assert.equal(resolveCircularTrackMetrics(120, 128, { ...base, outerReach: 0.9 }).radius, plain.radius);
+  // One reaching further: the knob draws in until the housing fits, 2 px from the edge.
+  const housed = resolveCircularTrackMetrics(120, 128, { ...base, outerReach: 1.4 });
+  assert.ok(housed.radius < plain.radius);
+  assert.ok(housed.centerX - housed.radius * 1.4 >= 2 - 1e-9, 'the housing clears the side');
+  // A knob that is not tight keeps the size it always had.
+  assert.equal(resolveCircularTrackMetrics(120, 128, { ...base, tight: false, outerReach: 1.4 }).radius,
+    resolveCircularTrackMetrics(120, 128, { ...base, tight: false }).radius);
+  // The renderer and the layers pass it the housing's reach.
   const renderer = source('editor/SliderFamilyRenderer.svelte');
-  assert.match(renderer, /\.\.\.textRoom,\s*tight: circularFitTight,/);
-  assert.match(renderer, /outerReach: housingReach/);
+  assert.match(renderer, /handleLabelSize,\s*tight: circularFitTight,\s*outerReach: housingReach,/);
 });

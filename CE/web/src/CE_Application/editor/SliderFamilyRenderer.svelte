@@ -17,7 +17,7 @@
     getSliderValueMode,
   } from '../utils/sliderBehavior.js';
   import {
-    buildSliderLabelAnchors,
+    buildSliderHandleLabelAnchors,
     buildSliderTickStops,
     normalizeDegrees,
     resolveCircularArcSweep,
@@ -26,7 +26,7 @@
     resolveLinearPointerPoint,
     resolveLinearTrackFrame,
     sliderNormalizedToAngle,
-    sliderTextRoom,
+    sliderHandleLabelRoom,
   } from '../utils/sliderGeometry.js';
 
   let {
@@ -178,13 +178,9 @@
     const effects = text?._children?.Effects ?? null;
     const shadow = buildLabelShadow(effects, fill?.colour ?? 'FFFFFFFF');
     const filter = buildLabelFilter(effects);
-    // A corner-placed label (utils/sliderGeometry.js placedLabel) hangs from its start or end
-    // rather than its centre; the stylesheet's translate is the centred default.
-    const align = anchor?.align === 'start' ? 'translate(0, -50%)' : (anchor?.align === 'end' ? 'translate(-100%, -50%)' : '');
     return [
       `left:${numberOr(anchor?.x, 0)}px`,
       `top:${numberOr(anchor?.y, 0)}px`,
-      align ? `transform:${align}` : '',
       `color:${argbToCss(fill?.colour, '#FFFFFF')}`,
       `font-family:${JSON.stringify(font?.family ?? 'Arial')}`,
       `font-size:${numberOr(font?.size, 11)}px`,
@@ -296,8 +292,6 @@
     current: numberOr(signals?.currentValueRaw, numberOr(signals?.valueRaw, 0)),
     end: numberOr(signals?.endValueRaw, 0),
   });
-  // It draws no name, value or range ends of its own: those are Labels beside it (utils/labelShows.js),
-  // and its track fills the box (sliderTextRoom). Only the labels riding its handles are its own.
   let showTicks = $derived(behavior?.showTicks !== false);
   // Behavior.tickRadius: the scale's own radius, a percentage of the track's, where a knob prints
   // its scale away from its value arc (0, the default: on the track, either side of its width).
@@ -312,20 +306,15 @@
   let pointerEndPart = $derived(parts?._children?.pointerEnd ?? null);
   let tickMajorPart = $derived(parts?._children?.tickMajor ?? null);
   let tickMinorPart = $derived(parts?._children?.tickMinor ?? null);
+  // The labels riding the handles: the only text it draws. Its name, value and range ends are
+  // Labels of their own beside it (utils/labelShows.js), and its track keeps no room for them.
   let labelParts = $derived({
-    min: parts?._children?.labelMin ?? null,
-    max: parts?._children?.labelMax ?? null,
     start: parts?._children?.labelStart ?? null,
     current: parts?._children?.labelCurrent ?? null,
     end: parts?._children?.labelEnd ?? null,
-    title: parts?._children?.labelTitle ?? null,
-    value: parts?._children?.labelValue ?? null,
-    unit: parts?._children?.labelUnit ?? null,
   });
-  let textRoom = $derived(sliderTextRoom(behavior, {
-    handleSize: Math.max(labelFontSize(labelParts.start, 11), labelFontSize(labelParts.current, 11), labelFontSize(labelParts.end, 11)),
-  }));
-  let labelMetrics = $derived(textRoom.labelMetrics);
+  let handleLabelSize = $derived(sliderHandleLabelRoom(behavior,
+    Math.max(labelFontSize(labelParts.start, 11), labelFontSize(labelParts.current, 11), labelFontSize(labelParts.end, 11))));
   let trackThickness = $derived(numberOr(trackBasePart?._children?.Layout?.height, 10));
   let pointerCurrentSize = $derived(numberOr(pointerCurrentPart?._children?.Layout?.width, 20));
   // The knob's body (utils/sliderEntityFactory.js `bodyCap`): a disc under the pointer, sized as a
@@ -582,7 +571,7 @@
     if (!(span > 0)) return 0.5;
     return clamp((numberOr(behavior?.centerValue, min) - min) / span, 0, 1);
   });
-  let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, false, labelMetrics));
+  let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize));
   let circularFitTight = $derived(String(behavior?.circularFit ?? 'auto') === 'tight');
   // How far the housing reaches, as a multiple of the track's radius: its size and its outline's
   // reach (a square set square reaches less far than its corners). For the tight fit.
@@ -612,10 +601,9 @@
     majorTickLength,
     hasTicks: showTicks,
     circularDiameter: behavior?.circularDiameter,
-    ...textRoom,
+    handleLabelSize,
     tight: circularFitTight,
     outerReach: housingReach,
-    readoutGap: numberOr(behavior?.labelReadoutGap, 14),
     numberReach: scaleNumberReach,
     numberSize: scaleNumberSize,
   }));
@@ -623,11 +611,10 @@
     x: circularMetrics.centerX,
     y: circularMetrics.centerY,
   });
-  let labelAnchors = $derived(buildSliderLabelAnchors(behavior, width, height, normalizedValues, {
+  let labelAnchors = $derived(buildSliderHandleLabelAnchors(behavior, width, height, normalizedValues, {
     trackThickness,
     pointerSize: maxPointerSize,
-    hasReadout: false,
-    labelMetrics,
+    handleLabelSize,
   }));
   let tickStops = $derived(buildSliderTickStops(behavior));
   // How a tick is drawn (utils/sliderEntityFactory.js): a line, a dot, the stop's numeral, or a
@@ -816,7 +803,7 @@
       : role === 'end'
         ? pointerEndSize
         : pointerCurrentSize;
-    return resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, size, false, labelMetrics);
+    return resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, size);
   }
 
   function circularPointerPoint(role) {
@@ -829,7 +816,7 @@
   }
 
   function linearTickLine(normalized, length) {
-    const point = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, maxPointerSize, false, labelMetrics);
+    const point = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, maxPointerSize);
     const placement = String(behavior?.tickPlacement ?? 'outside').trim().toLowerCase();
 
     if (orientation === 'vertical') {
@@ -920,7 +907,7 @@
       };
     }
 
-    const point = resolveLinearPointerPoint(behavior, width, height, centerMarkerNormalized, trackThickness, maxPointerSize, false, labelMetrics);
+    const point = resolveLinearPointerPoint(behavior, width, height, centerMarkerNormalized, trackThickness, maxPointerSize);
     if (orientation === 'vertical') {
       return {
         x1: point.x - (centerMarkerLength / 2),
@@ -1209,7 +1196,7 @@
         />
       {/if}
       {#if valueMode === 'single'}
-        {@const fillStartPoint = resolveLinearPointerPoint(behavior, width, height, selectionStart, trackThickness, pointerCurrentSize, false, labelMetrics)}
+        {@const fillStartPoint = resolveLinearPointerPoint(behavior, width, height, selectionStart, trackThickness, pointerCurrentSize)}
         {@const currentPoint = linearPointerPoint('current')}
         {#if fillGlow}
           <line x1={fillStartPoint.x} y1={fillStartPoint.y} x2={currentPoint.x} y2={currentPoint.y} stroke={argbToCss(trackFillPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')} stroke-width={fillThickness * 1.8} stroke-linecap="round" opacity={0.55 * numberOr(trackFillPart?.opacity, 1)} filter={`url(#${fillGlowId})`} />

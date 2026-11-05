@@ -13,7 +13,9 @@
 //                  fills from its centre (two arcs).
 //   pointer        a line, a dot, or the needle or chicken-head as a path, turning about the centre.
 //   ticks          a rectangle or dot each, lit up to the value as the panel lights them.
-//   readout, title text; the readout shows the channel's value as the knob's readout did.
+//   handle labels  text riding each pointer (`showHandleLabels`), showing its channel's value. A
+//                  knob's name and value are Labels of their own (utils/labelShows.js), which
+//                  come in as text layers of their own (utils/customComponentFromControls.js).
 //
 // The geometry is the panel renderer's own (editor/SliderFamilyRenderer.svelte), from the same
 // helpers (utils/sliderGeometry.js, utils/knobOutlines.js), so a layer sits where its part was
@@ -26,8 +28,8 @@
 import { createPartNode } from './customComponentFactory.js';
 import { resolveSliderSemanticParts } from './sliderEntityFactory.js';
 import {
-  buildSliderLabelAnchors, buildSliderTickStops, resolveCircularTrackMetrics, resolveLinearPointerPoint, resolveLinearTrackFrame,
-  sliderTextRoom,
+  buildSliderHandleLabelAnchors, buildSliderTickStops, resolveCircularTrackMetrics, resolveLinearPointerPoint, resolveLinearTrackFrame,
+  sliderHandleLabelRoom,
 } from './sliderGeometry.js';
 import {
   formatSliderNumericValue, getSliderAllowHandleCross, getSliderAllowWrapAround, getSliderDirection, getSliderGeometry, getSliderMax,
@@ -615,11 +617,9 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   // The renderer's derived values (SliderFamilyRenderer.svelte, the block from `trackThickness`).
   const g = (name) => geometryParts[name];
   const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
-  // No room for text of its own, as the renderer keeps none (sliderTextRoom): only riding labels.
-  const textRoom = sliderTextRoom(behavior, {
-    handleSize: Math.max(labelFontSize(g('labelStart'), 11), labelFontSize(g('labelCurrent'), 11), labelFontSize(g('labelEnd'), 11)),
-  });
-  const labelMetrics = textRoom.labelMetrics;
+  // No room for text of its own, as the renderer keeps none: only for the labels riding its handles.
+  const handleLabelSize = sliderHandleLabelRoom(behavior,
+    Math.max(labelFontSize(g('labelStart'), 11), labelFontSize(g('labelCurrent'), 11), labelFontSize(g('labelEnd'), 11)));
   const showTicks = behavior.showTicks !== false;
   const trackThickness = num(g('bodyTrackBase')?._children?.Layout?.height, 10);
   const pointerCurrentSize = num(g('pointerCurrent')?._children?.Layout?.width, 20);
@@ -665,10 +665,9 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     majorTickLength,
     hasTicks: showTicks,
     circularDiameter: behavior.circularDiameter,
-    ...textRoom,
+    handleLabelSize,
     tight,
     outerReach: housingReach,
-    readoutGap: num(behavior.labelReadoutGap, 14),
     numberReach: scaleNumberReach,
     numberSize: scaleNumberSize,
   });
@@ -1110,15 +1109,14 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   }
   if (valueMode !== 'single') handleDot('end', 'FF202020');
 
-  // Readout and title, where the panel's labels hang: centred on their anchor.
-  const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
-    trackThickness, pointerSize: maxPointerSize, hasReadout: false, labelMetrics,
+  // A label that rides the pointer: 22 px out from the track, upright, round the circle the panel's
+  // handle labels use (buildSliderHandleLabelAnchors' own track metrics, not the knob's tight fit).
+  const anchors = buildSliderHandleLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
+    trackThickness, pointerSize: maxPointerSize, handleLabelSize,
   });
-  // A label that rides the pointer: 22 px out from the track, upright, round the centre the panel's
-  // label anchors use (buildSliderLabelAnchors' own track metrics, not the knob's drawn centre).
   const labelCircle = resolveCircularTrackMetrics(width, height, {
     trackThickness, pointerSize: maxPointerSize, majorTickLength: num(behavior.majorTickLength, 12), hasTicks: behavior.showTicks !== false,
-    hasReadout: false, circularDiameter: behavior.circularDiameter, labelMetrics,
+    circularDiameter: behavior.circularDiameter, handleLabelSize,
   });
   const riding = behavior.showHandleLabels === true
     ? handles.map((each) => ({ ...each, at: anchors[each.role], centre: { x: labelCircle.centerX, y: labelCircle.centerY }, turn: signed * sweep }))
@@ -1153,15 +1151,14 @@ function addLabelLayers({ parts, width, origin, add, named, depthOf, out }, ridi
     text._children.Font.weightValue = num(text._children.Font.weightValue, 600);
     text._children.Font.family = text._children.Font.family ?? 'Arial';
     text._children.Fill = { ...(text._children.Fill ?? {}), colour: text._children.Fill?.colour ?? 'FFFFFFFF' };
-    text._children.Position = { ...(text._children.Position ?? {}), justification: anchor?.align === 'start' ? 'left' : (anchor?.align === 'end' ? 'right' : 'centred') };
+    text._children.Position = { ...(text._children.Position ?? {}), justification: 'centred' };
     const size = text._children.Font.size;
     const boxWidth = width + 16;
     const boxHeight = Math.ceil(size * 2);
-    const x = anchor?.align === 'start' ? anchor.x - 8 : (anchor?.align === 'end' ? anchor.x - boxWidth + 8 : anchor.x - boxWidth / 2);
-    const box = { x, y: anchor.y - boxHeight / 2, width: boxWidth, height: boxHeight };
+    const box = { x: anchor.x - boxWidth / 2, y: anchor.y - boxHeight / 2, width: boxWidth, height: boxHeight };
     return createPartNode(named(suffix), { role: 'label', kind: 'rectangle', zIndex: depthOf(), opacity: num(part?.opacity, 1), layout: pxBox(box, origin), sections: { Text: text } });
   };
-  // The label that rides each pointer or cap (`showHandleLabels`): its value as the readout shows it,
+  // The label that rides each pointer or cap (`showHandleLabels`): its value as the knob prints it,
   // at the start of the travel, carried with the value: round the knob upright (`meta.orbit`, the
   // turn its pointer makes), or along the slider's travel.
   for (const handle of riding) {
@@ -1224,16 +1221,12 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   const sources = handleSources(behavior, sourceOf);
   out.handles = handles;
 
-  const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
-  const labelMetrics = sliderTextRoom(behavior, {
-    handleSize: Math.max(labelFontSize(g('labelStart'), 11), labelFontSize(g('labelCurrent'), 11), labelFontSize(g('labelEnd'), 11)),
-  }).labelMetrics;
   const showTicks = behavior.showTicks !== false;
   const trackThickness = num(g('bodyTrackBase')?._children?.Layout?.height, 10);
   const pointerCurrentSize = num(g('pointerCurrent')?._children?.Layout?.width, 20);
   const maxPointerSize = Math.max(pointerCurrentSize, num(g('pointerStart')?._children?.Layout?.width, 18), num(g('pointerEnd')?._children?.Layout?.width, 18));
-  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, false, labelMetrics);
-  const pointAt = (t, size) => resolveLinearPointerPoint(behavior, width, height, t, trackThickness, size, false, labelMetrics);
+  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize);
+  const pointAt = (t, size) => resolveLinearPointerPoint(behavior, width, height, t, trackThickness, size);
   const corners = g('bodyTrackBase')?._children?.Background?._children?.Corners;
   const cornerRadius = num(corners?.radius, 999);
   const square = cornerRadius < trackThickness / 2 ? Math.max(0, cornerRadius) : null;
@@ -1608,11 +1601,9 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   };
   for (const handle of handles) addCap(handle);
 
-  const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
-    trackThickness, pointerSize: maxPointerSize, hasReadout: false, labelMetrics,
-  });
   // A label that rides each cap: beside it, or above it, from one end of the travel to the other.
-  const far = buildSliderLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize, hasReadout: false, labelMetrics });
+  const anchors = buildSliderHandleLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, { trackThickness, pointerSize: maxPointerSize });
+  const far = buildSliderHandleLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize });
   const riding = behavior.showHandleLabels === true ? handles.map((each) => ({ ...each, at: anchors[each.role], to: far[each.role] })) : [];
   addLabelLayers({ parts, width, origin, add, named, depthOf: () => depth, out }, riding);
 
@@ -2081,7 +2072,8 @@ export function meterDeviceLayersRefusal(resolved) {
  * A meter drawn with device parts (models/meterDeviceParts.js, utils/meterParts.js) as layers, placed
  * as ControlAnatomy fits the 160 by 100 frame in the box: each part a path layer in its own box,
  * swinging (a needle) or sliding (a pointer, a marker) with the reading, a fill growing from its edge,
- * lit cells each lit from its own level, a scale's marks and numerals, a fixed legend, and the readout.
+ * lit cells each lit from its own level, a scale's marks and numerals, and a fixed legend. Its reading
+ * is a Label of its own (utils/labelShows.js), which comes in as a text layer of its own.
  */
 export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName }) {
   const geometry = resolved?._children?.Parts?._children ?? {};
@@ -2749,14 +2741,14 @@ function textColourOf(raw, fallback = 'E6DCDCDC') {
 }
 
 /**
- * A plain meter as layers, as MeterRenderer lays it out: padding 4 round a column of its label (above
- * or below, as tall as one line of its text) and its body, 3 apart. In the body, for a bar, the
- * track, the zones' gradient over the whole track, and over that, from the reading to the end, a
- * cover in the track's colour, so the gradient shows up to the reading and stays where the panel
- * draws it (on a track you can see through, a mask that reveals it up to the reading); for segments, each segment plain until the reading reaches its middle, then lit in its
- * zone's colour; and the ticks, the scale's labels and the readout. An arc is the meter's SVG fitted
- * to the body: the track, the fill as one arc in the zones' colours whose sweep is the reading (or
- * its segments), the ticks, the labels round it and the readout under it.
+ * A plain meter as layers, as MeterRenderer lays it out: its body, 4 in from its box. In the body,
+ * for a bar, the track, the zones' gradient over the whole track, and over that, from the reading to
+ * the end, a cover in the track's colour, so the gradient shows up to the reading and stays where the
+ * panel draws it (on a track you can see through, a mask that reveals it up to the reading); for
+ * segments, each segment plain until the reading reaches its middle, then lit in its zone's colour;
+ * and the ticks and the scale's labels. An arc is the meter's SVG fitted to the body: the track, the
+ * fill as one arc in the zones' colours whose sweep is the reading (or its segments), the ticks and
+ * the labels round it. Its reading and caption are Labels of their own (utils/labelShows.js).
  */
 export function plainMeterLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName }) {
   const cfg = resolved?._children?.Meter ?? {};
@@ -3070,7 +3062,7 @@ function numeralFor(behavior, stop) {
   return text.replace(/(\.\d*?[1-9])0+(?!\d)|\.0+(?!\d)/g, '$1');
 }
 
-/** The format a knob's channel needs for its readout to print as the knob's did. */
+/** The format a knob's channel needs for a Label showing its value to print it as the knob does. */
 export function knobChannelFormat(behavior) {
   const step = num(behavior?.step, 0.01);
   const precision = Number.isFinite(Number(behavior?.precision))
@@ -3091,7 +3083,7 @@ export function knobChannelFormat(behavior) {
   }
   if (behavior?.showSign === true) format.showSign = true;
   // How the synth writes the value (a frequency, a pan, a note, a table: utils/parameterDisplay.js),
-  // as the knob's readout wrote it: the channel's display text is the same (formatChannelValue).
+  // as the knob's value prints it: the channel's display text is the same (formatChannelValue).
   if (formatBehaviorDisplay(behavior, getSliderMin(behavior), getSliderMax(behavior), getSliderMin(behavior)) !== null) {
     format.display = {};
     for (const key of ['displayFormat', 'displayTable', 'displayMin', 'displayMax', 'precision', 'displayMiddleC']) {

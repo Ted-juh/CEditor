@@ -165,10 +165,10 @@ test('the renderer draws every plate the one way, the numbers, the bar, the scal
 });
 
 test('the tight fit leaves room for the numbers round the scale', () => {
-  const plain = resolveCircularTrackMetrics(150, 165, { tight: true, readoutBelow: true, trackThickness: 1, pointerSize: 0, hasTicks: true, majorTickLength: 4 });
-  const numbered = resolveCircularTrackMetrics(150, 165, { tight: true, readoutBelow: true, trackThickness: 1, pointerSize: 0, hasTicks: true, majorTickLength: 4, numberReach: 1.19, numberSize: 6 });
+  const plain = resolveCircularTrackMetrics(150, 165, { tight: true, trackThickness: 1, pointerSize: 0, hasTicks: true, majorTickLength: 4 });
+  const numbered = resolveCircularTrackMetrics(150, 165, { tight: true, trackThickness: 1, pointerSize: 0, hasTicks: true, majorTickLength: 4, numberReach: 1.19, numberSize: 6 });
   assert.ok(numbered.radius < plain.radius);
-  assert.ok(numbered.radius * 1.19 + 4.5 <= numbered.centerY, 'the top number inside the box');
+  assert.ok(numbered.radius * 1.19 + 4.5 <= numbered.centerX, 'the side numbers inside the box');
 });
 
 test('as layers, a knob with a skirt, an insert, a shadow, a turning gear or a bar becomes layers too', () => {

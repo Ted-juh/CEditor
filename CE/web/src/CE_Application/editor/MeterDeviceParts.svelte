@@ -1,7 +1,7 @@
 <script>
   /**
    * A meter drawn with its own parts (models/meterDeviceParts.js), in the form frame's 160 by 100
-   * units: ControlAnatomy places the frame and sets the readout under it, as it does for a form.
+   * units: ControlAnatomy places the frame, as it does for a form. Its reading is a Label of its own.
    * What each part draws at the reading comes from utils/meterParts.js; this paints it, each part
    * with its fill, a gradient laid over it, a border and a finish, its lit cells and its zone in
    * the active colour, and where the meter's colour zones decide, in theirs. A scale's numerals are

@@ -24,7 +24,7 @@
   // key on. Its caption is its own text, in its own text colour.
   let partsDrawn = $derived(!knob && !meter && !anatomyForm(core.controlType, form) && buttonDeviceDrawn(control));
   // A meter drawn with its own parts (models/meterDeviceParts.js): no form named, its indicator on.
-  // Its readout is its own text, in its own text colour.
+  // Its reading is a Label of its own (utils/labelShows.js).
   let meterPartsDrawn = $derived(meter && !anatomyForm(core.controlType, form) && meterDeviceDrawn(control));
   let signals = $derived(runtime?.signals ?? {});
   let value = $derived(anatomyValue(control, signals));

@@ -4,7 +4,7 @@
 // colours were five fields, and while it was on, the knob's parts, background and effects were not
 // drawn. The owner decided that forms become parts (docs/design/changeable-control-sets.md, piece
 // B): each form here is a family patch of the knob's parts (the housing plate, the value track and
-// arc, the cap, the pointer, the ticks, the readout) with the properties every knob has, so every
+// arc, the cap, the pointer, the ticks) with the properties every knob has, so every
 // one of them can be changed on the knob, and bipolar, range and linear work as they do for any
 // knob.
 //
@@ -44,10 +44,12 @@ const ticks = (divisions, { placement = 'outside', major = 5, minor = 2.5 } = {}
   };
 };
 const noTicks = { component: { 'Behavior.showTicks': false }, parts: {} };
-// The readout under the knob, and no min/max labels: what every form drew. The track fitted tight
-// to the box (utils/sliderGeometry.js), as the drawings filled it.
+// The value under the knob, and no min/max labels: what every form drew. A value Label the Labels tab
+// adds goes there (utils/attachedLabels.js; 'center' puts it in the face). The track fitted tight to
+// the box (utils/sliderGeometry.js), as the drawings filled it.
 const board = { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.circularFit': 'tight' };
-// The readout as the forms set it: small, monospaced, in the legend colour.
+// The value as the forms lettered it: small, monospaced, in the legend colour. A Label showing the
+// knob's value takes it (models/controlSetFamilies.js patchShownLabel).
 const readout = (colour = '{text.primary}') => ({ labelValue: { 'Text.Fill.colour': colour, 'Text.Font.family': 'JetBrains Mono', 'Text.Font.weight': 'normal' } });
 // No track: hidden, and thin, since its thickness still sets where the ticks start.
 const noTrack = { bodyTrackBase: { visible: false, 'Layout.height': 2 }, bodyTrackFill: { visible: false, 'Layout.height': 2 } };

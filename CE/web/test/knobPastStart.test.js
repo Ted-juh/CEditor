@@ -5,13 +5,13 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { resolveCircularCenter, resolveSliderNormalizedFromPoint } from '../src/CE_Application/utils/sliderGeometry.js';
+import { resolveCircularCenter, resolveCircularTrackMetrics, resolveSliderNormalizedFromPoint } from '../src/CE_Application/utils/sliderGeometry.js';
 import { getSliderStartAngle, getSliderSweepAngle } from '../src/CE_Application/utils/sliderBehavior.js';
 
 const rect = { left: 0, top: 0, width: 120, height: 120 };
 
 function at(behavior, angleDegrees) {
-  const center = resolveCircularCenter(rect.width, rect.height, { hasReadout: behavior.showValueReadout !== false });
+  const center = resolveCircularCenter(rect.width, rect.height);
   const radians = (angleDegrees * Math.PI) / 180;
   return resolveSliderNormalizedFromPoint(behavior, rect, center.x + Math.cos(radians) * 40, center.y + Math.sin(radians) * 40);
 }
@@ -31,3 +31,14 @@ for (const direction of ['cw', 'ccw']) {
     assert.equal(at(behavior, start + sign * (sweep + gap / 2 - 2)), 1, 'nearer the end half of the gap');
   });
 }
+
+test('a knob reads the pointer\'s angle about the centre it is drawn round', () => {
+  // It kept 8 px under the centre for a readout of its own after it stopped drawing one (its value
+  // is a Label beside it now), so a press at three o'clock read as a little above it.
+  const behavior = { geometry: 'circular', min: 0, max: 1 };
+  const drawn = resolveCircularTrackMetrics(rect.width, rect.height, { trackThickness: 6, pointerSize: 14 });
+  const start = getSliderStartAngle(behavior);
+  const sweep = getSliderSweepAngle(behavior);
+  const read = resolveSliderNormalizedFromPoint(behavior, rect, drawn.centerX + 40, drawn.centerY);
+  assert.ok(Math.abs(read - ((360 - start) % 360) / sweep) < 1e-9, `three o'clock: ${read}`);
+});
