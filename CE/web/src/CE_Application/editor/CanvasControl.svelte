@@ -84,12 +84,14 @@
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances, snapMovingRect, snapResizeRect } from '../utils/canvasSnapping.js';
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
+  import { attachedFollowers, withAttached } from '../utils/attachedLabels.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
+  import { authoredShownText } from '../utils/labelShows.js';
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
@@ -726,13 +728,14 @@
     if (hadGesture) {
       if (isDragging) {
         containerDropTargetId.set(null);
-        multiDragDelta.set({ x: 0, y: 0, active: false });
+        multiDragDelta.set({ x: 0, y: 0, active: false, followers: null });
       }
       clearActivePanelSnapGuides();
     }
     isDragging = false;
     dragEngaged = false;
     dragSpaceHeld = false;
+    dragFollowers = null;
     isResizing = false;
     isRotating = false;
     transientX = null;
@@ -755,9 +758,11 @@
   // go did not put it back.
   let carriedByAncestor = $derived(isSelected && hasSelectedAncestor(parentChainIds, $selectedComponentIds));
 
-  // During multi-drag, non-dragged selected components offset by the shared delta
-  let multiDragOffsetX = $derived(!isDragging && isSelected && !carriedByAncestor && $multiDragDelta.active ? $multiDragDelta.x : 0);
-  let multiDragOffsetY = $derived(!isDragging && isSelected && !carriedByAncestor && $multiDragDelta.active ? $multiDragDelta.y : 0);
+  // During multi-drag, non-dragged selected components offset by the shared delta, and so do the
+  // Labels attached to what is dragged (utils/attachedLabels.js), selected or not.
+  let followsDrag = $derived($multiDragDelta.active && !!$multiDragDelta.followers?.has(core?.id));
+  let multiDragOffsetX = $derived(!isDragging && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active ? $multiDragDelta.x : 0);
+  let multiDragOffsetY = $derived(!isDragging && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active ? $multiDragDelta.y : 0);
   // ...and when the pointer has hold of the carried child itself, its own transient position is
   // the same double from the other end: the ancestor is already moving it. Falling back to the
   // stored Transform lets the container's translation be the only thing that moves it on screen,
@@ -1110,6 +1115,7 @@
     // The document and the selection are fixed for the length of the gesture, so the drop targets
     // are worked out here rather than on every move. Cleared in handleDragEnd.
     dropCandidates = buildDropCandidates();
+    dragFollowers = null;
     dragStartMouse = { x: e.clientX, y: e.clientY };
     dragStartPos = { x: transform?.x ?? 0, y: transform?.y ?? 0 };
     transientX = dragStartPos.x;
@@ -1335,6 +1341,9 @@
 
   // Held for the length of one gesture; null whenever no gesture is in flight.
   let dropCandidates = null;
+  // The Labels attached to what this drag moves and that are not selected (utils/attachedLabels.js):
+  // null until the gesture's first move, then fixed for its length.
+  let dragFollowers = null;
 
   function dropCandidateAt(panelX, panelY) {
     const candidates = dropCandidates ?? buildDropCandidates();
@@ -1386,10 +1395,14 @@
     transientY = Math.round(align.y);
     publishMeasurements(align, $showDistances ? distancesFor(transientX, transientY, displayW, displayH) : []);
 
-    // Broadcast delta for other selected components to follow
+    // Broadcast delta for other selected components to follow, and for the Labels attached to what
+    // moves (worked out once a gesture, at its first move).
     const ids = get(selectedComponentIds);
-    if (ids.size > 1) {
-      multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true });
+    if (dragFollowers === null) {
+      dragFollowers = attachedFollowers(panelControls, ids.size > 1 && ids.has(core?.id) ? ids : [core?.id]);
+    }
+    if (ids.size > 1 || dragFollowers.size) {
+      multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true, followers: dragFollowers });
     }
 
     // Highlight the container under the pointer as the drop target
@@ -1442,8 +1455,9 @@
 
     if (moved && targetParentId !== currentParentId) {
       // Structural move: reparent the selection roots into the target container
-      // (or to top level when null), converting positions so nothing visually jumps.
-      const roots = isMultiDrag ? selectionRoots(panelControls, ids) : [core?.id];
+      // (or to top level when null), converting positions so nothing visually jumps. The Labels
+      // attached to them go along (utils/attachedLabels.js).
+      const roots = [...(isMultiDrag ? selectionRoots(panelControls, ids) : [core?.id]), ...(dragFollowers ?? [])];
       const entries = [];
       for (const rootId of roots) {
         if (rootId == null) continue;
@@ -1487,8 +1501,17 @@
       }
     }
 
+    // Alt+click, not a drag: the control together with the Labels attached to it, or a Label together
+    // with its control and that control's other Labels (utils/attachedLabels.js).
+    if (!moved && e?.altKey === true && !e.ctrlKey && !e.metaKey && !e.shiftKey && core?.id) {
+      const owner = core.attachedTo && findControlById(panelControls, core.attachedTo) ? core.attachedTo : core.id;
+      const group = withAttached(panelControls, [owner]);
+      if (group.size > 1) selectedComponentIds.set(group);
+    }
+
     // Clear multi-drag delta
-    multiDragDelta.set({ x: 0, y: 0, active: false });
+    multiDragDelta.set({ x: 0, y: 0, active: false, followers: null });
+    dragFollowers = null;
 
     // One gesture = one undo step, committed at the boundary instead of
     // letting the 400ms debounce merge it with whatever comes next.
@@ -2164,6 +2187,14 @@
     // uses, so the two cannot say different things.
     if (isSelectorFace) {
       return String(resolveInteractionContext(renderControl, appliedPreviewSession).valueDisplay ?? '');
+    }
+
+    // A Label that shows something of a control (utils/labelShows.js): on the editor's canvas its
+    // words come from the control as it is authored; in Preview, the player and the plug-in the
+    // surface has already written the live words into its text (applyLabelShowsSource).
+    if (editorInteractionEnabled !== false && text?.shows) {
+      const shown = authoredShownText(renderControl, panelControls);
+      if (shown !== null) return shown;
     }
 
     return String(text?.content ?? '');

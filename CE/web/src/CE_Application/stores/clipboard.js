@@ -1,6 +1,7 @@
 import { get } from 'svelte/store';
 import { panels, resolvedActivePanelId, selectedComponentIds } from './panels.js';
 import { removeControl } from './controls.js';
+import { remapAttachments, withAttached } from '../utils/attachedLabels.js';
 import {
   collectControlNames,
   controlPanelRect,
@@ -61,8 +62,8 @@ export function copySelection() {
   if (!panel) return;
 
   // Copy selection roots only (a selected child inside a selected container
-  // rides along in the subtree).
-  buffer = selectionRoots(panel.controls, ids)
+  // rides along in the subtree), and the Labels attached to them (utils/attachedLabels.js).
+  buffer = selectionRoots(panel.controls, withAttached(panel.controls, ids))
     .map(id => {
       const source = findControlById(panel.controls, id);
       if (!source) return null;
@@ -225,9 +226,16 @@ function paste({ position = null, inPlace = false } = {}) {
       const containerTarget = (position || inPlace) ? null : selectedContainerTarget(controls, entries);
       const nextBuffer = [];
 
-      for (const entry of entries) {
-        // Fresh ids for the control and its whole subtree
-        const clone = remintControlIds(entry.control);
+      // Fresh ids for each control and its whole subtree, all at once: a Label copied with its
+      // knob is attached to the knob's copy, one copied alone stays with its knob, and one whose
+      // knob is not on this panel is attached to nothing (utils/attachedLabels.js).
+      const idMap = new Map();
+      const clones = entries.map((entry) => remintControlIds(entry.control, idMap));
+      const onPanel = (id) => !!findControlById(controls, id);
+      for (const clone of clones) remapAttachments(clone, idMap, onPanel);
+
+      for (const [entryIndex, entry] of entries.entries()) {
+        const clone = clones[entryIndex];
         const name = uniqueCopyName(existingNames, clone._children.Core.name);
         clone._children.Core.name = name;
         existingNames.add(name);

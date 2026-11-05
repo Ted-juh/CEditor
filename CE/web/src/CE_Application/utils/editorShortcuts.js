@@ -343,7 +343,11 @@ export function handleEditorShortcut(e, ctx) {
   // deliberate presses. A held key repeats the SAME tag, which is what keeps an autorepeat run
   // one step. The keyup flush that closes that run is in EditorCanvas/App's key handlers.
   tagNextChange(`nudge:${arrowAxis}:${arrowDir}:${baseNudge}`);
+  // A Label attached to a control that is moving is moved by it (utils/attachedLabels.js): nudged
+  // on its own as well, it would go twice as far.
+  const moving = new Set(nudgeable.map((c) => c._children.Core.id));
   for (const c of nudgeable) {
+    if (moving.has(c._children.Core.attachedTo)) continue;
     const cur = c._children?.Transform?.[arrowAxis] ?? 0;
     updateControlProperty(c._children.Core.id, `Transform.${arrowAxis}`, cur + nudge);
   }

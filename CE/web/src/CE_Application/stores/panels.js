@@ -421,9 +421,11 @@ export function isSelected(id) {
  * 200 ms (utils/equalityStore.js); here it is worth a single callback, and it is fixed because it
  * is the same bug rather than because the measurement demanded it.
  */
+// `followers`: the controls attached to what is dragged that are not selected themselves (a knob's
+// Labels, utils/attachedLabels.js), which follow it on screen as the selection does.
 export const multiDragDelta = equalityWritable(
-  { x: 0, y: 0, active: false },
-  (a, b) => a?.x === b?.x && a?.y === b?.y && a?.active === b?.active,
+  { x: 0, y: 0, active: false, followers: null },
+  (a, b) => a?.x === b?.x && a?.y === b?.y && a?.active === b?.active && a?.followers === b?.followers,
 );
 
 /** Editor zoom state */

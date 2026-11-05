@@ -293,9 +293,11 @@ test('the commit goes through multiDragPatches, not a walk of the top-level list
 test('the broadcast delta is refused by a control an ancestor is already carrying', () => {
   assert.match(canvasControl,
     /carriedByAncestor = \$derived\(isSelected && hasSelectedAncestor\(parentChainIds, \$selectedComponentIds\)\)/);
+  // A knob's attached Labels follow too (followsDrag); utils/attachedLabels.js never names one that
+  // sits inside something moving, so they are never carried as well.
   for (const axis of ['X', 'Y']) {
     assert.match(canvasControl,
-      new RegExp(`multiDragOffset${axis} = \\$derived\\(!isDragging && isSelected && !carriedByAncestor`),
+      new RegExp(`multiDragOffset${axis} = \\$derived\\(!isDragging && \\(\\(isSelected && !carriedByAncestor\\) \\|\\| followsDrag\\)`),
       `multiDragOffset${axis} applies to a carried child again — Ctrl+A then drag double-moves it`);
   }
 });

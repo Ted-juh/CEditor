@@ -6,6 +6,7 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import Type from 'lucide-svelte/icons/type';
   import TextEditor from './TextEditor.svelte';
+  import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
 
   let { control = null } = $props();
 
@@ -95,6 +96,10 @@
   let selectedLabelPart = $derived(parts?._children?.[selectedLabelTarget?.id] ?? null);
   let selectedLabelText = $derived(selectedLabelPart?._children?.Text ?? null);
 </script>
+
+{#if $selectedComponentIds.size <= 1}
+  <AttachedLabelsEditor {control} />
+{/if}
 
 {#if behavior && selectedLabelTarget}
   <PropertySection title="Slider Label" icon={Type}>

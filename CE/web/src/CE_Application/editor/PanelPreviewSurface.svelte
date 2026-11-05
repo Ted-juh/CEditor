@@ -246,6 +246,7 @@
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
   import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
+  import { labelShows, labelSourceId, shownText } from '../utils/labelShows.js';
   import {
     createMomentaryButtonPreviewController,
     isPressToTalkBehavior,
@@ -738,7 +739,25 @@
     // objects (interactionRuntime.js, reshareUnchanged), not a copy each for as long as it is drawn;
     // the value sources below copy what they change.
     const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides, { shareUnchanged: true }));
-    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
+    return applyLabelShowsSource(control, applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))))))));
+  }
+
+  // A Label that shows something of a control (utils/labelShows.js): its words, from that control's
+  // live value as this surface resolves it, written into its text before it is drawn.
+  function applyLabelShowsSource(control, resolved) {
+    const shows = labelShows(control);
+    if (!shows) return resolved;
+    const base = resolved?.control ?? control;
+    const text = base?._children?.Text;
+    if (!text) return resolved;
+    const source = controlById(labelSourceId(control));
+    // The control it shows is not on the panel: its own words, as on the canvas.
+    if (!source) return resolved;
+    // The source as this surface draws it (a meter's live reading); a Label that itself shows
+    // something is read as it stands, so two Labels showing each other cannot go round for ever.
+    const live = !labelShows(source) ? (resolvedPreviewFor(source)?.control ?? source) : source;
+    const content = shownText(live, shows, sessionFor(source));
+    return { ...resolved, control: { ...base, _children: { ...base._children, Text: { ...text, content } } } };
   }
 
   function applyDeviceSyncStatus(control) {

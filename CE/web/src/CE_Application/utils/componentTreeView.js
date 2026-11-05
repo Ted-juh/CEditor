@@ -156,6 +156,8 @@ function controlFingerprint(control) {
     // the pages themselves (names, order, which one is showing), are all drawn.
     core?.tabPageId ?? '',
     control?._children?.TabContainer ? tabPageSignature(control) : '',
+    // A Label attached to a control is listed under it (nestAttached).
+    core?.attachedTo ?? '',
     // Joined on a separator no name can contain, so {name:'a', type:'b'} and {name:'ab', type:''}
     // do not fingerprint the same.
   ].join('\u0001');
@@ -219,6 +221,38 @@ export function controlTreeSignature(controls) {
   };
   visit(controls);
   return parts.join('\u0002');
+}
+
+/**
+ * One sibling list in tree order, each control attached to another in the same list (a knob's
+ * Labels, utils/attachedLabels.js) moved to just after it and marked: `[{ ctrl, attached }]`. One
+ * level only: a control attached to one that is itself listed under another stays where it is, so a
+ * chain or a loop of attachments can never lose a row.
+ */
+export function nestAttached(siblings) {
+  const list = siblings ?? [];
+  const ids = new Set(list.map(getControlId));
+  const ownerOf = (ctrl) => {
+    const owner = ctrl?._children?.Core?.attachedTo;
+    return owner && owner !== getControlId(ctrl) && ids.has(owner) ? owner : '';
+  };
+  const byId = new Map(list.map((ctrl) => [getControlId(ctrl), ctrl]));
+  const under = new Map();
+  for (const ctrl of list) {
+    const owner = ownerOf(ctrl);
+    if (!owner || ownerOf(byId.get(owner))) continue;
+    if (!under.has(owner)) under.set(owner, []);
+    under.get(owner).push(ctrl);
+  }
+  if (!under.size) return list.map((ctrl) => ({ ctrl, attached: false }));
+  const nested = new Set([...under.values()].flat());
+  const out = [];
+  for (const ctrl of list) {
+    if (nested.has(ctrl)) continue;
+    out.push({ ctrl, attached: false });
+    for (const label of under.get(getControlId(ctrl)) ?? []) out.push({ ctrl: label, attached: true });
+  }
+  return out;
 }
 
 /**
