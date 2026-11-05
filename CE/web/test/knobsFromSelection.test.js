@@ -123,8 +123,10 @@ test('the part draws the knob with the panel\'s own renderer', () => {
     },
   }).body;
   assert.match(draw(0.8), /<svg/);
-  assert.match(draw(0.8), /0\.80/);
-  assert.match(draw(0.2), /0\.20/);
+  // The value turns it (its arc reaches further); it prints no value, which is a Label of its own.
+  const arc = (html) => html.match(/bodyTrackFillArc"[\s\S]*?<path d="([^"]+)"/)?.[1];
+  assert.ok(arc(draw(0.8)) && arc(draw(0.2)) && arc(draw(0.8)) !== arc(draw(0.2)), 'the value arc follows the value');
+  assert.doesNotMatch(draw(0.8), /slider-readout|0\.80/);
 });
 
 // --- What is refused ---------------------------------------------------------------------------------
