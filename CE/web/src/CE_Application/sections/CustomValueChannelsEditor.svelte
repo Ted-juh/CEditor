@@ -15,6 +15,8 @@
   import Share2 from 'lucide-svelte/icons/share-2';
   import Type from 'lucide-svelte/icons/type';
   import { createValueChannel } from '../utils/customComponentFactory.js';
+  import { valueSourceChoices } from '../utils/valueSources.js';
+  import { activePanel } from '../stores/panels.js';
   import { denormalizeCustomChannelValue, normalizeCustomChannelValue, snapCustomChannelValue } from '../utils/customComponentInteraction.js';
   import { CURVE_LABELS, CURVE_MODES, curveGraphPoints, curveSpec, defaultCurveCentre, defaultCurveSteps, travelToFraction } from '../utils/channelCurves.js';
 
@@ -70,6 +72,9 @@
   let halfTravelFraction = $derived(travelToFraction(selectedCurve, 0.5));
   let halfTravelValue = $derived(selected ? denormalizeCustomChannelValue(selected, 0.5) : 0);
   let linearHalfValue = $derived(selected ? snapCustomChannelValue(selected, ((Number(selected.min ?? 0) + Number(selected.max ?? 1)) / 2)) : 0);
+  // Where the value is taken from (utils/valueSources.js): its own, another value here, or a knob or
+  // slider on the panel.
+  let sourceChoices = $derived(selected ? valueSourceChoices(control, selectedName, $activePanel?.controls ?? []) : []);
   let enumText = $derived((selected?.values ?? selected?.options ?? []).join(', '));
   let selectedNumeric = $derived(!['bool', 'enum', 'text', 'color', 'note'].includes(String(selected?.type ?? 'float')));
   let constraintChannelOptions = $derived(channelEntries
@@ -295,6 +300,13 @@
         </PropertyCell>
         <PropertyCell label="Default" span={1} compact hint="Initial value when the component is inserted.">
           <NumberCell label="Def" value={selected.defaultValue ?? 0} step={selected.step ?? 0.01} defaultValue={0} onchange={(value) => set('defaultValue', value)} />
+        </PropertyCell>
+        <PropertyCell label="Value From" span={4} path={`ValueChannels.${selectedName}.valueSource`} hint="Where this value is taken from: its own, another value of this component, or a knob or slider on the panel, followed as far along its range as the source is along its own.">
+          <select class="val" value={String(selected.valueSource ?? '')} onchange={(event) => set('valueSource', event.target.value)}>
+            {#each sourceChoices as choice (choice.value)}
+              <option value={choice.value}>{choice.label}</option>
+            {/each}
+          </select>
         </PropertyCell>
       {:else}
         <PropertyCell label="Default" span={4} hint="Initial value for this non-numeric channel.">

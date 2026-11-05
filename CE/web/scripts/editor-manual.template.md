@@ -1110,7 +1110,9 @@ comes in as layers that place the reading, and the held peak, on that scale, as 
 bindings' **Scale** is **Decibels**, from **Floor dB** to **Ceil dB**. A meter part coloured by the zones keeps them: lit cells, scale
 marks and a fill by where they sit, a needle, lamp or legend by the zone the reading is in. A meter
 that shows another control's value keeps showing it: the knob that came into the component with it,
-or the control that stayed on the panel. A control drawn in a classic design (**Core › Control
+or the control that stayed on the panel. The **Interact** card says what such a value follows, and
+**Value From** in the value's **Definition** (Advanced) changes it: its own value, another value of
+the component, or a knob or slider on the panel. A control drawn in a classic design (**Core › Control
 design**: Flat disc, Moulded pebble, Studio needle and the rest) comes in as layers that draw that design in its
 own colours: a knob as the drawing itself, shape by shape, its pointer or cap turning with the value;
 a button, switch or meter as the design's parts. Designs whose parts differ from their drawing

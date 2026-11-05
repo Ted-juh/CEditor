@@ -10,6 +10,8 @@
   import { buildInteractivePatch } from '../utils/customComponentScaffold.js';
   import { listInteractiveArchetypes } from '../utils/customComponentFactory.js';
   import { numberOr } from '../utils/primitives.js';
+  import { describeValueSource } from '../utils/valueSources.js';
+  import { activePanel } from '../stores/panels.js';
   import { behaviorTypeWord, capitalised, carriedControlWord, channelTypeWord, isCarriedControlBehavior } from '../utils/authorWords.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
@@ -309,7 +311,8 @@
     <PropertySection title="Not wired up" icon={Unplug}>
       <div class="orphans">
         {#each orphans.channels as name (name)}
-          <div class="orphan-row"><span class="tag">channel</span><strong>{name}</strong><em>no behavior drives it (fine for output-only values)</em></div>
+          <!-- A value that follows another (its Value From): what it follows, where nothing here drives it. -->
+          <div class="orphan-row"><span class="tag">channel</span><strong>{name}</strong><em>{describeValueSource(control, name, $activePanel?.controls ?? []) || 'no behavior drives it (fine for output-only values)'}</em></div>
         {/each}
         {#each orphans.behaviors as name (name)}
           <div class="orphan-row warn"><span class="tag">behavior</span><strong>{name}</strong><em>its value channel is missing</em></div>

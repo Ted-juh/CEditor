@@ -484,6 +484,11 @@ components):
      editor's canvas against the panel's on Graphite and Tolex, the place the same and only the
      readout's words apart. A meter's value in the editor's Preview could not be driven from the
      check (a value set there did not reach the canvas, for the panel's meter as for the layers).
+     The designer shows it, as the owner approved in its mock-up (`utils/valueSources.js`): a value
+     nothing in the component drives says on the Interact card what it follows ("follows Cutoff, a
+     knob on the panel"), and Interact › Advanced › channel › Definition has **Value From**: its own
+     value, another numeric value of the component, or a knob or slider on the panel (a source the
+     panel no longer has is kept and said to be missing).
 
    - *Classic designs* (R5): a control drawn in a classic form (Core › Control design names one:
      Flat disc, Moulded pebble, Studio needle…) comes in as layers that draw what the panel draws. A knob in one
