@@ -7,6 +7,8 @@ import { createPanel } from '../stores/panelModel.js';
 import { setAnatomy } from './controlAnatomy.js';
 import { starterDirection } from './controlSetCoverage.js';
 import { labelTreatmentFor } from './labelDesigns.js';
+import { makeAttachedLabel, wordsWidth } from '../utils/attachedLabelFactory.js';
+import { attachedLabelRect } from '../utils/attachedLabels.js';
 
 // Gallery and starter share ordinary controls. Materialization exposes design values in the
 // inspector; the pin keeps the design when the user copies a control to another panel.
@@ -49,19 +51,37 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
   // the starter did before sets designed labels, kept the plate sets' dark plate lettering and
   // removed the plate it is lettered on.
   const bareCaption = labelTreatmentFor(set) ? {} : { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } } };
-  function label(title, x, y, width = 250, size = 13) {
-    place('Label', x, y, width, 26, { ...bareCaption, Text: { content: title, _children: { Font: { size } } } });
+  function label(title, x, y, width = 250, size = 13, owner = null) {
+    const made = place('Label', x, y, width, 26, { ...bareCaption, Text: { content: title, _children: { Font: { size } } } });
+    // A knob's caption is attached to it: it moves, copies and deletes with it (utils/attachedLabels.js).
+    if (owner) made._children.Core.attachedTo = owner._children.Core.id;
+    return made;
+  }
+  // A Label of a knob's or slider's own: its value, or its title in its own words. A knob draws no
+  // text of its own; these are what it had (utils/attachedLabelFactory.js).
+  function attach(owner, shows, options = {}) {
+    // A title in its own words is a caption like the others, attached where its part would be.
+    if (!shows) {
+      const r = attachedLabelRect(owner, options.at || 'name', { size: 11, width: wordsWidth(options.content, 11) });
+      return label(options.content, r.x, r.y - (26 - r.height) / 2, r.width, 11, owner);
+    }
+    const n = nextId?.();
+    let made = makeAttachedLabel(owner, shows, { ...options, core: { ...(n == null ? {} : { id: `ctrl_${n}`, name: `Label_${n}` }), controlSetId: setOverride?.id ?? setId } });
+    if (materialize) made = resolveControlForSet(made, set);
+    controls.push(made);
+    return made;
   }
   if(direction?.physical) {
     label(set.name.toUpperCase(),26,16,650,24);
     label(direction.title,26,48,650,12);
     label('OSCILLATOR / FILTER',26,85,300); label('ENVELOPE',356,85,210); label('PERFORMANCE',586,85,250);
-    place('Knob',26,120,150,164,{Behavior:{defaultCurrentValue:.63}});
-    place('Knob',194,120,150,164,{Behavior:{defaultCurrentValue:.35}});
-    label('TUNE',26,280,150,11);label('CUTOFF',194,280,150,11);
+    const tune=place('Knob',26,120,150,150,{Behavior:{defaultCurrentValue:.63}});
+    const cutoff=place('Knob',194,120,150,150,{Behavior:{defaultCurrentValue:.35}});
+    attach(tune,'value');attach(cutoff,'value');
+    label('TUNE',26,292,150,11,tune);label('CUTOFF',194,292,150,11,cutoff);
     for(const [i,title] of ['A','D','S','R'].entries()) {
-      const c=place('Slider',356+i*50,120,44,173,{Behavior:{orientation:'vertical',direction:'btt',defaultCurrentValue:[.2,.55,.7,.35][i],showMinMaxLabels:false,showValueReadout:false}});
-      c._children.Parts._children.labelTitle._children.Text.content=title;
+      const c=place('Slider',356+i*50,120,44,155,{Behavior:{orientation:'vertical',direction:'btt',defaultCurrentValue:[.2,.55,.7,.35][i]}});
+      attach(c,'',{content:title,at:'value'});
     }
     place('Button',586,126,116,76,{Text:{content:'TRIGGER'}});
     place('ToggleButton',728,126,124,76,{Text:{content:'HOLD'},Behavior:{defaultValue:true}});
@@ -84,10 +104,13 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
   label(direction?.title ?? 'Control set', 26, 48, 650, 12);
   label('TURN / SLIDE', 26, 82);
   label('PRESS / SELECT', 580, 82);
-  place('Knob', 26, 112, 190, 190, { Behavior: { defaultCurrentValue: 0.63 } });
-  place('Knob', 220, 125, 128, 158, { Behavior: { defaultCurrentValue: 0.35 } });
-  const slider = place('Slider', 364, 133, 190, 78, { Behavior: { defaultCurrentValue: 0.66 } });
-  slider._children.Parts._children.labelTitle._children.Text.content = 'LEVEL';
+  const big = place('Knob', 36, 112, 170, 170, { Behavior: { defaultCurrentValue: 0.63 } });
+  const small = place('Knob', 228, 132, 112, 112, { Behavior: { defaultCurrentValue: 0.35 } });
+  attach(big, 'value');
+  attach(small, 'value');
+  const slider = place('Slider', 364, 150, 190, 48, { Behavior: { defaultCurrentValue: 0.66 } });
+  attach(slider, '', { content: 'LEVEL' });
+  attach(slider, 'value');
   place('Crossfader', 364, 234, 190, 62);
   place('Button', 576, 118, 124, 84, { Text: { content: 'TRIGGER' } });
   place('ToggleButton', 716, 118, 136, 84, { Text: { content: 'HOLD' }, Behavior: { defaultValue: true } });

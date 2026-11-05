@@ -1,9 +1,10 @@
 // labelShows.js — a Label that shows something of another control instead of its own words.
 //
-// A knob, a slider or a meter draws no text of its own: its name, its value, the ends of its range
-// are Labels beside it, each a Label like any other (every Text property applies), told what to
-// show (`Text.shows`) and of which control (`Text.showsControl`, or else the control it is attached
-// to, `Core.attachedTo`; utils/attachedLabels.js keeps the two together). None of the three is a
+// A knob or a slider draws no text of its own (a meter still prints its reading): its name, its
+// value, the ends of its range are Labels beside it, each a Label like any other (every Text
+// property applies), told what to show (`Text.shows`) and of which control (`Text.showsControl`, or
+// else the control it is attached to, `Core.attachedTo`; utils/attachedLabels.js keeps the two
+// together). None of the three is a
 // section default, so a control that uses none of them carries none of them, and a linked library
 // copy still matches its package. The words are worked out where the Label is drawn: on the
 // editor's canvas from the control as it is authored, in Preview, the player and the plug-in from

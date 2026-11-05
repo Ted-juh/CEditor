@@ -58,18 +58,6 @@
   ];
 
   let selectedStyleTarget = $state('bodyTrackBase');
-  let labelPositionTarget = $state('');
-
-  const READOUT_POSITION_OPTIONS = [
-    { value: 'auto', label: 'auto' },
-    { value: 'top', label: 'top' },
-    { value: 'center', label: 'center' },
-    { value: 'bottom', label: 'bottom' },
-    { value: 'topLeft', label: 'top left' },
-    { value: 'topRight', label: 'top right' },
-    { value: 'bottomLeft', label: 'bottom left' },
-    { value: 'bottomRight', label: 'bottom right' },
-  ];
 
   function set(path, value) {
     const controlId = getSection(control, 'Core')?.id;
@@ -121,38 +109,6 @@
   function setCircularEndAngle(value) {
     const start = numberOr(behavior?.startAngle, 135);
     set('Behavior.sweepAngle', clampSweep(numberOr(value, start) - start));
-  }
-
-  function showLabelPositionEditor(target, event) {
-    event?.preventDefault?.();
-    labelPositionTarget = labelPositionTarget === target ? '' : target;
-  }
-
-  function minMaxPositionOptions() {
-    if (geometry === 'circular') {
-      return [
-        { value: 'auto', label: 'auto' },
-        { value: 'outside', label: 'outside' },
-        { value: 'inside', label: 'inside' },
-        { value: 'center', label: 'center' },
-      ];
-    }
-
-    if (String(behavior?.orientation ?? 'horizontal') === 'vertical') {
-      return [
-        { value: 'auto', label: 'auto' },
-        { value: 'right', label: 'right' },
-        { value: 'left', label: 'left' },
-        { value: 'center', label: 'center' },
-      ];
-    }
-
-    return [
-      { value: 'auto', label: 'auto' },
-      { value: 'below', label: 'below' },
-      { value: 'above', label: 'above' },
-      { value: 'center', label: 'center' },
-    ];
   }
 
   // The presets. Each used to write its own width and height, so going from Single to Bipolar on
@@ -214,9 +170,7 @@
       'Behavior.centerValue': center,
       'Behavior.fillOrigin': preset.bipolar === true ? 'center' : 'min',
       'Behavior.showHandleLabels': preset.valueMode !== 'single',
-      'Behavior.showValueReadout': true,
       'Behavior.showTicks': true,
-      'Behavior.showMinMaxLabels': true,
       'Behavior.showCenterMarker': preset.bipolar === true,
       'Behavior.showSign': preset.bipolar === true,
       'Behavior.defaultStartValue': min + ((max - min) * 0.25),
@@ -422,71 +376,21 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Ticks & Labels" icon={Ruler}>
-    <PropertyCell label="Show" span={4} hint="Ticks, min/max labels, handle labels, readout, centre marker. Right-click min/max or readout to place them.">
+  <PropertySection title="Ticks" icon={Ruler}>
+    <PropertyCell label="Show" span={4} hint="Ticks, the labels that ride the handles, the centre marker. Its name, value and range ends are Labels of their own: add them on the Labels tab.">
       <FlagStrip
         flags={[
           { key: 'ticks', title: 'Ticks — generated major/minor ticks', on: behavior.showTicks !== false, icon: Ruler },
-          { key: 'minMax', title: 'Min / max labels (right-click to position)', on: behavior.showMinMaxLabels !== false, active: labelPositionTarget === 'minMax', icon: MoveHorizontal },
           { key: 'handleLabels', title: 'Handle labels beside the active handles', on: behavior.showHandleLabels === true, icon: Tags },
-          { key: 'readout', title: 'Primary value readout (right-click to position)', on: behavior.showValueReadout !== false, active: labelPositionTarget === 'readout', icon: Type },
           { key: 'centerMarker', title: 'Centre marker at the authored centre value', on: behavior.showCenterMarker === true, icon: AlignCenterVertical },
         ]}
         ontoggle={(key) => {
           if (key === 'ticks') set('Behavior.showTicks', !(behavior.showTicks !== false));
-          else if (key === 'minMax') set('Behavior.showMinMaxLabels', !(behavior.showMinMaxLabels !== false));
           else if (key === 'handleLabels') set('Behavior.showHandleLabels', !(behavior.showHandleLabels === true));
-          else if (key === 'readout') set('Behavior.showValueReadout', !(behavior.showValueReadout !== false));
           else if (key === 'centerMarker') set('Behavior.showCenterMarker', !(behavior.showCenterMarker === true));
-        }}
-        oncontextmenu={(key, event) => {
-          if (key === 'minMax' || key === 'readout') showLabelPositionEditor(key, event);
         }}
       />
     </PropertyCell>
-
-    {#if labelPositionTarget === 'minMax'}
-      <PropertyCell label="MinMax Pos" span={1} hint="Position for generated min and max labels.">
-        <select class="val" value={behavior.labelMinMaxPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelMinMaxPlacement', event.target.value)}>
-          {#each minMaxPositionOptions() as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Gap" span={1} compact hint="Distance from the track for generated min and max labels.">
-        <NumberCell label="Gap" value={behavior.labelMinMaxGap ?? 22} defaultValue={22} step={1} onchange={(value) => set('Behavior.labelMinMaxGap', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for generated min and max labels.">
-        <NumberCell label="X" value={behavior.labelMinMaxOffsetX ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetX', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset for generated min and max labels.">
-        <NumberCell label="Y" value={behavior.labelMinMaxOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
-      </PropertyCell>
-    {:else if labelPositionTarget === 'readout'}
-      <PropertyCell label="Readout Pos" span={1} path="Behavior.labelReadoutPlacement" hint="Position for the generated value readout. A corner hangs it from the track's end: top left and top right make the row above the track.">
-        <select class="val" value={behavior.labelReadoutPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelReadoutPlacement', event.target.value)}>
-          {#each READOUT_POSITION_OPTIONS as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Title Pos" span={1} path="Behavior.labelTitlePlacement" hint="Position for the title (the control's text). It shares the readout's gap: title top left with the readout top right is one row above the track.">
-        <select class="val" value={behavior.labelTitlePlacement ?? 'auto'} onchange={(event) => set('Behavior.labelTitlePlacement', event.target.value)}>
-          {#each READOUT_POSITION_OPTIONS as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for a top or bottom readout or title placement.">
-        <NumberCell label="Gap" value={behavior.labelReadoutGap ?? 14} defaultValue={14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for the generated value readout.">
-        <NumberCell label="X" value={behavior.labelReadoutOffsetX ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetX', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset for the generated value readout.">
-        <NumberCell label="Y" value={behavior.labelReadoutOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetY', value)} />
-      </PropertyCell>
-    {/if}
 
     <PropertyCell label="Major Count" span={1} compact path="Behavior.majorTickCount" hint="Generated major tick stops across the slider domain.">
       <NumberCell label="Major" value={behavior.majorTickCount ?? 11} defaultValue={11} step={1} min={SLIDER_TICK_LIMITS.majorMin} max={SLIDER_TICK_LIMITS.majorMax} onchange={(value) => set('Behavior.majorTickCount', clampSliderTickCount('major', value, 11))} />

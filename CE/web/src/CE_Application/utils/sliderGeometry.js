@@ -125,6 +125,28 @@ export function resolveCircularArcSweep(behavior = null, startAngle, endAngle) {
   return Math.min(sweep, getSliderSweepAngle(behavior));
 }
 
+/**
+ * The room a knob or slider keeps for text of its own, as the functions below take it: none. Its
+ * name, its value and the ends of its range are Labels of their own beside it (utils/labelShows.js,
+ * utils/attachedLabels.js), so its track fills its box. Only the labels that ride its handles
+ * (`showHandleLabels`) are still its own, and they keep their room. `labelMetrics` is what the
+ * control's label parts measure (their font sizes). Spread it into resolveCircularTrackMetrics'
+ * options, or pass its `hasReadout` and `labelMetrics` to the linear functions.
+ */
+export function sliderTextRoom(behavior = null, labelMetrics = {}) {
+  return {
+    hasReadout: false,
+    showsMinMax: false,
+    readoutBelow: false,
+    labelMetrics: {
+      readoutSize: 0,
+      titleSize: 0,
+      minMaxSize: 0,
+      handleSize: behavior?.showHandleLabels === true ? Math.max(0, numberOr(labelMetrics?.handleSize, 11)) : 0,
+    },
+  };
+}
+
 export function resolveLinearTrackFrame(behavior = null, width = 0, height = 0, trackThickness = 8, pointerSize = 16, hasReadout = false, labelMetrics = {}) {
   const orientation = getSliderOrientation(behavior);
   const readoutSize = Math.max(0, numberOr(labelMetrics?.readoutSize, 12));

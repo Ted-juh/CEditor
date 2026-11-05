@@ -172,7 +172,9 @@ test('the tight fit keeps a knob above a readout under it, its housing and all',
   // A housing within the track does not shrink it.
   const small = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 0.9 });
   assert.ok(small.radius > below.radius);
+  // A knob draws no readout of its own now (its value is a Label beside it, utils/labelShows.js):
+  // it keeps no room for one, and the tight fit fills its box, housing and all.
   const renderer = source('editor/SliderFamilyRenderer.svelte');
-  assert.match(renderer, /readoutBelow: showReadout && String\(behavior\?\.labelReadoutPlacement \?\? 'auto'\) === 'bottom'/);
+  assert.match(renderer, /\.\.\.textRoom,\s*tight: circularFitTight,/);
   assert.match(renderer, /outerReach: housingReach/);
 });

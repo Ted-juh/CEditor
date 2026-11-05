@@ -66,6 +66,7 @@ import { DRAWN_KNOB_FORMS, knobFormDrawingLayers } from './formDrawingLayers.js'
 import { drawnDeviceDirection, synthDeviceDrawingLayers } from './deviceDrawingLayers.js';
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
+import { authoredShownText, labelShows, labelSourceId } from './labelShows.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
 /** Controls with a value that convert: drawn by SliderFamilyRenderer, one value each. */
@@ -86,6 +87,9 @@ const TEXT_KEYS = new Set([
   'Multiline.wrapMode',
   // Only read by the label renderer when ContentLayout has no padding of its own, which it always has.
   'Position.paddingLeft', 'Position.paddingRight', 'Position.paddingTop', 'Position.paddingBottom',
+  // What a Label shows of a control (utils/labelShows.js): its words come in as text, a value bound
+  // to that control's channel when it comes in too (planComponentFromSelection).
+  'shows', 'showsControl',
 ]);
 
 /**
@@ -1168,11 +1172,22 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   const asParts = [];
   // Turned or scaled buttons, switches, meters and artwork: built upright, then turned (turnControlLayers).
   const turnedControls = [];
+  // Labels that show something of a control (utils/labelShows.js): their text layers, what they show
+  // and of which control, bound to its channel below when it comes in too.
+  const shownLabels = [];
   order.forEach(({ control: placed, resolved: placedResolved, rect }, i) => {
     const local = { ...rect, x: rect.x - bounds.x, y: rect.y - bounds.y };
     const turn = VALUE_TYPES.includes(String(placed._children.Core.controlType)) ? null : turnOf(placed);
-    const control = turn ? upright(placed) : placed;
-    const resolved = meterFromItsSource(turn ? upright(placedResolved) : placedResolved, panel);
+    let control = turn ? upright(placed) : placed;
+    let resolved = meterFromItsSource(turn ? upright(placedResolved) : placedResolved, panel);
+    // A Label showing a control's name, value or range reads what it reads on the canvas: its words.
+    const shows = String(control._children.Core.controlType) === 'Label' ? labelShows(control) : '';
+    if (shows) {
+      const words = authoredShownText(control, controls) ?? String(control._children.Text?.content ?? '');
+      const worded = (each) => ({ ...each, _children: { ...each._children, Text: { ...each._children.Text, content: words } } });
+      control = worded(control);
+      resolved = worded(resolved);
+    }
     let asLayers = false;
     if (valueControlsAs === 'layers' && VALUE_TYPES.includes(String(control._children.Core.controlType))) {
       const why = valueLayersRefusal(resolved);
@@ -1200,6 +1215,10 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
         names.push(area);
       }
       turnedControls.push({ id: String(placed._children.Core.id), name: nameOf(placed), names, rect: local, ...turn, zone: channel ? `${channel}Zone` : '', area });
+    }
+    if (shows) {
+      const texts = built.filter((part) => part.role === 'label').map((part) => part.name);
+      if (texts.length) shownLabels.push({ shows, sourceId: labelSourceId(control), texts });
     }
     if (built.layered) values.push({ control, resolved, local, paintIndex: i, layered: built.layered });
     if (built.buttoned) values.push({ control, resolved, local, paintIndex: i, buttoned: built.buttoned });
@@ -1230,6 +1249,30 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
   // None of the starter channels or behaviours a fresh component is given: artwork has no value, and
   // each knob brings exactly its own.
   const valueSections = knobSections(values, bounds, parts);
+  // A shown value follows the channel of the control it shows, when that control came in too.
+  for (const { shows, sourceId, texts } of shownLabels) {
+    if (!['value', 'start', 'end'].includes(shows)) continue;
+    const source = values.find((each) => String(each.control._children.Core.id) === sourceId);
+    if (!source) continue;
+    const handles = source.layered?.handles ?? [];
+    const own = source.layered?.channel ?? source.buttoned?.channel ?? source.metered?.channel ?? source.part?.name ?? '';
+    // A range's value reads its start, the separator and its end; a band's its three values
+    // (formatSliderReadout): the first written, the rest added on.
+    const behavior = source.control._children.Behavior ?? {};
+    const read = shows === 'value'
+      ? (handles.length > 1 ? handles.map((handle) => handle.channel) : [own])
+      : [handles.find((handle) => handle.role === shows)?.channel ?? own];
+    if (!read.every((channel) => channel && valueSections.channels[channel])) continue;
+    const separator = String(handles.length === 3 ? (behavior.bandSeparator ?? ' | ') : (behavior.rangeSeparator ?? ' - '));
+    for (const text of texts) {
+      read.forEach((channel, index) => {
+        const bindingName = index === 0 ? `${text}Text` : `${text}Text${index + 1}`;
+        valueSections.bindings[bindingName] = index === 0
+          ? { _type: 'Binding', name: bindingName, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${text}.Text.content` }
+          : { _type: 'Binding', name: bindingName, enabled: true, source: `channel.${channel}.display`, mapMode: 'template', template: `${separator}{value}`, target: `Parts.${text}.Text.content`, add: true };
+      });
+    }
+  }
   children.ValueChannels = { ...children.ValueChannels, _children: valueSections.channels };
   children.Behaviors = { ...children.Behaviors, _children: valueSections.behaviors };
   children.HitZones = { ...children.HitZones, _children: valueSections.hitZones };

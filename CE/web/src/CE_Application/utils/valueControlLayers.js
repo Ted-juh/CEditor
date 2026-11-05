@@ -27,6 +27,7 @@ import { createPartNode } from './customComponentFactory.js';
 import { resolveSliderSemanticParts } from './sliderEntityFactory.js';
 import {
   buildSliderLabelAnchors, buildSliderTickStops, resolveCircularTrackMetrics, resolveLinearPointerPoint, resolveLinearTrackFrame,
+  sliderTextRoom,
 } from './sliderGeometry.js';
 import {
   formatSliderNumericValue, getSliderAllowHandleCross, getSliderAllowWrapAround, getSliderDirection, getSliderGeometry, getSliderMax,
@@ -614,13 +615,11 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   // The renderer's derived values (SliderFamilyRenderer.svelte, the block from `trackThickness`).
   const g = (name) => geometryParts[name];
   const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
-  const labelMetrics = {
-    readoutSize: labelFontSize(g('labelValue'), 12),
-    titleSize: labelFontSize(g('labelTitle'), 11),
-    minMaxSize: Math.max(labelFontSize(g('labelMin'), 11), labelFontSize(g('labelMax'), 11)),
+  // No room for text of its own, as the renderer keeps none (sliderTextRoom): only riding labels.
+  const textRoom = sliderTextRoom(behavior, {
     handleSize: Math.max(labelFontSize(g('labelStart'), 11), labelFontSize(g('labelCurrent'), 11), labelFontSize(g('labelEnd'), 11)),
-  };
-  const showReadout = behavior.showValueReadout !== false;
+  });
+  const labelMetrics = textRoom.labelMetrics;
   const showTicks = behavior.showTicks !== false;
   const trackThickness = num(g('bodyTrackBase')?._children?.Layout?.height, 10);
   const pointerCurrentSize = num(g('pointerCurrent')?._children?.Layout?.width, 20);
@@ -665,12 +664,9 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
       : maxPointerSize,
     majorTickLength,
     hasTicks: showTicks,
-    hasReadout: showReadout,
     circularDiameter: behavior.circularDiameter,
-    labelMetrics,
+    ...textRoom,
     tight,
-    showsMinMax: behavior.showMinMaxLabels !== false,
-    readoutBelow: showReadout && String(behavior.labelReadoutPlacement ?? 'auto') === 'bottom',
     outerReach: housingReach,
     readoutGap: num(behavior.labelReadoutGap, 14),
     numberReach: scaleNumberReach,
@@ -1116,18 +1112,18 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
 
   // Readout and title, where the panel's labels hang: centred on their anchor.
   const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
-    trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics,
+    trackThickness, pointerSize: maxPointerSize, hasReadout: false, labelMetrics,
   });
   // A label that rides the pointer: 22 px out from the track, upright, round the centre the panel's
   // label anchors use (buildSliderLabelAnchors' own track metrics, not the knob's drawn centre).
   const labelCircle = resolveCircularTrackMetrics(width, height, {
     trackThickness, pointerSize: maxPointerSize, majorTickLength: num(behavior.majorTickLength, 12), hasTicks: behavior.showTicks !== false,
-    hasReadout: showReadout, circularDiameter: behavior.circularDiameter, labelMetrics,
+    hasReadout: false, circularDiameter: behavior.circularDiameter, labelMetrics,
   });
   const riding = behavior.showHandleLabels === true
     ? handles.map((each) => ({ ...each, at: anchors[each.role], centre: { x: labelCircle.centerX, y: labelCircle.centerY }, turn: signed * sweep }))
     : [];
-  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handles, riding }, anchors);
+  addLabelLayers({ parts, width, origin, add, named, depthOf: () => depth, out }, riding);
 
   // The drag: the knob's own mode, about its centre, over its own sweep.
   out.behavior = {
@@ -1143,11 +1139,11 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
 }
 
 /**
- * The readout, the title and the min and max labels, as text layers centred on where the panel hangs
- * its labels (`anchors`, buildSliderLabelAnchors). The readout shows the channel's value as the
- * control's readout did, unless its text was written by hand.
+ * The labels that ride a knob's or slider's handles (`showHandleLabels`), as text layers. Its name,
+ * value and range ends are Labels of their own beside it (utils/labelShows.js): selected with it,
+ * they come in as layers of their own (customComponentFromControls.js).
  */
-function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf, out, channel, showReadout, handles = [], riding = [] }, anchors) {
+function addLabelLayers({ parts, width, origin, add, named, depthOf, out }, riding = []) {
   const textLayer = (suffix, part, anchor, content, fallbackSize) => {
     const text = deepClone(part?._children?.Text ?? SECTION_DEFAULTS.Text);
     text.content = content;
@@ -1165,32 +1161,6 @@ function addLabelLayers({ behavior, parts, resolved, width, origin, add, named, 
     const box = { x, y: anchor.y - boxHeight / 2, width: boxWidth, height: boxHeight };
     return createPartNode(named(suffix), { role: 'label', kind: 'rectangle', zIndex: depthOf(), opacity: num(part?.opacity, 1), layout: pxBox(box, origin), sections: { Text: text } });
   };
-  if (showReadout) {
-    const authored = String(parts.labelValue?._children?.Text?.content ?? '').trim();
-    const layer = add('labelValue', textLayer('readout', parts.labelValue, anchors.value, authored || '', 12));
-    if (!authored) {
-      const target = `Parts.${layer.name}.Text.content`;
-      // A range's readout is its start, the range separator and its end; a band's its three values
-      // between the band separator (formatSliderReadout): the first written, the rest added on.
-      const shown = handles.length > 1 ? handles : [{ channel }];
-      const separator = String(handles.length === 3 ? (behavior.bandSeparator ?? ' | ') : (behavior.rangeSeparator ?? ' - '));
-      shown.forEach((each, index) => {
-        const name = index === 0 ? `${layer.name}Text` : `${layer.name}Text${index + 1}`;
-        out.bindings[name] = index === 0
-          ? { _type: 'Binding', name, enabled: true, source: `channel.${each.channel}.display`, mapMode: 'direct', target }
-          : addingBinding({ _type: 'Binding', name, enabled: true, source: `channel.${each.channel}.display`, mapMode: 'template', template: `${separator}{value}`, target });
-      });
-    }
-  }
-  const title = String(parts.labelTitle?._children?.Text?.content ?? resolved?._children?.Text?.content ?? '').trim();
-  if (title) add('labelTitle', textLayer('title', parts.labelTitle, anchors.title, title, 11));
-  if (behavior.showMinMaxLabels !== false) {
-    const minText = String(parts.labelMin?._children?.Text?.content ?? '').trim();
-    const maxText = String(parts.labelMax?._children?.Text?.content ?? '').trim();
-    // Written as the panel writes them (formatSliderNumericValue): as the synth writes the value too.
-    add('labelMin', textLayer('min', parts.labelMin, anchors.min, minText || formatSliderNumericValue(behavior, getSliderMin(behavior)), 11));
-    add('labelMax', textLayer('max', parts.labelMax, anchors.max, maxText || formatSliderNumericValue(behavior, getSliderMax(behavior)), 11));
-  }
   // The label that rides each pointer or cap (`showHandleLabels`): its value as the readout shows it,
   // at the start of the travel, carried with the value: round the knob upright (`meta.orbit`, the
   // turn its pointer makes), or along the slider's travel.
@@ -1255,19 +1225,15 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   out.handles = handles;
 
   const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
-  const labelMetrics = {
-    readoutSize: labelFontSize(g('labelValue'), 12),
-    titleSize: labelFontSize(g('labelTitle'), 11),
-    minMaxSize: Math.max(labelFontSize(g('labelMin'), 11), labelFontSize(g('labelMax'), 11)),
+  const labelMetrics = sliderTextRoom(behavior, {
     handleSize: Math.max(labelFontSize(g('labelStart'), 11), labelFontSize(g('labelCurrent'), 11), labelFontSize(g('labelEnd'), 11)),
-  };
-  const showReadout = behavior.showValueReadout !== false;
+  }).labelMetrics;
   const showTicks = behavior.showTicks !== false;
   const trackThickness = num(g('bodyTrackBase')?._children?.Layout?.height, 10);
   const pointerCurrentSize = num(g('pointerCurrent')?._children?.Layout?.width, 20);
   const maxPointerSize = Math.max(pointerCurrentSize, num(g('pointerStart')?._children?.Layout?.width, 18), num(g('pointerEnd')?._children?.Layout?.width, 18));
-  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, showReadout, labelMetrics);
-  const pointAt = (t, size) => resolveLinearPointerPoint(behavior, width, height, t, trackThickness, size, showReadout, labelMetrics);
+  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, false, labelMetrics);
+  const pointAt = (t, size) => resolveLinearPointerPoint(behavior, width, height, t, trackThickness, size, false, labelMetrics);
   const corners = g('bodyTrackBase')?._children?.Background?._children?.Corners;
   const cornerRadius = num(corners?.radius, 999);
   const square = cornerRadius < trackThickness / 2 ? Math.max(0, cornerRadius) : null;
@@ -1643,12 +1609,12 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   for (const handle of handles) addCap(handle);
 
   const anchors = buildSliderLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
-    trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics,
+    trackThickness, pointerSize: maxPointerSize, hasReadout: false, labelMetrics,
   });
   // A label that rides each cap: beside it, or above it, from one end of the travel to the other.
-  const far = buildSliderLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize, hasReadout: showReadout, labelMetrics });
+  const far = buildSliderLabelAnchors(behavior, width, height, { start: 1, current: 1, end: 1 }, { trackThickness, pointerSize: maxPointerSize, hasReadout: false, labelMetrics });
   const riding = behavior.showHandleLabels === true ? handles.map((each) => ({ ...each, at: anchors[each.role], to: far[each.role] })) : [];
-  addLabelLayers({ behavior, parts, resolved, width, origin, add, named, depthOf: () => depth, out, channel, showReadout, handles, riding }, anchors);
+  addLabelLayers({ parts, width, origin, add, named, depthOf: () => depth, out }, riding);
 
   // The drag: across the track, from one end to the other.
   const lo = pointAt(0, pointerCurrentSize);

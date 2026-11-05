@@ -155,10 +155,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Slider_1709143310893.value",
-      "label": "Slider_1709143310893",
-      "controlName": "Slider_1709143310893",
-      "path": "Slider_1709143310893.value",
+      "id": "Slider_1709143310895.value",
+      "label": "Slider_1709143310895",
+      "controlName": "Slider_1709143310895",
+      "path": "Slider_1709143310895.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.66,
@@ -169,10 +169,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Crossfader_1709143310894.value",
-      "label": "Crossfader_1709143310894",
-      "controlName": "Crossfader_1709143310894",
-      "path": "Crossfader_1709143310894.value",
+      "id": "Crossfader_1709143310898.value",
+      "label": "Crossfader_1709143310898",
+      "controlName": "Crossfader_1709143310898",
+      "path": "Crossfader_1709143310898.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -185,10 +185,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "ToggleButton_1709143310896.value",
-      "label": "ToggleButton_1709143310896",
-      "controlName": "ToggleButton_1709143310896",
-      "path": "ToggleButton_1709143310896.value",
+      "id": "ToggleButton_1709143310900.value",
+      "label": "ToggleButton_1709143310900",
+      "controlName": "ToggleButton_1709143310900",
+      "path": "ToggleButton_1709143310900.value",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -199,10 +199,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "CyclicButton_1709143310897.value",
-      "label": "CyclicButton_1709143310897",
-      "controlName": "CyclicButton_1709143310897",
-      "path": "CyclicButton_1709143310897.value",
+      "id": "CyclicButton_1709143310901.value",
+      "label": "CyclicButton_1709143310901",
+      "controlName": "CyclicButton_1709143310901",
+      "path": "CyclicButton_1709143310901.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -218,10 +218,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Combobox_1709143310898.value",
-      "label": "Combobox_1709143310898",
-      "controlName": "Combobox_1709143310898",
-      "path": "Combobox_1709143310898.value",
+      "id": "Combobox_1709143310902.value",
+      "label": "Combobox_1709143310902",
+      "controlName": "Combobox_1709143310902",
+      "path": "Combobox_1709143310902.value",
       "min": 0,
       "max": 2,
       "defaultValue": 0,
@@ -237,10 +237,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Number_1709143310899.value",
-      "label": "Number_1709143310899",
-      "controlName": "Number_1709143310899",
-      "path": "Number_1709143310899.value",
+      "id": "Number_1709143310903.value",
+      "label": "Number_1709143310903",
+      "controlName": "Number_1709143310903",
+      "path": "Number_1709143310903.value",
       "min": 0,
       "max": 100,
       "defaultValue": 0,
@@ -251,10 +251,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "Ribbon_1709143310905.value",
-      "label": "Ribbon_1709143310905",
-      "controlName": "Ribbon_1709143310905",
-      "path": "Ribbon_1709143310905.value",
+      "id": "Ribbon_1709143310909.value",
+      "label": "Ribbon_1709143310909",
+      "controlName": "Ribbon_1709143310909",
+      "path": "Ribbon_1709143310909.value",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -267,10 +267,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1709143310908.x",
-      "label": "VectorJoystick_1709143310908 X",
-      "controlName": "VectorJoystick_1709143310908",
-      "path": "VectorJoystick_1709143310908.x",
+      "id": "VectorJoystick_1709143310912.x",
+      "label": "VectorJoystick_1709143310912 X",
+      "controlName": "VectorJoystick_1709143310912",
+      "path": "VectorJoystick_1709143310912.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -283,10 +283,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1709143310908.y",
-      "label": "VectorJoystick_1709143310908 Y",
-      "controlName": "VectorJoystick_1709143310908",
-      "path": "VectorJoystick_1709143310908.y",
+      "id": "VectorJoystick_1709143310912.y",
+      "label": "VectorJoystick_1709143310912 Y",
+      "controlName": "VectorJoystick_1709143310912",
+      "path": "VectorJoystick_1709143310912.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -299,10 +299,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1709143310909.bpm",
-      "label": "StepSequencer_1709143310909 Tempo",
-      "controlName": "StepSequencer_1709143310909",
-      "path": "StepSequencer_1709143310909.bpm",
+      "id": "StepSequencer_1709143310913.bpm",
+      "label": "StepSequencer_1709143310913 Tempo",
+      "controlName": "StepSequencer_1709143310913",
+      "path": "StepSequencer_1709143310913.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -315,10 +315,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1709143310909.run",
-      "label": "StepSequencer_1709143310909 Run",
-      "controlName": "StepSequencer_1709143310909",
-      "path": "StepSequencer_1709143310909.run",
+      "id": "StepSequencer_1709143310913.run",
+      "label": "StepSequencer_1709143310913 Run",
+      "controlName": "StepSequencer_1709143310913",
+      "path": "StepSequencer_1709143310913.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -384,7 +384,7 @@
     {
       "_children": {
         "Core": {"name":"Knob_1709143310891","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310891","controlType":"Knob"},
-        "Transform": {"x":26,"y":112,"width":190,"height":190},
+        "Transform": {"x":36,"y":112,"width":170,"height":170},
         "Behavior": {"defaultCurrentValue":0.63,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
           "_drawing": "56d2070b"
@@ -396,7 +396,7 @@
     {
       "_children": {
         "Core": {"name":"Knob_1709143310892","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310892","controlType":"Knob"},
-        "Transform": {"x":220,"y":125,"width":128,"height":158},
+        "Transform": {"x":228,"y":132,"width":112,"height":112},
         "Behavior": {"defaultCurrentValue":0.35,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"bottom"},
         "Parts": {
           "_drawing": "56d2070b"
@@ -407,8 +407,28 @@
     },
     {
       "_children": {
-        "Core": {"name":"Slider_1709143310893","controlSetId":"satellite","id":"ctrl_1709143310893","controlType":"Slider"},
-        "Transform": {"x":364,"y":133,"width":190,"height":78},
+        "Core": {"name":"Label_1709143310893","controlSetId":"satellite","id":"ctrl_1709143310893","attachedTo":"ctrl_1709143310891","controlType":"Label"},
+        "Transform": {"x":70,"y":284,"width":102,"height":19},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Multiline":{"wrapMode":"none"}},"shows":"value"},
+        "ContentLayout": {"paddingLeft":0,"paddingRight":0,"lampColour":"FF70CFC0","lampOffColour":"FF162B35","lampBezelColour":"AAFFFFFF"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Label_1709143310894","controlSetId":"satellite","id":"ctrl_1709143310894","attachedTo":"ctrl_1709143310892","controlType":"Label"},
+        "Transform": {"x":251,"y":246,"width":67,"height":19},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Multiline":{"wrapMode":"none"}},"shows":"value"},
+        "ContentLayout": {"paddingLeft":0,"paddingRight":0,"lampColour":"FF70CFC0","lampOffColour":"FF162B35","lampBezelColour":"AAFFFFFF"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Slider_1709143310895","controlSetId":"satellite","id":"ctrl_1709143310895","controlType":"Slider"},
+        "Transform": {"x":364,"y":150,"width":190},
         "Behavior": {"defaultCurrentValue":0.66,"showTicks":false,"showMinMaxLabels":false,"labelReadoutPlacement":"topRight","labelTitlePlacement":"topLeft"},
         "Parts": {
           "_children": {
@@ -432,7 +452,7 @@
             "labelCurrent": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFC2DADB"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelEnd": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFB6FFE8"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelValue": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
-            "labelTitle": {"_children":{"Text":{"content":"LEVEL","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
+            "labelTitle": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}},
             "labelUnit": {"_children":{"Text":{"_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","letterSpacing":0.9}}}}}
           }
         },
@@ -442,7 +462,27 @@
     },
     {
       "_children": {
-        "Core": {"name":"Crossfader_1709143310894","controlSetId":"satellite","id":"ctrl_1709143310894","controlType":"Crossfader"},
+        "Core": {"name":"Label_1709143310896","controlSetId":"satellite","id":"ctrl_1709143310896","attachedTo":"ctrl_1709143310895","controlType":"Label"},
+        "Transform": {"x":364,"y":126,"width":190,"height":26},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"LEVEL","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":11,"letterSpacing":0.9}}},
+        "ContentLayout": {"lampColour":"FF70CFC0","lampOffColour":"FF162B35","lampBezelColour":"AAFFFFFF"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Label_1709143310897","controlSetId":"satellite","id":"ctrl_1709143310897","attachedTo":"ctrl_1709143310895","controlType":"Label"},
+        "Transform": {"x":439,"y":200,"width":40,"height":19},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Multiline":{"wrapMode":"none"}},"shows":"value"},
+        "ContentLayout": {"paddingLeft":0,"paddingRight":0,"lampColour":"FF70CFC0","lampOffColour":"FF162B35","lampBezelColour":"AAFFFFFF"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Crossfader_1709143310898","controlSetId":"satellite","id":"ctrl_1709143310898","controlType":"Crossfader"},
         "Transform": {"x":364,"y":234,"width":190,"height":62},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Crossfader": {"handleSize":22,"handleStyle":"block","trackSize":8,"trackColour":"FF162B35","fillAColour":"FF70CFC0","fillBColour":"FFFFB6E6","handleColour":"FFC2DADB","labelColour":"FFF2F2F2"},
@@ -453,7 +493,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Button_1709143310895","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310895","controlType":"Button"},
+        "Core": {"name":"Button_1709143310899","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310899","controlType":"Button"},
         "Transform": {"x":576,"y":118,"width":124,"height":84},
         "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
         "Text": {"content":"TRIGGER","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -468,7 +508,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"ToggleButton_1709143310896","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310896","controlType":"ToggleButton"},
+        "Core": {"name":"ToggleButton_1709143310900","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310900","controlType":"ToggleButton"},
         "Transform": {"x":716,"y":118,"height":84},
         "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
         "Text": {"content":"HOLD","_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -484,7 +524,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"CyclicButton_1709143310897","controlSetId":"satellite","id":"ctrl_1709143310897","controlType":"CyclicButton"},
+        "Core": {"name":"CyclicButton_1709143310901","controlSetId":"satellite","id":"ctrl_1709143310901","controlType":"CyclicButton"},
         "Transform": {"x":576,"y":220,"width":124,"height":36},
         "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
         "Text": {"content":"CYCLE","_children":{"Fill":{"colour":"FFF2F2F2"}}},
@@ -499,7 +539,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Combobox_1709143310898","controlSetId":"satellite","id":"ctrl_1709143310898","controlType":"Combobox"},
+        "Core": {"name":"Combobox_1709143310902","controlSetId":"satellite","id":"ctrl_1709143310902","controlType":"Combobox"},
         "Transform": {"x":716,"y":220,"width":136,"height":36},
         "Background": {"_children":{"Fill":{"colour":"38FFFFFF"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.7}}},
@@ -511,7 +551,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Number_1709143310899","controlSetId":"satellite","id":"ctrl_1709143310899","controlType":"Number"},
+        "Core": {"name":"Number_1709143310903","controlSetId":"satellite","id":"ctrl_1709143310903","controlType":"Number"},
         "Transform": {"x":576,"y":265,"width":124,"height":46},
         "Parts": {
           "_children": {
@@ -526,7 +566,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"TextInput_1709143310900","controlSetId":"satellite","id":"ctrl_1709143310900","controlType":"TextInput"},
+        "Core": {"name":"TextInput_1709143310904","controlSetId":"satellite","id":"ctrl_1709143310904","controlType":"TextInput"},
         "Transform": {"x":716,"y":273,"width":136},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":14}}},
         "Text": {"content":"Studio A","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk"}}},
@@ -538,7 +578,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1709143310901","controlSetId":"satellite","id":"ctrl_1709143310901","controlType":"Label"},
+        "Core": {"name":"Label_1709143310905","controlSetId":"satellite","id":"ctrl_1709143310905","controlType":"Label"},
         "Transform": {"x":26,"y":310,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"PLAY / SHAPE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
@@ -548,7 +588,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1709143310902","controlSetId":"satellite","id":"ctrl_1709143310902","controlType":"Label"},
+        "Core": {"name":"Label_1709143310906","controlSetId":"satellite","id":"ctrl_1709143310906","controlType":"Label"},
         "Transform": {"x":540,"y":310,"width":250,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"MEASURE / ROUTE","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"size":13,"letterSpacing":0.9}}},
@@ -558,7 +598,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"DrumPads_1709143310903","controlSetId":"satellite","id":"ctrl_1709143310903","controlType":"DrumPads"},
+        "Core": {"name":"DrumPads_1709143310907","controlSetId":"satellite","id":"ctrl_1709143310907","controlType":"DrumPads"},
         "Transform": {"x":26,"y":348,"width":228,"height":214},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "DrumPads": {"rows":2,"cols":2,"showNotes":false,"showHeader":false,"padForm":"pod","padLayout":"orbit","padAppearance":"raised","padRadius":4,"fieldColour":"FF162B35","padColour":"FFC2DADB","accentColour":"FF70CFC0","hitColour":"FF70CFC0","labelColour":"FF202020"},
@@ -569,7 +609,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Envelope_1709143310904","controlSetId":"satellite","id":"ctrl_1709143310904","controlType":"Envelope"},
+        "Core": {"name":"Envelope_1709143310908","controlSetId":"satellite","id":"ctrl_1709143310908","controlType":"Envelope"},
         "Transform": {"x":284,"y":348,"width":220,"height":70},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Envelope": {"lineWidth":3,"nodeRadius":3,"lineColour":"FF70CFC0","fillColour":"20000000","nodeColour":"FFC2DADB","gridColour":"88FFFFFF","sustainColour":"FFFFB6E6","playheadColour":"FF70CFC0"},
@@ -580,7 +620,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Ribbon_1709143310905","controlSetId":"satellite","id":"ctrl_1709143310905","controlType":"Ribbon"},
+        "Core": {"name":"Ribbon_1709143310909","controlSetId":"satellite","id":"ctrl_1709143310909","controlType":"Ribbon"},
         "Transform": {"x":284,"y":427,"width":220,"height":30},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Ribbon": {"orientation":"horizontal","style":"wheel3d","showGlow":false,"indicatorSize":8,"trackColour":"FF162B35","fillColour":"FF70CFC0","indicatorColour":"FFC2DADB","glowColour":"FF70CFC0","wheelColour":"FFFFFFFF","labelColour":"FFF2F2F2"},
@@ -591,7 +631,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Meter_1709143310906","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310906","controlType":"Meter"},
+        "Core": {"name":"Meter_1709143310910","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310910","controlType":"Meter"},
         "Transform": {"x":540,"y":342,"width":312,"height":108},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":12,"segmentGap":3,"trackColour":"FF162B35","fillColour":"FF70CFC0","thickness":16,"rounded":false,"peakColour":"FF70CFC0","showTicks":true,"valuePrecision":2},
@@ -615,7 +655,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1709143310907","controlSetId":"satellite","id":"ctrl_1709143310907","controlType":"Matrix"},
+        "Core": {"name":"Matrix_1709143310911","controlSetId":"satellite","id":"ctrl_1709143310911","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FF162B35","gridColour":"88FFFFFF","posColour":"FF70CFC0","negColour":"FFFFB6E6","labelColour":"FFF2F2F2","activeColour":"FF70CFC0"},
@@ -626,7 +666,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1709143310908","controlSetId":"satellite","id":"ctrl_1709143310908","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1709143310912","controlSetId":"satellite","id":"ctrl_1709143310912","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Joystick": {"puckRadius":7,"padColour":"FF162B35","gridColour":"88FFFFFF","crosshairColour":"FF70CFC0","puckColour":"FFC2DADB","cornerColour":"FFF7F4EC","labelColour":"FFF2F2F2"},
@@ -637,7 +677,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1709143310909","controlSetId":"satellite","id":"ctrl_1709143310909","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1709143310913","controlSetId":"satellite","id":"ctrl_1709143310913","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":466,"width":220,"height":100},
         "StepSequencer": {"cellForm":"pod","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FFC2DADB","cellOnColour":"FF70CFC0","playheadColour":"FF70CFC0","gridColour":"88FFFFFF","labelColour":"FFF7F4EC"},
         "Text": {"_children":{"Fill":{"colour":"FFF7F4EC"}}}
@@ -646,7 +686,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1709143310910","controlSetId":"satellite","id":"ctrl_1709143310910","controlType":"Label"},
+        "Core": {"name":"Label_1709143310914","controlSetId":"satellite","id":"ctrl_1709143310914","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},

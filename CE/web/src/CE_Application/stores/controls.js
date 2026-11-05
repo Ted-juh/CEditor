@@ -32,8 +32,9 @@ import { targetLayerName } from './panelLayerActions.js';
 import { withSetPins } from '../models/controlSetFamilies.js';
 import { convertRangeControl } from '../utils/rangeControlConversion.js';
 import { isDesignerViewPatch } from '../utils/designerViewState.js';
-import { attachedLabelRect, followMoves, remapAttachments, withAttached } from '../utils/attachedLabels.js';
-import { LABEL_SHOWS, SHOWN_LETTERING, shownText, withShownLettering } from '../utils/labelShows.js';
+import { followMoves, remapAttachments, withAttached } from '../utils/attachedLabels.js';
+import { makeAttachedLabel } from '../utils/attachedLabelFactory.js';
+import { LABEL_SHOWS } from '../utils/labelShows.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
@@ -448,22 +449,9 @@ export function addAttachedLabel(ownerId, shows) {
   const menuWords = LABEL_SHOWS.find(([key]) => key && key === shows)?.[1];
   if (!owner || !menuWords) return null;
   const ownerCore = owner._children.Core;
-  // As wide as its words, and a value as wide as the widest it prints (either end of the range).
-  const size = SHOWN_LETTERING[shows]?.size ?? 11;
-  const words = shows === 'value' ? ['value', 'min', 'max'].map((s) => shownText(owner, s)) : [shownText(owner, shows)];
-  const across = Math.max(...words.map((text) => Math.ceil(String(text ?? '').length * size * 0.62) + 8));
-  const rect = attachedLabelRect(owner, shows, { size, width: across });
   const name = uniqueControlName(collectControlNames(panel.controls),
     `${ownerCore.name || ownerCore.controlType || 'Control'} ${menuWords.replace(/ of$/, '')}`, 'Label');
-  const label = createControlFromType('Label', {
-    Core: { name, layer: ownerCore.layer ?? targetLayerName(), attachedTo: ownerId },
-    Transform: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
-    // One line: a value that grows is clipped at its box rather than broken onto a second line.
-    Text: { content: '', shows, _children: { Multiline: { wrapMode: 'none' } } },
-    Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false } } },
-    ContentLayout: { mode: 'text_only', horizontalAlign: rect.align, paddingLeft: 0, paddingRight: 0 },
-  });
-  label._children.Text = withShownLettering(label._children.Text, shows);
+  const label = makeAttachedLabel(owner, shows, { core: { name, layer: ownerCore.layer ?? targetLayerName() } });
   const parentId = findParentOfControl(panel.controls, ownerId)?._children?.Core?.id ?? null;
   panels.update((list) => list.map((p) => (p.id !== panelId ? p : {
     ...p,

@@ -12,7 +12,6 @@
   import { numberOr, clamp } from '../utils/primitives.js';
   import {
     formatSliderNumericValue,
-    formatSliderReadout,
     getSliderGeometry,
     getSliderOrientation,
     getSliderValueMode,
@@ -27,6 +26,7 @@
     resolveLinearPointerPoint,
     resolveLinearTrackFrame,
     sliderNormalizedToAngle,
+    sliderTextRoom,
   } from '../utils/sliderGeometry.js';
 
   let {
@@ -296,12 +296,12 @@
     current: numberOr(signals?.currentValueRaw, numberOr(signals?.valueRaw, 0)),
     end: numberOr(signals?.endValueRaw, 0),
   });
-  let showReadout = $derived(behavior?.showValueReadout !== false);
+  // It draws no name, value or range ends of its own: those are Labels beside it (utils/labelShows.js),
+  // and its track fills the box (sliderTextRoom). Only the labels riding its handles are its own.
   let showTicks = $derived(behavior?.showTicks !== false);
   // Behavior.tickRadius: the scale's own radius, a percentage of the track's, where a knob prints
   // its scale away from its value arc (0, the default: on the track, either side of its width).
   let tickRadiusShare = $derived(Math.max(0, numberOr(behavior?.tickRadius, 0)) / 100);
-  let showMinMaxLabels = $derived(behavior?.showMinMaxLabels !== false);
   let showHandleLabels = $derived(behavior?.showHandleLabels === true);
   let trackBasePart = $derived(parts?._children?.bodyTrackBase ?? null);
   let trackFillPart = $derived(parts?._children?.bodyTrackFill ?? null);
@@ -322,12 +322,10 @@
     value: parts?._children?.labelValue ?? null,
     unit: parts?._children?.labelUnit ?? null,
   });
-  let labelMetrics = $derived({
-    readoutSize: labelFontSize(labelParts.value, 12),
-    titleSize: labelFontSize(labelParts.title, 11),
-    minMaxSize: Math.max(labelFontSize(labelParts.min, 11), labelFontSize(labelParts.max, 11)),
+  let textRoom = $derived(sliderTextRoom(behavior, {
     handleSize: Math.max(labelFontSize(labelParts.start, 11), labelFontSize(labelParts.current, 11), labelFontSize(labelParts.end, 11)),
-  });
+  }));
+  let labelMetrics = $derived(textRoom.labelMetrics);
   let trackThickness = $derived(numberOr(trackBasePart?._children?.Layout?.height, 10));
   let pointerCurrentSize = $derived(numberOr(pointerCurrentPart?._children?.Layout?.width, 20));
   // The knob's body (utils/sliderEntityFactory.js `bodyCap`): a disc under the pointer, sized as a
@@ -584,7 +582,7 @@
     if (!(span > 0)) return 0.5;
     return clamp((numberOr(behavior?.centerValue, min) - min) / span, 0, 1);
   });
-  let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, showReadout, labelMetrics));
+  let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize, false, labelMetrics));
   let circularFitTight = $derived(String(behavior?.circularFit ?? 'auto') === 'tight');
   // How far the housing reaches, as a multiple of the track's radius: its size and its outline's
   // reach (a square set square reaches less far than its corners). For the tight fit.
@@ -613,12 +611,9 @@
       : maxPointerSize,
     majorTickLength,
     hasTicks: showTicks,
-    hasReadout: showReadout,
     circularDiameter: behavior?.circularDiameter,
-    labelMetrics,
+    ...textRoom,
     tight: circularFitTight,
-    showsMinMax: behavior?.showMinMaxLabels !== false,
-    readoutBelow: showReadout && String(behavior?.labelReadoutPlacement ?? 'auto') === 'bottom',
     outerReach: housingReach,
     readoutGap: numberOr(behavior?.labelReadoutGap, 14),
     numberReach: scaleNumberReach,
@@ -631,7 +626,7 @@
   let labelAnchors = $derived(buildSliderLabelAnchors(behavior, width, height, normalizedValues, {
     trackThickness,
     pointerSize: maxPointerSize,
-    hasReadout: showReadout,
+    hasReadout: false,
     labelMetrics,
   }));
   let tickStops = $derived(buildSliderTickStops(behavior));
@@ -769,9 +764,7 @@
     const shown = new Set(majorStopsShown.map((stop) => stop.index));
     return tickStops.minor.filter((stop) => shown.has(Number(String(stop.key).split('_')[1])));
   });
-  let readoutText = $derived(String(signals?.valueDisplay ?? formatSliderReadout(behavior, null)));
   let activeHandleLabel = $derived(String(signals?.activeHandle ?? 'current'));
-  let titleText = $derived(String(labelParts.title?._children?.Text?.content ?? control?._children?.Text?.content ?? '').trim());
   const sliderInstanceId = $props.id();
   let sliderMaskSeed = $derived(safeSvgId(`${control?._children?.Core?.id ?? 'slider'}-${sliderInstanceId}`));
   let singleFillOrigin = $derived(String(behavior?.fillOrigin ?? 'min').trim().toLowerCase() === 'center' ? centerMarkerNormalized : 0);
@@ -823,7 +816,7 @@
       : role === 'end'
         ? pointerEndSize
         : pointerCurrentSize;
-    return resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, size, showReadout, labelMetrics);
+    return resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, size, false, labelMetrics);
   }
 
   function circularPointerPoint(role) {
@@ -836,7 +829,7 @@
   }
 
   function linearTickLine(normalized, length) {
-    const point = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, maxPointerSize, showReadout, labelMetrics);
+    const point = resolveLinearPointerPoint(behavior, width, height, normalized, trackThickness, maxPointerSize, false, labelMetrics);
     const placement = String(behavior?.tickPlacement ?? 'outside').trim().toLowerCase();
 
     if (orientation === 'vertical') {
@@ -927,7 +920,7 @@
       };
     }
 
-    const point = resolveLinearPointerPoint(behavior, width, height, centerMarkerNormalized, trackThickness, maxPointerSize, showReadout, labelMetrics);
+    const point = resolveLinearPointerPoint(behavior, width, height, centerMarkerNormalized, trackThickness, maxPointerSize, false, labelMetrics);
     if (orientation === 'vertical') {
       return {
         x1: point.x - (centerMarkerLength / 2),
@@ -1216,7 +1209,7 @@
         />
       {/if}
       {#if valueMode === 'single'}
-        {@const fillStartPoint = resolveLinearPointerPoint(behavior, width, height, selectionStart, trackThickness, pointerCurrentSize, showReadout, labelMetrics)}
+        {@const fillStartPoint = resolveLinearPointerPoint(behavior, width, height, selectionStart, trackThickness, pointerCurrentSize, false, labelMetrics)}
         {@const currentPoint = linearPointerPoint('current')}
         {#if fillGlow}
           <line x1={fillStartPoint.x} y1={fillStartPoint.y} x2={currentPoint.x} y2={currentPoint.y} stroke={argbToCss(trackFillPart?._children?.Background?._children?.Fill?.colour, '#FFFFFF')} stroke-width={fillThickness * 1.8} stroke-linecap="round" opacity={0.55 * numberOr(trackFillPart?.opacity, 1)} filter={`url(#${fillGlowId})`} />
@@ -1541,27 +1534,6 @@
       {/if}
     {/if}
   </svg>
-
-  {#if showReadout}
-    <div class="slider-label slider-readout" style={labelStyle(labelParts.value, labelAnchors.value)}>
-      {labelContent(labelParts.value, readoutText)}
-    </div>
-  {/if}
-
-  {#if titleText}
-    <div class="slider-label slider-title" style={labelStyle(labelParts.title, labelAnchors.title)}>
-      {titleText}
-    </div>
-  {/if}
-
-  {#if showMinMaxLabels}
-    <div class="slider-label" style={labelStyle(labelParts.min, labelAnchors.min)}>
-      {labelContent(labelParts.min, formatSliderNumericValue(behavior, numberOr(behavior?.min, 0)))}
-    </div>
-    <div class="slider-label" style={labelStyle(labelParts.max, labelAnchors.max)}>
-      {labelContent(labelParts.max, formatSliderNumericValue(behavior, numberOr(behavior?.max, 1)))}
-    </div>
-  {/if}
 
   {#if showHandleLabels && valueMode !== 'single'}
     <div class="slider-label" style={labelStyle(labelParts.start, labelAnchors.start)}>

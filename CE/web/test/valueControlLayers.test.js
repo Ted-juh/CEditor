@@ -16,6 +16,12 @@ import { applyCustomBindings } from '../src/CE_Application/utils/interactionRunt
 
 const panelWith = (controls, setId = 'graphite') => ({ id: 'p', controlSet: { id: setId }, controlSets: [], controls });
 const knob = (patch = {}) => createControl('Knob', { Core: { id: 'k1', name: 'Cutoff' }, Transform: { x: 40, y: 60, width: 120, height: 140 }, ...patch });
+// A Label attached to a control, showing `shows` of it (utils/labelShows.js).
+const shown = (owner, shows, id = `l_${shows}`) => createControl('Label', {
+  Core: { id, name: `${owner._children.Core.name} ${shows}`, attachedTo: owner._children.Core.id },
+  Transform: { x: owner._children.Transform.x, y: owner._children.Transform.y + owner._children.Transform.height, width: owner._children.Transform.width, height: 18 },
+  Text: { content: '', shows },
+});
 const plan = (controls, setId = 'graphite', valueControlsAs = 'layers') => planComponentFromSelection(panelWith(controls, setId), controls.map((c) => c._children.Core.id), { set: getControlSet(setId), name: 'T', valueControlsAs });
 
 test('a knob comes in as layers wired to its value, and as one exact part when asked', () => {
@@ -23,13 +29,23 @@ test('a knob comes in as layers wired to its value, and as one exact part when a
   assert.ok(layered.ok);
   const parts = layered.component._children.Parts._children;
   assert.ok(!Object.values(parts).some((part) => part.kind === 'slidercontrol'), 'no frozen copy');
-  assert.deepEqual(Object.keys(parts), ['Cutoff_track', 'Cutoff_value', 'Cutoff_cap', 'Cutoff_pointer', 'Cutoff_readout']);
+  // The knob only: its name, value and range ends are Labels of their own.
+  assert.deepEqual(Object.keys(parts), ['Cutoff_track', 'Cutoff_value', 'Cutoff_cap', 'Cutoff_pointer']);
   const bindings = layered.component._children.Bindings._children;
   assert.equal(bindings.Cutoff_pointerTurn.source, 'channel.Cutoff.normalized');
   assert.equal(bindings.Cutoff_pointerTurn.target, 'Parts.Cutoff_pointer.Layout.rotation');
   assert.equal(bindings.Cutoff_pointerTurn.outputMax - bindings.Cutoff_pointerTurn.outputMin, 270, 'turns through the knob\'s sweep');
   assert.equal(bindings.Cutoff_valueSweep.target, 'Parts.Cutoff_value.meta.arcTrack.sweepAngle');
-  assert.equal(bindings.Cutoff_readoutText.source, 'channel.Cutoff.display');
+  // Its value Label, selected with it, comes in as a text layer that reads the knob's value; its min
+  // Label as the words it prints.
+  const k = knob();
+  const withLabels = plan([k, shown(k, 'value'), shown(k, 'min')]);
+  assert.ok(withLabels.ok, JSON.stringify(withLabels.refused));
+  const labelled = withLabels.component._children;
+  const valueText = Object.values(labelled.Bindings._children).find((b) => b.source === 'channel.Cutoff.display');
+  assert.ok(valueText, 'the value Label reads the knob\'s channel');
+  assert.match(valueText.target, /^Parts\..+\.Text\.content$/);
+  assert.ok(Object.values(labelled.Parts._children).some((part) => part._children?.Text?.content === '0.00'), 'the min Label prints the knob\'s min');
   const behaviour = layered.component._children.Behaviors._children.Cutoff;
   assert.equal(behaviour.geometry, 'circular');
   assert.equal(behaviour.startAngle, 225, 'the designer counts from 12 o\'clock');
@@ -307,7 +323,8 @@ const zonePoint = (component, zone, across, along = 0.5) => {
 
 test('a range knob comes in as layers: a value for each handle, kept in order, its arc from one to the other', async () => {
   const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
-  const result = plan([rangeOf('Knob', { showHandleLabels: true })]);
+  const range = rangeOf('Knob', { showHandleLabels: true });
+  const result = plan([range, shown(range, 'value')]);
   assert.ok(result.ok);
   assert.equal(result.asParts.length, 0, result.asParts[0]?.reason);
   const component = result.component;
@@ -321,22 +338,24 @@ test('a range knob comes in as layers: a value for each handle, kept in order, i
   const zone = Object.values(component._children.HitZones._children)[0];
   assert.deepEqual(zone.targetValueChannels, ['RangeStart', 'RangeEnd']);
   assert.equal(Object.values(component._children.Behaviors._children)[0].frame, 'zone');
-  // Drawn at its values: the arc from 20 to 70 of a 270-degree sweep, the readout the panel's.
+  // Drawn at its values: the arc from 20 to 70 of a 270-degree sweep, its value Label the panel's.
   const drawn = resolveInteractiveControl(component, { customValues: {} }).control._children.Parts._children;
+  const valueLabel = Object.keys(drawn).find((name) => name.startsWith('Range_value') && drawn[name]._children?.Text);
   assert.equal(drawn.Range_range.meta.arcTrack.sweepAngle, 135);
-  assert.equal(drawn.Range_readout._children.Text.content, '20.00 - 70.00');
+  assert.equal(drawn[valueLabel]._children.Text.content, '20.00 - 70.00');
   assert.ok(drawn.Range_start && drawn.Range_end, 'a dot for each handle');
   assert.equal(drawn.Range_startLabel._children.Text.content, '20.00');
   // Moved: the arc follows both ends.
   const moved = resolveInteractiveControl(component, { customValues: { RangeStart: 40, RangeEnd: 60 } }).control._children.Parts._children;
   assert.equal(moved.Range_range.meta.arcTrack.sweepAngle, 54);
-  assert.equal(moved.Range_readout._children.Text.content, '40.00 - 60.00');
+  assert.equal(moved[valueLabel]._children.Text.content, '40.00 - 60.00');
 });
 
 test('a band slider comes in with three caps; a press takes the nearest and a drag stops at the next', async () => {
   const { resolveCustomHitZoneAtPoint, resolveCustomInteractionPatch } = await import('../src/CE_Application/utils/customComponentInteraction.js');
   const { resolveInteractiveControl } = await import('../src/CE_Application/utils/interactionRuntime.js');
-  const result = plan([rangeOf('Slider', { valueMode: 'band', defaultCurrentValue: 40 })]);
+  const band = rangeOf('Slider', { valueMode: 'band', defaultCurrentValue: 40 });
+  const result = plan([band, shown(band, 'value')]);
   assert.ok(result.ok);
   assert.equal(result.asParts.length, 0, result.asParts[0]?.reason);
   const component = result.component;
@@ -362,7 +381,9 @@ test('a band slider comes in with three caps; a press takes the nearest and a dr
   const wide = fill({ RangeStart: 0, RangeEnd: 100 });
   const narrow = fill({ RangeStart: 50, RangeEnd: 100 });
   assert.ok(Math.abs((wide.width - narrow.width) - (narrow.x - wide.x)) < 0.01, 'the start moves the near edge and shortens it as much');
-  assert.equal(resolveInteractiveControl(component, { customValues: {} }).control._children.Parts._children.Range_readout._children.Text.content, '20.00 | 40.00 | 70.00');
+  const drawn = resolveInteractiveControl(component, { customValues: {} }).control._children.Parts._children;
+  const valueLabel = Object.keys(drawn).find((name) => name.startsWith('Range_value') && drawn[name]._children?.Text);
+  assert.equal(drawn[valueLabel]._children.Text.content, '20.00 | 40.00 | 70.00');
 });
 
 test('handles that may pass each other or wrap round come in as layers, drawn from the end less the start', () => {

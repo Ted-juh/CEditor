@@ -68,8 +68,7 @@
     resolveCircularTrackMetrics,
     resolveLinearPointerPoint,
     resolveSliderNormalizedFromPoint,
-    sliderValueToAngle,
-  } from '../utils/sliderGeometry.js';
+    sliderValueToAngle, sliderTextRoom } from '../utils/sliderGeometry.js';
   import {
     denormalizeCustomChannelValue,
     getCustomBehaviors,
@@ -857,7 +856,8 @@
     const scale = sliderPreviewScale(rect);
     const trackThickness = sliderTrackThickness() * scale;
     const pointerSize = sliderPointerSize(role) * scale;
-    const showReadout = behavior?.showValueReadout !== false;
+    // The track as the renderer lays it out: no room kept for text of its own (sliderTextRoom).
+    const textRoom = sliderTextRoom(behavior);
     const min = getRangeMin(behavior);
     const max = getRangeMax(behavior);
     const span = max - min;
@@ -872,7 +872,8 @@
         pointerSize: maxPointerSize,
         majorTickLength: sliderMajorTickLength() * scale,
         hasTicks: behavior?.showTicks !== false,
-        hasReadout: showReadout,
+        hasReadout: false,
+        labelMetrics: textRoom.labelMetrics,
         circularDiameter: numberOr(behavior?.circularDiameter, 0) * scale,
       });
       return resolveCircularPoint(
@@ -891,7 +892,8 @@
       normalized,
       trackThickness,
       pointerSize,
-      showReadout,
+      false,
+      textRoom.labelMetrics,
     );
   }
 

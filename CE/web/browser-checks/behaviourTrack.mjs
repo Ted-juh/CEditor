@@ -9,8 +9,9 @@
  *
  * WHERE THE EVIDENCE IS. Ticks are `<line>` elements — the track is one too, so a tick is told
  * apart by being PERPENDICULAR to it (x1 === x2 on a horizontal slider), and major from minor by
- * stroke width. The labels are `.slider-label` divs, one of which carries `.slider-readout`; their
- * text is what `formatSliderNumericValue` produced, which is where prefix, suffix, unit and the
+ * stroke width. A slider draws no text of its own: its value is its accessible value text in
+ * Preview, and its name, value and range ends are Labels of their own beside it (utils/labelShows.js),
+ * whose text is what `formatSliderNumericValue` produced, which is where prefix, suffix, unit and the
  * sign live. So the formatting rows read the same string a user reads.
  *
  * THREE FIXTURE TRAPS, two of them new here:
@@ -70,11 +71,24 @@ const fillLine = async (id) => {
   return flat[0] ?? null;
 };
 
-const labelsOf = (id) => kit.dom(id, '.slider-label');
-const readoutOf = async (id) => (await kit.dom(id, '.slider-readout'))[0] ?? null;
-/** The min and max labels: every slider-label that is not the readout or the title. */
-const minMaxOf = async (id) => (await labelsOf(id))
-  .filter((l) => !String(l.cls).includes('slider-readout') && !String(l.cls).includes('slider-title'));
+/** The text a slider draws itself: none but the labels riding its handles. */
+const ownTextOf = (id) => kit.dom(id, '.slider-label');
+/** Its value as it prints it, in Preview: its accessible value text (`{ text }`, as a label reads). */
+const readoutOf = async (id) => {
+  const text = await kit.page.evaluate((id) => document.querySelector(`[data-control-id="${id}"]`)?.getAttribute('aria-valuetext') ?? null, id);
+  return text === null ? null : { text: text.trim() };
+};
+/** Labels attached to a slider, showing its min and its max (the Labels tab's + Min and + Max). */
+const addEnds = (id) => kit.page.evaluate(async (id) => {
+  const { addAttachedLabel } = await window.__ceImport('/src/CE_Application/stores/controls.js');
+  return ['min', 'max'].map((shows) => addAttachedLabel(id, shows)._children.Core.id);
+}, id);
+/** What each of those Labels reads, and where it sits. */
+const labelsRead = (ids) => kit.page.evaluate((ids) => ids.map((id) => {
+  const el = document.querySelector(`[data-control-id="${id}"]`);
+  const r = el?.getBoundingClientRect();
+  return { text: el?.innerText.trim() ?? null, x: r?.x ?? null, y: r?.y ?? null, w: r?.width ?? null };
+}), ids);
 
 const focusAnd = async (id, ...keys) => {
   await kit.page.evaluate(({ id }) => {
@@ -233,20 +247,16 @@ try {
   // =============================================================================================
   await kit.fresh();
   {
-    const sid = await slider(110, { 'Behavior.showMinMaxLabels': true,
-      'Behavior.showValueReadout': true, 'Behavior.showTicks': false });
+    const sid = await slider(110, { 'Behavior.showTicks': false });
+    const ends = await addEnds(sid);
     await kit.preview(true);
     await kit.settle(600);
 
-    led.check(B, 'showMinMaxLabels (true)', 'the two ends of the range are written out under the track, formatted the same way the readout is',
-      ['0', '100'], (await minMaxOf(sid)).map((l) => l.text));
-    await kit.set(sid, { 'Behavior.showMinMaxLabels': false });
-    await kit.settle(340);
-    led.check(B, 'showMinMaxLabels (false)', 'and switched off there are none — the readout stays, because it is a different label',
-      { minMax: 0, readout: '40' },
-      { minMax: (await minMaxOf(sid)).length, readout: (await readoutOf(sid))?.text ?? null });
-    await kit.set(sid, { 'Behavior.showMinMaxLabels': true });
-    await kit.settle(320);
+    led.check(B, 'min and max Labels', 'Labels showing the two ends of the range write them out, formatted the same way the value is',
+      ['0', '100'], (await labelsRead(ends)).map((l) => l.text));
+    led.check(B, 'no text of its own', 'the slider itself draws no ends and no readout: those are Labels of their own, and its value is its accessible value text',
+      { ownText: 0, value: '40' },
+      { ownText: (await ownTextOf(sid)).length, value: (await readoutOf(sid))?.text ?? null });
 
     led.check(B, 'prefix + suffix + unit', 'the three wrap the number in the order the author expects — prefix, the digits, suffix, then the unit with a space before it',
       '~40%  dB', await (async () => {
@@ -256,7 +266,7 @@ try {
       })());
     led.check(B, 'prefix + suffix + unit (the ends are formatted too)',
       'and the min and max labels are formatted by the same function, so a panel does not read one way in the middle and another at the ends',
-      ['~0%  dB', '~100%  dB'], (await minMaxOf(sid)).map((l) => l.text));
+      ['~0%  dB', '~100%  dB'], (await labelsRead(ends)).map((l) => l.text));
     await kit.set(sid, { 'Behavior.prefix': '', 'Behavior.suffix': '', 'Behavior.unit': '' });
     await kit.settle(320);
 
@@ -288,84 +298,25 @@ try {
   await kit.preview(false);
 
   // =============================================================================================
-  // Where the labels sit: gap, offset and placement, for the two label groups separately.
+  // Where the Labels go: the Labels tab places them by the track. The gap, offset and placement
+  // settings that moved the slider's own labels went with them; a Label is moved like any control.
   // =============================================================================================
   await kit.fresh();
   {
-    // The end labels switched on by the author, as the section above does. A set's slider design
-    // (title and value above the track, no min/max) applies wherever a slider still has the factory
-    // value, Graphite's included; a value the author writes is theirs (Core.setOverrides). Left at
-    // the factory value here, there were no end labels to measure, and every row below read null.
-    const sid = await slider(110, { 'Behavior.showTicks': false, 'Behavior.showMinMaxLabels': true });
-    await kit.preview(true);
-    await kit.settle(600);
-    const readoutY = async () => (await readoutOf(sid))?.y ?? null;
-    const minMaxY = async () => (await minMaxOf(sid))[0]?.y ?? null;
-    const minMaxX = async () => (await minMaxOf(sid))[0]?.x ?? null;
-
-    const baseMinMax = await minMaxY();
-    await kit.set(sid, { 'Behavior.labelMinMaxGap': 44 });
-    await kit.settle(360);
-    const widerMinMax = await minMaxY();
-    led.check(B, 'labelMinMaxGap (D-19: it did nothing at the default placement)',
-      'widening the gap pushes the end labels further from the track, and by the amount asked for. It used to move nothing at all until the Position dropdown beside it was taken off `auto`, which carried the distance as a literal — and the literal was the very number the cell was showing, so the setting looked live and was not',
-      true, baseMinMax !== null && widerMinMax !== null && near(widerMinMax - baseMinMax, 22, 1.5));
-
-    const baseX = await minMaxX();
-    await kit.set(sid, { 'Behavior.labelMinMaxOffsetX': 18, 'Behavior.labelMinMaxOffsetY': 6 });
-    await kit.settle(360);
-    led.check(B, 'labelMinMaxOffsetX + labelMinMaxOffsetY', 'and the two offsets nudge them from wherever the gap left them, one axis each',
-      { x: true, y: true },
-      { x: near((await minMaxX()) - baseX, 18, 1.5),
-        y: near((await minMaxY()) - widerMinMax, 6, 1.5) });
-    await kit.set(sid, { 'Behavior.labelMinMaxOffsetX': 0, 'Behavior.labelMinMaxOffsetY': 0,
-      'Behavior.labelMinMaxGap': 22 });
-    await kit.settle(320);
-
-    const track = await trackLine(sid);
-    const trackY = Number(track.y1);
-    await kit.set(sid, { 'Behavior.labelMinMaxPlacement': 'above' });
-    await kit.settle(360);
-    const above = await minMaxY();
-    await kit.set(sid, { 'Behavior.labelMinMaxPlacement': 'below' });
-    await kit.settle(360);
-    const below = await minMaxY();
-    led.check(B, 'labelMinMaxPlacement', 'and placement moves them to the other side of the track outright, rather than by a distance',
-      { above: true, below: true, apart: true },
-      { above: above < trackY, below: below > trackY, apart: below - above > 10 });
-
-    const baseReadout = await readoutY();
-    await kit.set(sid, { 'Behavior.labelReadoutGap': 40 });
-    await kit.settle(360);
-    const movedReadout = await readoutY();
-    led.check(B, 'labelReadoutGap (D-19: the same, for the readout)',
-      'the readout has a gap of its own, so the value can sit close while the ends sit far — and it moves the readout ALONE, which is what makes the two gaps two settings rather than one spelled twice',
-      { moved: true, endsUnmoved: true },
-      { moved: baseReadout !== null && near(movedReadout - baseReadout, 26, 1.5),
-        endsUnmoved: near(await minMaxY(), below, 1.5) });
-    const baseReadoutX = (await readoutOf(sid))?.x ?? null;
-    await kit.set(sid, { 'Behavior.labelReadoutOffsetX': -14, 'Behavior.labelReadoutOffsetY': 9 });
-    await kit.settle(360);
-    led.check(B, 'labelReadoutOffsetX + labelReadoutOffsetY', 'and its own pair of offsets, which move it and nothing else',
-      { x: true, y: true },
-      { x: near(((await readoutOf(sid))?.x ?? 0) - baseReadoutX, -14, 1.5),
-        y: near((await readoutY()) - movedReadout, 9, 1.5) });
-    await kit.set(sid, { 'Behavior.labelReadoutOffsetX': 0, 'Behavior.labelReadoutOffsetY': 0 });
-    await kit.settle(320);
-    // The readout's placement vocabulary is its own — auto/top/center/bottom, measured from the
-    // component's edges — where the min/max one is auto/below/above/center measured from the track.
-    // Two lists, two meanings; using one's words on the other is silently ignored.
-    const readoutBefore = await readoutY();
-    await kit.set(sid, { 'Behavior.labelReadoutPlacement': 'bottom' });
-    await kit.settle(360);
-    const atBottom = await readoutY();
-    await kit.set(sid, { 'Behavior.labelReadoutPlacement': 'center' });
-    await kit.settle(360);
-    led.check(B, 'labelReadoutPlacement',
-      'the readout can be sent to the bottom edge of the component or parked in the middle of it, where the default leaves it at the top',
-      { bottom: true, belowTrack: true, centre: true },
-      { bottom: Math.abs(atBottom - readoutBefore) > 10, belowTrack: atBottom > trackY,
-        centre: near(await readoutY(), trackY, 14) });
+    const sid = await slider(110, { 'Behavior.showTicks': false });
+    const ends = await addEnds(sid);
+    const value = await kit.page.evaluate(async (id) => {
+      const { addAttachedLabel } = await window.__ceImport('/src/CE_Application/stores/controls.js');
+      return addAttachedLabel(id, 'value')._children.Core.id;
+    }, sid);
+    await kit.settle(400);
+    const [min, max, readout] = await labelsRead([...ends, value]);
+    const box = await kit.box(sid);
+    led.check(B, 'the Labels tab places the ends and the value',
+      'min under the start of the track, max under its end, the value between them, all just below the slider',
+      { order: true, below: true },
+      { order: min.x < readout.x && readout.x + readout.w <= max.x + 0.5,
+        below: [min, max, readout].every((l) => l.y >= box.y + box.h - 1 && l.y <= box.y + box.h + 30) });
   }
   await kit.preview(false);
 
