@@ -597,7 +597,12 @@ components):
        are still refused by name. Checked against the panel (strict) on six sets of
        different kinds (Graphite, Ember, Tolex, Ivory, Carbon, Pop): knobs crossed, knobs with
        crossing allowed and in order, knobs wrapped, sliders across crossed and in order, sliders
-       upright crossed, 24 of 24 each.
+       upright crossed, 24 of 24 each. Every offered set's (strict): knobs crossed 256 of 256,
+       knobs wrapped 256 of 256, knobs as a range in order 256 of 256, sliders across and upright
+       crossed 256 of 256 each. The wrapped run first found 9 rows apart on the sets whose cap turns
+       with the control's own value (Chicken-head, Hex-drive, Gimbal-ring): a range keeps that value
+       at its start, as the panel does (getSliderDefaultValues), and the component had given it the
+       knob's own; it stands at the start now.
      - *Fires and Afterwards* (Interact card, a button's behaviour; utils/customButtonFiring.js):
        a button fires when pressed, when released (a toggle's way), after a hold, on a number of
        clicks within a window, again and again while held (at the press, after a delay, then every
