@@ -42,7 +42,7 @@
   let selectedSource = $derived(sourceLabel(selected));
 
   const SHAPES = ['rectangle', 'circle', 'ellipse', 'ring', 'arc', 'polygon', 'generated-grid-cell', 'generated-piano-key'];
-  const ACTIONS = ['press', 'toggleValue', 'cycleValue', 'dragValue', 'scroll', 'setValue', 'cellValue', 'noteValue', 'selectCell', 'selectNote', 'focusOnly'];
+  const ACTIONS = ['press', 'toggleValue', 'momentaryValue', 'cycleValue', 'dragValue', 'scroll', 'setValue', 'cellValue', 'noteValue', 'selectCell', 'selectNote', 'focusOnly'];
   const ZONE_TEMPLATES = [
     { id: 'sliderDrag', label: 'Slider Drag', shape: 'rectangle', action: 'dragValue', bounds: { x: 0, y: 34, width: 100, height: 32, unit: 'percent' } },
     { id: 'buttonPress', label: 'Button', shape: 'rectangle', action: 'press', bounds: { x: 10, y: 12, width: 80, height: 76, unit: 'percent' } },

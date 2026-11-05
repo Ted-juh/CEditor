@@ -30,8 +30,49 @@ clip lamp that lights at its level and holds with the peak; the reading or the h
 Colours by position or by level, from the meter's own zones, the ones scripts' zone events
 report), Shape, Position, Appearance (Fill Type solid or gradient), and on the Scale part major
 and minor ticks in the Knob tab's words, each kind its own length and width, and numerals. A
-ninth part, the Clip Lamp, is a round lamp in the top right corner from the start. Still drawn by
-code: the 48 direction forms. SVG and Photoshop
+ninth part, the Clip Lamp, is a round lamp in the top right corner from the start. The knobs of the
+36 synth sets (Vintage Mono to Future Lab, Heritage to Carbon Pro, Valve Console to Prism Cap) are the
+knob's parts too (`models/directionKnobParts.js`), each written as its drawing was, in its 160 by 170
+units: a skirt between the housing and the cap and an insert set into the cap (two more plates, the
+Knob tab's **Skirt** and **Insert**), a shadow under any plate (its outline again, lower, as soft as
+asked; with no drop, a glow), a plate in perspective for the sculpted series (an oval, `aspect`,
+moved up or down, `shiftY`: the outline squashed, then turned with the value, then moved, so an
+oval ring turns as a gimbal does), a **gear** and a **chicken-head** outline, a **bar** pointer with
+square ends that can taper, carry an edge or be shaded (Lever Dial's brushed lever),
+the scale on a radius of its own (`Behavior.tickRadius`) with its 0 to 10 numbers round it
+(`Behavior.scaleNumberCount`, `Parts.tickNumber`), and ticks that light in a colour of their own up
+to the value (`activeColour`, the LED ring). Their shading is the drawing's gradients laid over the
+part's own colour, clear where the drawing used the set's face, so the knob still follows its set.
+Compared side by side with the drawings at two values: the same knobs, a little smaller in the box
+since the scale numbers take room of their own (the sculpted drawings let them run off the top of
+the frame); a cap's highlight, and the sculpted series' perspective, stay put while the knob turns
+(the drawings turned them with it). Left out, as no part draws them yet: Vintage Mono's faint inner
+ring, the line under the digital knobs, Dual Scale's second scale and inner bar, the pointer tails
+of Classic Poly and Heritage, Precision's knurling, Recessed's grip line, Arc Line's centre dot and
+the gap between its two arcs; the sculpted series' specular glints, the lines painted along their
+pointers, Prism Cap's facets, Coin Edge's accent tick and Gimbal Ring's two beads. Still drawn by
+code, a classic category as the owner decided: the 12 additional designs, most of which are not
+turning knobs at all (a bellows, an iris, a fan, a balance).
+The 36 synth sets' buttons, switches and meters are their own device parts too
+(`models/directionDeviceParts.js`), each written as drawn in its device frame: a key in a well that
+goes down and lights its bar, a rocker that tips, a piano key (a new **bevel** shape), a key with a
+lamp in a side window that rises, flat touch, membrane and edge-lit keys; the sculpted series' keys
+on a drop shadow, which device parts now cast (`shadowOffset`, `shadowBlur`, `shadowColour`, on the
+Button and Meter tabs). The meters: paper VU meters with their scale's curve (a **bow**), ticks
+round it and a needle, two side by side on Studio Console (the right needle the marker), bars that
+fill with a cursor at their end, LED ladders, dots and twin rows that light, the sculpted series'
+split ladder (its low cells the marker). Device gradients are drawn in SVG, which fades through a
+clear stop's own colour, so a clear stop takes its neighbours'; and a linear one now runs as CSS
+runs it, across the part's box in the drawing's units, where it ran in the box's fractions and so
+skewed at an angle on a box that is not square: the part, the Gradient dock and a layer made from it
+agree (the base sets' gradients run straight down and draw as they did). Compared side by side with the
+drawings off and on, empty and full: the same controls. Left out: the faint lines across the console
+keys, a border that lights (Edge Light, Floating Halo), the slant of the guard keys' bars, Gimbal
+Ring's frame in metal, the lens keys' highlight line, the second VU's ticks on Studio Console, and
+the paper meters' curved tick lines (an arc of ticks instead). As layers, every one of them
+converts, the sculpted ones' shadows a layer of their own under each part (see piece D2). The twelve classic
+sets' buttons, switches and meters are illustrations like their knobs and stay drawn by code.
+SVG and Photoshop
 drawings import as layered components (Bringing designs in, below).
 
 ## The principle
@@ -198,15 +239,474 @@ The natural way to design a set is on the panel: style one knob in the propertie
 reverse: **Edit the set's Knob**, which places one to edit. Settings › Control Sets gets every
 colour role (grouped), the fonts, the lamp, and every family, not 7.
 
+**Built** (owner's approved mock-up, in the words of Unity's prefab overrides and Figma's main
+components):
+
+- **Overrides list** on Core › Control design: each override by part and property, with Revert and
+  Apply. `models/setFromControl.js controlOverrides` reads them from `setOwnership`, which now
+  counts every look path the set may write (`EDITOR_PATHS`, part properties included), not only
+  colour roles; a colour role counts only where the control differs from both the factory value
+  and what the family gives it.
+- **Apply to Set…** (`layout/ApplyToSetDialog.svelte`, `stores/setFromControl.js`): the overrides
+  ticked, and what changes (how many other controls of the type follow, how many keep a value of
+  their own). Applying writes the values as the control holds them into the family (a role stays a
+  role), marks the family the author's own (`chosenFamilies[type] = 'own'`, so no derived design
+  writes over it) and hands the control back to the set. A set of the author's is changed in the
+  library and in the copy the panel carries (the panel's copy wins a lookup, so both must change).
+  A built-in set is copied under a name the window offers, and the panel moves to the copy, or the
+  control does where it was assigned a set of its own. One panel write, one undo step.
+- **Settings › Control Sets** (`models/setEditing.js`): the 45 colour roles in six groups, the ten
+  derived ones shown read-only; the swatch opens the Colors dock on the role (colours go through
+  the dock, never a popup). Lettering: typeface, weight and spacing written to every family's text,
+  a knob's readout part included. Lamp: direction and height. Families grouped as the Insert menu
+  groups them, each with its design source, Edit on Panel and Reset (back to the built-in the set
+  was copied from).
+- **Edit on Panel**: places one of the family's controls on the open panel where a new control
+  goes, drawn with the set (assigned to it if it is not the panel's), selected, with a banner in the
+  window's notice row: Apply to Set, or Cancel, which removes it.
+
 ### D. Components and sets meet (medium to large)
 
 1. The designer's colour fields offer the set's roles (Accent, Knob cap, Panel surface...) beside a
-   literal colour, so a component follows the panel's set.
+   literal colour, so a component follows the panel's set. **Built:** the Colors dock's **Set
+   colours** (`panels/DisplayPanel.svelte`), for every target that can hold a role
+   (`colorTargetAcceptsRoles`: a colour property of a control or a layer, or a callback marked
+   `acceptsRoles`), from the set the target's control is drawn with (`colorTargetSet`). A role is
+   written as a token (`applyRoleToTarget`), which `resolveControlForSet` already resolves for parts;
+   a colour picked after it is a literal again. The designer's look bar draws a linked swatch as the
+   panel's set gives it and names the role. Library cards draw with the open panel's set.
 2. From selection turns a knob into editable layers once forms are parts (B), not a frozen copy.
-3. Channel curves (bipolar, exponential, stepped) take effect.
-4. Later: a family may name a library component ("this set's knobs are Studio Knob 1.2"), placed as
-   linked copies. The two models differ (Behavior on built-ins, channels on components), so this
-   is the largest piece and can wait.
+   **Built** for knobs and sliders (`utils/valueControlLayers.js`), chosen in the new Create
+   Component from Selection window (`layout/ComponentFromSelectionDialog.svelte`): housing and cap
+   as path layers (any outline, its fill, gradient, finish and border; a see-through or lit border
+   as a separate edge layer, as the panel strokes it over the fill), track and value arc as arc
+   layers, ticks (line, dot, engraved, numeral) lit up to the value by opacity bindings, the
+   pointer turning about the centre, readout and labels as text; a slider's track, edge and slot,
+   a fill that grows from its origin, and a fader cap (dot, ring, line, bar) moving along it.
+   Geometry from the renderer's own helpers; colours from the family with roles kept; the knob's
+   interaction states written to its layers. `browser-checks/knobLayers.mjs` draws each built-in
+   set's knob and slider, converts it and compares the pixels at four values (within 2.5 %, a
+   one-pixel shift forgiven): all 79 sets' knobs match. What a layer cannot draw yet comes in as
+   one exact part, named: a control form not made of parts.
+
+   **Every offered set converts** (Iris and Satellite, drawn whole, aside). Of the 64, 41 knobs and
+   52 sliders used to come in as one exact part and 12 buttons, 13 switches and 17 meters were
+   refused; now none is. What it took:
+
+   - *A path layer whose light stays put* (`meta.fixedLight`, InteractivePartRenderer): turned, only
+     its outline turns about its pivot (`rotatePathData`), its fill, gradient, finish and shadows
+     drawn upright under it, as the panel draws a plate through a mask of its turned outline. A gear,
+     a scallop, flutes or a chicken-head turn under the set's lamp.
+   - *Plates as the panel draws them* (`plateLayers`): any outline, curves kept
+     (`transformPathData` maps a path, arcs included, under any affine map); in perspective, squashed
+     then moved; a skirt and an insert; a drop shadow as a layer of its own under the plate (a blurred
+     path, so it shows through a plate you can see through); grooves; the box the panel's fill box,
+     so a gradient runs as it does. The metrics take the skirt, the shadows, the ovals, the scale's
+     radius and its numbers, as the renderer's do.
+   - *Knob pointers and scales*: a bar with its taper and its edge (a mitred band, `offsetPolygon`),
+     a shaded bar, a second bar on it, a second scale, numbers round the scale, ticks on a radius of
+     their own, and ticks lit in their own colour.
+   - *Fader caps*: block, console, lens and glass, the sheen and the dome as gradient layers, a glow
+     as a blurred layer, a ring's glow, gradients and finishes on caps, tracks and fills. The panel's
+     glowing fill draws nothing (its blur's region is a share of a straight line's box, which has no
+     width), so its layers draw none either.
+   - *Buttons, switches and meters*: a part's shadow a blurred layer moving with it; a plain
+     switch's lamp (an LED, a jewel or a window, lit by a state); a legend that shows the reading; a
+     fill drawn in a pattern or a shape, each cell bound to where it stands; a counter, its digits a
+     **Counter Figures** binding (`mapMode: 'figures'`, utils/interactionRuntime.js: the reading to N
+     places, one character of it, only at a given count of figures) and its windows shown for each
+     count (`figureLengths`).
+   - A layer's box shadow keeps its colour's alpha (it was cut to six digits, so a soft shadow drew
+     solid).
+   - *A held peak*: a value channel can hold its peak (`peakHold`: hold time, fall rate, and what
+     it reads where nothing runs, `idle`), kept by the preview surface as a meter's is (`meterPeak`,
+     on the same ticker) and read by bindings as `channel.<name>.peak`. A meter with Peak Hold, a
+     clip lamp or a part showing the peak carries it, so the clip lamp (lit at `clipFrom`, held
+     while the peak holds), a peak needle and Peak Hold's marker convert; where nothing runs a
+     device meter reads its value as the peak and a plain one has none, as each renderer draws
+     them. A range binding can write only inside its range (`band`, **Inside Only**): the segment
+     the peak rounds to.
+   - *A button's or a label's text*: a text layer draws what the label draws: its colour's alpha,
+     the nine placements, lines of its own at their line height, a baseline shift, and an
+     underline, strikethrough or overline (thickness, offset, colour, insets, in front or behind)
+     across centred text. Still refused by name: such a line across text not centred, one that
+     leaves gaps round the letters, and an outline inside the text. A device's caption is one line
+     of SVG text in the text's colour, family, size, weight and spacing and nothing else, so its
+     layer takes only those.
+   - *Turned and scaled*: the panel turns and scales a whole control about its box's centre; each
+     layer of a button, switch, meter or piece of artwork, built upright, turns by the same angle and
+     scales by the same factor about its own pivot, its box moved so the pivot lands where the
+     control's turn puts it (`turnControlLayers`). A layer a binding moves or sizes is placed so at
+     both ends of the binding, one place binding per axis, so it travels along the turned direction;
+     one moved by two readings is refused. A button's grab area follows a layer of its box that draws
+     nothing (`source: 'part:…'`), turned with the rest. A component clips to its own box (the
+     canvas's `.control-content`), so it holds the box as drawn, turned and scaled. Knobs and
+     sliders turned or scaled are still refused.
+   - *Effects*: every set gives its buttons, switches and meters a drop shadow, and one drawn as a
+     device does not draw it (the canvas skips a device's effect surface); a plain one does, and its
+     layers used to drop it. Now a control's shadows and bevel are cast through the canvas's own
+     surface (EffectSurface) by the layer that holds its shape (`meta.surfaceEffects`): its plate,
+     when the plate is opaque and the rest lies on it, or its only layer; the component's box grows
+     by the shadows' reach, since the canvas draws them past the control's. Its colour filters
+     change each pixel by itself, so every layer takes them. A blur or a blend over a control of
+     several layers, and shadows with no one layer to cast them, are refused by name.
+   - *Icons*: an icon is a layer of its own (an `Icon` section), drawn and placed by the same code
+     as the canvas's (`editor/iconLook.js`): fitted, tinted, turned, flipped, with its shadow, glow
+     and blur, beside the text in the layout's mode, which makes room for it. `CE_KNOB_LAYERS_ICON=1`
+     puts a test icon in the library for the pixel check.
+
+   - *A bat switch* (ContentLayout `lamp: 'bat'`, a lever in a round bezel beside the legend):
+     the panel draws it as SVG in a box a lamp wide and three tall; each circle and round-capped
+     line of it is a path layer, its strokes edge layers (`batLampLayers`), and the lever, its
+     shadow and its ball are drawn twice, down in the off colour and up in the lit one, the lamp's
+     state showing the one and hiding the other. The ball's highlight is a radial gradient over its
+     box, as the SVG's is. Every set that names a bat draws its switches as devices, which draw no
+     lamp; the bat shows on a plain button where an author chooses it, and comes in as layers there.
+
+   - *Rendered looks* (piece E's lit pictures): a layer can carry a part's rendered look
+     (`look: 'rendered'` and the part's render properties, with `renderShape` round or block, a
+     block's `renderCorner` and `renderAxis`), and draws the same picture through the same renderer
+     (utils/layerRenderedLook.js, its spec from renderedLookCore's): a turned body the size of its
+     larger side, or a block its box, centred, its fill colour the body's and its fill the fallback
+     while the picture is made. One whose light stays put (`meta.fixedLight`) picks the picture of its
+     turn (`meta.renderTurn` plus its rotation) rather than turning as a picture. A rendered knob
+     plate, fader cap (with its groove unless its top is ridged), key, housing, guard or indicator,
+     and a meter's housing and clip lamp (unlit and lit), come in as such layers; a part the meter's
+     zones colour draws flat, as on the panel. The static part bake keeps them live, and both export
+     bakers (the editor's and the tools') bake a component's rendered layers, a state's colour
+     resolved through the set, so a plug-in draws them without WebGL.
+     The dock's **Render** tab (components/RenderTab.svelte, in the designer only, beside Mask;
+     approved from its mock-up) edits a layer's rendered look with the fields the Knob, Slider,
+     Button and Meter tabs show for a part's: Look, Shape (turned body or block), Light Stays Put,
+     profile, ridges, depth, taper, height, corner, top, ridge direction, materials and colours.
+
+   - *Track gradients, riding labels and synth readouts* (R5): a knob's track or value arc in a
+     gradient, a picture or a finish is an arc layer that paints its background through the arc
+     (`meta.arcTrack.paint: 'background'`, over its box and `paintPad` pixels, as SliderShapeFill
+     paints it), and a dot pointer in one is a path layer, with its edge, that goes round the knob
+     upright (`meta.orbit`: its rotation applied as a move round its pivot). A label that rides the
+     pointer (`showHandleLabels`) is a text layer bound to the channel's display text, orbiting the
+     centre the panel's label anchors use (the label metrics' circle, which is not quite the knob's
+     drawn centre), or moved along a slider's travel between its two end anchors. A value written as
+     the synth writes it (`displayFormat`, a table: utils/parameterDisplay.js) is carried on the
+     channel (`format.display`) and printed by `formatChannelValue` through the same
+     `formatBehaviorDisplay`; the min and max labels use `formatSliderNumericValue`, as the panel's.
+     The channel's display range follows the panel's rule for a cleared bound (`null` is no bound;
+     `Number(null)` had made it 0, and every value read 0), and a plus on positive values
+     (`showSign`) is carried too. Checked against the panel on Graphite and Ceramic at four values:
+     a knob with a gradient track, value arc and dot pointer 8 of 8; its riding label written as a
+     pan, with a plus sign, and with a cleared display range 24 of 24; a slider's riding label 8 of 8
+     each way (at most 0.21 % of pixels apart).
+
+   - *Ranges* (R5): a knob's or slider's range (`valueMode: 'range'`, a start and an end) or band
+     (the value between them) comes in as layers, a value for each handle (`valueHandles`): the
+     control's own channel keeps the value the panel's range sends and its host parameter, and
+     `<name>Start` and `<name>End` are values beside it, published, kept in order by the channel
+     constraints the runtime already enforces (`normalizedMax: 'channel.<end>.normalized'`, the
+     panel's normalizeHandleOrder). The fill from start to end (bodySelectedRange) is one layer moved
+     by both: its near edge (or an arc's start angle) by the start, its length (or sweep) by the end,
+     less the start's travel. That takes a binding that **adds** (`add: true`,
+     interactionRuntime's `addedBindingValue`): its result added to what the bindings before it
+     wrote, numbers summed and text joined, so the readout is the start, the separator and the end
+     (`rangeSeparator`, a band's `bandSeparator`), as formatSliderReadout writes it. Ticks light
+     between the handles as highlightStop lights them, the end setting the opacity and the start
+     adding to it, which never comes out below nothing since the start never passes the end. Each
+     handle is drawn as the panel draws it (a knob's start and end as circles, a slider's as caps of
+     their own kind on the travel their size lays out) with its riding label. One grab area takes the
+     handle nearest the press (`targetValueChannels`, `resolveCustomHitZoneAtPoint`), as the panel
+     takes its nearest handle. Handles that may pass each other or wrap round the end were refused by
+     name (layers since R6, with Minus); as one exact part a range is still refused, as a part holds one value. Each handle glides
+     to a value it is given other than by a drag, on the control's glide timing, as the panel moves
+     its start, value and end along one curve (SliderFamilyRenderer's glide). A knob in the
+     tight fit leaves room for a range's start and end dots, as the panel sizes it (without them the
+     converted knob drew larger than the panel's, 4 to 19 % of its pixels apart). Run over every
+     offered set, a band from 15 to 80 with its riding labels: knobs, sliders across and sliders
+     upright, 256 of 256 rows each (strict).
+     The designer shows and edits what these use (approved from its mock-up): on the React tab, a
+     binding's **Combine** (Set the value, or Add to the bindings before it) and, in its Range Map,
+     **Scale** (Linear or Decibels, with **Floor dB** and **Ceil dB**); on the Interact card, a
+     behaviour's **Measured in** (its grab area or the whole component) and, on a grab area over
+     several values, **Takes** the nearest of them.
+     The behaviour of a knob or slider made into layers now measures a point against its own grab
+     area (`frame: 'zone'`). It used to measure against the whole component, so a knob beside
+     another turned about a point between them: pressing straight above the second of two knobs set
+     75.7 where the panel sets 50.
+
+   - *Decibel scales* (R5): a meter on a decibel scale (`Meter.scale: 'db'`, `dbFloor` to `dbCeil`)
+     comes in as layers. Every binding that places a part by the reading or the held peak reads it
+     on that scale (`scale: 'db'` on a range or Counter Figures binding: interactionRuntime places
+     the source with meterLayout's `decibelPosition`, the curve meterPosition uses), so the needle,
+     the bar and its cover, lit cells, segments, an arc's sweep, the peak marker and a percentage
+     legend stand where the meter puts them; the printed reading stays the raw value, as the meter
+     prints it. The held peak falls on the same scale (`peakHold.scale`): the preview surface holds
+     and drops it in dB, as the meter does, and hands it on as a fraction again (`decibelFraction`),
+     so a binding reads the peak as it reads the value. The static layers are seeded through the
+     same curve. Found on the way: an arc meter of segments drew the whole track arc behind them,
+     where the panel draws only the segments and leaves the gaps open (Ceramic, 3 % of pixels
+     apart); the track now comes only without segments. Run over every offered set's own meter on
+     a -40 to +6 dB scale: with peak hold, 256 of 256 rows; turned 25 degrees and scaled 1.1, 256 of
+     256 (strict).
+
+   - *Zone colours* (R5): a device meter's part coloured by the meter's zones (`zoneColours`) comes
+     in as layers. By position: each lit cell in the zone it sits in, each scale mark in its own
+     (the marks grouped by colour, a layer each, drawn without an outline as the panel draws them),
+     and a fill as the box painted in the zones' gradient along its direction, one layer to each of
+     its cells (one, for a plain fill), each shown through a mask of the cell's shape placed where the
+     cell stands and bound to the reading as the cell moves and grows: a rectangle with the part's
+     corner in pixels (an SVG with no view box, so the corner keeps its size however the mask is
+     sized) or an ellipse. Its outline is a rectangle growing over it. By the reading's zone ('level', or 'position' on a part with no
+     positions of its own: a needle, a lamp, a legend): each layer whose paint the zone decides
+     becomes a copy in each zone's colour (`zoneLevelCopies`). Stepped zones show one copy at a time,
+     an Inside Only binding on its zone (and, for a lit cell or a clip lamp, no lower than its own
+     level); blended zones stack the copies, each fading in across the span from the zone before,
+     which composites to the meter's own blend of the two colours. The part's other paths come apart
+     as the panel draws them: its own in its paint and outline, the zoned ones without, and a scale's
+     marks past Zone From in its lit colour (they had been drawn in the part's own paint). Refused by
+     name then, and layers since (R6, below): a fill by position in cells of another shape, or
+     patterned and outlined; counter windows by the reading's zone; and blended level colour on lit
+     cells, a clip lamp or a part you can see through. Run over every offered set's own meter with three zones: as the set draws it, 256 of
+     256; the indicator by level (stepped), 256 of 256; the indicator and the scale by position, 248
+     of 256, the eight Neon's and Obsidian's scale, which is counter windows, refused by name.
+
+   - *A value from another control* (R5): a meter that shows another control's value (Meter
+     `valueSourceId`, a knob or slider) comes in as layers. Its value names its source
+     (`channel.valueSource`): `channel:<name>` when the knob came into the same component (the value
+     that knob became), or the panel control's id when it stayed on the panel. Each time the
+     component is drawn the value is set as far along its range as its source is along its own
+     (`sourcedCustomValues`): the runtime does it for a source inside the component, wherever it is
+     drawn, and the panel's preview surface for a panel control (read as the meter reads its Value
+     Source, lcdRangeForSource), before its peak is held. So the value follows its source however
+     that moves: a drag, a host's automation, a message from the synth. The value is over the
+     source's range, as the panel's meter is while the source drives it, so its readout prints the
+     source's value; it starts at the meter's own test value, at the same place along that range, as
+     the panel's meter stands in the editor (where its readout prints the test value itself, the
+     layers' that place in the source's range). Checked: the plan and the runtime (unit tests); the
+     editor's canvas against the panel's on Graphite and Tolex, the place the same and only the
+     readout's words apart. A meter's value in the editor's Preview could not be driven from the
+     check (a value set there did not reach the canvas, for the panel's meter as for the layers).
+     The designer shows it, as the owner approved in its mock-up (`utils/valueSources.js`): a value
+     nothing in the component drives says on the Interact card what it follows ("follows Cutoff, a
+     knob on the panel"), and Interact › Advanced › channel › Definition has **Value From**: its own
+     value, another numeric value of the component, or a knob or slider on the panel (a source the
+     panel no longer has is kept and said to be missing).
+
+   - *Classic designs* (R5): a control drawn in a classic form (Core › Control design names one:
+     Flat disc, Moulded pebble, Studio needle…) comes in as layers that draw what the panel draws. A knob in one
+     of the twelve base forms comes in as its drawing (`utils/formDrawingLayers.js`): shape by shape
+     as ControlAnatomy draws it in its 160 by 170 frame, fitted to the box as the SVG fits its
+     viewBox, the form's Size scaling it about the knob's centre. Each shape is a filled path layer;
+     a stroke is the band it paints, a path of its own (square ends, mitred corners, bevelled past a
+     mitre of four, a dashed ring its dashes), so its opacity lies over the fill as the drawing's
+     did; the dome and metal shading sit on the shape's own box, as strong as the form's Depth; the
+     readout and the tuning dial's ends are text layers. What moves is bound to the value: the
+     turning group about its centre (the tuning dial's small knob about its own), the disc's arc,
+     the roller's ribs (the twelfth back to the top at the very end, an adding binding) and its
+     marker, the tuning needle, the encoder's segments each lit from its own point of the travel over
+     the faint ring of all of them. Its drag is the drag the same knob in parts has, as the panel's
+     is. A form's parts (Convert to Parts) are close in spirit and not in pixels (the tab's card
+     square where the drawing's is askew, the parts filling the box where the drawing keeps to its
+     frame: 10 to 53 % of pixels apart), so a knob's drawing is not made from its parts.
+     A button, switch or meter in a base form comes in as its parts, made on a copy
+     (`withFormAsParts`) in the form's own colours: Core's Face, Housing, Ink, Legends and Indicator,
+     a role kept a role, where Convert to Parts writes the set's roles. The drawing shows the
+     control's colours, which a set fills from its roles and an author may since have changed.
+     A gradient painted in SVG (the drawings, and every device part) is sampled for its layer
+     (`unpremultipliedStops`, every 2.5 % and at each stop): SVG blends a stop's colour and its
+     opacity apart, CSS premultiplied, and between a clear white and an opaque face the two part by
+     a fifth of the shading (the pebble, lens, roller and scallop 2.4 to 7.9 % apart before).
+     The synth sets' knobs (`new-<set>`) come in as their drawings too, read from markup: the knob
+     branch of each drawing written out once as SVG (`utils/synthKnobDrawings.js`), with marks where
+     the drawing used the value (a group that turns, an arc to the value, ticks that light), and
+     read shape by shape (`utils/svgDrawingItems.js`: circles, ellipses, rects, paths, polygons and
+     text, groups and their turns, fills and strokes, gradients by id). An SVG gradient is redrawn on
+     the layer's own box from the shape's, where SVG measured it (a linear one's value rises across
+     that box at an angle CSS can draw, its stops placed where the CSS line meets them; a radial one
+     an ellipse in the layer's percentages), so a gradient on a stroke keeps its place. A group's
+     drop shadow is its silhouette (the shapes marked to cast, hulled, or an outline drawn for it),
+     lower, blurred, under it and turning with it, as the filter ran in the group's turned space;
+     cast by a fill clear in places it is as clear there, the gradient's opacities in black. A glow
+     is a blurred copy under the shape. Ticks drawn alike and not crossing share a layer.
+     The five base buttons and switches whose parts only approximated their drawings are drawn
+     outlines now: a device part takes a `path` shape (`shapePath`, SVG path data in 0..1 of its
+     box, several outlines allowed; `shapePathOn` for pressed or on, a state on its layer, as the
+     rocker tips, the latch sinks and the strap flips), Drawn Outline on the Button and Meter tabs.
+     The forms' metal and dome are the drawings' own, written as white then black over the part's
+     colour (the same over any colour, as strong as the form's Depth), which brings the Soft,
+     Carbon, Console and Machined sets' keys to their forms' drawings (their starters regenerated).
+     The synth sets' buttons, switches and meters come in as their drawings too
+     (`utils/synthDeviceDrawings.js`, `utils/deviceDrawingLayers.js`), in the frame ControlAnatomy
+     draws them in (a button's 160 by 100 with its caption under it, or laid out in the box's own
+     pixels where the caption does not fit; a meter's 160 by 100). A button or switch is drawn
+     twice, at rest and pressed or on, with the same shapes in the same order, and what differs
+     (a key moved down, a lamp lit, a rocker tipped, an edge lit) is its layers' state while pressed
+     or on. A meter's needle swings over its own arc about its own foot, its bar grows with the
+     reading and the mark at its end moves with it, and each cell lights past its own point, as the
+     drawings' `<` compares them; unlit cells drawn alike share a layer. No classic design is
+     refused now but the two illustrated sets'.
+     Checked against the panel on Graphite: the twelve base knobs 48 of 48 (four readings, at most
+     0.27 % of pixels apart); the 36 synth knobs 144 of 144 (at most 0.54 %); the base buttons 12
+     of 12, switches 12 of 12 off and on (0.12 %), meters 12 of 12 at four readings (0.26 %); a
+     cushion and a rocker drawn in their parts against their layers, 0.00 %. The synth sets'
+     devices as their drawings: buttons 36 of 36 (0.40 %), switches 36 of 36 off and on (0.46 %),
+     meters 36 of 36 at four readings (0.78 %). Every offered set's own devices, drawn in their
+     parts, after these changes (strict): buttons 64 of 64 in both sizes, switches 128 of 128,
+     meters 256 of 256.
+   - *The last meter refusals* (R6): what a meter drew that layers did not, now layers. Counter
+     cells that fill or light (pattern Digits, motion Fill or Light): for each count of figures the
+     reading can have, the part laid out as that many columns and drawn as a fill or a ladder is.
+     Each of those layers, and every copy the zones make of it, shows only while the reading has
+     that many figures: a Counter Figures binding, applied after every other, adds nothing to its
+     opacity while it has and takes one off it while it has not (`meta.lengthGate` marks the layers
+     until the binding is written). Counter windows took the same gate in place of the binding that
+     set their opacity, so their zone copies (Neon's and Obsidian's windows by the reading's zone)
+     keep it. Blended zone colour on a lit cell or a clip lamp: its copies blend as on any part, and
+     a gate at the cell's level hides them all until the reading reaches it. On a part you can see
+     through, a copy fading in over another no longer hides it, so each copy also fades out under the
+     next as that one fades in (`zoneFadeUnder`): at alpha·(1 − s)/(1 − alpha·s) against the upper
+     copy's alpha·s, which keeps the pair as opaque as the part and weighs the two colours as the
+     meter blends them. That curve is four to eight straight pieces, adding bindings, so no colour
+     strays more than about 2 % of the way between two zones'. A fill coloured by position in cells
+     of any shape is masked by each cell's outline stretched to the cell, as a patterned fill's
+     cells stretch, and an outlined one has each cell's outline as a layer growing with it. A bar
+     meter on a track you can see through shows its fill through a mask as wide as the reading; an
+     opaque track keeps its cover. For a shadow the whole control casts, a text layer counts by where
+     its words are rather than its box, so a Ceramic meter with scale labels (their boxes as wide as
+     the body, past the meter's edge) casts its shadow from its plate, as the panel does.
+     Checked against the panel (strict): lit cells by level, blended, on Ember and Carbon 8 of 8;
+     see-through lit cells on Pop and Bakelite 8 of 8; a see-through needle on Tolex 4 of 4; counter
+     windows by level on Neon and Obsidian 8 of 8, stepped 4 of 4; counter digits that light, that
+     fill, that fill by position and that light by level, 4 of 4 each; a fill by position in
+     hexagons, in outlined columns and in an outlined ellipse, 4 of 4 each; a bar on a see-through
+     track across (Graphite, Ceramic) 8 of 8 and upright 4 of 4; Ceramic and Graphite with scale
+     labels 8 of 8, Ceramic with scale labels, ticks and readout 4 of 4. Every offered set's own
+     meter after these changes 256 of 256, and with its indicator coloured by level, blended, 256 of
+     256; every set's button 64 of 64 in both sizes and switch 128 of 128 (the text-layer change is
+     theirs too).
+     The last two, built as approved from their mock-up:
+     - *Minus* (React tab, a binding): a binding may read its source less another value
+       (`minus`, interactionRuntime's bindingSourceValue; seeding and a range's glide read it too).
+       A range whose handles may pass each other (Allow Handle Cross) or wrap round the end (a
+       knob's Allow Wrap-Around) comes in as layers, its handles kept in no order, as the panel
+       keeps them. Everything that depended on their order reads the end less the start: a knob's
+       arc runs from the start round to the end, through the gap when the end is below the start
+       (360 degrees less what lies between them, no more than the sweep unless it wraps); a
+       slider's bar runs from whichever comes first, its near edge moved back by that difference
+       where it is below nothing and its length the difference either way; and a tick that lights
+       between the handles lights outside them when they are crossed (one more adding binding, the
+       step highlightStop takes). A slider's two handles of different sizes, laid out on two travels,
+       are still refused by name. Checked against the panel (strict) on six sets of
+       different kinds (Graphite, Ember, Tolex, Ivory, Carbon, Pop): knobs crossed, knobs with
+       crossing allowed and in order, knobs wrapped, sliders across crossed and in order, sliders
+       upright crossed, 24 of 24 each. Every offered set's (strict): knobs crossed 256 of 256,
+       knobs wrapped 256 of 256, knobs as a range in order 256 of 256, sliders across and upright
+       crossed 256 of 256 each. The wrapped run first found 9 rows apart on the sets whose cap turns
+       with the control's own value (Chicken-head, Hex-drive, Gimbal-ring): a range keeps that value
+       at its start, as the panel does (getSliderDefaultValues), and the component had given it the
+       knob's own; it stands at the start now.
+     - *Fires and Afterwards* (Interact card, a button's behaviour; utils/customButtonFiring.js):
+       a button fires when pressed, when released (a toggle's way), after a hold, on a number of
+       clicks within a window, again and again while held (at the press, after a delay, then every
+       interval), or only while held (a momentary button's way); afterwards it is ready again,
+       disabled, or locked for a time. A toggle flips when it fires; a momentary button sends its
+       value on for a moment (150 ms, no more than half a repeat's interval). `pending` is set while
+       a hold or a run of clicks is under way and `executed` for the moment it fires, as the
+       panel's timed buttons set them; a spent button disables the component when it is the
+       component's only behaviour. The preview surface (the panel and the plug-in player) and the
+       Test Bench time it, by pointer and by Enter or Space. A timed button comes in firing after
+       its hold or on its clicks, a one-shot firing on release and then disabled or locked for its
+       lockout, a repeating one again and again; it looks pressed while held, as the panel's does.
+       Pressed in Preview: a hold of 600 ms pending until it fires; a one-shot fired on release and
+       then disabled; a repeat of 200 then 100 ms fired 6 times in 650 ms held. Radio, cyclic and
+       combo-box buttons are still refused by name. Their look at rest against the
+       panel (strict, eight sets): hold to confirm, one-shot and repeating, 8 of 8 each.
+
+   Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
+   turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned
+   25 degrees and scaled 1.1, a knob of each kind 120 of 120 and a slider of each kind 40 of 40 (the
+   text layers they share changed), and the text, icon and effect cases above.
+
+   `knobLayers.mjs` with `CE_KNOB_LAYERS_STRICT=1` checks every offered set but the two illustrated
+   ones, and fails a control that comes in as one exact part or is refused. Run over all of them:
+   knobs 256 of 256 rows (four readings each, at most 1.4 % of pixels apart), sliders 256 of 256 each
+   way (0.1 %), meters 256 of 256 (1.0 %), buttons 64 of 64 in both sizes (1.9 %), switches 128 of
+   128, off and on (0.7 %);
+   `test/everySetAsLayers.test.js` plans each set's six controls (a knob, a slider each way, a button,
+   a switch, a meter) through the real path.
+   Value glide is carried: the knob's value-change animation (`pointerSlide`, 140 ms) becomes one on
+   its channel over every layer property its bindings move that can ease, an arc's sweep included,
+   which the part renderer eases in JS as the slider renderer eases a knob (CSS cannot ease an SVG
+   attribute). The tracker drops it during a drag, as it does the knob's own.
+   **Buttons and switches** (Button, MomentaryButton, ToggleButton) come in as layers only: a plain
+   one as its plate and its text (the label's text part and rules), one drawn as a device as a path
+   layer per part (housing, guard, key, symbol, indicator; `utils/deviceShapes.js` shapes over their
+   pattern cells, placed as ControlAnatomy places the 160 by 80 frame) with its legend and caption as
+   text. A bool channel; a toggle's grab area `toggleValue`, a momentary one the new
+   `momentaryValue` action (on while pressed, by the pointer or by Space or Enter, off on release
+   or a lost pointer, on the panel and in the designer's Preview). Pressed or on, a part's travel and swing are bindings, its lit
+   colour, opacity and legend a state (`rule: '<channel> == true'`); the button's own hover,
+   focus, pressed and selected looks are states on its layers. The pixel check compares them in
+   Preview, off and on. Refused by name: control forms not made of parts, a part that moves on a key
+   that turns, timed and one-shot buttons. A device part with a border is two layers, its
+   fill and its edge, the edge an open path the part renderer strokes as the panel does (round
+   joins, half outside the outline).
+   **Meters** come in as layers only, with a display-only channel (no grab area) printed as the
+   meter's readout. A plain one (MeterRenderer) as its plate, its track, the zones as one gradient
+   over the whole track and a cover in the track's colour from the reading to the end (square at
+   the reading, rounded at the end, bound by the reading), or its segments each lit from its middle,
+   and its ticks. One drawn with device parts (`utils/meterParts.js`) as a layer per part in its own
+   box, fitted as ControlAnatomy fits the 160 by 100 frame: a needle swinging, a pointer or marker
+   sliding, a bar growing from its edge (a rectangle, so its corners keep their radius), lit cells
+   each lit from its level and moved by the lit offset, a scale's marks and numerals, a fixed legend
+   and the readout. A plain meter's readout, label (above or below, its line measured in its font,
+   as it takes that much from the body) and scale labels are text layers, with the shadow or outline
+   the meter draws them with (text layers draw a soft shadow and an outer outline now). An arc meter
+   is its SVG fitted to the body: the track, its segments each lit by the reading, or one fill arc in
+   the zones' colours whose sweep is the reading. An arc layer draws zone colours (`zones`, fixed to
+   `zoneSweep`, blended or hard) as a conic gradient on a ring; the meter's own blended arc, 128
+   spans, had a seam at every join, and its spans now overlap. Refused by name: peak hold and parts
+   that follow the peak, decibel scales, zone-coloured parts, counter digits, legends that show the
+   reading, patterned or shaped fills, a value taken from another control, and a bar meter's track
+   you can see through (its fill shows under a cover in the track's colour).
+   The pixel check compares, since buttons, by the other picture's 3 by 3 neighbourhood: a pixel
+   differs when a channel falls outside that neighbourhood's range by more than 24, so a half-pixel
+   edge or an anti-aliased one against a crisp one passes and a part missing, moved or recoloured
+   does not (a switch compared with another set's: 47 %).
+3. Channel curves (bipolar, exponential, stepped) take effect. **Built:** `utils/channelCurves.js`
+   maps travel to value (Linear, Exponential and Logarithmic through a Centre value, S-Curve,
+   Stepped with Steps and Hysteresis, Bipolar, Dead Zone). `normalizeCustomChannelValue` is the
+   travel and `denormalizeCustomChannelValue` the value it gives, so the drag, the wheel and keys
+   (`stepCustomChannelValue`) and artwork bound to `.normalized` move by travel; Bipolar adds
+   `channel.x.bipolar` (-1 to 1) and rests at its centre. The exported parameter carries the curve
+   and `PanelParameters.h parameterRange` gives the host's range the same maths.
+4. A family may name a library component ("this set's knobs are Studio Knob 1.2"), placed as
+   linked copies. **Built** (`utils/setLibraryComponents.js`). The two models differ (Behavior on
+   built-ins, channels on components), so the component is not drawn over the knob: applying the set
+   puts a linked copy where each knob was. The set holds `libraryComponents[type]`, the package as the
+   library knows it; the exact version is used when the library has it, else the newest of its
+   family. A component can stand for knobs and sliders with one value a drag moves, for buttons with
+   an on/off value a press holds, for switches with one a click flips, for meters with one value and
+   nothing that moves it; and the value's look must read it as travel (normalized, bipolar or its
+   printed text), because a binding that reads the number maps it through a fixed input range and a
+   copy carrying a knob of another range would turn past its end. A copy keeps the knob's id and
+   name, place and size, layer; its value takes the knob's range, start and format; its device
+   bindings move to the value; its plug-in parameter keeps the id the knob exported under; an export
+   list entry is pointed at the value; its caption goes to the first published text no binding
+   writes; and a script's `Cutoff.value` reaches it (panelRuntime's `value` shorthand names the
+   placed channel). `Designer.setPlacement` records the knob. Applying a set that names no component
+   for the family, or another one, puts the knob back from that record with what the copy has now
+   (name, place, size, range, bindings back on the knob's own value, the live value). A copy's
+   range, caption and placement record are classed as its own, as its position is
+   (`customComponentSourceLink.setPlacementPaths`), so they are not design edits and an update keeps
+   them. Knobs with a script of their own, two handles or bindings to other controls stay, as do
+   meters taking another control's value or reading decibels; the Apply window names each. A set
+   file carries the packages it names, and importing it adds those the library lacks.
+   The Control Sets page draws the component too: its live preview runs its sample through the same
+   plan (`controlsWithSetComponents`), and a set's card draws its one control as a copy
+   (`drawnWithSetComponent`), its colour roles resolved for the set. A copy is fitted at the
+   component's proportions into the control's box, centred, its layers scaled to it
+   (`contentScaleMode: 'scaleInternals'`); the placement records both boxes, so the control comes
+   back at its own size, following the copy if it was moved or resized. A control pinned to the
+   set being applied takes its component as well.
 
 ### E. Realistic looks that stay changeable (medium to large)
 
@@ -229,11 +729,102 @@ and every property stays editable.
 - The "Control Studio" of the mock-up becomes this part's properties, in the properties panel and
   the designer, not a separate screen.
 
+**Built, first slice** (`utils/renderedLook.js`): a knob plate (housing, skirt, cap, insert) whose
+`look` is `rendered` is drawn from `renderProfile` (smooth, knurled, fluted), `renderCount`,
+`renderDepth`, `renderTaper`, `renderHeight` (percentages of its radius), `renderTop` (flat, insert,
+dome), `renderMaterial` and `renderTopMaterial` (spun or brushed metal, gloss or satin plastic,
+rubber) and `renderTopColour`, its fill colour the body's, lit by the set's lamp. The prototype's
+shader, its painted indicator switched off: the pointer stays a part. Images are made one a frame,
+cached by spec, size and turn; a grooved plate that turns needs eight, through one groove's repeat,
+so the light stays put. Until one is ready, or without WebGL2, the plate draws its plain fill.
+Export bakes them (`bakeRenderedLooks` in `preparePanelForExport`), each distinct image once, into
+the document's `renderedLookImages`; the player loads them and draws them, no WebGL needed. Three
+knobs: three images, about 120 KB each. The Knob tab edits it (approved mock-up): each plate's
+**Look**, Flat or Rendered, and a rendered plate shows only what the render draws (size, turns,
+profile, ridges and their depth, taper, height, top, the two materials and colours). A knob
+with a rendered plate is refused as layers by name.
+
+Fader caps and button parts are rendered too: a block (a rounded box the part's size, its top flat,
+with an insert, ridged across the travel, a dome or a dish), or a turned body for a round cap or a
+circular key. The shader, the specs and the drawing are in `utils/renderedLookCore.js`, which imports
+nothing; `renderedLookJobs` lists the images a control needs, and the bake runs it over each control
+as its set draws it (roles resolved), so the keys are the ones the plug-in's parts ask for. The export
+tools that start from a saved file (`prepare-export-panel.mjs`, `export-panel-vst3.mjs`,
+`export-panel-template.mjs`) bake in headless Chromium with that same file
+(`tools/scripts/lib/bakeRenderedLooks.mjs`); without a browser they say so and those parts draw flat.
+The Slider tab edits a cap's look (**Cap Look**, its fields going to all three handles) and the
+Button and Switch tabs a part's (**Look** in its Appearance), as the approved mock-up showed.
+
+A meter's housing and clip lamp render the same way (`renderedMeterPartSpec`): the housing a low
+block in the meter's 160 by 100 frame (a bezel, 12 % of its narrower side high where a key is 30, the
+face and scale drawn over it), a round lamp a turned body, and a lamp needs a second image in its lit
+colour. A part the meter's zones colour keeps its flat drawing, since its colour moves with the
+reading and no fixed set of images covers it. A meter with a rendered part is refused as layers by
+name. The Meter tab edits it (approved mock-up): **Look** in the Housing's and the Clip Lamp's
+Appearance, with the Button tab's fields; the housing's Height starts at 12, and a part with Zone
+Colours on says it is drawn flat while they are.
+
 ### F. Filmstrips as their own category (small)
 
 Image controls (imported strips, KnobMan or Blender renders, vendor packs) in a category of their
 own in the Library, marked for what they cannot do. They use the filmstrip support that exists. A
 tint per part (hue, brightness) is the one cheap kind of change they can take.
+
+**Built** (the owner approved the mock-up): `isImageStripComponent` (`utils/componentLibraryModel.js`)
+finds a component drawn from frames, by an enabled frames generator or a layer whose Image shows
+frames. The Library tab's cards mark it **Image strip**; once the library holds one, a row above the
+cards filters **All**, **Made of parts**, **Image strips**; and the detail column says what a strip
+cannot do and that it tints per layer through Effects › Filters (brightness and hue rotation, which
+parts already had).
+
+### G. A knob's text as Labels of its own (medium)
+
+A knob or a slider drew its name, its value and the ends of its range itself, from a Label section
+of its own that took only part of the Text properties, so most of them did nothing on a set's knob.
+The owner asked for the text to be separate: a knob is a knob, as a Label is a Label.
+
+**Built** in three steps (the owner chose option B, then: placement by rule, Alt+click, convert):
+
+- **Shows** (`utils/labelShows.js`, the words in `utils/labelText.js`). A Label shows its own
+  words, or the name, value, min, max, unit, start or end of a control: the one it names, else the
+  one it is attached to. The words are the control's own printing (its value format, a meter's
+  prefix and suffix); the canvas reads the control as authored, Preview, the player and the plug-in
+  its live value. A set letters a shown Label as it letters that part of a knob, where the author
+  has not. The words are apart from the model because they read the interaction runtime, and the
+  set resolution that reads the model must load in the plain-Node export tools.
+- **Attached to** (`utils/attachedLabels.js`). A Label attached to a control moves with it however
+  it is moved (every store write that moves a control goes through `withAttachedFollowing`), is
+  copied with it and attached to the copy, goes into a container with it, and is deleted with it.
+  Alt+click selects a control with its Labels; the tree lists them under it. The knob's **Labels**
+  tab lists them and adds them (`utils/attachedLabelFactory.js`): the name above, the value below
+  (in the middle when the knob reads it there), min and max beside the ends of the arc or under the
+  ends of the track.
+- **The knob draws no text.** Its track keeps no room for any; only the labels riding the handles
+  are still the control's. The circle a knob is drawn round is worked out once
+  (`utils/knobTrack.js`, from the control as drawn, its set applied), and the renderer, Preview's
+  and the Test Bench's hit tests, the riding labels and Create Component from Selection all ask it.
+  A value Label selected with its knob comes in as a text layer bound to the knob's channel.
+
+The starters were re-exported with value Labels and attached titles; a panel generated from a
+profile attaches each caption to its control and gives a knob a value Label. The example panels in
+`CE/panels` have no knob of this kind, so there was nothing to convert.
+
+**Meters and keys** (the owner chose: meters as the knobs; for buttons, the captions of keys drawn as
+devices only). A meter draws no reading and no caption: its Meter tab's Labels section adds them
+(+ Value printed with its precision, prefix and suffix, + Caption in the author's words). A Label can
+show a control's own **text** (`Text.shows` 'text'), and a control whose text a Label shows prints
+none itself (`textShownOwners`): a key drawn from its parts then gives the caption's room to the
+device, and a flat key its face. The text stays the button's, so scripts and states still set it.
+A flat button's face legend stays its own unless the author asks for a Label; illustrated sets and
+the classic forms print theirs as part of the drawing.
+
+**What the old text left behind is gone** (the owner: CEditor is in beta, existing panels need not
+carry over). The settings for text a knob or a meter no longer draws are out of the model, the set
+recipes and the shipped sets and starters: a knob's show readout, show min/max and the placement,
+gap and offset of its title, value and ends; a meter's show value, label and label position. What
+was left of the readout's placement is `Behavior.valueLabelPlacement`, 'below' or 'center': where
+the Labels tab puts a value Label. `ce.components.meter` lost `label()`, `labelPosition()` and
+`showValue()`; a script reaches a meter's reading and caption as the Labels they are.
 
 ## Bringing designs in: Photoshop and Blender
 
@@ -423,8 +1014,23 @@ Taken by the owner, 2026-11-02:
 3. **Filmstrips are for those who want them** (Photoshop, Blender), as their own category; the way
    in for those designs should be layers, not strips (Bringing designs in, above).
 
-Open:
+Taken by the owner, 2026-11-03:
 
-1. Rendered looks: live in the editor and baked into the plug-in at export (recommended), or live
-   everywhere (needs the Linux JUCE patch)?
-2. A set that names a library component (D4): later (recommended) or as part of this?
+4. **Rendered looks (E): live in the editor, baked into the plug-in at export**, as recommended. The
+   plug-in needs no WebGL, and Linux, whose webview has no GPU, needs no JUCE patch.
+5. **A set that names a library component (D4): later.** Taken up the same day and built as the
+   approved mock-up showed: chosen in the family's row, placed and put back by the Apply window.
+
+Taken by the owner, 2026-11-05:
+
+6. **A knob's text is Labels of its own (G).** "A label is a label as a slider is a slider." Option
+   B: a Label shows a control's name, value or range, and can be attached to it; a knob inserted
+   new comes with none. The Labels tab places a new one by rule; Alt+click selects a control with
+   its Labels; the example panels are converted once by a script (there turned out to be nothing
+   in them to convert).
+
+Taken by the owner, 2026-11-05 (after the mock-up of meters and keys):
+
+7. **A meter's reading and caption are Labels too, as the knobs'.**
+8. **A key's caption is a Label where the key is drawn as a device; a flat button keeps the text on
+   its face.** It lights up and moves with the key there, and already takes every text setting.

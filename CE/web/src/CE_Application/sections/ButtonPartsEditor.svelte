@@ -22,13 +22,16 @@
   import Zap from 'lucide-svelte/icons/zap';
   import Type from 'lucide-svelte/icons/type';
   import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch } from '../stores/controls.js';
+  import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet } from '../stores/controlSets.js';
   import { resolveColourLiteral } from '../models/controlSets.js';
   import { BUTTON_DEVICE_PARTS } from '../models/buttonDeviceParts.js';
   import { DEVICE_SHADINGS } from '../models/buttonFormParts.js';
-  import { anatomyForm, anatomyOptions } from '../models/controlAnatomy.js';
+  import { RENDERED_BLOCK_TOPS, RENDERED_MATERIALS, RENDERED_TOPS } from '../utils/renderedLook.js';
+  import { anatomyForm, anatomyOptions, isIllustratedForm } from '../models/controlAnatomy.js';
+  import IllustratedFormNote from './IllustratedFormNote.svelte';
   import { DEVICE_SHAPES, DEVICE_PATTERNS } from '../utils/deviceShapes.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { numberOr } from '../utils/primitives.js';
@@ -38,6 +41,7 @@
   const SHAPE_LABELS = {
     rect: 'Rectangle', ellipse: 'Ellipse', diamond: 'Diamond', hexagon: 'Hexagon', flap: 'Folded Sheet', corner: 'Fold',
     pillow: 'Cushion', bracket: 'Guard Bracket', crosshair: 'Crosshair', pair: 'Pair', ribbon: 'Ribbon', ring: 'Ring',
+    arch: 'Arch', ticket: 'Paper Tally', pointer: 'Pointer', bow: 'Bow', bevel: 'Bevelled Key', octagon: 'Octagon', path: 'Drawn Outline',
   };
   const PATTERN_LABELS = { solid: 'Solid', lines: 'Lines', grid: 'Grid' };
   const word = (text) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -57,8 +61,20 @@
   let material = $derived(part?._children?.Background?._children?.Effects?._children?.Material ?? {});
   let shapeKind = $derived(String(part?.shape ?? 'rect'));
   let pattern = $derived(String(part?.pattern ?? 'solid'));
+  // A housing, guard, key or indicator can be rendered (utils/renderedLookCore.js): a block its box's
+  // size, or a turned body when it is a circle.
+  const RENDERABLE = new Set(['housing', 'guard', 'key', 'indicator']);
+  let renderable = $derived(RENDERABLE.has(partName));
+  let rendered = $derived(renderable && String(part?.look ?? '') === 'rendered');
+  let renderedRound = $derived.by(() => {
+    const w = (Number(layout.width) || 0) * 1.6;
+    const h = (Number(layout.height) || 0) * 0.8;
+    return shapeKind === 'ellipse' && w > 0 && h > 0 && Math.abs(w - h) / Math.max(w, h) < 0.08;
+  });
   let form = $derived(anatomyForm(core?.controlType, core?.controlForm));
   let formName = $derived(anatomyOptions(core?.controlType).find(([id]) => id === form)?.[1] ?? form);
+  // Iris's and Satellite's forms are drawn whole: the parts below do not apply (IllustratedFormNote).
+  let illustrated = $derived(isIllustratedForm(form));
   let partsDrawn = $derived(String(core?.controlForm ?? '') !== 'original' && !form && parts.key?.visible === true);
 
   const partLabel = (name) => (name === 'key' ? (isSwitch ? 'Actuator' : 'Key') : word(name));
@@ -114,8 +130,14 @@
   const fraction = (value) => Math.max(0, Math.min(100, Number(value) || 0)) / 100;
 </script>
 
-<div class="button-parts">
-  {#if !partsDrawn}
+{#if $selectedComponentIds.size <= 1}
+  <AttachedLabelsEditor {control} />
+{/if}
+
+<div class="button-parts" class:dimmed={illustrated}>
+  {#if illustrated}
+    <IllustratedFormNote name={formName} />
+  {:else if !partsDrawn}
     <p class="note">
       {#if String(core?.controlForm ?? '') === 'original'}
         Core › Control design is Original parts, so this {noun} draws as a plain box and these parts are not drawn.
@@ -149,7 +171,7 @@
             {#each DEVICE_SHAPES as id (id)}<option value={id}>{SHAPE_LABELS[id] ?? word(id)}</option>{/each}
           </select>
         </PropertyCell>
-        <PropertyCell label="Depth %" compact path={`${prefix}.shapeDepth`} disabled={['rect', 'ellipse', 'diamond'].includes(shapeKind)} hint="How deep a fold, a bracket or a ring is, as a percentage of the part.">
+        <PropertyCell label="Depth %" compact path={`${prefix}.shapeDepth`} disabled={['rect', 'ellipse', 'diamond', 'path'].includes(shapeKind)} hint="How deep a fold, a bracket or a ring is, as a percentage of the part.">
           <NumberCell label="Depth %" value={numberOr(part.shapeDepth, 20)} defaultValue={20} step={1} min={0} max={100} onchange={(v) => set(`${prefix}.shapeDepth`, v)} />
         </PropertyCell>
         <PropertyCell label="Corner" compact path={`${prefix}.Background.Corners.radius`} disabled={!['rect', 'pillow'].includes(shapeKind)} hint="How round its corners are, in the device's units.">
@@ -197,6 +219,53 @@
     </PropertySection>
 
     <PropertySection title="Appearance" icon={Palette}>
+      {#if renderable}
+        <PropertyCell label="Look" path={`${prefix}.look`} hint="Flat: drawn from its shape, fill, border, finish and shading. Rendered: drawn as a lit object its box's size (a turned body if it is a circle), lit by the set's lamp; the fields below are its own.">
+          <select class="val" aria-label="Look" value={rendered ? 'rendered' : 'flat'} onchange={(e) => set(`${prefix}.look`, e.target.value === 'rendered' ? 'rendered' : '')}>
+            <option value="flat">Flat</option><option value="rendered">Rendered</option>
+          </select>
+        </PropertyCell>
+      {/if}
+      {#if rendered}
+        <!-- A rendered part (utils/renderedLookCore.js): only what the render draws. Its corners are
+             the Shape section's Corner; its border, finish, shading and shadow are the flat look's. -->
+        <PropertyCell label="Top" path={`${prefix}.renderTop`} hint="Its top: flat, with an insert set into it, ridged, a dome or a dish.">
+          <select class="val" aria-label="Top" value={part?.renderTop ?? 'flat'} onchange={(e) => set(`${prefix}.renderTop`, e.target.value)}>
+            {#each (renderedRound ? RENDERED_TOPS : RENDERED_BLOCK_TOPS) as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Ridges" compact path={`${prefix}.renderCount`} disabled={renderedRound || part?.renderTop !== 'ridged'} hint="How many ridges across its top.">
+          <NumberCell label="Ridges" value={numberOr(part?.renderCount, 5)} defaultValue={5} step={1} min={1} max={40} onchange={(v) => set(`${prefix}.renderCount`, Math.round(Number(v) || 0))} />
+        </PropertyCell>
+        <PropertyCell label="Depth %" compact path={`${prefix}.renderDepth`} disabled={renderedRound} hint="How deep its ridges or dish go, or how high its dome stands, as a percentage of half its narrower side.">
+          <NumberCell label="Depth" value={numberOr(part?.renderDepth, 12)} defaultValue={12} step={1} min={0} max={60} onchange={(v) => set(`${prefix}.renderDepth`, v)} />
+        </PropertyCell>
+        <PropertyCell label="Height %" compact path={`${prefix}.renderHeight`} hint={renderedRound ? 'How tall it stands, as a percentage of its radius.' : 'How tall it stands, as a percentage of its narrower side.'}>
+          <NumberCell label="Height" value={numberOr(part?.renderHeight, renderedRound ? 80 : 30)} defaultValue={renderedRound ? 80 : 30} step={1} min={10} max={200} onchange={(v) => set(`${prefix}.renderHeight`, v)} />
+        </PropertyCell>
+        <PropertyCell label="Taper %" compact path={`${prefix}.renderTaper`} hint="How much narrower its top is than its foot.">
+          <NumberCell label="Taper" value={numberOr(part?.renderTaper, renderedRound ? 8 : 6)} defaultValue={renderedRound ? 8 : 6} step={1} min={0} max={40} onchange={(v) => set(`${prefix}.renderTaper`, v)} />
+        </PropertyCell>
+        <PropertyCell label="Opacity" compact path={`${prefix}.opacity`} hint="How much it shows, 0 to 100.">
+          <NumberCell label="Opacity" value={percent(part.opacity)} defaultValue={100} step={5} min={0} max={100} onchange={(v) => set(`${prefix}.opacity`, fraction(v))} />
+        </PropertyCell>
+        <PropertyCell label="Material" span={2} path={`${prefix}.renderMaterial`} hint="What its body is made of.">
+          <select class="val" aria-label="Material" value={part?.renderMaterial ?? (renderedRound ? 'metal' : 'satin')} onchange={(e) => set(`${prefix}.renderMaterial`, e.target.value)}>
+            {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Top Material" span={2} path={`${prefix}.renderTopMaterial`} hint="What its top is made of.">
+          <select class="val" aria-label="Top Material" value={part?.renderTopMaterial ?? (renderedRound ? 'spun' : 'satin')} onchange={(e) => set(`${prefix}.renderTopMaterial`, e.target.value)}>
+            {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Body Colour" span={2} path={`${prefix}.Background.Fill.colour`} hint="Its body's colour. The swatch opens it in the Colors dock.">
+          <PropertyColor value={shown(fill.colour)} onchange={(v) => set(`${prefix}.Background.Fill.colour`, v)} onswatchclick={() => pickColour(`${prefix}.Background.Fill.colour`, fill.colour, fill.colour, 'Body Colour')} />
+        </PropertyCell>
+        <PropertyCell label="Top Colour" span={2} path={`${prefix}.renderTopColour`} hint="Its top's colour; empty, the body's.">
+          <PropertyColor value={shown(part?.renderTopColour || fill.colour)} onchange={(v) => set(`${prefix}.renderTopColour`, v)} onswatchclick={() => pickColour(`${prefix}.renderTopColour`, part?.renderTopColour, fill.colour, 'Top Colour')} />
+        </PropertyCell>
+      {:else}
       <PropertyCell label="Fill" span={2} path={`${prefix}.Background.Fill.colour`} hint="Its colour. The swatch opens it in the Colors dock; the field takes AARRGGBB or RRGGBB.">
         <PropertyColor value={shown(fill.colour)} onchange={(v) => set(`${prefix}.Background.Fill.colour`, v)} onswatchclick={() => pickColour(`${prefix}.Background.Fill.colour`, fill.colour, fill.colour, 'Fill')} />
       </PropertyCell>
@@ -223,6 +292,16 @@
       <PropertyCell label="Border Colour" span={2} path={`${prefix}.Background.Border.colour`} hint="The colour of its edge.">
         <PropertyColor value={shown(border.colour, 'FF333333')} onchange={(v) => set(`${prefix}.Background.Border.colour`, v)} onswatchclick={() => pickColour(`${prefix}.Background.Border.colour`, border.colour, 'FF333333', 'Border Colour')} />
       </PropertyCell>
+      <PropertyCell label="Shadow %" compact path={`${prefix}.shadowOffset`} hint="A drop shadow under it: its outline again, this percentage of the device's height lower. 0 for none.">
+        <NumberCell label="Shadow" value={numberOr(part.shadowOffset, 0)} defaultValue={0} step={0.5} min={0} max={50} onchange={(v) => set(`${prefix}.shadowOffset`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Softness %" compact path={`${prefix}.shadowBlur`} hint="How soft the shadow's edge is, as a percentage of the device's height. 0 for a hard edge.">
+        <NumberCell label="Softness" value={numberOr(part.shadowBlur, 0)} defaultValue={0} step={0.5} min={0} max={50} onchange={(v) => set(`${prefix}.shadowBlur`, v)} />
+      </PropertyCell>
+      <PropertyCell label="Shadow Colour" span={2} path={`${prefix}.shadowColour`} hint="The shadow's colour; its alpha is how dark it falls.">
+        <PropertyColor value={shown(part.shadowColour, '99000000')} onchange={(v) => set(`${prefix}.shadowColour`, v)} onswatchclick={() => pickColour(`${prefix}.shadowColour`, part.shadowColour, '99000000', 'Shadow Colour')} />
+      </PropertyCell>
+      {/if}
     </PropertySection>
 
     <PropertySection title={isSwitch ? 'When On' : 'When Pressed'} icon={Zap}>
@@ -279,6 +358,7 @@
 
 <style>
   .button-parts { min-width: 0; }
+  .button-parts.dimmed > :global(:not([data-illustrated-note])) { opacity: 0.4; }
   .val { box-sizing: border-box; width: 100%; min-width: 0; height: var(--pp-field-height, 26px); padding: var(--pp-field-padding, 0 6px); background: var(--pp-field-bg, #1A1A1A); border: 1px solid var(--pp-field-border, #333); border-radius: var(--pp-field-radius, 3px); color: var(--pp-field-fg, #DDD); font-size: var(--pp-field-font, 11px); font-family: inherit; outline: none; }
   .val:focus { border-color: var(--pp-field-focus, #5B9BD5); }
   .note { margin: 6px 8px; padding: 6px 8px; border: 1px solid #3A4A56; border-radius: 4px; background: #16222A; color: #B8C7D2; font-size: 11px; line-height: 1.4; }

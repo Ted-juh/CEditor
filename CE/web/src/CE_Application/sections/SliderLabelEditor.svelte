@@ -6,21 +6,19 @@
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import Type from 'lucide-svelte/icons/type';
   import TextEditor from './TextEditor.svelte';
+  import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
 
   let { control = null } = $props();
 
+  // The labels that ride the handles are the only text a knob or slider still draws itself: its
+  // name, value and range ends are Labels of their own (AttachedLabelsEditor, above).
   const LABEL_TARGETS = [
-    { id: 'labelTitle', label: 'Title', path: 'Parts.labelTitle.Text', visibility: 'title' },
-    { id: 'labelValue', label: 'Readout', path: 'Parts.labelValue.Text', visibility: 'readout' },
-    { id: 'labelMin', label: 'Min', path: 'Parts.labelMin.Text', visibility: 'minMax' },
-    { id: 'labelMax', label: 'Max', path: 'Parts.labelMax.Text', visibility: 'minMax' },
     { id: 'labelStart', label: 'Start', path: 'Parts.labelStart.Text', visibility: 'handles' },
     { id: 'labelCurrent', label: 'Current', path: 'Parts.labelCurrent.Text', visibility: 'handles' },
     { id: 'labelEnd', label: 'End', path: 'Parts.labelEnd.Text', visibility: 'handles' },
-    { id: 'labelUnit', label: 'Unit', path: 'Parts.labelUnit.Text', visibility: 'unit' },
   ];
 
-  let selectedLabelId = $state('labelTitle');
+  let selectedLabelId = $state('labelCurrent');
 
   function set(path, value) {
     const controlId = getSection(control, 'Core')?.id;
@@ -42,38 +40,12 @@
     }
   }
 
-  function labelVisible(target) {
-    if (target?.visibility === 'title') return String(selectedLabelText?.content ?? '').trim().length > 0;
-    if (target?.visibility === 'readout') return behavior?.showValueReadout !== false;
-    if (target?.visibility === 'minMax') return behavior?.showMinMaxLabels !== false;
-    if (target?.visibility === 'handles') return behavior?.showHandleLabels === true;
-    if (target?.visibility === 'unit') return String(behavior?.unit ?? '').trim().length > 0;
-    return selectedLabelPart?.visible !== false;
+  function labelVisible() {
+    return behavior?.showHandleLabels === true;
   }
 
-  function toggleVisible(target) {
-    if (target?.visibility === 'title') {
-      const hasTitle = String(selectedLabelText?.content ?? '').trim().length > 0;
-      set(`${target.path}.content`, hasTitle ? '' : 'Label');
-      return;
-    }
-    if (target?.visibility === 'readout') {
-      set('Behavior.showValueReadout', !(behavior?.showValueReadout !== false));
-      return;
-    }
-    if (target?.visibility === 'minMax') {
-      set('Behavior.showMinMaxLabels', !(behavior?.showMinMaxLabels !== false));
-      return;
-    }
-    if (target?.visibility === 'handles') {
-      set('Behavior.showHandleLabels', !(behavior?.showHandleLabels === true));
-      return;
-    }
-    if (target?.visibility === 'unit') {
-      set('Behavior.unit', String(behavior?.unit ?? '').trim() ? '' : 'unit');
-      return;
-    }
-    set(`Parts.${target.id}.visible`, !(selectedLabelPart?.visible !== false));
+  function toggleVisible() {
+    set('Behavior.showHandleLabels', !(behavior?.showHandleLabels === true));
   }
 
   function resetSelectedLabelText() {
@@ -96,9 +68,13 @@
   let selectedLabelText = $derived(selectedLabelPart?._children?.Text ?? null);
 </script>
 
+{#if $selectedComponentIds.size <= 1}
+  <AttachedLabelsEditor {control} />
+{/if}
+
 {#if behavior && selectedLabelTarget}
-  <PropertySection title="Slider Label" icon={Type}>
-    <PropertyCell label="Label Part" span={4} hint="Pick the slider-owned label to edit with the full Label/Text editor below.">
+  <PropertySection title="Handle Labels" icon={Type}>
+    <PropertyCell label="Label" span={4} hint="The label that rides each handle, beside it as it moves. Pick one to style it with the Text editor below.">
       <div class="label-target-grid">
         {#each LABEL_TARGETS as target (target.id)}
           <button
@@ -112,8 +88,8 @@
         {/each}
       </div>
     </PropertyCell>
-    <PropertyCell label="Visible" span={1} hint="Visibility is mapped to the slider setting that owns this label.">
-      <PropertyToggle value={labelVisible(selectedLabelTarget)} onchange={() => toggleVisible(selectedLabelTarget)} />
+    <PropertyCell label="Visible" span={1} hint="Whether the handles carry their labels.">
+      <PropertyToggle value={labelVisible()} onchange={toggleVisible} />
     </PropertyCell>
     <PropertyCell label="Reset Label" span={3} hint="Reset the selected label's text styling basics.">
       <button class="label-action-btn" type="button" onclick={resetSelectedLabelText}>Reset label text</button>
@@ -133,7 +109,7 @@
 <style>
   .label-target-grid {
     display: grid;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 6px;
     width: 100%;
   }

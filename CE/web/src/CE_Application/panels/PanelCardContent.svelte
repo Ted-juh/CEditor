@@ -38,7 +38,7 @@
   import Scale from 'lucide-svelte/icons/scale';
   import ListMusic from 'lucide-svelte/icons/list-music';
   import Palette from 'lucide-svelte/icons/palette';
-  import { DEFAULT_CONTROL_SET_ID, getControlSet } from '../models/controlSets.js';
+  import { DEFAULT_CONTROL_SET_ID, controlSetOptionLabel, getControlSet } from '../models/controlSets.js';
   import { requestControlSetApply } from '../stores/controlSets.js';
   import { availableControlSets, controlSetLibrary } from '../stores/controlSetLibrary.js';
   import { gradientToCSS } from '../utils/gradientCSS.js';
@@ -620,7 +620,7 @@
           {#each setGroups as group (group.origin)}
             <optgroup label={group.label}>
               {#each group.sets as set (set.id)}
-                <option value={set.id}>{set.name}</option>
+                <option value={set.id}>{controlSetOptionLabel(set)}</option>
               {/each}
             </optgroup>
           {/each}

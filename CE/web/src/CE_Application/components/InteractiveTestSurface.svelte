@@ -26,6 +26,7 @@
   import {
     createMomentaryButtonPreviewController,
   } from '../utils/momentaryButtonPreview.js';
+  import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
   import {
     adjustRangeValue,
     getCurrentRangeValue,
@@ -56,6 +57,7 @@
     getSliderStep,
     getSliderDisplayValue,
     getSliderLegalRangeForHandle,
+    getSliderGeometry,
     getSliderResolvedValues,
     getSliderValueMode,
     isSliderBehavior,
@@ -64,11 +66,10 @@
   } from '../utils/sliderBehavior.js';
   import {
     resolveCircularPoint,
-    resolveCircularTrackMetrics,
     resolveLinearPointerPoint,
     resolveSliderNormalizedFromPoint,
-    sliderValueToAngle,
-  } from '../utils/sliderGeometry.js';
+    sliderValueToAngle } from '../utils/sliderGeometry.js';
+  import { knobHandleSize, knobTrackOf } from '../utils/knobTrack.js';
   import {
     denormalizeCustomChannelValue,
     getCustomBehaviors,
@@ -80,9 +81,11 @@
     resetCustomChannelToDefault,
     resolveCustomHitZoneAtPoint,
     resolveCustomInteractionPatch,
+    customButtonActPatch,
     resolveCustomNormalizedFromPoint,
     seedCustomValues,
     snapCustomChannelValue,
+    stepCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
 
   function getValueRows(control) {
@@ -132,6 +135,22 @@
   const momentaryButtonPreview = createMomentaryButtonPreviewController({
     patchSession: (_controlId, patch) => patchSession(patch),
   });
+  // A component's button that fires after a hold, on clicks, again and again or once only
+  // (customButtonFiring.js), as on the panel (PanelPreviewSurface).
+  const customButtonFiring = createButtonFiring({
+    act: ({ zone }, what) => patchSession(customButtonActPatch(control, session, zone, what)),
+    flags: ({ sole }, flags) => {
+      const { disabled, ...rest } = flags;
+      const patch = sole && disabled !== undefined ? { ...rest, disabled } : rest;
+      if (Object.keys(patch).length) patchSession(patch);
+    },
+  });
+  function customFiringFor(hitZoneEntry) {
+    const behaviorName = hitZoneEntry?.zone?.targetBehavior ?? '';
+    const config = buttonFiring(customBehaviors?.[behaviorName]);
+    if (!config) return null;
+    return { config, key: behaviorName, context: { zone: hitZoneEntry, sole: Object.keys(customBehaviors ?? {}).length === 1 } };
+  }
 
   function patchSession(patch = {}) {
     const controlId = String(control?._children?.Core?.id ?? '');
@@ -257,7 +276,6 @@
   let isCustomComponent = $derived(String(control?._children?.Core?.controlType ?? '') === 'CustomComponent');
   let customBehaviors = $derived(getCustomBehaviors(control));
   let customChannels = $derived(getCustomValueChannels(control));
-  let sliderParts = $derived((resolvedControl ?? control)?._children?.Parts?._children ?? {});
   let transform = $derived(control?._children?.Transform ?? null);
   let previewRenderIdNamespace = $derived(
     `interaction-preview-${control?._children?.Core?.id ?? 'control'}`
@@ -382,6 +400,13 @@
     }
     momentaryButtonPreview.cancel(control?._children?.Core?.id);
     const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
+    // A component's button that fires on its own time, held when the pointer is lost: let go outside.
+    const lostFiring = pointerActive ? customFiringFor(pointerCustomHitZone) : null;
+    if (lostFiring) customButtonFiring.release(lostFiring.key, lostFiring.config, { inside: false });
+    // A momentary custom button held when the pointer is lost: off again.
+    else if (pointerActive && String(pointerCustomHitZone?.zone?.action ?? '').toLowerCase() === 'momentaryvalue') {
+      patchCustomInteraction(pointerCustomHitZone, { release: true }, {});
+    }
     if (pointerActive) {
       patchSession({
         hover: false,
@@ -409,6 +434,7 @@
     }
     timedButtonPreview.destroy();
     momentaryButtonPreview.destroy();
+    customButtonFiring.destroy();
     keyboardActivationKey = '';
     for (const timer of oneShotTimers.values()) clearTimeout(timer);
     oneShotTimers.clear();
@@ -623,6 +649,7 @@
       startValues: pointerCustomStartValues,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
+      release: event?.release === true,
     });
     if (!Object.keys(patch).length) return;
     patchSession({
@@ -700,7 +727,7 @@
     if (!channel) return;
     const currentValues = customSessionValues();
     const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
-    const nextValue = snapCustomChannelValue(channel, numberOr(currentValue, 0) + (direction * numberOr(channel?.step, 0.01)));
+    const nextValue = stepCustomChannelValue(channel, numberOr(currentValue, 0), direction);
     patchSession({
       customValues: {
         ...currentValues,
@@ -789,32 +816,17 @@
     return currentSliderValues()?.[role] ?? currentSliderValues().current;
   }
 
-  function sliderPreviewScale(rect = null) {
-    if (!rect) return 1;
-    const widthScale = rect.width / Math.max(1, controlWidth);
-    const heightScale = rect.height / Math.max(1, controlHeight);
-    return clamp(Math.min(widthScale || 1, heightScale || 1), 0.01, 100);
-  }
-
-  function sliderTrackThickness() {
-    const trackLayout = sliderParts?.bodyTrackBase?._children?.Layout ?? null;
-    return Math.max(4, numberOr(trackLayout?.height, 10));
-  }
-
-  function sliderMajorTickLength() {
-    const tickLayout = sliderParts?.tickMajor?._children?.Layout ?? null;
-    return Math.max(0, numberOr(tickLayout?.height, numberOr(behavior?.majorTickLength, 12)));
-  }
-
-  function sliderPointerSize(role = 'current') {
-    const partName = role === 'start'
-      ? 'pointerStart'
-      : role === 'end'
-        ? 'pointerEnd'
-        : 'pointerCurrent';
-    const fallback = role === 'current' ? 20 : 18;
-    const pointerLayout = sliderParts?.[partName]?._children?.Layout ?? null;
-    return Math.max(8, numberOr(pointerLayout?.width, numberOr(pointerLayout?.height, fallback)));
+  // The knob or slider as it is drawn (the control resolved for its set when the caller resolved it),
+  // in the box the renderer draws it in, scaled to the hit box; the sizes and circle it is drawn
+  // with come from utils/knobTrack.js, which SliderFamilyRenderer asks too.
+  function sliderDrawnGeometry(rect) {
+    const drawn = resolvedControl ?? control;
+    return {
+      behavior: drawn?._children?.Behavior ?? behavior,
+      sx: rect.width / Math.max(1, controlWidth),
+      sy: rect.height / Math.max(1, controlHeight),
+      track: knobTrackOf(drawn, controlWidth, controlHeight),
+    };
   }
 
   function sliderHandleRoles() {
@@ -823,48 +835,21 @@
       : (getSliderValueMode(behavior) === 'band' ? ['start', 'current', 'end'] : ['current']);
   }
 
-  function sliderHandlePoint(role = 'current', rect = null) {
+  // Where a handle is drawn, on the screen relative to the hit box.
+  function sliderHandlePoint(role = 'current', rect = null, drawnGeometry = null) {
     if (!rect) return null;
-
-    const scale = sliderPreviewScale(rect);
-    const trackThickness = sliderTrackThickness() * scale;
-    const pointerSize = sliderPointerSize(role) * scale;
-    const showReadout = behavior?.showValueReadout !== false;
-    const min = getRangeMin(behavior);
-    const max = getRangeMax(behavior);
-    const span = max - min;
-    const normalized = span > 0
-      ? clamp((currentSliderRoleValue(role) - min) / span, 0, 1)
-      : 0;
-
-    if (String(behavior?.geometry ?? 'linear').trim().toLowerCase() === 'circular') {
-      const maxPointerSize = Math.max(...sliderHandleRoles().map((handleRole) => sliderPointerSize(handleRole))) * scale;
-      const metrics = resolveCircularTrackMetrics(rect.width, rect.height, {
-        trackThickness,
-        pointerSize: maxPointerSize,
-        majorTickLength: sliderMajorTickLength() * scale,
-        hasTicks: behavior?.showTicks !== false,
-        hasReadout: showReadout,
-        circularDiameter: numberOr(behavior?.circularDiameter, 0) * scale,
-      });
-      return resolveCircularPoint(
-        rect.width,
-        rect.height,
-        sliderValueToAngle(behavior, currentSliderRoleValue(role)),
-        metrics.radius,
-        { x: metrics.centerX, y: metrics.centerY },
-      );
+    const { behavior: drawnBehavior, sx, sy, track } = drawnGeometry ?? sliderDrawnGeometry(rect);
+    const value = currentSliderRoleValue(role);
+    let point;
+    if (getSliderGeometry(drawnBehavior) === 'circular') {
+      point = resolveCircularPoint(controlWidth, controlHeight, sliderValueToAngle(drawnBehavior, value), track.radius, { x: track.centerX, y: track.centerY });
+    } else {
+      const min = getRangeMin(drawnBehavior);
+      const span = getRangeMax(drawnBehavior) - min;
+      const normalized = span > 0 ? clamp((value - min) / span, 0, 1) : 0;
+      point = resolveLinearPointerPoint(drawnBehavior, controlWidth, controlHeight, normalized, track.trackThickness, knobHandleSize(track, role));
     }
-
-    return resolveLinearPointerPoint(
-      behavior,
-      rect.width,
-      rect.height,
-      normalized,
-      trackThickness,
-      pointerSize,
-      showReadout,
-    );
+    return { x: point.x * sx, y: point.y * sy };
   }
 
   function sliderValueForPoint(event) {
@@ -902,17 +887,18 @@
     const rect = hitboxElement?.getBoundingClientRect?.();
     if (!rect) return '';
 
-    const scale = sliderPreviewScale(rect);
+    const drawnGeometry = sliderDrawnGeometry(rect);
+    const scale = Math.min(drawnGeometry.sx, drawnGeometry.sy);
     const localX = event.clientX - rect.left;
     const localY = event.clientY - rect.top;
     let nearestRole = '';
     let nearestDistance = Number.POSITIVE_INFINITY;
 
     for (const role of sliderHandleRoles()) {
-      const point = sliderHandlePoint(role, rect);
+      const point = sliderHandlePoint(role, rect, drawnGeometry);
       if (!point) continue;
 
-      const hitRadius = Math.max((sliderPointerSize(role) * scale) / 2, 12);
+      const hitRadius = Math.max((knobHandleSize(drawnGeometry.track, role) * scale) / 2, 12);
       const distance = Math.hypot(localX - point.x, localY - point.y);
       if (distance > hitRadius || distance >= nearestDistance) continue;
       nearestDistance = distance;
@@ -1482,13 +1468,32 @@
       }
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
-      if (isDragAction) {
+      const firing = isDragAction ? null : customFiringFor(pointerCustomHitZone);
+      if (firing) {
+        patchSession({
+          hover: true,
+          pressed: true,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+        });
+        customButtonFiring.press(firing.key, firing.config, firing.context);
+      } else if (isDragAction) {
         patchCustomInteraction(pointerCustomHitZone, event, {
           hover: true,
           pressed: true,
           dragging: true,
         });
         updateCustomDragFromPointer(event);
+      } else if (action === 'momentaryvalue') {
+        // A momentary button: on at the press, off at the release.
+        patchCustomInteraction(pointerCustomHitZone, event, {
+          hover: true,
+          pressed: true,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+        });
       } else {
         patchSession({
           hover: true,
@@ -1599,7 +1604,18 @@
 
     if (isCustomComponent) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (inside && !isDisabled && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
+      const firing = action !== 'dragvalue' && action !== 'scrubvalue' ? customFiringFor(pointerCustomHitZone) : null;
+      if (firing) {
+        patchSession({ hover: inside, pressed: false, dragging: false, inputModality: 'pointer' });
+        customButtonFiring.release(firing.key, firing.config, { inside: inside && !isDisabled });
+      } else if (action === 'momentaryvalue') {
+        patchCustomInteraction(pointerCustomHitZone, { clientX: event?.clientX, clientY: event?.clientY, release: true }, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+      } else if (inside && !isDisabled && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
         patchCustomInteraction(pointerCustomHitZone, event, {
           hover: inside,
           pressed: false,

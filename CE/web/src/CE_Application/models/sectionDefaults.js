@@ -926,23 +926,25 @@ export const SECTION_DEFAULTS = {
     tickStops: 'all',             // all / ends / endsCentre
     // What a numeral tick prints: the stop's index (a dial's 0…10) or the value at the stop.
     tickNumerals: 'index',        // index / value
-    showMinMaxLabels: true,
+    // A knob's scale numbers (Parts.tickNumber): how many, evenly round the sweep, and what the
+    // first and the last say — a synth panel's 0 2 4 6 8 10 is 6 from 0 to 10. 0 draws none.
+    scaleNumberCount: 0,
+    // A knob's scale on a radius of its own, a percentage of the track's (0: on the track): the
+    // printed scale outside a value arc that runs close round the cap.
+    tickRadius: 0,
+    // A second scale further in, on a radius of its own (a percentage of the track's), with this many
+    // divisions, long and short in turn: Dual Scale's ring of ticks on its collar. 0 draws none.
+    secondScaleRadius: 0,
+    secondScaleCount: 0,
+    scaleNumberFrom: 0,
+    scaleNumberTo: 10,
+    // The labels riding the handles: the only text a knob or slider draws itself. Its name, value
+    // and range ends are Labels of their own beside it (utils/labelShows.js).
     showHandleLabels: false,
-    showValueReadout: true,
     showCenterMarker: false,
-    labelMinMaxPlacement: 'auto',
-    labelMinMaxGap: 22,
-    labelMinMaxOffsetX: 0,
-    labelMinMaxOffsetY: 0,
-    // auto / top / center / bottom, or a corner (topLeft, topRight, bottomLeft, bottomRight) that
-    // hangs the label from the track's end. The title takes the same set; a title top-left and a
-    // readout top-right is the row above the track the control-set boards drew. Both share the
-    // readout gap: they are one row.
-    labelReadoutPlacement: 'auto',
-    labelTitlePlacement: 'auto',
-    labelReadoutGap: 14,
-    labelReadoutOffsetX: 0,
-    labelReadoutOffsetY: 0,
+    // Where the Labels tab puts a Label showing the value (utils/attachedLabels.js): 'below' the
+    // knob or slider, or in the 'center' of its face, as a set whose knobs read there says.
+    valueLabelPlacement: 'below',
     precision: 2,
     prefix: '',
     suffix: '',
@@ -1050,14 +1052,10 @@ export const SECTION_DEFAULTS = {
     showTicks: false,
     tickCount: 4,
     showScaleLabels: false,       // print value/dB at the ticks
-    // Numeric readout.
-    showValue: false,
+    // How a Label showing the reading prints it (utils/labelShows.js), and the scale's labels.
     valuePrecision: 0,
     valuePrefix: '',
     valueSuffix: '',
-    // Caption.
-    label: '',
-    labelPosition: 'none',        // none | above | below
     // Arc geometry (orientation = arc): clockwise from 3 o'clock in SVG space.
     arcStart: 135,
     arcSweep: 270,

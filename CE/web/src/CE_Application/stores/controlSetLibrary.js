@@ -21,6 +21,9 @@ import { controlSetLibrary } from './controlSetLibraryStore.js';
 import { BUILT_IN_CONTROL_SETS, builtInControlSetId, normalizeControlSetDefinition, normalizeControlSetList, offeredControlSetsWith } from '../models/controlSets.js';
 import { createControlSetEnvelope, normalizeControlSetEnvelope } from '../models/controlSetPackage.js';
 import { deepClone } from '../utils/deepClone.js';
+import { customComponentLibrary } from './customComponentLibrary.js';
+import { resolveSetComponent } from '../utils/setLibraryComponents.js';
+import { customComponentPackageId, normalizeCustomComponentEnvelope } from '../utils/customComponentPackage.js';
 
 // The store and its persistence live in controlSetLibraryStore.js, so that createPanel can read
 // the library without importing this module (and, through it, panels.js).
@@ -103,7 +106,14 @@ export function importControlSetText(text, { carry = true } = {}) {
   }
   const set = addControlSetToLibrary(envelope.set);
   if (carry) carryControlSetInDocument(set);
-  return { ok: true, set, envelope, replacedBuiltIn: BUILT_IN_CONTROL_SETS.some((entry) => entry.id === set.id) };
+  // The components it names come with it; a version the library already holds is left as it is.
+  const held = new Set(customComponentLibrary.snapshot().map((entry) => entry.id));
+  const wanted = (envelope.components ?? []).filter((component) => {
+    const normal = normalizeCustomComponentEnvelope(component);
+    return normal && !held.has(customComponentPackageId(normal));
+  });
+  const components = wanted.length ? customComponentLibrary.importEnvelopes(wanted) : { imported: [], failures: [] };
+  return { ok: true, set, envelope, components, replacedBuiltIn: BUILT_IN_CONTROL_SETS.some((entry) => entry.id === set.id) };
 }
 
 function customSetId(name, existing = get(controlSetLibrary)) {
@@ -140,7 +150,21 @@ export function updateControlSetInLibrary(id, value) {
 /** The file form of a set the picker knows, or null. */
 export function exportControlSetEnvelope(id) {
   const set = get(availableControlSets).find((entry) => entry.id === id);
-  return set ? createControlSetEnvelope(stripOrigin(set)) : null;
+  return set ? createControlSetEnvelope(stripOrigin(set), {}, namedComponentEnvelopes(set)) : null;
+}
+
+/** The packages of the library components a set names, each once, as the library holds them. */
+function namedComponentEnvelopes(set) {
+  const entries = customComponentLibrary.snapshot();
+  const seen = new Set();
+  const out = [];
+  for (const ref of Object.values(set?.libraryComponents ?? {})) {
+    const entry = resolveSetComponent(ref, entries)?.entry;
+    if (!entry?.envelope || seen.has(entry.id)) continue;
+    seen.add(entry.id);
+    out.push(entry.envelope);
+  }
+  return out;
 }
 
 /**

@@ -21,6 +21,32 @@ additional finishes.
 | Fan | Opening folded fan | Pleated fan outlines | Triangular buttons at different heights |
 | Crown | Toothed gear and spokes | Gear outlines | Hexagonal buttons beside a tall central field |
 
+**Ten of the twelve are retired.** Atlas, Kiln, Arcade and Spool went first, judged unrelated to
+synthesizers. After reviewing a starter panel for each of the remaining eight, the owner retired
+Tessera, Bellows, Helix, Balance, Fan and Crown as "hardly usable for a synthesizer panel". A
+retired set stays defined in `RETIRED_CONTROL_SET_IDS` (`models/controlSets.js`), so a panel
+that uses one still draws. It is not offered in the set pickers, the Library, a new panel or the
+starter gallery, and its starter file is gone. No shipped panel used any of the ten. Their
+definitions stay in place because `ADDITIONAL_DIRECTIONS`, `NUMBER_LAYOUTS` and the form tables
+are indexed by position.
+
+Iris and Satellite stay, marked as **illustrated** (the owner: "it should be clear for those two
+that they do not work as the rest as a control set"; the mock-up was approved). Unlike the other
+sets, their knobs, keys, switches and meters are whole drawings (`editor/AdditionalAnatomy.svelte`),
+not parts, so only colours, size and depth change, and the value moves the mechanism rather than a
+pointer over a scale. `ILLUSTRATED_CONTROL_SET_IDS` and `isIllustratedControlSet`
+(`models/controlSets.js`) and `isIllustratedForm` (`models/controlAnatomy.js`) say which. What the
+author sees:
+
+- The Library's style and group are **Illustrated** (formerly Mechanical), with a line under the
+  group heading, and each card carries an **Illustration** badge.
+- The set's page has an **Illustrated set** tag and a short explanation of what differs, naming the
+  kinds of control it draws whole, so a copy whose knobs were given a template's design says less.
+- The set pickers and the Form list name them "(illustrated)". The Form list no longer offers a
+  retired set's form, except the one a control already has.
+- The Knob, Button, Switch and Meter tabs of such a control say the parts do not apply and dim them.
+  They used to send the author to Convert to Parts, which these forms do not have.
+
 Each new starter includes a stopped, editable eight-step, two-track sequencer. Its cells
 follow the pad design. Active cells still display velocity through opacity; muted tracks
 remain dim, and the live playhead remains distinct. Track order, step order and MIDI notes

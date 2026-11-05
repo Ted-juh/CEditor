@@ -1,6 +1,8 @@
 import { writable, get } from 'svelte/store';
 import { activePanel, resolvedActivePanelId, selectedComponentIds, updatePanel } from './panels.js';
-import { controlSetForPanel, isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
+import { controlSetForPanel, isColourKey, isTokenReference, makeTokenReference, resolveColourLiteral } from '../models/controlSets.js';
+import { controlSetForControl } from '../models/controlSetFamilies.js';
+import { controlSetLibrary } from './controlSetLibrary.js';
 import {
   applyInspectorControlPatchesById, inspectorStateNameForPath, updateControlProperty, updateInspectorControlProperty,
   updateSelectedInspectorProperty,
@@ -155,6 +157,43 @@ export function applyColorToTarget(hex) {
   } else if (target.type === 'callback' && typeof target.apply === 'function') {
     target.apply(hex);
   }
+}
+
+// --- Set colours (docs/design/changeable-control-sets.md, piece D1) ------------------------------
+// The Colors dock offers the colour roles of the set the edited thing is drawn with. A role written
+// in place of a colour ('{control.cap}') links the property to the set: the control, or a component's
+// layer, is drawn with whatever that set gives the role, and follows a set switch. Any colour picked
+// after that is a literal again, an override, as before.
+
+/**
+ * Whether a target can hold a role: a colour property of a control or a component's layer, or a
+ * callback that says it writes one (`acceptsRoles`). Not the panel's own colours (the set has a
+ * Surface role of its own) and not other callbacks, which expect a colour code.
+ */
+export function colorTargetAcceptsRoles(target) {
+  if (!target) return false;
+  if (target.type === 'control') {
+    const key = String(target.path ?? '').split('.').pop() ?? '';
+    return Boolean(target.controlId) && isColourKey(key);
+  }
+  return target.type === 'callback' && target.acceptsRoles === true;
+}
+
+/** The set a target's control is drawn with: its own, where it was given one, else the panel's. */
+export function colorTargetSet(target, panel = get(activePanel)) {
+  if (!panel) return null;
+  const library = get(controlSetLibrary);
+  const panelSet = controlSetForPanel(panel, library);
+  const control = target?.controlId ? findControlById(panel.controls ?? [], target.controlId) : null;
+  return control ? controlSetForControl(control, panelSet, { document: panel.controlSets ?? [], library }) : panelSet;
+}
+
+/** Link the target's colour to `role` of its set. Returns the colour the role gives, AARRGGBB. */
+export function applyRoleToTarget(role) {
+  const target = get(colorTarget);
+  if (!colorTargetAcceptsRoles(target) || !role) return null;
+  applyColorToTarget(makeTokenReference(role));
+  return resolveColourLiteral(makeTokenReference(role), colorTargetSet(target), 'FF5B9BD5');
 }
 
 /** Return the exact pre-edit value only after the session made a live write. */

@@ -66,6 +66,8 @@
         {/if}
       </span>
 
+      <!-- Drawn from pictures: its shapes are fixed (utils/componentLibraryModel.js isImageStripComponent). -->
+      {#if row.imageStrip}<em class="strip" title="Drawn from pictures, one per position: resize and tint it, but its shapes are fixed">Image strip</em>{/if}
       <span class="cname">
         {row.name}
         {#if !row.valid}<TriangleAlert size={10} class="warnicon" aria-label={`${row.issues.length} issues`} />{/if}
@@ -186,5 +188,9 @@
     border-radius: 4px;
     font: 400 10px/1.5 'IBM Plex Sans', system-ui, sans-serif;
     color: #69737B;
+  }
+  .strip {
+    position: absolute; top: 4px; left: 4px; z-index: 2; font-style: normal; font-size: 9px; font-weight: 600;
+    color: #E6C27A; border: 1px solid #6B5A33; background: rgba(0, 0, 0, 0.55); border-radius: 8px; padding: 0 5px;
   }
 </style>

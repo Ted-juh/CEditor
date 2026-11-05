@@ -10,6 +10,7 @@ import { DragScrub, presets } from '../scrub/dragScrub';
 import { appScrubOverrides } from './scrubRuntime.js';
 import { SLIDER_CONTROL_KIND, sliderControlValueFromPoint } from './sliderControlPart.js';
 import { hasPatternEditing } from './arpPatternLayouts.js';
+import { curveIsIdentity, curveMode, curveSpec, fractionToTravel, steppedFractionWithHysteresis, travelToFraction } from './channelCurves.js';
 
 function sectionChildren(control, sectionName) {
   return control?._children?.[sectionName]?._children ?? {};
@@ -129,7 +130,7 @@ export function resetCustomChannelToDefault(control, channelNames, values = {}) 
   for (const name of names) {
     const channel = channels?.[name];
     if (!channel) continue;
-    next[name] = customChannelResetValue(channel);
+    next[name] = customChannelRestValue(channel);
     changed = true;
   }
   return changed ? constrainCustomValues(control, next) : (values ?? {});
@@ -158,10 +159,26 @@ export function normalizeCustomChannelValue(channel, rawValue) {
   const max = numberOr(channel?.max, 1);
   const span = max - min;
   if (Math.abs(span) < 0.000001) return 0;
-  return clamp((numberOr(rawValue, customChannelDefaultValue(channel)) - min) / span, 0, 1);
+  const fraction = clamp((numberOr(rawValue, customChannelDefaultValue(channel)) - min) / span, 0, 1);
+  // The channel's curve (utils/channelCurves.js): "normalized" is where the control is drawn, its
+  // travel, and the value is what that travel gives.
+  const spec = curvedSpec(channel);
+  return spec ? fractionToTravel(spec, fraction) : fraction;
 }
 
-export function denormalizeCustomChannelValue(channel, normalized) {
+/** The channel's curve, or null when it maps travel straight to the value. */
+function curvedSpec(channel) {
+  const mode = channel?.curve?.mode;
+  if (!mode || mode === 'linear') return null;
+  const spec = curveSpec(channel);
+  return curveIsIdentity(spec) ? null : spec;
+}
+
+/**
+ * The value `normalized` travel gives. `previous`, the value before (a drag's), lets a Stepped
+ * curve's Hysteresis hold the step it was on.
+ */
+export function denormalizeCustomChannelValue(channel, normalized, { previous } = {}) {
   const type = String(channel?.type ?? 'float').trim().toLowerCase();
   const clamped = clamp(numberOr(normalized, 0), 0, 1);
   if (type === 'bool') return clamped >= 0.5;
@@ -177,7 +194,44 @@ export function denormalizeCustomChannelValue(channel, normalized) {
 
   const min = numberOr(channel?.min, 0);
   const max = numberOr(channel?.max, 1);
-  return snapCustomChannelValue(channel, min + ((max - min) * clamped));
+  const spec = curvedSpec(channel);
+  let fraction = clamped;
+  if (spec?.mode === 'stepped' && previous !== undefined && Math.abs(max - min) > 0.000001) {
+    fraction = steppedFractionWithHysteresis(spec, clamped, (numberOr(previous, min) - min) / (max - min));
+  } else if (spec) {
+    fraction = travelToFraction(spec, clamped);
+  }
+  return snapCustomChannelValue(channel, min + ((max - min) * fraction));
+}
+
+/**
+ * The value one wheel notch or arrow key moves to from `current`: a step of the channel's own
+ * where travel and value agree, and the same distance of travel where a curve bends them, so a
+ * notch moves an Exponential knob as far at the bottom as at the top. A Stepped curve moves a step.
+ */
+export function stepCustomChannelValue(channel, current, direction = 1) {
+  const value = numberOr(current, numberOr(channel?.defaultValue, 0));
+  const spec = curvedSpec(channel);
+  if (!spec) return snapCustomChannelValue(channel, value + (direction * numberOr(channel?.step, 0.01)));
+  const span = Math.abs(numberOr(channel?.max, 1) - numberOr(channel?.min, 0)) || 1;
+  const travelStep = spec.mode === 'stepped'
+    ? 1 / (spec.steps - 1)
+    : Math.max(0.001, Math.abs(numberOr(channel?.step, 0.01)) / span);
+  const travel = clamp(normalizeCustomChannelValue(channel, value) + (Math.sign(direction || 1) * travelStep), 0, 1);
+  const next = denormalizeCustomChannelValue(channel, travel);
+  // A step too small to leave the snapped value where it was moves to the next one that does.
+  if (next === value && travel > 0 && travel < 1) {
+    return snapCustomChannelValue(channel, value + (direction * numberOr(channel?.step, 0.01)));
+  }
+  return next;
+}
+
+/** Where a double-click returns a channel: a Bipolar channel's centre, else its default. */
+export function customChannelRestValue(channel) {
+  if (curveMode(channel) === 'bipolar') {
+    return denormalizeCustomChannelValue(channel, 0.5);
+  }
+  return customChannelResetValue(channel);
 }
 
 function normalizedConstraintValue(spec, values = {}, channels = {}) {
@@ -394,6 +448,22 @@ export function snapCustomChannelValue(channel, rawValue) {
   return type === 'int' ? Math.round(next) : next;
 }
 
+/**
+ * A momentary channel's value while held (`on`) and once let go: true and false for a bool, the
+ * maximum and the default (or minimum) for a number, the last and the first option of a list.
+ */
+export function momentaryChannelValue(channel, on) {
+  const type = String(channel?.type ?? 'float').trim().toLowerCase();
+  if (type === 'bool' || type === 'boolean') return on === true;
+  if (type === 'enum') {
+    const values = (Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []))
+      .map((entry) => entry?.value ?? entry?.id ?? entry);
+    return on ? values[values.length - 1] : values[0];
+  }
+  const min = numberOr(channel?.min, 0);
+  return snapCustomChannelValue(channel, on ? numberOr(channel?.max, 1) : numberOr(channel?.defaultValue, min));
+}
+
 export function nextCustomEnumValue(channel, currentValue) {
   const explicitValues = Array.isArray(channel?.values) ? channel.values : (Array.isArray(channel?.options) ? channel.options : []);
   const values = explicitValues
@@ -496,7 +566,10 @@ export function resolveCustomHitZoneProbeValues(control, hitZoneEntry = null, se
   const currentValue = previousValues[channelName] ?? customChannelDefaultValue(channel);
   const nextValues = { ...previousValues };
 
-  if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
+  if (action === 'momentaryvalue') {
+    // Tried from the Test Bench: the value while held.
+    nextValues[channelName] = momentaryChannelValue(channel, true);
+  } else if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = nextCustomEnumValue(channel, currentValue);
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValues[channelName] = !snapCustomChannelValue({ ...channel, type: 'bool' }, currentValue);
@@ -624,6 +697,44 @@ function mapNumericValue(link, sourceValue) {
 function snapLinkedValue(control, target, value) {
   const channel = getCustomValueChannels(control)?.[target];
   return channel ? snapCustomChannelValue(channel, value) : value;
+}
+
+/**
+ * `values` with each value that takes it from somewhere else (`channel.valueSource`) set from there,
+ * as far along its own range as its source is along its: `channel:<name>`, another value of the
+ * component (a meter made into layers with the knob it shows); or a panel control's id, read through
+ * `readControl` (id -> { value, min, max }), as the panel's meter reads its Value Source. Read each
+ * time the component is drawn, so the value follows its source however that moves. A source that
+ * cannot be read leaves the value as it is.
+ */
+export function sourcedCustomValues(control, values = {}, readControl = null) {
+  const channels = getCustomValueChannels(control) ?? {};
+  let next = null;
+  for (const [name, channel] of Object.entries(channels)) {
+    const source = String(channel?.valueSource ?? '').trim();
+    if (!source) continue;
+    let fraction = null;
+    if (source.startsWith('channel:')) {
+      const from = channels[source.slice('channel:'.length)];
+      if (from) {
+        const lo = numberOr(from.min, 0);
+        const span = numberOr(from.max, 1) - lo;
+        const raw = numberOr(values?.[source.slice('channel:'.length)], numberOr(customChannelDefaultValue(from), lo));
+        fraction = span ? clamp((raw - lo) / span, 0, 1) : 0;
+      }
+    } else if (typeof readControl === 'function') {
+      const range = readControl(source);
+      const value = Number(range?.value);
+      if (range && Number.isFinite(value)) {
+        const span = numberOr(range.max, 1) - numberOr(range.min, 0);
+        fraction = span ? clamp((value - numberOr(range.min, 0)) / span, 0, 1) : 0;
+      }
+    }
+    if (fraction == null) continue;
+    next ??= { ...(values ?? {}) };
+    next[name] = numberOr(channel.min, 0) + fraction * (numberOr(channel.max, 1) - numberOr(channel.min, 0));
+  }
+  return next ?? values;
 }
 
 export function applyCustomLinks(control, values = {}) {
@@ -820,11 +931,55 @@ export function resolveCustomHitZoneAtPoint(control, rect, clientX, clientY, val
 
   for (const [name, zone] of entries) {
     if (isPointInZone(zone, rect, localX, localY, parts)) {
+      // A grab area over several values (`targetValueChannels`, a range's handles): the press takes
+      // the one whose value is nearest the point, as the panel's slider takes its nearest handle,
+      // and the drag moves that one.
+      const choices = Array.isArray(zone?.targetValueChannels) ? zone.targetValueChannels.filter(Boolean) : [];
+      if (choices.length > 1) {
+        const chosen = nearestValueChannel(control, zone, choices, rect, clientX, clientY, conditionValues, parts);
+        return { name, zone: { ...zone, targetValueChannel: chosen } };
+      }
       return { name, zone };
     }
   }
 
   return null;
+}
+
+/**
+ * The box a behaviour measures a point against: its grab area's (`frame: 'zone'`), or the
+ * component's. A knob made into layers states its centre in its own box, and a slider its travel
+ * along its track; measured against the whole component, a knob beside another turned about a
+ * point between them.
+ */
+function behaviorFrameRect(behaviorModule, hitZone, rect, parts = null) {
+  if (!rect || String(behaviorModule?.frame ?? '').trim().toLowerCase() !== 'zone' || !hitZone) return rect;
+  const box = customHitZoneRect(hitZone, rect, parts);
+  if (!box || !(box.width > 0) || !(box.height > 0)) return rect;
+  const left = rect.left + box.x;
+  const top = rect.top + box.y;
+  return { left, top, width: box.width, height: box.height, right: left + box.width, bottom: top + box.height };
+}
+
+/** Of `choices`, the channel whose value is nearest the value at the point (the first, on a tie). */
+function nearestValueChannel(control, zone, choices, rect, clientX, clientY, values, parts) {
+  const channels = getCustomValueChannels(control);
+  const behaviorModule = getCustomBehaviors(control)?.[zone?.targetBehavior] ?? null;
+  // Where the point is on the travel, by position: a relative drag still picks by where you press.
+  const frame = behaviorFrameRect(behaviorModule, zone, rect, parts);
+  const at = resolveCustomNormalizedFromPoint({ ...(behaviorModule ?? {}), dragMode: 'auto' }, frame, clientX, clientY);
+  let chosen = choices[0];
+  let nearest = Number.POSITIVE_INFINITY;
+  for (const name of choices) {
+    const channel = channels?.[name];
+    if (!channel) continue;
+    const distance = Math.abs(normalizeCustomChannelValue(channel, values?.[name] ?? customChannelDefaultValue(channel)) - at);
+    if (distance < nearest) {
+      nearest = distance;
+      chosen = name;
+    }
+  }
+  return chosen;
 }
 
 // Translates a behavior module's drag config into DragScrubOptions. Weights
@@ -934,6 +1089,17 @@ function resolveSecondaryChannelName(hitZone, behaviorModule, primaryChannelName
   return channels.find((name) => name !== primaryChannelName) ?? '';
 }
 
+/**
+ * What a button behaviour's grab area does when it fires (customButtonFiring.js): its value on, off
+ * or flipped, through the same path as a press, so links, constraints and the main value follow.
+ */
+export function customButtonActPatch(control, session = {}, hitZoneEntry = null, what = 'flip') {
+  const zone = hitZoneEntry?.zone ?? null;
+  if (!zone) return {};
+  const entry = { ...hitZoneEntry, zone: { ...zone, action: what === 'flip' ? 'toggleValue' : 'momentaryValue' } };
+  return resolveCustomInteractionPatch(control, session, entry, { release: what === 'off' });
+}
+
 export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntry = null, point = null) {
   const hitZone = hitZoneEntry?.zone ?? null;
   if (String(hitZone?.action).toLowerCase() === 'arpeggiatorendstep') {
@@ -983,7 +1149,11 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   let normalized = normalizeCustomChannelValue(channel, currentValue);
   const nextValues = { ...previousValues };
 
-  if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
+  if (action === 'momentaryvalue') {
+    // On while held: the press sets the channel on, the release (point.release) back off.
+    nextValue = momentaryChannelValue(channel, point?.release !== true);
+    normalized = normalizeCustomChannelValue(channel, nextValue);
+  } else if (action === 'cyclevalue' || (String(behaviorModule?.type ?? '') === 'cycle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
     nextValue = nextCustomEnumValue(channel, currentValue);
     normalized = normalizeCustomChannelValue(channel, nextValue);
   } else if (action === 'togglevalue' || (String(behaviorModule?.type ?? '') === 'toggle' && !['setvalue', 'selectvalue', 'cellvalue', 'notevalue'].includes(action))) {
@@ -1032,15 +1202,16 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
   } else if (point?.rect) {
     const geometry = String(behaviorModule?.geometry ?? '').trim().toLowerCase();
     const type = String(behaviorModule?.type ?? '').trim().toLowerCase();
+    const frame = behaviorFrameRect(behaviorModule, hitZone, point.rect, control?._children?.Parts?._children ?? null);
     if (geometry === 'grid' || geometry === 'xy' || type.includes('xy')) {
-      const xy = resolveCustomXYNormalizedFromPoint(point.rect, point.clientX, point.clientY);
+      const xy = resolveCustomXYNormalizedFromPoint(frame, point.clientX, point.clientY);
       normalized = xy.x;
       const secondaryChannelName = resolveSecondaryChannelName(hitZone, behaviorModule, channelName);
       if (secondaryChannelName && channels?.[secondaryChannelName]) {
         nextValues[secondaryChannelName] = denormalizeCustomChannelValue(channelForBehaviorInput(channels[secondaryChannelName], behaviorModule), xy.y);
       }
     } else {
-      normalized = resolveCustomNormalizedFromPoint(behaviorModule, point.rect, point.clientX, point.clientY, {
+      normalized = resolveCustomNormalizedFromPoint(behaviorModule, frame, point.clientX, point.clientY, {
         startClientX: point.startClientX,
         startClientY: point.startClientY,
         startNormalized: point.startNormalized ?? normalizeCustomChannelValue(channel, point.startValues?.[channelName] ?? currentValue),
@@ -1048,7 +1219,7 @@ export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntr
         coarse: point.coarse === true,
       });
     }
-    nextValue = denormalizeCustomChannelValue(channelForBehaviorInput(channel, behaviorModule), normalized);
+    nextValue = denormalizeCustomChannelValue(channelForBehaviorInput(channel, behaviorModule), normalized, { previous: currentValue });
   }
   nextValues[channelName] = nextValue;
   const unsnapped = behaviorModule?.interaction?.snap === false

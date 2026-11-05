@@ -32,10 +32,28 @@ import { targetLayerName } from './panelLayerActions.js';
 import { withSetPins } from '../models/controlSetFamilies.js';
 import { convertRangeControl } from '../utils/rangeControlConversion.js';
 import { isDesignerViewPatch } from '../utils/designerViewState.js';
+import { followMoves, remapAttachments, withAttached } from '../utils/attachedLabels.js';
+import { makeAttachedLabel } from '../utils/attachedLabelFactory.js';
+import { LABEL_SHOWS } from '../utils/labelShows.js';
 
 // Re-export for convenience
 export { getSection, hasSection };
 export { applyPatchObject } from './controlTreeUtils.js';
+
+/**
+ * `after` (a panel list one write made from `before`) with each control attached to one that moved
+ * moved as far (utils/attachedLabels.js). Every write that can move a control goes through this, so
+ * a knob's Labels follow a drag, the arrow keys, the inspector's X and Y, Align and a script alike.
+ */
+function withAttachedFollowing(before, after, panelId) {
+  if (before === after) return after;
+  const was = before.find((panel) => panel.id === panelId)?.controls;
+  const now = after.find((panel) => panel.id === panelId)?.controls;
+  if (!was || !now || was === now) return after;
+  const patches = followMoves(was, now);
+  if (!patches.size) return after;
+  return patchPanelControlsInList(after, panelId, (control) => patches.get(control?._children?.Core?.id) ?? null);
+}
 
 /**
  * A custom component open on its own: File › New Custom Component, opened from the library, or
@@ -250,7 +268,7 @@ export function updateSelectedProperty(path, value) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
     }
 
-    return nextList;
+    return withAttachedFollowing(list, nextList, panelId);
   });
 }
 
@@ -264,9 +282,9 @@ export function updateSelectedInspectorProperty(path, value, stateName = inspect
   const ids = get(selectedComponentIds);
   if (panelId == null || ids.size === 0) return;
 
-  panels.update((list) => mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
+  panels.update((list) => withAttachedFollowing(list, mutatePanelControlsByIdsInList(list, panelId, ids, (draft) => {
     return applyInspectorResolvedValue(draft, path, value, stateName);
-  }));
+  }), panelId));
 }
 
 /** Apply distinct inspector patches to selected controls in one document update. */
@@ -285,7 +303,7 @@ export function applyInspectorControlPatchesById(patchesByControlId) {
   }
   if (panelId == null || !patchesByControlId?.size) return;
   const selectedIds = get(selectedComponentIds);
-  panels.update((list) => mutatePanelControlsInList(
+  panels.update((list) => withAttachedFollowing(list, mutatePanelControlsInList(
     list,
     panelId,
     (control) => {
@@ -300,7 +318,7 @@ export function applyInspectorControlPatchesById(patchesByControlId) {
       }
       return changed;
     },
-  ));
+  ), panelId));
 }
 
 /**
@@ -418,6 +436,33 @@ export function addControl(type, overrides = {}, { at = null } = {}) {
   return control;
 }
 
+/**
+ * A Label attached to a control, showing `shows` of it (utils/labelShows.js): placed beside it
+ * (attachedLabelRect), lettered as the control's own text was, bare (no fill, no border), named after
+ * the control, and put in the same container. The selection stays on the control, so its Labels tab
+ * can add the next. Returns the Label, or null.
+ */
+export function addAttachedLabel(ownerId, shows, { content = null } = {}) {
+  const panelId = get(resolvedActivePanelId);
+  const panel = panelId == null ? null : get(panels).find((p) => p.id === panelId);
+  const owner = panel ? findControlById(panel.controls, ownerId) : null;
+  // A caption in its own words (`shows` '' and `content`), or what it shows of the control.
+  const ownWords = !shows && content !== null;
+  const menuWords = ownWords ? 'Caption' : LABEL_SHOWS.find(([key]) => key && key === shows)?.[1];
+  if (!owner || !menuWords) return null;
+  const ownerCore = owner._children.Core;
+  const name = uniqueControlName(collectControlNames(panel.controls),
+    `${ownerCore.name || ownerCore.controlType || 'Control'} ${menuWords.replace(/ of$/, '')}`, 'Label');
+  const label = makeAttachedLabel(owner, ownWords ? '' : shows, { content: ownWords ? String(content) : '', core: { name, layer: ownerCore.layer ?? targetLayerName() } });
+  const parentId = findParentOfControl(panel.controls, ownerId)?._children?.Core?.id ?? null;
+  panels.update((list) => list.map((p) => (p.id !== panelId ? p : {
+    ...p,
+    controls: insertControlIntoTree(p.controls, parentId, label),
+    modified: true,
+  })));
+  return label;
+}
+
 export function addCustomComponentPackage(value, overrides = {}) {
   const panelId = get(resolvedActivePanelId);
   if (panelId == null) return null;
@@ -466,9 +511,16 @@ export function removeControl(id) {
   panels.update(list =>
     list.map(p => {
       if (p.id !== panelId) return p;
-      const { controls, removed } = removeControlFromTree(p.controls, id);
-      if (!removed) return p;
-      removedIds = collectSubtreeIds(removed);
+      if (!findControlById(p.controls, id)) return p;
+      // The Labels attached to it, or to anything inside it, go with it (utils/attachedLabels.js).
+      let controls = p.controls;
+      removedIds = [];
+      for (const target of withAttached(p.controls, [id])) {
+        const { controls: without, removed } = removeControlFromTree(controls, target);
+        if (!removed) continue;
+        controls = without;
+        removedIds.push(...collectSubtreeIds(removed));
+      }
       return { ...p, controls, modified: true };
     })
   );
@@ -509,18 +561,20 @@ export function duplicateControl(ids) {
   if (!panel) return null;
 
   // When a container and its descendant are both selected, duplicate only the
-  // container — the descendant rides along in the subtree copy.
-  const rootIds = selectionRoots(panel.controls, idList);
+  // container — the descendant rides along in the subtree copy. The Labels attached to what is
+  // copied are copied too, and attached to the copies (utils/attachedLabels.js).
+  const rootIds = selectionRoots(panel.controls, withAttached(panel.controls, idList));
 
   const existingNames = collectControlNames(panel.controls);
   const clones = [];
+  const idMap = new Map();
   for (const id of rootIds) {
     const source = findControlById(panel.controls, id);
     if (!source) continue;
 
     // Fresh ids for the control and every descendant; a unique name for the
     // root (names are script handles — same rule as paste).
-    const clone = remintControlIds(source);
+    const clone = remintControlIds(source, idMap);
     clone._children.Core.name = uniqueCopyName(existingNames, clone._children.Core.name);
     existingNames.add(clone._children.Core.name);
 
@@ -539,6 +593,7 @@ export function duplicateControl(ids) {
   }
 
   if (clones.length === 0) return null;
+  for (const { clone } of clones) remapAttachments(clone, idMap);
 
   panels.update(list =>
     list.map(p => {
@@ -573,13 +628,14 @@ export function duplicateControlsInPlace(ids) {
   const panel = get(panels).find(p => p.id === panelId);
   if (!panel) return null;
 
-  const rootIds = selectionRoots(panel.controls, idList);
+  const rootIds = selectionRoots(panel.controls, withAttached(panel.controls, idList));
   const existingNames = collectControlNames(panel.controls);
   const clones = [];
+  const idMap = new Map();
   for (const id of rootIds) {
     const source = findControlById(panel.controls, id);
     if (!source) continue;
-    const clone = remintControlIds(source);
+    const clone = remintControlIds(source, idMap);
     clone._children.Core.name = uniqueCopyName(existingNames, clone._children.Core.name);
     existingNames.add(clone._children.Core.name);
     if (isExclusiveSelectBehavior(clone?._children?.Behavior) && clone._children.Behavior.defaultValue === true) {
@@ -589,6 +645,7 @@ export function duplicateControlsInPlace(ids) {
     clones.push({ clone, parentId: parent?._children?.Core?.id ?? null });
   }
   if (clones.length === 0) return null;
+  for (const { clone } of clones) remapAttachments(clone, idMap);
 
   panels.update(list =>
     list.map(p => {
@@ -705,14 +762,14 @@ export function updateInspectorControlProperty(
     return;
   }
 
-  panels.update((list) => mutatePanelControlsInList(
+  panels.update((list) => withAttachedFollowing(list, mutatePanelControlsInList(
     list,
     panelId,
     (control) => control?._children?.Core?.id === controlId,
     (draft) => {
       return applyInspectorResolvedValue(draft, path, value, stateName);
     },
-  ));
+  ), panelId));
 }
 
 export function applyControlPatchesById(patchesByControlId, targetPanelId = get(resolvedActivePanelId), { pin = false } = {}) {
@@ -758,9 +815,10 @@ export function applyControlPatchesById(patchesByControlId, targetPanelId = get(
       nextList = updatePanelInList(nextList, panelId, (panel) => (
         panel.modified === wasModified ? panel : { ...panel, modified: wasModified }
       ));
+      return nextList;
     }
 
-    return nextList;
+    return withAttachedFollowing(list, nextList, panelId);
   });
 }
 
@@ -849,7 +907,7 @@ export function applySelectedPatch(patch, { pin = false } = {}) {
       nextList = normalizeExclusiveSelectionInList(nextList, panelId, preferredControlIds);
     }
 
-    return nextList;
+    return withAttachedFollowing(list, nextList, panelId);
   });
 }
 

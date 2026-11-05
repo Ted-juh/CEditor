@@ -478,6 +478,9 @@ track's end rather than centring it on a point, and the title has a placement of
 board labels are title top-left, value top-right, which is what every board drew and what the
 default set now draws. A knob's corners are the arc's extent.
 
+*Superseded 2026-11-05: a knob or slider draws no title, value or range ends of its own; they are
+Labels attached to it (changeable-control-sets.md, decision 6), and these placements are gone.*
+
 **A bat switch.** The lamp kinds gain `bat`: a lever in a round bezel beside the legend, thrown up
 while the control is checked and down when not, three bezels tall. The lever takes the lamp
 colour and the ball on its end a lighter tone of it; the bezel is the lamp's bezel colour. Reel,

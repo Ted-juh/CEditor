@@ -56,6 +56,14 @@
 </script>
 
 {#if row}
+  {#if row.imageStrip}
+    <!-- What an image strip cannot do, and the one change it takes (the owner approved the mock-up). -->
+    <p class="strip-note" data-image-strip-note>
+      <b>An image strip.</b> Drawn from pictures, one per position (a KnobMan or Blender render, a
+      vendor pack). Its shapes and colours cannot be edited part by part. It can be resized, and tinted
+      per layer: Effects › Filters, hue and brightness.
+    </p>
+  {/if}
   <div class="setbox">
     <div class="grp">Package</div>
     <div class="r"><label for="lib-name">Name</label><div class="f" id="lib-name">{row.name}</div></div>
@@ -223,4 +231,9 @@
     font: 400 10px/1.5 'IBM Plex Sans', system-ui, sans-serif;
     color: #69737B;
   }
+  .strip-note {
+    margin: 0 0 8px; padding: 8px 10px; border: 1px solid #5A4C2E; border-left: 3px solid #E6C27A; border-radius: 4px;
+    background: #2A2620; color: #DCD6C8; font-size: 11.5px; line-height: 1.45;
+  }
+  .strip-note b { color: #F0E3C2; }
 </style>

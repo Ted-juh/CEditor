@@ -15,10 +15,6 @@ export function degToRad(value) {
   return (numberOr(value, 0) * Math.PI) / 180;
 }
 
-function sliderHasReadout(behavior = null) {
-  return behavior?.showValueReadout !== false;
-}
-
 export function normalizeDegrees(value) {
   const normalized = numberOr(value, 0) % 360;
   return normalized < 0 ? normalized + 360 : normalized;
@@ -37,9 +33,8 @@ export function resolveSliderNormalizedFromPoint(behavior = null, rect = null, c
   const reverse = (value) => behavior?.reverseMouseDirection === true ? 1 - value : value;
 
   if (getSliderGeometry(behavior) === 'circular') {
-    const center = resolveCircularCenter(rect.width, rect.height, {
-      hasReadout: sliderHasReadout(behavior),
-    });
+    // About the centre the knob is drawn round (resolveCircularTrackMetrics).
+    const center = resolveCircularCenter(rect.width, rect.height);
     const centerX = rect.left + center.x;
     const centerY = rect.top + center.y;
     const angle = normalizeDegrees((Math.atan2(clientY - centerY, clientX - centerX) * 180) / Math.PI);
@@ -96,13 +91,8 @@ export function sliderNormalizedToAngle(behavior = null, normalized = 0) {
   );
 }
 
-export function resolveCircularCenter(width = 0, height = 0, {
-  hasReadout = false,
-} = {}) {
-  return {
-    x: width / 2,
-    y: (height / 2) + (hasReadout ? 8 : 0),
-  };
+export function resolveCircularCenter(width = 0, height = 0) {
+  return { x: width / 2, y: height / 2 };
 }
 
 export function resolveCircularPoint(width, height, angleDegrees, radius, center = null) {
@@ -125,36 +115,43 @@ export function resolveCircularArcSweep(behavior = null, startAngle, endAngle) {
   return Math.min(sweep, getSliderSweepAngle(behavior));
 }
 
-export function resolveLinearTrackFrame(behavior = null, width = 0, height = 0, trackThickness = 8, pointerSize = 16, hasReadout = false, labelMetrics = {}) {
-  const orientation = getSliderOrientation(behavior);
-  const readoutSize = Math.max(0, numberOr(labelMetrics?.readoutSize, 12));
-  const titleSize = Math.max(0, numberOr(labelMetrics?.titleSize, 11));
-  const minMaxSize = Math.max(0, numberOr(labelMetrics?.minMaxSize, 11));
-  const topPadding = hasReadout ? Math.max(24, readoutSize + 12) : 10;
-  const bottomPadding = Math.max(14, titleSize + minMaxSize + 8);
-  const outerPadding = 14;
+/**
+ * The room a knob keeps round its track for text of its own: only for the labels that ride its
+ * handles (Behavior.showHandleLabels), at their size (`size`, the largest of the label parts'). Its
+ * name, its value and the ends of its range are Labels of their own beside it (utils/labelShows.js,
+ * utils/attachedLabels.js), so it keeps none for those. Pass it to resolveCircularTrackMetrics and
+ * buildSliderHandleLabelAnchors as `handleLabelSize`; a linear track keeps no room for them.
+ */
+export function sliderHandleLabelRoom(behavior = null, size = 11) {
+  return behavior?.showHandleLabels === true ? Math.max(0, numberOr(size, 11)) : 0;
+}
 
-  if (orientation === 'vertical') {
+/**
+ * A linear track's ends: 14 px in from the sides across, 10 from the top and 14 from the bottom up,
+ * and half the pointer so it stays inside at either end.
+ */
+export function resolveLinearTrackFrame(behavior = null, width = 0, height = 0, trackThickness = 8, pointerSize = 16) {
+  if (getSliderOrientation(behavior) === 'vertical') {
     return {
       x1: width / 2,
-      y1: height - bottomPadding - (pointerSize / 2),
+      y1: height - 14 - (pointerSize / 2),
       x2: width / 2,
-      y2: topPadding + (pointerSize / 2),
+      y2: 10 + (pointerSize / 2),
       trackThickness,
     };
   }
 
   return {
-    x1: outerPadding + (pointerSize / 2),
-    y1: hasReadout ? Math.max(topPadding + 12, height / 2) : height / 2,
-    x2: width - outerPadding - (pointerSize / 2),
-    y2: hasReadout ? Math.max(topPadding + 12, height / 2) : height / 2,
+    x1: 14 + (pointerSize / 2),
+    y1: height / 2,
+    x2: width - 14 - (pointerSize / 2),
+    y2: height / 2,
     trackThickness,
   };
 }
 
-export function resolveLinearPointerPoint(behavior = null, width = 0, height = 0, normalized = 0, trackThickness = 8, pointerSize = 16, hasReadout = false, labelMetrics = {}) {
-  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, pointerSize, hasReadout, labelMetrics);
+export function resolveLinearPointerPoint(behavior = null, width = 0, height = 0, normalized = 0, trackThickness = 8, pointerSize = 16) {
+  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, pointerSize);
   const orientation = getSliderOrientation(behavior);
   const direction = getSliderDirection(behavior);
   const safeNormalized = clamp(numberOr(normalized, 0), 0, 1);
@@ -177,74 +174,47 @@ export function resolveCircularTrackMetrics(width = 0, height = 0, {
   pointerSize = 18,
   majorTickLength = 12,
   hasTicks = true,
-  hasReadout = false,
   circularDiameter = 0,
-  labelMetrics = {},
-  // `tight`: reserve room only for what the knob draws — the min/max labels when they are shown,
-  // the pointer it uses — not for every label and handle it might. Opt-in (Behavior.circularFit),
-  // so every knob that exists keeps its size; the knob forms rebuilt as parts ask for it, since
-  // their drawings filled the box (models/knobFormParts.js).
+  // The labels riding the handles (sliderHandleLabelRoom): the room they hang in round the track.
+  handleLabelSize = 0,
+  // `tight`: reserve room only for what the knob draws (the pointer it uses, its ticks), not for
+  // every handle it might, and keep what it draws past its track inside its box: its housing and
+  // skirt, and the numbers round its scale. Opt-in (Behavior.circularFit), so every knob that exists
+  // keeps its size; the knob forms rebuilt as parts ask for it, since their drawings filled the box
+  // (models/knobFormParts.js). Labels riding the handles hang outside the box in it.
   tight = false,
-  showsMinMax = true,
-  // With `tight` and the readout placed under the knob (Behavior.labelReadoutPlacement 'bottom'):
-  // the knob is centred in the room above the readout and sized to fit it, so a housing plate,
-  // which is a full disc where a track leaves its bottom open, does not run into the value.
-  // `outerReach` is how far the housing reaches from the centre, as a multiple of the track's
-  // radius (0 without one); `readoutGap` is the readout's distance from the bottom edge.
-  readoutBelow = false,
+  // How far the housing reaches from the centre, as a multiple of the track's radius (0 without one).
   outerReach = 0,
-  readoutGap = 14,
+  // A knob's scale numbers (Parts.tickNumber): their distance from the centre as a multiple of the
+  // track's radius, and their size in px, which hangs half outside that distance.
+  numberReach = 0,
+  numberSize = 0,
 } = {}) {
-  const readoutSize = Math.max(0, numberOr(labelMetrics?.readoutSize, 12));
-  const titleSize = Math.max(0, numberOr(labelMetrics?.titleSize, 11));
-  const minMaxSize = Math.max(0, numberOr(labelMetrics?.minMaxSize, 11));
-  const handleSize = Math.max(0, numberOr(labelMetrics?.handleSize, 11));
-  const labelAllowance = tight
-    ? (showsMinMax ? minMaxSize : 0)
-    : Math.max(minMaxSize, handleSize, titleSize, hasReadout ? readoutSize : 0);
-  const topInset = hasReadout ? Math.max(12, readoutSize * 0.5) : 0;
+  const labelAllowance = tight ? 0 : Math.max(0, numberOr(handleLabelSize, 0));
   // What actually sits outside the arc, measured rather than summed. The ticks and the pointer
   // both reach outward from the track, into the SAME ring, so the room they need is the larger of
   // the two and not both added together — and a knob with its ticks off needs none for them. The
   // old padding added the tick length, the whole pointer half-size and a 14 px slack on top of
   // each other, which for a 100 px knob left an arc 16 px in radius (the floor below) in a box
-  // that could hold one twice that; the min/max labels, which hang 24 px past the arc's ends at
-  // the bottom corners, are what the label allowance is still reserving for.
+  // that could hold one twice that.
   const tickRoom = hasTicks ? Math.max(0, majorTickLength) + 2 : 0;
   const pointerRoom = Math.max(0, (pointerSize - trackThickness) / 2) + 2;
   const outerPadding = 6 + Math.max(tickRoom, pointerRoom) + (labelAllowance * 0.4);
-  const center = resolveCircularCenter(width, height, { hasReadout });
-  const autoRadius = Math.max(
-    16,
-    (Math.min(width, height - topInset) / 2) - outerPadding - (trackThickness / 2)
-  );
+  const center = resolveCircularCenter(width, height);
+  const autoRadius = Math.max(16, (Math.min(width, height) / 2) - outerPadding - (trackThickness / 2));
   const diameter = numberOr(circularDiameter, 0);
-  const authoredRadius = diameter > 0
-    ? Math.max(1, diameter / 2)
-    : autoRadius;
-  const maxRadius = Math.max(
-    1,
-    Math.min(
-      center.x,
-      width - center.x,
-      center.y,
-      height - center.y,
-    ) - (trackThickness / 2)
-  );
-  const radius = Math.min(authoredRadius, maxRadius);
+  const authoredRadius = diameter > 0 ? Math.max(1, diameter / 2) : autoRadius;
+  const maxRadius = Math.max(1, Math.min(center.x, center.y) - (trackThickness / 2));
+  let radius = Math.min(authoredRadius, maxRadius);
 
-  if (tight && readoutBelow) {
-    const bottom = height - Math.max(0, numberOr(readoutGap, 14)) - (readoutSize * 0.6) - 2;
-    const centerY = Math.max(1, bottom / 2);
-    const room = Math.max(1, Math.min(width / 2, centerY) - 2);
-    // The track and what reaches past it (ticks or the pointer, the min/max labels), and the housing.
-    const ring = Math.max(tickRoom, pointerRoom) + (trackThickness / 2) + (labelAllowance * 0.4);
-    const fitted = Math.max(16, Math.min(room - ring, room / Math.max(1, numberOr(outerReach, 0))));
-    return {
-      centerX: center.x,
-      centerY,
-      radius: diameter > 0 ? Math.min(authoredRadius, room) : fitted,
-    };
+  if (tight && diameter <= 0) {
+    // The housing's and the numbers' reach, 2 px in from the edge.
+    const room = Math.max(1, Math.min(center.x, center.y) - 2);
+    const reach = numberOr(outerReach, 0);
+    const numbers = numberOr(numberReach, 0) > 0
+      ? (room - Math.max(0, numberOr(numberSize, 0)) * 0.75) / numberOr(numberReach, 1)
+      : Infinity;
+    radius = Math.min(radius, Math.max(16, Math.min(reach > 1 ? room / reach : Infinity, numbers)));
   }
 
   return {
@@ -311,151 +281,43 @@ export function buildSliderTickStops(behavior = null) {
   return { major, minor };
 }
 
-export function buildSliderLabelAnchors(behavior = null, width = 0, height = 0, normalizedValues = {}, {
+/**
+ * Where the labels riding a knob's or slider's handles hang (Behavior.showHandleLabels): 22 px out
+ * from a knob's track at each handle's angle, 18 above a horizontal track's handles and 22 beside a
+ * vertical one's. The only text a knob or slider still draws itself. `circle` is the circle the
+ * knob is drawn round (utils/knobTrack.js); without one, the track's own metrics from the sizes.
+ */
+export function buildSliderHandleLabelAnchors(behavior = null, width = 0, height = 0, normalizedValues = {}, {
   trackThickness = 8,
   pointerSize = 16,
-  hasReadout = false,
-  labelMetrics = {},
+  handleLabelSize = 0,
+  circle = null,
 } = {}) {
-  const geometry = getSliderGeometry(behavior);
-  const minMaxPlacement = String(behavior?.labelMinMaxPlacement ?? 'auto').trim().toLowerCase();
-  const readoutPlacement = String(behavior?.labelReadoutPlacement ?? 'auto').trim().toLowerCase();
-  const titlePlacement = String(behavior?.labelTitlePlacement ?? 'auto').trim().toLowerCase();
-  // THE GAPS APPLY UNDER `auto` TOO, and they did not used to. Both `auto` branches carried the
-  // distance as a literal — 22 below a horizontal track, 14 above it for the readout — which are
-  // exactly the two defaults declared beside them in sectionDefaults.js. So the Gap cells in the
-  // Slider editor, whose hint is the unqualified "distance from the track", moved nothing at all
-  // until the Position dropdown next to them was taken off `auto`; and because each cell SHOWED
-  // the same number the literal used, it read as though it were already in effect. Naming the
-  // default here instead of inlining it leaves every existing horizontal slider and every readout
-  // pixel-identical and makes the cells live. The vertical min/max literal was 18 rather than 22,
-  // so a vertical slider left on `auto` with an untouched gap moves four pixels further from its
-  // track — the one visible change, taken deliberately: two orientations that disagreed with each
-  // other and with the number the editor was showing is the thing being fixed.
-  const minMaxGap = numberOr(behavior?.labelMinMaxGap, 22);
-  const readoutGap = numberOr(behavior?.labelReadoutGap, 14);
-  const minMaxOffsetX = numberOr(behavior?.labelMinMaxOffsetX, 0);
-  const minMaxOffsetY = numberOr(behavior?.labelMinMaxOffsetY, 0);
-  const readoutOffsetX = numberOr(behavior?.labelReadoutOffsetX, 0);
-  const readoutOffsetY = numberOr(behavior?.labelReadoutOffsetY, 0);
-
-  function offset(point, x = 0, y = 0) {
-    return {
-      x: numberOr(point?.x, 0) + x,
-      y: numberOr(point?.y, 0) + y,
-    };
-  }
-
-  // A placed label is a point and, for the four corners, the side it hangs from: `topleft` puts
-  // its left edge on the left of the span, `topright` its right edge on the right, so a title
-  // and a readout share the row above the track the way the boards drew them — the title
-  // starting where the track starts, the value ending where it ends. `span` is the track's
-  // extent (the arc's diameter for a knob, the frame for a linear track); the centre placements
-  // keep the point-only shape they had.
-  function placedLabel(placement, centerX, centerY, gap, span) {
-    if (placement === 'top') return { x: centerX, y: gap };
-    if (placement === 'center') return { x: centerX, y: centerY };
-    if (placement === 'bottom') return { x: centerX, y: height - gap };
-    const corner = /^(top|bottom)(left|right)$/.exec(placement);
-    if (!corner) return null;
-    const y = corner[1] === 'top' ? gap : height - gap;
-    return corner[2] === 'left'
-      ? { x: span.x1, y, align: 'start' }
-      : { x: span.x2, y, align: 'end' };
-  }
-
-  function applyReadoutPlacement(anchors, centerX, centerY, span = { x1: 0, x2: width }) {
-    const value = placedLabel(readoutPlacement, centerX, centerY, readoutGap, span) ?? anchors.value;
-    const title = placedLabel(titlePlacement, centerX, centerY, readoutGap, span) ?? anchors.title;
-
-    return {
-      ...anchors,
-      title,
-      value: { ...value, ...offset(value, readoutOffsetX, readoutOffsetY) },
-    };
-  }
-
-  if (geometry === 'circular') {
-    const metrics = resolveCircularTrackMetrics(width, height, {
+  if (getSliderGeometry(behavior) === 'circular') {
+    const metrics = circle ?? resolveCircularTrackMetrics(width, height, {
       trackThickness,
       pointerSize,
       majorTickLength: numberOr(behavior?.majorTickLength, 12),
       hasTicks: behavior?.showTicks !== false,
-      hasReadout,
       circularDiameter: behavior?.circularDiameter,
-      labelMetrics,
+      handleLabelSize,
     });
     const center = { x: metrics.centerX, y: metrics.centerY };
-    const startAngle = getSliderStartAngle(behavior);
-    const endAngle = sliderNormalizedToAngle(behavior, 1);
-    let minRadius = metrics.radius + 24;
-    let maxRadius = metrics.radius + 24;
-    if (minMaxPlacement === 'inside') {
-      minRadius = metrics.radius - minMaxGap;
-      maxRadius = metrics.radius - minMaxGap;
-    } else if (minMaxPlacement === 'outside') {
-      minRadius = metrics.radius + minMaxGap;
-      maxRadius = metrics.radius + minMaxGap;
-    } else if (minMaxPlacement === 'center') {
-      minRadius = 0;
-      maxRadius = 0;
-    }
-
-    const anchors = {
-      min: offset(resolveCircularPoint(width, height, startAngle, minRadius, center), minMaxOffsetX, minMaxOffsetY),
-      max: offset(resolveCircularPoint(width, height, endAngle, maxRadius, center), minMaxOffsetX, minMaxOffsetY),
-      start: resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, normalizedValues.start ?? 0), metrics.radius + 22, center),
-      current: resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, normalizedValues.current ?? 0), metrics.radius + 22, center),
-      end: resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, normalizedValues.end ?? 0), metrics.radius + 22, center),
-      title: { x: metrics.centerX, y: metrics.centerY - 18 },
-      value: { x: metrics.centerX, y: metrics.centerY + 10 },
+    const at = (normalized) => resolveCircularPoint(width, height, sliderNormalizedToAngle(behavior, normalized ?? 0), metrics.radius + 22, center);
+    return {
+      start: at(normalizedValues.start),
+      current: at(normalizedValues.current),
+      end: at(normalizedValues.end),
     };
-    return applyReadoutPlacement(anchors, metrics.centerX, metrics.centerY, { x1: metrics.centerX - metrics.radius, x2: metrics.centerX + metrics.radius });
   }
 
-  const frame = resolveLinearTrackFrame(behavior, width, height, trackThickness, pointerSize, hasReadout, labelMetrics);
-  const startPoint = resolveLinearPointerPoint(behavior, width, height, normalizedValues.start ?? 0, trackThickness, pointerSize, hasReadout, labelMetrics);
-  const currentPoint = resolveLinearPointerPoint(behavior, width, height, normalizedValues.current ?? 0, trackThickness, pointerSize, hasReadout, labelMetrics);
-  const endPoint = resolveLinearPointerPoint(behavior, width, height, normalizedValues.end ?? 0, trackThickness, pointerSize, hasReadout, labelMetrics);
-  const vertical = getSliderOrientation(behavior) === 'vertical';
-  const direction = getSliderDirection(behavior);
-
-  if (vertical) {
-    const anchorX = minMaxPlacement === 'left'
-      ? frame.x1 - minMaxGap
-      : (minMaxPlacement === 'center'
-        ? frame.x1
-        : frame.x1 + minMaxGap);
-    const minY = direction === 'ttb' ? frame.y2 : frame.y1;
-    const maxY = direction === 'ttb' ? frame.y1 : frame.y2;
-    const anchors = {
-      min: offset({ x: anchorX, y: minY + 4 }, minMaxOffsetX, minMaxOffsetY),
-      max: offset({ x: anchorX, y: maxY + 4 }, minMaxOffsetX, minMaxOffsetY),
-      start: { x: startPoint.x + 22, y: startPoint.y + 4 },
-      current: { x: currentPoint.x + 22, y: currentPoint.y + 4 },
-      end: { x: endPoint.x + 22, y: endPoint.y + 4 },
-      title: { x: width / 2, y: height - 14 },
-      value: { x: width / 2, y: readoutGap },
-    };
-    // A vertical track has no width to speak of; the corners hang off the component's edges.
-    return applyReadoutPlacement(anchors, width / 2, height / 2, { x1: 0, x2: width });
-  }
-
-  const anchorY = minMaxPlacement === 'above'
-    ? frame.y1 - minMaxGap
-    : (minMaxPlacement === 'center'
-      ? frame.y1
-      : frame.y1 + minMaxGap);
-  const minX = direction === 'rtl' ? frame.x2 : frame.x1;
-  const maxX = direction === 'rtl' ? frame.x1 : frame.x2;
-  const anchors = {
-    min: offset({ x: minX, y: anchorY }, minMaxOffsetX, minMaxOffsetY),
-    max: offset({ x: maxX, y: anchorY }, minMaxOffsetX, minMaxOffsetY),
-    start: { x: startPoint.x, y: startPoint.y - 18 },
-    current: { x: currentPoint.x, y: currentPoint.y - 18 },
-    end: { x: endPoint.x, y: endPoint.y - 18 },
-    title: { x: width / 2, y: height - 12 },
-    value: { x: width / 2, y: readoutGap },
+  const point = (normalized) => resolveLinearPointerPoint(behavior, width, height, normalized ?? 0, trackThickness, pointerSize);
+  const beside = getSliderOrientation(behavior) === 'vertical'
+    ? (p) => ({ x: p.x + 22, y: p.y + 4 })
+    : (p) => ({ x: p.x, y: p.y - 18 });
+  return {
+    start: beside(point(normalizedValues.start)),
+    current: beside(point(normalizedValues.current)),
+    end: beside(point(normalizedValues.end)),
   };
-  return applyReadoutPlacement(anchors, width / 2, height / 2, { x1: frame.x1, x2: frame.x2 });
 }

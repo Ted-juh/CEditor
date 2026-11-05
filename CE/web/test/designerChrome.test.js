@@ -74,16 +74,6 @@ test('the Simple Interact card has each behaviour\'s Pointer, Keyboard, Wheel an
   for (const key of ['pointer', 'keyboard', 'snap']) assert.match(interact, new RegExp(`on: interaction\\.${key} !== false`));
 });
 
-test('a library copy\'s Contract says the contract is its package\'s, and suggests colours before ticks', () => {
-  const contract = src('CE_Application/sections/CustomPublishedPropertiesEditor.svelte');
-  assert.match(contract, /\{#if sourcePackage\}\s*<!--[\s\S]*?-->\s*<div class="copy-contract-note" role="note">/);
-  assert.match(contract, /its contract is the package's\. A change here is a design edit of this copy/);
-  // Sections live under _children; part.Background found none, so no colour was ever suggested.
-  assert.match(contract, /const sections = part\?\._children \?\? part \?\? \{\};/);
-  assert.match(contract, /if \(runParts\.has\(name\)\) continue;/);
-  assert.match(contract, /const SUGGESTION_ORDER = \{ Colour: 0, Text: 1, Visible: 2, Opacity: 3 \};/);
-});
-
 test('the layer list is one line a row and folds a numbered run of five or more', () => {
   const layers = src('CE_Application/sections/SurfaceDockLayers.svelte');
   assert.match(layers, /const RUN_MIN = 5;/);
@@ -320,11 +310,15 @@ test('the options strip holds snapping, View and ?, and wraps rather than hiding
   // View list, and the strip takes a second row when even that does not fit.
   const strip = src('CE_Application/sections/SurfaceBottomBar.svelte');
   const markup = strip.slice(strip.indexOf('</script>'), strip.indexOf('<style>'));
-  const list = markup.slice(markup.indexOf('<div class="view-list"'), markup.indexOf('{/if}', markup.indexOf('<div class="view-list"')));
+  // To the list's own end: the toggles inside it have conditions of their own.
+  const list = markup.slice(markup.indexOf('<div class="view-list"'), markup.indexOf('</div>\n      {/if}', markup.indexOf('<div class="view-list"')));
   for (const label of ['Measure', 'Bounds', 'Generated names', 'Hit zones', 'Rulers']) {
     assert.match(list, new RegExp(`label="${label}"`), `${label} is in the View list`);
   }
   assert.match(list, /aria-label="Which hit zones are drawn"/);
+  // Offered only when they draw something (the designer review, item 14).
+  assert.match(list, /\{#if hasGeneratedLayers\}\s*<PropertyToggle label="Generated names"/);
+  assert.match(list, /\{#if hasHitZones\}\s*<PropertyToggle label="Hit zones"/);
   assert.match(list, /<span>Zoom step<\/span>/);
   const outside = markup.replace(list, '');
   for (const label of ['Snap', 'Smart']) assert.match(outside, new RegExp(`label="${label}"`), `${label} stays on the strip`);

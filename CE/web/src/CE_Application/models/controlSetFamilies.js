@@ -32,6 +32,7 @@
 // Copy-on-write, like the token resolver: a control the set has nothing to say about comes back
 // as the same object, and one it changes is copied only along the paths that changed.
 
+import { labelShows, SHOWN_PART, withShownLettering } from '../utils/labelShows.js';
 import { COMPONENT_TYPES, createControl } from './componentTypes.js';
 import { SECTION_DEFAULTS } from './sectionDefaults.js';
 import { BUILT_IN_CONTROL_SETS, isTokenReference, resolveColourValue, resolveControlTokens, resolveToken, getControlSet } from './controlSets.js';
@@ -205,6 +206,7 @@ export function resolveControlFamily(control, set, sources = {}) {
 
 function patchFamily(control, set) {
   const type = control?._children?.Core?.controlType;
+  if (type === 'Label' && labelShows(control)) return patchShownLabel(control, set);
   const family = familyPatchFor(set, type);
   if (!family) return control;
   const pristine = pristineControlFor(type);
@@ -230,6 +232,26 @@ function patchFamily(control, set) {
     }
   }
   return out;
+}
+
+/**
+ * A Label that shows something of a control (utils/labelShows.js) is lettered as the knob lettered
+ * the same text when knobs drew their own: the set's patch for that part of the knob (labelValue for
+ * a value, labelTitle for a name, labelMin for a min…), where the Label still has the lettering a
+ * shown Label is made with (SHOWN_LETTERING). The Label family's own patch, for a Label with words
+ * of its own, does not apply. Pinned paths (Core.setOverrides) are the author's, as everywhere.
+ */
+function patchShownLabel(control, set) {
+  const shows = labelShows(control);
+  const partPatch = familyPatchFor(set, 'Knob')?.parts?.[SHOWN_PART[shows]];
+  const pristineLabel = pristineControlFor('Label');
+  if (!partPatch || !pristineLabel) return control;
+  const textPatch = Object.fromEntries(Object.entries(partPatch).filter(([path]) => path.startsWith('Text.')));
+  if (!Object.keys(textPatch).length) return control;
+  const pristine = { ...pristineLabel, _children: { ...pristineLabel._children, Text: withShownLettering(pristineLabel._children.Text, shows) } };
+  const overrides = control._children?.Core?.setOverrides;
+  const pinned = new Set(Array.isArray(overrides) ? overrides : []);
+  return applyPatchWhereDefault(control, pristine, textPatch, '', control, pinned);
 }
 
 // The instruments, and the step sequencer's tracks. Not the Meter: its green, amber and red zones

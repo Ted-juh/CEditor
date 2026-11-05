@@ -91,8 +91,11 @@ test('the third synth collection has twelve distinct sculpted mechanisms, not pa
   assert.ok(new Set(sculpted.map((entry) => entry.slider.cap)).size >= 5, 'faders span several physical cap constructions');
   for (const entry of sculpted) {
     const set = getControlSet(entry.id);
-    assert.equal(set.families.Knob.component['Core.formDepth'], 92, `${entry.id}: deep form is visible by default`);
-    assert.equal(set.families.Knob.component['Core.controlForm'], `new-${entry.id}`);
+    // Drawn with their own parts now (models/directionKnobParts.js, models/directionDeviceParts.js),
+    // the knob, the buttons, the switch and the meter name no form; the depth is in their shading.
+    for (const type of ['Knob', 'Button', 'ToggleButton', 'Meter']) {
+      assert.equal(set.families[type].component['Core.controlForm'], undefined, `${entry.id}: its ${type} names no form`);
+    }
   }
 });
 

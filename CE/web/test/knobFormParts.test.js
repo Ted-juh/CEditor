@@ -10,7 +10,7 @@ import { getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { familyPatchFor, readControlPath, resolveControlForSet } from '../src/CE_Application/models/controlSetFamilies.js';
 import { EDITOR_PATHS } from '../src/CE_Application/models/controlSetDesigns.js';
 import { setAnatomy } from '../src/CE_Application/models/controlAnatomy.js';
-import { KNOB_FORMS_AS_PARTS, knobFormFamily } from '../src/CE_Application/models/knobFormParts.js';
+import { BASE_KNOB_FORMS, KNOB_FORMS_AS_PARTS, knobFormFamily } from '../src/CE_Application/models/knobFormParts.js';
 import { knobOutlinePath, knobOutlineReach } from '../src/CE_Application/utils/knobOutlines.js';
 import { resolveCircularTrackMetrics } from '../src/CE_Application/utils/sliderGeometry.js';
 import { CONTROL_FORMS } from '../src/CE_Application/models/controlAnatomy.js';
@@ -67,7 +67,8 @@ test('the sets that drew these forms draw them with parts, and name no form', ()
   assert.equal(console_._children.Parts._children.pointerCurrent.kind, 'line');
   // Every base knob form is parts now: Tolex's tuning window, Pop's paper tab, Soft's pebble and
   // Carbon's roller were the last.
-  assert.deepEqual([...KNOB_FORMS_AS_PARTS].sort(), CONTROL_FORMS.Knob.map(([id]) => id).filter((id) => !id.startsWith('new-')).sort());
+  assert.deepEqual([...BASE_KNOB_FORMS].sort(), CONTROL_FORMS.Knob.map(([id]) => id).filter((id) => !id.startsWith('new-')).sort());
+  assert.deepEqual(KNOB_FORMS_AS_PARTS.filter((id) => !id.startsWith('new-')), BASE_KNOB_FORMS);
   for (const id of ['tolex', 'pop', 'soft', 'carbon']) assert.equal(familyPatchFor(getControlSet(id), 'Knob').component['Core.controlForm'], undefined, id);
   const tuning = resolveControlForSet(createControl('Knob'), getControlSet('tolex'))._children.Parts._children;
   assert.equal(tuning.bodyHousing.visible, true);
@@ -78,12 +79,16 @@ test('the sets that drew these forms draw them with parts, and name no form', ()
 
 test('the knob renderer draws the housing, the outlines, the needle, and hides what is hidden', () => {
   const renderer = source('editor/SliderFamilyRenderer.svelte');
-  assert.ok(renderer.indexOf("maskIdFor('bodyHousing')") < renderer.indexOf("maskIdFor('bodyTrackBaseCircle')"), 'the housing under the track');
-  assert.match(renderer, /outlineShapeFor\(bodyCapPart, bodyCapRadius\)/);
+  const housingAt = renderer.indexOf("{@render bodyPlate(bodyHousingPart, bodyHousingRadius, 'bodyHousing'");
+  assert.ok(housingAt > 0 && housingAt < renderer.indexOf("maskIdFor('bodyTrackBaseCircle')"), 'the housing under the track');
+  // Every plate is drawn the one way: its shadow, its fill in its outline, its border; or, when its
+  // look is rendered (utils/renderedLook.js), as the rendered image in its place.
+  assert.match(renderer, /\{#snippet bodyPlate\(part, r, mask, borderFallback, role = mask\)\}\s*\{@const rendered = renderedPlate\(part, r\)\}\s*\{#if rendered\}\s*<image data-rendered-look=\{role\}[\s\S]*?\{:else\}\s*\{@const shape = outlineShapeFor\(part, r\)\}/);
+  assert.match(renderer, /\{@render bodyPlate\(bodyCapPart, bodyCapRadius, 'bodyCapCircle', 1, 'bodyCap'\)\}/);
   assert.match(renderer, /kind === 'needle'/);
   assert.match(renderer, /trackBasePart\?\.visible === false/);
   assert.match(renderer, /pointerKind !== 'dot' && pointerCurrentPart\?\.visible !== false/);
-  assert.match(renderer, /circularFit \?\? 'auto'\) === 'tight'/);
+  assert.match(source('utils/knobTrack.js'), /circularFit \?\? 'auto'\) === 'tight'/, 'the fit the renderer draws with, worked out where the hit tests read it');
   assert.match(source('editor/SliderShapeFill.svelte'), /shape\.kind === 'filled-path'/);
   // Every knob that exists keeps its look: the housing is off and the fit is opt-in.
   const knob = createControl('Knob');
@@ -153,21 +158,19 @@ test('the Knob tab has a section per part, each field naming a property a set ma
   assert.match(slider, /id: 'bodyHousing', path: 'Parts\.bodyHousing\.Background', label: 'Housing'/);
 });
 
-test('the tight fit keeps a knob above a readout under it, its housing and all', () => {
-  const base = { trackThickness: 2, pointerSize: 0, majorTickLength: 5, hasTicks: true, hasReadout: true, tight: true, showsMinMax: false, labelMetrics: { readoutSize: 12 } };
-  // As before without the readout below: a knob that exists keeps its size.
-  const before = resolveCircularTrackMetrics(120, 128, base);
-  assert.equal(before.centerY, 72);
-  // Below: centred in the room above the readout, and the housing's reach fits in it.
-  const below = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 1.4 });
-  const readoutTop = 128 - 14 - 12 * 0.6;
-  assert.ok(below.centerY < 72);
-  assert.ok(below.centerY + below.radius * 1.4 <= readoutTop, 'the housing clears the readout');
-  assert.ok(below.centerY - below.radius * 1.4 >= 0, 'and the top');
-  // A housing within the track does not shrink it.
-  const small = resolveCircularTrackMetrics(120, 128, { ...base, readoutBelow: true, outerReach: 0.9 });
-  assert.ok(small.radius > below.radius);
-  const renderer = source('editor/SliderFamilyRenderer.svelte');
-  assert.match(renderer, /readoutBelow: showReadout && String\(behavior\?\.labelReadoutPlacement \?\? 'auto'\) === 'bottom'/);
-  assert.match(renderer, /outerReach: housingReach/);
+test('the tight fit keeps a knob\'s housing inside its box', () => {
+  const base = { trackThickness: 2, pointerSize: 0, majorTickLength: 5, hasTicks: true, tight: true };
+  // A housing within the track's reach: the knob keeps its size.
+  const plain = resolveCircularTrackMetrics(120, 128, base);
+  assert.deepEqual([plain.centerX, plain.centerY], [60, 64], 'centred: it keeps no room for a readout of its own');
+  assert.equal(resolveCircularTrackMetrics(120, 128, { ...base, outerReach: 0.9 }).radius, plain.radius);
+  // One reaching further: the knob draws in until the housing fits, 2 px from the edge.
+  const housed = resolveCircularTrackMetrics(120, 128, { ...base, outerReach: 1.4 });
+  assert.ok(housed.radius < plain.radius);
+  assert.ok(housed.centerX - housed.radius * 1.4 >= 2 - 1e-9, 'the housing clears the side');
+  // A knob that is not tight keeps the size it always had.
+  assert.equal(resolveCircularTrackMetrics(120, 128, { ...base, tight: false, outerReach: 1.4 }).radius,
+    resolveCircularTrackMetrics(120, 128, { ...base, tight: false }).radius);
+  // The renderer and the layers pass it the housing's reach, through utils/knobTrack.js.
+  assert.match(source('utils/knobTrack.js'), /handleLabelSize,\s*tight,\s*outerReach: housingReach,/);
 });

@@ -464,7 +464,11 @@ function channelizePath(control, path) {
   // Only when the shorthand landed nowhere: a control that genuinely has the section keeps it.
   if (node === undefined && path === SHORTHANDS.value) {
     const channels = control?._children?.ValueChannels?._children;
-    const main = channels && (channels.value ? 'value' : (channels.mainValue ? 'mainValue' : null));
+    // A copy a set placed where a knob was (utils/setLibraryComponents.js) answers for the knob's
+    // value through the channel it went to, so a script written for the knob still reaches it.
+    const placed = String(control?._children?.Designer?.setPlacement?.channel ?? '');
+    const main = channels && (placed && channels[placed] ? placed
+      : channels.value ? 'value' : (channels.mainValue ? 'mainValue' : null));
     if (main) return `ValueChannels._children.${main}.currentValue`;
   }
   return path;
@@ -7532,8 +7536,9 @@ const DEFINE_SPECS = {
   Bindings: {
     templates: [ENTRY_BASELINES.Bindings],
     // mapMode "format" and "template" (utils/interactionRuntime.js resolveBindingValue); the app's
-    // own readouts are format bindings (utils/customComponentFactory.js).
-    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template'],
+    // own readouts are format bindings (utils/customComponentFactory.js). "figures": one figure of a
+    // counter, or its windows' opacity for a count of figures.
+    extra: ['multiplier', 'offset', 'precision', 'prefix', 'suffix', 'template', 'character', 'length', 'band'],
   },
   Parts: {
     templates: [createPartNode('')],
@@ -7544,8 +7549,15 @@ const DEFINE_SPECS = {
       'generated', 'detachedFromGenerator', 'locked',
       // A knob cap's and housing's outline (utils/knobOutlines.js).
       'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
+      // A knob plate's shadow and perspective, a bar pointer's taper (models/directionKnobParts.js).
+      'shadowOffset', 'shadowColour', 'shadowBlur', 'taper', 'aspect', 'shiftY',
+      // A plate's grooves and a bar pointer's second bar (models/directionKnobParts.js).
+      'grooves', 'grooveLength', 'grooveWidth', 'markFrom', 'markTo', 'markWidth', 'markColour',
+      // A plate's, a fader cap's or a button part's rendered look (utils/renderedLookCore.js).
+      'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop',
+      'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'renderCorner',
       // A button's or a switch's device parts (models/buttonDeviceParts.js).
-      'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
+      'shape', 'shapeDepth', 'shapePath', 'shapePathOn', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
       'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize',
       // A meter's parts (models/meterDeviceParts.js).
       'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',
@@ -7557,8 +7569,8 @@ const DEFINE_SPECS = {
     // An array channel's size, items and itemFields come from its own maker.
     templates: [ENTRY_BASELINES.ValueChannels, createValueChannel(''), createArrayChannel('', { itemFields: {} })],
     // An enum channel's choices, and `constraint`, the older spelling of constraints, still read
-    // in its place (utils/customComponentInteraction.js).
-    extra: ['values', 'options', 'constraint'],
+    // in its place (utils/customComponentInteraction.js); a meter's held peak (`peakHold`).
+    extra: ['values', 'options', 'constraint', 'peakHold'],
   },
   Behaviors: {
     templates: [ENTRY_BASELINES.Behaviors, createBehaviorModule('')],

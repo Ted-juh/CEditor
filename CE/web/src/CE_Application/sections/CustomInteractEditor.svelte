@@ -10,6 +10,9 @@
   import { buildInteractivePatch } from '../utils/customComponentScaffold.js';
   import { listInteractiveArchetypes } from '../utils/customComponentFactory.js';
   import { numberOr } from '../utils/primitives.js';
+  import { describeValueSource } from '../utils/valueSources.js';
+  import { defaultFires, isButtonBehavior } from '../utils/customButtonFiring.js';
+  import { activePanel } from '../stores/panels.js';
   import { behaviorTypeWord, capitalised, carriedControlWord, channelTypeWord, isCarriedControlBehavior } from '../utils/authorWords.js';
   import PropertySection from '../properties/PropertySection.svelte';
   import NumberCell from '../properties/NumberCell.svelte';
@@ -118,6 +121,16 @@
     if (!core?.id) return;
     updateControlProperty(core.id, `ValueChannels.${name}.${field}`, value);
   }
+
+  // A button's Fires choices, in the order the mock-up gave them.
+  const FIRES_CHOICES = [
+    ['press', 'when pressed'],
+    ['release', 'when released'],
+    ['hold', 'after a hold'],
+    ['double', 'on a double click'],
+    ['repeat', 'again and again while held'],
+    ['held', 'only while held'],
+  ];
 
   function setBehaviorField(name, field, value) {
     if (!core?.id) return;
@@ -235,6 +248,34 @@
                 <div class="field-row">
                   <span class="field-name">{behaviorName}</span>
                   <div class="ro-field"><em>Type</em><span class="readout">{capitalised(behaviorTypeWord(behavior, parts))}</span></div>
+                  {#if isButtonBehavior(behavior)}
+                    {@const fires = String(behavior.fires ?? '') || defaultFires(behavior)}
+                    <!-- When a button fires, and what it does after (utils/customButtonFiring.js). -->
+                    <label title="When the button acts: a toggle flips, a momentary button sends its value on for a moment (on for as long as it is held, while held)."><em>Fires</em>
+                      <select aria-label="Fires" value={fires} onchange={(event) => setBehaviorField(behaviorName, 'fires', event.currentTarget.value)}>
+                        {#each FIRES_CHOICES as [value, words] (value)}<option {value}>{words}</option>{/each}
+                      </select>
+                    </label>
+                    {#if fires === 'hold'}
+                      <label title="How long it is held before it fires."><em>Hold ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.holdMs, 1200)} defaultValue={1200} min={0} step={50} onchange={(v) => setBehaviorField(behaviorName, 'holdMs', v)} /></span></label>
+                    {:else if fires === 'double'}
+                      <label title="How many clicks fire it."><em>Clicks</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.clicks, 2)} defaultValue={2} min={1} step={1} onchange={(v) => setBehaviorField(behaviorName, 'clicks', Math.max(1, Math.round(v)))} /></span></label>
+                      <label title="The most time between one click and the next."><em>Within ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.clickWindow, 350)} defaultValue={350} min={50} step={10} onchange={(v) => setBehaviorField(behaviorName, 'clickWindow', v)} /></span></label>
+                    {:else if fires === 'repeat'}
+                      <label title="How long after the press it starts to repeat."><em>Delay ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.repeatDelay, 300)} defaultValue={300} min={0} step={10} onchange={(v) => setBehaviorField(behaviorName, 'repeatDelay', v)} /></span></label>
+                      <label title="How often it fires once it repeats."><em>Every ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.repeatInterval, 120)} defaultValue={120} min={10} step={10} onchange={(v) => setBehaviorField(behaviorName, 'repeatInterval', v)} /></span></label>
+                    {/if}
+                    <label title="After it fires: ready again, disabled for good, or locked for a time."><em>Afterwards</em>
+                      <select aria-label="Afterwards" value={String(behavior.afterwards ?? '')} onchange={(event) => setBehaviorField(behaviorName, 'afterwards', event.currentTarget.value)}>
+                        <option value="">ready again</option>
+                        <option value="disabled">disabled</option>
+                        <option value="locked">locked for a time</option>
+                      </select>
+                    </label>
+                    {#if behavior.afterwards === 'locked'}
+                      <label title="How long presses do nothing after it fires."><em>Locked ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.lockMs, 1000)} defaultValue={1000} min={0} step={50} onchange={(v) => setBehaviorField(behaviorName, 'lockMs', v)} /></span></label>
+                    {/if}
+                  {/if}
                   {#if isCarriedControlBehavior(behavior)}
                     <!-- A knob or slider converted from the panel is dragged by its own maths, from its
                          own settings (customComponentInteraction.js, before geometry is read), so
@@ -249,6 +290,14 @@
                     <label><em>Drag</em>
                       <select value={behavior.dragMode ?? 'auto'} onchange={(event) => setBehaviorField(behaviorName, 'dragMode', event.currentTarget.value)}>
                         {#each DRAG_MODES as option (option)}<option value={option}>{option}</option>{/each}
+                      </select>
+                    </label>
+                    <!-- What a press is measured against: its grab area (a knob's centre and a slider's
+                         travel in its own box), or the whole component. -->
+                    <label title="Measure where the pointer is against this behaviour's grab area, or against the whole component."><em>Measured in</em>
+                      <select aria-label="Measured in" value={behavior.frame === 'zone' ? 'zone' : 'component'} onchange={(event) => setBehaviorField(behaviorName, 'frame', event.currentTarget.value === 'zone' ? 'zone' : '')}>
+                        <option value="zone">its grab area</option>
+                        <option value="component">the whole component</option>
                       </select>
                     </label>
                   {/if}
@@ -272,6 +321,10 @@
                   <span class="tag">generated</span>
                 {:else if zone}
                   <span class="readout wide">{zoneSourceLabel(zone)}</span>
+                  {#if (zone.targetValueChannels ?? []).filter(Boolean).length > 1}
+                    <!-- One grab area over several values (a range's handles): the press takes the nearest. -->
+                    <div class="ro-field" title="A press takes the value nearest to where it lands, and the drag moves that one."><em>Takes</em><span class="readout">the nearest of {zone.targetValueChannels.filter(Boolean).join(', ')}</span></div>
+                  {/if}
                   <label title="Inflate the grab area (px each side)"><em>Grow</em><span class="nc-wrap"><NumberCell value={numberOr(zone.inflate?.x, 0)} defaultValue={0} onchange={(v) => setZoneField(entry.name, 'inflate', { x: v, y: v, unit: 'px' })} /></span></label>
                   <label title="Minimum touch size (finger floor)"><em>Min px</em><span class="nc-wrap"><NumberCell value={numberOr(zone.minTouch, 0)} defaultValue={0} onchange={(v) => setZoneField(entry.name, 'minTouch', v)} /></span></label>
                 {/if}
@@ -297,7 +350,8 @@
     <PropertySection title="Not wired up" icon={Unplug}>
       <div class="orphans">
         {#each orphans.channels as name (name)}
-          <div class="orphan-row"><span class="tag">channel</span><strong>{name}</strong><em>no behavior drives it (fine for output-only values)</em></div>
+          <!-- A value that follows another (its Value From): what it follows, where nothing here drives it. -->
+          <div class="orphan-row"><span class="tag">channel</span><strong>{name}</strong><em>{describeValueSource(control, name, $activePanel?.controls ?? []) || 'no behavior drives it (fine for output-only values)'}</em></div>
         {/each}
         {#each orphans.behaviors as name (name)}
           <div class="orphan-row warn"><span class="tag">behavior</span><strong>{name}</strong><em>its value channel is missing</em></div>

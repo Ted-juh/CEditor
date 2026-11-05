@@ -35,6 +35,7 @@
     foldsForLevel,
     foldsUnder,
     isTabPageRowId,
+    nestAttached,
     levelOfFolds,
     scrollTopForRow,
     tabPageGroups,
@@ -159,18 +160,19 @@
   // DOM at once, so a screen reader counting `role="treeitem"` children would announce "3 of 25"
   // in a panel of 413. They have to be told the real position, and only the walk knows it.
   const rowCache = new WeakMap();
-  const rowFor = (ctrl, id, depth, container, inheritedHidden, inheritedLocked, posinset, setsize) => {
+  const rowFor = (ctrl, id, depth, container, inheritedHidden, inheritedLocked, posinset, setsize, attached = false) => {
     const cached = rowCache.get(ctrl);
     if (
       cached !== undefined &&
       cached.depth === depth &&
+      cached.attached === attached &&
       cached.container === container &&
       cached.inheritedHidden === inheritedHidden &&
       cached.inheritedLocked === inheritedLocked &&
       cached.posinset === posinset &&
       cached.setsize === setsize
     ) return cached;
-    const row = { ctrl, id, depth, container, inheritedHidden, inheritedLocked, posinset, setsize };
+    const row = { ctrl, id, depth, container, inheritedHidden, inheritedLocked, posinset, setsize, attached };
     rowCache.set(ctrl, row);
     return row;
   };
@@ -218,16 +220,17 @@
 
     const out = [];
     const visit = (list, depth, inheritedHidden, inheritedLocked) => {
-      const siblings = [...sortControlsForRender(list)].reverse()
-        .filter((ctrl) => !visibleSet || visibleSet.has(getControlId(ctrl)));
+      // A knob's Labels are listed under it, a step in (componentTreeView.js nestAttached).
+      const siblings = nestAttached([...sortControlsForRender(list)].reverse()
+        .filter((ctrl) => !visibleSet || visibleSet.has(getControlId(ctrl))));
       const setsize = siblings.length;
-      siblings.forEach((ctrl, index) => {
+      siblings.forEach(({ ctrl, attached }, index) => {
         const id = getControlId(ctrl);
         const container = isContainerControl(ctrl);
         const core = ctrl._children?.Core;
         const hidden = core?.visible === false;
         const locked = core?.locked === true;
-        out.push(rowFor(ctrl, id, depth, container, inheritedHidden, inheritedLocked, index + 1, setsize));
+        out.push(rowFor(ctrl, id, attached ? depth + 1 : depth, container, inheritedHidden, inheritedLocked, index + 1, setsize, attached));
         if (!container || (!query && collapsedIds.has(id))) return;
         const childHidden = inheritedHidden || hidden;
         const childLocked = inheritedLocked || locked;
@@ -980,6 +983,9 @@
               {:else}
                 <span class="collapse-spacer"></span>
               {/if}
+              {#if row.attached}
+                <span class="attached-mark" title="Attached to its control: moves, copies and deletes with it" aria-hidden="true">↳</span>
+              {/if}
 
               <!--
                 The type badge only earns its 72px when the name has stopped saying the type. It used
@@ -1371,6 +1377,13 @@
   .collapse-spacer {
     width: 14px;
     flex-shrink: 0;
+  }
+
+  .attached-mark {
+    flex: none;
+    margin-right: 3px;
+    font-size: 12px;
+    color: #5B9BD5;
   }
 
   .item-type {

@@ -13,7 +13,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { get } from 'svelte/store';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { createPanel } from '../src/CE_Application/stores/panelModel.js';
@@ -154,8 +154,8 @@ test('Variants are hidden: no Publish page, no picker on a copy, no "Variant" se
   assert.ok(!('variant' in editable), 'a new component offers no Variant setting');
   assert.ok('variant' in createControl('CustomComponent')._children.PublishedProperties.editableProperties,
     'the type\'s defaults keep it: a saved component is a difference from them');
-  const publish = src('CE_Application/sections/CustomPublishEditor.svelte');
-  assert.doesNotMatch(publish, /id: 'variants'|CustomVariantsEditor/);
+  // The Publish page, which had a Variants page, is gone: the Settings tab replaced it.
+  assert.ok(!existsSync(new URL('../src/CE_Application/sections/CustomPublishEditor.svelte', import.meta.url)));
   assert.doesNotMatch(src('CE_Application/sections/CustomInstancePropertiesEditor.svelte'), /setActiveVariant|<select/);
 });
 

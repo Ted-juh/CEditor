@@ -76,8 +76,9 @@
       />
     {:else if shape.kind === 'filled-path'}
       <!-- An outline filled: a knob's polygon, scallop or flutes, or a ring with its hole
-           (utils/knobOutlines.js). -->
-      <path d={shape.d} fill="white" fill-rule="evenodd" />
+           (utils/knobOutlines.js); moved, squashed and turned by its transform when it has one, a
+           plate seen in perspective. -->
+      <path d={shape.d} fill="white" fill-rule="evenodd" transform={shape.transform} />
     {:else if shape.kind === 'circle'}
       <circle cx={shape.cx} cy={shape.cy} r={shape.r} fill="white" />
     {:else if shape.kind === 'rect'}

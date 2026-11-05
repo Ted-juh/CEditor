@@ -469,7 +469,7 @@ test('patch refuses a part the control does not have, and a key that leads nowhe
     api.panelDefine('k', 'States', 'Warn', {});
     clearScriptTrace();
     assert.equal(api.panelPatch('k', 'Warn', { 'Background.Fill.colour': 'FF00FF00' }, 'cap'), 0);
-    assert.match(traced(), /"k" has no part called "cap", so nothing was applied\. Its parts are bodyHousing, bodyTrackBase, /);
+    assert.match(traced(), /"k" has no part called "cap", so nothing was applied\. Its parts are bodyHousing, bodySkirt, bodyTrackBase, /);
     assert.deepEqual(api.panelEntry('k', 'States', 'Warn').patches.parts, {}, 'nothing stored for the part');
     clearScriptTrace();
     assert.equal(api.panelPatch('k', 'Warn', { 'Backgrnd.Fill.colour': 'FF00FF00' }, 'bodyCap'), 0);

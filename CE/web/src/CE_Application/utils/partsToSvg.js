@@ -142,6 +142,8 @@ function cornersArePlain(corners, border) {
 export function whyNotBakeable(part) {
   if (!part || typeof part !== 'object') return 'not a part';
   if (part.visible === false) return null;                   // invisible: nothing to draw, safe to drop
+  // A rendered look (utils/layerRenderedLook.js) is an image made live from the set's lamp.
+  if (String(part.look ?? '') === 'rendered') return 'a rendered look';
   const kind = String(part.kind ?? 'rectangle').toLowerCase();
   if (kind !== 'rectangle') return `part kind "${kind}"`;
 

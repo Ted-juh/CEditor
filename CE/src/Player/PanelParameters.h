@@ -62,7 +62,92 @@ struct PanelParameter
 
     // The folder the DAW lists it in ("DAW group" in the control's inspector), or empty for none.
     juce::String group;
+
+    // How the control's travel maps to its value (web/.../utils/channelCurves.js, which this must
+    // match): the host's 0..1 is the travel, so an automation lane drawn half way sits where the
+    // knob does at half travel. "linear" when the panel says nothing, which is what it always was.
+    struct Curve
+    {
+        juce::String mode { "linear" };
+        double centre = 0.5;   // the value at half travel, as a fraction of the range
+        int steps = 5;
+        double deadZone = 0.0; // a share of the travel around the centre that holds the centre
+    };
+    Curve curve;
 };
+
+// --- Curves: travel (0..1) to a fraction of the range, and back. The same maths as
+// channelCurves.js travelToFraction / fractionToTravel; keep the two together.
+
+inline double curveTravelToFraction (const PanelParameter::Curve& c, double p)
+{
+    p = juce::jlimit (0.0, 1.0, p);
+    if (c.mode == "exponential" || c.mode == "logarithmic")
+        return juce::jlimit (0.0, 1.0, std::pow (p, std::log (c.centre) / std::log (0.5)));
+    if (c.mode == "s-curve")
+        return p * p * (3.0 - 2.0 * p);
+    if (c.mode == "stepped")
+    {
+        const auto last = (double) juce::jmax (1, c.steps - 1);
+        return std::round (p * last) / last;
+    }
+    if ((c.mode == "bipolar" || c.mode == "dead-zone") && c.deadZone > 0.0)
+    {
+        const auto half = c.deadZone / 2.0, reach = 0.5 - half;
+        if (std::abs (p - 0.5) <= half) return 0.5;
+        return p < 0.5 ? (p / reach) * 0.5 : 0.5 + ((p - 0.5 - half) / reach) * 0.5;
+    }
+    return p;
+}
+
+inline double curveFractionToTravel (const PanelParameter::Curve& c, double v)
+{
+    v = juce::jlimit (0.0, 1.0, v);
+    if (c.mode == "exponential" || c.mode == "logarithmic")
+        return juce::jlimit (0.0, 1.0, std::pow (v, 1.0 / (std::log (c.centre) / std::log (0.5))));
+    if (c.mode == "s-curve")
+        return juce::jlimit (0.0, 1.0, 0.5 - std::sin (std::asin (1.0 - 2.0 * v) / 3.0));
+    if (c.mode == "stepped")
+    {
+        const auto last = (double) juce::jmax (1, c.steps - 1);
+        return std::round (v * last) / last;
+    }
+    if ((c.mode == "bipolar" || c.mode == "dead-zone") && c.deadZone > 0.0)
+    {
+        const auto half = c.deadZone / 2.0, reach = 0.5 - half;
+        if (v == 0.5) return 0.5;
+        return v < 0.5 ? (v / 0.5) * reach : 0.5 + half + ((v - 0.5) / 0.5) * reach;
+    }
+    return v;
+}
+
+/** Whether a curve changes the mapping at all; a linear range keeps JUCE's own, as before. */
+inline bool curveBends (const PanelParameter::Curve& c)
+{
+    if (c.mode == "exponential" || c.mode == "logarithmic" || c.mode == "s-curve" || c.mode == "stepped")
+        return true;
+    return (c.mode == "bipolar" || c.mode == "dead-zone") && c.deadZone > 0.0;
+}
+
+/** The parameter's range: its min and max, and its curve when it has one. */
+inline juce::NormalisableRange<float> parameterRange (const PanelParameter& p)
+{
+    if (! curveBends (p.curve))
+        return juce::NormalisableRange<float> (p.min, p.max);
+
+    const auto curve = p.curve;
+    return juce::NormalisableRange<float> (
+        p.min, p.max,
+        [curve] (float start, float end, float travel)
+        {
+            return start + (end - start) * (float) curveTravelToFraction (curve, travel);
+        },
+        [curve] (float start, float end, float value)
+        {
+            const auto span = end - start;
+            return span == 0.0f ? 0.0f : (float) curveFractionToTravel (curve, (value - start) / span);
+        });
+}
 
 /** Read `exportParameters` from a parsed .cepanel. Returns an empty list if absent/malformed. */
 inline juce::Array<PanelParameter> parseExportParameters (const juce::var& parsed)
@@ -97,6 +182,23 @@ inline juce::Array<PanelParameter> parseExportParameters (const juce::var& parse
                 static_cast<float> (static_cast<double> (entry.getProperty ("defaultValue", p.min))));
             p.unit = entry.getProperty ("unit", "").toString();
             p.group = entry.getProperty ("group", "").toString().trim();
+
+            // Absent for a linear channel (exportParameters.js writes it only when it bends).
+            if (auto* curve = entry.getProperty ("curve", juce::var()).getDynamicObject())
+            {
+                const auto mode = curve->getProperty ("mode").toString();
+                if (mode == "exponential" || mode == "logarithmic" || mode == "s-curve"
+                    || mode == "stepped" || mode == "bipolar" || mode == "dead-zone")
+                {
+                    p.curve.mode = mode;
+                    if (curve->hasProperty ("centre"))
+                        p.curve.centre = juce::jlimit (0.001, 0.999, static_cast<double> (curve->getProperty ("centre")));
+                    if (curve->hasProperty ("steps"))
+                        p.curve.steps = juce::jmax (2, static_cast<int> (curve->getProperty ("steps")));
+                    if (curve->hasProperty ("deadZone"))
+                        p.curve.deadZone = juce::jlimit (0.0, 0.9, static_cast<double> (curve->getProperty ("deadZone")));
+                }
+            }
 
             const auto kind = entry.getProperty ("valueKind", "float").toString();
             p.valueKind = (kind == "bool" || kind == "choice") ? kind : juce::String ("float");
@@ -353,7 +455,7 @@ inline std::unique_ptr<juce::RangedAudioParameter> makeParameter (const PanelPar
     return std::make_unique<RenamableFloat> (
         juce::ParameterID { p.id, 1 },
         p.label,
-        juce::NormalisableRange<float> (p.min, p.max),
+        parameterRange (p),
         p.defaultValue,
         juce::AudioParameterFloatAttributes()
             .withLabel (p.unit)

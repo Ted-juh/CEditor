@@ -1,3 +1,4 @@
+import { curveExportSpec } from './channelCurves.js';
 import { COMPONENT_TYPES } from '../models/componentTypes.js';
 import { flatControls } from './containment.js';
 import { isDisplayOnly } from './displayMode.js';
@@ -75,6 +76,7 @@ export function normalizeExportParameter(entry) {
     ...(entry?.section && entry?.field
       ? { section: String(entry.section), field: String(entry.field) }
       : {}),
+    ...curveField(entry?.curve),
   };
 }
 
@@ -225,7 +227,22 @@ function paramFromChannel(controlName, channelName, channel, single) {
     midiCC: null,
     // A value channel is a scalar by construction — there is no enum shape on this path.
     valueKind: 'float',
+    // The channel's curve, so the host's automation lane maps travel to value as the control does
+    // (utils/channelCurves.js; read by CE/src/Player/PanelParameters.h). Absent when linear.
+    ...curveField(curveExportSpec(channel)),
   };
+}
+
+const CURVE_EXPORT_MODES = new Set(['exponential', 'logarithmic', 's-curve', 'stepped', 'bipolar', 'dead-zone']);
+/** `{ curve }` for a curve the C++ side knows, or nothing. */
+function curveField(curve) {
+  const mode = String(curve?.mode ?? '');
+  if (!CURVE_EXPORT_MODES.has(mode)) return {};
+  const out = { mode };
+  if (Number.isFinite(Number(curve.centre))) out.centre = Math.max(0.001, Math.min(0.999, Number(curve.centre)));
+  if (Number.isFinite(Number(curve.steps))) out.steps = Math.max(2, Math.round(Number(curve.steps)));
+  if (Number.isFinite(Number(curve.deadZone))) out.deadZone = Math.max(0, Math.min(0.9, Number(curve.deadZone)));
+  return { curve: out };
 }
 
 function clampNum(v, lo, hi) {

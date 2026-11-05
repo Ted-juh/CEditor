@@ -9,6 +9,11 @@
   import { DISPLAY_FORMATS } from '../utils/parameterDisplay.js';
   import PropertyScrub from '../properties/PropertyScrub.svelte';
   import FlagStrip from '../properties/FlagStrip.svelte';
+  import PropertyColor from '../properties/PropertyColor.svelte';
+  import { activateInspectorColorTarget } from '../stores/colorTarget.js';
+  import { activeControlSet } from '../stores/controlSets.js';
+  import { resolveColourLiteral } from '../models/controlSets.js';
+  import { RENDERED_BLOCK_TOPS, RENDERED_MATERIALS, RENDERED_TOPS } from '../utils/renderedLook.js';
   import Cloud from 'lucide-svelte/icons/cloud';
   import Sun from 'lucide-svelte/icons/sun';
   import Layers from 'lucide-svelte/icons/layers';
@@ -53,18 +58,6 @@
   ];
 
   let selectedStyleTarget = $state('bodyTrackBase');
-  let labelPositionTarget = $state('');
-
-  const READOUT_POSITION_OPTIONS = [
-    { value: 'auto', label: 'auto' },
-    { value: 'top', label: 'top' },
-    { value: 'center', label: 'center' },
-    { value: 'bottom', label: 'bottom' },
-    { value: 'topLeft', label: 'top left' },
-    { value: 'topRight', label: 'top right' },
-    { value: 'bottomLeft', label: 'bottom left' },
-    { value: 'bottomRight', label: 'bottom right' },
-  ];
 
   function set(path, value) {
     const controlId = getSection(control, 'Core')?.id;
@@ -116,38 +109,6 @@
   function setCircularEndAngle(value) {
     const start = numberOr(behavior?.startAngle, 135);
     set('Behavior.sweepAngle', clampSweep(numberOr(value, start) - start));
-  }
-
-  function showLabelPositionEditor(target, event) {
-    event?.preventDefault?.();
-    labelPositionTarget = labelPositionTarget === target ? '' : target;
-  }
-
-  function minMaxPositionOptions() {
-    if (geometry === 'circular') {
-      return [
-        { value: 'auto', label: 'auto' },
-        { value: 'outside', label: 'outside' },
-        { value: 'inside', label: 'inside' },
-        { value: 'center', label: 'center' },
-      ];
-    }
-
-    if (String(behavior?.orientation ?? 'horizontal') === 'vertical') {
-      return [
-        { value: 'auto', label: 'auto' },
-        { value: 'right', label: 'right' },
-        { value: 'left', label: 'left' },
-        { value: 'center', label: 'center' },
-      ];
-    }
-
-    return [
-      { value: 'auto', label: 'auto' },
-      { value: 'below', label: 'below' },
-      { value: 'above', label: 'above' },
-      { value: 'center', label: 'center' },
-    ];
   }
 
   // The presets. Each used to write its own width and height, so going from Single to Bipolar on
@@ -209,9 +170,7 @@
       'Behavior.centerValue': center,
       'Behavior.fillOrigin': preset.bipolar === true ? 'center' : 'min',
       'Behavior.showHandleLabels': preset.valueMode !== 'single',
-      'Behavior.showValueReadout': true,
       'Behavior.showTicks': true,
-      'Behavior.showMinMaxLabels': true,
       'Behavior.showCenterMarker': preset.bipolar === true,
       'Behavior.showSign': preset.bipolar === true,
       'Behavior.defaultStartValue': min + ((max - min) * 0.25),
@@ -238,6 +197,21 @@
     ? 'table'
     : (typeof behavior?.displayFormat === 'string' && behavior.displayFormat ? behavior.displayFormat : 'number'));
   let parts = $derived(getSection(control, 'Parts'));
+  // A fader cap can be rendered (utils/renderedLookCore.js): a block the cap's size, or a turned body
+  // for a round one. Its fields go to all three handles, as the Cap's kind does.
+  let cap = $derived(parts?._children?.pointerCurrent ?? {});
+  let capKind = $derived(String(cap.kind ?? 'dot'));
+  let capRendered = $derived(String(cap.look ?? '') === 'rendered');
+  let capRound = $derived(['dot', 'lens', 'glass'].includes(capKind));
+  function setCaps(key, value) {
+    setPatch({ [`Parts.pointerCurrent.${key}`]: value, [`Parts.pointerStart.${key}`]: value, [`Parts.pointerEnd.${key}`]: value });
+  }
+  const shownColour = (colour, fallback = 'FF3A3A3A') => resolveColourLiteral(colour, $activeControlSet, fallback);
+  function pickCapColour(key, current) {
+    const controlId = getSection(control, 'Core')?.id;
+    if (!controlId) return;
+    activateInspectorColorTarget({ type: 'control', controlId, path: `Parts.pointerCurrent.${key}` }, current || shownColour(current));
+  }
   let geometry = $derived(String(behavior?.geometry ?? 'linear'));
   let valueMode = $derived(String(behavior?.valueMode ?? 'single'));
   let styleTargets = $derived(isKnob ? [...KNOB_STYLE_TARGETS, ...STYLE_TARGETS] : STYLE_TARGETS);
@@ -402,71 +376,21 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Ticks & Labels" icon={Ruler}>
-    <PropertyCell label="Show" span={4} hint="Ticks, min/max labels, handle labels, readout, centre marker. Right-click min/max or readout to place them.">
+  <PropertySection title="Ticks" icon={Ruler}>
+    <PropertyCell label="Show" span={4} hint="Ticks, the labels that ride the handles, the centre marker. Its name, value and range ends are Labels of their own: add them on the Labels tab.">
       <FlagStrip
         flags={[
           { key: 'ticks', title: 'Ticks — generated major/minor ticks', on: behavior.showTicks !== false, icon: Ruler },
-          { key: 'minMax', title: 'Min / max labels (right-click to position)', on: behavior.showMinMaxLabels !== false, active: labelPositionTarget === 'minMax', icon: MoveHorizontal },
           { key: 'handleLabels', title: 'Handle labels beside the active handles', on: behavior.showHandleLabels === true, icon: Tags },
-          { key: 'readout', title: 'Primary value readout (right-click to position)', on: behavior.showValueReadout !== false, active: labelPositionTarget === 'readout', icon: Type },
           { key: 'centerMarker', title: 'Centre marker at the authored centre value', on: behavior.showCenterMarker === true, icon: AlignCenterVertical },
         ]}
         ontoggle={(key) => {
           if (key === 'ticks') set('Behavior.showTicks', !(behavior.showTicks !== false));
-          else if (key === 'minMax') set('Behavior.showMinMaxLabels', !(behavior.showMinMaxLabels !== false));
           else if (key === 'handleLabels') set('Behavior.showHandleLabels', !(behavior.showHandleLabels === true));
-          else if (key === 'readout') set('Behavior.showValueReadout', !(behavior.showValueReadout !== false));
           else if (key === 'centerMarker') set('Behavior.showCenterMarker', !(behavior.showCenterMarker === true));
-        }}
-        oncontextmenu={(key, event) => {
-          if (key === 'minMax' || key === 'readout') showLabelPositionEditor(key, event);
         }}
       />
     </PropertyCell>
-
-    {#if labelPositionTarget === 'minMax'}
-      <PropertyCell label="MinMax Pos" span={1} hint="Position for generated min and max labels.">
-        <select class="val" value={behavior.labelMinMaxPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelMinMaxPlacement', event.target.value)}>
-          {#each minMaxPositionOptions() as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Gap" span={1} compact hint="Distance from the track for generated min and max labels.">
-        <NumberCell label="Gap" value={behavior.labelMinMaxGap ?? 22} defaultValue={22} step={1} onchange={(value) => set('Behavior.labelMinMaxGap', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for generated min and max labels.">
-        <NumberCell label="X" value={behavior.labelMinMaxOffsetX ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetX', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset for generated min and max labels.">
-        <NumberCell label="Y" value={behavior.labelMinMaxOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelMinMaxOffsetY', value)} />
-      </PropertyCell>
-    {:else if labelPositionTarget === 'readout'}
-      <PropertyCell label="Readout Pos" span={1} path="Behavior.labelReadoutPlacement" hint="Position for the generated value readout. A corner hangs it from the track's end: top left and top right make the row above the track.">
-        <select class="val" value={behavior.labelReadoutPlacement ?? 'auto'} onchange={(event) => set('Behavior.labelReadoutPlacement', event.target.value)}>
-          {#each READOUT_POSITION_OPTIONS as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Title Pos" span={1} path="Behavior.labelTitlePlacement" hint="Position for the title (the control's text). It shares the readout's gap: title top left with the readout top right is one row above the track.">
-        <select class="val" value={behavior.labelTitlePlacement ?? 'auto'} onchange={(event) => set('Behavior.labelTitlePlacement', event.target.value)}>
-          {#each READOUT_POSITION_OPTIONS as option (option.value)}
-            <option value={option.value}>{option.label}</option>
-          {/each}
-        </select>
-      </PropertyCell>
-      <PropertyCell label="Gap" span={1} compact hint="Distance from the component edge for a top or bottom readout or title placement.">
-        <NumberCell label="Gap" value={behavior.labelReadoutGap ?? 14} defaultValue={14} step={1} onchange={(value) => set('Behavior.labelReadoutGap', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset X" span={1} compact hint="Horizontal offset for the generated value readout.">
-        <NumberCell label="X" value={behavior.labelReadoutOffsetX ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetX', value)} />
-      </PropertyCell>
-      <PropertyCell label="Offset Y" span={1} compact hint="Vertical offset for the generated value readout.">
-        <NumberCell label="Y" value={behavior.labelReadoutOffsetY ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.labelReadoutOffsetY', value)} />
-      </PropertyCell>
-    {/if}
 
     <PropertyCell label="Major Count" span={1} compact path="Behavior.majorTickCount" hint="Generated major tick stops across the slider domain.">
       <NumberCell label="Major" value={behavior.majorTickCount ?? 11} defaultValue={11} step={1} min={SLIDER_TICK_LIMITS.majorMin} max={SLIDER_TICK_LIMITS.majorMax} onchange={(value) => set('Behavior.majorTickCount', clampSliderTickCount('major', value, 11))} />
@@ -508,6 +432,46 @@
           }}
         />
       </PropertyCell>
+      <PropertyCell label="Cap Look" span={2} path="Parts.pointerCurrent.look" disabled={capKind === 'ring' || capKind === 'line'} hint="Flat: drawn from its kind, colour and finish. Rendered: drawn as a lit object, a block the cap's size (a turned body for a round cap), lit by the set's lamp; the fields below are its own. A ring or a line cap is not rendered.">
+        <select class="val" value={capRendered ? 'rendered' : 'flat'} onchange={(event) => setCaps('look', event.target.value === 'rendered' ? 'rendered' : '')}>
+          <option value="flat">Flat</option><option value="rendered">Rendered</option>
+        </select>
+      </PropertyCell>
+      {#if capRendered}
+        <PropertyCell label="Cap Top" span={2} path="Parts.pointerCurrent.renderTop" hint="Its top: flat, with an insert, ridged across the travel, a dome or a dish.">
+          <select class="val" value={cap.renderTop ?? 'flat'} onchange={(event) => setCaps('renderTop', event.target.value)}>
+            {#each (capRound ? RENDERED_TOPS : RENDERED_BLOCK_TOPS) as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Ridges" span={1} compact path="Parts.pointerCurrent.renderCount" disabled={capRound || cap.renderTop !== 'ridged'} hint="How many ridges across its top.">
+          <NumberCell label="Ridges" value={cap.renderCount ?? 5} defaultValue={5} step={1} min={1} max={40} onchange={(value) => setCaps('renderCount', Math.round(Number(value) || 0))} />
+        </PropertyCell>
+        <PropertyCell label="Depth %" span={1} compact path="Parts.pointerCurrent.renderDepth" disabled={capRound} hint="How deep its ridges or dish go, or how high its dome stands, as a percentage of half its narrower side.">
+          <NumberCell label="Depth" value={cap.renderDepth ?? 12} defaultValue={12} step={1} min={0} max={60} onchange={(value) => setCaps('renderDepth', value)} />
+        </PropertyCell>
+        <PropertyCell label="Height %" span={1} compact path="Parts.pointerCurrent.renderHeight" hint={capRound ? 'How tall it stands, as a percentage of its radius.' : 'How tall it stands, as a percentage of its narrower side.'}>
+          <NumberCell label="Height" value={cap.renderHeight ?? (capRound ? 80 : 60)} defaultValue={capRound ? 80 : 60} step={1} min={10} max={200} onchange={(value) => setCaps('renderHeight', value)} />
+        </PropertyCell>
+        <PropertyCell label="Taper %" span={1} compact path="Parts.pointerCurrent.renderTaper" hint="How much narrower its top is than its foot.">
+          <NumberCell label="Taper" value={cap.renderTaper ?? (capRound ? 8 : 6)} defaultValue={capRound ? 8 : 6} step={1} min={0} max={40} onchange={(value) => setCaps('renderTaper', value)} />
+        </PropertyCell>
+        <PropertyCell label="Corner %" span={1} compact path="Parts.pointerCurrent.renderCorner" disabled={capRound} hint="How round its corners are seen from above, as a percentage of half its narrower side: 100 rounds its ends.">
+          <NumberCell label="Corner" value={cap.renderCorner ?? (capKind === 'block' ? 30 : 36)} defaultValue={capKind === 'block' ? 30 : 36} step={1} min={0} max={100} onchange={(value) => setCaps('renderCorner', value)} />
+        </PropertyCell>
+        <PropertyCell label="Cap Material" span={2} path="Parts.pointerCurrent.renderMaterial" hint="What its body is made of.">
+          <select class="val" value={cap.renderMaterial ?? (capRound ? 'metal' : 'satin')} onchange={(event) => setCaps('renderMaterial', event.target.value)}>
+            {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Top Material" span={2} path="Parts.pointerCurrent.renderTopMaterial" hint="What its top is made of.">
+          <select class="val" value={cap.renderTopMaterial ?? (capRound ? 'spun' : 'satin')} onchange={(event) => setCaps('renderTopMaterial', event.target.value)}>
+            {#each RENDERED_MATERIALS as [id, label] (id)}<option value={id}>{label}</option>{/each}
+          </select>
+        </PropertyCell>
+        <PropertyCell label="Top Colour" span={2} path="Parts.pointerCurrent.renderTopColour" hint="Its top's colour; empty, the cap's own. The cap's colour is the Current Handle's fill, under Style.">
+          <PropertyColor value={shownColour(cap.renderTopColour || cap?._children?.Background?._children?.Fill?.colour)} onchange={(value) => setCaps('renderTopColour', value)} onswatchclick={() => pickCapColour('renderTopColour', cap.renderTopColour)} />
+        </PropertyCell>
+      {/if}
     {/if}
     <!-- How a tick is drawn, and which major stops draw. A control set usually chooses these;
          this is where an author overrides it. Numerals are for the majors, so the minors between
@@ -536,6 +500,36 @@
         <option value="endsCentre">ends and centre</option>
       </select>
     </PropertyCell>
+    {#if geometry !== 'linear'}
+      <!-- A knob's printed scale (models/directionKnobParts.js): on a radius of its own, and its
+           numbers round it. -->
+      <PropertyCell label="Scale Radius %" span={1} compact path="Behavior.tickRadius" hint="Where the ticks sit, as a percentage of the track's radius: a scale printed outside a value arc that runs close round the cap. 0 puts them on the track.">
+        <NumberCell label="Radius" value={behavior.tickRadius ?? 0} defaultValue={0} step={1} min={0} max={250} onchange={(value) => set('Behavior.tickRadius', Math.max(0, Number(value) || 0))} />
+      </PropertyCell>
+      <PropertyCell label="Numbers" span={1} compact path="Behavior.scaleNumberCount" hint="Numbers printed round the scale, evenly from the start of the sweep to its end: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. 0 for none.">
+        <NumberCell label="Numbers" value={behavior.scaleNumberCount ?? 0} defaultValue={0} step={1} min={0} max={41} onchange={(value) => set('Behavior.scaleNumberCount', Math.max(0, Math.min(41, Math.round(Number(value) || 0))))} />
+      </PropertyCell>
+      <PropertyCell label="Second Scale %" span={1} compact path="Behavior.secondScaleRadius" hint="A second ring of ticks further in, at this percentage of the track's radius, drawn as the first scale's: Dual Scale's on its collar. 0 for none.">
+        <NumberCell label="2nd Radius" value={behavior.secondScaleRadius ?? 0} defaultValue={0} step={1} min={0} max={250} onchange={(value) => set('Behavior.secondScaleRadius', Math.max(0, Number(value) || 0))} />
+      </PropertyCell>
+      <PropertyCell label="Second Scale Divisions" span={1} compact path="Behavior.secondScaleCount" hint="How many divisions the second scale has, long and short ticks in turn. 0 for none.">
+        <NumberCell label="2nd Div" value={behavior.secondScaleCount ?? 0} defaultValue={0} step={1} min={0} max={96} onchange={(value) => set('Behavior.secondScaleCount', Math.max(0, Math.min(96, Math.round(Number(value) || 0))))} />
+      </PropertyCell>
+      {#if (behavior.scaleNumberCount ?? 0) >= 2}
+        <PropertyCell label="From" span={1} compact path="Behavior.scaleNumberFrom" hint="What the first number says.">
+          <NumberCell label="From" value={behavior.scaleNumberFrom ?? 0} defaultValue={0} step={1} onchange={(value) => set('Behavior.scaleNumberFrom', Number(value) || 0)} />
+        </PropertyCell>
+        <PropertyCell label="To" span={1} compact path="Behavior.scaleNumberTo" hint="What the last number says.">
+          <NumberCell label="To" value={behavior.scaleNumberTo ?? 10} defaultValue={10} step={1} onchange={(value) => set('Behavior.scaleNumberTo', Number(value) || 0)} />
+        </PropertyCell>
+        <PropertyCell label="Number Radius %" span={1} compact path="Parts.tickNumber.Layout.offsetX" hint="How far out the numbers sit, as a percentage of the track's radius.">
+          <NumberCell label="Radius" value={parts?._children?.tickNumber?._children?.Layout?.offsetX ?? 122} defaultValue={122} step={1} min={20} max={300} onchange={(value) => set('Parts.tickNumber.Layout.offsetX', Number(value) || 122)} />
+        </PropertyCell>
+        <PropertyCell label="Number Size" span={1} compact path="Parts.tickNumber.Text.Font.size" hint="The numbers' size, in px.">
+          <NumberCell label="Size" value={parts?._children?.tickNumber?._children?.Text?._children?.Font?.size ?? 7} defaultValue={7} step={0.5} min={4} max={40} onchange={(value) => set('Parts.tickNumber.Text.Font.size', Number(value) || 7)} />
+        </PropertyCell>
+      {/if}
+    {/if}
   </PropertySection>
 
   <PropertySection title="Interaction" icon={MousePointer}>

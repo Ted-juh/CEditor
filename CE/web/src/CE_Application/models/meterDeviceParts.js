@@ -78,6 +78,9 @@ function meterPart(name, zIndex, fill, extra = {}) {
     clipChildren: false,
     shape: name === 'lamp' ? 'ellipse' : 'rect',
     shapeDepth: 20,
+    // A drawn outline (utils/deviceShapes.js `path`), and its outline pressed or on.
+    shapePath: '',
+    shapePathOn: '',
     pattern: 'solid',
     patternCount: 4,
     patternRows: 3,

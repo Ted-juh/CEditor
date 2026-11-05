@@ -26,6 +26,8 @@
 import { COMPONENT_TYPES, createControl } from '../models/componentTypes.js';
 import { getPreferredPort } from '../models/componentPorts.js';
 import { parameterAdoptionPatches } from './parameterAdoptionRules.js';
+import { makeAttachedLabel } from './attachedLabelFactory.js';
+import { SHOWN_LETTERING } from './labelShows.js';
 
 /**
  * The component to reach for when the profile does not name one, by parameter type.
@@ -201,6 +203,25 @@ function boundControl(parameter, componentType, box, id, deviceRole) {
   return control;
 }
 
+/**
+ * A knob's or slider's value, as a Label of its own attached to it (utils/attachedLabelFactory.js),
+ * where its readout used to be drawn: inside a knob's arc, just below its centre, or over a slider's
+ * track. A knob draws no text of its own. Null for any other control.
+ */
+function valueLabel(control, id) {
+  const behavior = control?._children?.Behavior ?? {};
+  if (String(behavior.family ?? '').toLowerCase() !== 'range' || String(behavior.role ?? '').toLowerCase() !== 'slider') return null;
+  const label = makeAttachedLabel(control, 'value', { core: { id, name: id } });
+  const t = control._children.Transform;
+  const lt = label._children.Transform;
+  const line = Math.round((SHOWN_LETTERING.value?.size ?? 12) * 1.6);
+  lt.width = Math.min(lt.width, t.width);
+  lt.x = Math.round(t.x + (t.width - lt.width) / 2);
+  lt.y = Math.round(String(behavior.geometry ?? 'linear').toLowerCase() === 'circular' ? t.y + t.height / 2 + 10 - line / 2 : t.y);
+  label._children.ContentLayout.horizontalAlign = 'center';
+  return label;
+}
+
 /** The profile's groups in first-appearance order — the order its author wrote them in. */
 export function profileGroups(profile) {
   const seen = [];
@@ -277,11 +298,16 @@ export function autoPanelPlan(profile, options = {}) {
       if (usedIds.has(id)) id = `${id}_${usedIds.size}`;
       usedIds.add(id);
 
-      controls.push(captionControl(parameterLabel(parameter),
-        { x, y, width: density.cellWidth, height: density.captionHeight }, `${id}_cap`, config.density));
-      controls.push(boundControl(parameter, type,
+      // The caption belongs to its control: it moves, copies and deletes with it (utils/attachedLabels.js).
+      const caption = captionControl(parameterLabel(parameter),
+        { x, y, width: density.cellWidth, height: density.captionHeight }, `${id}_cap`, config.density);
+      caption._children.Core.attachedTo = id;
+      const bound = boundControl(parameter, type,
         { x, y: y + density.captionHeight, width: density.cellWidth, height: density.cellHeight },
-        id, config.deviceRole));
+        id, config.deviceRole);
+      controls.push(caption, bound);
+      const value = valueLabel(bound, `${id}_value`);
+      if (value) controls.push(value);
 
       column += 1;
       placedInGroup += 1;

@@ -21,7 +21,9 @@
   import Type from 'lucide-svelte/icons/type';
   import { getSection, selectedControls, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
-  import { selectedComponentIds } from '../stores/panels.js';
+  import { activePanel, selectedComponentIds } from '../stores/panels.js';
+  import { attachedTo as attachedToOf, controlsById, LABEL_SHOWS, labelShows, labelSourceId } from '../utils/labelShows.js';
+  import { authoredShownText } from '../utils/labelText.js';
   import { fontChoices, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet, controlSetSources } from '../stores/controlSets.js';
@@ -80,6 +82,48 @@
   }
 
   let core = $derived(getSection(control, 'Core'));
+  // A Label that shows something of a control, and the control it is attached to (utils/labelShows.js).
+  let isPlainLabel = $derived(String(core?.controlType ?? '') === 'Label' && textPathPrefix === 'Text');
+  let panelControls = $derived($activePanel?.controls ?? []);
+  let panelIndex = $derived(controlsById(panelControls));
+  let shownKind = $derived(isPlainLabel ? labelShows(control) : '');
+  let shownSourceId = $derived(isPlainLabel ? labelSourceId(control) : '');
+  let attachedId = $derived(isPlainLabel ? attachedToOf(control) : '');
+  let attachedName = $derived(controlWords(panelIndex.get(attachedId)));
+  let shownWords = $derived(shownKind ? (authoredShownText(control, panelControls) ?? '') : '');
+  // Every other control on the panel, by name, for Shows and Attach to.
+  let sourceChoices = $derived([...panelIndex.values()]
+    .filter((entry) => String(entry?._children?.Core?.id ?? '') !== String(core?.id ?? ''))
+    .map((entry) => ({ id: String(entry._children.Core.id), name: controlWords(entry) })));
+
+  function controlWords(entry) {
+    if (!entry) return '';
+    const name = String(entry._children?.Core?.name ?? '').trim();
+    const type = String(entry._children?.Core?.controlType ?? '');
+    return name ? `${name} (${type})` : type;
+  }
+
+  function setShows(next) {
+    set('Text.shows', next);
+    // Showing something of no control yet: the one it is attached to, if any, needs no naming.
+    if (next && !shownSourceId && sourceChoices[0] && !attachedId) set('Text.showsControl', sourceChoices[0].id);
+  }
+
+  function setShownSource(id) {
+    set('Text.showsControl', id === attachedId ? '' : id);
+  }
+
+  function attachTo(id) {
+    if (!id) return;
+    set('Core.attachedTo', id);
+    if (String(text?.showsControl ?? '') === id) set('Text.showsControl', '');
+  }
+
+  // Detached, it keeps showing what it showed: the control it was attached to, named.
+  function detach() {
+    if (shownKind && !String(text?.showsControl ?? '')) set('Text.showsControl', attachedId);
+    set('Core.attachedTo', '');
+  }
   let transform = $derived(getSection(control, 'Transform'));
   let text = $derived(textOverride ?? getSection(control, 'Text'));
   let textFill = $derived(text?._children?.Fill ?? null);
@@ -786,17 +830,50 @@
       collapsed={dock ? false : textSectionCollapsed}
       ontoggle={(value) => setCollapsed(sectionKey('text'), value)}
     >
-      <PropertyCell label="Text" span={4} hint="The text content displayed by this component">
+      {#if isPlainLabel && !dock}
+        <PropertyCell label="Shows" span={4} hint="Its own words, or something of a control: its value as it prints it, its name, the ends of its range, its unit, a range's start or end. It follows the control as it changes.">
+          <div class="shows-row">
+            <select class="val" aria-label="Shows" value={shownKind} onchange={(event) => setShows(event.currentTarget.value)}>
+              {#each LABEL_SHOWS as [value, words] (value)}<option {value}>{words}</option>{/each}
+            </select>
+            {#if shownKind}
+              <select class="val" aria-label="Of control" value={shownSourceId} onchange={(event) => setShownSource(event.currentTarget.value)}>
+                {#if !shownSourceId}<option value="">Choose a control</option>{/if}
+                {#each sourceChoices as entry (entry.id)}<option value={entry.id}>{entry.name}</option>{/each}
+              </select>
+            {/if}
+          </div>
+        </PropertyCell>
+        <PropertyCell label="Attached to" span={4} hint="A Label attached to a control moves, copies and deletes with it. Detached, it stays where it is and keeps showing what it showed.">
+          {#if attachedId}
+            <div class="attached-row">
+              <span class="attached-name">{attachedName || attachedId}</span>
+              <span class="attached-note">moves, copies and deletes with it</span>
+              <button class="style-btn" onclick={detach}>Detach</button>
+            </div>
+          {:else}
+            <select class="val" aria-label="Attach to" value="" onchange={(event) => attachTo(event.currentTarget.value)}>
+              <option value="">Nothing</option>
+              {#each sourceChoices as entry (entry.id)}<option value={entry.id}>{entry.name}</option>{/each}
+            </select>
+          {/if}
+        </PropertyCell>
+      {/if}
+      <PropertyCell label={shownKind ? `Text (from ${String(panelIndex.get(shownSourceId)?._children?.Core?.name ?? '').trim() || 'the control'})` : 'Text'} span={4} hint="The text content displayed by this component">
         <div class="text-edit-row">
-          <textarea
-            class="text-input"
-            bind:value={textDraft}
-            rows="1"
-            onfocus={selectAll}
-            onblur={commitTextDraft}
-            onkeydown={handleTextDraftKeydown}
-          ></textarea>
-          <button class="style-btn text-accept-btn" onclick={commitTextDraft}>OK</button>
+          {#if shownKind}
+            <textarea class="text-input" value={shownWords} rows="1" disabled aria-label="Shown text"></textarea>
+          {:else}
+            <textarea
+              class="text-input"
+              bind:value={textDraft}
+              rows="1"
+              onfocus={selectAll}
+              onblur={commitTextDraft}
+              onkeydown={handleTextDraftKeydown}
+            ></textarea>
+            <button class="style-btn text-accept-btn" onclick={commitTextDraft}>OK</button>
+          {/if}
         </div>
       </PropertyCell>
       {#if !dock && String(core?.controlType ?? '') === 'Label'}
@@ -1967,6 +2044,31 @@
     .style-row {
       display: flex;
       gap: 4px;
+    }
+
+    .shows-row {
+      width: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 6px;
+    }
+
+    .attached-row {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .attached-name {
+      font-size: 12px;
+      color: var(--pp-field-fg, #DDD);
+    }
+
+    .attached-note {
+      flex: 1;
+      font-size: 11px;
+      color: #8b96a3;
     }
 
     .text-edit-row {

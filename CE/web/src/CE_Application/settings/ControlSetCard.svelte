@@ -10,8 +10,10 @@
   import EffectPreview from '../components/effects/EffectPreview.svelte';
   import { createControl } from '../models/componentTypes.js';
   import { resolveControlForSet } from '../models/controlSetFamilies.js';
-  import { resolveToken } from '../models/controlSets.js';
+  import { isIllustratedControlSet, resolveToken } from '../models/controlSets.js';
   import { aarrggbbToHex } from '../utils/colourHex.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { drawnWithSetComponent } from '../utils/setLibraryComponents.js';
 
   let { set = null, family = 'Knob', active = false, onPanel = false, onselect = () => {} } = $props();
 
@@ -21,6 +23,7 @@
     Knob: [84, 84], Slider: [170, 56], Button: [116, 76], ToggleButton: [124, 76], Meter: [240, 72], DrumPads: [228, 206],
   };
 
+  let illustrated = $derived(isIllustratedControlSet(set));
   let element = $state(null);
   let seen = $state(false);
   let observer = null;
@@ -40,7 +43,11 @@
     try {
       const [width, height] = DRAWN[family] ?? DRAWN.Knob;
       const control = createControl(DRAWN[family] ? family : 'Knob', { Core: { controlSetId: set.id }, Transform: { x: 0, y: 0, width, height } });
-      return resolveControlForSet(control, set);
+      // A family the set names a library component for shows the component, as applying it would,
+      // its colour roles resolved for this set: the card draws outside any panel.
+      const resolved = resolveControlForSet(control, set);
+      const drawn = drawnWithSetComponent(resolved, set, $customComponentLibrary);
+      return drawn === resolved ? resolved : resolveControlForSet(drawn, set);
     } catch {
       return null;
     }
@@ -55,6 +62,8 @@
   </span>
   <b>{set?.name ?? ''}</b>
   {#if onPanel}<i>In use</i>{/if}
+  <!-- Iris and Satellite (or a copy) work unlike the other sets: models/controlSets.js ILLUSTRATED_CONTROL_SET_IDS. -->
+  {#if illustrated}<em class="illustration" title="Drawn as whole illustrations: the shapes cannot be edited part by part">Illustration</em>{/if}
 </button>
 
 <style>
@@ -74,5 +83,9 @@
   i {
     position: absolute; top: 4px; right: 4px; font-style: normal; font-size: 8.5px; color: #8fd1a6;
     border: 1px solid #3c5a46; border-radius: 8px; padding: 0 4px; background: #11221a;
+  }
+  .illustration {
+    position: absolute; top: 4px; left: 4px; font-style: normal; font-size: 8.5px; font-weight: 600; letter-spacing: .02em;
+    color: #E6C27A; border: 1px solid #6B5A33; background: rgba(0, 0, 0, 0.45); border-radius: 8px; padding: 0 5px;
   }
 </style>

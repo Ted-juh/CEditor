@@ -73,6 +73,7 @@
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
   import { storedFonts, storedIcons, fontRuntimeStatus, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { documentIcons, resolveIcon } from '../utils/documentIcons.js';
+  import { iconImageStyle, iconPlacement } from './iconLook.js';
   import { nativeFontPreviews, requestNativeFontPreview } from '../stores/nativeFontPreviews.js';
   import { get } from 'svelte/store';
   import { onDestroy } from 'svelte';
@@ -83,12 +84,14 @@
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances, snapMovingRect, snapResizeRect } from '../utils/canvasSnapping.js';
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
+  import { attachedFollowers, textShownOwners, withAttached } from '../utils/attachedLabels.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
+  import { authoredShownText } from '../utils/labelText.js';
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
@@ -725,13 +728,14 @@
     if (hadGesture) {
       if (isDragging) {
         containerDropTargetId.set(null);
-        multiDragDelta.set({ x: 0, y: 0, active: false });
+        multiDragDelta.set({ x: 0, y: 0, active: false, followers: null });
       }
       clearActivePanelSnapGuides();
     }
     isDragging = false;
     dragEngaged = false;
     dragSpaceHeld = false;
+    dragFollowers = null;
     isResizing = false;
     isRotating = false;
     transientX = null;
@@ -754,9 +758,11 @@
   // go did not put it back.
   let carriedByAncestor = $derived(isSelected && hasSelectedAncestor(parentChainIds, $selectedComponentIds));
 
-  // During multi-drag, non-dragged selected components offset by the shared delta
-  let multiDragOffsetX = $derived(!isDragging && isSelected && !carriedByAncestor && $multiDragDelta.active ? $multiDragDelta.x : 0);
-  let multiDragOffsetY = $derived(!isDragging && isSelected && !carriedByAncestor && $multiDragDelta.active ? $multiDragDelta.y : 0);
+  // During multi-drag, non-dragged selected components offset by the shared delta, and so do the
+  // Labels attached to what is dragged (utils/attachedLabels.js), selected or not.
+  let followsDrag = $derived($multiDragDelta.active && !!$multiDragDelta.followers?.has(core?.id));
+  let multiDragOffsetX = $derived(!isDragging && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active ? $multiDragDelta.x : 0);
+  let multiDragOffsetY = $derived(!isDragging && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active ? $multiDragDelta.y : 0);
   // ...and when the pointer has hold of the carried child itself, its own transient position is
   // the same double from the other end: the ancestor is already moving it. Falling back to the
   // stored Transform lets the container's translation be the only thing that moves it on screen,
@@ -1109,6 +1115,7 @@
     // The document and the selection are fixed for the length of the gesture, so the drop targets
     // are worked out here rather than on every move. Cleared in handleDragEnd.
     dropCandidates = buildDropCandidates();
+    dragFollowers = null;
     dragStartMouse = { x: e.clientX, y: e.clientY };
     dragStartPos = { x: transform?.x ?? 0, y: transform?.y ?? 0 };
     transientX = dragStartPos.x;
@@ -1334,6 +1341,9 @@
 
   // Held for the length of one gesture; null whenever no gesture is in flight.
   let dropCandidates = null;
+  // The Labels attached to what this drag moves and that are not selected (utils/attachedLabels.js):
+  // null until the gesture's first move, then fixed for its length.
+  let dragFollowers = null;
 
   function dropCandidateAt(panelX, panelY) {
     const candidates = dropCandidates ?? buildDropCandidates();
@@ -1385,10 +1395,14 @@
     transientY = Math.round(align.y);
     publishMeasurements(align, $showDistances ? distancesFor(transientX, transientY, displayW, displayH) : []);
 
-    // Broadcast delta for other selected components to follow
+    // Broadcast delta for other selected components to follow, and for the Labels attached to what
+    // moves (worked out once a gesture, at its first move).
     const ids = get(selectedComponentIds);
-    if (ids.size > 1) {
-      multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true });
+    if (dragFollowers === null) {
+      dragFollowers = attachedFollowers(panelControls, ids.size > 1 && ids.has(core?.id) ? ids : [core?.id]);
+    }
+    if (ids.size > 1 || dragFollowers.size) {
+      multiDragDelta.set({ x: transientX - dragStartPos.x, y: transientY - dragStartPos.y, active: true, followers: dragFollowers });
     }
 
     // Highlight the container under the pointer as the drop target
@@ -1441,8 +1455,9 @@
 
     if (moved && targetParentId !== currentParentId) {
       // Structural move: reparent the selection roots into the target container
-      // (or to top level when null), converting positions so nothing visually jumps.
-      const roots = isMultiDrag ? selectionRoots(panelControls, ids) : [core?.id];
+      // (or to top level when null), converting positions so nothing visually jumps. The Labels
+      // attached to them go along (utils/attachedLabels.js).
+      const roots = [...(isMultiDrag ? selectionRoots(panelControls, ids) : [core?.id]), ...(dragFollowers ?? [])];
       const entries = [];
       for (const rootId of roots) {
         if (rootId == null) continue;
@@ -1486,8 +1501,17 @@
       }
     }
 
+    // Alt+click, not a drag: the control together with the Labels attached to it, or a Label together
+    // with its control and that control's other Labels (utils/attachedLabels.js).
+    if (!moved && e?.altKey === true && !e.ctrlKey && !e.metaKey && !e.shiftKey && core?.id) {
+      const owner = core.attachedTo && findControlById(panelControls, core.attachedTo) ? core.attachedTo : core.id;
+      const group = withAttached(panelControls, [owner]);
+      if (group.size > 1) selectedComponentIds.set(group);
+    }
+
     // Clear multi-drag delta
-    multiDragDelta.set({ x: 0, y: 0, active: false });
+    multiDragDelta.set({ x: 0, y: 0, active: false, followers: null });
+    dragFollowers = null;
 
     // One gesture = one undo step, committed at the boundary instead of
     // letting the 400ms debounce merge it with whatever comes next.
@@ -2151,7 +2175,12 @@
   let lastTextSet = null;
   let textSet = $derived(lastTextSet = resolveTextSettings(textFont, textPosition, textMultiline, lastTextSet));
   let textFillMode = $derived(normalizeFillMode(textFill?.mode));
+  // A Label of its own shows this control's text (a button's caption, utils/attachedLabels.js): the
+  // control prints none, on its face or beside its key, so a set that draws it the other way never
+  // doubles or loses it.
+  let captionShownByLabel = $derived(String(core?.controlType ?? '') !== 'Label' && textShownOwners(panelControls).has(core?.id));
   let rawTextContent = $derived.by(() => {
+    if (captionShownByLabel) return '';
     const isSelectorFace = buttonType === 'cyclic' || buttonType === 'combobox';
     if (isSelectorFace && interactionRuntime?.signals?.valueDisplay !== undefined) {
       return String(interactionRuntime.signals.valueDisplay ?? '');
@@ -2163,6 +2192,14 @@
     // uses, so the two cannot say different things.
     if (isSelectorFace) {
       return String(resolveInteractionContext(renderControl, appliedPreviewSession).valueDisplay ?? '');
+    }
+
+    // A Label that shows something of a control (utils/labelShows.js): on the editor's canvas its
+    // words come from the control as it is authored; in Preview, the player and the plug-in the
+    // surface has already written the live words into its text (applyLabelShowsSource).
+    if (editorInteractionEnabled !== false && text?.shows) {
+      const shown = authoredShownText(renderControl, panelControls);
+      if (shown !== null) return shown;
     }
 
     return String(text?.content ?? '');
@@ -3128,73 +3165,20 @@
   });
   let hasIcon = $derived(!hasAnatomy && !isRadioGroupControl && !!resolvedStoredIcon?.dataUrl && icon?.source !== 'none' && contentLayoutMode !== 'text_only');
   let iconIsTinted = $derived(usesIconTint(icon?.tint));
-  let iconEffects = $derived(icon?._children?.Effects ?? null);
-  let iconSizeValue = $derived(Math.max(4, Number(icon?.size ?? 16)));
+  // Where the icon sits and how it is drawn: editor/iconLook.js, which a component's icon layer
+  // draws with too.
   let iconContainerStyle = $derived.by(() => {
     if (!hasIcon) return '';
-
-    const horizontalAlign = String(contentLayout?.horizontalAlign ?? 'center');
-    const verticalAlign = String(contentLayout?.verticalAlign ?? 'center');
-    const contentLeft = contentBox.paddingLeft;
-    const contentRight = Math.max(contentLeft, displayW - contentBox.paddingRight);
-    const contentTop = contentBox.paddingTop;
-    const contentBottom = Math.max(contentTop, displayH - contentBox.paddingBottom);
-
-    const alignAxis = (min, max, size, align, startValue, endValue) => {
-      if (align === startValue) return min + (size / 2);
-      if (align === endValue) return max - (size / 2);
-      return (min + max) / 2;
-    };
-
-    let centerX = alignAxis(contentLeft, contentRight, iconSizeValue, horizontalAlign, 'left', 'right');
-    let centerY = alignAxis(contentTop, contentBottom, iconSizeValue, verticalAlign, 'top', 'bottom');
-
-    if (contentLayoutMode === 'icon_left_text_right') {
-      centerX = contentLeft + (iconSizeValue / 2);
-    } else if (contentLayoutMode === 'text_left_icon_right') {
-      centerX = contentRight - (iconSizeValue / 2);
-    } else if (contentLayoutMode === 'icon_above_text_below') {
-      centerY = contentTop + (iconSizeValue / 2);
-    } else if (contentLayoutMode === 'text_above_icon_below') {
-      centerY = contentBottom - (iconSizeValue / 2);
-    }
-
-    centerX += numberOr(contentLayout?.iconOffsetX, 0);
-    centerY += numberOr(contentLayout?.iconOffsetY, 0);
-
+    const box = iconPlacement(contentLayout, contentBox, contentLayoutMode, icon, displayW, displayH);
     return [
-      `left:${centerX - (iconSizeValue / 2)}px`,
-      `top:${centerY - (iconSizeValue / 2)}px`,
-      `width:${iconSizeValue}px`,
-      `height:${iconSizeValue}px`,
-      `z-index:${numberOr(contentLayout?.iconZIndex, 1)}`,
+      `left:${box.left}px`,
+      `top:${box.top}px`,
+      `width:${box.size}px`,
+      `height:${box.size}px`,
+      `z-index:${box.zIndex}`,
     ].join('; ');
   });
-  let iconStyle = $derived.by(() => {
-    const fit = icon?.fit === 'cover' ? 'cover' : 'contain';
-    const transforms = [];
-    if (icon?.flipH === true) transforms.push('scaleX(-1)');
-    if (icon?.flipV === true) transforms.push('scaleY(-1)');
-    if (Math.abs(numberOr(icon?.rotation, 0)) > 0.001) transforms.push(`rotate(${numberOr(icon?.rotation, 0)}deg)`);
-    const filters = [];
-    if (iconEffects?.shadowEnabled === true) {
-      filters.push(`drop-shadow(${numberOr(iconEffects?.shadowOffsetX, 0)}px ${numberOr(iconEffects?.shadowOffsetY, 2)}px ${Math.max(0, numberOr(iconEffects?.shadowBlur, 4))}px ${cssColor(iconEffects?.shadowColour ?? '66000000')})`);
-    }
-    if (iconEffects?.glowEnabled === true) {
-      filters.push(`drop-shadow(0 0 ${Math.max(0, numberOr(iconEffects?.glowSize, 4))}px ${cssColor(iconEffects?.glowColour ?? '66FFFFFF')})`);
-    }
-    if (iconEffects?.blurEnabled === true && numberOr(iconEffects?.blurAmount, 0) > 0) {
-      filters.push(`blur(${numberOr(iconEffects?.blurAmount, 0)}px)`);
-    }
-    return [
-      'width:100%',
-      'height:100%',
-      `object-fit:${fit}`,
-      `opacity:${Math.max(0, Math.min(1, numberOr(icon?.opacity, 1)))}`,
-      transforms.length ? `transform:${transforms.join(' ')}` : '',
-      filters.length ? `filter:${filters.join(' ')}` : '',
-    ].join('; ');
-  });
+  let iconStyle = $derived(iconImageStyle(icon));
   let iconTintStyle = $derived(buildIconTintStyle(
     icon?.tint,
     resolvedStoredIcon?.dataUrl,
@@ -3281,7 +3265,7 @@
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
-      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} />
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />

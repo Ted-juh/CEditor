@@ -4,12 +4,14 @@
 // edited and its colours were five fields. The owner decided that forms become parts
 // (docs/design/changeable-control-sets.md, piece B): each form here is a family patch of the
 // meter's parts (models/meterDeviceParts.js), so every shape, colour and motion of it is a
-// property, and the form frame still places it, readout and all.
+// property, and the form frame still places it. Its reading is a Label of its own.
 //
 // The colours are the form's five, as set colour roles: face {surface}, housing {control.track},
 // legends {text.primary}, indicator {accent}, and the ink, which the set works out against its
 // surface (models/controlSetCoverage.js inkOn) and passes in. The boxes are the drawings' own, in
 // the 160 by 100 frame, as percentages of it.
+
+import { directionDeviceParts } from './directionDeviceParts.js';
 
 export const METER_FORMS_AS_PARTS = ['bar', 'ruler', 'ticket', 'capsule', 'column', 'counter', 'vu', 'blocks', 'dial', 'radio', 'semaphore', 'dots'];
 
@@ -153,10 +155,15 @@ export function meterFormsAsParts(type) {
  * scale, as Core › Control design's Divisions gave them; `face` the set's surface as a colour, for
  * a sheen that runs through it.
  */
-export function meterFormFamily(type, form, { ink = 'FF20282C', divisions = 12, face = '' } = {}) {
+export function meterFormFamily(type, form, { ink = 'FF20282C', divisions = 12, face = '', housing = '' } = {}) {
   if (!meterFormsAsParts(type).length) return null;
   const recipe = METERS[String(form ?? '')];
-  if (!recipe) return null;
-  // The readout in the legend colour, as the forms set it.
+  if (!recipe) {
+    // A synth set's meter (models/directionDeviceParts.js).
+    const parts = directionDeviceParts(type, form, { ink, ...(face ? { face } : {}), ...(housing ? { housing } : {}) });
+    // Its text monospaced, as the synth sets lettered it.
+    return parts ? { component: { 'Text.Fill.colour': ROLES.legend, 'Text.Font.family': 'JetBrains Mono' }, parts } : null;
+  }
+  // Its text in the legend colour, as the forms set it.
   return { component: { 'Text.Fill.colour': ROLES.legend }, parts: recipe({ ink, face, divisions: Math.max(4, Math.min(48, Math.round(Number(divisions) || 12))) }) };
 }

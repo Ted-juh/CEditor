@@ -78,7 +78,7 @@
   import { applySectionValues } from '../utils/sectionValueOverrides.js';
   import { recallRowSlot } from '../stores/presetChoiceSync.js';
   import { visibleChoiceRows, dependsOnId, dependentControl, sortDependentControls } from '../utils/dependentChoices.js';
-  import { meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
+  import { decibelFraction, decibelPosition, meterPosition, meterPeak, meterZoneIndexAt } from '../utils/meterLayout.js';
   import { meterNeedsPeak } from '../models/meterDeviceParts.js';
   import {
     envelopeConfig, envelopePoints, envelopeGeometry, envHitNode, envFromPx,
@@ -245,6 +245,9 @@
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
+  import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
+  import { labelShows, labelSourceId } from '../utils/labelShows.js';
+  import { shownText } from '../utils/labelText.js';
   import {
     createMomentaryButtonPreviewController,
     isPressToTalkBehavior,
@@ -284,6 +287,7 @@
   import {
     formatSliderReadout,
     getSliderActiveHandle,
+    getSliderGeometry,
     getSliderStep,
     getSliderLegalRangeForHandle,
     getSliderResolvedValues,
@@ -294,11 +298,10 @@
   } from '../utils/sliderBehavior.js';
   import {
     resolveCircularPoint,
-    resolveCircularTrackMetrics,
     resolveLinearPointerPoint,
     resolveSliderNormalizedFromPoint,
-    sliderValueToAngle,
-  } from '../utils/sliderGeometry.js';
+    sliderValueToAngle } from '../utils/sliderGeometry.js';
+  import { knobHandleSize, knobTrackOf } from '../utils/knobTrack.js';
   import {
     getCustomHitZones,
     getCustomValueChannels,
@@ -309,8 +312,11 @@
     behaviorTakesInput,
     channelForBehaviorInput,
     resolveCustomInteractionPatch,
+    customButtonActPatch,
+    sourcedCustomValues,
     seedCustomValues,
     snapCustomChannelValue,
+    stepCustomChannelValue,
   } from '../utils/customComponentInteraction.js';
   import {
     firstSliderControlZone, hasSliderControlParts, sliderControlBlurPatch, sliderControlFocusZonePatch,
@@ -540,6 +546,31 @@
     patchSession: (controlId, patch) => patchControlSession(controlId, patch),
   });
   const oneShotTimers = new Map();
+  // A component's button that fires other than as it is pressed (Interact card › Fires and
+  // Afterwards: after a hold, on a double click, again and again while held, once only). Its value
+  // goes through the press path; while it is spent, a component with no other behaviour is disabled,
+  // as the panel's one-shot button is.
+  const customButtonFiring = createButtonFiring({
+    act: ({ controlId, zone }, what) => {
+      const control = controlById(controlId);
+      if (control) patchControlSession(controlId, customButtonActPatch(control, sessionFor(control), zone, what));
+    },
+    flags: ({ controlId, sole }, flags) => {
+      const { disabled, ...rest } = flags;
+      const patch = sole && disabled !== undefined ? { ...rest, disabled } : rest;
+      if (Object.keys(patch).length) patchControlSession(controlId, patch);
+    },
+  });
+  // The firing of the behaviour a grab area drives, its key, and what `act` needs; null for a button
+  // that fires as it always has.
+  function customFiringFor(control, hitZoneEntry) {
+    const behaviors = getCustomBehaviors(control) ?? {};
+    const behaviorName = hitZoneEntry?.zone?.targetBehavior ?? '';
+    const config = buttonFiring(behaviors[behaviorName]);
+    if (!config) return null;
+    const controlId = getControlId(control);
+    return { config, key: `${controlId}::${behaviorName}`, context: { controlId, zone: hitZoneEntry, sole: Object.keys(behaviors).length === 1 } };
+  }
   let scrollDrag = null;
 
   function setScrollOffset(control, offset) {
@@ -686,7 +717,15 @@
     // The keyframe pose rides in with the session: this surface resolves the control itself and
     // hands CanvasControl the result, so the overlay has to be applied here, not there.
     const keyframeOverlay = keyframeOverlayView.values.get(getControlId(rawControl)) ?? null;
-    const previewOverrides = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
+    const posed = keyframeOverlay ? { ...(baseOverrides ?? {}), keyframeOverlay } : baseOverrides;
+    // A component's value that takes it from a panel control (`valueSource`, a meter made into
+    // layers that showed another control's value), read as the meter read its Value Source, before
+    // its peak is held from it.
+    const keyed = isCustomComponent(rawControl) ? withSourcedValues(rawControl, posed) : posed;
+    // A component's held peaks (a meter made into layers: its clip lamp, a peak needle), kept as
+    // a meter's are, below; the bindings read them as `channel.<name>.peak`.
+    const customPeaks = componentPeaks(rawControl, keyed);
+    const previewOverrides = customPeaks ? { ...(keyed ?? {}), customPeaks } : keyed;
     // Host automation of a field on the component's OWN section (an Arp's rate, a joystick's x)
     // lands here first, so every apply*ValueSource below and the renderer itself read the section
     // as they always do. It has to happen before the chain rather than inside it: several of those
@@ -701,7 +740,25 @@
     // objects (interactionRuntime.js, reshareUnchanged), not a copy each for as long as it is drawn;
     // the value sources below copy what they change.
     const resolved = applyKeyboardValueSource(control, resolveInteractiveControl(control, previewOverrides, { shareUnchanged: true }));
-    return applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved))))))))))))))))))))))))))))));
+    return applyLabelShowsSource(control, applySetlistValueSource(control, applyHarmoniserValueSource(control, applyRecorderValueSource(control, applyPhraseValueSource(control, applySplitZoneValueSource(control, applyTransportValueSource(control, applyPanicValueSource(control, applyDrumPadsValueSource(control, applyNoteRibbonValueSource(control, applyStepSequencerValueSource(control, applyArpValueSource(control, applyChordPadValueSource(control, applyConstraintValueSource(control, applyConstellationValueSource(control, applyKineticValueSource(control, applyTuringValueSource(control, applyTimbreValueSource(control, applyRouterValueSource(control, applyLooperValueSource(control, applyOrbitValueSource(control, applyMacroValueSource(control, applyRibbonValueSource(control, applyNumpadValueSource(control, applyCrossfaderValueSource(control, applyJoystickValueSource(control, applyMatrixValueSource(control, applyEnvelopeValueSource(control, applyMeterValueSource(control, applyPixelValueSource(control, applyLcdValueSource(control, resolved)))))))))))))))))))))))))))))));
+  }
+
+  // A Label that shows something of a control (utils/labelShows.js): its words, from that control's
+  // live value as this surface resolves it, written into its text before it is drawn.
+  function applyLabelShowsSource(control, resolved) {
+    const shows = labelShows(control);
+    if (!shows) return resolved;
+    const base = resolved?.control ?? control;
+    const text = base?._children?.Text;
+    if (!text) return resolved;
+    const source = controlById(labelSourceId(control));
+    // The control it shows is not on the panel: its own words, as on the canvas.
+    if (!source) return resolved;
+    // The source as this surface draws it (a meter's live reading); a Label that itself shows
+    // something is read as it stands, so two Labels showing each other cannot go round for ever.
+    const live = !labelShows(source) ? (resolvedPreviewFor(source)?.control ?? source) : source;
+    const content = shownText(live, shows, sessionFor(source));
+    return { ...resolved, control: { ...base, _children: { ...base._children, Text: { ...text, content } } } };
   }
 
   function applyDeviceSyncStatus(control) {
@@ -1726,12 +1783,54 @@
     meterTickerRunning = true;
     const loop = () => {
       const anyPeak = flatControls(orderedControls ?? []).some((c) =>
-        isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true);
+        (isMeterFamily(c?._children?.Core?.controlType) && c?._children?.Meter?.peakHold === true) || peakChannels(c).length > 0);
       if (!anyPeak) { meterTickerRunning = false; return; } // self-stop when none remain
       if (hostShown) meterClock = Date.now();   // the peak decays by the time, seen or not
       meterAnimationFrame = requestAnimationFrame(loop);
     };
     meterAnimationFrame = requestAnimationFrame(loop);
+  }
+
+  function withSourcedValues(control, session) {
+    const values = session?.customValues ?? {};
+    const sourced = sourcedCustomValues(control, values, lcdRangeForSource);
+    return sourced === values ? session : { ...(session ?? {}), customValues: sourced };
+  }
+
+  // A component's channels that hold their peak (`peakHold`: a meter made into layers).
+  function peakChannels(control) {
+    if (String(control?._children?.Core?.controlType ?? '') !== 'CustomComponent') return [];
+    return Object.entries(getCustomValueChannels(control) ?? {}).filter(([, channel]) => channel?.peakHold);
+  }
+
+  // Each such channel's held peak, 0 to 1, as a meter's peak is kept (meterPeak: held for its hold
+  // time, then falling at its rate), from the channel's value as the session has it; null for a
+  // component with none.
+  function componentPeaks(control, session) {
+    const channels = peakChannels(control);
+    if (!channels.length) return null;
+    ensureMeterTicker();
+    void meterClock; // re-evaluate as the peaks fall
+    const id = getControlId(control);
+    const now = Date.now();
+    const peaks = {};
+    for (const [name, channel] of channels) {
+      const raw = session?.customValues?.[name] ?? channel.currentValue ?? channel.defaultValue;
+      // A meter on a decibel scale holds its peak, and lets it fall, on that scale (`peakHold.scale`);
+      // the peak is handed on as a fraction again, so a binding reads it as it reads the value.
+      const db = channel.peakHold.scale === 'db';
+      const fraction = normalizeCustomChannelValue(channel, raw);
+      const pos = db ? decibelPosition(fraction, channel.peakHold.dbFloor, channel.peakHold.dbCeil) : fraction;
+      const key = `${id}:${name}`;
+      const prev = meterPeakState[key] ?? { peak: pos, peakAt: now };
+      const next = meterPeak({
+        prevPeak: prev.peak, prevPeakAt: prev.peakAt, prevUpdatedAt: prev.updatedAt, pos, now,
+        holdMs: numberOr(channel.peakHold.holdMs, 1200), decayPerSec: numberOr(channel.peakHold.decayPerSec, 0.4),
+      });
+      meterPeakState[key] = { ...next, updatedAt: now };
+      peaks[name] = db ? decibelFraction(next.peak, channel.peakHold.dbFloor, channel.peakHold.dbCeil) : next.peak;
+    }
+    return peaks;
   }
 
   // Inject the meter's live value + peak-hold onto the resolved Meter section:
@@ -6804,83 +6903,33 @@
       : (getSliderValueMode(behavior) === 'band' ? ['start', 'current', 'end'] : ['current']);
   }
 
-  function sliderPreviewScale(control, rect = null) {
-    if (!rect) return 1;
-    const transform = control?._children?.Transform ?? null;
-    const widthScale = rect.width / Math.max(1, numberOr(transform?.width, rect.width));
-    const heightScale = rect.height / Math.max(1, numberOr(transform?.height, rect.height));
-    return Math.max(0.01, Math.min(widthScale || 1, heightScale || 1));
+  // A knob or slider as it is drawn: the control with its set applied (resolvedPreviewFor), the box
+  // the renderer draws it in (its own size; the preview scales that to the screen), and the sizes
+  // and circle it is drawn with (utils/knobTrack.js, which SliderFamilyRenderer asks too).
+  function sliderDrawnGeometry(control, rect) {
+    const drawn = resolvedPreviewFor(control)?.control ?? control;
+    const transform = drawn?._children?.Transform ?? control?._children?.Transform ?? null;
+    const width = Math.max(1, numberOr(transform?.width, rect.width));
+    const height = Math.max(1, numberOr(transform?.height, rect.height));
+    return { drawn, width, height, sx: rect.width / width, sy: rect.height / height, track: knobTrackOf(drawn, width, height) };
   }
 
-  function sliderPartsFor(control) {
-    return control?._children?.Parts?._children ?? {};
-  }
-
-  function sliderTrackThickness(control) {
-    const trackLayout = sliderPartsFor(control)?.bodyTrackBase?._children?.Layout ?? null;
-    return Math.max(4, numberOr(trackLayout?.height, 10));
-  }
-
-  function sliderMajorTickLength(control) {
-    const behavior = getBehavior(control);
-    const tickLayout = sliderPartsFor(control)?.tickMajor?._children?.Layout ?? null;
-    return Math.max(0, numberOr(tickLayout?.height, numberOr(behavior?.majorTickLength, 12)));
-  }
-
-  function sliderPointerSize(control, role = 'current') {
-    const partName = role === 'start'
-      ? 'pointerStart'
-      : role === 'end'
-        ? 'pointerEnd'
-        : 'pointerCurrent';
-    const fallback = role === 'current' ? 20 : 18;
-    const pointerLayout = sliderPartsFor(control)?.[partName]?._children?.Layout ?? null;
-    return Math.max(8, numberOr(pointerLayout?.width, numberOr(pointerLayout?.height, fallback)));
-  }
-
-  function sliderHandlePoint(control, role = 'current', rect = null) {
+  // Where a handle is drawn, on the screen relative to the control's box.
+  function sliderHandlePoint(control, role = 'current', rect = null, drawnGeometry = null) {
     if (!rect) return null;
-
-    const behavior = getBehavior(control);
-    const scaleFactor = sliderPreviewScale(control, rect);
-    const trackThickness = sliderTrackThickness(control) * scaleFactor;
-    const pointerSize = sliderPointerSize(control, role) * scaleFactor;
-    const showReadout = behavior?.showValueReadout !== false;
-    const min = getRangeMin(behavior);
-    const max = getRangeMax(behavior);
-    const span = max - min;
-    const normalized = span > 0
-      ? Math.max(0, Math.min(1, (currentSliderRoleValue(control, role) - min) / span))
-      : 0;
-
-    if (String(behavior?.geometry ?? 'linear').trim().toLowerCase() === 'circular') {
-      const maxPointerSize = Math.max(...sliderHandleRoles(control).map((handleRole) => sliderPointerSize(control, handleRole))) * scaleFactor;
-      const metrics = resolveCircularTrackMetrics(rect.width, rect.height, {
-        trackThickness,
-        pointerSize: maxPointerSize,
-        majorTickLength: sliderMajorTickLength(control) * scaleFactor,
-        hasTicks: behavior?.showTicks !== false,
-        hasReadout: showReadout,
-        circularDiameter: numberOr(behavior?.circularDiameter, 0) * scaleFactor,
-      });
-      return resolveCircularPoint(
-        rect.width,
-        rect.height,
-        sliderValueToAngle(behavior, currentSliderRoleValue(control, role)),
-        metrics.radius,
-        { x: metrics.centerX, y: metrics.centerY },
-      );
+    const { drawn, width, height, sx, sy, track } = drawnGeometry ?? sliderDrawnGeometry(control, rect);
+    const behavior = drawn?._children?.Behavior ?? getBehavior(control);
+    const value = currentSliderRoleValue(control, role);
+    let point;
+    if (getSliderGeometry(behavior) === 'circular') {
+      point = resolveCircularPoint(width, height, sliderValueToAngle(behavior, value), track.radius, { x: track.centerX, y: track.centerY });
+    } else {
+      const min = getRangeMin(behavior);
+      const span = getRangeMax(behavior) - min;
+      const normalized = span > 0 ? Math.max(0, Math.min(1, (value - min) / span)) : 0;
+      point = resolveLinearPointerPoint(behavior, width, height, normalized, track.trackThickness, knobHandleSize(track, role));
     }
-
-    return resolveLinearPointerPoint(
-      behavior,
-      rect.width,
-      rect.height,
-      normalized,
-      trackThickness,
-      pointerSize,
-      showReadout,
-    );
+    return { x: point.x * sx, y: point.y * sy };
   }
 
   function sliderValueForPoint(control, event) {
@@ -6918,17 +6967,18 @@
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return '';
 
-    const scaleFactor = sliderPreviewScale(control, rect);
+    const drawnGeometry = sliderDrawnGeometry(control, rect);
+    const scaleFactor = Math.min(drawnGeometry.sx, drawnGeometry.sy);
     const localX = event.clientX - rect.left;
     const localY = event.clientY - rect.top;
     let nearestRole = '';
     let nearestDistance = Number.POSITIVE_INFINITY;
 
     for (const role of sliderHandleRoles(control)) {
-      const point = sliderHandlePoint(control, role, rect);
+      const point = sliderHandlePoint(control, role, rect, drawnGeometry);
       if (!point) continue;
 
-      const hitRadius = Math.max((sliderPointerSize(control, role) * scaleFactor) / 2, 12);
+      const hitRadius = Math.max((knobHandleSize(drawnGeometry.track, role) * scaleFactor) / 2, 12);
       const distance = Math.hypot(localX - point.x, localY - point.y);
       if (distance > hitRadius || distance >= nearestDistance) continue;
       nearestDistance = distance;
@@ -7363,6 +7413,7 @@
       dragState: pointerCustomDragState,
       fine: event?.shiftKey === true,
       coarse: event?.ctrlKey === true || event?.metaKey === true,
+      release: event?.release === true,
     });
     if (!controlId || !Object.keys(patch).length) return;
     patchControlSession(controlId, {
@@ -7403,7 +7454,7 @@
     if (!channel) return;
     const currentValues = customSessionValues(control);
     const currentValue = currentValues?.[channelName] ?? channel?.defaultValue ?? 0;
-    const nextValue = snapCustomChannelValue(channel, numberOr(currentValue, 0) + (direction * numberOr(channel?.step, 0.01)));
+    const nextValue = stepCustomChannelValue(channel, numberOr(currentValue, 0), direction);
     patchControlSession(getControlId(control), {
       customValues: {
         ...currentValues,
@@ -7443,19 +7494,34 @@
     });
   }
 
-  function patchCustomKeyboardActivation(control, event) {
+  // Enter and Space act at the key-up, as a button does; a momentary zone is on from the key-down
+  // and off again at the key-up.
+  function patchCustomKeyboardActivation(control, event, phase = 'up') {
     const resolvedPreview = resolvedPreviewFor(control);
     const hitZoneEntry = defaultCustomActivationHitZone(resolvedPreview?.control ?? control)
       ?? defaultCustomActivationHitZone(control);
+    const momentary = String(hitZoneEntry?.zone?.action ?? '').trim().toLowerCase() === 'momentaryvalue';
     // Keyboard off on the behaviour Enter and Space would press.
     const behavior = getCustomBehaviors(control)?.[hitZoneEntry?.zone?.targetBehavior] ?? customMainBehaviorModule(control);
     if (!behaviorTakesInput(behavior, 'keyboard')) return;
+    // A button that fires after a hold, on clicks, again and again or once only: the key down is
+    // its press and the key up its release, as a pointer's are (a key held repeats no press).
+    const firing = customFiringFor(control, hitZoneEntry);
+    if (firing) {
+      if (phase === 'down' && event?.repeat === true) return;
+      patchControlSession(getControlId(control), { focused: true, hover: true, pressed: phase === 'down', dragging: false, inputModality: 'keyboard' });
+      if (phase === 'down') customButtonFiring.press(firing.key, firing.config, firing.context);
+      else customButtonFiring.release(firing.key, firing.config, { inside: true });
+      return;
+    }
+    if (phase === 'down' && !momentary) return;
     const rect = event?.currentTarget?.getBoundingClientRect?.();
     patchCustomInteraction(control, hitZoneEntry, {
       ...event,
       currentTarget: event?.currentTarget,
       clientX: rect ? rect.left + rect.width / 2 : undefined,
       clientY: rect ? rect.top + rect.height / 2 : undefined,
+      release: momentary && phase === 'up',
     }, {
       focused: true,
       hover: true,
@@ -8036,6 +8102,7 @@
     stopListboxMomentum();
     timedButtonPreview.destroy();
     momentaryButtonPreview.destroy();
+    customButtonFiring.destroy();
     for (const timer of oneShotTimers.values()) clearTimeout(timer);
     oneShotTimers.clear();
   });
@@ -8057,6 +8124,7 @@
     }
     timedButtonPreview.syncKeys(activeControlIds);
     momentaryButtonPreview.syncKeys(activeControlIds);
+    customButtonFiring.syncKeys((key) => controlsById.has(key.split('::')[0]));
     for (const [id, timer] of oneShotTimers) {
       if (!controlsById.has(id)) { clearTimeout(timer); oneShotTimers.delete(id); }
     }
@@ -8563,7 +8631,21 @@
         : {};
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
-      if (isDragAction) {
+      const firing = isDragAction ? null : customFiringFor(control, pointerCustomHitZone);
+      if (firing) {
+        // A button that fires after a hold, on clicks, again and again or once only: the press is
+        // the firing's to time (customButtonFiring.js), and the release below ends it.
+        patchControlSession(pointerActiveControlId, {
+          hover: true,
+          pressed: true,
+          focused: false,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+          ...knobFocus,
+        });
+        customButtonFiring.press(firing.key, firing.config, firing.context);
+      } else if (isDragAction) {
         patchCustomInteraction(control, pointerCustomHitZone, event, {
           hover: true,
           pressed: false,
@@ -8574,6 +8656,17 @@
         // A panel knob's press is one patch, value included (setSliderRoleValue); the press above
         // already is that for a knob part, and a second at the same point would send it twice.
         if (!sliderControlForZone(control, pointerCustomHitZone?.zone)) updateCustomDragFromPointer(control, event);
+      } else if (action === 'momentaryvalue') {
+        // A momentary button: on at the press, off at the release (below).
+        patchCustomInteraction(control, pointerCustomHitZone, event, {
+          hover: true,
+          pressed: false,
+          focused: false,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+          ...knobFocus,
+        });
       } else {
         patchControlSession(pointerActiveControlId, {
           hover: true,
@@ -8888,7 +8981,25 @@
 
     if (isCustomComponent(activeControl)) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
+      const firing = activeControl && action !== 'dragvalue' && action !== 'scrubvalue' ? customFiringFor(activeControl, pointerCustomHitZone) : null;
+      if (firing) {
+        // Let go, inside or out: the firing decides what that does.
+        patchControlSession(activeId, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+        customButtonFiring.release(firing.key, firing.config, { inside: inside && !isDisabled(activeControl) });
+      } else if (action === 'momentaryvalue' && activeControl) {
+        // Let go, inside or out: a momentary button is off again.
+        patchCustomInteraction(activeControl, pointerCustomHitZone, { clientX: event?.clientX, clientY: event?.clientY, release: true }, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+      } else if (inside && activeControl && !isDisabled(activeControl) && action && action !== 'dragvalue' && action !== 'scrubvalue' && !['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action)) {
         patchCustomInteraction(activeControl, pointerCustomHitZone, event, {
           hover: inside,
           pressed: false,
@@ -9142,6 +9253,7 @@
         pressed: isCustomComponent(control) ? false : true,
         ...(momentaryButtonPreview.beginPress(controlId, getBehavior(control)) ?? {}),
       });
+      if (isCustomComponent(control)) patchCustomKeyboardActivation(control, event, 'down');
       if (isTimedButtonBehavior(getBehavior(control))) {
         timedButtonPreview.beginPress(controlId, getBehavior(control));
       }

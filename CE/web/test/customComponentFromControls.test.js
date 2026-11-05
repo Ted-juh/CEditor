@@ -95,13 +95,14 @@ test('an artwork component is a complete package, not one "with issues"', () => 
 
 // --- What is refused, and the reason given ---------------------------------------------------------
 
-test('a button is refused, and so is the whole command — nothing converts partly', () => {
-  // Knobs and sliders convert (test/knobsFromSelection.test.js); buttons still do not.
+test('as one exact part a button is refused, and so is the whole command — nothing converts partly', () => {
+  // Knobs and sliders convert as one exact part (test/knobsFromSelection.test.js); a button comes in
+  // only as layers (test/valueControlLayers.test.js), and the refusal says so.
   const panel = artworkPanel();
   panel.controls.push(at('Button', 'go', 240, 20, 50, 30));
   const plan = planComponentFromSelection(panel, ids('plate', 'go'));
   assert.equal(plan.ok, false);
-  assert.match(refusal(plan, 'go'), /a Button — only artwork \(shapes, labels, images, backgrounds\), knobs and sliders/);
+  assert.match(refusal(plan, 'go'), /a Button — as one exact part only artwork, knobs and sliders convert; ask for layers/);
   assert.equal(plan.component, undefined);
 });
 
@@ -115,17 +116,87 @@ test('a control a script names is refused, with the script and the line', () => 
 
 test('settings the part renderer would draw differently are refused by name', () => {
   const cases = [
-    [{ Effects: { _children: { Shadows: { items: [{ enabled: true, type: 'drop', offsetX: 0, offsetY: 2, blur: 4, spread: 0, colour: '66000000' }] } } } }, /effects/],
-    [{ Text: { _children: { Font: { underline: true } } } }, /underline/],
-    [{ Text: { _children: { Position: { justification: 'topLeft' } } } }, /text aligned top left/],
-    [{ Text: { content: 'two\nlines' } }, /more than one line/],
+    [{ Text: { _children: { Font: { underline: true }, Position: { justification: 'left' } } } }, /underline, strikethrough or overline on text that is not centred/],
+    [{ Text: { _children: { Font: { underline: true, underlineGap: 2 } } } }, /gaps round the letters/],
+    [{ Text: { _children: { Effects: { outlineEnabled: true, outlinePlacement: 'inner' } } } }, /an outline inside the text/],
     [{ ContentLayout: { lamp: 'dot' } }, /a lamp/],
-    [{ Transform: { scale: 2 } }, /scaled/],
   ];
   for (const [extra, reason] of cases) {
     const label = at('Label', 'l', 0, 0, 100, 20, extra);
     assert.match(whyNotConvertible(label, label), reason, JSON.stringify(extra));
   }
+});
+
+test('text placed, decorated, on two lines, scaled or turned, an icon and effects convert as the canvas draws them', () => {
+  const plate = { Background: { _children: { Fill: { solidEnabled: true, colour: 'FF303030' } } } };
+  const cases = [
+    { Text: { _children: { Font: { underline: true } } } },
+    { Text: { _children: { Position: { justification: 'topLeft' } } } },
+    { Text: { content: 'two\nlines' } },
+    { Transform: { scale: 2 } },
+    { Transform: { rotation: 30 } },
+    { Icon: { assetId: 'any' }, ContentLayout: { mode: 'icon_left_text_right' } },
+    { Effects: { _children: { Shadows: { items: [{ enabled: true, type: 'drop', offsetX: 0, offsetY: 2, blur: 4, spread: 0, colour: '66000000' }] } } } },
+  ];
+  for (const extra of cases) {
+    const label = at('Label', 'l', 0, 0, 100, 40, { ...plate, ...extra, Text: { content: 'CUTOFF', ...(extra.Text ?? {}) } });
+    assert.equal(whyNotConvertible(label, label), '', JSON.stringify(extra));
+    const plan = planComponentFromSelection({ id: 'p', controls: [label], scripts: [] }, ['l']);
+    assert.ok(plan.ok, `${JSON.stringify(extra)}: ${plan.refused?.[0]?.reason ?? ''}`);
+  }
+});
+
+test('a control\'s shadows are cast by its opaque plate through the canvas\'s surface, its filters taken by every layer', () => {
+  const shadow = { enabled: true, type: 'drop', offsetX: 3, offsetY: 3, blur: 4, spread: 0, colour: '88000000' };
+  const label = at('Label', 'l', 40, 40, 100, 40, {
+    Text: { content: 'CUTOFF' },
+    Background: { _children: { Fill: { solidEnabled: true, colour: 'FF303030' } } },
+    Icon: { assetId: 'any', size: 20 }, ContentLayout: { mode: 'icon_left_text_right' },
+    Effects: { _children: { Shadows: { items: [shadow] }, Filters: { hueRotate: 90 } } },
+  });
+  const plan = planComponentFromSelection({ id: 'p', controls: [label], scripts: [] }, ['l']);
+  assert.ok(plan.ok, plan.refused?.[0]?.reason);
+  const parts = Object.values(plan.component._children.Parts._children);
+  const casting = parts.filter((part) => part.meta?.surfaceEffects === true);
+  assert.equal(casting.length, 1);
+  assert.equal(casting[0].role, 'background');
+  assert.deepEqual(casting[0]._children.Effects._children.Shadows.items, [shadow]);
+  assert.ok(parts.every((part) => part._children.Effects?._children?.Filters?.hueRotate === 90), 'every layer takes the colour filter');
+  const icon = parts.find((part) => part._children.Icon);
+  assert.ok(icon, 'an icon layer');
+  assert.equal(icon._children.Layout.width, 20);
+  // The component holds the shadow's reach (3 + 3 + 4 * 3 = 18 px) about the label: the canvas draws it past the box.
+  assert.deepEqual(plan.bounds, { x: 22, y: 22, width: 136, height: 76 });
+  // Without a plate the icon and the text have no one layer to cast from.
+  delete label._children.Background;
+  label._children.Background = { ...plan.component._children.Background, _children: { Fill: { solidEnabled: false } } };
+  const bare = planComponentFromSelection({ id: 'p', controls: [label], scripts: [] }, ['l']);
+  assert.equal(bare.ok, false);
+  assert.match(bare.refused[0].reason, /no one layer that holds its shape/);
+});
+
+test('a turned and scaled button turns and scales its layers about its centre, and is pressed where it is drawn', () => {
+  const button = at('Button', 'b', 100, 100, 120, 40, {
+    Text: { content: 'GO' }, Transform: { rotation: 90, scale: 0.5 },
+    Background: { _children: { Fill: { solidEnabled: true, colour: 'FF303030' } } },
+  });
+  const plan = planComponentFromSelection({ id: 'p', controls: [button], scripts: [] }, ['b'], { valueControlsAs: 'layers' });
+  assert.ok(plan.ok, plan.refused?.[0]?.reason);
+  // Turned a quarter and halved, the 120 by 40 box is drawn 20 by 60 about its centre (160, 120).
+  assert.deepEqual(plan.bounds, { x: 150, y: 90, width: 20, height: 60 });
+  const parts = plan.component._children.Parts._children;
+  const plateLayer = Object.values(parts).find((part) => part.role === 'background');
+  assert.equal(plateLayer._children.Layout.rotation, 90);
+  assert.equal(plateLayer._children.Layout.scale, 0.5);
+  // Its pivot, the box's centre, stays at the centre: (10, 30) in the component.
+  const l = plateLayer._children.Layout;
+  assert.equal(l.x + (l.width * l.pivotX) / 100, 10);
+  assert.equal(l.y + (l.height * l.pivotY) / 100, 30);
+  const zone = Object.values(plan.component._children.HitZones._children)[0];
+  assert.match(zone.source, /^part:/);
+  const area = parts[zone.source.slice(5)];
+  assert.equal(area._children.Layout.rotation, 90);
+  assert.ok(!area._children.Background, 'the area layer draws nothing');
 });
 
 test('a label that does not wrap converts — it is what a part draws', () => {
@@ -205,4 +276,44 @@ test('a name already in the library is never overwritten', () => {
   assert.equal(unusedPackageName('Plate', entries), 'Plate 3');
   assert.equal(unusedPackageName('', []), 'Artwork');
   assert.ok(customComponentPackageId(createCustomComponentExportEnvelope(existing, { name: 'Plate 3' })).startsWith('plate-3@'));
+});
+
+test('an empty label keeps its text layer, so its text stays a setting a copy can fill; a label showing only its icon has none', () => {
+  const empty = at('Label', 'e', 0, 0, 100, 20, { Text: { content: '' } });
+  const plan = planComponentFromSelection({ id: 'p', controls: [empty], scripts: [] }, ['e']);
+  assert.ok(plan.ok, plan.refused?.[0]?.reason);
+  assert.ok(Object.values(plan.component._children.Parts._children).some((part) => part.role === 'label'));
+  assert.ok(Object.keys(plan.component._children.PublishedProperties.editableProperties).length === 1);
+  const iconOnly = at('Label', 'i', 0, 0, 40, 40, { Text: { content: 'X' }, Icon: { assetId: 'any' }, ContentLayout: { mode: 'icon_only' } });
+  const parts = Object.values(planComponentFromSelection({ id: 'p', controls: [iconOnly], scripts: [] }, ['i']).component._children.Parts._children);
+  assert.ok(!parts.some((part) => part.role === 'label'));
+  assert.ok(parts.some((part) => part._children.Icon));
+});
+
+test('a bat switch beside the legend comes in as layers: its bezel and hub, and its lever down, thrown up while on', () => {
+  const toggle = at('ToggleButton', 't', 0, 0, 160, 100, {
+    Text: { content: 'PLAY' }, ContentLayout: { lamp: 'bat', lampSize: 10, paddingLeft: 12 },
+    Background: { _children: { Fill: { solidEnabled: true, colour: 'FF303030' } } },
+  });
+  assert.equal(whyNotConvertible(toggle, toggle, { layers: true }), '');
+  const plan = planComponentFromSelection({ id: 'p', controls: [toggle], scripts: [] }, ['t'], { valueControlsAs: 'layers' });
+  assert.ok(plan.ok, plan.refused?.[0]?.reason);
+  const parts = plan.component._children.Parts._children;
+  // The panel's 10 by 30 view in a box a lamp wide and three tall, centred down the button: one unit a pixel.
+  const bezel = parts.t_lampBezel ?? Object.values(parts).find((part) => /lampBezel$/.test(part.name));
+  assert.deepEqual([bezel._children.Layout.x, bezel._children.Layout.y, bezel._children.Layout.width], [12.4, 45.4, 9.2]);
+  const down = Object.values(parts).filter((part) => /lampDown/.test(part.name));
+  const up = Object.values(parts).filter((part) => /lampUp/.test(part.name));
+  assert.equal(down.length, 5);
+  assert.equal(up.length, 5);
+  assert.ok(down.every((part) => part.opacity === 1) && up.every((part) => part.opacity === 0));
+  const lit = Object.values(plan.component._children.States._children).find((state) => /Lamp$/.test(state.name));
+  for (const part of up) assert.equal(lit.patches.parts[part.name].opacity, 1);
+  for (const part of down) assert.equal(lit.patches.parts[part.name].opacity, 0);
+  // Every layer of it its own depth, under the text, which makes room for it.
+  const depths = Object.values(parts).map((part) => part.zIndex);
+  assert.equal(new Set(depths).size, depths.length);
+  const text = Object.values(parts).find((part) => part.role === 'label');
+  assert.ok(text.zIndex > Math.max(...[...down, ...up].map((part) => part.zIndex)));
+  assert.equal(text._children.Layout.x, 12 + 10 + 8 - 8);
 });

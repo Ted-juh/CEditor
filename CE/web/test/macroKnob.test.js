@@ -62,8 +62,7 @@ test('the hosted knob only draws: no labels, no readout, no id of the Macro\'s, 
   assert.equal(JSON.stringify(pristineControlFor('Knob')), before, 'the cached factory Knob is not mutated');
   assert.equal(knob._children.Core.id, `${source._children.Core.id}~knob`);
   assert.equal(knob._children.Core.formShowValue, false);
-  assert.equal(knob._children.Behavior.showValueReadout, false);
-  assert.equal(knob._children.Behavior.showMinMaxLabels, false);
+  assert.equal(knob._children.Behavior.showHandleLabels, false);
   assert.deepEqual(Object.keys(knob._children.Parts._children).filter((name) => name.startsWith('label')), []);
   assert.deepEqual([knob._children.Transform.x, knob._children.Transform.y, knob._children.Transform.width], [box.x, box.y, box.width]);
   // A Macro pinned to a set pins its knob to the same one.

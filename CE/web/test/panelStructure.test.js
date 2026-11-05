@@ -150,7 +150,7 @@ test('a colour create cannot read refuses the whole call: each is named, and not
   withPanel(panel, (api) => {
     clearScriptTrace();
     const props = {
-      name: 'm', x: 10, Meter: { trackColour: 'redd', label: 'Level', zones: [{ from: 0, colour: '#0008' }] },
+      name: 'm', x: 10, Meter: { trackColour: 'redd', valueSuffix: ' dB', zones: [{ from: 0, colour: '#0008' }] },
     };
     const answer = api.panelCreate('Meter', props);
     assert.equal(answer, null, 'what create answers for any other refusal');

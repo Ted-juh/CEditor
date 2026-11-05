@@ -11,10 +11,11 @@
   import PanelPreviewSurface from '../editor/PanelPreviewSurface.svelte';
   import ControlSetGallery from '../panels/ControlSetGallery.svelte';
   import ControlSetCard from './ControlSetCard.svelte';
+  import EffectPreview from '../components/effects/EffectPreview.svelte';
   import { SET_STYLES, groupControlSets } from '../utils/controlSetGroups.js';
   import { buildSolidStyle } from '../utils/backgroundCSS.js';
   import { createControlSetStarter } from '../models/controlSetStarter.js';
-  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, getControlSet, isRetiredControlSet, normalizeControlSetDefinition, offeredControlSetsWith, resolveToken } from '../models/controlSets.js';
+  import { BASE_CONTROL_SET, BUILT_IN_CONTROL_SETS, DEFAULT_CONTROL_SET_ID, NEW_PANEL_CONTROL_SET_ID, controlSetOptionLabel, getControlSet, illustratedKinds, illustratedValueNote, normalizeControlSetDefinition, offeredControlSetsWith, resolveToken } from '../models/controlSets.js';
   import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
   import { MATERIAL_KINDS } from '../utils/materialFilter.js';
   import { controlSetFileName } from '../models/controlSetPackage.js';
@@ -25,17 +26,22 @@
   import { generalSettings, updateGeneralSettings } from '../stores/appSettings.js';
   import { activePanelId, panels } from '../stores/panels.js';
   import { requestControlSetApply } from '../stores/controlSets.js';
+  import { availableFonts } from '../stores/appSettings.js';
+  import { activateColorTarget } from '../stores/colorTarget.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
+  import { placeFamilyControlForEditing } from '../stores/setFromControl.js';
+  import {
+    DERIVED_ROLE_GROUP, ROLE_GROUPS, familyLabel, familySourceLabel, groupedFamilies, setLettering, withFamilyReset, withLamp, withLettering,
+  } from '../models/setEditing.js';
   import { deepClone } from '../utils/deepClone.js';
+  import { customComponentLibrary } from '../stores/customComponentLibrary.js';
+  import { componentFit, controlsWithSetComponents, fittingLibraryComponents, isSetComponentType, resolveSetComponent, setComponentFor, setComponentRef } from '../utils/setLibraryComponents.js';
 
-  const COLOUR_ROLES = [
-    ['panel.surface', 'Panel surface'], ['surface', 'Button surface'], ['control.body', 'Control body'], ['control.cap', 'Knob / fader cap'],
-    ['control.fill', 'Value fill'], ['accent', 'Accent'], ['text.primary', 'Primary text'],
-    ['display.screen', 'Display glass'], ['display.lit', 'Display light'],
-  ];
-  const FAMILY_ROLES = [
-    ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'],
-    ['ToggleButton', 'Switches'], ['DrumPads', 'Drum pads'], ['StepSequencer', 'Steppers'], ['Label', 'Labels'],
-  ];
+  // Every colour role and every family a set holds (models/setEditing.js), grouped; the groups the
+  // page opens on, the rest folded.
+  let openRoleGroups = $state(new Set(['panel', 'controls']));
+  let openFamilyGroups = $state(new Set(['rotary', 'buttons', 'meters']));
+  const WEIGHTS = [[300, 'Light'], [400, 'Regular'], [500, 'Medium'], [600, 'Semibold'], [700, 'Bold']];
   // What the Library's cards show of each set: one kind of control at a time, chosen above them.
   const CARD_FAMILIES = [
     ['Knob', 'Knobs'], ['Slider', 'Sliders'], ['Button', 'Buttons'], ['ToggleButton', 'Switches'], ['Meter', 'Meters'], ['DrumPads', 'Pads'],
@@ -55,8 +61,9 @@
   let galleryOpen = $state(false);
   let familySources = $state({});
   let query = $state('');
-  // The mechanisms fold away by default: twelve odd ones out, opened when wanted.
-  let folded = $state(new Set(['mechanical']));
+  // Every group opens unfolded. The mechanisms used to fold away, twelve odd ones out; the two kept
+  // (Illustrated) show, with the line that says how they differ.
+  let folded = $state(new Set());
   let previewWidth = $state(376);
   let cardFamily = $state('Knob');
   let cardStyle = $state('');
@@ -78,6 +85,10 @@
   let builtInSets = $derived(allSets.filter((set) => set.origin === 'built-in'));
   let selectedSet = $derived(allSets.find((set) => set.id === selectedId) ?? allSets[0]);
   let isCustom = $derived(selectedSet?.origin === 'library');
+  // Iris, Satellite or a copy of one: the kinds it draws as whole illustrations, which its page names
+  // (models/controlSets.js ILLUSTRATED_CONTROL_SET_IDS). Empty for every other set.
+  let illustrated = $derived(draft ? illustratedKinds(draft) : []);
+  const listed = (words) => words.length > 1 ? `${words.slice(0, -1).join(', ')} and ${words.at(-1)}` : (words[0] ?? '');
   let groups = $derived(groupControlSets({ librarySets: mySets, builtInSets, panelSetId, query, style: cardStyle }));
   let panelName = $derived(String(targetPanel?.name ?? ''));
 
@@ -104,7 +115,10 @@
     // ever showed in its preview.
     const layoutId = isBuiltIn(draft.id) ? draft.id : (isBuiltIn(draft.basedOn) ? draft.basedOn : NEW_PANEL_CONTROL_SET_ID);
     const sample = createControlSetStarter(layoutId, { set });
-    return { ...sample, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [set] };
+    // A family the set names a library component for draws it, as applying the set would place it
+    // (utils/setLibraryComponents.js): its knobs as copies of the component, not the set's own knob.
+    const controls = controlsWithSetComponents(sample, set, $customComponentLibrary);
+    return { ...sample, controls, name: `${draft.name} preview`, controlSet: { id: draft.id }, controlSets: [set] };
   });
 
   function choose(id) {
@@ -173,6 +187,49 @@
     });
   }
 
+  /** A role's swatch: the Colors dock edits it, as every colour is edited. */
+  function pickRole(key, label) {
+    if (!draft) return;
+    const raw = String(resolveToken(key, draft) ?? 'FFFFFFFF').replace('#', '');
+    activateColorTarget({
+      type: 'callback',
+      label: `${draft.name} › ${label}`,
+      _swatchKey: `controlset:${key}`,
+      apply: (hex) => setToken(key, hex),
+    }, /^[0-9a-f]{8}$/i.test(raw) ? raw.toUpperCase() : `FF${raw.slice(-6).toUpperCase()}`);
+    displayTabRequest.set({ tab: 'colors' });
+  }
+
+  function toggleIn(setState, id) {
+    const next = new Set(setState);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  }
+
+  let lettering = $derived(draft ? setLettering(draft) : { family: '', weightValue: 400, letterSpacing: 0 });
+  function setLetteringField(patch) { edit((next) => withLettering(next, patch)); }
+  function setLampField(patch) { edit((next) => withLamp(next, patch)); }
+
+  // Where a family goes back to: the built-in the set descends from, or the set's own built-in self.
+  let resetSource = $derived(draft ? (getControlSet(draft.basedOn) ?? (isCustom ? null : getControlSet(draft.id))) : null);
+  function resetFamily(type) {
+    if (!resetSource) return;
+    edit((next) => withFamilyReset(next, type, resetSource));
+    const { [type]: _, ...rest } = familySources;
+    familySources = rest;
+  }
+
+  /**
+   * Edit on Panel: the family's control placed on the open panel, drawn with this set, to style and
+   * then Apply to Set. Your own set is saved first, so the panel draws what this page shows.
+   */
+  function editOnPanel(type) {
+    if (!targetPanel) { status = 'Open a panel to edit a family on it.'; return; }
+    if (isCustom && draft) updateControlSetInLibrary(draft.id, draft);
+    const placed = placeFamilyControlForEditing(draft?.id ?? selectedId, type, targetPanel.id);
+    if (!placed) status = 'The family\'s control could not be placed on this panel.';
+  }
+
   function colourValue(key) {
     // A role may be an alias ('{surface}', '{accent}'): show the colour it gives, not its name.
     const raw = String(resolveToken(key, draft) ?? 'FFFFFFFF').replace('#', '');
@@ -202,6 +259,33 @@
       };
     });
     familySources = { ...familySources, [family]: sourceId };
+  }
+
+  /**
+   * A family that names a library component (utils/setLibraryComponents.js): applying the set
+   * places a linked copy of it for each control of the family. Choosing a design again, or Reset,
+   * takes it away.
+   */
+  function setFamilyComponent(type, entryId) {
+    const entry = ($customComponentLibrary ?? []).find((candidate) => candidate.id === entryId);
+    if (!entry) return;
+    edit((next) => ({ ...next, libraryComponents: { ...(next.libraryComponents ?? {}), [type]: setComponentRef(entry) } }));
+  }
+
+  function clearFamilyComponent(type) {
+    edit((next) => {
+      const { [type]: _, ...rest } = next.libraryComponents ?? {};
+      const out = { ...next, libraryComponents: rest };
+      if (!Object.keys(rest).length) delete out.libraryComponents;
+      return out;
+    });
+  }
+
+  function chooseFamilyDesign(type, value) {
+    if (!value || value === 'own') return;
+    if (value.startsWith('lib:')) { setFamilyComponent(type, value.slice(4)); return; }
+    if (setComponentFor(draft, type)) clearFamilyComponent(type);
+    setFamilySource(type, value);
   }
 
   function downloadSelected() {
@@ -279,6 +363,7 @@
             <span>{group.label}</span><small>{group.sets.length}</small>
           </button>
           {#if open}
+            {#if group.note}<p class="group-note">{group.note}</p>{/if}
             <!-- By era only while the whole Library shows: a style or a search leaves one or two per era. -->
             {#if group.eras && !cardStyle && !query.trim()}
               {#each group.eras as era (era.label)}
@@ -304,7 +389,7 @@
     <div class="column editor">
       <header class="editor-head">
         <div class="title">
-          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">In use</span>{/if}</h2>
+          <h2>{draft.name}{#if draft.id === panelSetId}<span class="on-panel">In use</span>{/if}{#if illustrated.length}<span class="illustrated-tag">Illustrated set</span>{/if}</h2>
           <p>{isCustom ? 'User set. Save Set stores changes; Export writes it to a file.' : 'Built-in set. Editing creates a copy.'}</p>
         </div>
         <div class="actions">
@@ -314,6 +399,17 @@
           {#if isCustom}<button class="primary" onclick={saveDraft}>Save Set</button>{/if}
         </div>
       </header>
+      {#if illustrated.length}
+        <!-- How an illustrated set differs (the owner approved the mock-up). -->
+        <div class="illustrated-callout" data-illustrated-callout>
+          <b>{draft.name} works differently from the other sets.</b>
+          <ul>
+            <li>Its {listed(illustrated.map((kind) => kind.noun))} are drawn as whole illustrations. Colours, size and depth can be changed (Core › Control design); the parts on the {listed(illustrated.map((kind) => kind.tab))} {illustrated.length > 1 ? 'tabs' : 'tab'} do not apply, and Convert to Parts is not available.</li>
+            <li>The value moves the mechanism{illustratedValueNote(draft) ? `: ${illustratedValueNote(draft)}` : ' instead of a pointer over a scale'}.</li>
+            <li>Pads and Number steppers are ordinary parts and can be edited as in any other set.</li>
+          </ul>
+        </div>
+      {/if}
 
       <div class="scroll fields">
         <section>
@@ -325,12 +421,55 @@
         </section>
 
         <section>
-          <h3>Shared colours</h3>
-          <div class="colour-grid">
-            {#each COLOUR_ROLES as [key, label]}
-              <label><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span>
-                <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
-            {/each}
+          <h3>Colour roles</h3>
+          <p>Every colour a set gives its controls. A swatch opens the Colors dock; a code can be typed.</p>
+          {#each ROLE_GROUPS as group (group.id)}
+            <button type="button" class="fold-head" aria-expanded={openRoleGroups.has(group.id)} data-role-group={group.id}
+              onclick={() => (openRoleGroups = toggleIn(openRoleGroups, group.id))}>
+              {#if openRoleGroups.has(group.id)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}{group.label} <span>{group.roles.length}</span>
+            </button>
+            {#if openRoleGroups.has(group.id)}
+              <div class="colour-grid">
+                {#each group.roles as [key, label] (key)}
+                  <label><button type="button" class="swatch" style:background={colourValue(key)} title={`Edit ${label} in the Colors dock`} aria-label={`Edit ${label} in the Colors dock`} onclick={() => pickRole(key, label)}></button><span class="role">{label}</span>
+                    <input class="code" type="text" value={colourValue(key).toUpperCase()} spellcheck="false" aria-label={`${label} colour code`} onchange={(event) => setToken(key, event.target.value)} /></label>
+                {/each}
+              </div>
+            {/if}
+          {/each}
+          <button type="button" class="fold-head" aria-expanded={openRoleGroups.has('derived')} onclick={() => (openRoleGroups = toggleIn(openRoleGroups, 'derived'))}>
+            {#if openRoleGroups.has('derived')}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}{DERIVED_ROLE_GROUP.label} <span>{DERIVED_ROLE_GROUP.roles.length}</span>
+          </button>
+          {#if openRoleGroups.has('derived')}
+            <div class="colour-grid derived">
+              {#each DERIVED_ROLE_GROUP.roles as [key, label] (key)}
+                <div class="derived-role" title="Worked out from the set's other colours on every read"><span class="swatch" style:background={colourValue(key)}></span><span class="role">{label}</span><span class="code">{colourValue(key).toUpperCase()}</span></div>
+              {/each}
+            </div>
+          {/if}
+        </section>
+
+        <section>
+          <h3>Lettering</h3>
+          <p>The typeface of every family's text: captions, legends, readouts.</p>
+          <div class="material-row">
+            <label><span>Typeface</span><select aria-label="Lettering typeface" value={lettering.family} onchange={(event) => setLetteringField({ family: event.target.value })}>
+              {#if lettering.family && !$availableFonts.some((font) => font.value === lettering.family)}<option value={lettering.family}>{lettering.family}</option>{/if}
+              {#each $availableFonts as font (font.value)}<option value={font.value}>{font.label}</option>{/each}
+            </select></label>
+            <label><span>Weight</span><select aria-label="Lettering weight" value={lettering.weightValue} onchange={(event) => setLetteringField({ weightValue: Number(event.target.value) })}>
+              {#each WEIGHTS as [value, label] (value)}<option {value}>{label}</option>{/each}
+            </select></label>
+            <label><span>Letter spacing</span><input type="number" step="0.1" aria-label="Lettering spacing" value={lettering.letterSpacing} onchange={(event) => setLetteringField({ letterSpacing: Number(event.target.value) })} /></label>
+          </div>
+        </section>
+
+        <section>
+          <h3>Lamp</h3>
+          <p>Where the light on finishes and materials comes from.</p>
+          <div class="material-row">
+            <label><span>From (degrees)</span><input type="number" min="0" max="360" step="5" aria-label="Lamp direction" value={draft.lamp?.azimuth ?? 225} onchange={(event) => setLampField({ azimuth: event.target.value })} /></label>
+            <label><span>Height (degrees)</span><input type="number" min="0" max="90" step="1" aria-label="Lamp height" value={draft.lamp?.elevation ?? 48} onchange={(event) => setLampField({ elevation: event.target.value })} /></label>
           </div>
         </section>
 
@@ -346,15 +485,64 @@
 
         <section>
           <h3>Control families</h3>
-          <p>Mix mechanisms from the 36 synthesizer templates. The complete family definition is copied into your set.</p>
-          <div class="family-grid">
-            {#each FAMILY_ROLES as [family, label]}
-              <label><span>{label}</span><select value={familySources[family] ?? ''} onchange={(event) => setFamilySource(family, event.target.value)}>
-                <option value="">Keep current design</option>
-                {#each DESIGN_SOURCES as source}<option value={source.id}>{source.name}</option>{/each}
-              </select></label>
-            {/each}
-          </div>
+          <p>Each family takes its design from one of the 36 synthesizer templates or an Own design; <b>Reset</b> returns it to the set it was copied from. <b>Edit on Panel</b> places one on the open panel to style, then Apply to Set.</p>
+          {#each groupedFamilies(draft) as group (group.id)}
+            <button type="button" class="fold-head" aria-expanded={openFamilyGroups.has(group.id)} data-family-group={group.id}
+              onclick={() => (openFamilyGroups = toggleIn(openFamilyGroups, group.id))}>
+              {#if openFamilyGroups.has(group.id)}<ChevronDown size={12} />{:else}<ChevronRight size={12} />{/if}{group.label} <span>{group.types.length}</span>
+            </button>
+            {#if openFamilyGroups.has(group.id)}
+              <div class="family-rows">
+                {#each group.types as type (type)}
+                  {@const own = draft.chosenFamilies?.[type] === 'own'}
+                  {@const named = setComponentFor(draft, type)}
+                  {@const resolved = named ? resolveSetComponent(named, $customComponentLibrary) : null}
+                  {@const fitting = isSetComponentType(type) ? fittingLibraryComponents(type, $customComponentLibrary).filter((row) => row.fit.ok) : []}
+                  <div class="family-row" data-family={type}>
+                    <span class="family-name">{familyLabel(type)}</span>
+                    <select aria-label={`${familyLabel(type)} design`} value={named ? `lib:${resolved?.entry?.id ?? named.id}` : own ? 'own' : (familySources[type] ?? '')} onchange={(event) => chooseFamilyDesign(type, event.target.value)}>
+                      {#if named}<option value={`lib:${resolved?.entry?.id ?? named.id}`}>{named.name} {named.version} (library)</option>
+                      {:else if own}<option value="own">{familySourceLabel(draft, type)}</option>{:else}<option value="">Keep current design</option>{/if}
+                      {#if isSetComponentType(type)}
+                        <optgroup label="Library components">
+                          {#each fitting as row (row.entry.id)}{#if row.entry.id !== (resolved?.entry?.id ?? named?.id)}<option value={`lib:${row.entry.id}`}>{row.entry.name} {row.entry.version}</option>{/if}{/each}
+                          {#if !fitting.length}<option disabled>None in your library fits {familyLabel(type).toLowerCase()}</option>{/if}
+                        </optgroup>
+                      {/if}
+                      <optgroup label="Templates">
+                        {#each DESIGN_SOURCES as source (source.id)}<option value={source.id}>{source.name}</option>{/each}
+                      </optgroup>
+                    </select>
+                    {#if named}
+                      <button type="button" disabled title="A library component is edited in the Component Designer, from the Library">Edit on Panel</button>
+                      <button type="button" onclick={() => clearFamilyComponent(type)} title={`Back to ${draft.name}'s own ${familyLabel(type).toLowerCase()}`}>Reset</button>
+                    {:else}
+                      <button type="button" onclick={() => editOnPanel(type)} disabled={!targetPanel} title={targetPanel ? `Place one of ${draft.name}'s ${familyLabel(type).toLowerCase()} on ${panelName} to style, then Apply to Set` : 'Open a panel first'}>Edit on Panel</button>
+                      <button type="button" onclick={() => resetFamily(type)} disabled={!resetSource?.families?.[type]} title={resetSource ? `Back to ${resetSource.name}'s ${familyLabel(type).toLowerCase()}` : 'This set has nothing to go back to'}>Reset</button>
+                    {/if}
+                  </div>
+                  {#if named}
+                    {@const fit = resolved ? componentFit(type, resolved.entry.component) : null}
+                    <div class="family-component" data-family-component={type}>
+                      <span class="thumb">{#if resolved?.entry?.component}<EffectPreview control={resolved.entry.component} boxWidth={44} boxHeight={44} padding={2} maxScale={1} label={resolved.entry.name} />{/if}</span>
+                      <p>
+                        {#if !resolved}
+                          <b>{named.name} {named.version}</b> is not in your library. Applying the set leaves {familyLabel(type).toLowerCase()} as they are until it is imported.
+                        {:else if !fit?.ok}
+                          <b>{resolved.entry.name} {resolved.entry.version}</b> no longer fits {familyLabel(type).toLowerCase()}: {fit?.reason}.
+                        {:else}
+                          Applying the set places a linked copy of <b>{resolved.entry.name} {resolved.entry.version}</b> for each of the panel's {familyLabel(type).toLowerCase()}.
+                          Each copy keeps the control's name, position, size, value, range, device bindings and plug-in parameter.
+                          {#if fit.caption}Its caption goes to the component's text.{:else}This component has no caption text, so captions are not shown.{/if}
+                          {#if !resolved.exact}Version {named.version} is gone from your library; {resolved.entry.version} is used.{/if}
+                        {/if}
+                      </p>
+                    </div>
+                  {/if}
+                {/each}
+              </div>
+            {/if}
+          {/each}
         </section>
       </div>
     </div>
@@ -378,9 +566,9 @@
         <label class="default"><span>Default for new panels</span>
           <select value={defaultSetId} onchange={(event) => updateGeneralSettings({ defaultControlSetId: event.target.value, defaultControlSetChosen: true })}>
             {#if mySets.length}
-              <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{set.name}</option>{/each}</optgroup>
+              <optgroup label="My sets">{#each mySets as set (set.id)}<option value={set.id}>{controlSetOptionLabel(set)}</option>{/each}</optgroup>
             {/if}
-            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{set.name}{isRetiredControlSet(set.id) ? ' (no longer offered)' : ''}</option>{/each}</optgroup>
+            <optgroup label="Built in">{#each builtInSets as set (set.id)}<option value={set.id}>{controlSetOptionLabel(set)}</option>{/each}</optgroup>
             {#if !allSets.some((set) => set.id === defaultSetId)}
               <option value={defaultSetId}>{defaultSetId} (not installed; new panels use {BASE_CONTROL_SET.name})</option>
             {/if}
@@ -412,7 +600,7 @@
   .scroll { flex:1 1 auto; min-height:0; overflow:auto; }
   h2,h3,p { margin:0; }
   label { display:flex; flex-direction:column; gap:6px; font-size:11px; color:#aaa; } select,input,textarea,button { font:inherit; }
-  select,input[type='text'],input[type='search'],textarea { color:#e9e9e9; background:#161616; border:1px solid #3b3b3b; border-radius:6px; padding:6px 9px; }
+  select,input[type='text'],input[type='search'],input[type='number'],textarea { color:#e9e9e9; background:#161616; border:1px solid #3b3b3b; border-radius:6px; padding:6px 9px; }
   textarea { resize:vertical; }
   button { display:flex; align-items:center; justify-content:center; gap:6px; color:#ddd; background:#292929; border:1px solid #444; border-radius:7px; padding:6px 10px; cursor:pointer; white-space:nowrap; }
   button:hover:not(:disabled) { border-color:#5b9bd5; } button:disabled { opacity:.55; cursor:default; }
@@ -429,6 +617,11 @@
   .group-head[aria-expanded='false'] { color:#8a8a8a; }
   .group-head small { margin-left:auto; color:#777; font-weight:600; letter-spacing:0; }
   .era { padding:5px 14px 1px; color:#8a8a8a; font-size:10px; }
+  .group-note { margin:2px 10px 6px 24px; color:#B9B9B9; font-size:11px; line-height:1.45; }
+  .illustrated-tag { margin-left:8px; font-size:10px; font-weight:600; color:#E6C27A; border:1px solid #6B5A33; border-radius:9px; padding:1px 7px; vertical-align:middle; }
+  .illustrated-callout { margin:10px 14px 0; padding:9px 12px; border:1px solid #5A4C2E; border-left:3px solid #E6C27A; border-radius:5px; background:#2A2620; color:#DCD6C8; font-size:12px; line-height:1.5; }
+  .illustrated-callout b { color:#F0E3C2; }
+  .illustrated-callout ul { margin:4px 0 0; padding-left:18px; }
   .cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(92px,1fr)); gap:6px; padding:4px 10px 8px; }
   .empty { padding:14px; color:#888; font-size:11px; }
 
@@ -447,7 +640,22 @@
   .colour-grid .code { width:78px; flex:0 0 auto; padding:3px 6px; font-family:ui-monospace,monospace; font-size:11px; }
   .material-row { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px; align-items:end; } .check { flex-direction:row; align-items:center; padding-bottom:8px; }
   input[type='range'] { accent-color:#2486c5; width:100%; }
-  .family-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(170px,1fr)); gap:8px; }
+  .fold-head { display:flex; align-items:center; justify-content:flex-start; gap:5px; width:100%; margin:6px 0 4px; padding:2px 0; border:0; background:none; color:#a9b9c6; font:inherit; font-size:11px; font-weight:600; cursor:pointer; text-align:left; }
+  .fold-head span { color:#6f6f6f; font-weight:400; }
+  .colour-grid .swatch { padding:0; cursor:pointer; }
+  .colour-grid .derived-role { display:flex; gap:6px; align-items:center; padding:4px 6px; background:#242424; border-radius:5px; opacity:.75; font-size:11px; }
+  .colour-grid.derived .code { color:#9a9a9a; }
+  .family-rows { display:flex; flex-direction:column; }
+  .family-row { display:grid; grid-template-columns:minmax(110px,1fr) minmax(0,1.4fr) auto auto; gap:6px; align-items:center; padding:4px 0; border-top:1px solid #2a2a2a; }
+  .family-row:first-child { border-top:0; }
+  .family-component { display:flex; gap:9px; align-items:flex-start; margin:0 0 6px; padding:7px 9px; border:1px solid #2f4a5f; border-radius:5px; background:#1f262c; }
+  .family-component .thumb { width:44px; height:44px; flex:0 0 auto; border-radius:4px; background:#151515; border:1px solid #333; overflow:hidden; display:flex; align-items:center; justify-content:center; }
+  .family-component p { margin:0; font-size:11px; line-height:1.45; color:#b8c3cc; }
+  .family-component b { color:#e6eef4; font-weight:600; }
+  .family-row .family-name { color:#ddd; font-size:11.5px; }
+  .family-row button { height:24px; padding:0 9px; border:1px solid #3b3b3b; border-radius:4px; background:#262626; color:#ddd; font:inherit; font-size:11px; cursor:pointer; white-space:nowrap; }
+  .family-row button:hover:not(:disabled) { border-color:#5B9BD5; }
+  .family-row button:disabled { opacity:.45; cursor:default; }
   .on-panel { margin-left:8px; font-size:10px; font-weight:600; color:#8fd1a6; border:1px solid #3c5a46; border-radius:9px; padding:1px 7px; vertical-align:middle; }
 
   .side-body { padding:12px; display:flex; flex-direction:column; gap:9px; }

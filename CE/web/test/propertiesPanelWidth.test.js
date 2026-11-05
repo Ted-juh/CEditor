@@ -58,7 +58,7 @@ test('the tab\'s content area is the container the narrow rules go by', () => {
   // Every rule that goes by it switches at the same width, and that width is the module's.
   const queries = svelteFiles(join(srcRoot, 'CE_Application')).flatMap((file) =>
     [...readFileSync(file, 'utf8').matchAll(/@container properties-tab \(max-width: (\d+)px\)/g)].map((m) => [file, Number(m[1])]));
-  assert.ok(queries.length >= 5, `${queries.length} rules: the two grids, the cell, Test Bench and Publish`);
+  assert.ok(queries.length >= 4, `${queries.length} rules: the two grids, the cell and Test Bench`);
   for (const [file, width] of queries) assert.equal(width, NARROW_PROPERTIES_CONTENT, file);
 });
 
@@ -70,7 +70,7 @@ test('narrow, property grids are two columns and a wide field takes the row', ()
     /@container properties-tab \(max-width: 460px\) \{\s*\.property-cell\.span-3,\s*\.property-cell\.span-4 \{ grid-column: 1 \/ -1; \}/);
 });
 
-test('narrow, Test Bench\'s fixed-width rows take two lines and Publish\'s contract one column', () => {
+test('narrow, Test Bench\'s fixed-width rows take two lines', () => {
   const bench = src('CE_Application/sections/CustomTestBenchEditor.svelte');
   const narrow = bench.slice(bench.lastIndexOf('@container properties-tab'));
   assert.match(narrow, /\.rig-row \{[^}]*grid-template-areas: "name note reset" "control control control";/);
@@ -80,6 +80,4 @@ test('narrow, Test Bench\'s fixed-width rows take two lines and Publish\'s contr
   // Their wide layouts need more than a 420 panel's 355 pixels, which is why they change at all.
   const minimums = (rule) => [...bench.match(new RegExp(`\\.${rule} \\{[^}]*grid-template-columns: ([^;]+);`))[1].matchAll(/minmax\((\d+)px|(?:^|\s)(\d+)px/g)].reduce((sum, m) => sum + Number(m[1] ?? m[2]), 0);
   assert.ok(minimums('rig-row') > 300 && minimums('state-head') > 300 && minimums('generated-source-row') > 355);
-  assert.match(src('CE_Application/sections/CustomPublishedPropertiesEditor.svelte'),
-    /@container properties-tab \(max-width: 460px\) \{\s*\.contract-board \{ grid-template-columns: minmax\(0, 1fr\); \}/);
 });

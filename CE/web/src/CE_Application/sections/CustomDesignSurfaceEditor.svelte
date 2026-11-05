@@ -543,10 +543,11 @@
 
   // Dock inspector = per-object + spatial concerns only (Stage B8). The
   // component-wide States/API/Bindings lists moved to their panel homes.
+  // `empty`: why a tab is not offered when it holds nothing for the selection (inspectorTabHas).
   const INSPECTOR_TABS = [
     { id: 'object', label: 'Object' },
-    { id: 'display', label: 'Display' },
-    { id: 'behavior', label: 'Behavior' },
+    { id: 'display', label: 'Display', empty: 'Nothing to set here for this selection. Fill, stroke, corners, text and opacity are in the bar above the canvas; this tab holds the settings of an arc and of a hit zone.' },
+    { id: 'behavior', label: 'Behavior', empty: 'Nothing to set here for this selection. Select a hit zone to set what it does and which value it drives.' },
     { id: 'states', label: 'Preview' },
   ];
 
@@ -707,6 +708,21 @@
     applyControlPatch(core.id, patch);
   }
   let selectedArcPivotTarget = $derived.by(() => nearestArcPivotTarget());
+  // A tab that holds nothing for the selection is not offered (the designer review, item 14): it
+  // used to open on a single line, "Use hit zones to make artwork interactive" on every layer's
+  // Behavior tab. Display holds an arc's and a hit zone's settings, Behavior a hit zone's. The chosen
+  // tab is kept, so selecting a hit zone again opens on it; meanwhile Object shows.
+  let inspectorTabHas = $derived({
+    object: true,
+    display: (activeSelectionKind === 'layer' && selectedIsArc) || (activeSelectionKind === 'hitZone' && !!selectedZone),
+    behavior: activeSelectionKind === 'hitZone' && !!selectedZone,
+    states: true,
+  });
+  let shownInspectorTab = $derived(inspectorTabHas[inspectorTab] ? inspectorTab : 'object');
+  // The view toggles that draw something only when there is something to draw: generated layers'
+  // names (a kit's), and hit zones. With none, both did nothing.
+  let hasGeneratedLayers = $derived(Object.values(parts?._children ?? {}).some((part) => isGeneratedPart(part)));
+  let hasHitZones = $derived(Object.keys(hitZones?._children ?? {}).length > 0);
   let arpeggiator = $derived.by(() => normalizeArpeggiator(designer?.arpeggiator));
   let arpeggiatorEnabled = $derived(arpeggiator?.enabled === true);
   let arpBlocks = $derived(Array.isArray(arpeggiator?.blocks) ? arpeggiator.blocks : []);
@@ -1894,6 +1910,8 @@
       ? {
           type: 'callback',
           _swatchKey: `surface:${relativePath}`,
+          acceptsRoles: true,
+          controlId,
           apply: (hex) => {
             for (const name of targetLayerNames) {
               updateControlProperty(controlId, `Parts.${name}.${relativePath}`, hex);
@@ -3587,7 +3605,7 @@
     <SurfaceLookBar
       {activeSelectionKind} {canPaintLayer}
       {selectedAuthoredPart} {selectedPart} {selectedBackground} {selectedFill} {selectedBorder}
-      {selectedCorners} {selectedIsArc} {selectedText} {selectedTextFill} {selectedTextFont}
+      {selectedCorners} {selectedText} {selectedTextFill} {selectedTextFont}
       {componentScriptsEnabled} {componentScriptList}
       {setLayerProperty} {openLayerColour} {openLayerGradient} {toggleFillGradient}
       {openComponentScripts}
@@ -3631,7 +3649,7 @@
       {snapSize} {setSnapSize}
       {smartSnapEnabled} setSmartSnapEnabled={(v) => { smartSnapEnabled = v; }}
       {measureEnabled} setMeasureEnabled={(v) => { measureEnabled = v; }}
-      {showBounds} {showGeneratedLabels} {showHitZones} {setPreviewFlag}
+      {showBounds} {showGeneratedLabels} {showHitZones} {setPreviewFlag} {hasGeneratedLayers} {hasHitZones}
       {zoneDisplayMode} {setZoneDisplayMode}
       {arpeggiatorEnabled} {arpStepCount} {setArpStepCount} {arpSelectedBlock}
       {shiftArpOctave} {removeSelectedArpBlock}
@@ -4082,8 +4100,10 @@
               <button
                 type="button"
                 role="tab"
-                class:active={inspectorTab === tab.id}
-                aria-selected={inspectorTab === tab.id}
+                class:active={shownInspectorTab === tab.id}
+                aria-selected={shownInspectorTab === tab.id}
+                disabled={!inspectorTabHas[tab.id]}
+                title={inspectorTabHas[tab.id] ? undefined : tab.empty}
                 onclick={() => { inspectorTab = tab.id; }}
               >
                 {tab.label}
@@ -4093,14 +4113,14 @@
 
           <div class="inspector-content">
             <SurfaceDockInspector
-              {inspectorTab}
+              inspectorTab={shownInspectorTab}
               {activeSelectionKind} {activeSelectionName} {activeSelectionFrame} {multiSelectionActive}
               {selectedLayer} {selectedPart} {selectedAuthoredPart} {selectedPartEditable}
               {selectedZone} {selectedZoneEditable} {selectedKitEntry}
               {selectedIsArc} {selectedArcMeta} {selectedArcPivotTarget}
               {canManageLayer}
               {parts} {states} {behaviorEntries} {valueChannelEntries} {artboardWidth} {artboardHeight}
-              {showBounds} {showGeneratedLabels} {showHitZones} {zoneDisplayMode}
+              {showBounds} {showGeneratedLabels} {showHitZones} {zoneDisplayMode} {hasGeneratedLayers} {hasHitZones}
               {setLayerProperty} {setLayerLayoutProperty} {setHitZoneProperty}
               {setArcMetaProperty} {setSelectedPivotToArcCenter}
               {setSelectionFramePosition} {setSelectionFrameSize} {setArtboardSize}
@@ -4708,7 +4728,12 @@
     white-space: nowrap;
   }
 
-  .inspector-tabs button:hover,
+  .inspector-tabs button:disabled {
+    color: #4E5A63;
+    cursor: default;
+  }
+
+  .inspector-tabs button:hover:not(:disabled),
   .inspector-tabs button.active {
     border-color: #3F6C92;
     background: #173449;
@@ -5642,7 +5667,7 @@
     background: #111A21;
     border-bottom-color: #24313A;
   }
-  .inspector-tabs button:hover,
+  .inspector-tabs button:hover:not(:disabled),
   .inspector-tabs button.active {
     border-color: var(--surface-accent, #14B8A6);
     background: rgba(20, 184, 166, 0.17);

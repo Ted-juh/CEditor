@@ -32,6 +32,8 @@
   // A binding's source, mode or unit that the lists do not hold is offered as it is: a select whose
   // value is not among its options shows blank (utils/bindingSourceOptions.js).
   let sourceGroups = $derived(bindingSourceGroups(control, selectedBinding?.source ?? 'value.normalized'));
+  // What the source is read less of, if anything: a range's end less its start.
+  let minusGroups = $derived([{ label: '', options: [{ value: '', label: 'Nothing' }] }, ...bindingSourceGroups(control, String(selectedBinding?.minus ?? ''))]);
   let modeGroups = $derived(choiceGroups(MAP_MODES, selectedBinding?.mapMode ?? 'range'));
   let unitGroups = $derived(choiceGroups(OUTPUT_UNITS, selectedBinding?.outputUnit ?? 'percent'));
 
@@ -166,6 +168,17 @@
           {@render choices(unitGroups)}
         </select>
       </PropertyCell>
+      <PropertyCell label="Minus" span={4} hint="Read the source less another value: how far a range's end is from its start, either way round. Nothing reads the source as it is.">
+        <select class="val" aria-label="Minus" value={String(selectedBinding.minus ?? '')} title={String(selectedBinding.minus ?? '')} onchange={(e) => setBindingProp('minus', e.target.value)}>
+          {@render choices(minusGroups)}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Combine" span={4} hint="Set the target to this binding's value, or add it to what the bindings before it wrote: a range's fill moved by both its ends, a readout joined from several values.">
+        <select class="val" aria-label="Combine" value={selectedBinding.add === true ? 'add' : 'set'} onchange={(e) => setBindingProp('add', e.target.value === 'add')}>
+          <option value="set">Set the value</option>
+          <option value="add">Add to the bindings before it</option>
+        </select>
+      </PropertyCell>
       <PropertyCell label="Target" span={4} hint="Control or part path that receives the resolved output value.">
         <!-- What the path reaches, in words, over the path that edits it: the field alone read
              Parts.Cutoff.meta.sliderControl.value. -->
@@ -202,6 +215,23 @@
         <PropertyCell label="Invert" span={1} hint="Invert the input range before output mapping.">
           <PropertyToggle value={selectedBinding.invert === true} onchange={() => setBindingProp('invert', !(selectedBinding.invert === true))} />
         </PropertyCell>
+        <PropertyCell label="Inside Only" span={1} hint="Write Out Max while the source is inside In Min to In Max, and Out Min outside it, instead of a ramp between them.">
+          <PropertyToggle value={selectedBinding.band === true} onchange={() => setBindingProp('band', !(selectedBinding.band === true))} />
+        </PropertyCell>
+        <PropertyCell label="Scale" span={1} hint="How the source is read: as it is, or placed on a decibel scale from Floor dB to Ceil dB, as a meter on a decibel scale places its reading.">
+          <select class="val" aria-label="Scale" value={selectedBinding.scale === 'db' ? 'db' : 'linear'} onchange={(e) => setBindingProp('scale', e.target.value === 'db' ? 'db' : '')}>
+            <option value="linear">Linear</option>
+            <option value="db">Decibels</option>
+          </select>
+        </PropertyCell>
+        {#if selectedBinding.scale === 'db'}
+          <PropertyCell label="Floor dB" span={1} compact hint="The level in decibels at the start of the scale.">
+            <NumberCell label="Floor dB" value={selectedBinding.dbFloor ?? -60} step={1} defaultValue={-60} onchange={(value) => setBindingProp('dbFloor', value)} />
+          </PropertyCell>
+          <PropertyCell label="Ceil dB" span={1} compact hint="The level in decibels at the end of the scale.">
+            <NumberCell label="Ceil dB" value={selectedBinding.dbCeil ?? 6} step={1} defaultValue={6} onchange={(value) => setBindingProp('dbCeil', value)} />
+          </PropertyCell>
+        {/if}
         <PropertyCell label="" span={1} hint="Send the selected binding payload to the Debug panel." compact>
           <button class="action-btn" onclick={dumpBindingDebug}>Debug</button>
         </PropertyCell>
@@ -247,6 +277,32 @@
         <PropertyCell label="Decimals" span={1} compact hint="Digits after the decimal point, 0 to 8.">
           <NumberCell label="Decimals" value={selectedBinding.precision ?? 0} min={0} max={8} step={1} defaultValue={0} onchange={(value) => setBindingProp('precision', value)} />
         </PropertyCell>
+      </PropertySection>
+    {:else if selectedBinding.mapMode === 'figures'}
+      <!-- The source as a counter shows it (utils/interactionRuntime.js 'figures'): one figure of it
+           for one digit's window, or a window's opacity while the reading has that many figures.
+           Create Component from Selection writes these for a meter's counter. -->
+      <PropertySection title="Counter Figures" icon={ArrowRightLeft}>
+        <PropertyCell label="Times" span={1} compact hint="The source is multiplied by this first: 100 for a percentage of a normalized source.">
+          <NumberCell label="Times" value={selectedBinding.multiplier ?? 1} step={0.01} defaultValue={1} onchange={(value) => setBindingProp('multiplier', value)} />
+        </PropertyCell>
+        <PropertyCell label="Decimals" span={1} compact hint="Digits after the decimal point, 0 to 3, as a meter's counter writes them.">
+          <NumberCell label="Decimals" value={selectedBinding.precision ?? 0} min={0} max={3} step={1} defaultValue={0} onchange={(value) => setBindingProp('precision', value)} />
+        </PropertyCell>
+        <PropertyCell label="Figure" span={1} compact hint="Which character to write, counted from 0 at the left. Empty writes them all.">
+          <NumberCell label="Figure" value={selectedBinding.character ?? ''} allowEmpty min={0} max={12} step={1} onchange={(value) => setBindingProp('character', value === '' ? null : value)} />
+        </PropertyCell>
+        <PropertyCell label="Only At" span={1} compact hint="Write only while the figures are this many characters long; empty for always. With no Figure, it writes Shown or Hidden instead, for a window's opacity.">
+          <NumberCell label="Only At" value={selectedBinding.length ?? ''} allowEmpty min={1} max={16} step={1} onchange={(value) => setBindingProp('length', value === '' ? null : value)} />
+        </PropertyCell>
+        {#if selectedBinding.length != null && selectedBinding.length !== '' && (selectedBinding.character == null || selectedBinding.character === '')}
+          <PropertyCell label="Shown" span={1} compact hint="Written while the figures are that long.">
+            <NumberCell label="Shown" value={selectedBinding.outputMax ?? 1} step={0.05} defaultValue={1} onchange={(value) => setBindingProp('outputMax', value)} />
+          </PropertyCell>
+          <PropertyCell label="Hidden" span={1} compact hint="Written while they are not.">
+            <NumberCell label="Hidden" value={selectedBinding.outputMin ?? 0} step={0.05} defaultValue={0} onchange={(value) => setBindingProp('outputMin', value)} />
+          </PropertyCell>
+        {/if}
       </PropertySection>
     {:else}
       <PropertySection title="Direct Map" icon={ArrowRightLeft}>

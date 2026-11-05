@@ -100,6 +100,19 @@ export function createSliderSemanticParts() {
           Background: backgroundFill('{control.track}', { radius: 999 }),
         },
       }),
+      // A knob's SKIRT — a second plate between the housing and the cap: the ribbed grip round a
+      // synth knob's cap, the metal ring of a console knob, the dark well of a recessed one. Off by
+      // default; sized and drawn as the housing is, a percentage of the track's radius, under the
+      // track and the value arc. Circular geometry only.
+      bodySkirt: createPartNode('bodySkirt', {
+        role: 'bodySkirt',
+        zIndex: 0,
+        visible: false,
+        layout: { width: 90, height: 90, widthUnit: 'percent', heightUnit: 'percent' },
+        sections: {
+          Background: backgroundFill('{control.body}', { radius: 999 }),
+        },
+      }),
       bodyTrackBase: createPartNode('bodyTrackBase', {
         role: 'bodyTrackBase',
         zIndex: 0,
@@ -138,6 +151,23 @@ export function createSliderSemanticParts() {
         zIndex: 2,
         visible: false,
         layout: { width: 72, height: 72, widthUnit: 'percent', heightUnit: 'percent' },
+        sections: {
+          Background: backgroundFill('{control.cap}', {
+            borderEnabled: true,
+            borderColour: '{control.cap.edge}',
+            borderThickness: 1,
+            radius: 999,
+          }),
+        },
+      }),
+      // A knob's INSERT — a disc set into the cap, over it and under the pointer: the dark centre
+      // of a vintage knob, the ring engraved round a console cap's middle. Off by default; sized as
+      // the cap is. A ring is an insert with no fill and a border. Circular geometry only.
+      bodyInsert: createPartNode('bodyInsert', {
+        role: 'bodyInsert',
+        zIndex: 2,
+        visible: false,
+        layout: { width: 45, height: 45, widthUnit: 'percent', heightUnit: 'percent' },
         sections: {
           Background: backgroundFill('{control.cap}', {
             borderEnabled: true,
@@ -217,6 +247,15 @@ export function createSliderSemanticParts() {
         sections: {
           Background: backgroundFill('{control.tick.minor}', { radius: 999 }),
         },
+      }),
+      // The SCALE NUMBERS round a knob — 0 to 10 at even steps, as a synth's panel prints them
+      // (Behavior.scaleNumberCount, From, To). Layout.offsetX is their distance from the centre as a
+      // percentage of the track's radius; the Text section is their lettering. None by default.
+      tickNumber: createPartNode('tickNumber', {
+        role: 'tickNumber',
+        zIndex: 1,
+        layout: { offsetX: 122 },
+        sections: { Text: textSection({ size: 7, weight: 400, colour: '{text.primary}' }) },
       }),
       labelMin: createPartNode('labelMin', {
         role: 'labelMin',

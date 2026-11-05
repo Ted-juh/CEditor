@@ -7,6 +7,10 @@ import { createPanel } from '../stores/panelModel.js';
 import { setAnatomy } from './controlAnatomy.js';
 import { starterDirection } from './controlSetCoverage.js';
 import { labelTreatmentFor } from './labelDesigns.js';
+import { makeAttachedLabel, wordsWidth } from '../utils/attachedLabelFactory.js';
+import { buttonDeviceDrawn } from './buttonDeviceParts.js';
+import { anatomyForm } from './controlAnatomy.js';
+import { attachedLabelRect } from '../utils/attachedLabels.js';
 
 // Gallery and starter share ordinary controls. Materialization exposes design values in the
 // inspector; the pin keeps the design when the user copies a control to another panel.
@@ -49,22 +53,49 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
   // the starter did before sets designed labels, kept the plate sets' dark plate lettering and
   // removed the plate it is lettered on.
   const bareCaption = labelTreatmentFor(set) ? {} : { Background: { _children: { Fill: { colour: '00000000' }, Border: { enabled: false, thickness: 0 } } } };
-  function label(title, x, y, width = 250, size = 13) {
-    place('Label', x, y, width, 26, { ...bareCaption, Text: { content: title, _children: { Font: { size } } } });
+  function label(title, x, y, width = 250, size = 13, owner = null) {
+    const made = place('Label', x, y, width, 26, { ...bareCaption, Text: { content: title, _children: { Font: { size } } } });
+    // A knob's caption is attached to it: it moves, copies and deletes with it (utils/attachedLabels.js).
+    if (owner) made._children.Core.attachedTo = owner._children.Core.id;
+    return made;
+  }
+  // A Label of a knob's or slider's own: its value, or its title in its own words. A knob draws no
+  // text of its own; these are what it had (utils/attachedLabelFactory.js).
+  function attach(owner, shows, options = {}) {
+    // A title in its own words is a caption like the others, attached where its part would be.
+    if (!shows) {
+      const r = attachedLabelRect(owner, options.at || 'name', { size: 11, width: wordsWidth(options.content, 11) });
+      return label(options.content, r.x, r.y - (26 - r.height) / 2, r.width, 11, owner);
+    }
+    const n = nextId?.();
+    let made = makeAttachedLabel(owner, shows, { ...options, core: { ...(n == null ? {} : { id: `ctrl_${n}`, name: `Label_${n}` }), controlSetId: setOverride?.id ?? setId } });
+    if (materialize) made = resolveControlForSet(made, set);
+    controls.push(made);
+    return made;
+  }
+  // A key or switch the set draws from its parts prints no caption of its own: a Label shows its
+  // text under it, in the room the caption took. A flat key keeps its text on its face.
+  function caption(c) {
+    const drawn = resolveControlForSet(c, set);
+    const core = drawn._children.Core;
+    if (!buttonDeviceDrawn(drawn) || anatomyForm(core.controlType, core.controlForm)) return;
+    c._children.Transform.height = Math.max(32, c._children.Transform.height - 20);
+    attach(c, 'text');
   }
   if(direction?.physical) {
     label(set.name.toUpperCase(),26,16,650,24);
     label(direction.title,26,48,650,12);
     label('OSCILLATOR / FILTER',26,85,300); label('ENVELOPE',356,85,210); label('PERFORMANCE',586,85,250);
-    place('Knob',26,120,150,164,{Behavior:{defaultCurrentValue:.63}});
-    place('Knob',194,120,150,164,{Behavior:{defaultCurrentValue:.35}});
-    label('TUNE',26,280,150,11);label('CUTOFF',194,280,150,11);
+    const tune=place('Knob',26,120,150,150,{Behavior:{defaultCurrentValue:.63}});
+    const cutoff=place('Knob',194,120,150,150,{Behavior:{defaultCurrentValue:.35}});
+    attach(tune,'value');attach(cutoff,'value');
+    label('TUNE',26,292,150,11,tune);label('CUTOFF',194,292,150,11,cutoff);
     for(const [i,title] of ['A','D','S','R'].entries()) {
-      const c=place('Slider',356+i*50,120,44,173,{Behavior:{orientation:'vertical',direction:'btt',defaultCurrentValue:[.2,.55,.7,.35][i],showMinMaxLabels:false,showValueReadout:false}});
-      c._children.Parts._children.labelTitle._children.Text.content=title;
+      const c=place('Slider',356+i*50,120,44,155,{Behavior:{orientation:'vertical',direction:'btt',defaultCurrentValue:[.2,.55,.7,.35][i]}});
+      attach(c,'',{content:title,at:'value'});
     }
-    place('Button',586,126,116,76,{Text:{content:'TRIGGER'}});
-    place('ToggleButton',728,126,124,76,{Text:{content:'HOLD'},Behavior:{defaultValue:true}});
+    caption(place('Button',586,126,116,76,{Text:{content:'TRIGGER'}}));
+    caption(place('ToggleButton',728,126,124,76,{Text:{content:'HOLD'},Behavior:{defaultValue:true}}));
     place('CyclicButton',586,218,116,34,{Text:{content:'MODE'}});
     place('Combobox',728,218,124,34);
     place('Number',586,267,116,42);
@@ -74,7 +105,7 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
     place('Envelope',284,356,220,70);
     place('Crossfader',284,435,220,42);
     place('StepSequencer',284,489,220,77,{StepSequencer:{steps:8,trackHeaderWidth:38,running:false,tracks:[{id:'kick',label:'Kick',note:36,channel:10},{id:'hat',label:'Hat',note:42,channel:10}],pattern:{'kick:0':{on:true,velocity:100},'kick:4':{on:true,velocity:100},'hat:0':{on:true,velocity:70},'hat:2':{on:true,velocity:70},'hat:4':{on:true,velocity:70},'hat:6':{on:true,velocity:70}}}});
-    place('Meter',540,352,312,92,{Meter:{orientation:'horizontal',value:.7,valuePrecision:2}});
+    attach(place('Meter',540,352,312,72,{Meter:{orientation:'horizontal',value:.7,valuePrecision:2}}),'value');
     place('Matrix',540,466,166,100,{Matrix:{rows:['LFO','ENV','VEL'],cols:['OSC','FLT','AMP'],amounts:[.6,0,-.4,0,.7,0,0,.4,.8]}});
     place('VectorJoystick',728,466,124,100);
     label('Editable synthesizer controls — copy individual controls into your panel.',26,590,820,12);
@@ -84,13 +115,16 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
   label(direction?.title ?? 'Control set', 26, 48, 650, 12);
   label('TURN / SLIDE', 26, 82);
   label('PRESS / SELECT', 580, 82);
-  place('Knob', 26, 112, 190, 190, { Behavior: { defaultCurrentValue: 0.63 } });
-  place('Knob', 220, 125, 128, 158, { Behavior: { defaultCurrentValue: 0.35 } });
-  const slider = place('Slider', 364, 133, 190, 78, { Behavior: { defaultCurrentValue: 0.66 } });
-  slider._children.Parts._children.labelTitle._children.Text.content = 'LEVEL';
+  const big = place('Knob', 36, 112, 170, 170, { Behavior: { defaultCurrentValue: 0.63 } });
+  const small = place('Knob', 228, 132, 112, 112, { Behavior: { defaultCurrentValue: 0.35 } });
+  attach(big, 'value');
+  attach(small, 'value');
+  const slider = place('Slider', 364, 150, 190, 48, { Behavior: { defaultCurrentValue: 0.66 } });
+  attach(slider, '', { content: 'LEVEL' });
+  attach(slider, 'value');
   place('Crossfader', 364, 234, 190, 62);
-  place('Button', 576, 118, 124, 84, { Text: { content: 'TRIGGER' } });
-  place('ToggleButton', 716, 118, 136, 84, { Text: { content: 'HOLD' }, Behavior: { defaultValue: true } });
+  caption(place('Button', 576, 118, 124, 84, { Text: { content: 'TRIGGER' } }));
+  caption(place('ToggleButton', 716, 118, 136, 84, { Text: { content: 'HOLD' }, Behavior: { defaultValue: true } }));
   place('CyclicButton', 576, 220, 124, 36, { Text: { content: 'CYCLE' } });
   place('Combobox', 716, 220, 136, 36);
   place('Number', 576, direction?.padForm ? 265 : 273, 124, direction?.padForm ? 46 : 32);
@@ -100,7 +134,7 @@ export function createControlSetStarter(setId, { materialize = true, nextId = nu
   place('DrumPads', 26, 348, 228, 214, { DrumPads: { rows: 2, cols: 2, showHeader: false, showNotes: false } });
   place('Envelope', 284, 348, 220, 120);
   place('Ribbon', 284, 484, 220, 76, { Ribbon: { orientation: 'horizontal', showValue: false } });
-  place('Meter', 540, 342, 312, 108, { Meter: { orientation: 'horizontal', value: 0.7, valuePrecision: 2 } });
+  attach(place('Meter', 540, 342, 312, 86, { Meter: { orientation: 'horizontal', value: 0.7, valuePrecision: 2 } }), 'value');
   place('Matrix', 540, 466, 166, 100, { Matrix: { rows: ['LFO', 'ENV', 'VEL'], cols: ['OSC', 'FLT', 'AMP'], amounts: [.6, 0, -.4, 0, .7, 0, 0, .4, .8] } });
   place('VectorJoystick', 728, 466, 124, 100);
   if (direction?.padForm) {

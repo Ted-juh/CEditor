@@ -327,15 +327,21 @@ export function insertControlIntoTree(controls, parentId, control) {
   return inserted ? next : [...(controls ?? []), control];
 }
 
-/** Deep-clone a control with fresh panel-unique ids for it and every descendant. */
-export function remintControlIds(control) {
+/**
+ * Deep-clone a control with fresh panel-unique ids for it and every descendant. `idMap`, when given,
+ * is filled old id → new id, so whatever named an old id among the copies can be pointed at its copy
+ * (utils/attachedLabels.js remapAttachments).
+ */
+export function remintControlIds(control, idMap = null) {
   const clone = deepClone(control);
-  remintNode(clone);
+  remintNode(clone, idMap);
   return clone;
 }
 
-function remintNode(node) {
+function remintNode(node, idMap = null) {
+  const oldId = node._children.Core.id;
   node._children.Core.id = `ctrl_${Date.now()}_${(remintCounter++).toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  if (idMap && oldId != null) idMap.set(oldId, node._children.Core.id);
 
   const kids = childrenMapOf(node);
   if (kids) {
@@ -343,7 +349,7 @@ function remintNode(node) {
     const rebuilt = {};
     for (const child of Object.values(kids)) {
       if (!child?._children?.Core) continue;
-      remintNode(child);
+      remintNode(child, idMap);
       rebuilt[child._children.Core.id] = child;
     }
     node._children.Children = { ...node._children.Children, _children: rebuilt };

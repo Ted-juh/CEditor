@@ -1,3 +1,4 @@
+import { curveIsIdentity, curveSpec, fractionToTravel } from './channelCurves.js';
 import { deepClone } from './deepClone.js';
 import { resolveRadioSelectedKeys } from './radioSegmentStyle.js';
 import { setNestedValue } from '../stores/controlTreeUtils.js';
@@ -28,11 +29,12 @@ import {
   isSliderDirty,
 } from './sliderBehavior.js';
 import { sliderValueToAngle } from './sliderGeometry.js';
+import { decibelPosition } from './meterLayout.js';
 import { materializeCustomComponent } from './customComponentMaterializer.js';
 import { applyCustomInternalScale } from './customComponentScale.js';
 import { attachBooleanInputs } from './booleanGroups.js';
 import { applyActiveVariant, applyVariantPatches } from './customComponentVariants.js';
-import { constrainCustomValues, customConditionMatches } from './customComponentInteraction.js';
+import { constrainCustomValues, customConditionMatches, sourcedCustomValues } from './customComponentInteraction.js';
 import { clamp } from './primitives.js';
 import { formatChannelValue } from './valueDisplayScale.js';
 import { visibleChoiceRows, dependsOnId } from './dependentChoices.js';
@@ -224,6 +226,20 @@ function evaluateBindingSource(binding, signals) {
   }
 }
 
+/**
+ * What a binding reads: its source, or, with `minus` naming another source, the source less that
+ * one: a range's end less its start, how far apart its handles are and which way round. A `minus`
+ * that reads nothing takes nothing off. Its Scale and its map apply to the difference.
+ */
+export function bindingSourceValue(binding, signals) {
+  const value = evaluateBindingSource(binding, signals);
+  const minus = String(binding?.minus ?? '').trim();
+  if (!minus) return value;
+  const less = Number(evaluateBindingSource({ source: minus }, signals));
+  const read = Number(value);
+  return Number.isFinite(read) && Number.isFinite(less) ? read - less : value;
+}
+
 function resolveBindingValue(binding, sourceValue) {
   if (binding?.mapMode === 'direct') {
     return sourceValue;
@@ -238,6 +254,25 @@ function resolveBindingValue(binding, sourceValue) {
       ? ((numeric * multiplier) + offset).toFixed(precision)
       : String(sourceValue ?? '');
     return `${binding?.prefix ?? ''}${formatted}${binding?.suffix ?? ''}`;
+  }
+
+  if (binding?.mapMode === 'figures') {
+    // The source as a counter shows it (utils/meterParts.js meterFigures): times `multiplier`, to
+    // `precision` decimals (0 to 3). With `character` set, that one figure ('' past the end); with
+    // `length` set, only while the figures are that many characters long ('' otherwise). With
+    // `length` and no `character`, a number instead: `outputMax` (1) while they are, `outputMin` (0)
+    // while not, for a window that shows only for that many figures.
+    const read = Number(sourceValue);
+    // A meter's percentage on a decibel scale is of where the reading stands on it.
+    const numeric = binding?.scale === 'db' && Number.isFinite(read) ? decibelPosition(read, binding?.dbFloor, binding?.dbCeil) : read;
+    const precision = Math.max(0, Math.min(3, Math.round(numberOr(binding?.precision, 0))));
+    const figures = (Number.isFinite(numeric) ? numeric * numberOr(binding?.multiplier, 1) : 0).toFixed(precision);
+    const length = binding?.length == null || binding.length === '' ? null : Math.round(numberOr(binding.length, 0));
+    const matches = length === null || figures.length === length;
+    const character = binding?.character == null || binding.character === '' ? null : Math.round(numberOr(binding.character, 0));
+    if (character === null && length !== null) return matches ? numberOr(binding?.outputMax, 1) : numberOr(binding?.outputMin, 0);
+    if (!matches) return '';
+    return character === null ? figures : (figures[character] ?? '');
   }
 
   if (binding?.mapMode === 'template') {
@@ -259,6 +294,18 @@ function resolveBindingValue(binding, sourceValue) {
 
   let numeric = Number(sourceValue);
   if (!Number.isFinite(numeric)) numeric = numberOr(binding?.inputMin, 0);
+  // On a decibel scale (`scale: 'db'`, from `dbFloor` to `dbCeil`): the source, a fraction 0..1, is
+  // first placed where a meter on that scale places it (meterLayout's decibelPosition).
+  if (binding?.scale === 'db') numeric = decibelPosition(numeric, binding?.dbFloor, binding?.dbCeil);
+
+  // Only inside (`band`): Out Max while the source is inside In Min to In Max (the upper end left
+  // out), Out Min outside it. A meter's segment marked while its peak is in it.
+  if (binding?.band === true) {
+    const lo = Math.min(numberOr(binding?.inputMin, 0), numberOr(binding?.inputMax, 1));
+    const hi = Math.max(numberOr(binding?.inputMin, 0), numberOr(binding?.inputMax, 1));
+    const inside = Number.isFinite(Number(sourceValue)) && numeric >= lo && numeric < hi;
+    return inside !== (binding?.invert === true) ? numberOr(binding?.outputMax, 100) : numberOr(binding?.outputMin, 0);
+  }
 
   let inputMin = numberOr(binding?.inputMin, 0);
   let inputMax = numberOr(binding?.inputMax, 1);
@@ -398,6 +445,11 @@ export const PART_PATH_BUCKETS = {
   // this target it fades: the renderer keeps such a part mounted while hidden, so there is a
   // `visibility: hidden; opacity: 0` to ease to and from (utils/transitionCss.js).
   visible: 'visibility',
+  // An arc layer's sweep and start, which a value moves (a knob's value arc, a meter's fill). They
+  // are drawn as SVG attributes, which CSS cannot ease, so InteractivePartRenderer eases them in JS
+  // on this bucket's timing.
+  'meta.arcTrack.sweepAngle': 'size',
+  'meta.arcTrack.startAngle': 'size',
 };
 
 export const ROOT_PATH_BUCKETS = {
@@ -690,13 +742,21 @@ function normalizeCustomChannelValue(channel = null, rawValue = 0) {
   const min = numberOr(channel?.min, 0);
   const max = Math.max(min, numberOr(channel?.max, min + 1));
   const numeric = numberOr(rawValue, numberOr(channel?.defaultValue, min));
-  return clamp(normalizeRange(numeric, min, max), 0, 1);
+  const fraction = clamp(normalizeRange(numeric, min, max), 0, 1);
+  // Where the control is drawn is its travel, through the channel's curve (utils/channelCurves.js):
+  // a pointer bound to `.normalized` turns as far as the knob was turned, not as far as the value went.
+  const mode = channel?.curve?.mode;
+  if (!mode || mode === 'linear') return fraction;
+  const spec = curveSpec(channel);
+  return curveIsIdentity(spec) ? fraction : fractionToTravel(spec, fraction);
 }
 
 function resolveCustomComponentInteractionContext(control, previewSession = {}) {
   const core = getNodeChild(control, 'Core');
   const channels = getValueChannels(control);
-  const constrainedCustomValues = constrainCustomValues(control, previewSession?.customValues ?? {});
+  // A value that takes it from another of the component's (`valueSource: 'channel:<name>'`) follows
+  // it here, wherever the component is drawn; the panel fills a panel control's in before this.
+  const constrainedCustomValues = constrainCustomValues(control, sourcedCustomValues(control, previewSession?.customValues ?? {}));
   const mainChannel = channels.mainValue
     ?? Object.values(channels).find((channel) => ! ['enum', 'array'].includes(String(channel?.type ?? '').trim().toLowerCase()))
     ?? Object.values(channels)[0]
@@ -716,6 +776,20 @@ function resolveCustomComponentInteractionContext(control, previewSession = {}) 
     const channelRaw = constrainedCustomValues?.[name] ?? channel?.currentValue ?? channel?.defaultValue;
     channelSignals[`channel.${name}.raw`] = channelRaw;
     channelSignals[`channel.${name}.normalized`] = normalizeCustomChannelValue(channel, channelRaw);
+    // The travel from the centre, -1 to 1: what a Bipolar channel's artwork grows from (a value
+    // arc both ways from the top). Every scalar channel has it; the binding Source offers it for
+    // Bipolar ones (utils/bindingSourceOptions.js).
+    channelSignals[`channel.${name}.bipolar`] = (channelSignals[`channel.${name}.normalized`] * 2) - 1;
+    // A channel that holds its peak (`peakHold`, a meter's: hold time, fall rate): the peak the
+    // preview has held (PanelPreviewSurface), or, where nothing is running, what the meter it came
+    // from shows then: the value itself (a device meter's clip lamp), or nothing (a plain meter's
+    // marker, `idle: 'none'`).
+    if (channel?.peakHold) {
+      const held = Number(previewSession?.customPeaks?.[name]);
+      channelSignals[`channel.${name}.peak`] = Number.isFinite(held)
+        ? held
+        : (String(channel.peakHold.idle ?? 'value') === 'none' ? undefined : channelSignals[`channel.${name}.normalized`]);
+    }
     // The channel's own formatting AND its display scale — a knob bound to a parameter stored
     // 61..67 and printed -3..+3 read 64 here where the instrument reads 0. String(raw) also threw
     // away the channel's prefix/suffix/unit/precision, which nothing had ever applied.
@@ -937,12 +1011,25 @@ export function applyCustomBindings(control, signals = {}) {
   if (!bindings || bindings.enabled === false) return control;
   for (const binding of Object.values(bindings?._children ?? {})) {
     if (!binding || binding.enabled === false) continue;
-    const sourceValue = evaluateBindingSource(binding, signals);
+    const sourceValue = bindingSourceValue(binding, signals);
     const resolvedValue = resolveBindingValue(binding, sourceValue);
     if (resolvedValue === undefined) continue;
-    setTreeValueAtPath(control, binding.target, resolvedValue);
+    setTreeValueAtPath(control, binding.target, binding.add === true
+      ? addedBindingValue(treeValueAtPath(control, binding.target), resolvedValue)
+      : resolvedValue);
   }
   return control;
+}
+
+/**
+ * A binding that adds (`add`): its result added to the property as the bindings before it left it,
+ * or as the layer has it. One property moved by two values: a range's fill as long as its end less
+ * its start, a sweep from one handle to the other, a readout that is the start, a dash and the end.
+ * Numbers add; text is joined.
+ */
+export function addedBindingValue(previous, value) {
+  if (typeof value === 'string' || typeof previous === 'string') return `${previous ?? ''}${value}`;
+  return numberOr(previous, 0) + numberOr(value, 0);
 }
 
 /**

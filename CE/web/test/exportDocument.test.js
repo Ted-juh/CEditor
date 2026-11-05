@@ -55,3 +55,39 @@ test('what the app hands the exporter is the payload, through its whole preparat
   assert.equal(await exportFormFor(prepared), prepared, 'so the exporter leaves it exactly as the app made it');
   assert.equal(prepared.exportParameters.length, 60, 'with the host parameters derived from whole controls');
 });
+
+// Rendered looks (utils/renderedLookCore.js): the editor bakes their images into its export; a saved
+// file exported by the tools is baked in headless Chromium (tools/scripts/lib/bakeRenderedLooks.mjs).
+const renderedStarter = () => {
+  const doc = JSON.parse(readFileSync(new URL('../../panels/Control set starters/brassworks.cepanel', import.meta.url), 'utf8'));
+  const first = (type) => doc.controls.find((control) => control._children.Core.controlType === type);
+  const mark = (control, part, props) => {
+    const parts = control._children.Parts ??= { _type: 'Parts', _children: {} };
+    parts._children ??= {};
+    parts._children[part] = { ...(parts._children[part] ?? {}), ...props };
+  };
+  mark(first('Knob'), 'bodyCap', { look: 'rendered', renderProfile: 'knurled', turns: true });
+  mark(first('Slider'), 'pointerCurrent', { look: 'rendered', kind: 'block', renderTop: 'ridged' });
+  mark(first('Button'), 'key', { look: 'rendered', renderTop: 'dish' });
+  return doc;
+};
+
+test('a panel with no rendered part asks for no images and starts no browser', async () => {
+  const { bakeRenderedLookImages } = await import('../../../tools/scripts/lib/bakeRenderedLooks.mjs');
+  const { deserializePanel } = await import('../src/CE_Application/stores/panelModel.js');
+  const doc = read('QA-08-export.cepanel');
+  const panel = deserializePanel(JSON.stringify(doc), 'QA-08-export.cepanel', doc.name ?? null);
+  assert.deepEqual(await bakeRenderedLookImages(panel), { images: {}, wanted: 0, reason: '' });
+  assert.equal((await exportFormFor(doc, 'QA-08-export.cepanel')).renderedLookImages, undefined);
+});
+
+test('a saved panel\'s rendered parts are baked into its export where a browser is', { skip: !process.env.CHROMIUM_PATH && 'set CHROMIUM_PATH to draw them' }, async () => {
+  const payload = await exportFormFor(renderedStarter(), 'brassworks.cepanel');
+  const specs = Object.keys(payload.renderedLookImages ?? {}).map((key) => JSON.parse(key)[0]);
+  // Eight turns of the knurled cap, the ridged fader cap and the dished key: what the parts ask for.
+  assert.equal(specs.length, 10);
+  assert.equal(specs.filter((spec) => spec.shape === 'knurled').length, 8);
+  assert.deepEqual(specs.filter((spec) => spec.shape === 'block').map((spec) => spec.topKind).sort(), ['dish', 'ridged']);
+  assert.ok(specs.every((spec) => spec.body !== '#C9CCD0' && spec.body !== '#2A2D31'), 'each coloured as its set draws it, not the fallback');
+  for (const url of Object.values(payload.renderedLookImages)) assert.match(url, /^data:image\/png;base64,/);
+});

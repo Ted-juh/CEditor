@@ -14429,51 +14429,18 @@ Good to know:
 
 *Short name: `meterGradient`.*
 
-##### `ce.components.meter.label(target, label) -> boolean`
-
-Set the caption shown with the meter.
-
-Example: `ce.components.meter.label("Meter", "OUT")` captions the meter OUT.
-
-- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `label` (text, required): The caption.<br>Shown above or below the meter, as `labelPosition()` says.<br>A number: written as text.<br>Left out: rejected with a console error.
-
-Good to know:
-
-- Returns true. Already set: true, with a console line.
-- Rejected: false, with a console error. Nothing changes.
-
-*Short name: `meterLabel`.*
-
-##### `ce.components.meter.labelPosition(target, labelPosition) -> boolean`
-
-Set where the caption sits.
-
-Example: `ce.components.meter.labelPosition("Meter", "below")` puts the caption under the meter.
-
-- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `labelPosition` (text, required): "none": hidden.<br>"above": above the meter.<br>"below": below it.<br>Case-insensitive.<br>Invalid: rejected with a console error.
-
-Good to know:
-
-- Default: "none".
-- Returns true. Already set: true, with a console line.
-- Rejected: false, with a console error. Nothing changes.
-
-*Short name: `meterLabelPosition`.*
-
 ##### `ce.components.meter.valuePrecision(target, valuePrecision) -> boolean`
 
-Set how many decimal places the readout shows.
+Set how many decimal places a Label showing the reading prints.
 
-Example: `ce.components.meter.valuePrecision("Meter", 2)` shows the readout with two decimal places.
+Example: `ce.components.meter.valuePrecision("Meter", 2)` prints the reading with two decimal places.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
 - `valuePrecision` (number, required): Decimal places.<br>Range: 0 ↔ 6, whole.<br>A fraction: rounded.<br>Outside the range: the nearest end.<br>Invalid: rejected with a console error.
 
 Good to know:
 
-- The readout shows while `showValue()` is on.
+- The meter prints no reading itself: a Label showing its value does, as this says.
 - Default: 0.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
@@ -14482,9 +14449,9 @@ Good to know:
 
 ##### `ce.components.meter.valuePrefix(target, valuePrefix) -> boolean`
 
-Set the text before the number in the readout and the scale labels.
+Set the text before the number in the reading and the scale labels.
 
-Example: `ce.components.meter.valuePrefix("Meter", "Gain ")` shows the readout as Gain 1.
+Example: `ce.components.meter.valuePrefix("Meter", "Gain ")` prints the reading as Gain 1.
 
 - `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
 - `valuePrefix` (text, required): The text.<br>On a dB scale, the scale labels say "dB" instead.<br>A number: written as text.<br>Left out: rejected with a console error.
@@ -14498,7 +14465,7 @@ Good to know:
 
 ##### `ce.components.meter.valueSuffix(target, valueSuffix) -> boolean`
 
-Set the text after the number in the readout and the scale labels.
+Set the text after the number in the reading and the scale labels.
 
 Example: `ce.components.meter.valueSuffix("Meter", " ms")` writes ms after the number.
 
@@ -14559,7 +14526,7 @@ Example: `ce.components.meter.showTicks("Meter")` shows the ticks if they are hi
 
 Good to know:
 
-- How many divisions: set in the inspector, under Scale & readout. Default: 4.
+- How many divisions: set in the inspector, under Scale & reading. Default: 4.
 - Default: hidden.
 - Returns true. Already set: true, with a console line.
 - Rejected: false, with a console error. Nothing changes.
@@ -14583,24 +14550,6 @@ Good to know:
 - Rejected: false, with a console error. Nothing changes.
 
 *Short name: `meterShowScaleLabels`.*
-
-##### `ce.components.meter.showValue(target [, showValue]) -> boolean`
-
-Show or hide the readout: the value as a number.
-
-Example: `ce.components.meter.showValue("Meter")` shows the value if it is hidden, and hides it if it is shown.
-
-- `target` (control name, required): The Meter's control, by name.<br>Not a Meter: rejected with a console error.
-- `showValue` (true or false, optional): Left out: toggles.<br>0, "", "false", "off" or "0": false. Case-insensitive.<br>Any other value: true.
-
-Good to know:
-
-- Written with `valuePrecision()`, `valuePrefix()` and `valueSuffix()`, as the value is: not in decibels.
-- Default: hidden; a Progress Bar's: shown.
-- Returns true. Already set: true, with a console line.
-- Rejected: false, with a console error. Nothing changes.
-
-*Short name: `meterShowValue`.*
 
 ##### `ce.components.meter.read(target [, name [, index]]) -> value`
 

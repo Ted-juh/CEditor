@@ -5,6 +5,9 @@ import { ensureTs, transpileTs } from '../scripting/tsService.js';
 import { packagePanelForSharing, openSharedPanel } from './panelSharing.js';
 import { exportFormDocument } from './panelModel.js';
 import { controlsInTree } from '../scripting/scriptPanelExport.js';
+import { bakeRenderedLooks } from '../utils/renderedLook.js';
+import { getControlSet, isTokenReference, resolveColourLiteral } from '../models/controlSets.js';
+import { resolveControlForSet } from '../models/controlSetFamilies.js';
 
 /**
  * Prepare the same document for either native exporter: assets carried, TypeScript compiled,
@@ -40,6 +43,21 @@ export async function preparePanelForExport(serialized) {
   panel.scripting = { ...(panel.scripting ?? {}), modules: modules.enabled, apiVersion: CE_API_VERSION };
   if (extensions.length) panel.scripting.extensions = extensions;
   else delete panel.scripting.extensions;
+  // Rendered looks (utils/renderedLook.js), baked here where WebGL is, so the plug-in carries their
+  // images and needs none: the owner's choice, live in the editor and baked at export.
+  // Each control as it is drawn, its set's family applied and its colour roles resolved, so the
+  // images are the ones its parts ask for in the plug-in.
+  const sources = { document: panel.controlSets ?? [] };
+  const panelSet = getControlSet(panel.controlSet?.id, sources);
+  const looks = await bakeRenderedLooks(controlsInTree(panel.controls), {
+    lamp: panelSet?.lamp ?? null,
+    resolve: (control) => resolveControlForSet(control, panelSet, sources),
+    // A component's state may colour a rendered layer by a role; it draws in the set's colour.
+    resolveColour: (value) => (isTokenReference(value) ? resolveColourLiteral(value, panelSet, value) : value),
+  });
+  if (Object.keys(looks.images).length) panel.renderedLookImages = looks.images;
+  else delete panel.renderedLookImages;
+  if (looks.failed) console.warn(`[export] ${looks.failed} rendered look image(s) could not be made; those parts draw their plain fill in the plug-in.`);
   panel.exportParameters = deriveExportParameters(panel);
   // Last, because everything above reads whole controls (exportFormDocument says why).
   return JSON.stringify(exportFormDocument(panel));

@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "42404ffa",
+  "fingerprint": "d17fbabf",
   "set": {
     "id": "chrome",
     "name": "Chrome",
@@ -80,8 +80,6 @@
     "families": {
       "Knob": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelReadoutPlacement": "bottom",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 5,
           "Behavior.minorTickCount": 2,
@@ -459,11 +457,13 @@
             "Background.Fill.gradientEnabled": false,
             "Background.Border.enabled": false,
             "Background.Corners.radius": 0,
+            "shape": "path",
+            "shapePath": "M0 0 L1 0 L1 0.847 L0 1 Z",
+            "shapePathOn": "M0 0.169 L1 0.169 L1 0.983 L0 0.983 Z",
             "Layout.x": 30,
             "Layout.y": 11.25,
             "Layout.width": 40,
-            "Layout.height": 65,
-            "travelY": 12.5
+            "Layout.height": 73.75
           },
           "symbol": {
             "visible": true,
@@ -477,7 +477,21 @@
             "Layout.width": 27.5,
             "Layout.height": 10,
             "activeColour": "{accent}",
-            "follows": "key"
+            "travelY": 11.25
+          },
+          "indicator": {
+            "visible": true,
+            "opacity": 0.3,
+            "Background.Fill.colour": "FFF2F2F2",
+            "Background.Fill.gradientEnabled": false,
+            "Background.Border.enabled": false,
+            "Background.Corners.radius": 0,
+            "shape": "path",
+            "shapePath": "M0 0 L1 0 L1 0.167 L0 0.167 Z M0 0.833 L1 0.833 L1 1 L0 1 Z",
+            "Layout.x": 36.25,
+            "Layout.y": 58.13,
+            "Layout.width": 27.5,
+            "Layout.height": 7.5
           }
         }
       },
@@ -542,9 +556,6 @@
       },
       "Slider": {
         "component": {
-          "Behavior.showMinMaxLabels": false,
-          "Behavior.labelTitlePlacement": "topLeft",
-          "Behavior.labelReadoutPlacement": "topRight",
           "Behavior.showTicks": true,
           "Behavior.majorTickCount": 11,
           "Behavior.minorTickCount": 1,

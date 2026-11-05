@@ -10,6 +10,13 @@ for (const [type, forms] of Object.entries(CONTROL_FORMS)) {
   for (const d of ADDITIONAL_DIRECTIONS) forms.push([`new-${d.id}`, `${d.name} ${type === 'Knob' ? d.rotary : type === 'Meter' ? 'indicator' : type === 'ToggleButton' ? 'switch' : 'key'}`]);
 }
 export const FORM_SETS = ['graphite','blueprint','pop','soft','frost','obsidian','console','carbon','machined','tolex','field','phosphor',...ADDITIONAL_DIRECTIONS.map(d=>d.id)];
+// The twelve mechanical forms (new-iris, new-satellite…) are drawn whole by editor/AdditionalAnatomy.svelte:
+// no parts to edit and no Convert to Parts, only colours, size and depth. The tabs and pickers call them
+// illustrations (models/controlSets.js ILLUSTRATED_CONTROL_SET_IDS).
+// (ADDITIONAL_DIRECTIONS goes on with the 36 synth sets, whose forms are parts: those are not.)
+const ILLUSTRATED_FORMS = new Set(ADDITIONAL_DIRECTIONS.filter((d) => !d.physical).map((d) => `new-${d.id}`));
+/** Whether a form is one of those whole drawings. */
+export function isIllustratedForm(form) { return ILLUSTRATED_FORMS.has(String(form ?? '')); }
 export function anatomyOptions(type) { return CONTROL_FORMS[type] ?? (['MomentaryButton','TimedButton','OneShotButton'].includes(type) ? CONTROL_FORMS.Button : type === 'ProgressBar' ? CONTROL_FORMS.Meter : []); }
 export function anatomyForm(type, form) { return anatomyOptions(type).some(([id]) => id === form) ? form : ''; }
 export function setAnatomy(type, id) { return anatomyOptions(type)[FORM_SETS.indexOf(id)]?.[0] ?? ''; }

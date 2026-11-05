@@ -250,7 +250,7 @@
     { id: 'slider',     icon: SlidersHorizontal, label: 'Slider', section: 'Behavior', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
     // A button's or a switch's own parts (models/buttonDeviceParts.js); called Switch on a toggle.
     { id: 'button',     icon: RectangleHorizontal, label: 'Button', section: 'Parts', when: (control) => BUTTON_DEVICE_TYPES.has(String(getSection(control, 'Core')?.controlType ?? '')) && !!getSection(control, 'Parts')?._children?.key },
-    { id: 'label',      icon: Type,          label: 'Label',      section: 'Parts', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
+    { id: 'label',      icon: Type,          label: 'Labels',     section: 'Parts', when: (control) => String(getSection(control, 'Behavior')?.family ?? '').trim().toLowerCase() === 'range' && String(getSection(control, 'Behavior')?.role ?? '').trim().toLowerCase() === 'slider' },
     // Custom components edit states/bindings/animations (and links) inside
     // the React tab; the standalone tabs remain for every other control.
     { id: 'states',     icon: Workflow,      label: 'States',     section: 'States', when: (control) => String(getSection(control, 'Core')?.controlType ?? '') !== 'CustomComponent' },

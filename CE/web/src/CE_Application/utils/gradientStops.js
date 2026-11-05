@@ -92,3 +92,39 @@ export function svgGradientStops(grad) {
 
   return out;
 }
+
+/**
+ * A gradient's stops as SVG blends them, for CSS to draw: `[{ color, position }]`, AARRGGBB or
+ * RRGGBB. SVG blends a stop's colour and its opacity apart; CSS, which draws a layer's gradient,
+ * blends them premultiplied. Between a clear white and an opaque face, or a face and a half-clear
+ * black, the two part by a fifth of the shading, so a drawing's dome, or a device part's (drawn in
+ * SVG: editor/ButtonDeviceParts.svelte), came out flatter as a layer. Here the SVG blend is sampled
+ * every two and a half percent and at each stop, and CSS blends only between samples close enough
+ * to agree. Stops that are all opaque blend the same either way and come back as they were, as do
+ * stops holding a colour role, which has no colour to blend until it is drawn.
+ */
+export function unpremultipliedStops(stops) {
+  const parsed = (stops ?? []).map((stop) => {
+    const hex = String(stop?.color ?? '').replace(/^#/, '');
+    if (/^[0-9a-f]{8}$/i.test(hex)) return { position: Number(stop.position), alpha: parseInt(hex.slice(0, 2), 16), rgb: hex.slice(2) };
+    if (/^[0-9a-f]{6}$/i.test(hex)) return { position: Number(stop.position), alpha: 255, rgb: hex };
+    return null;
+  });
+  if (parsed.length < 2 || parsed.some((stop) => !stop || !Number.isFinite(stop.position))) return stops;
+  if (parsed.every((stop) => stop.alpha === 255)) return stops;
+  const sorted = [...parsed].sort((a, b) => a.position - b.position);
+  const channels = (hex) => [0, 2, 4].map((i) => parseInt(hex.slice(i, i + 2), 16));
+  const hex2 = (n) => Math.round(Math.max(0, Math.min(255, n))).toString(16).padStart(2, '0').toUpperCase();
+  const at = new Set(sorted.map((stop) => stop.position));
+  for (let step = 0; step <= 40; step += 1) at.add(step * 2.5);
+  return [...at].sort((a, b) => a - b).map((position) => {
+    let i = 0;
+    while (i < sorted.length - 2 && position > sorted[i + 1].position) i += 1;
+    const from = sorted[i];
+    const to = sorted[Math.min(sorted.length - 1, i + 1)];
+    const span = to.position - from.position;
+    const t = span > 0 ? Math.max(0, Math.min(1, (position - from.position) / span)) : (position >= to.position ? 1 : 0);
+    const [a, b] = [channels(from.rgb), channels(to.rgb)];
+    return { color: `${hex2(from.alpha + (to.alpha - from.alpha) * t)}${a.map((v, k) => hex2(v + (b[k] - v) * t)).join('')}`, position };
+  });
+}

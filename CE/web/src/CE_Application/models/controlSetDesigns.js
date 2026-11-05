@@ -80,8 +80,6 @@ function outerGlow(blur, colour) {
   return { enabled: true, type: 'outer-glow', offsetX: 0, offsetY: 0, blur, spread: 0, colour };
 }
 
-/** The labels every board drew: title left and value right above the track, no min/max. */
-const BOARD_LABELS = { 'Behavior.showMinMaxLabels': false, 'Behavior.labelTitlePlacement': 'topLeft', 'Behavior.labelReadoutPlacement': 'topRight' };
 function ticks({ count = 11, minor = 0, length = 5, kind = 'line', placement = 'outside', stops = null, numerals = null, width = 1.5, colour = null, minorColour = null } = {}) {
   const component = { 'Behavior.showTicks': true, 'Behavior.majorTickCount': count, 'Behavior.minorTickCount': minor, 'Behavior.majorTickLength': length, 'Behavior.tickPlacement': placement };
   if (stops) component['Behavior.tickStops'] = stops;
@@ -105,7 +103,7 @@ function handles(cap, { start = '{control.cap.start}', end = '{control.cap.end}'
   };
 }
 function slider(scale, parts, component = {}) {
-  return { Slider: { component: { ...BOARD_LABELS, ...scale.component, ...component }, parts: { ...scale.parts, ...parts } } };
+  return { Slider: { component: { ...scale.component, ...component }, parts: { ...scale.parts, ...parts } } };
 }
 
 // ---- sliders ----------------------------------------------------------------------------------
@@ -425,9 +423,9 @@ export const EDITOR_PATHS = [
   /^Layout\.(x|y|width|height|offsetX|offsetY|xUnit|yUnit|widthUnit|heightUnit|anchorX|anchorY|rotation)$/,
   // A part's own visibility and opacity, on the part editor's header.
   /^(visible|opacity)$/,
-  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|showMinMaxLabels|labelTitlePlacement|labelReadoutPlacement|circularFit)$/,
+  /^Behavior\.(showTicks|majorTickCount|minorTickCount|majorTickLength|tickPlacement|tickStops|tickNumerals|valueLabelPlacement|circularFit|tickRadius|secondScaleRadius|secondScaleCount|scaleNumberCount|scaleNumberFrom|scaleNumberTo)$/,
   /^Text\.Fill\.colour$/,
-  /^Text\.Font\.(family|weight|weightValue|letterSpacing)$/,
+  /^Text\.Font\.(family|weight|weightValue|letterSpacing|size)$/,
   /^Text\.Effects\.(shadowEnabled|shadowStyle|shadowOffsetX|shadowOffsetY|shadowBlur|shadowColour|glowEnabled|glowSize|glowIntensity|glowColour)$/,
   /^ContentLayout\.(lamp|lampSize|lampSide|lampGap|lampColour|lampOffColour|lampBezelColour)$/,
   /^States\.Selected$/,
@@ -435,8 +433,15 @@ export const EDITOR_PATHS = [
   /^(kind|grooveColour|plateColour|sheen|shadow|glow|slot|inset)$/,
   // A knob's cap and housing outline (utils/knobOutlines.js), the knob forms as parts.
   /^(outline|outlineCount|outlineDepth|outlineRotation|turns)$/,
+  // A knob plate's shadow and perspective, a bar pointer's taper (the synth sets' knobs as parts,
+  // models/directionKnobParts.js).
+  /^(shadowOffset|shadowColour|shadowBlur|taper|aspect|shiftY)$/,
+  // A plate's grooves (Precision's knurling) and a second bar on the pointer (Dual Scale's).
+  /^(grooves|grooveLength|grooveWidth|markFrom|markTo|markWidth|markColour)$/,
+  // A plate drawn as a rendered object (utils/renderedLook.js, piece E).
+  /^(look|renderProfile|renderCount|renderDepth|renderTaper|renderHeight|renderTop|renderMaterial|renderTopMaterial|renderTopColour|renderCorner)$/,
   // A button's or a switch's device parts (models/buttonDeviceParts.js), the forms as parts.
-  /^(shape|shapeDepth|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
+  /^(shape|shapeDepth|shapePath|shapePathOn|pattern|patternCount|patternRows|travelX|travelY|swing|pivotX|pivotY|follows|activeColour|activeOpacity|offText|onText|fontSize)$/,
   // A meter's parts (models/meterDeviceParts.js), the meter forms as parts.
   /^(motion|fillFrom|lightFrom|source|cellWidth|cellHeight|zoneFrom|zoneColours|clipFrom|textSource|legendText|fontFamily|majorCount|minorCount|majorLength|minorLength|majorWidth|minorWidth|numerals|numeralSize|numeralPlacement|numeralUnits)$/,
   /^Listbox\.(cardRows|rowHeight|selectionStyle|zebra|accentColour)$/,

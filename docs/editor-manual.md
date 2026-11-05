@@ -266,6 +266,48 @@ clicked. **Ctrl+D** duplicates the selection, a little offset. **Delete** remove
 **Copy Style** (Ctrl+Alt+C) and **Paste Style** (Ctrl+Alt+V) copy the look of one control — its
 background, border, text styling, icon and effects — onto others, without changing what they do.
 
+### A knob's name, value and range
+
+A knob or a slider draws no text of its own. Its name, its value and the ends of its range are
+Labels of their own beside it, so every text setting applies to them and they go wherever you put
+them. A knob you insert comes without any; add the ones you want.
+
+Select the knob and open its **Labels** tab. It lists the Labels attached to the knob, each with
+what it reads and a **Select** button, and adds one with **+ Name**, **+ Value**, **+ Min**, **+ Max**
+or **+ Unit** (and **+ Start** and **+ End** for a range): the name above the knob, the value below
+it, min and max beside the ends of the arc or under the ends of the track, each as wide as its
+words. The control set letters it as it letters that part of a knob.
+
+On any Label's **Text** tab, **Shows** chooses what it reads: its own text, or the value, name, min,
+max, unit, start or end of a control. On the canvas it reads the control as it is set up; in
+Preview, the player and the plug-in it follows the live value, printed as the control prints it (a
+frequency, a note name, a plus sign). **Attached to** names the control the Label belongs to;
+**Detach** sets it free, and it goes on showing that control.
+
+An attached Label moves with its control however the control is moved (a drag, the arrow keys, the
+X and Y fields, Align, a script), is copied with it by Copy and Paste, Duplicate and Alt+drag and
+attached to the copy, goes into a container with it, and is deleted with it. Moved on its own, it
+stays where you put it. **Alt+click** selects a control together with its Labels, and the component
+tree lists them under it. Selected with the knob for **Create Component from Selection**, they come
+in too, the value as a layer that follows the knob's value.
+
+The labels that ride a knob's or slider's handles as they move are still its own: **Handle Labels**
+on its Labels tab.
+
+A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
+at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,
+prefix and suffix), **+ Name**, **+ Min**, **+ Max**, **+ Unit** and **+ Caption** (your own words).
+Its scale numbers, and a legend its design prints in its window, stay part of the meter.
+
+A key or switch your set draws as a device (a key in a housing, a lever, a rocker) prints its
+caption beside or under itself, in the set's lettering. Make the caption a Label of its own with
+**+ Text** in the **Labels** section at the top of its **Button** tab: the Label shows the button's
+own text, so a script or a state that changes the text changes the Label, and every text setting
+applies to it. A button whose text a Label shows prints none itself, so the device takes its whole
+box. A flat button keeps the text printed on its face, where it lights up and moves with the key;
+**+ Text** works there too, if you would rather have the words beside it. Sets drawn as
+illustrations (Iris, Satellite and the classic forms) print their captions as part of the drawing.
+
 ### Containers and grouping
 
 A **container** holds other controls, so that they move together. **Ctrl+G** (Edit → Group into
@@ -338,15 +380,51 @@ and **Device** (what it is bound to).
 - Many tabs have **Presets** at the bottom, to save a look and apply it again.
 
 A knob, a button and a switch each have a tab for the parts they are drawn with: **Knob** (housing,
-track and value arc, cap, pointer), **Button** and, on a toggle, **Switch**. The Button and Switch
+skirt, track and value arc, cap, insert, pointer), **Button** and, on a toggle, **Switch**. On the
+Knob tab the **Housing**, **Skirt**, **Cap** and **Insert** are plates, one over the other: each has
+an **Outline** (a circle, a polygon, a rounded square, a scallop, flutes, a **Gear**, the ribbed
+grip of a synth knob, a **Chicken-head**, or a ring), a size, a fill and a border, a finish, and a
+**Shadow** on the panel: its outline again, lower by **Shadow %** of its radius, its edge as soft as
+**Softness %** (with no drop and a bright colour, a glow). **Height %** makes a plate an oval, a
+round part seen at an angle, and **Offset Y %** moves it down or up: a side wall under a top, a cap
+lifted off it. An oval that turns turns as a gimbal does. An insert with no fill and a border is a
+ring engraved in the cap. A plate's **Look** is **Flat**, drawn from those fields, or **Rendered**:
+drawn as a lit, three-dimensional object, lit from the set's **Lamp**. A rendered plate has its own
+fields instead: **Size**, **Turns**, a **Profile** (smooth, knurled or fluted) with its **Ridges** and
+their **Depth**, a **Taper**, a **Height**, a **Top** (flat, with an insert, or a dome), a
+**Material** and a **Top Material** (spun or brushed metal, gloss or satin plastic, rubber), and a
+**Body Colour** and **Top Colour**. Its ridges turn with the value while the light stays where the
+lamp is. The images are made in the editor and stored in the plug-in when the panel is exported, so
+the plug-in renders nothing itself; until an image is ready, or on a computer that cannot render it,
+the plate shows its plain fill. The **Pointer** can be a **Bar**, a painted bar with square ends: **Taper
+%** narrows its tip into a wedge (below 0 the tip is the wider end) and **Edge** draws a rim round
+it, or two fine lines when the bar has no fill; a gradient on its fill makes it a brushed lever. Under
+the ticks, **Scale Radius %** sets the scale on a radius of its own, outside a value arc that runs
+close round the cap, and **Numbers** prints numbers round it, evenly **From** one value **To**
+another: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. The Button and Switch
 tabs show one part at a time: pick **Housing**, **Guard**, **Actuator** (called **Key** on a button),
 **Symbol**, **Indicator** or **Legend** in the row at the top (a green dot marks a part that is drawn),
-then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid),
+then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid; a
+**Drawn Outline** is a classic design's own curve, kept as the design drew it, and may change when
+the part is pressed or on, as a rocker tips),
 **Position** (in % of the device, with its rotation and the pivot it turns about), **Appearance**
-(fill, opacity, finish, border and shading) and what it does **When On** or **When Pressed**: how far
+(fill, opacity, finish, border and shading, and a drop **Shadow** under it, with its **Softness** and
+colour) and what it does **When On** or **When Pressed**: how far
 it moves and swings, its opacity and colour then, and whether it follows the actuator, as the ball on
 a lever does. The Legend part has its text as well. Choosing a form under **Core → Control design**
-fills the parts in, to change from there.
+fills the parts in, to change from there. The Housing, Guard, Actuator and Indicator also have a
+**Look** at the top of **Appearance**: **Rendered** draws the part as a lit object its box's size (a
+turned body if it is a circle), with a **Top** (flat, with an insert, ridged, a dome or a dish), its
+**Ridges**, **Depth**, **Height** and **Taper**, two materials and a **Body Colour** and **Top
+Colour**, in place of the border, finish, shading and shadow; its corners are the Shape section's
+**Corner**. A part that lights up when pressed or on is rendered in its lit colour then.
+
+On a slider's tab, a fader cap of the bar, console, block, dot, lens or glass kind has a **Cap
+Look** under **Cap** and **Cap Finish**: **Rendered** draws it as a lit block the cap's size (a turned
+body for a round cap), with its own **Cap Top**, **Ridges** (across its travel), **Depth**,
+**Height**, **Taper**, **Corner**, **Cap Material**, **Top Material** and **Top Colour**; the cap's
+own colour is the Current Handle's fill under **Style**. The fields apply to all of a slider's
+handles. Rendered caps and parts are made and exported as rendered plates are.
 
 A meter's parts are on its **Meter** tab, below its value, **Colour Zones** and peak hold. Pick
 **Housing**, **Face**, **Track**, **Scale**, **Indicator**, **Marker**, **Cover**, **Legend** or
@@ -360,7 +438,15 @@ reading's zone. The zones themselves are rows of a level in % and a colour, with
 **Blend** between them. On the **Scale** part: marks **Along a Line** or **Round an Arc**, the
 **Major Count** and **Minor / Gap**, each kind's length and width, the arc's sweep, a zone of
 ticks in their own colour, and **Numerals** on the long ticks in the reading's units, dB or
-percent. **Fill Type** makes any part a gradient, edited in the Gradient tab of the dock. While
+percent. **Fill Type** makes any part a gradient, edited in the Gradient tab of the dock; a part can
+cast a drop **Shadow**, as a button's can. A **Bow** is the curved line of a paper meter's scale.
+The **Housing** and the **Clip Lamp** also have a **Look** at the top of **Appearance**, with the
+same fields as a button's part: **Rendered** draws the housing as a low lit block (a bezel, the face
+and scale drawn over it; its **Height** starts at 12) and a round lamp as a lit dome, in its **Body
+Colour** when unlit and its **Lit Colour** (under **Reading**) when lit. A part coloured by **Zone
+Colours** is drawn flat while they are on, since its colour changes with the reading; the tab says
+so, and keeps its rendered fields for when they are off.
+While
 the parts draw the meter, the plain meter's own fill, arc and tick settings are hidden.
 
 The **context bar** above the canvas holds the settings you change most often — text, fill, border,
@@ -377,10 +463,26 @@ pins that one control to a different design, form and size.
 **Settings → Control Sets** has three columns. On the left, the **Library**: each set shown by one of its
 controls, grouped (the panel's set, your own, the built-ins), searchable, with two rows of buttons above
 it: which control the cards show (Knobs, Sliders, Buttons, Switches, Meters, Pads) and which style
-(Modern, Metal, Vintage, Glow, Mechanical). In the middle, the chosen set's colours, surface material
-and control families; built-in sets are read-only, and editing one creates a copy. On the right,
+(Modern, Metal, Vintage, Glow, Illustrated). In the middle, the chosen set itself: its colour roles in
+groups (panel and borders, controls, buttons, fields and menus, text and accent, displays; the ten
+worked out from those are shown and not edited), its **Lettering** (typeface, weight and letter
+spacing for every family's text), its **Lamp** (where the light on finishes comes from), its surface
+material and its control families. A swatch opens the **Colors** dock on that role. Each family takes
+its design from one of the templates or is an **Own design**; **Reset** returns it to the set it was
+copied from, and **Edit on Panel** places one of the family's controls on the open panel to style.
+Built-in sets are read-only, and editing one creates a copy. On the right,
 the live preview, **Apply to** the panel, the default for new panels, **Browse the 36 templates** and
 **Import a set…**.
+
+Two sets, **Iris** and **Satellite**, are **illustrated** and work differently from the others. Their
+knobs, keys, switches and meters are drawn as whole illustrations: their colours, size and depth can be
+changed in **Core → Control design**, but they cannot be edited part by part, the parts on the **Knob**,
+**Button**, **Switch** and **Meter** tabs do not apply to them, and **Convert to Parts** is not
+available. The value moves the mechanism (Iris's knob opens an aperture, Satellite's tilts a dish)
+rather than a pointer over a scale. Their pads and Number steppers are ordinary parts. The Library
+marks their cards **Illustration**, the set's page says what differs, and the set pickers and the
+**Form** list name them "(illustrated)". To edit such a control part by part, choose one of the other
+forms in **Core → Control design**.
 
 Applying a set opens the **Apply Control Set** window: the background colour, the surface material,
 each kind of control on the panel, or the selected controls only, and whether controls assigned to
@@ -395,11 +497,49 @@ Overrides**, which reverts them all, and **Detach from Set**, which stores the s
 control so that set changes no longer affect it (with **Keep colour roles linked**, its colours still
 follow the set). **Reattach to Set** makes it inherit again. All three apply to every selected control.
 
+The card also lists the overrides, each with **Revert** and **Apply**. **Apply to Set…** works the other
+way round: it writes the control's overrides into its set, so every control of its kind that follows the
+set takes the look (as a prefab's overrides are applied in Unity, or a main component is updated in
+Figma). The window lists the overrides, all ticked, and says how many other controls of the kind change
+and how many keep a value of their own. A colour drawn from a role stays a role. A built-in set is never
+changed: the window names a copy of it, the change goes into the copy, and the panel moves to the copy.
+The control then inherits the applied values from the set again. It is one undo step.
+
+**Edit on Panel**, in Settings → Control Sets, starts from the set instead: it places one of the family's
+controls on the open panel, selected, with a banner above the status bar. Style it, then press **Apply
+to Set** in the banner, or **Cancel** to take it away.
+
+A family can also use a **library component** instead of a design. In Settings → Control Sets, the
+family's design list has a **Library components** group with the components in your library that can
+stand in for that kind of control: for knobs and sliders, one value that a drag moves, drawn from its
+position rather than its number, so that each copy can keep its own range; for buttons, an on/off value
+that a press holds; for switches, one that a click flips; for meters, one value and nothing that moves
+it. When the set is applied, each control of the family becomes a linked copy of the component, in the
+same place and at the same size, with the control's name, value, range, device bindings and plug-in
+parameter. A script that sets `Cutoff.value` still reaches it, and the control's caption goes into the
+component's caption text if it has one. Controls with a script of their own, with two handles or with
+bindings that drive other controls stay as they are, and the Apply window names them. Each copy
+remembers the control it replaced: applying a set that names no component (or another one) for the
+family puts the controls back, and the Apply window lists these changes with a tick for each. The
+set's live preview and its card in the Library show the component where applying the set would place
+it. A copy keeps the component's proportions: it takes the largest box of the component's shape that
+fits where the control was, centred there, and the control comes back at its own size. **Reset**
+on the family's row removes the component from the set. The copies are ordinary library copies: their
+**Component** tab offers newer versions, and an update keeps each copy's range. Exporting the set
+includes the components it names, and importing it adds them to your library.
+
 ### Colours
 
 Click any colour swatch — in the properties panel or the context bar — and the dock opens on **Colors**,
 showing what you are editing. Choose a colour and press **Done**, or **Cancel** to go back. **Panel**
-shows the colours this panel already uses and **Recent** the ones you used last. The swatch grid holds
+shows the colours this panel already uses and **Recent** the ones you used last.
+
+For a colour of a control or of a component's layer, **Set colours** above them shows the colour roles
+of the control set it is drawn with (the control's own set, or the panel's), in the groups Settings →
+Control Sets uses. Click one to link the colour to that role: the bar above the picker shows the link
+(🔗 Knob / fader cap), and the colour then follows the set, so a component placed on a panel with
+another set takes that set's colours. A colour picked after that, or a Panel or Recent chip, unlinks it.
+In the Component Designer the look bar marks a linked swatch and names its role. The swatch grid holds
 your own palettes: click an empty square to store the current colour, click a filled one to use it,
 right-click for more.
 
@@ -563,6 +703,24 @@ In the **Mask** tab:
   a picture: its transparency, or for a picture without any, its brightness. **Mask With Layer**
   uses another layer's outline, as a clipping mask does; that layer stays as it is, so hide it when
   it should only mask. **Delete Mask** removes it.
+
+### Rendered layers
+
+A layer can be drawn as a lit object instead of from its fill and stroke: the picture a knob's
+rendered plate, a fader cap, a key or a meter's housing draws on the panel, lit by the set's lamp.
+Select the layer and open the dock's **Render** tab (in the Component Designer only):
+
+- **Look**: Flat, or Rendered. Rendered turns the layer's fill on: its colour is the body's.
+- **Shape**: a **Turned Body**, round, the size of the layer's larger side (a knob, a lamp), or a
+  **Block** the layer's box (a key, a fader cap, a housing).
+- A turned body's **Profile** (smooth, knurled, fluted), **Ridges**, **Depth**, **Taper**, **Height**
+  and **Top**; **Light Stays Put** makes its ridges turn with its rotation while its highlight stays
+  where the lamp is, as a knob's plate turns with its value.
+- A block's **Corner %**, **Height %**, **Taper %** and **Top** (flat, insert, ridged, dome, dish),
+  and for a ridged top its **Ridges**, their **Depth** and which way they run.
+- **Material**, **Top Material**, **Body Colour** (the layer's fill) and **Top Colour**.
+
+Until its picture is made the layer shows its fill. An exported plug-in carries the pictures.
 
 What moves is wired: a dial, a fader, a switch or a button, with its value, the area that takes the
 mouse, and the layers that follow the value. A drawing with nothing named to move comes in as
@@ -910,17 +1068,28 @@ buttons at its foot unfolds it with the group names, and it stays the way you le
 
 A selected layer is styled in the bar along the top of the designer (**Fill**, **Gradient**,
 **Stroke** with its width beside it, **Corners** for the corner radius, **Opacity**, and for text
-its colour, size and words) and in the dock's **Colors** and **Gradient** tools. Beside them are
+its colour, size and words) and in the dock's **Colors** and **Gradient** tools. The bar shows only
+what draws on the selected layer: an ellipse, a ring or a capsule is always round, so it has no
+**Corners**, and nor has a polygon (both take a **Gradient** over their fill); a line has only
+**Stroke**; and an arc takes its colour and thickness from its own settings on the
+inspector's **Display** tab, so the bar shows only its **Opacity**. Beside them are
 the layer's own buttons (duplicate, copy, paste, order, make interactive, lock, delete). On a
 narrower window those are under one **Layer** button, and on a laptop-sized one the style controls
 have a row of their own, so all of them stay in sight.
 
 The strip under the canvas has **Snap**, **Grid** and **Smart** for snapping, **View** and **?** for
-the shortcuts. **View** lists what the canvas shows (**Measure**, **Bounds**, **Generated names**,
-**Hit zones** and which of them are drawn, **Rulers**) and the **Zoom step**, how far the status
+the shortcuts. **View** lists what the canvas shows (**Measure**, **Bounds**, **Generated names**
+when the component has generated layers, **Hit zones** and which of them are drawn when it has hit
+zones, **Rulers**) and the **Zoom step**, how far the status
 bar's **−** and **+** zoom. On a narrow window the strip takes a second row rather than hide
 anything. **Starters** replaces the component with a ready-made one, and its first entry, **Blank
 canvas**, clears it. Both ask first when there is a layer to lose, and undo takes either back.
+
+The inspector in the dock has four tabs. **Object** holds the selection's name, position, size and
+rotation, and **Rotate around arc centre** when the component has an arc to turn around. **Display**
+holds the settings of an arc and of a hit zone, and **Behavior** what a hit zone does and which value
+it drives; for anything else the two are greyed out, and pointing at one says why. **Preview** holds
+what the canvas shows while you work.
 
 While the designer is open, the dock's **Colors** tool colours the fill of the layer selected on its
 surface (several selected layers take the colour together; with none selected it changes nothing),
@@ -939,10 +1108,94 @@ the **Input** chips beside it on the Interact tab (and under **Interaction** in 
 plug-in. A new slider or dial starts with Wheel on, a button, toggle or pad with it off; turn it
 off on a control that should leave the wheel to scrolling the page.
 
+A grab area's **momentaryValue** action holds its channel on while it is pressed, by the pointer or
+by Space or Enter, and turns it off again when it is let go, as a momentary button does;
+**toggleValue** flips it on each click.
+
+A channel's **Curve**, under **Formatting & Mapping**, maps how far the control is turned to the value
+it gives, as a small graph beside it shows. **Linear** follows the travel. **Exponential** and
+**Logarithmic** bend it, through the **Centre value**, the value at half travel: half way round an
+Exponential 20 Hz to 20 kHz knob is 632 Hz by default. **S-Curve** is slow at both ends. **Stepped**
+clicks into **Steps** positions, and **Hysteresis** holds a step until the control is that share of a
+step past its edge. **Bipolar** rests at its centre (a double-click returns there) and offers bindings
+**-1 to 1**, so artwork can grow both ways from the centre. **Dead Zone** holds the centre value over a
+band around the middle; Bipolar takes a dead zone too. The drag, the wheel and the keys move by travel,
+and so does artwork bound to the channel's **0 to 1**. An exported plug-in gives the parameter the same
+curve, so a DAW's automation lane drawn half way sits where the knob is at half travel.
+
 You can also turn existing artwork into a component: select some backgrounds, images, shapes,
-labels, knobs or sliders and choose **Edit → Create Component from Selection...**. CEditor saves
-them as a component in your library and puts a linked copy in their place. Each label's text becomes
-a setting, so every copy can have its own.
+labels, knobs, sliders, buttons, switches or meters and choose **Edit → Create Component from
+Selection...**. A window asks for the component's name and, for knobs, sliders, buttons, switches and
+meters, how they come in. **As layers** makes each part a
+layer you can select, move, restyle and recolour (housing, track, value arc, cap, pointer, ticks;
+a slider's track, fill and fader cap), wired to the value by bindings the **React** tab
+shows, with their colours still linked to the set's colour roles. **As one exact part** keeps the
+knob as it was, drawn by the panel's own knob code. Every set's controls come in as layers, Iris and
+Satellite aside (they are drawn whole): a plate in perspective, a skirt, an insert, a drop shadow
+(a layer of its own under its part), grooves, a bar pointer, a second scale and the scale's numbers;
+every fader cap, its sheen, glow and finish; a key's shadow, a switch's lamp or bat lever, a meter's counter and
+a fill drawn in a pattern. A plate that turns with the value turns its outline while its light and
+shadow stay put, as on the panel. What a layer does not draw yet (a control form that is not made
+of parts) comes in as one exact part, and the window names it and why. A rendered plate, fader cap,
+key or meter housing comes in as a layer that draws the same lit picture, its ridges turning under a
+light that stays put. A track, value arc or dot pointer in a gradient, a picture or a finish keeps
+it. A label that rides the pointer or the fader cap moves with the value, upright. A knob's name,
+value and range ends are Labels of their own: selected with it (**Alt+click** takes them all), they
+come in too, a value Label as a layer that reads the knob's value as the synth does (a frequency, a
+pan position, a note name, a table entry, a plus sign on positive values). A range (two
+handles) or a band (a value between them) comes in with a value for each handle, kept in order: the
+fill runs from one to the other, the ticks light between them, and a press on the track takes the
+handle nearest to it, as on the panel. The fill is moved by both ends: on the **React** tab, the
+start's binding has **Combine** set to **Add to the bindings before it**, so its value is added to
+what the end's binding wrote. The grab area's row on the **Interact** card says it **Takes** the
+nearest of the handles. Handles that may pass each other (**Allow Handle Cross**) or wrap round the
+end come in too, kept in no order: their fill and lit ticks run from whichever handle comes first,
+and on a knob that wraps, round through the gap. Those bindings read the end **Minus** the start,
+a field on the **React** tab: a binding's source less another value, how far apart two handles are
+and which way round. A knob made into layers turns about its own centre when the component holds several: its
+behaviour is **Measured in** its grab area, not the whole component. A meter on a decibel scale
+comes in as layers that place the reading, and the held peak, on that scale, as the meter does: its
+bindings' **Scale** is **Decibels**, from **Floor dB** to **Ceil dB**. A meter part coloured by the zones keeps them: lit cells, scale
+marks and a fill by where they sit (cells of any shape, outlined or not), a needle, lamp, legend or
+counter window by the zone the reading is in, stepped or blended, and blended as the meter blends
+them even where the part is see-through. A bar meter on a track you can see through shows its fill
+through a mask as wide as the reading. A meter
+that shows another control's value keeps showing it: the knob that came into the component with it,
+or the control that stayed on the panel. The **Interact** card says what such a value follows, and
+**Value From** in the value's **Definition** (Advanced) changes it: its own value, another value of
+the component, or a knob or slider on the panel. A control drawn in a classic design (**Core › Control
+design**: Flat disc, Moulded pebble, Studio needle and the rest) comes in as layers that draw that design in its
+own colours: a knob as the drawing itself, shape by shape, its pointer or cap turning with the value;
+a button, switch or meter in a base design as the design's parts, and in a synth set's design as
+its drawing too: pressed or switched on it changes as the drawing does, and a meter's needle swings,
+its bar grows and its cells light with the reading. A counter's
+digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
+to each window, and each count of figures its own windows, shown while the reading has that many
+figures. Counter cells that fill or light come in the same way, a set of cells for each count. A meter that holds its peak (**Peak
+Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the
+meter's is, and its layers read it as the value's **held peak**: the lamp lights at its level and
+stays lit while the peak holds; a range binding with **Inside Only** marks the segment the peak is
+in. A button comes in
+as its plate and its text, or, drawn as a device, as its housing, key, symbol, indicator and legend
+with its caption; a switch flips its value on a click, a button holds it on while pressed, and the
+parts move and light up as they did. A button that fired otherwise keeps doing so: on the
+**Interact** card its behaviour **Fires** when pressed, when released, after a hold (**Hold ms**),
+on a double click (**Clicks**, **Within ms**), again and again while held (**Delay ms**, **Every
+ms**) or only while held, and **Afterwards** it is ready again, disabled, or locked for a time
+(**Locked ms**). A timed button comes in firing after its hold or on its clicks, a one-shot button
+firing on release and then disabled (or locked for its lockout), a repeating one again and again
+while held. A button that fires sends its value on for a moment, and a switch flips; a held timed
+button looks pressed while it is held. Radio, cyclic and combo-box buttons do not come in yet. A meter comes in as its track and its zones' colours covered past
+the reading, its segments each lighting as the reading reaches them, or, drawn as a device, as its
+housing, face, scale, needle or bar, moving with its value (its reading is a Label of its own, which
+comes in as a text layer when it is selected with it); it takes no input, and its
+value arrives as a knob's does. A button's or a label's text keeps where it is placed, its lines,
+its baseline shift and a line under, through or over it; its icon comes in as a layer of its own.
+A button, switch, meter or piece of artwork that is turned or scaled comes in turned and scaled, and
+a button is pressed where it is drawn. A control's shadow, bevel and colour filters come with it,
+the shadow cast by its plate. Buttons and meters come in as layers only. CEditor saves
+the result as a component in your library and puts a linked copy in their place. Each label's text
+becomes a setting, so every copy can have its own.
 
 > **Not finished yet:** **Variants**, named looks a copy could pick, are hidden while custom
 > components are being made simpler. A component made with variants keeps the look it shows.
@@ -953,6 +1206,12 @@ The dock's **Library** tool shows every saved component, drawn as it really look
 card, drag it onto the panel, or press **Place a copy**. **Open in Designer** opens it in a tab of
 its own to change and export again, and **Save as file...** writes it as a `.ceditor-component.json`.
 The icon rail and the insert search list your saved components too.
+
+An **image strip** is a component drawn from pictures, one per position: an imported strip, a KnobMan
+or Blender render, a vendor pack. Its card says **Image strip**, and when the library holds one, a row
+above the cards shows **All**, **Made of parts** or **Image strips**. A strip's shapes and colours
+cannot be edited part by part; it can be resized, and tinted per layer in **Effects › Filters** (hue
+and brightness).
 
 Select a placed copy and the properties panel opens on its **Component** tab (moving on to another
 copy keeps the tab you are on):
@@ -1316,6 +1575,7 @@ an open panel the items are greyed out.
 | **Gradient** | Edits a gradient fill. |
 | **Effects** | The selected control's effects: shadows, glows, blur and more, and saved looks. |
 | **Mask** | In the Component Designer only: the selected layer's mask; see [Layer masks](#layer-masks). |
+| **Render** | In the Component Designer only: the selected layer's rendered look; see [Rendered layers](#rendered-layers). |
 | **Text** | Every text setting of the selected control: font, size, spacing, alignment and more. |
 | **Assets** | A control's images, including filmstrips (one image holding every frame of a knob). |
 | **Screen** | Editors for LCD and pixel display controls. |

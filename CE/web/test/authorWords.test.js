@@ -22,7 +22,6 @@ import {
 import CustomInteractEditor from '../src/CE_Application/sections/CustomInteractEditor.svelte';
 import BindingsEditor from '../src/CE_Application/sections/BindingsEditor.svelte';
 import CustomTestBenchEditor from '../src/CE_Application/sections/CustomTestBenchEditor.svelte';
-import CustomPublishedPropertiesEditor from '../src/CE_Application/sections/CustomPublishedPropertiesEditor.svelte';
 import CoreEditor from '../src/CE_Application/sections/CoreEditor.svelte';
 
 const at = (type, id, x, y, width, height) => createControl(type, {
@@ -94,14 +93,6 @@ test('the Test Bench words its states: pointer over a zone, a zone pressed, and 
   assert.match(body, /cutoff · hover/);
   assert.match(body, /cutoff · keyboard focus/);
   assert.doesNotMatch(body, /hoveredCustomHitZone|activeCustomHitZone|meta\.sliderControl|dom focus/);
-});
-
-test('the contract reads "cutoff · number", not "cutoff > cutoff (float)"', () => {
-  const body = text(render(CustomPublishedPropertiesEditor, { props: { control: filter() } }).body);
-  const contract = body.slice(body.indexOf('Inputs'), body.indexOf('Properties', body.indexOf('Inputs')));
-  assert.match(contract, /Inputs cutoff · number reso · number/);
-  assert.match(contract, /Outputs cutoff · number reso · number/);
-  assert.doesNotMatch(contract, /\(float\)|cutoff > cutoff/);
 });
 
 test('the Core tab names the type as the Insert menu does, and the screen-reader field in words', () => {

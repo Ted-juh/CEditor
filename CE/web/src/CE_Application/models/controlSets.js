@@ -26,6 +26,7 @@
 import { PILOT_CONTROL_SETS } from './pilotControlSets.js';
 import { CATALOG_CONTROL_SETS, CATALOG_SET_EXTRAS } from './catalogControlSets.js';
 import { makeAdditionalControlSets } from './additionalControlSets.js';
+import { anatomyOptions, isIllustratedForm } from './controlAnatomy.js';
 import { extendControlSet } from './controlSetCoverage.js';
 import { typeFamilies } from './controlSetRecipes.js';
 import { withLabelDesign } from './labelDesigns.js';
@@ -379,10 +380,13 @@ export const BUILT_IN_CONTROL_SETS = [...ORIGINAL_CONTROL_SETS, ...makeAdditiona
   .map(withDisplayDesign);
 
 // Sets that are no longer offered: the owner's call, "nothing to do with synths, fun but not
-// suitable for a panel". Each stays defined, so a panel or a control drawn with one opens looking as
-// it did (getControlSet still finds it, as Graphite Classic is kept for old documents); the pickers,
-// the Library, the default for new panels and the shipped starters offer OFFERED_CONTROL_SETS.
-export const RETIRED_CONTROL_SET_IDS = Object.freeze(['walnut', 'kiln', 'arcade', 'saddle', 'field', 'atlas', 'spool']);
+// suitable for a panel", and later of six more of the mechanical ones, "hardly usable for a
+// synthesizer panel" (Iris and Satellite stay, marked as working unlike the rest). Each stays
+// defined, so a panel or a control drawn with one opens looking as it did (getControlSet still finds
+// it, as Graphite Classic is kept for old documents); the pickers, the Library, the default for new
+// panels and the shipped starters offer OFFERED_CONTROL_SETS.
+export const RETIRED_CONTROL_SET_IDS = Object.freeze(['walnut', 'kiln', 'arcade', 'saddle', 'field', 'atlas', 'spool',
+  'tessera', 'bellows', 'helix', 'balance', 'fan', 'crown']);
 export function isRetiredControlSet(id) {
   return RETIRED_CONTROL_SET_IDS.includes(String(id ?? ''));
 }
@@ -391,6 +395,57 @@ export const OFFERED_CONTROL_SETS = BUILT_IN_CONTROL_SETS.filter((set) => !isRet
 export function offeredControlSetsWith(id) {
   const retired = isRetiredControlSet(id) ? BUILT_IN_CONTROL_SETS.find((set) => set.id === id) : null;
   return retired ? [...OFFERED_CONTROL_SETS, retired] : OFFERED_CONTROL_SETS;
+}
+
+// Iris and Satellite, the two kept of the twelve mechanical sets (models/additionalControlSets.js),
+// work unlike every other set. Their knobs, keys, switches and meters are whole drawings
+// (models/controlAnatomy.js isIllustratedForm), not parts: only their colours, size and depth
+// change. And the value moves the mechanism, not a pointer over a scale. The owner: "it should be
+// clear for those two that they do not work as the rest as a control set." So the Library calls
+// their style Illustrated and badges their cards, the set's page says what differs, a picker names
+// them "(illustrated)", and a part tab says when its control is one of these drawings.
+export const ILLUSTRATED_CONTROL_SET_IDS = Object.freeze(['iris', 'satellite']);
+/** Whether a set draws any of its controls as illustrations: an Iris, a Satellite, or a copy of one. */
+export function isIllustratedControlSet(set) {
+  return illustratedFamilies(set).length > 0;
+}
+/** The control types a set draws as illustrations, from the forms its families name. */
+export function illustratedFamilies(set) {
+  return Object.entries(set?.families ?? {})
+    .filter(([, family]) => isIllustratedForm(family?.component?.['Core.controlForm']))
+    .map(([type]) => type);
+}
+// How each one shows its value, for the set's page. A copy says what the set it came from says.
+const ILLUSTRATED_VALUE_NOTES = {
+  iris: 'the knob opens an aperture instead of turning a pointer over a scale, and the meter opens two shutters',
+  satellite: 'the knob tilts a dish instead of turning a pointer over a scale, and the switch joins its two pods with a bar',
+};
+/** The set's line on how its value shows, or '' when nothing is known for it. */
+export function illustratedValueNote(set) {
+  return ILLUSTRATED_VALUE_NOTES[set?.id] ?? ILLUSTRATED_VALUE_NOTES[set?.basedOn] ?? '';
+}
+// The kinds of control an illustrated set draws whole, as the set's page names them, with the tab
+// whose parts do not apply to them.
+const ILLUSTRATED_KINDS = [['Knob', 'knobs', 'Knob'], ['Button', 'keys', 'Button'], ['ToggleButton', 'switches', 'Switch'], ['Meter', 'meters', 'Meter']];
+/** `[{ noun, tab }]` for the kinds a set draws as illustrations, in that order. */
+export function illustratedKinds(set) {
+  const types = illustratedFamilies(set);
+  return ILLUSTRATED_KINDS.filter(([type]) => types.includes(type)).map(([, noun, tab]) => ({ noun, tab }));
+}
+/** A set's name as a picker shows it: "(no longer offered)" or "(illustrated)" after it where either applies. */
+export function controlSetOptionLabel(set) {
+  const name = String(set?.name ?? set?.id ?? '');
+  if (isRetiredControlSet(set?.id)) return `${name} (no longer offered)`;
+  return isIllustratedControlSet(set) ? `${name} (illustrated)` : name;
+}
+/**
+ * A control type's forms as Core › Control design offers them: a retired set's form only when it is
+ * the one chosen, so the picker still shows it. An illustration says so after its name.
+ */
+export function offeredAnatomyOptions(type, current = '') {
+  return anatomyOptions(type)
+    .filter(([id]) => id === current || !isRetiredControlSet(String(id).replace(/^new-/, '')))
+    .map(([id, name]) => [id, isIllustratedForm(id) ? `${name} (illustrated)` : name]);
 }
 
 export const DEFAULT_CONTROL_SET_ID = 'graphite';
@@ -473,6 +528,13 @@ export function normalizeControlSetDefinition(value) {
     ? Object.fromEntries(Object.entries(entry).filter(([, v]) => typeof v === 'string')) : null);
   const chosen = plainStrings(value.chosenFamilies);
   if (chosen && Object.keys(chosen).length) out.chosenFamilies = chosen;
+  // A family that names a library component, placed as linked copies (utils/setLibraryComponents.js).
+  if (value.libraryComponents && typeof value.libraryComponents === 'object' && !Array.isArray(value.libraryComponents)) {
+    const named = Object.fromEntries(Object.entries(value.libraryComponents)
+      .filter(([, ref]) => ref && typeof ref === 'object' && typeof ref.id === 'string' && ref.id.trim())
+      .map(([type, ref]) => [type, { id: ref.id.trim(), name: String(ref.name ?? ''), version: String(ref.version ?? ''), fingerprint: String(ref.fingerprint ?? '') }]));
+    if (Object.keys(named).length) out.libraryComponents = named;
+  }
   // What the designs wrote on the last read, per family: key and value, or (as the label design kept
   // it before values were recorded) a list of keys. An empty record is kept: it says the design wrote
   // nothing its author had not already, which no record would not.

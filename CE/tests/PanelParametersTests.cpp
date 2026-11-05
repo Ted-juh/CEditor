@@ -356,6 +356,49 @@ int main()
                "the spare count is 0 to 32, and absent is none");
     }
 
+    // A channel's curve (utils/channelCurves.js) reaches the host's range: half way along the lane
+    // is where the knob is at half travel, not the middle of the range.
+    {
+        const auto params = roundTrip (R"JSON({
+          "id": "f.cutoff", "path": "f.cutoff", "label": "Cutoff", "min": 20, "max": 20000, "defaultValue": 1000,
+          "curve": { "mode": "exponential", "centre": 0.030530530530530526 }
+        }, {
+          "id": "f.plain", "path": "f.plain", "label": "Plain", "min": 0, "max": 10, "defaultValue": 5
+        }, {
+          "id": "f.steps", "path": "f.steps", "label": "Steps", "min": 0, "max": 4, "defaultValue": 0,
+          "curve": { "mode": "stepped", "steps": 5 }
+        }, {
+          "id": "f.s", "path": "f.s", "label": "S", "min": 0, "max": 1, "defaultValue": 0,
+          "curve": { "mode": "s-curve" }
+        }, {
+          "id": "f.odd", "path": "f.odd", "label": "Odd", "min": 0, "max": 1, "defaultValue": 0,
+          "curve": { "mode": "wobbly" }
+        })JSON");
+        check (params.size() == 5, "five curve entries parsed");
+        if (params.size() == 5)
+        {
+            check (params[0].curve.mode == "exponential", "  the exponential curve is read");
+            check (params[1].curve.mode == "linear" && params[4].curve.mode == "linear",
+                   "  no curve, or one it does not know, is linear");
+            const auto cutoff = ce::parameterRange (params[0]);
+            check (std::abs (cutoff.convertFrom0to1 (0.5f) - 630.0f) < 1.0f,
+                   "  half way along the lane is 630 Hz: " + juce::String (cutoff.convertFrom0to1 (0.5f)));
+            check (std::abs (cutoff.convertTo0to1 (630.0f) - 0.5f) < 0.001f, "  and 630 Hz is half way");
+            check (std::abs (cutoff.convertFrom0to1 (0.0f) - 20.0f) < 0.01f && std::abs (cutoff.convertFrom0to1 (1.0f) - 20000.0f) < 0.5f,
+                   "  the ends are the range's ends");
+            const auto plain = ce::parameterRange (params[1]);
+            check (std::abs (plain.convertFrom0to1 (0.5f) - 5.0f) < 0.0001f, "  a linear range is the middle at half way");
+            const auto steps = ce::parameterRange (params[2]);
+            check (steps.convertFrom0to1 (0.3f) == 1.0f && steps.convertFrom0to1 (0.4f) == 2.0f, "  a stepped lane clicks into its steps");
+            const auto sCurve = ce::parameterRange (params[3]);
+            check (std::abs (sCurve.convertTo0to1 (sCurve.convertFrom0to1 (0.2f)) - 0.2f) < 0.0001f, "  an S-curve reads back the travel it gave");
+            auto made = ce::makeParameter (params[0]);
+            auto* asFloat = dynamic_cast<juce::AudioParameterFloat*> (made.get());
+            check (asFloat != nullptr && std::abs (asFloat->getNormalisableRange().convertFrom0to1 (0.5f) - 630.0f) < 1.0f,
+                   "  the host parameter carries the curve");
+        }
+    }
+
     if (failures == 0)
     {
         std::cout << "--------------------\nALL PASS" << std::endl;

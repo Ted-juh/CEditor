@@ -91,6 +91,9 @@ export function isScenery(control) {
   for (const name of Object.keys(control?._children ?? {})) {
     if (DYNAMIC_SECTIONS.has(name)) return false;
   }
+  // A Label that shows something of a control (utils/labelShows.js) reads that control's value as
+  // it moves: never folded into the still picture.
+  if (String(control?._children?.Text?.shows ?? '')) return false;
   return true;
 }
 

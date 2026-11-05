@@ -425,8 +425,6 @@ const KINDS = {
     const control = bound(parameter, 'Slider', { x: at.x, y: at.y, w: SKIN.faderW, h: SKIN.faderH }, {
       'Behavior.orientation': 'vertical',
       'Behavior.showTicks': false,
-      'Behavior.showValueReadout': false,
-      'Behavior.showMinMaxLabels': false,
       // The slot. SliderFamilyRenderer reads the track's THICKNESS from bodyTrackBase's
       // Layout.height regardless of orientation (line ~243) — setting height to the fader's
       // length, which is the intuitive reading, produces a track 100px thick.
@@ -459,8 +457,6 @@ const KINDS = {
   knobLegacy: (parameter, spec, at) => {
     const control = bound(parameter, 'Knob', { x: at.x, y: at.y, w: SKIN.knob, h: SKIN.knob }, {
       'Behavior.showTicks': true,
-      'Behavior.showValueReadout': false,
-      'Behavior.showMinMaxLabels': false,
     });
     return { controls: [control], caption: { text: spec.label, x: at.x - 14, y: at.y + SKIN.knob + 5, w: SKIN.knob + 28 }, bottom: at.y + SKIN.knob + 19 };
   },

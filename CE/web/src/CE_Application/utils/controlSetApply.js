@@ -54,7 +54,9 @@ export function panelSetSummary(panel) {
   let pinned = 0;
   const pinnedSets = new Set();
   eachControl(panel?.controls, (control) => {
-    const type = String(control?._children?.Core?.controlType ?? '');
+    // A copy a set placed for a knob (utils/setLibraryComponents.js) counts as the knob it stands for.
+    const placed = String(control?._children?.Designer?.setPlacement?.type ?? '');
+    const type = placed || String(control?._children?.Core?.controlType ?? '');
     if (!type || type === 'Container' || type === 'CustomComponent') return;
     const pin = pinOf(control);
     if (pin) { pinned += 1; pinnedSets.add(pin); return; }

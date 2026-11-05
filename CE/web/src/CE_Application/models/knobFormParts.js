@@ -4,7 +4,7 @@
 // colours were five fields, and while it was on, the knob's parts, background and effects were not
 // drawn. The owner decided that forms become parts (docs/design/changeable-control-sets.md, piece
 // B): each form here is a family patch of the knob's parts (the housing plate, the value track and
-// arc, the cap, the pointer, the ticks, the readout) with the properties every knob has, so every
+// arc, the cap, the pointer, the ticks) with the properties every knob has, so every
 // one of them can be changed on the knob, and bipolar, range and linear work as they do for any
 // knob.
 //
@@ -14,8 +14,16 @@
 // track was 58 units in a 160 x 170 frame, so a part's width is its radius in the drawing as a
 // percentage of 58, and a stroke in px is its width in the drawing at a knob about 100 px tall.
 
-/** The forms that are parts now: all twelve base knob forms. The 48 direction forms are still drawn by code. */
-export const KNOB_FORMS_AS_PARTS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
+import { DIRECTION_KNOB_FORMS, directionKnobFamily } from './directionKnobParts.js';
+
+/** The base knob forms, all twelve parts now. */
+export const BASE_KNOB_FORMS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
+/**
+ * The forms that are parts now: the twelve base forms, and the 36 synth direction sets' knobs
+ * (models/directionKnobParts.js). The twelve additional designs are still drawn by code, a classic
+ * category: most are not turning knobs at all (a bellows, an iris, a fan).
+ */
+export const KNOB_FORMS_AS_PARTS = [...BASE_KNOB_FORMS, ...DIRECTION_KNOB_FORMS];
 
 const ROLES = { face: '{surface}', housing: '{control.track}', legend: '{text.primary}', accent: '{accent}' };
 
@@ -36,10 +44,12 @@ const ticks = (divisions, { placement = 'outside', major = 5, minor = 2.5 } = {}
   };
 };
 const noTicks = { component: { 'Behavior.showTicks': false }, parts: {} };
-// The readout under the knob, and no min/max labels: what every form drew. The track fitted tight
-// to the box (utils/sliderGeometry.js), as the drawings filled it.
-const board = { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.circularFit': 'tight' };
-// The readout as the forms set it: small, monospaced, in the legend colour.
+// The track fitted tight to the box (utils/sliderGeometry.js), as the drawings filled it. A value
+// Label the Labels tab adds goes under the knob, as every form printed its value, or in its face
+// where the form read it there (Behavior.valueLabelPlacement, utils/attachedLabels.js).
+const board = { 'Behavior.circularFit': 'tight' };
+// The value as the forms lettered it: small, monospaced, in the legend colour. A Label showing the
+// knob's value takes it (models/controlSetFamilies.js patchShownLabel).
 const readout = (colour = '{text.primary}') => ({ labelValue: { 'Text.Fill.colour': colour, 'Text.Font.family': 'JetBrains Mono', 'Text.Font.weight': 'normal' } });
 // No track: hidden, and thin, since its thickness still sets where the ticks start.
 const noTrack = { bodyTrackBase: { visible: false, 'Layout.height': 2 }, bodyTrackFill: { visible: false, 'Layout.height': 2 } };
@@ -156,7 +166,7 @@ const RECIPES = {
   }),
   // An optical lens in an octagonal housing, the value read in its centre.
   lens: ({ ink }) => merge(noTicks, {
-    component: { ...board, 'Behavior.labelReadoutPlacement': 'center' },
+    component: { ...board, 'Behavior.valueLabelPlacement': 'center' },
     parts: {
       ...noTrack,
       bodyHousing: { visible: true, ...size(117), ...outline('polygon', 8, 0, { outlineRotation: 22.5 }), ...edged(ROLES.housing, ink) },
@@ -200,7 +210,7 @@ const RECIPES = {
   encoder: ({ divisions }) => ({
     component: {
       ...board,
-      'Behavior.labelReadoutPlacement': 'center',
+      'Behavior.valueLabelPlacement': 'center',
       'Behavior.showTicks': true,
       'Behavior.majorTickCount': Math.max(4, Math.min(48, Math.round(divisions) || 12)),
       'Behavior.minorTickCount': 0,
@@ -219,11 +229,12 @@ const RECIPES = {
 
 /**
  * The family patch that draws `form` with the knob's parts, or null when the form is still drawn by
- * code. `ink` is the set's ink against its surface; `divisions` the form's scale divisions.
+ * code. `ink` is the set's ink against its surface; `divisions` the form's scale divisions; `face`
+ * and `housing` the set's surface and track as literal colours, for a direction knob's glass.
  */
-export function knobFormFamily(form, { ink = 'FF20282C', divisions = 12 } = {}) {
+export function knobFormFamily(form, { ink = 'FF20282C', divisions = 12, face = 'FFDEDBD2', housing = 'FF171A20' } = {}) {
   const recipe = RECIPES[String(form ?? '')];
-  if (!recipe) return null;
+  if (!recipe) return directionKnobFamily(form, { ink, face, housing });
   const family = recipe({ ink, divisions });
   return merge({ parts: readout() }, family);
 }

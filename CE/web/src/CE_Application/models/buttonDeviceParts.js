@@ -57,6 +57,9 @@ function devicePart(name, zIndex, { x = 10, y = 10, width = 80, height = 80, fil
     clipChildren: false,
     shape: 'rect',
     shapeDepth: 20,
+    // A drawn outline (utils/deviceShapes.js `path`), and its outline pressed or on.
+    shapePath: '',
+    shapePathOn: '',
     pattern: 'solid',
     patternCount: 4,
     patternRows: 3,

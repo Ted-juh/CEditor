@@ -68,7 +68,7 @@ export function macroKnobControl(macro, box, set = null) {
   if (macroCore.controlSetId) core.controlSetId = macroCore.controlSetId;
   core.formShowValue = false;
   Object.assign(knob._children.Transform, { x: box.x, y: box.y, width: box.width, height: box.height });
-  Object.assign(knob._children.Behavior, { showMinMaxLabels: false, showValueReadout: false, showHandleLabels: false });
+  knob._children.Behavior.showHandleLabels = false;
   const parts = knob._children.Parts?._children;
   if (parts) for (const name of LABEL_PARTS) delete parts[name];
   if (set) reinkForFace(knob, set);
@@ -99,7 +99,7 @@ export function macroKnobHalo(knob, set) {
   // A form rebuilt as the knob's parts (models/knobFormParts.js) has no form name: a knob that
   // reads its value in its centre (the lens, the encoder) or points with a needle (the drafting
   // pointer) lights itself, as those forms did.
-  if (!core.controlForm && (drawn._children.Behavior?.labelReadoutPlacement === 'center'
+  if (!core.controlForm && (drawn._children.Behavior?.valueLabelPlacement === 'center'
     || drawn._children.Parts?._children?.pointerCurrent?.kind === 'needle')) return null;
   const face = resolveToken('instrument.face', set);
   // Its body is what it shows outermost: the housing plate when it has one (the tuning dial's

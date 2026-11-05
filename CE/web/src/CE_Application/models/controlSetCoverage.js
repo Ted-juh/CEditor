@@ -137,8 +137,8 @@ export function extendControlSet(set) {
     const divisions = ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12;
     const deviceRecipe = type === 'Knob' ? null
       : (type === 'Meter' || type === 'ProgressBar')
-        ? meterFormFamily(type, form, { ink: inkOn(set.tokens.surface), divisions, face: literalOf('{surface}') })
-        : buttonFormFamily(type, form, { ink: inkOn(set.tokens.surface) });
+        ? meterFormFamily(type, form, { ink: inkOn(set.tokens.surface), divisions, face: literalOf('{surface}'), housing: literalOf('{control.track}') })
+        : buttonFormFamily(type, form, { ink: inkOn(set.tokens.surface), face: literalOf('{surface}'), housing: literalOf('{control.track}') });
     if (deviceRecipe) {
       const parts = { ...(families[type]?.parts ?? {}) };
       for (const [name, patch] of Object.entries(deviceRecipe.parts)) parts[name] = { ...(parts[name] ?? {}), ...patch };
@@ -146,7 +146,7 @@ export function extendControlSet(set) {
       continue;
     }
     if (type === 'Knob' && KNOB_FORMS_AS_PARTS.includes(form)) {
-      const recipe = knobFormFamily(form, { ink: inkOn(set.tokens.surface), divisions: ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12 });
+      const recipe = knobFormFamily(form, { ink: inkOn(set.tokens.surface), divisions: ['blueprint', 'machined', 'phosphor'].includes(d.id) ? 24 : 12, face: literalOf('{surface}'), housing: literalOf('{control.track}') });
       const parts = { ...(families.Knob?.parts ?? {}) };
       for (const [name, patch] of Object.entries(recipe.parts)) parts[name] = { ...(parts[name] ?? {}), ...patch };
       families.Knob = { ...families.Knob, component: { ...families.Knob?.component, ...recipe.component }, parts };

@@ -13,7 +13,7 @@
 import { CROSSFADER_LAWS } from '../utils/crossfaderLayout.js';
 import { RETURN_CURVES, RETURN_MODES } from '../utils/returnToRest.js';
 import {
-  CHORDPAD_LAYOUTS, CROSSFADER_ORIENTATIONS, MATRIX_CELL_STYLES, METER_LABEL_POSITIONS, METER_ORIENTATIONS, NOTERIBBON_MOD_AXES, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES,
+  CHORDPAD_LAYOUTS, CROSSFADER_ORIENTATIONS, MATRIX_CELL_STYLES, METER_ORIENTATIONS, NOTERIBBON_MOD_AXES, NOTERIBBON_ORIENTATIONS, NOTERIBBON_VELOCITY_SOURCES,
   RIBBON_ORIENTATIONS, RIBBON_STYLES,
 } from '../scripting/componentTables.js';
 import { METER_SCALES } from '../utils/meterLayout.js';
@@ -298,19 +298,13 @@ export const METER_PEAK_FIELDS = [
   { slot: 'peakColour', when: peakHold },
 ];
 
-const readout = (values) => values.showValue === true;
-
+// A meter's reading and caption are Labels of their own (utils/labelShows.js; its Labels section):
+// what is left here is how a Label showing its reading prints it.
 export const METER_READOUT_FIELDS = [
   { key: 'showTicks', kind: 'toggle', label: 'Ticks', span: 1, defaultOn: false, hint: 'Draw scale tick marks along the meter.' },
   { key: 'tickCount', kind: 'number', label: 'Tick count', numberLabel: 'Ticks', span: 1, compact: true, min: 1, max: 20, default: 4, round: true, clamp: 'min', when: (values) => values.showTicks === true, hint: 'Number of divisions (marks = count + 1).' },
-  { key: 'showValue', kind: 'toggle', label: 'Readout', span: 1, defaultOn: false, hint: 'Show the numeric value overlaid on the meter.' },
-  { key: 'valuePrecision', kind: 'number', label: 'Precision', numberLabel: 'Prec', span: 1, compact: true, min: 0, max: 6, default: 0, round: true, clamp: 'min', when: readout, hint: 'Decimal places in the readout.' },
-  { slot: 'suffix', when: readout },
-  { slot: 'caption' },
-  {
-    key: 'labelPosition', kind: 'select', label: 'Position', span: 1, default: 'none', table: METER_LABEL_POSITIONS,
-    hint: 'Where the caption sits.', options: [['none', 'None'], ['above', 'Above'], ['below', 'Below']],
-  },
+  { key: 'valuePrecision', kind: 'number', label: 'Precision', numberLabel: 'Prec', span: 1, compact: true, min: 0, max: 6, default: 0, round: true, clamp: 'min', hint: 'Decimal places a Label showing the reading prints.' },
+  { slot: 'suffix' },
 ];
 
 export const METER_ARC_FIELDS = [

@@ -2,7 +2,7 @@
   import { controlSources } from '../utils/controlSources.js';
   import { componentListWithElement } from '../utils/componentElements.js';
   import { getSection, updateControlProperty } from '../stores/controls.js';
-  import { activePanel } from '../stores/panels.js';
+  import { activePanel, selectedComponentIds } from '../stores/panels.js';
   import FieldList from '../properties/FieldList.svelte';
   import {
     METER_ARC_FIELDS, METER_FIELDS, METER_FILL_FIELDS, METER_PEAK_FIELDS, METER_READOUT_FIELDS, METER_VALUE_FIELDS,
@@ -19,8 +19,8 @@
   import Mountain from 'lucide-svelte/icons/mountain';
   import Ruler from 'lucide-svelte/icons/ruler';
   import Radius from 'lucide-svelte/icons/radius';
-  import PropertyToggle from '../properties/PropertyToggle.svelte';
   import MeterPartsEditor from './MeterPartsEditor.svelte';
+  import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
   import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js';
   import { anatomyForm } from '../models/controlAnatomy.js';
 
@@ -52,7 +52,7 @@
   // Steps or Blend is the zones' own setting now, in the Zones section.
   let fillFields = $derived(without(METER_FILL_FIELDS, ['gradient']));
   let peakFields = $derived(partsMode ? without(METER_PEAK_FIELDS, ['peakColour']) : METER_PEAK_FIELDS);
-  let readoutFields = $derived(partsMode ? without(METER_READOUT_FIELDS, ['showTicks', 'tickCount', 'showValue']) : METER_READOUT_FIELDS);
+  let readoutFields = $derived(partsMode ? without(METER_READOUT_FIELDS, ['showTicks', 'tickCount']) : METER_READOUT_FIELDS);
   // A part showing the held peak, or a clip lamp, keeps the peak whether or not the marker is on.
   let peakValues = $derived(needsPeak ? { ...m, peakHold: true } : m);
   function setZones(next) { set('zones', next); }
@@ -99,11 +99,10 @@
       <input class="val" type="text" value={m.valueSuffix ?? ''} onchange={(e) => set('valueSuffix', e.target.value)} />
     </PropertyCell>
   {/snippet}
-  {#snippet caption()}
-    <PropertyCell label="Caption" span={3} hint="A text label shown with the meter.">
-      <input class="val" type="text" value={m.label ?? ''} onchange={(e) => set('label', e.target.value)} />
-    </PropertyCell>
-  {/snippet}
+
+  {#if $selectedComponentIds.size <= 1}
+    <AttachedLabelsEditor {control} />
+  {/if}
 
   <PropertySection title="Meter" icon={Gauge}>
     <FieldList fields={meterFields} values={m} {set} />
@@ -160,13 +159,8 @@
 
   <MeterPartsEditor {control} />
 
-  <PropertySection title={partsMode ? 'Readout' : 'Scale & readout'} icon={Ruler}>
-    {#if partsMode}
-      <PropertyCell label="Readout" path="Core.formShowValue" hint="Show the reading under the meter.">
-        <PropertyToggle value={core?.formShowValue !== false} ariaLabel="Readout" onchange={(next) => core?.id && updateControlProperty(core.id, 'Core.formShowValue', next)} />
-      </PropertyCell>
-    {/if}
-    <FieldList fields={readoutFields} values={partsMode ? { ...m, showValue: true } : m} {set} slots={{ suffix, caption }} />
+  <PropertySection title={partsMode ? 'Reading' : 'Scale & reading'} icon={Ruler}>
+    <FieldList fields={readoutFields} values={m} {set} slots={{ suffix }} />
   </PropertySection>
 
   {#if !partsMode && String(m.orientation) === 'arc'}

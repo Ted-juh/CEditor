@@ -6,6 +6,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
 import {
   ENVELOPE_PART_CAP,
@@ -175,7 +176,7 @@ test('the counts say how big the library is and what is wrong with it', () => {
     entry({ id: 'b', validation: { ok: false, issues: ['x'] } }),
     entry({ id: 'c', useCount: 4 }),
   ]));
-  assert.deepEqual(counts, { total: 3, pinned: 1, invalid: 1, unused: 2 });
+  assert.deepEqual(counts, { total: 3, pinned: 1, invalid: 1, unused: 2, strips: 0 });
 });
 
 test('relativeTime reads at every scale, and says nothing about nonsense', () => {
@@ -195,4 +196,31 @@ test('field labels are collected for the day the panel rows come out', () => {
   assert.ok(labels.includes('Name'));
   assert.ok(labels.includes('Recent'));
   assert.equal(new Set(labels).size, labels.length, 'a duplicate label would double a search hit');
+});
+
+test('image strips are a kind of their own: found by their frames, filtered, counted, marked', async () => {
+  // The owner: "filmstrips are for those who want them, as their own category".
+  const { isImageStripComponent, filterLibraryKind, LIBRARY_KINDS } = await import('../src/CE_Application/utils/componentLibraryModel.js');
+  const parts = createControl('CustomComponent');
+  const byGenerator = createControl('CustomComponent');
+  byGenerator._children.Generators._children.strip = { _type: 'Generator', name: 'strip', type: 'filmstrip-frames', enabled: true };
+  const byLayer = createControl('CustomComponent');
+  byLayer._children.Parts._children.frames = createPartNode('frames', { kind: 'rectangle', sections: { Image: { _type: 'Image', mode: 'filmstrip', source: 'data:,', frameCount: 32 } } });
+  const off = createControl('CustomComponent');
+  off._children.Generators._children.strip = { _type: 'Generator', name: 'strip', type: 'filmstrip-frames', enabled: false };
+  assert.equal(isImageStripComponent(parts), false);
+  assert.equal(isImageStripComponent(byGenerator), true, 'a frames generator');
+  assert.equal(isImageStripComponent(byLayer), true, 'a layer whose picture is frames');
+  assert.equal(isImageStripComponent(off), false, 'a generator switched off draws nothing');
+  const rows = describeLibrary([{ id: 'a', name: 'Knob', component: parts }, { id: 'b', name: 'Strip', component: byLayer }]);
+  assert.deepEqual(rows.map((row) => row.imageStrip), [false, true]);
+  assert.equal(libraryCounts(rows).strips, 1);
+  assert.deepEqual(filterLibraryKind(rows, 'strips').map((row) => row.id), ['b']);
+  assert.deepEqual(filterLibraryKind(rows, 'parts').map((row) => row.id), ['a']);
+  assert.equal(filterLibraryKind(rows, 'all').length, 2);
+  assert.deepEqual(LIBRARY_KINDS.map((kind) => kind.label), ['All', 'Made of parts', 'Image strips']);
+  const read = (path) => readFileSync(new URL(`../src/CE_Application/${path}`, import.meta.url), 'utf8');
+  assert.match(read('components/library/LibraryGrid.svelte'), /\{#if row\.imageStrip\}<em class="strip"/);
+  assert.match(read('components/library/LibraryDetail.svelte'), /\{#if row\.imageStrip\}\s*<!--[\s\S]*?-->\s*<p class="strip-note" data-image-strip-note>/);
+  assert.match(read('components/LibraryTab.svelte'), /\{#if counts\.strips\}\s*<div class="kinds"/);
 });

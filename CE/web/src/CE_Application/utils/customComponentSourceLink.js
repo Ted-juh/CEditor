@@ -55,6 +55,31 @@ const INSTANCE_CORE_KEYS = new Set([
   'hostParameters',
 ]);
 
+// What a copy a set placed for a knob holds of that knob (utils/setLibraryComponents.js): its
+// value's range and format, and the same on the value's published entry. Each copy's own, as its
+// position is, so an update to the component keeps every knob's range.
+const PLACED_CHANNEL_KEYS = ['min', 'max', 'step', 'defaultValue', 'label', 'format'];
+const PLACED_PUBLISHED_KEYS = ['min', 'max', 'step', 'defaultValue', 'label'];
+
+/**
+ * The paths that belong to a copy because a set placed it for a control: the placement record, the
+ * value's range and format, its published entry's, and the caption it carries. Empty for any other
+ * copy.
+ */
+export function setPlacementPaths(control) {
+  const placement = control?._children?.Designer?.setPlacement;
+  const channel = String(placement?.channel ?? '').trim();
+  if (!channel) return [];
+  // Its layers scaled to the control's size (setLibraryComponents.js placedCopy) are its placement too.
+  const paths = ['Designer.setPlacement', 'Transform.contentScaleMode', ...PLACED_CHANNEL_KEYS.map((key) => `ValueChannels.${channel}.${key}`)];
+  for (const [name, entry] of Object.entries(control._children.PublishedProperties?.inputs ?? {})) {
+    if (String(entry?.channel || name) !== channel) continue;
+    paths.push(...PLACED_PUBLISHED_KEYS.map((key) => `PublishedProperties.inputs.${name}.${key}`));
+  }
+  if (placement.caption) paths.push(String(placement.caption));
+  return paths;
+}
+
 const INSTANCE_TRANSFORM_KEYS = new Set([
   'x', 'y', 'width', 'height', 'anchor', 'affectsFit', 'rotation', 'scale', 'opacity',
 ]);
@@ -172,8 +197,9 @@ function matchesPrefix(path, prefixes) {
 }
 
 /** The kind of a flattened path — see the header. `routeNames` are this instance's panel routes. */
-export function classifySourcePath(path, { overridePaths = [], routeNames = new Set() } = {}) {
+export function classifySourcePath(path, { overridePaths = [], routeNames = new Set(), instancePaths = [] } = {}) {
   const [section, key, sub] = path.split('.');
+  if (instancePaths.length && matchesPrefix(path, instancePaths)) return 'instance';
   if (section === 'Core') {
     if (key === 'id' || key === 'controlType') return 'ignored';
     if (INSTANCE_CORE_KEYS.has(key)) return 'instance';
@@ -324,7 +350,7 @@ export function diffCustomComponentAgainstSource(control, libraryEntries = []) {
   const base = found.base?.component ?? null;
   const overridePaths = publishedOverridePaths(control, latest, base);
   const routeNames = routeNamesOf(control, latest, base);
-  const context = { overridePaths, routeNames };
+  const context = { overridePaths, routeNames, instancePaths: setPlacementPaths(control) };
 
   const baseFlat = base ? flattenControl(base) : null;
   const instanceFlat = flattenControl(control);
@@ -532,6 +558,17 @@ export function rebaseCustomComponentOnSource(control, entry, options = {}) {
   designer.designWidth = Number(sourceTransform.width) || designer.designWidth;
   designer.designHeight = Number(sourceTransform.height) || designer.designHeight;
   children.Designer = stampProvenance(designer, entry, importedAt);
+
+  // A copy a set placed for a knob keeps the knob: its record, and its range and caption wherever the
+  // new version still has the value and the text they go to.
+  const placed = setPlacementPaths(control).filter((path) => path !== 'Designer.setPlacement');
+  if (mine.Designer?.setPlacement) {
+    children.Designer.setPlacement = deepClone(mine.Designer.setPlacement);
+    const mineFlat = flattenControl(control);
+    for (const [leaf, value] of mineFlat) {
+      if (matchesPrefix(leaf, placed)) setAtPath(next, leaf, value);
+    }
+  }
 
   const carried = [];
   const dropped = [];

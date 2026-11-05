@@ -26,6 +26,8 @@ test('the window gives it a row of its own above the status bar', () => {
   const app = read('App.svelte');
   assert.match(app, /grid-template-rows:\s*28px 1fr auto 24px;/);
   assert.match(app, /"trust\s+trust\s+trust\s+trust"\s*\n\s*"status\s+status\s+status\s+status"/);
-  assert.match(app, /<div class="trust-area">\s*<ScriptTrustBanner \/>\s*<\/div>/);
+  // The row also holds the Edit on Panel banner (layout/SetEditBanner.svelte): another notice
+  // about the open panel, laid out the same way and empty unless a family is being styled.
+  assert.match(app, /<div class="trust-area">\s*<ScriptTrustBanner \/>\s*<SetEditBanner \/>\s*<\/div>/);
   assert.equal(app.match(/<ScriptTrustBanner \/>/g).length, 1, 'mounted once, in the row');
 });

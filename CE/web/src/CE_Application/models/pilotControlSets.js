@@ -74,7 +74,7 @@ export const TOLEX_CONTROL_SET = {
   },
   families: {
     Knob: {
-      component: { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
+      component: { 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
       parts: {
         tickMajor: { 'Layout.width': 1.5, 'Layout.height': 5 },
         // The gold skirt: a thick arc around the cap.
@@ -180,7 +180,7 @@ export const MACHINED_CONTROL_SET = {
   },
   families: {
     Knob: {
-      component: { 'Behavior.showMinMaxLabels': false, 'Behavior.labelReadoutPlacement': 'bottom', 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
+      component: { 'Behavior.majorTickCount': 11, 'Behavior.minorTickCount': 0, 'Behavior.majorTickLength': 5 },
       parts: {
         // Eleven marks cut into the plate: a dark line over its own light edge.
         tickMajor: { kind: 'engraved', 'Layout.width': 1.5, 'Layout.height': 5 },

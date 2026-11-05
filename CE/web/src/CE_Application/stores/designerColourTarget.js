@@ -28,6 +28,9 @@ export function designerFillTarget(status) {
     type: 'callback',
     label: `${layers.length} layers › Fill`,
     _designerFill: key,
+    // Writes the value to each layer's colour, so a set colour (a role) can be linked here too.
+    acceptsRoles: true,
+    controlId,
     apply: (hex) => {
       for (const name of layers) updateControlProperty(controlId, `Parts.${name}.Background.Fill.colour`, hex);
     },

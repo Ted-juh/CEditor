@@ -23,6 +23,8 @@
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { bakeRenderedLookImages } from './bakeRenderedLooks.mjs';
+
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const webSrc = (rel) => pathToFileURL(path.join(REPO, 'CE/web/src/CE_Application', rel)).href;
 
@@ -47,6 +49,16 @@ export async function exportFormFor(doc, filePath = null) {
   const panel = deserializePanel(JSON.stringify(doc), filePath, doc.name ?? null);
   if (!panel) throw new Error(`Cannot export: ${panelOpenReport().error}`);
   const payload = exportFormDocument(JSON.parse(serializePanelForExport(panel)));
+  // Rendered looks, baked as the editor's export bakes them (bakeRenderedLooks.mjs): the plug-in
+  // carries their images and renders nothing. Without a browser to draw them in, the parts draw
+  // their plain fill, as the warning says.
+  const looks = await bakeRenderedLookImages(panel);
+  if (Object.keys(looks.images).length) payload.renderedLookImages = looks.images;
+  if (looks.wanted) {
+    const made = Object.keys(looks.images).length;
+    if (made === looks.wanted) console.log(`rendered looks: ${made} image(s) baked`);
+    else console.warn(`rendered looks: ${made} of ${looks.wanted} image(s) baked; ${looks.reason}. The rest draw their plain fill in the plug-in.`);
+  }
   // Carried as they were: the editor's export keeps the panel's identity and its baked settings.
   // The name too: the editor's loader names a panel after its FILE, as it does when you open one,
   // and the product name falls back to the panel's name — so "Validation" saved as panel.cepanel
