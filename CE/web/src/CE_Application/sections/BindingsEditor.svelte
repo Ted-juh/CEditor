@@ -32,6 +32,8 @@
   // A binding's source, mode or unit that the lists do not hold is offered as it is: a select whose
   // value is not among its options shows blank (utils/bindingSourceOptions.js).
   let sourceGroups = $derived(bindingSourceGroups(control, selectedBinding?.source ?? 'value.normalized'));
+  // What the source is read less of, if anything: a range's end less its start.
+  let minusGroups = $derived([{ label: '', options: [{ value: '', label: 'Nothing' }] }, ...bindingSourceGroups(control, String(selectedBinding?.minus ?? ''))]);
   let modeGroups = $derived(choiceGroups(MAP_MODES, selectedBinding?.mapMode ?? 'range'));
   let unitGroups = $derived(choiceGroups(OUTPUT_UNITS, selectedBinding?.outputUnit ?? 'percent'));
 
@@ -164,6 +166,11 @@
       <PropertyCell label="Unit" span={1} hint="Display/runtime unit expected by the target property.">
         <select class="val" value={selectedBinding.outputUnit ?? 'percent'} onchange={(e) => setBindingProp('outputUnit', e.target.value)}>
           {@render choices(unitGroups)}
+        </select>
+      </PropertyCell>
+      <PropertyCell label="Minus" span={4} hint="Read the source less another value: how far a range's end is from its start, either way round. Nothing reads the source as it is.">
+        <select class="val" aria-label="Minus" value={String(selectedBinding.minus ?? '')} title={String(selectedBinding.minus ?? '')} onchange={(e) => setBindingProp('minus', e.target.value)}>
+          {@render choices(minusGroups)}
         </select>
       </PropertyCell>
       <PropertyCell label="Combine" span={4} hint="Set the target to this binding's value, or add it to what the bindings before it wrote: a range's fill moved by both its ends, a readout joined from several values.">

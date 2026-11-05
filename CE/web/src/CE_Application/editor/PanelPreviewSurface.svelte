@@ -245,6 +245,7 @@
     createTimedButtonPreviewController,
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
+  import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
   import {
     createMomentaryButtonPreviewController,
     isPressToTalkBehavior,
@@ -309,6 +310,7 @@
     behaviorTakesInput,
     channelForBehaviorInput,
     resolveCustomInteractionPatch,
+    customButtonActPatch,
     sourcedCustomValues,
     seedCustomValues,
     snapCustomChannelValue,
@@ -542,6 +544,31 @@
     patchSession: (controlId, patch) => patchControlSession(controlId, patch),
   });
   const oneShotTimers = new Map();
+  // A component's button that fires other than as it is pressed (Interact card › Fires and
+  // Afterwards: after a hold, on a double click, again and again while held, once only). Its value
+  // goes through the press path; while it is spent, a component with no other behaviour is disabled,
+  // as the panel's one-shot button is.
+  const customButtonFiring = createButtonFiring({
+    act: ({ controlId, zone }, what) => {
+      const control = controlById(controlId);
+      if (control) patchControlSession(controlId, customButtonActPatch(control, sessionFor(control), zone, what));
+    },
+    flags: ({ controlId, sole }, flags) => {
+      const { disabled, ...rest } = flags;
+      const patch = sole && disabled !== undefined ? { ...rest, disabled } : rest;
+      if (Object.keys(patch).length) patchControlSession(controlId, patch);
+    },
+  });
+  // The firing of the behaviour a grab area drives, its key, and what `act` needs; null for a button
+  // that fires as it always has.
+  function customFiringFor(control, hitZoneEntry) {
+    const behaviors = getCustomBehaviors(control) ?? {};
+    const behaviorName = hitZoneEntry?.zone?.targetBehavior ?? '';
+    const config = buttonFiring(behaviors[behaviorName]);
+    if (!config) return null;
+    const controlId = getControlId(control);
+    return { config, key: `${controlId}::${behaviorName}`, context: { controlId, zone: hitZoneEntry, sole: Object.keys(behaviors).length === 1 } };
+  }
   let scrollDrag = null;
 
   function setScrollOffset(control, offset) {
@@ -7503,10 +7530,20 @@
     const hitZoneEntry = defaultCustomActivationHitZone(resolvedPreview?.control ?? control)
       ?? defaultCustomActivationHitZone(control);
     const momentary = String(hitZoneEntry?.zone?.action ?? '').trim().toLowerCase() === 'momentaryvalue';
-    if (phase === 'down' && !momentary) return;
     // Keyboard off on the behaviour Enter and Space would press.
     const behavior = getCustomBehaviors(control)?.[hitZoneEntry?.zone?.targetBehavior] ?? customMainBehaviorModule(control);
     if (!behaviorTakesInput(behavior, 'keyboard')) return;
+    // A button that fires after a hold, on clicks, again and again or once only: the key down is
+    // its press and the key up its release, as a pointer's are (a key held repeats no press).
+    const firing = customFiringFor(control, hitZoneEntry);
+    if (firing) {
+      if (phase === 'down' && event?.repeat === true) return;
+      patchControlSession(getControlId(control), { focused: true, hover: true, pressed: phase === 'down', dragging: false, inputModality: 'keyboard' });
+      if (phase === 'down') customButtonFiring.press(firing.key, firing.config, firing.context);
+      else customButtonFiring.release(firing.key, firing.config, { inside: true });
+      return;
+    }
+    if (phase === 'down' && !momentary) return;
     const rect = event?.currentTarget?.getBoundingClientRect?.();
     patchCustomInteraction(control, hitZoneEntry, {
       ...event,
@@ -8094,6 +8131,7 @@
     stopListboxMomentum();
     timedButtonPreview.destroy();
     momentaryButtonPreview.destroy();
+    customButtonFiring.destroy();
     for (const timer of oneShotTimers.values()) clearTimeout(timer);
     oneShotTimers.clear();
   });
@@ -8115,6 +8153,7 @@
     }
     timedButtonPreview.syncKeys(activeControlIds);
     momentaryButtonPreview.syncKeys(activeControlIds);
+    customButtonFiring.syncKeys((key) => controlsById.has(key.split('::')[0]));
     for (const [id, timer] of oneShotTimers) {
       if (!controlsById.has(id)) { clearTimeout(timer); oneShotTimers.delete(id); }
     }
@@ -8621,7 +8660,21 @@
         : {};
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
-      if (isDragAction) {
+      const firing = isDragAction ? null : customFiringFor(control, pointerCustomHitZone);
+      if (firing) {
+        // A button that fires after a hold, on clicks, again and again or once only: the press is
+        // the firing's to time (customButtonFiring.js), and the release below ends it.
+        patchControlSession(pointerActiveControlId, {
+          hover: true,
+          pressed: true,
+          focused: false,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+          ...knobFocus,
+        });
+        customButtonFiring.press(firing.key, firing.config, firing.context);
+      } else if (isDragAction) {
         patchCustomInteraction(control, pointerCustomHitZone, event, {
           hover: true,
           pressed: false,
@@ -8957,7 +9010,17 @@
 
     if (isCustomComponent(activeControl)) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (action === 'momentaryvalue' && activeControl) {
+      const firing = activeControl && action !== 'dragvalue' && action !== 'scrubvalue' ? customFiringFor(activeControl, pointerCustomHitZone) : null;
+      if (firing) {
+        // Let go, inside or out: the firing decides what that does.
+        patchControlSession(activeId, {
+          hover: inside,
+          pressed: false,
+          dragging: false,
+          inputModality: 'pointer',
+        });
+        customButtonFiring.release(firing.key, firing.config, { inside: inside && !isDisabled(activeControl) });
+      } else if (action === 'momentaryvalue' && activeControl) {
         // Let go, inside or out: a momentary button is off again.
         patchCustomInteraction(activeControl, pointerCustomHitZone, { clientX: event?.clientX, clientY: event?.clientY, release: true }, {
           hover: inside,

@@ -26,6 +26,7 @@
   import {
     createMomentaryButtonPreviewController,
   } from '../utils/momentaryButtonPreview.js';
+  import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
   import {
     adjustRangeValue,
     getCurrentRangeValue,
@@ -80,6 +81,7 @@
     resetCustomChannelToDefault,
     resolveCustomHitZoneAtPoint,
     resolveCustomInteractionPatch,
+    customButtonActPatch,
     resolveCustomNormalizedFromPoint,
     seedCustomValues,
     snapCustomChannelValue,
@@ -133,6 +135,22 @@
   const momentaryButtonPreview = createMomentaryButtonPreviewController({
     patchSession: (_controlId, patch) => patchSession(patch),
   });
+  // A component's button that fires after a hold, on clicks, again and again or once only
+  // (customButtonFiring.js), as on the panel (PanelPreviewSurface).
+  const customButtonFiring = createButtonFiring({
+    act: ({ zone }, what) => patchSession(customButtonActPatch(control, session, zone, what)),
+    flags: ({ sole }, flags) => {
+      const { disabled, ...rest } = flags;
+      const patch = sole && disabled !== undefined ? { ...rest, disabled } : rest;
+      if (Object.keys(patch).length) patchSession(patch);
+    },
+  });
+  function customFiringFor(hitZoneEntry) {
+    const behaviorName = hitZoneEntry?.zone?.targetBehavior ?? '';
+    const config = buttonFiring(customBehaviors?.[behaviorName]);
+    if (!config) return null;
+    return { config, key: behaviorName, context: { zone: hitZoneEntry, sole: Object.keys(customBehaviors ?? {}).length === 1 } };
+  }
 
   function patchSession(patch = {}) {
     const controlId = String(control?._children?.Core?.id ?? '');
@@ -383,8 +401,11 @@
     }
     momentaryButtonPreview.cancel(control?._children?.Core?.id);
     const momentaryRelease = momentaryButtonPreview.releasePress(control?._children?.Core?.id, behavior);
+    // A component's button that fires on its own time, held when the pointer is lost: let go outside.
+    const lostFiring = pointerActive ? customFiringFor(pointerCustomHitZone) : null;
+    if (lostFiring) customButtonFiring.release(lostFiring.key, lostFiring.config, { inside: false });
     // A momentary custom button held when the pointer is lost: off again.
-    if (pointerActive && String(pointerCustomHitZone?.zone?.action ?? '').toLowerCase() === 'momentaryvalue') {
+    else if (pointerActive && String(pointerCustomHitZone?.zone?.action ?? '').toLowerCase() === 'momentaryvalue') {
       patchCustomInteraction(pointerCustomHitZone, { release: true }, {});
     }
     if (pointerActive) {
@@ -414,6 +435,7 @@
     }
     timedButtonPreview.destroy();
     momentaryButtonPreview.destroy();
+    customButtonFiring.destroy();
     keyboardActivationKey = '';
     for (const timer of oneShotTimers.values()) clearTimeout(timer);
     oneShotTimers.clear();
@@ -1488,7 +1510,17 @@
       }
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
       const isDragAction = action === 'dragvalue' || action === 'scrubvalue' || ['arpeggiatormove', 'arpeggiatorvelocity', 'arpeggiatorresize', 'arpeggiatorendstep'].includes(action) || action === '';
-      if (isDragAction) {
+      const firing = isDragAction ? null : customFiringFor(pointerCustomHitZone);
+      if (firing) {
+        patchSession({
+          hover: true,
+          pressed: true,
+          dragging: false,
+          activeCustomBehavior: pointerCustomHitZone?.zone?.targetBehavior ?? '',
+          activeCustomHitZone: pointerCustomHitZone?.name ?? '',
+        });
+        customButtonFiring.press(firing.key, firing.config, firing.context);
+      } else if (isDragAction) {
         patchCustomInteraction(pointerCustomHitZone, event, {
           hover: true,
           pressed: true,
@@ -1614,7 +1646,11 @@
 
     if (isCustomComponent) {
       const action = String(pointerCustomHitZone?.zone?.action ?? '').trim().toLowerCase();
-      if (action === 'momentaryvalue') {
+      const firing = action !== 'dragvalue' && action !== 'scrubvalue' ? customFiringFor(pointerCustomHitZone) : null;
+      if (firing) {
+        patchSession({ hover: inside, pressed: false, dragging: false, inputModality: 'pointer' });
+        customButtonFiring.release(firing.key, firing.config, { inside: inside && !isDisabled });
+      } else if (action === 'momentaryvalue') {
         patchCustomInteraction(pointerCustomHitZone, { clientX: event?.clientX, clientY: event?.clientY, release: true }, {
           hover: inside,
           pressed: false,

@@ -226,6 +226,20 @@ function evaluateBindingSource(binding, signals) {
   }
 }
 
+/**
+ * What a binding reads: its source, or, with `minus` naming another source, the source less that
+ * one: a range's end less its start, how far apart its handles are and which way round. A `minus`
+ * that reads nothing takes nothing off. Its Scale and its map apply to the difference.
+ */
+export function bindingSourceValue(binding, signals) {
+  const value = evaluateBindingSource(binding, signals);
+  const minus = String(binding?.minus ?? '').trim();
+  if (!minus) return value;
+  const less = Number(evaluateBindingSource({ source: minus }, signals));
+  const read = Number(value);
+  return Number.isFinite(read) && Number.isFinite(less) ? read - less : value;
+}
+
 function resolveBindingValue(binding, sourceValue) {
   if (binding?.mapMode === 'direct') {
     return sourceValue;
@@ -997,7 +1011,7 @@ export function applyCustomBindings(control, signals = {}) {
   if (!bindings || bindings.enabled === false) return control;
   for (const binding of Object.values(bindings?._children ?? {})) {
     if (!binding || binding.enabled === false) continue;
-    const sourceValue = evaluateBindingSource(binding, signals);
+    const sourceValue = bindingSourceValue(binding, signals);
     const resolvedValue = resolveBindingValue(binding, sourceValue);
     if (resolvedValue === undefined) continue;
     setTreeValueAtPath(control, binding.target, binding.add === true

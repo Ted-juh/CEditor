@@ -59,7 +59,8 @@ import { meterDeviceDrawn, meterNeedsPeak } from '../models/meterDeviceParts.js'
 import { isDisplayOnly } from './displayMode.js';
 import { targetBuckets } from './interactionRuntime.js';
 import { surfaceShadows } from './surfaceEffects.js';
-import { getSliderDefaultValues, getSliderMax, getSliderMin, getSliderValueMode } from './sliderBehavior.js';
+import { isRepeatingBehavior } from './momentaryButtonPreview.js';
+import { getSliderAllowHandleCross, getSliderAllowWrapAround, getSliderDefaultValues, getSliderMax, getSliderMin, getSliderValueMode } from './sliderBehavior.js';
 import { formLayersRefusal, formPartsDiffer, withFormAsParts } from '../models/formAsParts.js';
 import { DRAWN_KNOB_FORMS, knobFormDrawingLayers } from './formDrawingLayers.js';
 import { drawnDeviceDirection, synthDeviceDrawingLayers } from './deviceDrawingLayers.js';
@@ -376,9 +377,10 @@ function whyNotButtonLayers(control, resolved, measure) {
   // (carryControlEffects).
   if (core.enabled === false) return 'disabled';
   if (core.visible === false) return 'hidden';
+  // A timed (hold to confirm, double click), one-shot, repeating or press-to-talk button comes in as
+  // a toggle or a momentary button whose behaviour fires as it did (buttonFiringFields).
   const kind = String(behavior.buttonType ?? 'momentary');
-  if (kind !== 'toggle' && kind !== 'momentary') return `a ${kind.replace(/_/g, '-')} button, which comes in as a toggle or a momentary button only`;
-  if (behavior.repeating === true || behavior.pressToTalk === true || behavior.press_to_talk === true) return 'a repeating or press-to-talk button';
+  if (!['toggle', 'momentary', 'timed', 'one_shot'].includes(kind)) return `a ${kind.replace(/_/g, '-')} button, which comes in as a toggle or a momentary button only`;
   const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
   // A synth set's form comes in as its drawing (deviceDrawingLayers.js), its caption with it.
   if (form && drawnDeviceDirection(core.controlType, form)) return scriptOrPortRefusal(kids);
@@ -1386,7 +1388,10 @@ function knobSections(values, bounds, allParts = {}) {
       const defaults = getSliderDefaultValues(rangeBehavior);
       const band = getSliderValueMode(rangeBehavior) === 'band';
       const named = Object.fromEntries(handles.map((handle) => [handle.role, handle.channel]));
-      const bounds = {
+      // Handles that may pass each other or wrap round the end are kept in no order, as the panel
+      // keeps them (normalizeHandleOrder leaves them be).
+      const free = getSliderAllowHandleCross(rangeBehavior) || getSliderAllowWrapAround(rangeBehavior);
+      const bounds = free ? { start: {}, current: {}, end: {} } : {
         start: { normalizedMax: `channel.${band ? named.current : named.end}.normalized` },
         current: { normalizedMin: `channel.${named.start}.normalized`, normalizedMax: `channel.${named.end}.normalized` },
         end: { normalizedMin: `channel.${band ? named.current : named.start}.normalized` },
@@ -1467,7 +1472,7 @@ function knobSections(values, bounds, allParts = {}) {
       // moves its start, value and end along one curve (SliderFamilyRenderer's glide).
       for (const glideChannel of ranged ? handles.map((handle) => handle.channel) : [channelName]) {
         const own = ranged
-          ? Object.fromEntries(Object.entries(layered.bindings).filter(([, binding]) => String(binding?.source ?? '').startsWith(`channel.${glideChannel}.`)))
+          ? Object.fromEntries(Object.entries(layered.bindings).filter(([, binding]) => [binding?.source, binding?.minus].some((read) => String(read ?? '').startsWith(`channel.${glideChannel}.`))))
           : layered.bindings;
         const glide = valueGlideAnimation(resolved, glideChannel, own);
         if (glide) out.animations[glide.name] = glide;
@@ -1548,6 +1553,32 @@ function knobSections(values, bounds, allParts = {}) {
 }
 
 /**
+ * How the panel's button fired, as a component's button behaviour says it (utils/customButtonFiring.js):
+ * a timed one after a hold or on its clicks, a one-shot on release and then disabled (or locked for
+ * its lockout), a repeating one again and again while held. Press-to-talk is on while held, as any
+ * momentary button is: nothing to say.
+ */
+function buttonFiringFields(behavior) {
+  const kind = String(behavior?.buttonType ?? 'momentary');
+  const subtype = String(behavior?.subtype ?? '');
+  const n = (value, fallback) => (Number.isFinite(Number(value)) ? Number(value) : fallback);
+  if (kind === 'timed') {
+    return subtype === 'double_click'
+      ? { fires: 'double', clicks: Math.max(1, Math.round(n(behavior.requiredClicks, 2))), clickWindow: n(behavior.clickWindow, 350) }
+      : { fires: 'hold', holdMs: n(behavior.holdDuration, 1200) };
+  }
+  if (kind === 'one_shot') {
+    const lock = Math.max(0, n(behavior.lockoutDuration, 0));
+    if (behavior.disableAfterUse === false) return { fires: 'release' };
+    return lock > 0 ? { fires: 'release', afterwards: 'locked', lockMs: lock } : { fires: 'release', afterwards: 'disabled' };
+  }
+  if (isRepeatingBehavior(behavior) || behavior?.repeating === true) {
+    return { fires: 'repeat', repeatDelay: n(behavior.repeatDelay, 300), repeatInterval: n(behavior.repeatInterval, 120) };
+  }
+  return {};
+}
+
+/**
  * A button as layers: a bool channel; a toggle flips it on a click, a momentary button holds it on
  * while pressed (the `momentaryValue` action). Its looks, which the button's States write to the
  * whole control, are written to its plate and text when THIS button is hovered, focused, pressed (a
@@ -1566,6 +1597,9 @@ function buttonSections(out, { control, resolved, local, paintIndex, buttoned },
     type: toggle ? 'toggle' : 'button', role: 'button', valueChannel: channelName, geometry: 'none',
     interaction: { wheel: false },
   });
+  // When it fires and what it does after, where the panel's button was not a plain press.
+  const firing = buttonFiringFields(behavior);
+  Object.assign(out.behaviors[channelName], firing);
   out.hitZones[zoneName] = createHitZone(zoneName, {
     shape: 'rectangle', targetBehavior: channelName, targetValueChannel: channelName,
     action: toggle ? 'toggleValue' : 'momentaryValue',
@@ -1587,7 +1621,9 @@ function buttonSections(out, { control, resolved, local, paintIndex, buttoned },
   const conditions = {
     Hover: { when: { hoveredCustomHitZone: zoneName } },
     Focused: { when: { focusedCustomHitZones: zoneName } },
-    Pressed: toggle ? null : { rule: on },
+    // Pressed while its value is on; one that fires on its own time is pressed while it is held, as
+    // the panel's timed and one-shot buttons are, its value only a moment's pulse.
+    Pressed: toggle ? null : (firing.fires ? { when: { pressed: true, activeCustomHitZone: zoneName } } : { rule: on }),
     Selected: toggle ? { rule: on } : null,
   };
   // Its lamp lights while it is on or pressed.

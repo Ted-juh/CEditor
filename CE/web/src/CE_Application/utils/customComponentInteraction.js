@@ -1089,6 +1089,17 @@ function resolveSecondaryChannelName(hitZone, behaviorModule, primaryChannelName
   return channels.find((name) => name !== primaryChannelName) ?? '';
 }
 
+/**
+ * What a button behaviour's grab area does when it fires (customButtonFiring.js): its value on, off
+ * or flipped, through the same path as a press, so links, constraints and the main value follow.
+ */
+export function customButtonActPatch(control, session = {}, hitZoneEntry = null, what = 'flip') {
+  const zone = hitZoneEntry?.zone ?? null;
+  if (!zone) return {};
+  const entry = { ...hitZoneEntry, zone: { ...zone, action: what === 'flip' ? 'toggleValue' : 'momentaryValue' } };
+  return resolveCustomInteractionPatch(control, session, entry, { release: what === 'off' });
+}
+
 export function resolveCustomInteractionPatch(control, session = {}, hitZoneEntry = null, point = null) {
   const hitZone = hitZoneEntry?.zone ?? null;
   if (String(hitZone?.action).toLowerCase() === 'arpeggiatorendstep') {

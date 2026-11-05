@@ -1105,8 +1105,11 @@ fill runs from one to the other, the ticks light between them, and a press on th
 handle nearest to it, as on the panel. The fill is moved by both ends: on the **React** tab, the
 start's binding has **Combine** set to **Add to the bindings before it**, so its value is added to
 what the end's binding wrote. The grab area's row on the **Interact** card says it **Takes** the
-nearest of the handles. Handles that may pass each other or wrap round the end are not converted
-yet. A knob made into layers turns about its own centre when the component holds several: its
+nearest of the handles. Handles that may pass each other (**Allow Handle Cross**) or wrap round the
+end come in too, kept in no order: their fill and lit ticks run from whichever handle comes first,
+and on a knob that wraps, round through the gap. Those bindings read the end **Minus** the start,
+a field on the **React** tab: a binding's source less another value, how far apart two handles are
+and which way round. A knob made into layers turns about its own centre when the component holds several: its
 behaviour is **Measured in** its grab area, not the whole component. A meter on a decibel scale
 comes in as layers that place the reading, and the held peak, on that scale, as the meter does: its
 bindings' **Scale** is **Decibels**, from **Floor dB** to **Ceil dB**. A meter part coloured by the zones keeps them: lit cells, scale
@@ -1132,7 +1135,14 @@ stays lit while the peak holds; a range binding with **Inside Only** marks the s
 in. A button comes in
 as its plate and its text, or, drawn as a device, as its housing, key, symbol, indicator and legend
 with its caption; a switch flips its value on a click, a button holds it on while pressed, and the
-parts move and light up as they did. A meter comes in as its track and its zones' colours covered past
+parts move and light up as they did. A button that fired otherwise keeps doing so: on the
+**Interact** card its behaviour **Fires** when pressed, when released, after a hold (**Hold ms**),
+on a double click (**Clicks**, **Within ms**), again and again while held (**Delay ms**, **Every
+ms**) or only while held, and **Afterwards** it is ready again, disabled, or locked for a time
+(**Locked ms**). A timed button comes in firing after its hold or on its clicks, a one-shot button
+firing on release and then disabled (or locked for its lockout), a repeating one again and again
+while held. A button that fires sends its value on for a moment, and a switch flips; a held timed
+button looks pressed while it is held. Radio, cyclic and combo-box buttons do not come in yet. A meter comes in as its track and its zones' colours covered past
 the reading, its segments each lighting as the reading reaches them, or, drawn as a device, as its
 housing, face, scale, needle or bar and readout, moving with its value; it takes no input, and its
 value arrives as a knob's does. A button's or a label's text keeps where it is placed, its lines,

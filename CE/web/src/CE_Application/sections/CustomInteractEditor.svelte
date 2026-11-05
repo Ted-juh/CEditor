@@ -11,6 +11,7 @@
   import { listInteractiveArchetypes } from '../utils/customComponentFactory.js';
   import { numberOr } from '../utils/primitives.js';
   import { describeValueSource } from '../utils/valueSources.js';
+  import { defaultFires, isButtonBehavior } from '../utils/customButtonFiring.js';
   import { activePanel } from '../stores/panels.js';
   import { behaviorTypeWord, capitalised, carriedControlWord, channelTypeWord, isCarriedControlBehavior } from '../utils/authorWords.js';
   import PropertySection from '../properties/PropertySection.svelte';
@@ -120,6 +121,16 @@
     if (!core?.id) return;
     updateControlProperty(core.id, `ValueChannels.${name}.${field}`, value);
   }
+
+  // A button's Fires choices, in the order the mock-up gave them.
+  const FIRES_CHOICES = [
+    ['press', 'when pressed'],
+    ['release', 'when released'],
+    ['hold', 'after a hold'],
+    ['double', 'on a double click'],
+    ['repeat', 'again and again while held'],
+    ['held', 'only while held'],
+  ];
 
   function setBehaviorField(name, field, value) {
     if (!core?.id) return;
@@ -237,6 +248,34 @@
                 <div class="field-row">
                   <span class="field-name">{behaviorName}</span>
                   <div class="ro-field"><em>Type</em><span class="readout">{capitalised(behaviorTypeWord(behavior, parts))}</span></div>
+                  {#if isButtonBehavior(behavior)}
+                    {@const fires = String(behavior.fires ?? '') || defaultFires(behavior)}
+                    <!-- When a button fires, and what it does after (utils/customButtonFiring.js). -->
+                    <label title="When the button acts: a toggle flips, a momentary button sends its value on for a moment (on for as long as it is held, while held)."><em>Fires</em>
+                      <select aria-label="Fires" value={fires} onchange={(event) => setBehaviorField(behaviorName, 'fires', event.currentTarget.value)}>
+                        {#each FIRES_CHOICES as [value, words] (value)}<option {value}>{words}</option>{/each}
+                      </select>
+                    </label>
+                    {#if fires === 'hold'}
+                      <label title="How long it is held before it fires."><em>Hold ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.holdMs, 1200)} defaultValue={1200} min={0} step={50} onchange={(v) => setBehaviorField(behaviorName, 'holdMs', v)} /></span></label>
+                    {:else if fires === 'double'}
+                      <label title="How many clicks fire it."><em>Clicks</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.clicks, 2)} defaultValue={2} min={1} step={1} onchange={(v) => setBehaviorField(behaviorName, 'clicks', Math.max(1, Math.round(v)))} /></span></label>
+                      <label title="The most time between one click and the next."><em>Within ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.clickWindow, 350)} defaultValue={350} min={50} step={10} onchange={(v) => setBehaviorField(behaviorName, 'clickWindow', v)} /></span></label>
+                    {:else if fires === 'repeat'}
+                      <label title="How long after the press it starts to repeat."><em>Delay ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.repeatDelay, 300)} defaultValue={300} min={0} step={10} onchange={(v) => setBehaviorField(behaviorName, 'repeatDelay', v)} /></span></label>
+                      <label title="How often it fires once it repeats."><em>Every ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.repeatInterval, 120)} defaultValue={120} min={10} step={10} onchange={(v) => setBehaviorField(behaviorName, 'repeatInterval', v)} /></span></label>
+                    {/if}
+                    <label title="After it fires: ready again, disabled for good, or locked for a time."><em>Afterwards</em>
+                      <select aria-label="Afterwards" value={String(behavior.afterwards ?? '')} onchange={(event) => setBehaviorField(behaviorName, 'afterwards', event.currentTarget.value)}>
+                        <option value="">ready again</option>
+                        <option value="disabled">disabled</option>
+                        <option value="locked">locked for a time</option>
+                      </select>
+                    </label>
+                    {#if behavior.afterwards === 'locked'}
+                      <label title="How long presses do nothing after it fires."><em>Locked ms</em><span class="nc-wrap"><NumberCell value={numberOr(behavior.lockMs, 1000)} defaultValue={1000} min={0} step={50} onchange={(v) => setBehaviorField(behaviorName, 'lockMs', v)} /></span></label>
+                    {/if}
+                  {/if}
                   {#if isCarriedControlBehavior(behavior)}
                     <!-- A knob or slider converted from the panel is dragged by its own maths, from its
                          own settings (customComponentInteraction.js, before geometry is read), so

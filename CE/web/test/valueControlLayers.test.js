@@ -365,9 +365,39 @@ test('a band slider comes in with three caps; a press takes the nearest and a dr
   assert.equal(resolveInteractiveControl(component, { customValues: {} }).control._children.Parts._children.Range_readout._children.Text.content, '20.00 | 40.00 | 70.00');
 });
 
-test('handles that may pass each other or wrap round are refused by name; as one exact part a range is refused', () => {
-  assert.match(plan([rangeOf('Slider', { allowHandleCross: true })]).refused?.[0]?.reason ?? '', /pass each other/);
-  assert.match(plan([rangeOf('Knob', { allowWrapAround: true })]).refused?.[0]?.reason ?? '', /wrap round/);
+test('handles that may pass each other or wrap round come in as layers, drawn from the end less the start', () => {
+  const at = (component, start, end) => {
+    const shown = structuredClone(component);
+    applyCustomBindings(shown, { customChannels: { 'channel.RangeStart.normalized': start, 'channel.RangeEnd.normalized': end } });
+    return shown._children.Parts._children;
+  };
+  // A slider whose handles cross: the bar from whichever comes first, as long as they are apart.
+  const slider = plan([rangeOf('Slider', { allowHandleCross: true })]);
+  assert.ok(slider.ok, JSON.stringify(slider.refused));
+  const channels = slider.component._children.ValueChannels._children;
+  assert.deepEqual([channels.RangeStart.constraints, channels.RangeEnd.constraints].map((c) => [c?.normalizedMax, c?.normalizedMin].some((v) => typeof v === 'string')), [false, false], 'kept in no order');
+  const bar = (start, end) => { const l = at(slider.component, start, end).Range_range._children.Layout; return [Math.round(l.x * 10) / 10, Math.round(l.width * 10) / 10]; };
+  const [x1, w1] = bar(0.2, 0.7);
+  const [x2, w2] = bar(0.7, 0.2);
+  assert.deepEqual([x2, w2], [x1, w1], 'the same bar either way round');
+  assert.ok(Math.abs(bar(0.5, 0.5)[1] - bar(0.3, 0.3)[1]) < 0.01, 'no longer than the track is thick when they meet');
+  assert.ok(Object.values(slider.component._children.Bindings._children).some((binding) => binding.minus === 'channel.RangeStart.normalized'));
+  // A knob that wraps round: the arc from the start round to the end, through the gap when the end
+  // is below the start; capped at the sweep only where it does not wrap.
+  const sweepOf = (made, start, end) => Number(at(made.component, start, end).Range_range.meta.arcTrack.sweepAngle);
+  const wrapping = plan([rangeOf('Knob', { allowWrapAround: true, sweepAngle: 270 })]);
+  assert.ok(wrapping.ok, JSON.stringify(wrapping.refused));
+  assert.ok(Math.abs(sweepOf(wrapping, 0.2, 0.7) - 135) < 0.01);
+  assert.ok(Math.abs(sweepOf(wrapping, 0.7, 0.2) - (360 - 135)) < 0.01);
+  assert.ok(Math.abs(sweepOf(wrapping, 0.5, 0.45) - (360 - 13.5)) < 0.01, 'round the circle when it wraps');
+  const crossing = plan([rangeOf('Knob', { allowHandleCross: true, sweepAngle: 270 })]);
+  assert.ok(Math.abs(sweepOf(crossing, 0.5, 0.45) - 270) < 0.01, 'no more than the sweep when it does not');
+  assert.ok(Math.abs(sweepOf(crossing, 0.8, 0.2) - 198) < 0.01);
+  // Two sizes of handle on a slider are laid out on two travels: still refused, by name.
+  const sizes = rangeOf('Slider', { allowHandleCross: true });
+  sizes._children.Parts ??= { _children: {} };
+  sizes._children.Parts._children.pointerEnd = { _children: { Layout: { width: 26, height: 26 } } };
+  assert.match(plan([sizes]).refused?.[0]?.reason ?? '', /two sizes/);
   assert.match(plan([rangeOf('Knob', {})], 'graphite', 'part').refused?.[0]?.reason ?? '', /two handles/);
 });
 

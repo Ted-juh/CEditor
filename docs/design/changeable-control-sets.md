@@ -414,8 +414,8 @@ components):
      handle is drawn as the panel draws it (a knob's start and end as circles, a slider's as caps of
      their own kind on the travel their size lays out) with its riding label. One grab area takes the
      handle nearest the press (`targetValueChannels`, `resolveCustomHitZoneAtPoint`), as the panel
-     takes its nearest handle. Handles that may pass each other or wrap round the end are refused by
-     name; as one exact part a range is still refused, as a part holds one value. Each handle glides
+     takes its nearest handle. Handles that may pass each other or wrap round the end were refused by
+     name (layers since R6, with Minus); as one exact part a range is still refused, as a part holds one value. Each handle glides
      to a value it is given other than by a drag, on the control's glide timing, as the panel moves
      its start, value and end along one curve (SliderFamilyRenderer's glide). A knob in the
      tight fit leaves room for a range's start and end dots, as the panel sizes it (without them the
@@ -582,11 +582,38 @@ components):
      meter after these changes 256 of 256, and with its indicator coloured by level, blended, 256 of
      256; every set's button 64 of 64 in both sizes and switch 128 of 128 (the text-layer change is
      theirs too).
-     Still refused, waiting on designer fields (mock-up sent): a range whose handles may pass each
-     other or wrap round the end, whose fill and lit ticks need a binding that reads one value less
-     another (Minus); and button types beyond a toggle and a momentary press (Fires: after a hold,
-     on a double click, again and again while held, only while held; Afterwards: ready again,
-     disabled, locked for a time).
+     The last two, built as approved from their mock-up:
+     - *Minus* (React tab, a binding): a binding may read its source less another value
+       (`minus`, interactionRuntime's bindingSourceValue; seeding and a range's glide read it too).
+       A range whose handles may pass each other (Allow Handle Cross) or wrap round the end (a
+       knob's Allow Wrap-Around) comes in as layers, its handles kept in no order, as the panel
+       keeps them. Everything that depended on their order reads the end less the start: a knob's
+       arc runs from the start round to the end, through the gap when the end is below the start
+       (360 degrees less what lies between them, no more than the sweep unless it wraps); a
+       slider's bar runs from whichever comes first, its near edge moved back by that difference
+       where it is below nothing and its length the difference either way; and a tick that lights
+       between the handles lights outside them when they are crossed (one more adding binding, the
+       step highlightStop takes). A slider's two handles of different sizes, laid out on two travels,
+       are still refused by name. Checked against the panel (strict) on six sets of
+       different kinds (Graphite, Ember, Tolex, Ivory, Carbon, Pop): knobs crossed, knobs with
+       crossing allowed and in order, knobs wrapped, sliders across crossed and in order, sliders
+       upright crossed, 24 of 24 each.
+     - *Fires and Afterwards* (Interact card, a button's behaviour; utils/customButtonFiring.js):
+       a button fires when pressed, when released (a toggle's way), after a hold, on a number of
+       clicks within a window, again and again while held (at the press, after a delay, then every
+       interval), or only while held (a momentary button's way); afterwards it is ready again,
+       disabled, or locked for a time. A toggle flips when it fires; a momentary button sends its
+       value on for a moment (150 ms, no more than half a repeat's interval). `pending` is set while
+       a hold or a run of clicks is under way and `executed` for the moment it fires, as the
+       panel's timed buttons set them; a spent button disables the component when it is the
+       component's only behaviour. The preview surface (the panel and the plug-in player) and the
+       Test Bench time it, by pointer and by Enter or Space. A timed button comes in firing after
+       its hold or on its clicks, a one-shot firing on release and then disabled or locked for its
+       lockout, a repeating one again and again; it looks pressed while held, as the panel's does.
+       Pressed in Preview: a hold of 600 ms pending until it fires; a one-shot fired on release and
+       then disabled; a repeat of 200 then 100 ms fired 6 times in 650 ms held. Radio, cyclic and
+       combo-box buttons are still refused by name. Their look at rest against the
+       panel (strict, eight sets): hold to confirm, one-shot and repeating, 8 of 8 each.
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned

@@ -92,10 +92,15 @@ export function valueLayersRefusal(resolved) {
     return getSliderValueMode(behavior) === 'single' ? '' : `two handles drawn in the "${form}" control form, which shows one value`;
   }
   if (form) return formLayersRefusal(core.controlType, form);
-  // A range's or a band's handles are values of their own, kept in order (valueHandles); handles that
-  // may pass each other or wrap round the end would need a fill from whichever is lower.
-  if (getSliderValueMode(behavior) !== 'single' && getSliderAllowHandleCross(behavior)) return 'handles that may pass each other';
-  if (getSliderValueMode(behavior) !== 'single' && getSliderAllowWrapAround(behavior)) return 'handles that wrap round the end';
+  // A range's or a band's handles are values of their own (valueHandles). Handles that may pass each
+  // other or wrap round the end are drawn from the end less the start (handleSources); on a slider,
+  // each handle's travel is laid out for its own size, so two of different sizes would not differ
+  // by that alone.
+  if (getSliderValueMode(behavior) !== 'single' && getSliderGeometry(behavior) !== 'circular' && getSliderAllowHandleCross(behavior)) {
+    const parts = resolveSliderSemanticParts(resolved?._children?.Parts ?? null)._children;
+    const sizeOf = (name) => num(parts?.[name]?._children?.Layout?.width, 18);
+    if (Math.abs(sizeOf('pointerStart') - sizeOf('pointerEnd')) > 0.01) return 'handles of two sizes that may pass each other';
+  }
   if (getSliderGeometry(behavior) !== 'circular') return sliderLayersRefusal();
   // Plates (housing, skirt, cap, insert) of every outline, in perspective, turning under a light
   // that stays put, with shadows and grooves, and rendered ones, are layers now (plateLayers).
@@ -529,6 +534,23 @@ function valueHandles(behavior, channel, name) {
   return mode === 'band' ? [start, current, end] : [start, end];
 }
 
+/**
+ * Where a range's handles are read (`start`, `end`), and whether they may pass each other
+ * (`crossing`: Allow Handle Cross, or Allow Wrap-Around on a knob) and go round the end (`wrap`).
+ * Handles that may cross are drawn from their difference, the end less the start (a binding's
+ * `minus`), as the panel draws them from whichever comes first.
+ */
+function handleSources(behavior, sourceOf) {
+  const ranged = getSliderValueMode(behavior) !== 'single';
+  const wrap = ranged && getSliderAllowWrapAround(behavior);
+  return { start: sourceOf('start'), end: sourceOf('end'), crossing: ranged && (wrap || getSliderAllowHandleCross(behavior)), wrap };
+}
+
+/** A binding that reads its source less the value `minus` names (interactionRuntime's bindingSourceValue). */
+function lessBinding(binding, minus) {
+  return { ...binding, minus };
+}
+
 /** A binding that adds its result to what the bindings before it wrote (interactionRuntime's `add`). */
 function addingBinding(binding) {
   return { ...binding, add: true };
@@ -543,6 +565,13 @@ function litBetween(out, layerName, label, sources, t, lit, unlit) {
   const target = `Parts.${layerName}.opacity`;
   out.bindings[`${layerName}${label}End`] = rangeBinding(`${layerName}${label}End`, sources.end, target, unlit, lit, t - 0.0005, t);
   out.bindings[`${layerName}${label}Start`] = addingBinding(rangeBinding(`${layerName}${label}Start`, sources.start, target, 0, unlit - lit, t, t + 0.0005));
+  // Handles that may pass each other: with the end below the start, highlightStop lights what lies
+  // outside them, at or past the start or at or before the end. The two above then sum to one step
+  // short of that, whichever side of them the tick is, so the end less the start adds the step back.
+  if (sources.crossing) {
+    out.bindings[`${layerName}${label}Crossed`] = addingBinding(lessBinding(
+      rangeBinding(`${layerName}${label}Crossed`, sources.end, target, lit - unlit, 0, -0.0005, 0), sources.start));
+  }
 }
 
 /**
@@ -579,7 +608,7 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   const valueMode = getSliderValueMode(behavior);
   const handles = valueHandles(behavior, channel, uniqueName);
   const sourceOf = (role) => `channel.${(handles.find((handle) => handle.role === role) ?? handles[0]).channel}.normalized`;
-  const sources = { start: sourceOf('start'), end: sourceOf('end') };
+  const sources = handleSources(behavior, sourceOf);
   out.handles = handles;
 
   // The renderer's derived values (SliderFamilyRenderer.svelte, the block from `trackThickness`).
@@ -716,8 +745,24 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
     if (fillIsRich(rangePart)) paintThrough(layer, parts.bodySelectedRange);
     const arcKey = `Parts.${layer.name}.meta.arcTrack`;
     out.bindings[`${layer.name}From`] = rangeBinding(`${layer.name}From`, sources.start, `${arcKey}.startAngle`, angleAt(0), angleAt(1));
-    out.bindings[`${layer.name}Sweep`] = rangeBinding(`${layer.name}Sweep`, sources.end, `${arcKey}.sweepAngle`, 0, sweep);
-    out.bindings[`${layer.name}SweepFrom`] = addingBinding(rangeBinding(`${layer.name}SweepFrom`, sources.start, `${arcKey}.sweepAngle`, 0, -sweep));
+    if (sources.crossing) {
+      // Handles that may pass each other: the arc runs from the start round to the end
+      // (resolveCircularArcSweep), so with the end below the start it goes the long way, through
+      // the gap: 360 degrees less what lies between them, no more than the knob's sweep unless it
+      // wraps round. All of it read from the end less the start.
+      const key = `${arcKey}.sweepAngle`;
+      out.bindings[`${layer.name}Sweep`] = lessBinding(rangeBinding(`${layer.name}Sweep`, sources.end, key, 0, sweep, 0, 1), sources.start);
+      const round = sources.wrap ? 360 : Math.min(360, sweep);
+      out.bindings[`${layer.name}SweepRound`] = addingBinding(lessBinding(rangeBinding(`${layer.name}SweepRound`, sources.end, key, round, 0, -0.0005, 0), sources.start));
+      // Past the point where 360 less the gap falls under the cap, it falls with the difference.
+      const capAt = sources.wrap ? 0 : Math.min(0, (sweep - 360) / sweep);
+      if (capAt > -1) {
+        out.bindings[`${layer.name}SweepBack`] = addingBinding(lessBinding(rangeBinding(`${layer.name}SweepBack`, sources.end, key, sweep * (-1 - capAt), 0, -1, capAt), sources.start));
+      }
+    } else {
+      out.bindings[`${layer.name}Sweep`] = rangeBinding(`${layer.name}Sweep`, sources.end, `${arcKey}.sweepAngle`, 0, sweep);
+      out.bindings[`${layer.name}SweepFrom`] = addingBinding(rangeBinding(`${layer.name}SweepFrom`, sources.start, `${arcKey}.sweepAngle`, 0, -sweep));
+    }
   }
   if (valueMode === 'single' && partVisible(g('bodyTrackFill'))) {
     const fromCentre = String(behavior.fillOrigin ?? 'min').trim().toLowerCase() === 'center';
@@ -1206,7 +1251,7 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
   const valueMode = getSliderValueMode(behavior);
   const handles = valueHandles(behavior, channel, uniqueName);
   const sourceOf = (role) => `channel.${(handles.find((handle) => handle.role === role) ?? handles[0]).channel}.normalized`;
-  const sources = { start: sourceOf('start'), end: sourceOf('end') };
+  const sources = handleSources(behavior, sourceOf);
   out.handles = handles;
 
   const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
@@ -1296,12 +1341,27 @@ export function sliderLayers({ resolved, styled = resolved, rect, channel, prefi
     const half = trackThickness / 2;
     const at = origin[axis];
     // The near edge: the start's, where the end lies further along the axis; else the end's.
-    const [nearSource, nearAt] = lead > 0 ? [sources.start, startAt] : [sources.end, endAt];
-    out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, nearSource, `Parts.${layer.name}.Layout.${posKey}`, at + nearAt(0) - half, at + nearAt(1) - half);
     const lengthTarget = `Parts.${layer.name}.Layout.${lengthKey}`;
-    out.bindings[`${layer.name}Length`] = rangeBinding(`${layer.name}Length`, sources.end, lengthTarget,
-      lead * (endAt(0) - startAt(0)) + trackThickness, lead * (endAt(1) - startAt(0)) + trackThickness);
-    out.bindings[`${layer.name}LengthFrom`] = addingBinding(rangeBinding(`${layer.name}LengthFrom`, sources.start, lengthTarget, 0, -lead * (startAt(1) - startAt(0))));
+    const moveTarget = `Parts.${layer.name}.Layout.${posKey}`;
+    if (sources.crossing) {
+      // Handles that may pass each other (of one size, valueLayersRefusal): the bar from whichever
+      // comes first along the axis to the other, as the panel's line from the start to the end is.
+      // Its near edge is the start's, moved back by the end less the start where that is below
+      // nothing (or on by it where the axis runs back, upright); its length that difference either way.
+      const k = startAt(1) - startAt(0);
+      out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, sources.start, moveTarget, at + startAt(0) - half, at + startAt(1) - half);
+      out.bindings[`${layer.name}MoveCrossed`] = addingBinding(lessBinding(k > 0
+        ? rangeBinding(`${layer.name}MoveCrossed`, sources.end, moveTarget, -k, 0, -1, 0)
+        : rangeBinding(`${layer.name}MoveCrossed`, sources.end, moveTarget, 0, k, 0, 1), sources.start));
+      out.bindings[`${layer.name}Length`] = lessBinding(rangeBinding(`${layer.name}Length`, sources.end, lengthTarget, trackThickness, Math.abs(k) + trackThickness, 0, 1), sources.start);
+      out.bindings[`${layer.name}LengthBack`] = addingBinding(lessBinding(rangeBinding(`${layer.name}LengthBack`, sources.end, lengthTarget, Math.abs(k), 0, -1, 0), sources.start));
+    } else {
+      const [nearSource, nearAt] = lead > 0 ? [sources.start, startAt] : [sources.end, endAt];
+      out.bindings[`${layer.name}Move`] = rangeBinding(`${layer.name}Move`, nearSource, moveTarget, at + nearAt(0) - half, at + nearAt(1) - half);
+      out.bindings[`${layer.name}Length`] = rangeBinding(`${layer.name}Length`, sources.end, lengthTarget,
+        lead * (endAt(0) - startAt(0)) + trackThickness, lead * (endAt(1) - startAt(0)) + trackThickness);
+      out.bindings[`${layer.name}LengthFrom`] = addingBinding(rangeBinding(`${layer.name}LengthFrom`, sources.start, lengthTarget, 0, -lead * (startAt(1) - startAt(0))));
+    }
   }
 
   // Value fill, from its origin to the value: one bar growing each way it can.
@@ -1640,7 +1700,8 @@ export function seedLayersAt(parts, bindings, travel, { peak = typeof travel ===
     const part = match ? byName.get(match[1]) : null;
     if (!part) continue;
     const fromPeak = /\.peak$/.test(String(binding.source ?? ''));
-    const read = fromPeak ? peak : travelOf(binding.source);
+    // A binding that reads its source less another (`minus`) reads the two travels' difference.
+    const read = fromPeak ? peak : travelOf(binding.source) - (String(binding.minus ?? '').trim() ? travelOf(binding.minus) : 0);
     // No peak: the binding's own minimum, already where it places things. A decibel scale places the
     // reading as the runtime does.
     const input = read == null ? binding.inputMin : (binding.scale === 'db' ? decibelPosition(read, binding.dbFloor, binding.dbCeil) : read);
