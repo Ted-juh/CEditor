@@ -338,7 +338,14 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     New-Item -ItemType Directory -Path $tcDst -Force | Out-Null
     Get-ChildItem (Join-Path $toolsSrc "toolchains") -File | Copy-Item -Destination $tcDst -Force
 
-    Write-Host "Staged export pipeline + toolchain scripts -> $toolsDst"
+    # The Blender add-on, installed in Blender from this file (Edit > Preferences > Add-ons > Install):
+    # it writes a knob's objects as a layered PSD for File > New Component from Photoshop Artwork. Its
+    # test (test_ceditor_layers.py) is for the repository, not for an installed CEditor.
+    $blenderDst = Join-Path $toolsDst "blender"
+    New-Item -ItemType Directory -Path $blenderDst -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "blender\ceditor_layers.py") -Destination $blenderDst -Force
+
+    Write-Host "Staged export pipeline + toolchain scripts + Blender add-on -> $toolsDst"
 }
 
 function Stage-NodeRuntime([string]$StageDir) {

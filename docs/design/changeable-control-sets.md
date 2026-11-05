@@ -992,9 +992,31 @@ The owner asked about reading these directly. What each format is, and the route
 
 ### Order
 
-Built: SVG and Photoshop as layered components. Next: the Blender add-on writing a layered PSD (the
-reader exists); .ai through its PDF part if Illustrator files are wanted directly; a Figma plugin if
-Figma is; Level 3 with piece E; Level 2 when somebody needs a shape only Blender can make.
+Built: SVG and Photoshop as layered components, and the Blender add-on writing a layered PSD
+(`tools/blender/ceditor_layers.py`; docs/panel-artwork-import.md says what it writes). Next: .ai
+through its PDF part if Illustrator files are wanted directly; a Figma plugin if Figma is; Level 3
+with piece E; Level 2 when somebody needs a shape only Blender can make.
+
+What building the add-on found, against Level 1 as written above:
+
+- **Seams where parts meet.** Rendered each with the others held out, two parts meeting along an
+  edge each cover part of its pixels, and laid over each other the pixels show through by a quarter.
+  Each part's opacity is now its coverage of what the parts above it leave, so the part under an
+  edge fills it.
+- **Light layers at a part's edge.** A multiply or an add on a pixel the part only partly covers
+  reaches what is beside it in the pixel too. There the part's whole look is in its colour layer,
+  and the light layers come in over the next three pixels: switching at one stroke showed as a light
+  ring once CEditor scaled the layers, which it always does (zoom, panel size, a screen of two pixels
+  to the point). The add-on's test now draws the layers twice the size and holds them to the picture
+  scaled.
+- **A turning part's reflection.** A metal cap mirrors the pointer's end; rendered without the
+  pointer, the cap lacked it. The shadow catcher's ratio over 1 is that light, written as a layer
+  that turns with the pointer.
+- **What a layer cannot carry**, since it depends on the panel the control is put on: the outline
+  against the panel is blended in sRGB (as every transparent picture's is); a lamp brighter than
+  white lights its edge pixels where Cycles also lets a light panel through; the light a lamp throws
+  on the panel is not written. In a dial, a lamp's lit layer is not wired to anything (only switches
+  and buttons light theirs).
 
 ## Recommended order
 

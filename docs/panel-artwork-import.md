@@ -145,6 +145,47 @@ Listed in the Console: what was drawn close to rather than exactly (Photoshop's 
 approximate adjustments), Selective Color and Color Lookup adjustments (not applied), adjustment
 layers inside groups with their own blend mode, and references to anything not in the file.
 
+## A knob modelled in Blender: the CEditor Layers add-on
+
+`tools/blender/ceditor_layers.py`, installed in Blender (Edit › Preferences › Add-ons › Install),
+writes the objects of a Blender scene as a layered Photoshop file for New Component from Photoshop
+Artwork: File › Export › CEditor Layers (.psd), or the CEditor tab of the 3D Viewport's sidebar,
+which lists what each object will do before it is written. The names are the ones above; the
+add-on keeps a copy of the words, which `test/blenderLayersImport.test.js` holds to the importer's.
+
+Each object is rendered by Cycles on its own, from straight above, with the others of its group
+held out, and written as the layers its look adds up from:
+
+| Layer | Blend | What it is |
+|---|---|---|
+| `<name>` | normal | its own colour, unlit (a metal's is what it reflects) |
+| `<name> shading` | multiply | what the lights and the room do to that colour |
+| `<name> highlights` | linear dodge | its reflections, and light brighter than its colour |
+| `<name> lit` | linear dodge | a lamp's glow; a switch or button shows it when on |
+| `shadow` | normal | the shadow on the panel: black, its darkness as opacity |
+| `<name> shadow`, `<name> reflection` | normal, linear dodge | a turning or sliding part's shadow and reflection on the panel and the parts under it, which move with it |
+| `pivot` | normal, hidden | where turning parts turn |
+
+A part named `rotor` (a round, knurled or fluted cap) has its colour turn and its light stay; a
+lamp's body keeps a name without its role word (`lens`), so only its glow lights. The pointer is
+modelled pointing up, the middle of its travel; the camera looks straight down (the scene's own when
+it is orthographic, else one is made); without a panel object, a plane is put under the control to
+catch its shadow. The renders run in a scene of their own, and the author's is left as it was.
+
+**How exact.** `tools/blender/test_ceditor_layers.py` (run with `blender -b --factory-startup
+--python tools/blender/test_ceditor_layers.py`) builds a knob, writes it, renders Blender's own image
+of it and checks that the layers stacked as CEditor stacks them give it back: a level or two in 255
+on the knob, the edges where parts meet included, and a few on a dark, grey or light panel with the
+shadow. Where a part covers only some of a pixel its whole look is in its colour layer (a multiply
+there would reach what is beside it); the light layers come in over the next three pixels, and a
+layer under a part goes two pixels on under its edge, so that the layers still add up when the
+browser scales them (the test draws them twice the size) or turns them. Not exact, since it depends
+on the panel CEditor puts the control on: the outline against the panel is blended in sRGB, as every
+transparent picture's is; a lit lamp's outermost pixels keep the lamp's colour; the light a lamp
+throws on the panel is not written. `--fixture` writes the small file the web suite reads
+(`test/fixtures/blender-knob.psd`), checked by `test/blenderLayersImport.test.js` for what turns,
+about where, in which modes, and for CEditor's compositor drawing it as the add-on composed it.
+
 ## Update Panel from SVG Artwork
 
 Artwork gets revised, and by then the panel has bindings, scripts and links. **File › Update Panel

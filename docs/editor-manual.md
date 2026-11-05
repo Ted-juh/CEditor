@@ -684,6 +684,30 @@ The control opens in the Component Designer, ready to use and to change:
   Adjustment layers are applied to the layers under them. Change a picture layer's colour with its
   tint. Text layers stay text where the file says their size and colour.
 
+### A knob modelled in Blender
+
+A knob, a fader or a switch modelled in Blender comes in the same way, every part a layer, through a
+small add-on that comes with CEditor.
+
+1. Install it once. In Blender (3.0 or later, from blender.org), choose **Edit → Preferences →
+   Add-ons → Install...** and pick `tools\blender\ceditor_layers.py` in CEditor's folder.
+2. Name the objects as for a drawing: **pointer** turns with the value (model it pointing straight
+   up, the middle of its travel); **rotor** is a round cap whose grip turns while its light stays;
+   **lamp** lights; **fader** slides. Everything else stays still. The object the control sits on
+   is the **panel** (or ground, floor, backdrop); without one, a plane is put under the control
+   while it renders, to catch its shadow.
+3. Choose **File → Export → CEditor Layers (.psd)**, or **Export for CEditor...** on the CEditor
+   tab of the 3D Viewport's sidebar, which also lists what each object will do. Then, in CEditor,
+   **File → New Component from Photoshop Artwork...**.
+
+Each object comes in as its colour, with its shading multiplied over it and its highlights added:
+change a part's colour with its tint and its light stays as Blender rendered it. The shadow on the
+panel is a layer, and so are a turning part's shadow and its reflection in the parts under it,
+which turn with it. Blender's camera looks straight down (the scene's own, when it is
+orthographic). A lamp's glow is a layer of its own; in a switch or a button it shows when the
+switch is on. What does not come across is the panel itself, which is CEditor's, and the light a
+lamp throws on it.
+
 ### Layer masks
 
 A mask says how much of a layer shows: white shows it, black or clear hides it, grey shows it
@@ -1491,7 +1515,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **New Custom Component** | | Opens an empty custom component in its own tab. |
 | **Import Component...** | | Brings in a `.ceditor-component.json` (or library) file and opens a single component. Dropping the file on the window does the same. |
 | **New Component from SVG Artwork...** | | Makes a control from an SVG drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
-| **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer. |
+| **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer; a knob modelled in Blender comes in this way too, see [A knob modelled in Blender](#a-knob-modelled-in-blender). |
 | **Open Component from Library...** | | Opens a component from your library in its own tab. |
 | **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |
 | **Open Device Profile** | | Opens a loaded device profile in the designer. |
