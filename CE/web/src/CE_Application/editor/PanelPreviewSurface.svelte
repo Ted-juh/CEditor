@@ -286,6 +286,7 @@
   import {
     formatSliderReadout,
     getSliderActiveHandle,
+    getSliderGeometry,
     getSliderStep,
     getSliderLegalRangeForHandle,
     getSliderResolvedValues,
@@ -296,10 +297,10 @@
   } from '../utils/sliderBehavior.js';
   import {
     resolveCircularPoint,
-    resolveCircularTrackMetrics,
     resolveLinearPointerPoint,
     resolveSliderNormalizedFromPoint,
-    sliderValueToAngle, sliderHandleLabelRoom } from '../utils/sliderGeometry.js';
+    sliderValueToAngle } from '../utils/sliderGeometry.js';
+  import { knobHandleSize, knobTrackOf } from '../utils/knobTrack.js';
   import {
     getCustomHitZones,
     getCustomValueChannels,
@@ -6901,81 +6902,33 @@
       : (getSliderValueMode(behavior) === 'band' ? ['start', 'current', 'end'] : ['current']);
   }
 
-  function sliderPreviewScale(control, rect = null) {
-    if (!rect) return 1;
-    const transform = control?._children?.Transform ?? null;
-    const widthScale = rect.width / Math.max(1, numberOr(transform?.width, rect.width));
-    const heightScale = rect.height / Math.max(1, numberOr(transform?.height, rect.height));
-    return Math.max(0.01, Math.min(widthScale || 1, heightScale || 1));
+  // A knob or slider as it is drawn: the control with its set applied (resolvedPreviewFor), the box
+  // the renderer draws it in (its own size; the preview scales that to the screen), and the sizes
+  // and circle it is drawn with (utils/knobTrack.js, which SliderFamilyRenderer asks too).
+  function sliderDrawnGeometry(control, rect) {
+    const drawn = resolvedPreviewFor(control)?.control ?? control;
+    const transform = drawn?._children?.Transform ?? control?._children?.Transform ?? null;
+    const width = Math.max(1, numberOr(transform?.width, rect.width));
+    const height = Math.max(1, numberOr(transform?.height, rect.height));
+    return { drawn, width, height, sx: rect.width / width, sy: rect.height / height, track: knobTrackOf(drawn, width, height) };
   }
 
-  function sliderPartsFor(control) {
-    return control?._children?.Parts?._children ?? {};
-  }
-
-  function sliderTrackThickness(control) {
-    const trackLayout = sliderPartsFor(control)?.bodyTrackBase?._children?.Layout ?? null;
-    return Math.max(4, numberOr(trackLayout?.height, 10));
-  }
-
-  function sliderMajorTickLength(control) {
-    const behavior = getBehavior(control);
-    const tickLayout = sliderPartsFor(control)?.tickMajor?._children?.Layout ?? null;
-    return Math.max(0, numberOr(tickLayout?.height, numberOr(behavior?.majorTickLength, 12)));
-  }
-
-  function sliderPointerSize(control, role = 'current') {
-    const partName = role === 'start'
-      ? 'pointerStart'
-      : role === 'end'
-        ? 'pointerEnd'
-        : 'pointerCurrent';
-    const fallback = role === 'current' ? 20 : 18;
-    const pointerLayout = sliderPartsFor(control)?.[partName]?._children?.Layout ?? null;
-    return Math.max(8, numberOr(pointerLayout?.width, numberOr(pointerLayout?.height, fallback)));
-  }
-
-  function sliderHandlePoint(control, role = 'current', rect = null) {
+  // Where a handle is drawn, on the screen relative to the control's box.
+  function sliderHandlePoint(control, role = 'current', rect = null, drawnGeometry = null) {
     if (!rect) return null;
-
-    const behavior = getBehavior(control);
-    const scaleFactor = sliderPreviewScale(control, rect);
-    const trackThickness = sliderTrackThickness(control) * scaleFactor;
-    const pointerSize = sliderPointerSize(control, role) * scaleFactor;
-    const min = getRangeMin(behavior);
-    const max = getRangeMax(behavior);
-    const span = max - min;
-    const normalized = span > 0
-      ? Math.max(0, Math.min(1, (currentSliderRoleValue(control, role) - min) / span))
-      : 0;
-
-    if (String(behavior?.geometry ?? 'linear').trim().toLowerCase() === 'circular') {
-      const maxPointerSize = Math.max(...sliderHandleRoles(control).map((handleRole) => sliderPointerSize(control, handleRole))) * scaleFactor;
-      const metrics = resolveCircularTrackMetrics(rect.width, rect.height, {
-        trackThickness,
-        pointerSize: maxPointerSize,
-        majorTickLength: sliderMajorTickLength(control) * scaleFactor,
-        hasTicks: behavior?.showTicks !== false,
-        handleLabelSize: sliderHandleLabelRoom(behavior),
-        circularDiameter: numberOr(behavior?.circularDiameter, 0) * scaleFactor,
-      });
-      return resolveCircularPoint(
-        rect.width,
-        rect.height,
-        sliderValueToAngle(behavior, currentSliderRoleValue(control, role)),
-        metrics.radius,
-        { x: metrics.centerX, y: metrics.centerY },
-      );
+    const { drawn, width, height, sx, sy, track } = drawnGeometry ?? sliderDrawnGeometry(control, rect);
+    const behavior = drawn?._children?.Behavior ?? getBehavior(control);
+    const value = currentSliderRoleValue(control, role);
+    let point;
+    if (getSliderGeometry(behavior) === 'circular') {
+      point = resolveCircularPoint(width, height, sliderValueToAngle(behavior, value), track.radius, { x: track.centerX, y: track.centerY });
+    } else {
+      const min = getRangeMin(behavior);
+      const span = getRangeMax(behavior) - min;
+      const normalized = span > 0 ? Math.max(0, Math.min(1, (value - min) / span)) : 0;
+      point = resolveLinearPointerPoint(behavior, width, height, normalized, track.trackThickness, knobHandleSize(track, role));
     }
-
-    return resolveLinearPointerPoint(
-      behavior,
-      rect.width,
-      rect.height,
-      normalized,
-      trackThickness,
-      pointerSize,
-    );
+    return { x: point.x * sx, y: point.y * sy };
   }
 
   function sliderValueForPoint(control, event) {
@@ -7013,17 +6966,18 @@
     const rect = pointerActiveElement?.getBoundingClientRect?.();
     if (!rect) return '';
 
-    const scaleFactor = sliderPreviewScale(control, rect);
+    const drawnGeometry = sliderDrawnGeometry(control, rect);
+    const scaleFactor = Math.min(drawnGeometry.sx, drawnGeometry.sy);
     const localX = event.clientX - rect.left;
     const localY = event.clientY - rect.top;
     let nearestRole = '';
     let nearestDistance = Number.POSITIVE_INFINITY;
 
     for (const role of sliderHandleRoles(control)) {
-      const point = sliderHandlePoint(control, role, rect);
+      const point = sliderHandlePoint(control, role, rect, drawnGeometry);
       if (!point) continue;
 
-      const hitRadius = Math.max((sliderPointerSize(control, role) * scaleFactor) / 2, 12);
+      const hitRadius = Math.max((knobHandleSize(drawnGeometry.track, role) * scaleFactor) / 2, 12);
       const distance = Math.hypot(localX - point.x, localY - point.y);
       if (distance > hitRadius || distance >= nearestDistance) continue;
       nearestDistance = distance;

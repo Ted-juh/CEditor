@@ -28,14 +28,14 @@
 import { createPartNode } from './customComponentFactory.js';
 import { resolveSliderSemanticParts } from './sliderEntityFactory.js';
 import {
-  buildSliderHandleLabelAnchors, buildSliderTickStops, resolveCircularTrackMetrics, resolveLinearPointerPoint, resolveLinearTrackFrame,
-  sliderHandleLabelRoom,
+  buildSliderHandleLabelAnchors, buildSliderTickStops, resolveLinearPointerPoint, resolveLinearTrackFrame,
 } from './sliderGeometry.js';
 import {
   formatSliderNumericValue, getSliderAllowHandleCross, getSliderAllowWrapAround, getSliderDirection, getSliderGeometry, getSliderMax,
   getSliderMin, getSliderOrientation, getSliderStartAngle, getSliderSweepAngle, getSliderValueMode, sliderDisplayScale,
 } from './sliderBehavior.js';
-import { knobOutlinePath, knobOutlineReach } from './knobOutlines.js';
+import { knobOutlinePath } from './knobOutlines.js';
+import { knobTrack } from './knobTrack.js';
 import { formatBehaviorDisplay } from './parameterDisplay.js';
 import { deepClone } from './deepClone.js';
 import { anatomyForm } from '../models/controlAnatomy.js';
@@ -614,63 +614,21 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   const sources = handleSources(behavior, sourceOf);
   out.handles = handles;
 
-  // The renderer's derived values (SliderFamilyRenderer.svelte, the block from `trackThickness`).
+  // The sizes the renderer draws it with and the circle it draws it round (utils/knobTrack.js, which
+  // SliderFamilyRenderer asks too).
   const g = (name) => geometryParts[name];
   const labelFontSize = (part, fallback) => Math.max(1, num(part?._children?.Text?._children?.Font?.size, fallback));
-  // No room for text of its own, as the renderer keeps none: only for the labels riding its handles.
-  const handleLabelSize = sliderHandleLabelRoom(behavior,
-    Math.max(labelFontSize(g('labelStart'), 11), labelFontSize(g('labelCurrent'), 11), labelFontSize(g('labelEnd'), 11)));
-  const showTicks = behavior.showTicks !== false;
-  const trackThickness = num(g('bodyTrackBase')?._children?.Layout?.height, 10);
-  const pointerCurrentSize = num(g('pointerCurrent')?._children?.Layout?.width, 20);
-  const pointerStartSize = num(g('pointerStart')?._children?.Layout?.width, 18);
-  const pointerEndSize = num(g('pointerEnd')?._children?.Layout?.width, 18);
-  const maxPointerSize = Math.max(pointerCurrentSize, pointerStartSize, pointerEndSize);
-  const kindOfPointer = String(g('pointerCurrent')?.kind ?? 'dot').toLowerCase();
-  const pointerKind = ['line', 'bar', 'chicken', 'capdot', 'needle'].includes(kindOfPointer) ? kindOfPointer : 'dot';
-  const majorTickLength = num(g('tickMajor')?._children?.Layout?.height, num(behavior.majorTickLength, 12));
+  const track = knobTrack({ behavior, parts: geometryParts }, width, height);
+  const {
+    showTicks, trackThickness, pointerCurrentSize, pointerStartSize, pointerEndSize, maxPointerSize,
+    pointerKind, majorTickLength, tickRadiusShare, scaleNumberCount, scaleNumberSize, scaleNumberReach,
+  } = track;
+  const metrics = track;
   const minorTickLength = num(g('tickMinor')?._children?.Layout?.height, num(behavior.minorTickLength, 7));
   const tickStrokeWidth = num(g('tickMajor')?._children?.Layout?.width, 2);
   const minorTickStrokeWidth = num(g('tickMinor')?._children?.Layout?.width, 1);
-  const tight = String(behavior.circularFit ?? 'auto') === 'tight';
   const housingVisible = g('bodyHousing')?.visible === true;
-  const tickRadiusShare = Math.max(0, num(behavior.tickRadius, 0)) / 100;
-  // How far the housing and the skirt reach, as SliderFamilyRenderer's plateReach has it: their size
-  // and outline, their shadow below, an oval taller than wide, a plate moved off the centre; and a
-  // scale on a radius of its own, in the tight fit.
-  const plateReach = (part, fallback) => {
-    if (part?.visible !== true) return 0;
-    const layout = part?._children?.Layout ?? {};
-    if (String(layout.widthUnit ?? 'percent') === 'px') return 0;
-    const reach = knobOutlineReach(String(part?.outline ?? 'circle'), {
-      count: part?.outlineCount, depth: part?.outlineDepth, rotation: num(part?.outlineRotation, 0),
-    });
-    const shadow = 1 + Math.max(0, num(part?.shadowOffset, 0) + num(part?.shadowBlur, 0)) / 100;
-    const tall = Math.max(1, Math.max(5, num(part?.aspect, 100)) / 100);
-    return (Math.max(0, num(layout.width, fallback)) / 100) * reach * shadow * tall + Math.abs(num(part?.shiftY, 0)) / 100;
-  };
-  const housingReach = Math.max(plateReach(g('bodyHousing'), 100), plateReach(g('bodySkirt'), 90),
-    showTicks && tickRadiusShare > 0 && tight ? tickRadiusShare + (String(behavior.tickPlacement ?? 'outside') === 'outside' ? 0.1 : 0.02) : 0);
-  // The scale's numbers (tickNumber): how many, their size, how far out.
   const numberPart = g('tickNumber');
-  const scaleNumberCount = numberPart?.visible !== false ? Math.max(0, Math.min(41, Math.round(num(behavior.scaleNumberCount, 0)))) : 0;
-  const scaleNumberSize = labelFontSize(numberPart, 7);
-  const scaleNumberReach = scaleNumberCount >= 2 ? Math.max(0, num(numberPart?._children?.Layout?.offsetX, 122)) / 100 : 0;
-  const metrics = resolveCircularTrackMetrics(width, height, {
-    trackThickness,
-    // Tight: the pointer it draws, and a range's handles, as SliderFamilyRenderer sizes it.
-    pointerSize: tight
-      ? Math.max(pointerKind === 'dot' ? pointerCurrentSize : 0, valueMode === 'single' ? 0 : Math.max(pointerStartSize, pointerEndSize))
-      : maxPointerSize,
-    majorTickLength,
-    hasTicks: showTicks,
-    circularDiameter: behavior.circularDiameter,
-    handleLabelSize,
-    tight,
-    outerReach: housingReach,
-    numberReach: scaleNumberReach,
-    numberSize: scaleNumberSize,
-  });
   const centre = { x: metrics.centerX, y: metrics.centerY };
   const radius = metrics.radius;
   const startPanel = getSliderStartAngle(behavior);
@@ -1109,17 +1067,13 @@ export function knobLayers({ resolved, styled = resolved, rect, channel, prefix,
   }
   if (valueMode !== 'single') handleDot('end', 'FF202020');
 
-  // A label that rides the pointer: 22 px out from the track, upright, round the circle the panel's
-  // handle labels use (buildSliderHandleLabelAnchors' own track metrics, not the knob's tight fit).
+  // A label that rides the pointer: 22 px out from the track it is drawn round, upright, as the
+  // panel hangs it (buildSliderHandleLabelAnchors with the same circle).
   const anchors = buildSliderHandleLabelAnchors(behavior, width, height, { start: 0, current: 0, end: 0 }, {
-    trackThickness, pointerSize: maxPointerSize, handleLabelSize,
-  });
-  const labelCircle = resolveCircularTrackMetrics(width, height, {
-    trackThickness, pointerSize: maxPointerSize, majorTickLength: num(behavior.majorTickLength, 12), hasTicks: behavior.showTicks !== false,
-    circularDiameter: behavior.circularDiameter, handleLabelSize,
+    trackThickness, pointerSize: maxPointerSize, circle: metrics,
   });
   const riding = behavior.showHandleLabels === true
-    ? handles.map((each) => ({ ...each, at: anchors[each.role], centre: { x: labelCircle.centerX, y: labelCircle.centerY }, turn: signed * sweep }))
+    ? handles.map((each) => ({ ...each, at: anchors[each.role], centre, turn: signed * sweep }))
     : [];
   addLabelLayers({ parts, width, origin, add, named, depthOf: () => depth, out }, riding);
 

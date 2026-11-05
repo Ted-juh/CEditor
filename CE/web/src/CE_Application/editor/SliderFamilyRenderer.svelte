@@ -2,7 +2,8 @@
   import { untrack } from 'svelte';
   import { resolveInteractionContext } from '../utils/interactionRuntime.js';
   import SliderShapeFill from './SliderShapeFill.svelte';
-  import { knobOutlinePath, knobOutlineReach } from '../utils/knobOutlines.js';
+  import { knobOutlinePath } from '../utils/knobOutlines.js';
+  import { knobTrack } from '../utils/knobTrack.js';
   import { transitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { parseTiming } from '../utils/easing.js';
   import { RENDERED_FRAME, renderedCapSpec, renderedFrame, renderedLookSpec, renderedLooks, renderedTurn, requestRenderedLook } from '../utils/renderedLook.js';
@@ -22,11 +23,9 @@
     normalizeDegrees,
     resolveCircularArcSweep,
     resolveCircularPoint,
-    resolveCircularTrackMetrics,
     resolveLinearPointerPoint,
     resolveLinearTrackFrame,
     sliderNormalizedToAngle,
-    sliderHandleLabelRoom,
   } from '../utils/sliderGeometry.js';
 
   let {
@@ -199,10 +198,6 @@
     ].filter(Boolean).join(';');
   }
 
-  function labelFontSize(part, fallback = 11) {
-    return Math.max(1, numberOr(part?._children?.Text?._children?.Font?.size, fallback));
-  }
-
   function labelContent(part, fallback = '') {
     const authored = String(part?._children?.Text?.content ?? '').trim();
     return authored || fallback;
@@ -210,6 +205,10 @@
 
   let behavior = $derived(control?._children?.Behavior ?? null);
   let parts = $derived(resolveSliderSemanticParts(control?._children?.Parts ?? null));
+  // The sizes it is drawn with and, for a knob, the circle it is drawn round: worked out in one
+  // place (utils/knobTrack.js), which Preview's and the Test Bench's hit tests and Create Component
+  // from Selection's layers ask too, so all four agree.
+  let track = $derived(knobTrack({ behavior, parts: parts?._children }, width, height));
   // Edit mode has no runtime overlay; its geometry must still use authored values.
   let signals = $derived(runtime?.signals ?? resolveInteractionContext(control));
   let geometry = $derived(getSliderGeometry(behavior));
@@ -292,10 +291,10 @@
     current: numberOr(signals?.currentValueRaw, numberOr(signals?.valueRaw, 0)),
     end: numberOr(signals?.endValueRaw, 0),
   });
-  let showTicks = $derived(behavior?.showTicks !== false);
+  let showTicks = $derived(track.showTicks);
   // Behavior.tickRadius: the scale's own radius, a percentage of the track's, where a knob prints
   // its scale away from its value arc (0, the default: on the track, either side of its width).
-  let tickRadiusShare = $derived(Math.max(0, numberOr(behavior?.tickRadius, 0)) / 100);
+  let tickRadiusShare = $derived(track.tickRadiusShare);
   let showHandleLabels = $derived(behavior?.showHandleLabels === true);
   let trackBasePart = $derived(parts?._children?.bodyTrackBase ?? null);
   let trackFillPart = $derived(parts?._children?.bodyTrackFill ?? null);
@@ -313,10 +312,8 @@
     current: parts?._children?.labelCurrent ?? null,
     end: parts?._children?.labelEnd ?? null,
   });
-  let handleLabelSize = $derived(sliderHandleLabelRoom(behavior,
-    Math.max(labelFontSize(labelParts.start, 11), labelFontSize(labelParts.current, 11), labelFontSize(labelParts.end, 11))));
-  let trackThickness = $derived(numberOr(trackBasePart?._children?.Layout?.height, 10));
-  let pointerCurrentSize = $derived(numberOr(pointerCurrentPart?._children?.Layout?.width, 20));
+  let trackThickness = $derived(track.trackThickness);
+  let pointerCurrentSize = $derived(track.pointerCurrentSize);
   // The knob's body (utils/sliderEntityFactory.js `bodyCap`): a disc under the pointer, sized as a
   // percentage of the track's diameter or in px, drawn only when the part is visible and the
   // geometry is circular. A set turns it on; a document that never heard of it keeps its arc.
@@ -398,9 +395,9 @@
   // The scale numbers (`tickNumber`, Behavior.scaleNumberCount/From/To): evenly round the sweep,
   // `Layout.offsetX` % of the track's radius out from the centre.
   let tickNumberPart = $derived(parts?._children?.tickNumber ?? null);
-  let scaleNumberCount = $derived(geometry === 'circular' && tickNumberPart?.visible !== false ? Math.max(0, Math.min(41, Math.round(numberOr(behavior?.scaleNumberCount, 0)))) : 0);
-  let scaleNumberSize = $derived(labelFontSize(tickNumberPart, 7));
-  let scaleNumberReach = $derived(scaleNumberCount >= 2 ? Math.max(0, numberOr(tickNumberPart?._children?.Layout?.offsetX, 122)) / 100 : 0);
+  let scaleNumberCount = $derived(track.scaleNumberCount);
+  let scaleNumberSize = $derived(track.scaleNumberSize);
+  let scaleNumberReach = $derived(track.scaleNumberReach);
   function scaleNumberText(i) {
     const from = numberOr(behavior?.scaleNumberFrom, 0);
     const to = numberOr(behavior?.scaleNumberTo, 10);
@@ -409,10 +406,7 @@
   }
   // How the current-value pointer is drawn on a circular track: the dot that rides the arc, or a
   // line / chicken-head drawn from the centre out along the value angle, over the cap.
-  let pointerKind = $derived.by(() => {
-    const kind = String(pointerCurrentPart?.kind ?? 'dot').toLowerCase();
-    return geometry === 'circular' && (kind === 'line' || kind === 'bar' || kind === 'chicken' || kind === 'capdot' || kind === 'needle') ? kind : 'dot';
-  });
+  let pointerKind = $derived(track.pointerKind);
   let pointerReach = $derived(bodyCapRadius > 0 ? bodyCapRadius : circularMetrics.radius * 0.7);
   // On a linear track a cap (current, start or end) can be the original dot, a fader cap
   // ('bar': a rectangle with a groove), a console cap ('console': the bar with a sheen, the
@@ -554,10 +548,10 @@
       .join(' ');
     return { polygon: { points, stroke: Math.max(1, thick * 0.35) } };
   }
-  let pointerStartSize = $derived(numberOr(pointerStartPart?._children?.Layout?.width, 18));
-  let pointerEndSize = $derived(numberOr(pointerEndPart?._children?.Layout?.width, 18));
-  let maxPointerSize = $derived(Math.max(pointerCurrentSize, pointerStartSize, pointerEndSize));
-  let majorTickLength = $derived(numberOr(tickMajorPart?._children?.Layout?.height, numberOr(behavior?.majorTickLength, 12)));
+  let pointerStartSize = $derived(track.pointerStartSize);
+  let pointerEndSize = $derived(track.pointerEndSize);
+  let maxPointerSize = $derived(track.maxPointerSize);
+  let majorTickLength = $derived(track.majorTickLength);
   let minorTickLength = $derived(numberOr(tickMinorPart?._children?.Layout?.height, numberOr(behavior?.minorTickLength, 7)));
   let tickStrokeWidth = $derived(numberOr(tickMajorPart?._children?.Layout?.width, 2));
   let minorTickStrokeWidth = $derived(numberOr(tickMinorPart?._children?.Layout?.width, 1));
@@ -572,41 +566,8 @@
     return clamp((numberOr(behavior?.centerValue, min) - min) / span, 0, 1);
   });
   let lineFrame = $derived(resolveLinearTrackFrame(behavior, width, height, trackThickness, maxPointerSize));
-  let circularFitTight = $derived(String(behavior?.circularFit ?? 'auto') === 'tight');
-  // How far the housing reaches, as a multiple of the track's radius: its size and its outline's
-  // reach (a square set square reaches less far than its corners). For the tight fit.
-  // The skirt's too, and either one's shadow below it.
-  function plateReach(part, fallback) {
-    if (geometry !== 'circular' || part?.visible !== true) return 0;
-    const layout = part?._children?.Layout ?? {};
-    if (String(layout.widthUnit ?? 'percent') === 'px') return 0;
-    const reach = knobOutlineReach(String(part?.outline ?? 'circle'), {
-      count: part?.outlineCount, depth: part?.outlineDepth, rotation: numberOr(part?.outlineRotation, 0),
-    });
-    const shadow = 1 + Math.max(0, numberOr(part?.shadowOffset, 0) + numberOr(part?.shadowBlur, 0)) / 100;
-    // An oval taller than it is wide, or one moved off the centre, reaches further.
-    const tall = Math.max(1, Math.max(5, numberOr(part?.aspect, 100)) / 100);
-    return (Math.max(0, numberOr(layout.width, fallback)) / 100) * reach * shadow * tall + Math.abs(numberOr(part?.shiftY, 0)) / 100;
-  }
-  // A scale set out on a radius of its own (Behavior.tickRadius) reaches that far too.
-  let housingReach = $derived(Math.max(plateReach(bodyHousingPart, 100), plateReach(bodySkirtPart, 90),
-    geometry === 'circular' && showTicks && tickRadiusShare > 0 && circularFitTight ? tickRadiusShare + (String(behavior?.tickPlacement ?? 'outside') === 'outside' ? 0.1 : 0.02) : 0));
-  let circularMetrics = $derived(resolveCircularTrackMetrics(width, height, {
-    trackThickness,
-    // Tight: the pointer it draws. A dot rides the arc and needs its size; a line, needle,
-    // chicken-head or dot on the cap stays inside it. Range handles only in a range.
-    pointerSize: circularFitTight
-      ? Math.max(pointerKind === 'dot' ? pointerCurrentSize : 0, valueMode === 'single' ? 0 : Math.max(pointerStartSize, pointerEndSize))
-      : maxPointerSize,
-    majorTickLength,
-    hasTicks: showTicks,
-    circularDiameter: behavior?.circularDiameter,
-    handleLabelSize,
-    tight: circularFitTight,
-    outerReach: housingReach,
-    numberReach: scaleNumberReach,
-    numberSize: scaleNumberSize,
-  }));
+  let circularFitTight = $derived(track.tight);
+  let circularMetrics = $derived({ centerX: track.centerX, centerY: track.centerY, radius: track.radius });
   let circularCenter = $derived({
     x: circularMetrics.centerX,
     y: circularMetrics.centerY,
@@ -614,7 +575,7 @@
   let labelAnchors = $derived(buildSliderHandleLabelAnchors(behavior, width, height, normalizedValues, {
     trackThickness,
     pointerSize: maxPointerSize,
-    handleLabelSize,
+    circle: circularMetrics,
   }));
   let tickStops = $derived(buildSliderTickStops(behavior));
   // How a tick is drawn (utils/sliderEntityFactory.js): a line, a dot, the stop's numeral, or a

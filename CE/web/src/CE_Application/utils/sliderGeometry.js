@@ -284,15 +284,17 @@ export function buildSliderTickStops(behavior = null) {
 /**
  * Where the labels riding a knob's or slider's handles hang (Behavior.showHandleLabels): 22 px out
  * from a knob's track at each handle's angle, 18 above a horizontal track's handles and 22 beside a
- * vertical one's. The only text a knob or slider still draws itself.
+ * vertical one's. The only text a knob or slider still draws itself. `circle` is the circle the
+ * knob is drawn round (utils/knobTrack.js); without one, the track's own metrics from the sizes.
  */
 export function buildSliderHandleLabelAnchors(behavior = null, width = 0, height = 0, normalizedValues = {}, {
   trackThickness = 8,
   pointerSize = 16,
   handleLabelSize = 0,
+  circle = null,
 } = {}) {
   if (getSliderGeometry(behavior) === 'circular') {
-    const metrics = resolveCircularTrackMetrics(width, height, {
+    const metrics = circle ?? resolveCircularTrackMetrics(width, height, {
       trackThickness,
       pointerSize,
       majorTickLength: numberOr(behavior?.majorTickLength, 12),

@@ -88,7 +88,7 @@ test('the knob renderer draws the housing, the outlines, the needle, and hides w
   assert.match(renderer, /kind === 'needle'/);
   assert.match(renderer, /trackBasePart\?\.visible === false/);
   assert.match(renderer, /pointerKind !== 'dot' && pointerCurrentPart\?\.visible !== false/);
-  assert.match(renderer, /circularFit \?\? 'auto'\) === 'tight'/);
+  assert.match(source('utils/knobTrack.js'), /circularFit \?\? 'auto'\) === 'tight'/, 'the fit the renderer draws with, worked out where the hit tests read it');
   assert.match(source('editor/SliderShapeFill.svelte'), /shape\.kind === 'filled-path'/);
   // Every knob that exists keeps its look: the housing is off and the fit is opt-in.
   const knob = createControl('Knob');
@@ -171,7 +171,6 @@ test('the tight fit keeps a knob\'s housing inside its box', () => {
   // A knob that is not tight keeps the size it always had.
   assert.equal(resolveCircularTrackMetrics(120, 128, { ...base, tight: false, outerReach: 1.4 }).radius,
     resolveCircularTrackMetrics(120, 128, { ...base, tight: false }).radius);
-  // The renderer and the layers pass it the housing's reach.
-  const renderer = source('editor/SliderFamilyRenderer.svelte');
-  assert.match(renderer, /handleLabelSize,\s*tight: circularFitTight,\s*outerReach: housingReach,/);
+  // The renderer and the layers pass it the housing's reach, through utils/knobTrack.js.
+  assert.match(source('utils/knobTrack.js'), /handleLabelSize,\s*tight,\s*outerReach: housingReach,/);
 });
