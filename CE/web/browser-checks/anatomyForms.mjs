@@ -58,6 +58,13 @@ function measure(ids) {
     const words = i % 2 ? 'LEGATO' : 'TRIGGER';
     const caption = [...svg.querySelectorAll('text')].find((t) => t.textContent.trim().startsWith(words));
     const device = svg.querySelector(':scope > g');
+    // The device without its drop shadow. A form's drawing cast its shadow through a filter, which
+    // a box does not count; drawn in parts (the synth sets' keys), the shadow is its outline again,
+    // lower, a path that does: Chicken-head's, 10 frame units under the housing, as the drawing's.
+    const shadows = [...(device?.querySelectorAll('[data-part-shadow]') ?? [])];
+    for (const shadow of shadows) shadow.style.display = 'none';
+    const deviceBox = device ? box(device.getBoundingClientRect()) : null;
+    for (const shadow of shadows) shadow.style.display = '';
     const serif = [...svg.querySelectorAll('text')].filter((t) => t.textContent.trim() && /serif/.test(getComputedStyle(t).fontFamily) && !/sans-serif|monospace/.test(getComputedStyle(t).fontFamily));
     return {
       id,
@@ -66,7 +73,7 @@ function measure(ids) {
       // Its size on screen: its font size in the drawing's units, times the drawing's scale.
       caption: caption ? { ...box(caption.getBoundingClientRect()), size: parseFloat(getComputedStyle(caption).fontSize) * caption.getScreenCTM().a, text: caption.textContent } : null,
       frame: (svg.getAttribute('viewBox') ?? '').startsWith('0 0 160 '),
-      device: device ? box(device.getBoundingClientRect()) : null,
+      device: deviceBox,
       scale: Number((device?.getAttribute('transform') ?? '').match(/scale\(([\d.]+)\)/)?.[1] ?? NaN),
       serif: serif.map((t) => t.textContent.trim()),
     };
