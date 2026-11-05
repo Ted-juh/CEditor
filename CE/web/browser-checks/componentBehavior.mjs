@@ -647,9 +647,12 @@ try {
       const verify=async()=>{await props.getByTitle('Enter Preview',{exact:true}).click();await captureMidi();assert.equal(Number(await valueText(id)),0);await node(id).focus();await page.keyboard.type('-2');await page.keyboard.press('Enter');await settle();assert.equal(Number(await valueText(id)),-2,'typed display value must survive commit');assert.equal(Number(await node(id).getAttribute('aria-valuenow')),62);assert.equal(await page.evaluate(()=>window.__behaviorMidi.filter(e=>e.name==='setDeviceParameter').at(-1)?.payload.value),62);await page.evaluate(()=>window.__JUCE__=undefined);await props.getByTitle('Exit Preview',{exact:true}).click();};await verify();await reopen(id);await verify();
     }
   });
-  await check('ProgressBar shows its reading and changing progress changes the actual fill after reopen',async()=>{
+  await check('ProgressBar shows its reading on its value Label and changing progress changes the actual fill after reopen',async()=>{
     const id=await fixture('ProgressBar',{Meter:{value:35,valueMin:0,valueMax:100,valuePrecision:0,valueSuffix:'%'}});
-    const verify=async expected=>{assert.equal(await node(id).locator('.meter-readout').textContent(),`${expected}%`);const track=await node(id).locator('.meter-track').boundingBox();const fill=await node(id).locator('.meter-clip').boundingBox();assert.ok(Math.abs(fill.width/track.width-expected/100)<.01);};await verify(35);await tab('Meter');await number('Val',75);await verify(75);await reopen(id);await verify(75);
+    // Its reading is a Label of its own (utils/labelShows.js), added as the Meter tab's + Value adds it.
+    const label=await page.evaluate(async id=>{const {addAttachedLabel}=await import('/src/CE_Application/stores/controls.js');return addAttachedLabel(id,'value')._children.Core.id;},id);
+    await settle();
+    const verify=async expected=>{assert.equal(await node(id).locator('.meter-readout').count(),0,'the bar prints no reading of its own');assert.equal((await node(label).innerText()).trim(),`${expected}%`);const track=await node(id).locator('.meter-track').boundingBox();const fill=await node(id).locator('.meter-clip').boundingBox();assert.ok(Math.abs(fill.width/track.width-expected/100)<.01);};await verify(35);await tab('Meter');await number('Val',75);await verify(75);await reopen(id);await verify(75);
   });
   await check('CyclicButton skips disabled choices obeys wrap and sends the displayed choice',async()=>{
     for(const wrapBehavior of [false,true]){
