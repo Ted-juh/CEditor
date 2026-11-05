@@ -13,6 +13,7 @@
 //
 //   ''       its own text (Text.content)
 //   name     the control's name
+//   text     its own text: a button's caption, which stays the button's (scripts and states set it)
 //   value    its value as it prints it (a knob's readout: "1.20 kHz", a note name, "+3")
 //   min/max  the ends of its range, printed the same way
 //   unit     its unit
@@ -26,6 +27,7 @@ export const LABEL_SHOWS = Object.freeze([
   ['', 'Its own text'],
   ['value', 'Value of'],
   ['name', 'Name of'],
+  ['text', 'Text of'],
   ['min', 'Min of'],
   ['max', 'Max of'],
   ['unit', 'Unit of'],
@@ -111,6 +113,7 @@ export function shownText(source, shows, session = null) {
   const behavior = kids.Behavior ?? {};
   const type = String(kids.Core?.controlType ?? '');
   if (shows === 'name') return String(kids.Core?.name ?? '');
+  if (shows === 'text') return String(kids.Text?.content ?? '');
   // A meter prints its value as its readout does (MeterRenderer): prefix, figures, suffix.
   if (kids.Meter && (type === 'Meter' || type === 'ProgressBar')) {
     const meter = kids.Meter;

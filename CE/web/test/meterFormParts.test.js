@@ -249,7 +249,9 @@ test('the Meter tab edits every part, each field naming its property, beside the
   // While parts draw it, the plain meter's orientation, fill, arc, ticks and marker colour go.
   assert.match(tab, /let partsMode = \$derived\(!anatomyForm\(core\?\.controlType, core\?\.controlForm\) && meterDeviceDrawn\(control\)\);/);
   assert.match(tab, /\{#if !partsMode\}\s*<PropertySection title="Fill"/);
-  assert.match(tab, /without\(METER_READOUT_FIELDS, \['showTicks', 'tickCount', 'showValue'\]\)/);
+  assert.match(tab, /without\(METER_READOUT_FIELDS, \['showTicks', 'tickCount'\]\)/);
+  // Its reading and caption are Labels of its own: the tab's Labels section adds them.
+  assert.match(tab, /<AttachedLabelsEditor \{control\} \/>/);
   // The zones in %, Steps or Blend between them.
   assert.match(tab, /<PropertySection title="Colour Zones"/);
   assert.match(tab, /updateZone\(i, 'from', Math\.max\(0, Math\.min\(100, Number\(v\) \|\| 0\)\) \/ 100\)/);

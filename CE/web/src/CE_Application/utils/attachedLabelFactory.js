@@ -23,7 +23,10 @@ export function wordsWidth(text, size = 11) {
  */
 export function makeAttachedLabel(owner, shows, { content = '', as = '', at = '', core = {} } = {}) {
   const kind = as || shows || 'name';
-  const size = SHOWN_LETTERING[kind]?.size ?? 11;
+  // A button's caption is lettered as the button lettered it beside its key: its own face, weight,
+  // spacing and colour, at a size that reads.
+  const ownFont = owner?._children?.Text?._children?.Font ?? {};
+  const size = shows === 'text' ? Math.max(9, Math.min(12, Number(ownFont.size) || 11)) : (SHOWN_LETTERING[kind]?.size ?? 11);
   const words = !shows ? [content]
     : shows === 'value' ? ['value', 'min', 'max'].map((each) => shownText(owner, each))
       : [shownText(owner, shows)];
@@ -37,5 +40,12 @@ export function makeAttachedLabel(owner, shows, { content = '', as = '', at = ''
     ContentLayout: { mode: 'text_only', horizontalAlign: rect.align, paddingLeft: 0, paddingRight: 0 },
   });
   label._children.Text = withShownLettering(label._children.Text, kind);
+  if (shows === 'text') {
+    const text = label._children.Text;
+    const font = { ...(text._children.Font ?? {}), size };
+    for (const key of ['family', 'weight', 'weightValue', 'letterSpacing', 'style']) if (ownFont[key] !== undefined) font[key] = ownFont[key];
+    const colour = owner?._children?.Text?._children?.Fill?.colour;
+    label._children.Text = { ...text, _children: { ...text._children, Font: font, ...(colour ? { Fill: { ...(text._children.Fill ?? {}), colour } } : {}) } };
+  }
   return label;
 }

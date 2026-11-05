@@ -294,6 +294,20 @@ in too, the value as a layer that follows the knob's value.
 The labels that ride a knob's or slider's handles as they move are still its own: **Handle Labels**
 on its Labels tab.
 
+A meter works the same way. It draws no reading and no caption of its own; the **Labels** section
+at the top of its **Meter** tab adds **+ Value** (the reading, printed with the meter's precision,
+prefix and suffix), **+ Name**, **+ Min**, **+ Max**, **+ Unit** and **+ Caption** (your own words).
+Its scale numbers, and a legend its design prints in its window, stay part of the meter.
+
+A key or switch your set draws as a device (a key in a housing, a lever, a rocker) prints its
+caption beside or under itself, in the set's lettering. Make the caption a Label of its own with
+**+ Text** in the **Labels** section at the top of its **Button** tab: the Label shows the button's
+own text, so a script or a state that changes the text changes the Label, and every text setting
+applies to it. A button whose text a Label shows prints none itself, so the device takes its whole
+box. A flat button keeps the text printed on its face, where it lights up and moves with the key;
+**+ Text** works there too, if you would rather have the words beside it. Sets drawn as
+illustrations (Iris, Satellite and the classic forms) print their captions as part of the drawing.
+
 ### Containers and grouping
 
 A **container** holds other controls, so that they move together. **Ctrl+G** (Edit → Group into

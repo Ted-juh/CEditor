@@ -8,7 +8,7 @@
 //
 // Pure, no stores: stores/controls.js and stores/clipboard.js call these.
 
-import { attachedTo } from './labelShows.js';
+import { attachedTo, labelShows, labelSourceId } from './labelShows.js';
 import { buildControlIndex, walkControls } from './containment.js';
 import { getSliderGeometry, getSliderOrientation } from './sliderBehavior.js';
 import { sliderNormalizedToAngle } from './sliderGeometry.js';
@@ -30,6 +30,28 @@ export function attachmentsOf(controls) {
     owners.get(owner).push(id);
   });
   ownersCache.set(controls, owners);
+  return owners;
+}
+
+const textCache = new WeakMap();
+
+/**
+ * The controls whose own text a Label shows (`Text.shows` 'text'): a button whose caption is a Label
+ * of its own prints none itself, flat or drawn as a key, so a set that draws it the other way never
+ * doubles or loses its caption. Cached per panel tree.
+ */
+export function textShownOwners(controls) {
+  if (!Array.isArray(controls)) return new Set();
+  let owners = textCache.get(controls);
+  if (owners) return owners;
+  owners = new Set();
+  walkControls(controls, (control) => {
+    if (labelShows(control) === 'text') {
+      const source = labelSourceId(control);
+      if (source) owners.add(source);
+    }
+  });
+  textCache.set(controls, owners);
   return owners;
 }
 
@@ -165,8 +187,10 @@ export function attachedLabelRect(owner, shows, { size = 11, width = 0 } = {}) {
   const fit = (least) => Math.round(Math.max(least, num(width)));
   const box = (left, top, across, align = 'center') => ({ x: Math.round(left), y: Math.round(top), width: Math.round(across), height: line, align });
   const centred = (cx, top, across) => box(cx - across / 2, top, across);
-  const circular = getSliderGeometry(behavior) === 'circular';
-  const vertical = !circular && getSliderOrientation(behavior) === 'vertical';
+  // A meter by its own orientation (an arc's ends are its bottom corners, as a bar's are).
+  const meter = owner?._children?.Meter;
+  const circular = !meter && getSliderGeometry(behavior) === 'circular';
+  const vertical = meter ? String(meter.orientation ?? '') === 'vertical' : (!circular && getSliderOrientation(behavior) === 'vertical');
   const middle = x + w / 2;
 
   if (shows === 'name') return centred(middle, y - line - gap, fit(w));

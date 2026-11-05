@@ -67,6 +67,7 @@ import { drawnDeviceDirection, synthDeviceDrawingLayers } from './deviceDrawingL
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
 import { authoredShownText, labelShows, labelSourceId } from './labelShows.js';
+import { textShownOwners } from './attachedLabels.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
 /** Controls with a value that convert: drawn by SliderFamilyRenderer, one value each. */
@@ -898,7 +899,7 @@ function buttonLampLayer(name, resolved, styled, rect, common, uniqueName = (wan
   return { layers: [layer], on: { [layer.name]: on }, depth: common.zIndex + 1 };
 }
 
-function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, asLayers = false } = {}) {
+function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, asLayers = false, captionShown = false } = {}) {
   const type = control._children.Core.controlType;
   const transform = control._children.Transform ?? {};
   const common = {
@@ -951,6 +952,9 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
       resolved, styled, rect, channel, prefix: channel, zIndex,
       uniqueName: (wanted) => uniquePartName(wanted, taken),
       caption, captionText: caption.trim() || (toggle ? 'SWITCH' : 'PRESS'),
+      // Its caption a Label of its own: the device alone, as the panel draws it; the Label, selected
+      // with it, comes in as a layer of its own.
+      bare: captionShown,
     });
     for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
     const captionLayer = built.partNames.caption?.[0] ?? '';
@@ -1188,6 +1192,14 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
       control = worded(control);
       resolved = worded(resolved);
     }
+    // A control whose text a Label shows prints none, as on the panel: the Label, selected with it,
+    // comes in as a layer of its own.
+    const captionShown = String(control._children.Core.controlType) !== 'Label' && textShownOwners(controls).has(String(control._children.Core.id));
+    if (captionShown && control._children.Text) {
+      const blank = (each) => ({ ...each, _children: { ...each._children, Text: { ...each._children.Text, content: '' } } });
+      control = blank(control);
+      resolved = blank(resolved);
+    }
     let asLayers = false;
     if (valueControlsAs === 'layers' && VALUE_TYPES.includes(String(control._children.Core.controlType))) {
       const why = valueLayersRefusal(resolved);
@@ -1198,7 +1210,7 @@ export function planComponentFromSelection(panel, ids, { set = null, name = 'Art
     const isButton = [...BUTTON_TYPES, ...METER_TYPES].includes(String(control._children.Core.controlType));
     const styled = asLayers || isButton ? resolveControlFamily(control, set, { document: panel?.controlSets ?? [] }) : resolved;
     // A knob's layers take ten depths each and more; the next control paints above all of them.
-    const built = partsFor(control, resolved, local, (i + 1) * 1000, taken, { styled, asLayers });
+    const built = partsFor(control, resolved, local, (i + 1) * 1000, taken, { styled, asLayers, captionShown });
     if (!VALUE_TYPES.includes(String(control._children.Core.controlType))) {
       const why = carryControlEffects(control, resolved, built, local);
       if (why) refused.push({ id: String(placed._children.Core.id), name: nameOf(placed), reason: why });

@@ -145,3 +145,56 @@ test('the surfaces: the drag shows the Labels following, Alt+click takes them, t
   const shortcuts = readFileSync(new URL('../src/CE_Application/utils/editorShortcuts.js', import.meta.url), 'utf8');
   assert.match(shortcuts, /if \(moving\.has\(c\._children\.Core\.attachedTo\)\) continue;/);
 });
+
+test('a Label can show a button\'s own text, lettered as the button lettered it, and the button then prints none', async () => {
+  const { shownText } = await import('../src/CE_Application/utils/labelShows.js');
+  const { makeAttachedLabel } = await import('../src/CE_Application/utils/attachedLabelFactory.js');
+  const { textShownOwners } = await import('../src/CE_Application/utils/attachedLabels.js');
+  const key = createControl('Button', { Core: { id: 'b1', name: 'Trigger' }, Transform: { x: 10, y: 10, width: 120, height: 56 },
+    Text: { content: 'TRIGGER', _children: { Font: { family: 'Space Mono', weightValue: 700, letterSpacing: 1.5 }, Fill: { colour: 'FFE0E0E0' } } } });
+  assert.equal(shownText(key, 'text'), 'TRIGGER');
+  const caption = makeAttachedLabel(key, 'text', { core: { id: 'c1' } });
+  assert.equal(caption._children.Text.shows, 'text');
+  assert.equal(caption._children.Core.attachedTo, 'b1');
+  const font = caption._children.Text._children.Font;
+  assert.deepEqual([font.family, font.weightValue, font.letterSpacing], ['Space Mono', 700, 1.5], 'its face, weight and spacing');
+  assert.equal(caption._children.Text._children.Fill.colour, 'FFE0E0E0', 'and its colour');
+  assert.ok(caption._children.Transform.y >= 66, 'under the key');
+  assert.deepEqual([...textShownOwners([key, caption])], ['b1']);
+  assert.equal(textShownOwners([key]).size, 0);
+});
+
+test('a key drawn from its parts, its caption a Label, comes in as the bare device and the Label as text', async () => {
+  const { getControlSet } = await import('../src/CE_Application/models/controlSets.js');
+  const { planComponentFromSelection } = await import('../src/CE_Application/utils/customComponentFromControls.js');
+  const { makeAttachedLabel } = await import('../src/CE_Application/utils/attachedLabelFactory.js');
+  const key = createControl('Button', { Core: { id: 'b1', name: 'Trigger' }, Transform: { x: 20, y: 20, width: 120, height: 56 }, Text: { content: 'TRIGGER' } });
+  const caption = makeAttachedLabel(key, 'text', { core: { id: 'c1', name: 'Trigger Text' } });
+  const plan = (controls) => planComponentFromSelection({ id: 'p', controlSet: { id: 'switchboard' }, controlSets: [], controls }, controls.map((c) => c._children.Core.id),
+    { set: getControlSet('switchboard'), name: 'T', valueControlsAs: 'layers' });
+  const alone = plan([key]);
+  assert.ok(alone.ok, JSON.stringify(alone.refused));
+  assert.ok(Object.keys(alone.component._children.Parts._children).some((name) => /caption/.test(name)), 'on its own it prints its caption');
+  const together = plan([key, caption]);
+  assert.ok(together.ok, JSON.stringify(together.refused));
+  const parts = together.component._children.Parts._children;
+  assert.ok(!Object.keys(parts).some((name) => /caption/.test(name)), 'with the Label, the device prints none');
+  assert.ok(Object.values(parts).some((part) => part._children?.Text?.content === 'TRIGGER'), 'the Label brings the words');
+});
+
+test('the Meter and Button tabs carry the Labels section, and each offers what that control can have shown', () => {
+  const editor = readFileSync(new URL('../src/CE_Application/sections/AttachedLabelsEditor.svelte', import.meta.url), 'utf8');
+  assert.match(editor, /isMeter \? \['name', 'value', 'min', 'max', 'unit', 'caption'\]/);
+  assert.match(editor, /: \['text', 'name'\]\);/);
+  for (const tab of ['MeterEditor', 'ButtonPartsEditor']) {
+    const source = readFileSync(new URL(`../src/CE_Application/sections/${tab}.svelte`, import.meta.url), 'utf8');
+    assert.match(source, /<AttachedLabelsEditor \{control\} \/>/, tab);
+  }
+  const canvas = readFileSync(new URL('../src/CE_Application/editor/CanvasControl.svelte', import.meta.url), 'utf8');
+  assert.match(canvas, /if \(captionShownByLabel\) return '';/);
+  assert.match(canvas, /captionShown=\{captionShownByLabel\}/);
+  const anatomy = readFileSync(new URL('../src/CE_Application/editor/ControlAnatomy.svelte', import.meta.url), 'utf8');
+  assert.match(anatomy, /let bareDevice = \$derived\(partsDrawn && captionShown\);/);
+  const meter = readFileSync(new URL('../src/CE_Application/editor/MeterRenderer.svelte', import.meta.url), 'utf8');
+  assert.doesNotMatch(meter, /meter-readout|meter-label/);
+});

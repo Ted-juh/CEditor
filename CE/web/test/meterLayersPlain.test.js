@@ -43,31 +43,16 @@ test('a readout, a label, scale labels, an arc and a track you can see through n
   assert.equal(plainMeterLayersRefusal(meter({ trackColour: '80141414', orientation: 'arc' })), '', 'so does an arc');
 });
 
-test('the readout prints the channel as the meter printed its value, at the body\'s right', () => {
-  const out = layersOf(meter({ showValue: true }));
-  const readout = named(out, 'readout');
-  assert.ok(readout, 'a readout layer');
-  assert.equal(out.bindings.level_readoutText.source, 'channel.level.display');
-  assert.equal(out.bindings.level_readoutText.target, 'Parts.level_readout.Text.content');
-  assert.equal(readout._children.Text._children.Position.justification, 'right');
-  assert.equal(readout._children.Text._children.Effects.shadowEnabled, true, 'its shadow, 0 1px 2px');
-  // Its right edge 5 px in from the body's (4 px in from the box): the box runs 8 px further for its padding.
-  const layout = readout._children.Layout;
-  assert.equal(Math.round(layout.x + layout.width), 200 - 4 - 5 + 8);
-});
-
-test('a label above takes its line and a gap of 3 from the body', () => {
+test('a meter comes in with no reading or caption of its own: those are Labels, and its body fills its box', () => {
   const plain = layersOf(meter({}));
-  const labelled = layersOf(meter({ label: 'LEVEL', labelPosition: 'above' }));
-  assert.equal(named(labelled, 'label')._children.Text.content, 'LEVEL');
-  const trackY = (out) => named(out, 'track')._children.Layout.y;
-  const trackH = (out) => named(out, 'track')._children.Layout.height;
-  assert.ok(trackY(labelled) > trackY(plain) + 3, 'the body starts below the label');
-  assert.ok(Math.abs((trackH(plain) - trackH(labelled)) - (trackY(labelled) - trackY(plain))) < 0.01, 'and is that much shorter');
+  const old = layersOf(meter({ showValue: true, label: 'LEVEL', labelPosition: 'above' }));
+  assert.ok(!named(old, 'readout') && !named(old, 'label'), 'a reading or caption left on the meter from before draws nothing');
+  const track = (out) => named(out, 'track')._children.Layout;
+  assert.deepEqual([track(old).y, track(old).height], [track(plain).y, track(plain).height], 'the body is the box less its padding');
 });
 
-test('an arc meter is its track, one fill arc in the zones\' colours whose sweep is the reading, and its readout under it', () => {
-  const out = layersOf(meter({ orientation: 'arc', showValue: true }));
+test('an arc meter is its track and one fill arc in the zones\' colours whose sweep is the reading', () => {
+  const out = layersOf(meter({ orientation: 'arc' }));
   const track = named(out, 'track');
   const fill = named(out, 'fill');
   assert.equal(track.kind, 'arcTrack');
@@ -80,7 +65,6 @@ test('an arc meter is its track, one fill arc in the zones\' colours whose sweep
   assert.equal(fill.meta.arcTrack.blend, true);
   const sweep = out.bindings.level_fillSweep;
   assert.equal(sweep.target, 'Parts.level_fill.meta.arcTrack.sweepAngle');
-  assert.ok(named(out, 'readout'), 'the readout');
   // Hard zones keep their edges; segments are arcs of their own, each lit by the reading.
   assert.equal(named(layersOf(meter({ orientation: 'arc', gradient: false })), 'fill').meta.arcTrack.blend, false);
   const segmented = layersOf(meter({ orientation: 'arc', segments: 6 }));

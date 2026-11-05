@@ -123,13 +123,17 @@ try {
     const verify=async()=>assert.ok(Math.abs((await node(id).locator('.meter-track').boundingBox()).height-12)<1,'horizontal bar must be 12px thick');
     await verify(); await reopen(id); await verify();
   });
-  await check('Meter segmented readout shows configured precision prefix suffix after reopening',async()=>{
-    const id=await fixture('Meter',{Meter:{value:0.5,showValue:true,valuePrecision:2,valuePrefix:'Level ',valueSuffix:' V'}});
+  await check('Meter segmented reading prints configured precision prefix suffix on its value Label after reopening',async()=>{
+    const id=await fixture('Meter',{Meter:{value:0.5,valuePrecision:2,valuePrefix:'Level ',valueSuffix:' V'}});
+    // Its reading is a Label of its own (utils/labelShows.js), added as the Meter tab's + Value adds it.
+    const label=await page.evaluate(async id=>{const {addAttachedLabel}=await import('/src/CE_Application/stores/controls.js');return addAttachedLabel(id,'value')._children.Core.id;},id);
+    await settle();
     await tab('Meter'); await number('Seg',10);
     const verify=async()=>{
       assert.equal(await node(id).locator('.seg').count(),10);
       assert.equal(await node(id).locator('.seg.lit').count(),5);
-      assert.equal(await node(id).locator('.meter-readout').innerText(),'Level 0.50 V');
+      assert.equal(await node(id).locator('.meter-readout').count(),0,'the meter prints no reading of its own');
+      assert.equal((await node(label).innerText()).trim(),'Level 0.50 V');
     };
     await verify(); await reopen(id); await verify();
   });
@@ -176,14 +180,17 @@ try {
     assert.equal(await node(id).locator('.meter-clip').evaluate(e=>e.style.height),'50%');
     await toggle('Ticks'); await number('Ticks',5);
     assert.equal(await node(id).locator('.meter-tick').count(),6);
-    await cell('Caption').locator('input').fill('Signal'); await cell('Caption').locator('input').press('Tab');
-    await choose('Position','above'); assert.equal(await node(id).locator('.meter-label').innerText(),'Signal');
+    // Its caption is a Label of its own (the Labels section's + Caption), which the meter makes no room for.
+    const caption=await page.evaluate(async id=>{const {addAttachedLabel}=await import('/src/CE_Application/stores/controls.js');return addAttachedLabel(id,'',{content:'Signal'})._children.Core.id;},id);
+    // A caption in its own words is still scenery (folded into the panel's ground), so it is found by its words.
+    const captionShown=async()=>page.locator('.canvas-viewport').last().getByText('Signal',{exact:true}).count();
+    await settle(); assert.ok(caption); assert.ok(await captionShown()>0,'the caption Label prints Signal'); assert.equal(await node(id).locator('.meter-label').count(),0);
     await number('Seg',8); assert.equal(await node(id).locator('.seg.lit').count(),4);
     assert.equal(await node(id).locator('.meter-tick').count(),6,'segment mode retains scale ticks');
     await choose('Orientation','arc');
     assert.equal(await node(id).locator('.meter-arc .meter-tick').count(),6,'arc mode retains scale ticks');
     await reopen(id);
-    assert.equal(await node(id).locator('.meter-label').innerText(),'Signal');
+    assert.ok(await captionShown()>0,'and still does after reopening');
     assert.equal(await node(id).locator('.meter-arc .meter-tick').count(),6);
   });
   await check('Numpad digits offset refusal clear auto-commit and read-only behavior survive reopen',async()=>{
@@ -374,7 +381,7 @@ try {
     };await verify();await reopen(id);await verify();
   });
   await check('Route into Meter moves its visible reading in the configured range',async()=>{
-    const id=await fixture('Meter',{Meter:{value:10,valueMin:0,valueMax:100,showValue:true,valuePrecision:0}},[],[
+    const id=await fixture('Meter',{Meter:{value:10,valueMin:0,valueMax:100,valuePrecision:0}},[],[
       {type:'Slider',sections:{Core:{id:'route_meter_source'},Transform:{x:50,y:300,width:300,height:60},Behavior:{min:0,max:1,defaultValue:0}}},
     ]);
     const added=await page.evaluate(async ({id})=>{
@@ -382,15 +389,18 @@ try {
       return addRoute({from:{controlId:'route_meter_source',port:'value'},to:{controlId:id,port:'value'},mode:'set'});
     },{id});
     assert.equal(added.ok,true);
+    // The reading, on the meter's value Label (utils/labelShows.js).
+    const reading=await page.evaluate(async id=>{const {addAttachedLabel}=await import('/src/CE_Application/stores/controls.js');return addAttachedLabel(id,'value')._children.Core.id;},id);
+    const shown=async()=>(await node(reading).innerText()).trim();
     await props.getByTitle('Enter Preview',{exact:true}).click();
     const source=node('route_meter_source');
     await source.focus();await page.keyboard.press('End');await settle();
-    assert.equal(await node(id).locator('.meter-readout').innerText(),'100');
+    assert.equal(await shown(),'100');
     await page.keyboard.press('Home');await settle();
-    assert.equal(await node(id).locator('.meter-readout').innerText(),'0');
+    assert.equal(await shown(),'0');
     await reopen(id);await props.getByTitle('Enter Preview',{exact:true}).click();
     await node('route_meter_source').focus();await page.keyboard.press('End');await settle();
-    assert.equal(await node(id).locator('.meter-readout').innerText(),'100');
+    assert.equal(await shown(),'100');
   });
   await check('Crossfader laws gains bipolar output labels detent and persisted pointer geometry agree',async()=>{
     const id=await fixture('Crossfader',{Crossfader:{showGains:true,labelA:'Dry',labelB:'Wet',detent:0.04},DeviceBindings:{enabled:true,bindings:['a','b','mix'].map(port=>({kind:'deviceParameter',port,deviceRole:'mainSynth',parameterId:port,dryRun:true}))}});

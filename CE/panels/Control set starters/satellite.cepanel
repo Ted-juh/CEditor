@@ -267,10 +267,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1709143310912.x",
-      "label": "VectorJoystick_1709143310912 X",
-      "controlName": "VectorJoystick_1709143310912",
-      "path": "VectorJoystick_1709143310912.x",
+      "id": "VectorJoystick_1709143310913.x",
+      "label": "VectorJoystick_1709143310913 X",
+      "controlName": "VectorJoystick_1709143310913",
+      "path": "VectorJoystick_1709143310913.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -283,10 +283,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1709143310912.y",
-      "label": "VectorJoystick_1709143310912 Y",
-      "controlName": "VectorJoystick_1709143310912",
-      "path": "VectorJoystick_1709143310912.y",
+      "id": "VectorJoystick_1709143310913.y",
+      "label": "VectorJoystick_1709143310913 Y",
+      "controlName": "VectorJoystick_1709143310913",
+      "path": "VectorJoystick_1709143310913.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -299,10 +299,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1709143310913.bpm",
-      "label": "StepSequencer_1709143310913 Tempo",
-      "controlName": "StepSequencer_1709143310913",
-      "path": "StepSequencer_1709143310913.bpm",
+      "id": "StepSequencer_1709143310914.bpm",
+      "label": "StepSequencer_1709143310914 Tempo",
+      "controlName": "StepSequencer_1709143310914",
+      "path": "StepSequencer_1709143310914.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -315,10 +315,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1709143310913.run",
-      "label": "StepSequencer_1709143310913 Run",
-      "controlName": "StepSequencer_1709143310913",
-      "path": "StepSequencer_1709143310913.run",
+      "id": "StepSequencer_1709143310914.run",
+      "label": "StepSequencer_1709143310914 Run",
+      "controlName": "StepSequencer_1709143310914",
+      "path": "StepSequencer_1709143310914.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -632,7 +632,7 @@
     {
       "_children": {
         "Core": {"name":"Meter_1709143310910","controlSetId":"satellite","controlForm":"new-satellite","formFaceColour":"FFC2DADB","formHousingColour":"FF162B35","formInkColour":"FF202020","formLabelColour":"FFF7F4EC","formAccentColour":"FF70CFC0","id":"ctrl_1709143310910","controlType":"Meter"},
-        "Transform": {"x":540,"y":342,"width":312,"height":108},
+        "Transform": {"x":540,"y":342,"width":312,"height":86},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Meter": {"value":0.7,"segments":12,"segmentGap":3,"trackColour":"FF162B35","fillColour":"FF70CFC0","thickness":16,"rounded":false,"peakColour":"FF70CFC0","showTicks":true,"valuePrecision":2},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk"}}},
@@ -655,7 +655,17 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1709143310911","controlSetId":"satellite","id":"ctrl_1709143310911","controlType":"Matrix"},
+        "Core": {"name":"Label_1709143310911","controlSetId":"satellite","id":"ctrl_1709143310911","attachedTo":"ctrl_1709143310910","controlType":"Label"},
+        "Transform": {"x":676,"y":430,"width":40,"height":19},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Multiline":{"wrapMode":"none"}},"shows":"value"},
+        "ContentLayout": {"paddingLeft":0,"paddingRight":0,"lampColour":"FF70CFC0","lampOffColour":"FF162B35","lampBezelColour":"AAFFFFFF"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Matrix_1709143310912","controlSetId":"satellite","id":"ctrl_1709143310912","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FF162B35","gridColour":"88FFFFFF","posColour":"FF70CFC0","negColour":"FFFFB6E6","labelColour":"FFF2F2F2","activeColour":"FF70CFC0"},
@@ -666,7 +676,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1709143310912","controlSetId":"satellite","id":"ctrl_1709143310912","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1709143310913","controlSetId":"satellite","id":"ctrl_1709143310913","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF162B35"},"Border":{"colour":"AAFFFFFF"},"Corners":{"radius":4}}},
         "Joystick": {"puckRadius":7,"padColour":"FF162B35","gridColour":"88FFFFFF","crosshairColour":"FF70CFC0","puckColour":"FFC2DADB","cornerColour":"FFF7F4EC","labelColour":"FFF2F2F2"},
@@ -677,7 +687,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1709143310913","controlSetId":"satellite","id":"ctrl_1709143310913","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1709143310914","controlSetId":"satellite","id":"ctrl_1709143310914","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":466,"width":220,"height":100},
         "StepSequencer": {"cellForm":"pod","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FFC2DADB","cellOnColour":"FF70CFC0","playheadColour":"FF70CFC0","gridColour":"88FFFFFF","labelColour":"FFF7F4EC"},
         "Text": {"_children":{"Fill":{"colour":"FFF7F4EC"}}}
@@ -686,7 +696,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1709143310914","controlSetId":"satellite","id":"ctrl_1709143310914","controlType":"Label"},
+        "Core": {"name":"Label_1709143310915","controlSetId":"satellite","id":"ctrl_1709143310915","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},

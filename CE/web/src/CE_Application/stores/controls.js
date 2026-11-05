@@ -442,16 +442,18 @@ export function addControl(type, overrides = {}, { at = null } = {}) {
  * the control, and put in the same container. The selection stays on the control, so its Labels tab
  * can add the next. Returns the Label, or null.
  */
-export function addAttachedLabel(ownerId, shows) {
+export function addAttachedLabel(ownerId, shows, { content = null } = {}) {
   const panelId = get(resolvedActivePanelId);
   const panel = panelId == null ? null : get(panels).find((p) => p.id === panelId);
   const owner = panel ? findControlById(panel.controls, ownerId) : null;
-  const menuWords = LABEL_SHOWS.find(([key]) => key && key === shows)?.[1];
+  // A caption in its own words (`shows` '' and `content`), or what it shows of the control.
+  const ownWords = !shows && content !== null;
+  const menuWords = ownWords ? 'Caption' : LABEL_SHOWS.find(([key]) => key && key === shows)?.[1];
   if (!owner || !menuWords) return null;
   const ownerCore = owner._children.Core;
   const name = uniqueControlName(collectControlNames(panel.controls),
     `${ownerCore.name || ownerCore.controlType || 'Control'} ${menuWords.replace(/ of$/, '')}`, 'Label');
-  const label = makeAttachedLabel(owner, shows, { core: { name, layer: ownerCore.layer ?? targetLayerName() } });
+  const label = makeAttachedLabel(owner, ownWords ? '' : shows, { content: ownWords ? String(content) : '', core: { name, layer: ownerCore.layer ?? targetLayerName() } });
   const parentId = findParentOfControl(panel.controls, ownerId)?._children?.Core?.id ?? null;
   panels.update((list) => list.map((p) => (p.id !== panelId ? p : {
     ...p,

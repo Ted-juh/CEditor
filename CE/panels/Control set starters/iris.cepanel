@@ -267,10 +267,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1718572545126.x",
-      "label": "VectorJoystick_1718572545126 X",
-      "controlName": "VectorJoystick_1718572545126",
-      "path": "VectorJoystick_1718572545126.x",
+      "id": "VectorJoystick_1718572545127.x",
+      "label": "VectorJoystick_1718572545127 X",
+      "controlName": "VectorJoystick_1718572545127",
+      "path": "VectorJoystick_1718572545127.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -283,10 +283,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1718572545126.y",
-      "label": "VectorJoystick_1718572545126 Y",
-      "controlName": "VectorJoystick_1718572545126",
-      "path": "VectorJoystick_1718572545126.y",
+      "id": "VectorJoystick_1718572545127.y",
+      "label": "VectorJoystick_1718572545127 Y",
+      "controlName": "VectorJoystick_1718572545127",
+      "path": "VectorJoystick_1718572545127.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -299,10 +299,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1718572545127.bpm",
-      "label": "StepSequencer_1718572545127 Tempo",
-      "controlName": "StepSequencer_1718572545127",
-      "path": "StepSequencer_1718572545127.bpm",
+      "id": "StepSequencer_1718572545128.bpm",
+      "label": "StepSequencer_1718572545128 Tempo",
+      "controlName": "StepSequencer_1718572545128",
+      "path": "StepSequencer_1718572545128.bpm",
       "min": 0,
       "max": 1,
       "defaultValue": 1,
@@ -315,10 +315,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "StepSequencer_1718572545127.run",
-      "label": "StepSequencer_1718572545127 Run",
-      "controlName": "StepSequencer_1718572545127",
-      "path": "StepSequencer_1718572545127.run",
+      "id": "StepSequencer_1718572545128.run",
+      "label": "StepSequencer_1718572545128 Run",
+      "controlName": "StepSequencer_1718572545128",
+      "path": "StepSequencer_1718572545128.run",
       "min": 0,
       "max": 1,
       "defaultValue": 0,
@@ -632,7 +632,7 @@
     {
       "_children": {
         "Core": {"name":"Meter_1718572545124","controlSetId":"iris","controlForm":"new-iris","formFaceColour":"FF4F6081","formHousingColour":"FF171C26","formInkColour":"FFF2F2F2","formLabelColour":"FFF7F4EC","formAccentColour":"FFECBA68","id":"ctrl_1718572545124","controlType":"Meter"},
-        "Transform": {"x":540,"y":342,"width":312,"height":108},
+        "Transform": {"x":540,"y":342,"width":312,"height":86},
         "Background": {"_children":{"Fill":{"colour":"FF171C26","gradientOpacity":22,"gradient":{"type":"linear","angle":180,"edge":100,"stops":[{"color":"FFFFFF","position":0},{"color":"FFFFFF","position":48},{"color":"161A21","position":48},{"color":"161A21","position":100}]}},"Border":{"colour":"AA8B8D90"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"glass","strength":50,"shine":120,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Meter": {"value":0.7,"segments":12,"segmentGap":3,"trackColour":"FF171C26","fillColour":"FFECBA68","thickness":16,"rounded":false,"peakColour":"FFECBA68","showTicks":true,"valuePrecision":2},
         "Text": {"_children":{"Fill":{"colour":"FFF2F2F2"},"Font":{"family":"Space Grotesk"}}},
@@ -655,7 +655,17 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1718572545125","controlSetId":"iris","id":"ctrl_1718572545125","controlType":"Matrix"},
+        "Core": {"name":"Label_1718572545125","controlSetId":"iris","id":"ctrl_1718572545125","attachedTo":"ctrl_1718572545124","controlType":"Label"},
+        "Transform": {"x":676,"y":430,"width":40,"height":19},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Multiline":{"wrapMode":"none"}},"shows":"value"},
+        "ContentLayout": {"paddingLeft":0,"paddingRight":0,"lampColour":"FFECBA68","lampOffColour":"FF171C26","lampBezelColour":"AA0B0D10"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Matrix_1718572545126","controlSetId":"iris","id":"ctrl_1718572545126","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF171C26","gradientOpacity":22,"gradient":{"type":"linear","angle":180,"edge":100,"stops":[{"color":"FFFFFF","position":0},{"color":"FFFFFF","position":48},{"color":"161A21","position":48},{"color":"161A21","position":100}]}},"Border":{"colour":"AA8B8D90"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"glass","strength":50,"shine":120,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8],"cellStyle":"dot","rowHeaderW":42,"cellBg":"FF171C26","gridColour":"660D1014","posColour":"FFECBA68","negColour":"FFB58CFF","labelColour":"FFF2F2F2","activeColour":"FFECBA68"},
@@ -666,7 +676,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1718572545126","controlSetId":"iris","id":"ctrl_1718572545126","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1718572545127","controlSetId":"iris","id":"ctrl_1718572545127","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Background": {"_children":{"Fill":{"colour":"FF171C26","gradientOpacity":22,"gradient":{"type":"linear","angle":180,"edge":100,"stops":[{"color":"FFFFFF","position":0},{"color":"FFFFFF","position":48},{"color":"161A21","position":48},{"color":"161A21","position":100}]}},"Border":{"colour":"AA8B8D90"},"Corners":{"radius":4},"Effects":{"_type":"Effects","_children":{"Shadows":{"_type":"Shadows","items":[{"enabled":false,"type":"drop","offsetX":0,"offsetY":2,"blur":4,"spread":0,"colour":"66000000"}]},"Bevel":{"_type":"Bevel","enabled":false,"style":"outer-bevel","depth":100,"size":5,"softness":0,"angle":135,"highlightColour":"FFFFFF","highlightOpacity":75,"shadowColour":"000000","shadowOpacity":75},"Filters":{"_type":"Filters","blur":0,"brightness":100,"contrast":100,"saturation":100,"hueRotate":0,"grayscale":0,"sepia":0,"invert":0},"Blend":{"_type":"Blend","mode":"normal"},"Material":{"_type":"Material","enabled":true,"kind":"glass","strength":50,"shine":120,"grain":100,"lampFollowsSet":true,"lampAzimuth":225,"lampElevation":48}}}}},
         "Joystick": {"puckRadius":7,"padColour":"FF171C26","gridColour":"660D1014","crosshairColour":"FFECBA68","puckColour":"FF4F6081","cornerColour":"FFF7F4EC","labelColour":"FFF2F2F2"},
@@ -677,7 +687,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"StepSequencer_1718572545127","controlSetId":"iris","id":"ctrl_1718572545127","controlType":"StepSequencer"},
+        "Core": {"name":"StepSequencer_1718572545128","controlSetId":"iris","id":"ctrl_1718572545128","controlType":"StepSequencer"},
         "Transform": {"x":284,"y":466,"width":220,"height":100},
         "StepSequencer": {"cellForm":"shutter","steps":8,"trackHeaderWidth":38,"tracks":[{"id":"kick","label":"Kick","note":36,"channel":10},{"id":"hat","label":"Hat","note":42,"channel":10}],"pattern":{"kick:0":{"on":true,"velocity":100},"kick:4":{"on":true,"velocity":100},"hat:0":{"on":true,"velocity":70},"hat:2":{"on":true,"velocity":70},"hat:4":{"on":true,"velocity":70},"hat:6":{"on":true,"velocity":70}},"cellColour":"FF4F6081","cellOnColour":"FFECBA68","playheadColour":"FFECBA68","gridColour":"660D1014","labelColour":"FFF7F4EC"},
         "Text": {"_children":{"Fill":{"colour":"FFF7F4EC"}}}
@@ -686,7 +696,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1718572545128","controlSetId":"iris","id":"ctrl_1718572545128","controlType":"Label"},
+        "Core": {"name":"Label_1718572545129","controlSetId":"iris","id":"ctrl_1718572545129","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFF7F4EC"},"Font":{"family":"Space Grotesk","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},

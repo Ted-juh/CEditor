@@ -183,11 +183,13 @@ test('a momentary channel is on while held and off once let go', async () => {
 test('a meter comes in as layers: a needle swings, a bar\'s gradient is covered past the reading, segments light', () => {
   const meter = (patch = {}) => createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 125 }, ...patch });
   // Tolex: a needle meter drawn with device parts.
-  const needle = plan([meter()], 'tolex');
+  const m = meter();
+  const needle = plan([m, shown(m, 'value')], 'tolex');
   assert.ok(needle.ok, JSON.stringify(needle.refused));
   const bindings = needle.component._children.Bindings._children;
   assert.ok(Object.keys(bindings).some((name) => /indicatorSwing$/.test(name)), 'the needle swings');
-  assert.equal(bindings.Level_readoutText.source, 'channel.Level.display', 'the readout prints the value');
+  assert.ok(!Object.keys(bindings).some((name) => /readoutText$/.test(name)), 'the meter prints no reading of its own');
+  assert.ok(Object.values(bindings).some((b) => b.source === 'channel.Level.display' && /\.Text\.content$/.test(b.target)), 'its value Label reads the value');
   assert.equal(Object.keys(needle.component._children.HitZones._children).length, 0, 'a meter takes no input');
   // Graphite: a plain bar; the cover runs from the reading to the end.
   const bar = plan([meter({ Transform: { x: 0, y: 0, width: 200, height: 40 } })], 'graphite');
@@ -572,11 +574,12 @@ test('a meter that shows another control\'s value shows it as layers: the knob i
   const cutoff = knob({ Behavior: { min: 0, max: 200, defaultValue: 50, defaultCurrentValue: 50 } });
   const meterOn = (id) => {
     const meter = createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 200, y: 60, width: 200, height: 40 } });
-    Object.assign(meter._children.Meter, { valueSourceId: id, showValue: true });
+    Object.assign(meter._children.Meter, { valueSourceId: id });
     return meter;
   };
   // Both in the selection: the meter's value follows the knob's inside the component.
-  const together = plan([cutoff, meterOn('k1')]);
+  const reading = meterOn('k1');
+  const together = plan([cutoff, reading, shown(reading, 'value')]);
   assert.ok(together.ok, JSON.stringify(together.refused));
   const level = together.component._children.ValueChannels._children.Level;
   assert.equal(level.valueSource, 'channel:Cutoff');
@@ -586,8 +589,8 @@ test('a meter that shows another control\'s value shows it as layers: the knob i
   const fraction = (Number(own.value) - Number(own.valueMin ?? 0)) / (Number(own.valueMax ?? 1) - Number(own.valueMin ?? 0));
   assert.deepEqual([level.min, level.max, level.defaultValue], [0, 200, fraction * 200]);
   const drawn = resolveInteractiveControl(together.component, { customValues: { Cutoff: 150 } }).control._children.Parts._children;
-  const readout = Object.values(drawn).find((part) => part.name.startsWith('Level') && /readout/i.test(part.name));
-  assert.equal(readout?._children?.Text?.content, '150');
+  const readout = Object.values(drawn).find((part) => /value/i.test(part.name) && part._children?.Text);
+  assert.equal(readout?._children?.Text?.content, '150', 'its value Label reads the knob\'s value through the meter');
   // The knob left on the panel: the meter's value names it, and the panel reads it there.
   const panel = { id: 'p', controlSet: { id: 'graphite' }, controlSets: [], controls: [cutoff, meterOn('k1')] };
   const outside = planComponentFromSelection(panel, ['m1'], { set: getControlSet('graphite'), name: 'T', valueControlsAs: 'layers' });

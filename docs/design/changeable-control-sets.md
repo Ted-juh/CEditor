@@ -804,8 +804,16 @@ The owner asked for the text to be separate: a knob is a knob, as a Label is a L
 
 The starters were re-exported with value Labels and attached titles; a panel generated from a
 profile attaches each caption to its control and gives a knob a value Label. The example panels in
-`CE/panels` have no knob of this kind, so there was nothing to convert. Not yet: a meter's reading
-and a button's caption are still drawn by the control.
+`CE/panels` have no knob of this kind, so there was nothing to convert.
+
+**Meters and keys** (the owner chose: meters as the knobs; for buttons, the captions of keys drawn as
+devices only). A meter draws no reading and no caption: its Meter tab's Labels section adds them
+(+ Value printed with its precision, prefix and suffix, + Caption in the author's words). A Label can
+show a control's own **text** (`Text.shows` 'text'), and a control whose text a Label shows prints
+none itself (`textShownOwners`): a key drawn from its parts then gives the caption's room to the
+device, and a flat key its face. The text stays the button's, so scripts and states still set it.
+A flat button's face legend stays its own unless the author asks for a Label; illustrated sets and
+the classic forms print theirs as part of the drawing.
 
 ## Bringing designs in: Photoshop and Blender
 
@@ -1009,3 +1017,9 @@ Taken by the owner, 2026-11-05:
    new comes with none. The Labels tab places a new one by rule; Alt+click selects a control with
    its Labels; the example panels are converted once by a script (there turned out to be nothing
    in them to convert).
+
+Taken by the owner, 2026-11-05 (after the mock-up of meters and keys):
+
+7. **A meter's reading and caption are Labels too, as the knobs'.**
+8. **A key's caption is a Label where the key is drawn as a device; a flat button keeps the text on
+   its face.** It lights up and moves with the key there, and already takes every text setting.

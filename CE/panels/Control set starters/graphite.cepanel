@@ -267,10 +267,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1752752637576.x",
-      "label": "VectorJoystick_1752752637576 X",
-      "controlName": "VectorJoystick_1752752637576",
-      "path": "VectorJoystick_1752752637576.x",
+      "id": "VectorJoystick_1752752637577.x",
+      "label": "VectorJoystick_1752752637577 X",
+      "controlName": "VectorJoystick_1752752637577",
+      "path": "VectorJoystick_1752752637577.x",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -283,10 +283,10 @@
       "deviceParameterId": ""
     },
     {
-      "id": "VectorJoystick_1752752637576.y",
-      "label": "VectorJoystick_1752752637576 Y",
-      "controlName": "VectorJoystick_1752752637576",
-      "path": "VectorJoystick_1752752637576.y",
+      "id": "VectorJoystick_1752752637577.y",
+      "label": "VectorJoystick_1752752637577 Y",
+      "controlName": "VectorJoystick_1752752637577",
+      "path": "VectorJoystick_1752752637577.y",
       "min": 0,
       "max": 1,
       "defaultValue": 0.5,
@@ -582,7 +582,7 @@
     {
       "_children": {
         "Core": {"name":"Meter_1752752637574","controlSetId":"graphite","id":"ctrl_1752752637574","controlType":"Meter"},
-        "Transform": {"x":540,"y":342,"width":312,"height":108},
+        "Transform": {"x":540,"y":342,"width":312,"height":86},
         "Meter": {"value":0.7,"valuePrecision":2},
         "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"}}},
         "Parts": {
@@ -603,7 +603,17 @@
     },
     {
       "_children": {
-        "Core": {"name":"Matrix_1752752637575","controlSetId":"graphite","id":"ctrl_1752752637575","controlType":"Matrix"},
+        "Core": {"name":"Label_1752752637575","controlSetId":"graphite","id":"ctrl_1752752637575","attachedTo":"ctrl_1752752637574","controlType":"Label"},
+        "Transform": {"x":676,"y":430,"width":40,"height":19},
+        "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false}}},
+        "Text": {"content":"","_children":{"Fill":{"colour":"FFF5F5F5"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.9},"Multiline":{"wrapMode":"none"}},"shows":"value"},
+        "ContentLayout": {"paddingLeft":0,"paddingRight":0,"lampColour":"FF5B9BD5","lampOffColour":"FF2C2C2C","lampBezelColour":"66FFFFFF"}
+      },
+      "_type": "Control"
+    },
+    {
+      "_children": {
+        "Core": {"name":"Matrix_1752752637576","controlSetId":"graphite","id":"ctrl_1752752637576","controlType":"Matrix"},
         "Transform": {"x":540,"y":466,"width":166,"height":100},
         "Matrix": {"rows":["LFO","ENV","VEL"],"cols":["OSC","FLT","AMP"],"amounts":[0.6,0,-0.4,0,0.7,0,0,0.4,0.8]},
         "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"}}}
@@ -612,7 +622,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"VectorJoystick_1752752637576","controlSetId":"graphite","id":"ctrl_1752752637576","controlType":"VectorJoystick"},
+        "Core": {"name":"VectorJoystick_1752752637577","controlSetId":"graphite","id":"ctrl_1752752637577","controlType":"VectorJoystick"},
         "Transform": {"x":728,"y":466,"width":124,"height":100},
         "Text": {"_children":{"Fill":{"colour":"FFFFFFFF"}}}
       },
@@ -620,7 +630,7 @@
     },
     {
       "_children": {
-        "Core": {"name":"Label_1752752637577","controlSetId":"graphite","id":"ctrl_1752752637577","controlType":"Label"},
+        "Core": {"name":"Label_1752752637578","controlSetId":"graphite","id":"ctrl_1752752637578","controlType":"Label"},
         "Transform": {"x":26,"y":590,"width":820,"height":26},
         "Background": {"_children":{"Fill":{"colour":"00000000"},"Border":{"enabled":false,"thickness":0}}},
         "Text": {"content":"Copy a control into your panel. Its pinned design travels with it.","_children":{"Fill":{"colour":"FFFFFFFF"},"Font":{"family":"DM Sans","weight":"Bold","weightValue":700,"letterSpacing":0.9}}},

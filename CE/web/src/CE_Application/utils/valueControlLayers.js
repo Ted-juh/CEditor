@@ -1797,8 +1797,16 @@ export function batLampLayers({ name, box, colours, tints, zIndex, opacity = 1, 
   return { layers, on, depth };
 }
 
-/** Where the device frame's units land in the control's box: `{ x, y, scale }`, and the caption. */
-export function deviceFrameIn(width, height, caption, letterSpacing) {
+/**
+ * Where the device frame's units land in the control's box: `{ x, y, scale }`, and the caption.
+ * `bare`: its caption is a Label of its own (editor/ControlAnatomy.svelte captionShown), so the
+ * device's 160 by 80 alone is fitted into the box, as the panel draws it.
+ */
+export function deviceFrameIn(width, height, caption, letterSpacing, bare = false) {
+  if (bare) {
+    const scale = Math.min(width / 160, height / 80);
+    return { x: (width - 160 * scale) / 2, y: (height - 80 * scale) / 2, scale, caption: null, inFrame: true };
+  }
   const lay = buttonAnatomyLayout(width, height, caption, { letterSpacing });
   if (lay) {
     const [x, y, scale] = (/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/.exec(lay.device) ?? [0, 0, 0, 1]).slice(1).map(Number);
@@ -1816,7 +1824,7 @@ export function deviceFrameIn(width, height, caption, letterSpacing) {
  * turns as it says (bindings on the channel, 0 or 1) and takes its lit colour, opacity and legend
  * (`onPatches`, for the state the caller makes). `caption` is the control's text.
  */
-export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName, caption = '', captionText = null }) {
+export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel, prefix, zIndex, uniqueName, caption = '', captionText = null, bare = false }) {
   const geometry = resolved?._children?.Parts?._children ?? {};
   const colours = styled?._children?.Parts?._children ?? geometry;
   const width = Math.max(1, rect.width);
@@ -1825,7 +1833,7 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
   const source = `channel.${channel}.normalized`;
   const font = resolved?._children?.Text?._children?.Font ?? {};
   const spacing = Math.max(0, num(font.letterSpacing, 0));
-  const frame = deviceFrameIn(width, height, caption, spacing);
+  const frame = deviceFrameIn(width, height, caption, spacing, bare);
   const S = frame.scale;
   const at = (fx, fy) => ({ x: frame.x + fx * S, y: frame.y + fy * S });
   const out = { parts: [], bindings: {}, partNames: {}, onPatches: {} };
@@ -1982,8 +1990,9 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
     }
   }
 
-  // The caption: under the device in the frame, or where the box's own layout puts it.
-  const words = String(captionText ?? caption ?? '').trim();
+  // The caption: under the device in the frame, or where the box's own layout puts it; none when it
+  // is a Label of its own.
+  const words = bare ? '' : String(captionText ?? caption ?? '').trim();
   const captionColour = resolved?._children?.Text?._children?.Fill?.colour;
   if (words) {
     const text = deepClone(styled?._children?.Text ?? resolved?._children?.Text ?? SECTION_DEFAULTS.Text);
@@ -2577,14 +2586,8 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     });
   }
 
-  // The readout under the frame, as the meter prints its value.
-  const core = resolved?._children?.Core ?? {};
-  if (core.formShowValue !== false) {
-    const point = at(80, 98);
-    const colour = resolved?._children?.Text?._children?.Fill?.colour ?? 'FF20282C';
-    const layer = add('readout', textLayer('readout', '', point.x, point.y, 10 * S, styled?._children?.Text?._children?.Fill?.colour ?? colour));
-    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
-  }
+  // Its reading is a Label of its own beside it: selected with it, that comes in as a text layer
+  // bound to this channel (customComponentFromControls.js).
   return out;
 }
 
@@ -2807,17 +2810,8 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
     return { x: x - span / 2, y: y - h / 2, width: span, height: h };
   };
 
-  // Padding 4, the label's line and a gap of 3, and the body the rest.
-  const label = String(cfg.label ?? '').trim() && ['above', 'below'].includes(String(cfg.labelPosition ?? 'none')) ? String(cfg.label) : '';
-  const labelSize = fontSize * 0.82;
-  const labelLine = label ? normalLineHeight(family, labelSize) : 0;
-  const above = label && String(cfg.labelPosition) === 'above';
-  const body = {
-    x: 4,
-    y: 4 + (above ? labelLine + 3 : 0),
-    width: Math.max(1, width - 8),
-    height: Math.max(1, height - 8 - (label ? labelLine + 3 : 0)),
-  };
+  // Padding 4, and the body the rest: its caption and reading are Labels of their own.
+  const body = { x: 4, y: 4, width: Math.max(1, width - 8), height: Math.max(1, height - 8) };
 
   const solid = (colour, corners = null) => {
     const background = solidBackground(colour);
@@ -2840,23 +2834,10 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
   if (fill.solidEnabled === true || fill.gradientEnabled === true || fill.imageEnabled === true || border.enabled === true) {
     rectLayer('plate', { x: 0, y: 0, width, height }, deepClone(styled?._children?.Background ?? plate));
   }
-  if (label) {
-    textLayer('label', label, textAt(4 + (width - 8) / 2, (above ? 4 : height - 4 - labelLine) + labelLine / 2, labelSize), labelSize, { opacity: 0.75 });
-  }
-
-  const readoutSize = fontSize * 0.9;
-  const readoutLine = normalLineHeight(family, readoutSize);
-  const readout = (box) => {
-    const layer = textLayer('readout', '', box, readoutSize, { justification: box.justification ?? 'centred', opacity: 0.92, shadow: '99000000' });
-    out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
-  };
   const ticks = cfg.showTicks === true || cfg.showScaleLabels === true ? meterTicks(cfg, cfg.tickCount) : [];
 
   if (arc) {
     plainArcMeterLayers({ cfg, styledCfg, body, width, height, origin, source, out, named, add, depthOf: () => depth, trackColour, zones, segments, ticks, fontSize, textLayer, textAt });
-    if (cfg.showValue === true) {
-      readout(textAt(body.x + body.width / 2, body.y + body.height - 6 - readoutLine / 2, readoutSize));
-    }
     return out;
   }
 
@@ -2976,11 +2957,6 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
       }
       textLayer(`scale${i}`, meterTickLabel(tick, cfg), box, size, { justification: box.justification ?? 'left', opacity: 0.78, shadow: 'CC000000' });
     });
-  }
-  if (cfg.showValue === true) {
-    // At the body's right, 5 px in, across its middle; upright, centred 4 px below its top.
-    if (vertical) readout(textAt(body.x + body.width / 2, body.y + 4 + readoutLine / 2, readoutSize));
-    else readout({ ...textAt(body.x + body.width - 5, body.y + body.height / 2, readoutSize, 'end'), justification: 'right' });
   }
   return out;
 }

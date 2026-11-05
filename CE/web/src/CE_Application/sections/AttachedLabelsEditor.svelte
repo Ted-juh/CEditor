@@ -13,15 +13,26 @@
 
   let { control = null } = $props();
 
-  const WORDS = new Map(LABEL_SHOWS.filter(([key]) => key).map(([key, words]) => [key, words.replace(/ of$/, '')]));
+  const WORDS = new Map([...LABEL_SHOWS.filter(([key]) => key).map(([key, words]) => [key, words.replace(/ of$/, '')]), ['caption', 'Caption']]);
 
   let core = $derived(getSection(control, 'Core'));
   let panelControls = $derived($activePanel?.controls ?? []);
   let attached = $derived(core?.id
     ? flatControls(panelControls).filter((c) => c?._children?.Core?.attachedTo === core.id)
     : []);
-  let ranged = $derived(getSliderValueMode(getSection(control, 'Behavior')) !== 'single');
-  let offered = $derived(['name', 'value', 'min', 'max', 'unit', ...(ranged ? ['start', 'end'] : [])]);
+  // What this control can have a Label show: a knob's or slider's name, value and range (a range's
+  // handles too); a meter's the same, and a caption in its own words; a button's its text (its
+  // caption, which stays the button's) and its name.
+  let type = $derived(String(core?.controlType ?? ''));
+  let isMeter = $derived(type === 'Meter' || type === 'ProgressBar');
+  let isSlider = $derived(!!getSection(control, 'Behavior') && String(getSection(control, 'Behavior')?.family ?? '').toLowerCase() === 'range');
+  let ranged = $derived(isSlider && getSliderValueMode(getSection(control, 'Behavior')) !== 'single');
+  let offered = $derived(isMeter ? ['name', 'value', 'min', 'max', 'unit', 'caption']
+    : isSlider ? ['name', 'value', 'min', 'max', 'unit', ...(ranged ? ['start', 'end'] : [])]
+      : ['text', 'name']);
+  const addLabel = (shows) => (shows === 'caption'
+    ? addAttachedLabel(core.id, '', { content: String(getSection(control, 'Meter')?.label ?? '').trim() || 'Caption' })
+    : addAttachedLabel(core.id, shows));
 
   const shownWords = (label) => {
     const text = authoredShownText(label, panelControls);
@@ -44,13 +55,14 @@
     <PropertyCell label="Add" span={4} hint="A Label showing this, placed beside the control and attached to it.">
       <div class="add-row">
         {#each offered as shows (shows)}
-          <button class="add-btn" type="button" onclick={() => addAttachedLabel(core.id, shows)}>+ {WORDS.get(shows)}</button>
+          <button class="add-btn" type="button" onclick={() => addLabel(shows)}>+ {WORDS.get(shows)}</button>
         {/each}
       </div>
     </PropertyCell>
     <p class="attached-note">
       Each is a Label of its own: select it to style it with every text property. It moves, copies and
-      deletes with this control, and Alt+click selects the control with its Labels.
+      deletes with this control, and Alt+click selects the control with its Labels.{#if !isMeter && !isSlider}
+      A Label showing its text prints it in place of the control.{/if}
     </p>
   </PropertySection>
 {/if}

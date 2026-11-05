@@ -84,7 +84,7 @@
   import { fileCache, loadFile } from '../stores/fileCache.js';
   import { findAlignmentSnap, computeDistances, snapMovingRect, snapResizeRect } from '../utils/canvasSnapping.js';
   import { framedGuides, hasSelectedAncestor, multiDragPatches, toPanelDistances, toPanelGuides } from '../utils/canvasDragFrame.js';
-  import { attachedFollowers, withAttached } from '../utils/attachedLabels.js';
+  import { attachedFollowers, textShownOwners, withAttached } from '../utils/attachedLabels.js';
   import { setActivePanelSnapGuides, clearActivePanelSnapGuides } from '../stores/panelSnapGuides.js';
   import { buildBlendCSS, buildFilterCSS } from '../utils/effectsCSS.js';
   import { hasBackgroundEffects } from '../utils/surfaceEffects.js';
@@ -2175,7 +2175,12 @@
   let lastTextSet = null;
   let textSet = $derived(lastTextSet = resolveTextSettings(textFont, textPosition, textMultiline, lastTextSet));
   let textFillMode = $derived(normalizeFillMode(textFill?.mode));
+  // A Label of its own shows this control's text (a button's caption, utils/attachedLabels.js): the
+  // control prints none, on its face or beside its key, so a set that draws it the other way never
+  // doubles or loses it.
+  let captionShownByLabel = $derived(String(core?.controlType ?? '') !== 'Label' && textShownOwners(panelControls).has(core?.id));
   let rawTextContent = $derived.by(() => {
+    if (captionShownByLabel) return '';
     const isSelectorFace = buttonType === 'cyclic' || buttonType === 'combobox';
     if (isSelectorFace && interactionRuntime?.signals?.valueDisplay !== undefined) {
       return String(interactionRuntime.signals.valueDisplay ?? '');
@@ -3260,7 +3265,7 @@
   {/if}
   <div bind:this={controlContentElement} class="control-content" class:absorbs-fill={!hasAnatomy && !!absorbedFillCSS} style="{filterCSS} {hasAnatomy ? '' : (absorbedFillCSS ?? '')}">
     {#if hasAnatomy}
-      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} />
+      <ControlAnatomy control={renderControl} runtime={interactionRuntime} width={displayW} height={displayH} checked={interactionRuntime ? lampLit : behavior?.defaultValue === true} label={rawTextContent} captionShown={captionShownByLabel} />
     {/if}
     {#if background && !separateBackground && !hasAnatomy}
       <BackgroundRenderer {background} width={displayW} height={displayH} absorbFill={!!absorbedFillCSS} />

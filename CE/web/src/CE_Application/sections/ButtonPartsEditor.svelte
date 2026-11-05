@@ -22,6 +22,7 @@
   import Zap from 'lucide-svelte/icons/zap';
   import Type from 'lucide-svelte/icons/type';
   import { getSection, updateControlProperty, updateSelectedProperty, applyControlPatch, applySelectedPatch } from '../stores/controls.js';
+  import AttachedLabelsEditor from './AttachedLabelsEditor.svelte';
   import { selectedComponentIds } from '../stores/panels.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet } from '../stores/controlSets.js';
@@ -128,6 +129,10 @@
   const percent = (value, fallback = 1) => Math.round(numberOr(value, fallback) * 100);
   const fraction = (value) => Math.max(0, Math.min(100, Number(value) || 0)) / 100;
 </script>
+
+{#if $selectedComponentIds.size <= 1}
+  <AttachedLabelsEditor {control} />
+{/if}
 
 <div class="button-parts" class:dimmed={illustrated}>
   {#if illustrated}
