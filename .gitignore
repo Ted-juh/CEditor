@@ -49,3 +49,7 @@
 .vscode
 .DS_Store
 build-installer.log
+
+# Python bytecode (the Blender add-on and its test, run from the checkout)
+__pycache__/
+*.pyc
