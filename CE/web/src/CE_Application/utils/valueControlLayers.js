@@ -2028,40 +2028,16 @@ export function figureLengths(min, max, precision) {
   return [...lengths].sort((a, b) => a - b);
 }
 
-/** Why a meter drawn with device parts cannot become layers, or ''. */
+/**
+ * Why a meter drawn with device parts cannot become layers, or ''. Nothing such a meter draws is
+ * refused now: counter digits (still, filling or lighting), shadows, a legend that shows the reading,
+ * a fill in a pattern or a shape, the held peak and a clip lamp; coloured by the meter's zones by
+ * position (each lit cell, each scale mark, a fill along its length, in any shape, outlined or not)
+ * or by the reading's zone (a copy of its paint for each zone, stepped or blended, lit or see-through:
+ * zoneLevelCopies). Kept as the place a new setting that layers cannot draw is named.
+ */
 export function meterDeviceLayersRefusal(resolved) {
-  const meter = resolved?._children?.Meter ?? {};
-  const parts = resolved?._children?.Parts?._children ?? {};
-  for (const name of METER_DEVICE_PARTS) {
-    const part = parts[name];
-    if (part?.visible !== true) continue;
-    const motion = String(part.motion ?? 'none');
-    const pattern = String(part.pattern ?? 'solid');
-    // Counter digits, shadows, a legend that shows the reading and a fill in a pattern or a shape are
-    // layers now (meterDeviceLayers).
-    if (pattern === 'digits' && (motion === 'fill' || motion === 'light')) return `counter digits that ${motion === 'fill' ? 'fill' : 'light'}, which a layer does not draw yet`;
-    // Coloured by the meter's zones: by position, each lit cell, each scale mark and a plain fill along
-    // its length; by the reading's zone, a copy of its paint for each zone (zoneLevelCopies).
-    const zoneMode = String(part.zoneColours ?? 'off');
-    if (zoneMode !== 'off') {
-      const scaled = pattern === 'ticks' || pattern === 'arc';
-      const byLevel = zoneMode === 'level' || (zoneMode === 'position' && !scaled && motion !== 'fill' && motion !== 'light');
-      const shaped = !['rect', 'ellipse'].includes(String(part.shape ?? 'rect'));
-      const outlined = part?._children?.Background?._children?.Border?.enabled === true && num(part?._children?.Background?._children?.Border?.thickness, 0) > 0;
-      if (zoneMode === 'position' && motion === 'fill' && (shaped || (pattern !== 'solid' && outlined))) {
-        return `its ${name} filled in the zones' colours in cells shaped other than a rectangle or an ellipse, or outlined, which a layer does not draw yet`;
-      }
-      if (byLevel && pattern === 'digits') return `its ${name}'s counter windows coloured by the reading's zone, which a layer does not draw yet`;
-      if (byLevel && meter.gradient !== false && (motion === 'light' || motion === 'clip')) {
-        return `its ${name} lit in the reading's zone colour, blended between zones, which a layer does not draw yet`;
-      }
-      if (byLevel && meter.gradient !== false && num(part.opacity, 1) < 1) {
-        return `its ${name} in the reading's zone colour, blended between zones and see-through, which a layer does not draw yet`;
-      }
-    }
-    // A part that follows the held peak, and a clip lamp, read the peak the component's value holds
-    // (`channel.<name>.peak`).
-  }
+  void resolved;
   return '';
 }
 
@@ -2160,8 +2136,36 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
   // Parts the meter's zones colour by the reading (`zoneColours` 'level'; 'position' on a part with no
   // positions of its own): their layers, given a copy for each zone after the parts are drawn.
   const zoneMarks = [];
+  // Counter cells that fill or light (pattern 'digits'): one cell to a figure of the reading, so for
+  // each count of figures the reading can have, the part laid out as that many columns, drawn as a
+  // fill or a ladder is, its layers shown only while the reading has that many (`lengthGate`).
+  const precision = Math.max(0, Math.min(3, Math.round(num(meter.valuePrecision, 0))));
+  const entries = [];
   for (const name of drawn) {
     const part = geometry[name];
+    const motion = String(part.motion ?? 'none');
+    if (name !== 'legend' && String(part.pattern ?? 'solid') === 'digits' && (motion === 'fill' || motion === 'light')) {
+      const lengths = figureLengths(num(meter.valueMin, 0), num(meter.valueMax, 1), precision);
+      for (const length of lengths) {
+        entries.push({
+          name, label: lengths.length > 1 ? `${name}${length}fig` : name,
+          part: { ...part, pattern: 'columns', patternCount: length, cellWidth: part.cellWidth ?? 92 },
+          lengthGate: lengths.length > 1 ? { length, precision } : null,
+        });
+      }
+      continue;
+    }
+    entries.push({ name, part, lengthGate: null });
+  }
+  // The layers each such entry adds carry its gate, so the zones' copies of them carry it too.
+  let gated = null;
+  const closeGate = () => {
+    if (gated) for (const layer of out.parts.slice(gated.from)) layer.meta = { ...(layer.meta ?? {}), lengthGate: gated.gate };
+    gated = null;
+  };
+  for (const { name, label = name, part, lengthGate } of entries) {
+    closeGate();
+    if (lengthGate) gated = { from: out.parts.length, gate: lengthGate };
     const styledPart = colours[name] ?? part;
     const motion = String(part.motion ?? 'none');
     const opacity = num(part.opacity, 1);
@@ -2259,14 +2263,12 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
           .filter(Boolean)
           .join(' ');
         if (!d) continue;
-        for (const layer of pathLayers(`${name}${lengths.length > 1 ? length : ''}`, d, box, background, { opacity, bw, pivot, rotation: restTurn })) {
+        for (const [k, layer] of pathLayers(`${label}${lengths.length > 1 ? length : ''}`, d, box, background, { opacity, bw, pivot, rotation: restTurn }).entries()) {
           add(name, layer);
-          if (lengths.length > 1) {
-            out.bindings[`${layer.name}Shown`] = {
-              _type: 'Binding', name: `${layer.name}Shown`, enabled: true, mapMode: 'figures', source: `channel.${channel}.raw`,
-              target: `Parts.${layer.name}.opacity`, precision, length, outputMin: 0, outputMax: opacity,
-            };
-          }
+          // Shown only while the reading has that many figures (the gate after the zones' copies).
+          if (lengths.length > 1) layer.meta = { ...(layer.meta ?? {}), lengthGate: { length, precision } };
+          // Coloured by the reading's zone, its windows (not their outline) take the zone's colour.
+          if (k === 0) mark.paint.push({ layer, opacity });
         }
       }
       continue;
@@ -2296,11 +2298,11 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         const litBox = { ...cellBox, x: cellBox.x + offset.x, y: cellBox.y + offset.y };
         const litD = deviceShapePath(part.shape, litBox.x, litBox.y, litBox.w, litBox.h, deviceShapeOptions(part, radius));
         // A cell is lit when its level (its index over the count) is at or under the reading.
-        for (const plain of pathLayers(`${name}${i}`, d, cellBox, base.background, { opacity, bw: base.bw })) {
+        for (const plain of pathLayers(`${label}${i}`, d, cellBox, base.background, { opacity, bw: base.bw })) {
           add(name, plain);
           out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, partSource, `Parts.${plain.name}.opacity`, opacity, 0, t - 0.0005, t);
         }
-        for (const [k, lighted] of pathLayers(`${name}${i}lit`, litD, litBox, lit.background, { opacity: 0, bw: lit.bw }).entries()) {
+        for (const [k, lighted] of pathLayers(`${label}${i}lit`, litD, litBox, lit.background, { opacity: 0, bw: lit.bw }).entries()) {
           add(name, lighted);
           out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, partSource, `Parts.${lighted.name}.opacity`, 0, litOpacity, t - 0.0005, t);
           if (k === 0) mark.paint.push({ layer: lighted, gate: t, opacity: litOpacity });
@@ -2334,10 +2336,10 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         let layer;
         if (rect) {
           cellBackground._children.Corners.radius = r3(radius * S);
-          layer = createPartNode(named(`${name}${i}`), { role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(end, origin), sections: { Background: cellBackground } });
+          layer = createPartNode(named(`${label}${i}`), { role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(end, origin), sections: { Background: cellBackground } });
         } else {
           const d = deviceShapePath(part.shape, 0, 0, cell.w, cell.h, deviceShapeOptions(part, radius));
-          layer = createPartNode(named(`${name}${i}`), {
+          layer = createPartNode(named(`${label}${i}`), {
             role: 'fill', kind: 'path', zIndex: depth, opacity, layout: pxBox(end, origin),
             meta: { pathData: scalePathData(d, 1 / Math.max(0.001, cell.w), 1 / Math.max(0.001, cell.h)), closed: true }, sections: { Background: cellBackground },
           });
@@ -2378,35 +2380,52 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       });
       const painted = solidBackground(zones[0]?.colour ?? 'FF39D98A');
       Object.assign(painted._children.Fill, { gradientEnabled: true, gradient: { type: 'linear', angle: { left: 90, right: 270, bottom: 0, top: 180 }[from] ?? 90, stops } });
-      const maskSrc = cellMaskSrc(String(part.shape ?? 'rect'), num(part?._children?.Background?._children?.Corners?.radius, 0) * S);
+      const shapeName = String(part.shape ?? 'rect');
+      const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
+      // The mask of a cell's shape: a rectangle's corner stays in pixels, an ellipse fills its box,
+      // any other shape is its outline stretched to the cell, as a patterned fill's cells stretch.
+      const maskOf = (cell) => (shapeName === 'rect' || shapeName === 'ellipse'
+        ? cellMaskSrc(shapeName, radius * S)
+        : pathMaskSrc(deviceShapePath(part.shape, 0, 0, cell.w, cell.h, deviceShapeOptions(part, radius)), cell.w, cell.h));
       const percent = (cell) => ({ x: ((cell.x - box.x) / box.w) * 100, y: ((cell.y - box.y) / box.h) * 100, width: (cell.w / box.w) * 100, height: (cell.h / box.h) * 100 });
+      // Where each cell starts: cells move and grow straight with the area (devicePatternCells).
+      const startOf = (cell, i) => ({ x: 2 * half[i].x - cell.x, y: 2 * half[i].y - cell.y, w: Math.max(0, 2 * half[i].w - cell.w), h: Math.max(0, 2 * half[i].h - cell.h) });
       full.forEach((cell, i) => {
-        // Where the cell starts: cells move and grow straight with the area (devicePatternCells).
-        const start = { x: 2 * half[i].x - cell.x, y: 2 * half[i].y - cell.y, w: Math.max(0, 2 * half[i].w - cell.w), h: Math.max(0, 2 * half[i].h - cell.h) };
         const end = percent(cell);
-        const begin = percent(start);
-        const layer = add(name, createPartNode(named(full.length > 1 ? `${name}${i}` : name), {
+        const begin = percent(startOf(cell, i));
+        const layer = add(name, createPartNode(named(full.length > 1 ? `${label}${i}` : label), {
           role: 'fill', kind: 'rectangle', zIndex: depth, opacity, layout: pxBox(exact, origin), sections: { Background: deepClone(painted) },
         }));
-        layer.mask = { enabled: true, src: maskSrc, x: r3(end.x), y: r3(end.y), width: r3(end.width), height: r3(end.height), invert: false, linked: true };
+        layer.mask = { enabled: true, src: maskOf(cell), x: r3(end.x), y: r3(end.y), width: r3(end.width), height: r3(end.height), invert: false, linked: true };
         for (const key of ['x', 'y', 'width', 'height']) {
           if (Math.abs(begin[key] - end[key]) > 1e-6) out.bindings[`${layer.name}Mask${key}`] = rangeBinding(`${layer.name}Mask${key}`, partSource, `Parts.${layer.name}.mask.${key}`, begin[key], end[key]);
         }
       });
+      // Its outline, where it has one: each cell's, over the fill, growing with the cell as a
+      // patterned fill's cells do.
       if (bw > 0) {
-        const along = from === 'left' || from === 'right' ? 'width' : 'height';
-        const edge = add(name, createPartNode(named(`${name}Edge`), {
-          role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity,
-          layout: pxBox({ x: exact.x - bw / 2, y: exact.y - bw / 2, width: exact.width + bw, height: exact.height + bw }, origin),
-          sections: { Background: edgeBackground(background, bw) },
-        }));
-        edge._children.Background._children.Corners.radius = r3(num(part?._children?.Background?._children?.Corners?.radius, 0) * S);
-        const length = edge._children.Layout[along];
-        out.bindings[`${edge.name}Grow`] = rangeBinding(`${edge.name}Grow`, partSource, `Parts.${edge.name}.Layout.${along}`, bw, length);
-        if (from === 'right' || from === 'bottom') {
-          const key = from === 'right' ? 'x' : 'y';
-          out.bindings[`${edge.name}Edge`] = rangeBinding(`${edge.name}Edge`, partSource, `Parts.${edge.name}.Layout.${key}`, edge._children.Layout[key] + length - bw, edge._children.Layout[key]);
-        }
+        const edgeOnly = edgeBackground(background, bw);
+        const pxOf = (c) => { const p = at(c.x, c.y); return { x: p.x - bw / 2, y: p.y - bw / 2, width: c.w * S + bw, height: c.h * S + bw }; };
+        full.forEach((cell, i) => {
+          const end = pxOf(cell);
+          const begin = pxOf(startOf(cell, i));
+          const edgeName = named(full.length > 1 ? `${label}${i}Edge` : `${label}Edge`);
+          let edge;
+          if (shapeName === 'rect') {
+            edge = createPartNode(edgeName, { role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(end, origin), sections: { Background: deepClone(edgeOnly) } });
+            edge._children.Background._children.Corners.radius = r3(radius * S);
+          } else {
+            const d = deviceShapePath(part.shape, 0, 0, cell.w, cell.h, deviceShapeOptions(part, radius));
+            edge = createPartNode(edgeName, {
+              role: 'fill', kind: 'path', zIndex: depth, opacity, layout: pxBox(end, origin),
+              meta: { pathData: scalePathData(d, 1 / Math.max(0.001, cell.w), 1 / Math.max(0.001, cell.h)), closed: true }, sections: { Background: deepClone(edgeOnly) },
+            });
+          }
+          add(name, edge);
+          for (const [key, a, b] of [['x', begin.x + origin.x, end.x + origin.x], ['y', begin.y + origin.y, end.y + origin.y], ['width', begin.width, end.width], ['height', begin.height, end.height]]) {
+            if (Math.abs(a - b) > 1e-6) out.bindings[`${edge.name}${key}`] = rangeBinding(`${edge.name}${key}`, partSource, `Parts.${edge.name}.Layout.${key}`, a, b);
+          }
+        });
       }
       continue;
     }
@@ -2446,7 +2465,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
           add(name, plain);
           out.bindings[`${plain.name}Dim`] = rangeBinding(`${plain.name}Dim`, partSource, `Parts.${plain.name}.opacity`, opacity, 0, clipFrom - 0.0005, clipFrom);
         }
-        for (const [k, lighted] of (renderable ? [renderedOf(`${name}Lit`, litColour, 0)] : pathLayers(`${name}Lit`, d, box, lit.background, { opacity: 0, bw: lit.bw, pivot, rotation: restTurn })).entries()) {
+        for (const [k, lighted] of (renderable ? [renderedOf(`${label}Lit`, litColour, 0)] : pathLayers(`${label}Lit`, d, box, lit.background, { opacity: 0, bw: lit.bw, pivot, rotation: restTurn })).entries()) {
           add(name, lighted);
           out.bindings[`${lighted.name}Lit`] = rangeBinding(`${lighted.name}Lit`, partSource, `Parts.${lighted.name}.opacity`, 0, litOpacity, clipFrom - 0.0005, clipFrom);
           if (k === 0) mark.paint.push({ layer: lighted, gate: clipFrom, opacity: litOpacity });
@@ -2473,7 +2492,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     const baseD = rest.paths.filter((path) => path.role === 'base' && !path.colour).map((path) => path.d).filter(Boolean).join(' ');
     const shadows = [];
     if (!renderable && baseD && (shadowDy > 0 || shadowBlur > 0)) {
-      for (const layer of pathLayers(`${name}Shadow`, translatePathData(baseD, 0, shadowDy), { ...box, y: box.y + shadowDy }, solidBackground(String(styledPart.shadowColour ?? part.shadowColour ?? '') || '99000000'), { opacity: 1, pivot, rotation: restTurn })) {
+      for (const layer of pathLayers(`${label}Shadow`, translatePathData(baseD, 0, shadowDy), { ...box, y: box.y + shadowDy }, solidBackground(String(styledPart.shadowColour ?? part.shadowColour ?? '') || '99000000'), { opacity: 1, pivot, rotation: restTurn })) {
         shadows.push(blurred(layer, (shadowBlur / 2) * S));
       }
     }
@@ -2483,13 +2502,13 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       standing.push(...shadows, ...(renderable ? [renderedOf(name, fill.colour, opacity)] : pathLayers(name, d, box, background, { opacity, bw, pivot, rotation: restTurn })));
     }
     colouredGroups.forEach((group, i) => {
-      const [layer] = pathLayers(`${name}Colour${colouredGroups.length > 1 ? i : ''}`, group.d, box, solidBackground(group.colour), { opacity, pivot, rotation: restTurn });
+      const [layer] = pathLayers(`${label}Colour${colouredGroups.length > 1 ? i : ''}`, group.d, box, solidBackground(group.colour), { opacity, pivot, rotation: restTurn });
       standing.push(layer);
       mark.paint.push({ layer, opacity });
     });
     if (pastZoneD) {
       const litColour = String(styledPart.activeColour ?? part.activeColour ?? '').trim() || fill.colour;
-      standing.push(...pathLayers(`${name}Zone`, pastZoneD, box, solidBackground(litColour ?? 'FFFF3030'), { opacity, pivot, rotation: restTurn }));
+      standing.push(...pathLayers(`${label}Zone`, pastZoneD, box, solidBackground(litColour ?? 'FFFF3030'), { opacity, pivot, rotation: restTurn }));
     }
     if (standing.length) {
       for (const layer of standing) {
@@ -2508,13 +2527,28 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
     }
     for (const [i, label] of rest.labels.entries()) {
       const point = at(label.x, label.y);
-      add(name, textLayer(`${name}Numeral${i}`, label.text, point.x, point.y, label.size * S, textColour, {
+      add(name, textLayer(`${label}Numeral${i}`, label.text, point.x, point.y, label.size * S, textColour, {
         anchor: label.anchor ?? 'middle', baseline: 'central', family: String(part.fontFamily ?? '').trim(), opacity,
       }));
     }
   }
 
+  closeGate();
+
   zoneLevelCopies(out, zoneMarks, meter, uniqueName);
+
+  // A layer drawn for one count of figures shows only while the reading has that many: a Counter
+  // Figures binding, applied last, adds nothing to its opacity while it has, and takes 1 off it while
+  // it has not, which no opacity outlives.
+  for (const layer of out.parts) {
+    const gate = layer.meta?.lengthGate;
+    if (!gate) continue;
+    delete layer.meta.lengthGate;
+    out.bindings[`${layer.name}Figures`] = addingBinding({
+      _type: 'Binding', name: `${layer.name}Figures`, enabled: true, mapMode: 'figures', source: `channel.${channel}.raw`,
+      target: `Parts.${layer.name}.opacity`, precision: gate.precision, length: gate.length, outputMin: -1, outputMax: 0,
+    });
+  }
 
   // The readout under the frame, as the meter prints its value.
   const core = resolved?._children?.Core ?? {};
@@ -2539,13 +2573,22 @@ function cellMaskSrc(shape, radius) {
   return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%'>${body}</svg>`)}`;
 }
 
+/** A mask picture of `d`, drawn in a `w` by `h` box, stretched to whatever size the mask is. */
+function pathMaskSrc(d, w, h) {
+  if (!d) return REVEAL_ALL_MASK_SRC;
+  const body = `<path d='${d}' fill='#fff' fill-rule='evenodd'/>`;
+  return `data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='100%' height='100%' viewBox='0 0 ${r3(w)} ${r3(h)}' preserveAspectRatio='none'>${body}</svg>`)}`;
+}
+
 /**
  * A meter part coloured by the reading's zone (`zoneColours` 'level'): each layer whose paint the zone
  * decides becomes a copy in each zone's colour. Stepped zones: the copy shows while the reading is in
  * its zone (and, for a lit cell or a clip lamp, at or past its own level), so one shows at a time.
  * Blended: the copies stand in order, each fading in across the span from the zone before it to its
- * own, which composites to the meter's blend of the two colours (meterFillColourAt), an opaque part
- * being the only kind that refusal lets through.
+ * own, which composites to the meter's blend of the two colours (meterFillColourAt). An opaque copy
+ * hides those under it; a see-through one does not, so each copy also fades out under the next as
+ * that one fades in, at the rate that leaves the two weighed as the blend weighs them (zoneFadeUnder).
+ * A lit cell or a clip lamp, blended, keeps its copies hidden until the reading reaches its level.
  */
 function zoneLevelCopies(out, marks, meter, uniqueName) {
   const zones = meterZones(meter);
@@ -2556,13 +2599,15 @@ function zoneLevelCopies(out, marks, meter, uniqueName) {
       const index = out.parts.indexOf(layer);
       if (index < 0) continue;
       const own = Object.entries(out.bindings).filter(([, binding]) => String(binding?.target ?? '').startsWith(`Parts.${layer.name}.`));
-      // A lit layer's own lighting gives way to the zones' bands, which start no lower than its level.
+      // A lit layer's own lighting gives way to the zones' bands, which start no lower than its level,
+      // or, blended, to the gate at its level.
       if (gate != null) for (const [key, binding] of own) if (binding.target === `Parts.${layer.name}.opacity`) delete out.bindings[key];
+      const seeThrough = opacity < 1;
       const copies = [];
       zones.forEach((zone, k) => {
-        const lo = stepped || gate != null ? Math.max(zone.from, gate ?? 0) : (k === 0 ? 0 : zones[k - 1].from);
+        const lo = stepped ? Math.max(zone.from, gate ?? 0) : (k === 0 ? 0 : zones[k - 1].from);
         const hi = zones[k + 1]?.from ?? 1.0001;
-        if ((stepped || gate != null) && lo >= hi) return;
+        if (stepped && lo >= hi) return;
         const copy = k === 0 ? layer : deepClone(layer);
         if (k > 0) copy.name = uniqueName(`${layer.name}Zone${k}`);
         const paint = copy._children.Text ? copy._children.Text._children.Fill : copy._children.Background._children.Fill;
@@ -2575,12 +2620,23 @@ function zoneLevelCopies(out, marks, meter, uniqueName) {
           }
         }
         const target = `Parts.${copy.name}.opacity`;
-        if (stepped || gate != null) {
+        if (stepped) {
           copy.opacity = 0;
           out.bindings[`${copy.name}InZone`] = { ...rangeBinding(`${copy.name}InZone`, mark.source, target, 0, opacity, lo, hi), band: true };
-        } else if (k > 0) {
-          copy.opacity = 0;
-          out.bindings[`${copy.name}Blend`] = rangeBinding(`${copy.name}Blend`, mark.source, target, 0, opacity, lo, zone.from);
+        } else {
+          const under = seeThrough && zones[k + 1] != null && zones[k + 1].from > zone.from;
+          // What the bindings that add to it start from: the first copy, its opacity; each other,
+          // fading in over the span before its zone.
+          if (k > 0) {
+            copy.opacity = 0;
+            out.bindings[`${copy.name}Blend`] = rangeBinding(`${copy.name}Blend`, mark.source, target, 0, opacity, lo, zone.from);
+          } else if (gate != null || under) {
+            copy.opacity = opacity;
+            out.bindings[`${copy.name}Zone`] = rangeBinding(`${copy.name}Zone`, mark.source, target, opacity, opacity, 0, 1);
+          }
+          if (under) zoneFadeUnder(out, copy.name, mark.source, opacity, zone.from, zones[k + 1].from);
+          // Lit at its level: nothing of it shows below.
+          if (gate != null) out.bindings[`${copy.name}Gate`] = addingBinding(rangeBinding(`${copy.name}Gate`, mark.source, target, -1, 0, gate - 0.0005, gate));
         }
         copies.push(copy);
       });
@@ -2589,6 +2645,25 @@ function zoneLevelCopies(out, marks, meter, uniqueName) {
       const named = out.partNames[mark.name] ?? [];
       out.partNames[mark.name] = [...named, ...copies.filter((copy) => copy !== layer).map((copy) => copy.name)];
     }
+  }
+}
+
+/**
+ * A see-through zone copy (opacity `alpha`) fading out from `from` to `to` while the next one fades in
+ * over it. With the next at alpha·s (s the share of the way), this one at alpha·(1 - s) / (1 - alpha·s)
+ * leaves the pair as opaque as the part and weighed (1 - s) to s, as the meter blends the colours.
+ * That curve, as adding bindings: straight pieces between points spaced evenly in opacity, more of
+ * them the more opaque the part, so no colour strays more than about 2 % of the way between the zones'.
+ */
+function zoneFadeUnder(out, layerName, source, alpha, from, to) {
+  const pieces = alpha <= 0.5 ? 4 : (alpha <= 0.8 ? 6 : 8);
+  const shareAt = (a) => (alpha - a) / (alpha * (1 - a));
+  let previous = from;
+  for (let i = 1; i <= pieces; i += 1) {
+    const next = from + (to - from) * shareAt(alpha * (1 - i / pieces));
+    const name = `${layerName}Under${i}`;
+    out.bindings[name] = addingBinding(rangeBinding(name, source, `Parts.${layerName}.opacity`, 0, -alpha / pieces, previous, next));
+    previous = next;
   }
 }
 
@@ -2628,14 +2703,12 @@ function edgeBackground(background, bw) {
 
 // --- plain meters ----------------------------------------------------------------------------------
 
-/** Why a plain meter (editor/MeterRenderer.svelte: a bar, segments or an arc) cannot become layers, or ''. */
+/**
+ * Why a plain meter (editor/MeterRenderer.svelte: a bar, segments or an arc) cannot become layers, or
+ * ''. Nothing is refused now; a bar on a track you can see through shows its fill through a mask.
+ */
 export function plainMeterLayersRefusal(resolved) {
-  const cfg = resolved?._children?.Meter ?? {};
-  // A bar's fill shows up to the reading under a cover in the track's colour, which only hides the
-  // fill if nothing shows through it. Segments and an arc draw their fill over the track instead.
-  const track = String(cfg.trackColour ?? 'FF141414');
-  const bar = String(cfg.orientation ?? 'horizontal') !== 'arc' && Math.round(num(cfg.segments, 0)) <= 0;
-  if (bar && /^[0-9a-f]{8}$/i.test(track) && track.slice(0, 2).toUpperCase() !== 'FF') return 'a track you can see through';
+  void resolved;
   return '';
 }
 
@@ -2650,7 +2723,7 @@ function textColourOf(raw, fallback = 'E6DCDCDC') {
  * or below, as tall as one line of its text) and its body, 3 apart. In the body, for a bar, the
  * track, the zones' gradient over the whole track, and over that, from the reading to the end, a
  * cover in the track's colour, so the gradient shows up to the reading and stays where the panel
- * draws it; for segments, each segment plain until the reading reaches its middle, then lit in its
+ * draws it (on a track you can see through, a mask that reveals it up to the reading); for segments, each segment plain until the reading reaches its middle, then lit in its
  * zone's colour; and the ticks, the scale's labels and the readout. An arc is the meter's SVG fitted
  * to the body: the track, the fill as one arc in the zones' colours whose sweep is the reading (or
  * its segments), the ticks, the labels round it and the readout under it.
@@ -2805,22 +2878,35 @@ export function plainMeterLayers({ resolved, styled = resolved, rect, channel, p
       gradientBackground._children.Fill.gradientEnabled = true;
       gradientBackground._children.Fill.gradient = { type: 'linear', angle: vertical ? 0 : 90, stops };
     }
-    rectLayer('fill', track, gradientBackground);
-    // The cover: from the reading to the end of the track, square where the reading is.
-    const cover = vertical
-      ? rectLayer('cover', track, solid(trackColour, { topLeft: radius, topRight: radius, bottomLeft: 0, bottomRight: 0 }))
-      : rectLayer('cover', track, solid(trackColour, { topLeft: 0, bottomLeft: 0, topRight: radius, bottomRight: radius }));
-    const name = cover.name;
-    if (vertical) {
-      out.bindings[`${name}Height`] = rangeBinding(`${name}Height`, source, `Parts.${name}.Layout.height`, track.height, 0);
+    const fillLayer = rectLayer('fill', track, gradientBackground);
+    if (/^[0-9a-f]{8}$/i.test(String(trackColour)) && String(trackColour).slice(0, 2).toUpperCase() !== 'FF') {
+      // A track you can see through would show a cover over the fill, so the fill shows only as far
+      // as the reading through a mask instead, square at the reading, as the renderer's clip shows it.
+      const fillName = fillLayer.name;
+      fillLayer.mask = { enabled: true, src: REVEAL_ALL_MASK_SRC, x: 0, y: vertical ? 100 : 0, width: vertical ? 100 : 0, height: vertical ? 0 : 100, invert: false, linked: true };
+      if (vertical) {
+        out.bindings[`${fillName}MaskY`] = rangeBinding(`${fillName}MaskY`, source, `Parts.${fillName}.mask.y`, 100, 0);
+        out.bindings[`${fillName}MaskHeight`] = rangeBinding(`${fillName}MaskHeight`, source, `Parts.${fillName}.mask.height`, 0, 100);
+      } else {
+        out.bindings[`${fillName}MaskWidth`] = rangeBinding(`${fillName}MaskWidth`, source, `Parts.${fillName}.mask.width`, 0, 100);
+      }
     } else {
-      out.bindings[`${name}Edge`] = rangeBinding(`${name}Edge`, source, `Parts.${name}.Layout.x`, cover._children.Layout.x, cover._children.Layout.x + track.width);
-      out.bindings[`${name}Width`] = rangeBinding(`${name}Width`, source, `Parts.${name}.Layout.width`, track.width, 0);
-    }
-    // At no reading the cover is the whole track, rounded where the track is.
-    const near = vertical ? ['bottomLeft', 'bottomRight'] : ['topLeft', 'bottomLeft'];
-    for (const corner of near) {
-      out.bindings[`${name}${corner}`] = rangeBinding(`${name}${corner}`, source, `Parts.${name}.Background.Corners.${corner}.radius`, radius, 0, 0, 0.0005);
+      // The cover: from the reading to the end of the track, square where the reading is.
+      const cover = vertical
+        ? rectLayer('cover', track, solid(trackColour, { topLeft: radius, topRight: radius, bottomLeft: 0, bottomRight: 0 }))
+        : rectLayer('cover', track, solid(trackColour, { topLeft: 0, bottomLeft: 0, topRight: radius, bottomRight: radius }));
+      const name = cover.name;
+      if (vertical) {
+        out.bindings[`${name}Height`] = rangeBinding(`${name}Height`, source, `Parts.${name}.Layout.height`, track.height, 0);
+      } else {
+        out.bindings[`${name}Edge`] = rangeBinding(`${name}Edge`, source, `Parts.${name}.Layout.x`, cover._children.Layout.x, cover._children.Layout.x + track.width);
+        out.bindings[`${name}Width`] = rangeBinding(`${name}Width`, source, `Parts.${name}.Layout.width`, track.width, 0);
+      }
+      // At no reading the cover is the whole track, rounded where the track is.
+      const near = vertical ? ['bottomLeft', 'bottomRight'] : ['topLeft', 'bottomLeft'];
+      for (const corner of near) {
+        out.bindings[`${name}${corner}`] = rangeBinding(`${name}${corner}`, source, `Parts.${name}.Background.Corners.${corner}.radius`, radius, 0, 0, 0.0005);
+      }
     }
     // Peak Hold's marker: a 2 px line across the track at the held peak, shown while there is one.
     if (cfg.peakHold === true) {

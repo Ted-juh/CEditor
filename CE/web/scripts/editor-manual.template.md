@@ -1110,7 +1110,10 @@ yet. A knob made into layers turns about its own centre when the component holds
 behaviour is **Measured in** its grab area, not the whole component. A meter on a decibel scale
 comes in as layers that place the reading, and the held peak, on that scale, as the meter does: its
 bindings' **Scale** is **Decibels**, from **Floor dB** to **Ceil dB**. A meter part coloured by the zones keeps them: lit cells, scale
-marks and a fill by where they sit, a needle, lamp or legend by the zone the reading is in. A meter
+marks and a fill by where they sit (cells of any shape, outlined or not), a needle, lamp, legend or
+counter window by the zone the reading is in, stepped or blended, and blended as the meter blends
+them even where the part is see-through. A bar meter on a track you can see through shows its fill
+through a mask as wide as the reading. A meter
 that shows another control's value keeps showing it: the knob that came into the component with it,
 or the control that stayed on the panel. The **Interact** card says what such a value follows, and
 **Value From** in the value's **Definition** (Advanced) changes it: its own value, another value of
@@ -1121,7 +1124,8 @@ a button, switch or meter in a base design as the design's parts, and in a synth
 its drawing too: pressed or switched on it changes as the drawing does, and a meter's needle swings,
 its bar grows and its cells light with the reading. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
-to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
+to each window, and each count of figures its own windows, shown while the reading has that many
+figures. Counter cells that fill or light come in the same way, a set of cells for each count. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the
 meter's is, and its layers read it as the value's **held peak**: the lamp lights at its level and
 stays lit while the peak holds; a range binding with **Inside Only** marks the segment the peak is

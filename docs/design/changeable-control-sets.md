@@ -462,9 +462,9 @@ components):
      which composites to the meter's own blend of the two colours. The part's other paths come apart
      as the panel draws them: its own in its paint and outline, the zoned ones without, and a scale's
      marks past Zone From in its lit colour (they had been drawn in the part's own paint). Refused by
-     name: a fill by position in cells of another shape, or patterned and outlined; counter windows
-     by the reading's zone; and blended level colour on lit cells, a clip lamp or a part you can see
-     through. Run over every offered set's own meter with three zones: as the set draws it, 256 of
+     name then, and layers since (R6, below): a fill by position in cells of another shape, or
+     patterned and outlined; counter windows by the reading's zone; and blended level colour on lit
+     cells, a clip lamp or a part you can see through. Run over every offered set's own meter with three zones: as the set draws it, 256 of
      256; the indicator by level (stepped), 256 of 256; the indicator and the scale by position, 248
      of 256, the eight Neon's and Obsidian's scale, which is counter windows, refused by name.
 
@@ -551,6 +551,39 @@ components):
      meters 36 of 36 at four readings (0.78 %). Every offered set's own devices, drawn in their
      parts, after these changes (strict): buttons 64 of 64 in both sizes, switches 128 of 128,
      meters 256 of 256.
+   - *The last meter refusals* (R6): what a meter drew that layers did not, now layers. Counter
+     cells that fill or light (pattern Digits, motion Fill or Light): for each count of figures the
+     reading can have, the part laid out as that many columns and drawn as a fill or a ladder is.
+     Each of those layers, and every copy the zones make of it, shows only while the reading has
+     that many figures: a Counter Figures binding, applied after every other, adds nothing to its
+     opacity while it has and takes one off it while it has not (`meta.lengthGate` marks the layers
+     until the binding is written). Counter windows took the same gate in place of the binding that
+     set their opacity, so their zone copies (Neon's and Obsidian's windows by the reading's zone)
+     keep it. Blended zone colour on a lit cell or a clip lamp: its copies blend as on any part, and
+     a gate at the cell's level hides them all until the reading reaches it. On a part you can see
+     through, a copy fading in over another no longer hides it, so each copy also fades out under the
+     next as that one fades in (`zoneFadeUnder`): at alpha·(1 − s)/(1 − alpha·s) against the upper
+     copy's alpha·s, which keeps the pair as opaque as the part and weighs the two colours as the
+     meter blends them. That curve is four to eight straight pieces, adding bindings, so no colour
+     strays more than about 2 % of the way between two zones'. A fill coloured by position in cells
+     of any shape is masked by each cell's outline stretched to the cell, as a patterned fill's
+     cells stretch, and an outlined one has each cell's outline as a layer growing with it. A bar
+     meter on a track you can see through shows its fill through a mask as wide as the reading; an
+     opaque track keeps its cover. For a shadow the whole control casts, a text layer counts by where
+     its words are rather than its box, so a Ceramic meter with scale labels (their boxes as wide as
+     the body, past the meter's edge) casts its shadow from its plate, as the panel does.
+     Checked against the panel (strict): lit cells by level, blended, on Ember and Carbon 8 of 8;
+     see-through lit cells on Pop and Bakelite 8 of 8; a see-through needle on Tolex 4 of 4; counter
+     windows by level on Neon and Obsidian 8 of 8, stepped 4 of 4; counter digits that light, that
+     fill, that fill by position and that light by level, 4 of 4 each; a fill by position in
+     hexagons, in outlined columns and in an outlined ellipse, 4 of 4 each; a bar on a see-through
+     track across (Graphite, Ceramic) 8 of 8 and upright 4 of 4; Ceramic and Graphite with scale
+     labels 8 of 8, Ceramic with scale labels, ticks and readout 4 of 4.
+     Still refused, waiting on designer fields (mock-up sent): a range whose handles may pass each
+     other or wrap round the end, whose fill and lit ticks need a binding that reads one value less
+     another (Minus); and button types beyond a toggle and a momentary press (Fires: after a hold,
+     on a double click, again and again while held, only while held; Afterwards: ready again,
+     disabled, locked for a time).
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned

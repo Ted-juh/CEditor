@@ -27,14 +27,18 @@ function layersOf(control, rect = { x: 0, y: 0, width: 200, height: 125 }) {
 
 const named = (out, suffix) => out.parts.find((part) => part.name === `level_${suffix}`);
 
-test('a readout, a label, scale labels and an arc no longer refuse; what a layer cannot follow still does', () => {
+test('a readout, a label, scale labels, an arc and a track you can see through no longer refuse', () => {
   for (const props of [{ showValue: true }, { label: 'LEVEL', labelPosition: 'above' }, { showScaleLabels: true }, { orientation: 'arc' }, { orientation: 'arc', segments: 12 }]) {
     assert.equal(plainMeterLayersRefusal(meter(props)), '', JSON.stringify(props));
   }
   assert.equal(plainMeterLayersRefusal(meter({ scale: 'db' })), '', 'a decibel scale: its bindings read on it');
   // Peak Hold is a marker on the held peak the value keeps (channel.<name>.peak).
   assert.equal(plainMeterLayersRefusal(meter({ peakHold: true })), '');
-  assert.match(plainMeterLayersRefusal(meter({ trackColour: '80141414' })), /see through/, 'a bar covers its fill with the track');
+  // A bar on a track you can see through shows its fill through a mask as wide as the reading.
+  assert.equal(plainMeterLayersRefusal(meter({ trackColour: '80141414' })), '');
+  const seeThrough = plainMeterLayers({ resolved: meter({ trackColour: '80141414' }), rect: { x: 0, y: 0, width: 200, height: 40 }, channel: 'level', prefix: 'level', zIndex: 0, uniqueName: (name) => name });
+  assert.ok(!named(seeThrough, 'cover'), 'no cover');
+  assert.equal(seeThrough.bindings.level_fillMaskWidth?.target, 'Parts.level_fill.mask.width');
   assert.equal(plainMeterLayersRefusal(meter({ trackColour: '80141414', segments: 8 })), '', 'segments draw over the track');
   assert.equal(plainMeterLayersRefusal(meter({ trackColour: '80141414', orientation: 'arc' })), '', 'so does an arc');
 });

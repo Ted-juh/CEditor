@@ -12,6 +12,7 @@ import { resolveControlForSet } from '../src/CE_Application/models/controlSetFam
 import { planComponentFromSelection } from '../src/CE_Application/utils/customComponentFromControls.js';
 import { valueLayersRefusal } from '../src/CE_Application/utils/valueControlLayers.js';
 import { unpremultipliedStops } from '../src/CE_Application/utils/gradientStops.js';
+import { applyCustomBindings } from '../src/CE_Application/utils/interactionRuntime.js';
 
 const panelWith = (controls, setId = 'graphite') => ({ id: 'p', controlSet: { id: setId }, controlSets: [], controls });
 const knob = (patch = {}) => createControl('Knob', { Core: { id: 'k1', name: 'Cutoff' }, Transform: { x: 40, y: 60, width: 120, height: 140 }, ...patch });
@@ -423,8 +424,77 @@ test('a meter part coloured by the zones comes in as layers: by position each ce
   assert.ok(needle.ok, JSON.stringify(needle.refused));
   const bands = Object.values(needle.component._children.Bindings._children).filter((binding) => /InZone$/.test(binding.name));
   assert.deepEqual(bands.map((binding) => [binding.inputMin, binding.band]), [[0, true], [0.6, true], [0.85, true]]);
-  // Still refused, by name: blended level colour on lit cells.
-  assert.match(withZones('ember', 'indicator', 'level').refused?.[0]?.reason ?? '', /blended/);
+  // Lit cells by level, blended: each cell's copies hidden until the reading reaches its level, and
+  // past it the zones' copies blending as the meter blends them.
+  const blended = withZones('ember', 'indicator', 'level');
+  assert.ok(blended.ok, JSON.stringify(blended.refused));
+  const at70 = readMeterAt(blended.component, 0.7);
+  assert.deepEqual([at70.Level_indicator0lit, at70.Level_indicator0litZone1, at70.Level_indicator0litZone2], [1, 1, 0.4]);
+  assert.ok(at70.Level_indicator7litZone2 <= 0 && at70.Level_indicator7litZone1 <= 0 && at70.Level_indicator7lit <= 0, 'a cell past the reading shows no zone');
+});
+
+/** Each layer's opacity, the component's bindings applied at `reading` (and `raw`, its figures). */
+function readMeterAt(component, reading, raw = reading) {
+  const shown = structuredClone(component);
+  applyCustomBindings(shown, { customChannels: { 'channel.Level.normalized': reading, 'channel.Level.peak': reading, 'channel.Level.raw': raw } });
+  return Object.fromEntries(Object.values(shown._children.Parts._children).map((part) => [part.name, Math.round(Number(part.opacity) * 1000) / 1000]));
+}
+
+test('a see-through part coloured by the reading\'s zone, blended, composites to its own opacity in the blend', () => {
+  const zones = [{ from: 0, colour: 'FF39D98A' }, { from: 0.6, colour: 'FFFFC107' }, { from: 0.85, colour: 'FFFF3B30' }];
+  const control = createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 125 } });
+  Object.assign(control._children.Meter, { zones });
+  Object.assign(control._children.Parts._children.indicator, { zoneColours: 'level', opacity: 0.6 });
+  const made = plan([control], 'tolex');
+  assert.ok(made.ok, JSON.stringify(made.refused));
+  for (const reading of [0.1, 0.3, 0.55, 0.62, 0.7, 0.8, 0.9]) {
+    const o = readMeterAt(made.component, reading);
+    const copies = [o.Level_indicatorColour, o.Level_indicatorColourZone1, o.Level_indicatorColourZone2].map((a) => Math.max(0, a));
+    // Over the background, the copies stacked: how much of the part shows, and of the upper colour.
+    const [lo, hi] = reading < 0.6 ? [0, 0.6] : [0.6, 0.85];
+    const share = Math.min(1, (reading - lo) / (hi - lo));
+    const [under, over] = reading < 0.6 ? [copies[0], copies[1]] : [copies[1], copies[2]];
+    assert.ok(Math.abs(1 - (1 - under) * (1 - over) - 0.6) < 0.02, `as opaque as the part at ${reading}`);
+    assert.ok(Math.abs(over / 0.6 - share) < 0.02, `the upper zone weighed by the blend at ${reading}`);
+    assert.ok(copies.filter((a) => a > 0.001).length <= 2, `two copies at most at ${reading}`);
+  }
+});
+
+test('counter cells that light or fill come in as layers for each count of figures, shown for that count', () => {
+  const control = createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 125 } });
+  Object.assign(control._children.Meter, { valueMin: 0, valueMax: 200 });
+  Object.assign(control._children.Parts._children.indicator, { pattern: 'digits' });
+  const lit = plan([control], 'ember');
+  assert.ok(lit.ok, JSON.stringify(lit.refused));
+  const names = Object.keys(lit.component._children.Parts._children);
+  for (const count of [1, 2, 3]) assert.ok(names.some((name) => name.startsWith(`Level_indicator${count}fig`)), `cells for ${count} figures`);
+  // At 60 (two figures) only the two-figure cells show; the first lit, the second not yet.
+  const o = readMeterAt(lit.component, 0.3, 60);
+  assert.equal(o.Level_indicator2fig0lit, 1);
+  assert.equal(o.Level_indicator2fig1, 1);
+  for (const [name, opacity] of Object.entries(o)) if (/indicator[13]fig/.test(name)) assert.ok(opacity <= 0, `${name} hidden at two figures`);
+});
+
+test('a zone-coloured fill in any shape, outlined, and a bar on a see-through track come in as layers', () => {
+  const zones = [{ from: 0, colour: 'FF39D98A' }, { from: 0.6, colour: 'FFFFC107' }];
+  const control = createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 125 } });
+  Object.assign(control._children.Meter, { zones });
+  const indicator = control._children.Parts._children.indicator;
+  Object.assign(indicator, { zoneColours: 'position', shape: 'hexagon', pattern: 'columns' });
+  indicator._children = { ...(indicator._children ?? {}), Background: { _children: { Border: { enabled: true, thickness: 1.5, colour: 'FFFFFFFF' } } } };
+  const shaped = plan([control], 'graphite-studio');
+  assert.ok(shaped.ok, JSON.stringify(shaped.refused));
+  const parts = Object.values(shaped.component._children.Parts._children);
+  assert.ok(parts.some((part) => part.mask && decodeURIComponent(part.mask.src).includes('<path')), 'masked by the hexagon');
+  assert.ok(parts.some((part) => /Edge$/.test(part.name) && part.kind === 'path'), 'each cell outlined');
+  const bar = createControl('Meter', { Core: { id: 'm1', name: 'Level' }, Transform: { x: 0, y: 0, width: 200, height: 40 } });
+  bar._children.Meter.trackColour = '66141414';
+  const plain = plan([bar], 'graphite');
+  assert.ok(plain.ok, JSON.stringify(plain.refused));
+  const plainParts = Object.values(plain.component._children.Parts._children);
+  assert.ok(!plainParts.some((part) => /cover/.test(part.name)), 'no cover over a track you can see through');
+  const fill = plainParts.find((part) => part.mask);
+  assert.ok(Object.values(plain.component._children.Bindings._children).some((binding) => binding.target === `Parts.${fill.name}.mask.width`));
 });
 
 test('the designer shows and edits what ranges and decibel meters made as layers use', () => {

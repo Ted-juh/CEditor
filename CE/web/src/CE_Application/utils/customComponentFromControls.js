@@ -796,9 +796,20 @@ function carryControlEffects(control, resolved, built, rect) {
       && inner.x + inner.width <= outer.x + outer.width + 0.5 && inner.y + inner.height <= outer.y + outer.height + 0.5;
     const boxOf = (layer) => {
       const l = layer._children.Layout ?? {};
-      // A text layer is widened 8px either side of where its glyphs go (labelTextPart).
-      const inset = layer.role === 'label' ? 8 : 0;
-      return { x: Number(l.x) + inset, y: Number(l.y), width: Number(l.width) - 2 * inset, height: Number(l.height) };
+      const text = layer.role === 'label' ? layer._children.Text : null;
+      if (text) {
+        // A text layer's box is wider than its words (8 px either side of where its glyphs go, and a
+        // meter's scale label as wide as the body): what it draws is its words, where its
+        // justification puts them, about 0.6 of the size a character.
+        const size = Number(text._children?.Font?.size ?? 12) || 12;
+        const room = Math.max(0, Number(l.width) - 16);
+        const ink = Math.min(room, String(text.content ?? '').length * size * 0.6);
+        const justification = String(text._children?.Position?.justification ?? 'centred');
+        const x = justification === 'left' ? Number(l.x) + 8
+          : (justification === 'right' ? Number(l.x) + 8 + room - ink : Number(l.x) + 8 + (room - ink) / 2);
+        return { x, y: Number(l.y), width: ink, height: Number(l.height) };
+      }
+      return { x: Number(l.x), y: Number(l.y), width: Number(l.width), height: Number(l.height) };
     };
     // The plate: a layer the control's own background paints, over its whole box.
     const plate = layers.find((layer) => layer._children.Background && layer.role !== 'label' && within(rect, boxOf(layer)) && within(boxOf(layer), rect));

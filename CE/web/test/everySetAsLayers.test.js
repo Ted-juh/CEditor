@@ -141,8 +141,13 @@ test('a counter: its figures as a binding, its windows and digits for each count
   const built = meterDeviceLayers({ resolved: meter, rect: { x: 0, y: 0, width: 200, height: 125 }, channel: 'v', prefix: 'm', zIndex: 0, uniqueName: unique() });
   const names = built.parts.map((part) => part.name);
   for (const n of [1, 2, 3]) assert.ok(names.includes(`m_face${n}`), `windows for ${n}`);
-  assert.equal(built.bindings.m_face2Shown.mapMode, 'figures');
-  assert.equal(built.bindings.m_face2Shown.length, 2);
+  // Each count's windows show only for that many figures: an adding Counter Figures binding, last.
+  assert.equal(built.bindings.m_face2Figures.mapMode, 'figures');
+  assert.equal(built.bindings.m_face2Figures.length, 2);
+  assert.equal(built.bindings.m_face2Figures.add, true);
+  assert.deepEqual([built.bindings.m_face2Figures.outputMin, built.bindings.m_face2Figures.outputMax], [-1, 0]);
+  const onOpacity = Object.keys(built.bindings).filter((key) => built.bindings[key].target === 'Parts.m_face2.opacity');
+  assert.equal(onOpacity.at(-1), 'm_face2Figures', 'applied after anything else that sets its opacity');
   assert.ok(names.includes('m_legend3Figure2'), 'the third figure of three');
   assert.equal(built.bindings.m_legend3Figure2Text.character, 2);
   assert.equal(built.bindings.m_legend3Figure2Text.length, 3);

@@ -48,6 +48,10 @@ const SIZE = TYPE === 'Knob'
 // was 12 %, a ring outline read as points 6 %.
 const MAX_SHARE = Number(process.env.CE_KNOB_LAYERS_MAX ?? 0.025);
 const EXTRA = JSON.parse(process.env.CE_KNOB_LAYERS_PROPS || '{}');
+// A meter's readings are shares of its scale, whatever range the properties give it (a counter's
+// figures need one wider than 0 to 1).
+const METER_LO = Number(EXTRA['Meter.valueMin'] ?? 0);
+const METER_HI = Number(EXTRA['Meter.valueMax'] ?? 1);
 const STRICT = process.env.CE_KNOB_LAYERS_STRICT === '1';
 // CE_KNOB_LAYERS_ICON=1 puts an icon in the library ('check-icon', a two-colour glyph) for a control
 // to name in CE_KNOB_LAYERS_PROPS ("Icon.assetId": "check-icon"), so an icon's layer is checked too.
@@ -164,7 +168,7 @@ try {
       }, setId);
       const knob = await kit.make(TYPE, BUTTON
         ? { 'Core.name': 'Play', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Text.content': 'PLAY', 'Behavior.defaultValue': value === 1, ...EXTRA }
-        : METER ? { 'Core.name': 'Level', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Meter.value': value, 'Meter.valueMin': 0, 'Meter.valueMax': 1, ...EXTRA }
+        : METER ? { 'Core.name': 'Level', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, 'Meter.valueMin': 0, 'Meter.valueMax': 1, ...EXTRA, 'Meter.value': METER_LO + value * (METER_HI - METER_LO) }
         : {
           'Core.name': 'Cutoff', 'Transform.x': 80, 'Transform.y': 80, ...SIZE, ...(TYPE === 'Slider' ? { 'Behavior.orientation': ORIENTATION } : {}),
           'Behavior.min': 0, 'Behavior.max': 100, 'Behavior.step': 1, 'Behavior.defaultValue': value * 100, 'Behavior.defaultCurrentValue': value * 100, ...EXTRA,
