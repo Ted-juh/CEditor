@@ -246,7 +246,8 @@
     isTimedButtonBehavior,
   } from '../utils/timedButtonPreview.js';
   import { buttonFiring, createButtonFiring } from '../utils/customButtonFiring.js';
-  import { labelShows, labelSourceId, shownText } from '../utils/labelShows.js';
+  import { labelShows, labelSourceId } from '../utils/labelShows.js';
+  import { shownText } from '../utils/labelText.js';
   import {
     createMomentaryButtonPreviewController,
     isPressToTalkBehavior,

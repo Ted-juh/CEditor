@@ -22,7 +22,8 @@
   import { getSection, selectedControls, updateInspectorControlProperty as updateControlProperty, updateSelectedInspectorProperty as updateSelectedProperty } from '../stores/controls.js';
   import { effectiveSwatchColour } from '../utils/setSwatchValue.js';
   import { activePanel, selectedComponentIds } from '../stores/panels.js';
-  import { attachedTo as attachedToOf, authoredShownText, controlsById, LABEL_SHOWS, labelShows, labelSourceId } from '../utils/labelShows.js';
+  import { attachedTo as attachedToOf, controlsById, LABEL_SHOWS, labelShows, labelSourceId } from '../utils/labelShows.js';
+  import { authoredShownText } from '../utils/labelText.js';
   import { fontChoices, WEIGHT_OPTIONS, ensureStoredFontLoaded } from '../stores/appSettings.js';
   import { activateInspectorColorTarget } from '../stores/colorTarget.js';
   import { activeControlSet, controlSetSources } from '../stores/controlSets.js';

@@ -91,7 +91,7 @@
   import EffectSurface from '../../CE_Panel/components/EffectSurface.svelte';
   import { gradientToCSS } from '../utils/gradientCSS.js';
   import { resolveInteractiveControl, resolveInteractionContext } from '../utils/interactionRuntime.js';
-  import { authoredShownText } from '../utils/labelShows.js';
+  import { authoredShownText } from '../utils/labelText.js';
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { rootTransitionDeclaration, colourTransitionVar } from '../utils/transitionCss.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';

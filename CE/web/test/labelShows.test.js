@@ -5,7 +5,8 @@ import { readFileSync } from 'node:fs';
 import { createControl } from '../src/CE_Application/models/componentTypes.js';
 import { getControlSet } from '../src/CE_Application/models/controlSets.js';
 import { resolveControlFamily } from '../src/CE_Application/models/controlSetFamilies.js';
-import { authoredShownText, labelShows, labelSourceId, shownText, withShownLettering } from '../src/CE_Application/utils/labelShows.js';
+import { labelShows, labelSourceId, withShownLettering } from '../src/CE_Application/utils/labelShows.js';
+import { authoredShownText, shownText } from '../src/CE_Application/utils/labelText.js';
 import { isScenery } from '../src/CE_Application/utils/sceneryModel.js';
 
 const knob = () => createControl('Knob', {

@@ -9,7 +9,8 @@
   import Tags from 'lucide-svelte/icons/tags';
   import { flatControls } from '../utils/containment.js';
   import { getSliderValueMode } from '../utils/sliderBehavior.js';
-  import { authoredShownText, LABEL_SHOWS, labelShows } from '../utils/labelShows.js';
+  import { LABEL_SHOWS, labelShows } from '../utils/labelShows.js';
+  import { authoredShownText } from '../utils/labelText.js';
 
   let { control = null } = $props();
 

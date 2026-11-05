@@ -6,7 +6,8 @@
 
 import { createControl } from '../models/componentTypes.js';
 import { attachedLabelRect } from './attachedLabels.js';
-import { SHOWN_LETTERING, shownText, withShownLettering } from './labelShows.js';
+import { SHOWN_LETTERING, withShownLettering } from './labelShows.js';
+import { shownText } from './labelText.js';
 
 /** About how wide `text` prints at `size` px, with a little room: a first width, the author's after. */
 export function wordsWidth(text, size = 11) {

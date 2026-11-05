@@ -147,7 +147,7 @@ test('the surfaces: the drag shows the Labels following, Alt+click takes them, t
 });
 
 test('a Label can show a button\'s own text, lettered as the button lettered it, and the button then prints none', async () => {
-  const { shownText } = await import('../src/CE_Application/utils/labelShows.js');
+  const { shownText } = await import('../src/CE_Application/utils/labelText.js');
   const { makeAttachedLabel } = await import('../src/CE_Application/utils/attachedLabelFactory.js');
   const { textShownOwners } = await import('../src/CE_Application/utils/attachedLabels.js');
   const key = createControl('Button', { Core: { id: 'b1', name: 'Trigger' }, Transform: { x: 10, y: 10, width: 120, height: 56 },

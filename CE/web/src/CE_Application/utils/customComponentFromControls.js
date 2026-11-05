@@ -66,7 +66,8 @@ import { DRAWN_KNOB_FORMS, knobFormDrawingLayers } from './formDrawingLayers.js'
 import { drawnDeviceDirection, synthDeviceDrawingLayers } from './deviceDrawingLayers.js';
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
-import { authoredShownText, labelShows, labelSourceId } from './labelShows.js';
+import { labelShows, labelSourceId } from './labelShows.js';
+import { authoredShownText } from './labelText.js';
 import { textShownOwners } from './attachedLabels.js';
 
 export const ARTWORK_TYPES = ['Background', 'Image', 'Shape', 'Label'];
