@@ -8,7 +8,10 @@
 // square ends, mitred corners). Four marks say what the value does, where the drawing used code:
 //
 //   <g data-turn="x y">     turns with the value about (x, y), as rotate(angle x y) did
-//   <g data-lit="t">        shows from `t` of the travel on, as a tick lit up to the value did
+//   <g data-lit="t">        shows from `t` of the travel on, as a tick lit up to the value did;
+//                           data-lit-above only past it, as a meter's cell lit below the reading
+//   <g data-turn-from data-turn-to>  a turn over its own angles (a needle's swing), not the knob's
+//   data-grow, data-move-x  a bar as long as the reading, a mark carried along it
 //   <valuearc r w stroke>   the arc from the start of the sweep to the value
 //   <text data-readout>     the value, as the knob's readout writes it
 //
@@ -197,9 +200,9 @@ const pointsOf = (subpaths) => subpaths.flatMap((sub) => (Array.isArray(sub) ? s
  * a layer colour, or '' for none; `gradients` the drawing's gradients by id; `shadow` and `glow` its
  * two filters (`{ dy, blur, colour, opacity }`, `{ blur }`).
  */
-export function drawingItems(markup, { colour, gradients = {}, shadow = null, glow = null }) {
+export function drawingItems(markup, { colour, gradients = {}, shadow = null, glow = null, merge = true }) {
   const items = [];
-  const stack = [{ matrix: IDENTITY, opacity: 1, turn: null, lit: null, group: null }];
+  const stack = [{ matrix: IDENTITY, opacity: 1, turn: null, turnRange: null, lit: null, litAbove: false, group: null }];
   let counter = 0;
   const name = (tag) => `${tag}${++counter}`;
   const tokens = [...String(markup).matchAll(/<(\/?)([a-zA-Z]+)((?:[^>"]|"[^"]*")*?)(\/?)>|([^<]+)/g)];
@@ -225,12 +228,19 @@ export function drawingItems(markup, { colour, gradients = {}, shadow = null, gl
     }
     const a = attributes(attrText);
     if (tag === 'g') {
-      const turn = a['data-turn'] !== undefined ? a['data-turn'].split(/[\s,]+/).map(Number) : top.turn;
-      const lit = a['data-lit'] !== undefined ? num(a['data-lit']) : top.lit;
+      const matrix = multiply(top.matrix, parseTransform(a.transform));
+      // The pivot in the drawing's own units, where the group's place puts it (a needle in a dial
+      // moved into its window turns about its own foot).
+      const turn = a['data-turn'] !== undefined ? apply(matrix, a['data-turn'].split(/[\s,]+/).map(Number)) : top.turn;
+      const turnRange = a['data-turn'] !== undefined && a['data-turn-from'] !== undefined
+        ? [num(a['data-turn-from']), num(a['data-turn-to'])] : (a['data-turn'] !== undefined ? null : top.turnRange);
+      const litMark = a['data-lit'] ?? a['data-lit-above'];
+      const lit = litMark !== undefined ? num(litMark) : top.lit;
+      const litAbove = litMark !== undefined ? a['data-lit-above'] !== undefined : top.litAbove;
       const group = {
-        matrix: multiply(top.matrix, parseTransform(a.transform)),
+        matrix,
         opacity: top.opacity * num(a.opacity, 1),
-        turn, lit, filter: a.filter ?? '', cast: [], castHull: false, start: items.length,
+        turn, turnRange, lit, litAbove, filter: a.filter ?? '', cast: [], castHull: false, start: items.length,
         parent: top,
       };
       if (!selfClose) stack.push(group);
@@ -263,7 +273,14 @@ export function drawingItems(markup, { colour, gradients = {}, shadow = null, gl
     const strokeWidth = num(a['stroke-width'], 1);
     const fillToken = a.fill ?? 'black';
     const strokeToken = a.stroke ?? 'none';
-    const common = { turn: top.turn, lit: top.lit };
+    const common = {
+      turn: top.turn, ...(top.turnRange ? { turnRange: top.turnRange } : {}),
+      lit: a['data-lit-above'] !== undefined ? num(a['data-lit-above']) : top.lit,
+      ...((a['data-lit-above'] !== undefined || top.litAbove) ? { litAbove: true } : {}),
+      // A bar as long as the reading, from its left edge; a mark carried along with it.
+      ...(a['data-grow'] !== undefined ? { growX: true } : {}),
+      ...(a['data-move-x'] !== undefined ? { moveX: num(a['data-move-x']) } : {}),
+    };
     const made = [];
     const paint = (token) => {
       const ref = String(token).match(/^url\(#([\w-]+)\)$/);
@@ -272,7 +289,9 @@ export function drawingItems(markup, { colour, gradients = {}, shadow = null, gl
     if (fillToken !== 'none' && shape.fill.length) {
       const fill = paint(fillToken);
       if (fill.gradient || fill.colour) {
-        made.push({ name: name(tag), shape: shape.fill, ...(fill.gradient ? { svgGradient: { def: fill.gradient, box: shape.box ?? boxOf(shape.fill) } } : { colour: fill.colour }), opacity: opacity * num(a['fill-opacity'], 1), ...common });
+        // A plain rectangle (a meter's unlit cell) may share a layer with the ones beside it too.
+        const cell = tag === 'rect' && !fill.gradient && !a.filter && shape.fill.every(Array.isArray);
+        made.push({ name: name(tag), shape: shape.fill, ...(fill.gradient ? { svgGradient: { def: fill.gradient, box: shape.box ?? boxOf(shape.fill) } } : { colour: fill.colour, mergeable: cell }), opacity: opacity * num(a['fill-opacity'], 1), ...common });
       }
     }
     let band = null;
@@ -310,7 +329,7 @@ export function drawingItems(markup, { colour, gradients = {}, shadow = null, gl
     if (a.filter === 'glow' && glow) made.slice().reverse().forEach((item) => made.unshift({ ...item, name: name('glow'), blur: glow.blur }));
     items.push(...made);
   }
-  return mergeRuns(items.filter(Boolean));
+  return merge ? mergeRuns(items.filter(Boolean)) : items.filter(Boolean).map(({ mergeable, ...item }) => item);
 
   function shadowItem(itemName, subpaths, group, clear = null) {
     const moved = subpaths.map((sub) => (Array.isArray(sub) ? sub.map(([x, y]) => [x, y + shadow.dy])
@@ -348,7 +367,7 @@ function overlaps(p, q) {
  */
 function mergeRuns(items) {
   const out = [];
-  const key = (item) => JSON.stringify([item.colour, item.opacity, item.turn, item.lit, item.blur]);
+  const key = (item) => JSON.stringify([item.colour, item.opacity, item.turn, item.turnRange, item.lit, item.litAbove, item.blur, item.growX, item.moveX]);
   for (const item of items) {
     const last = out.at(-1);
     if (item.mergeable && last?.mergeable && key(item) === key(last)

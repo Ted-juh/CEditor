@@ -380,7 +380,7 @@ function rangeBinding(name, source, target, outputMin, outputMax, inputMin = 0, 
 // --- the synth sets' knobs: their markup (utils/synthKnobDrawings.js) read into items --------------
 
 /** A markup colour ("$face", "#20282c", "white") as a layer's colour: a role kept, else AARRGGBB. */
-function markupColour(token, c) {
+export function markupColour(token, c) {
   const text = String(token ?? '').trim();
   if (!text || text === 'none') return '';
   if (text.startsWith('$')) return c[text.slice(1)] ?? '';
@@ -453,37 +453,14 @@ function layerGradient(def, on, layer, colourOf) {
 }
 
 /**
- * The layers that draw `resolved`'s form, or null when it names none drawn here. `drag` is the
- * knob's drag as its parts would give it (knobLayers' `behavior`): the panel turns a knob in a form
- * as it turns the same knob in parts. Returns knobLayers' shape: `{ parts, bindings, partNames,
- * behavior, handles }`.
+ * The colours, depth and divisions a form is drawn with, as ControlAnatomy reads them off Core: the
+ * five colours each a layer colour (a role kept as the role where the control's style names one)
+ * and, in `literals`, as AARRGGBB for gradient stops, which hold a colour and not a role.
  */
-export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, channel, prefix, zIndex, uniqueName, drag = null }) {
+export function formColours(resolved, styled = resolved) {
   const core = resolved?._children?.Core ?? {};
   const styledCore = styled?._children?.Core ?? core;
-  const form = String(core.controlForm ?? '');
-  const direction = form.startsWith('new-') ? PHYSICAL_DIRECTIONS.find((entry) => `new-${entry.id}` === form) : null;
-  const draw = DRAWINGS[form] ?? (direction ? (c) => synthItems(direction, c) : null);
-  if (!draw) return null;
-  const width = Math.max(1, box.width);
-  const height = Math.max(1, box.height);
-  const origin = { x: box.x, y: box.y };
-  const source = `channel.${channel}.normalized`;
-
-  // The frame fitted to the box as the SVG fits its viewBox (xMidYMid meet); the form's Size scales
-  // the drawing about the knob's centre, not its readout.
-  const s = Math.min(width / 160, height / 170);
-  const ox = (width - 160 * s) / 2;
-  const oy = (height - 170 * s) / 2;
-  const size = clamp(num(core.formSize, 100) / 100, 0.6, 1.15);
   const depth = clamp(num(core.formDepth, 60) / 100, 0, 1);
-  const detail = clamp(Math.round(num(core.formDivisions, 0) || 12), 4, 48);
-  const at = ([x, y], scaled) => {
-    const k = scaled ? size : 1;
-    return [ox + s * (80 + k * (x - 80)), oy + s * (76 + k * (y - 76))];
-  };
-
-  // The five colours as ControlAnatomy reads them; a role kept as the role where it reads one.
   const colour = (key, fallback) => {
     const shown = literal(core[key]);
     if (!shown) return fallback;
@@ -491,24 +468,30 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
   };
   const shownLiteral = (key, fallback) => literal(core[key]) ?? fallback;
   const ink = colour('formInkColour', 'FF20282C');
+  const font = resolved?._children?.Text?._children?.Font ?? {};
   const c = {
-    detail,
+    detail: clamp(Math.round(num(core.formDivisions, 0) || 12), 4, 48),
     face: colour('formFaceColour', 'FFDEDBD2'),
     housing: colour('formHousingColour', 'FF171A20'),
     ink,
     legend: literal(core.formLabelColour) ? colour('formLabelColour', ink) : ink,
     accent: colour('formAccentColour', 'FF40BCCC'),
     showValue: core.formShowValue !== false,
-    family: String(resolved?._children?.Text?._children?.Font?.family ?? '').trim() || 'sans-serif',
+    family: String(font.family ?? '').trim() || 'sans-serif',
+    weight: num(font.weightValue, /bold/i.test(String(font.weight ?? '')) ? 700 : 400),
+    spacing: Math.max(0, num(font.letterSpacing, 0)),
     min: resolved?._children?.Behavior?.min ?? 0,
     max: resolved?._children?.Behavior?.max ?? 1,
+    size: clamp(num(core.formSize, 100) / 100, 0.6, 1.15),
+    depthShare: depth,
   };
   const faceLiteral = shownLiteral('formFaceColour', 'FFDEDBD2');
-  const housingLiteral = shownLiteral('formHousingColour', 'FF171A20');
-  c.literals = { face: faceLiteral, housing: housingLiteral, ink: shownLiteral('formInkColour', 'FF20282C'), accent: shownLiteral('formAccentColour', 'FF40BCCC') };
+  c.literals = {
+    face: faceLiteral, housing: shownLiteral('formHousingColour', 'FF171A20'),
+    ink: shownLiteral('formInkColour', 'FF20282C'), accent: shownLiteral('formAccentColour', 'FF40BCCC'),
+  };
   c.literals.legend = literal(core.formLabelColour) ?? c.literals.ink;
-  c.depthShare = depth;
-  // The drawing's dome (radial, lit from the upper left) and brushed metal (top to bottom), over
+  // The base knobs' dome (radial, lit from the upper left) and brushed metal (top to bottom), over
   // the shape's own box: SVG's objectBoundingBox, the gradient's own percentages.
   c.dome = {
     type: 'radial', centerX: 32, centerY: 25, radiusX: 80, radiusY: 80, edge: 0, angle: 90,
@@ -518,24 +501,33 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     type: 'linear', angle: 180, centerX: 50, centerY: 50, radiusX: 50, radiusY: 50, edge: 0,
     stops: svgStops([[0, 'FFFFFF', 0.8 * depth], [42, faceLiteral.slice(2), 1], [55, faceLiteral.slice(2), 1], [100, '000000', 0.65 * depth]]),
   };
-  // The readout under the knob, outside the group the Size scales.
-  c.readout = c.showValue ? { name: 'readout', text: true, readout: true, x: 80, y: 164, size: 12, colour: c.legend, family: 'monospace', out: true } : null;
+  return c;
+}
 
-  const out = { parts: [], bindings: {}, partNames: {}, behavior: drag ? { ...drag } : { geometry: 'circular', dragMode: 'circular', startAngle: -135, sweepAngle: 270, direction: 'cw', centerX: 50, centerY: 50 }, handles: [{ role: 'current', channel, pointer: 'pointerCurrent', label: 'labelCurrent' }] };
+/**
+ * Items (svgDrawingItems' or the base knobs') as layers, in drawing order, into `out` (`parts`,
+ * `bindings`, `partNames`). `place.at(point, scaled)` puts a point of the drawing in the box's
+ * pixels and `place.k(scaled)` is how many pixels a unit is; `scaled` is false for what the form's
+ * Size does not scale. `names`, where given, are the layers' names by index: a second drawing of
+ * the same control (a key pressed) takes the first's.
+ */
+export function drawingLayers(items, { place, origin, named, zIndex, source, channel, c, width, out, names = null }) {
   let depthIndex = zIndex;
-  const named = (suffix) => uniqueName(`${prefix}_${suffix}`);
+  let index = 0;
+  const nameOf = (item) => (names ? names[index] : named(item.name));
   const pxBox = (b) => ({
     x: r3(origin.x + b.x), y: r3(origin.y + b.y), width: r3(Math.max(0.5, b.width)), height: r3(Math.max(0.5, b.height)),
     xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top', align: 'left', rotation: 0,
   });
   const pivotIn = (b, p) => ({ pivotX: r3(((p[0] - b.x) / b.width) * 100), pivotY: r3(((p[1] - b.y) / b.height) * 100) });
+  const { at } = place;
 
   const shapeLayer = (item) => {
     const scaled = !item.out;
-    const k = s * (scaled ? size : 1);
-    // Each subpath in the box's pixels: a polygon's points, a circle's centre and radius.
+    const k = place.k(scaled);
+    // Each subpath in the box's pixels: a polygon's points, an ellipse's centre and radii.
     const subpaths = item.shape.map((sub) => {
-      if (Array.isArray(sub)) return { pts: sub.map((p) => at(p, scaled)) };
+      if (Array.isArray(sub)) return { pts: sub.map((pt) => at(pt, scaled)) };
       if (sub.ellipse) return { ellipse: [...at([sub.ellipse[0], sub.ellipse[1]], scaled), sub.ellipse[2] * k, sub.ellipse[3] * k] };
       return { ellipse: [...at([sub.circle[0], sub.circle[1]], scaled), sub.circle[2] * k, sub.circle[2] * k] };
     });
@@ -566,8 +558,8 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     }
     const layout = pxBox(b);
     if (item.turn) Object.assign(layout, pivotIn(b, at(item.turn, scaled)));
-    const layer = createPartNode(named(item.name), {
-      role: item.turn || item.moveX || item.moveY || item.lit != null ? 'indicator' : 'custom',
+    const layer = createPartNode(nameOf(item), {
+      role: item.turn || item.moveX || item.moveY || item.lit != null || item.growX ? 'indicator' : 'custom',
       kind: 'path', zIndex: depthIndex, opacity: num(item.opacity, 1),
       layout, meta: { pathData, closed: true },
       sections: { Background: background(item.colour ?? null, gradient) },
@@ -579,48 +571,61 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
       effects._children.Filters.blur = r3(item.blur * k);
       layer._children.Effects = effects;
     }
-    if (item.turn) out.bindings[`${layer.name}Turn`] = rangeBinding(`${layer.name}Turn`, source, `Parts.${layer.name}.Layout.rotation`, -135, 135);
-    if (item.moveX) out.bindings[`${layer.name}MoveX`] = rangeBinding(`${layer.name}MoveX`, source, `Parts.${layer.name}.Layout.offsetX`, 0, item.moveX * k);
-    if (item.moveY) out.bindings[`${layer.name}MoveY`] = rangeBinding(`${layer.name}MoveY`, source, `Parts.${layer.name}.Layout.offsetY`, 0, item.moveY * k);
-    if (item.wrapY) {
+    if (item.turn && source) {
+      const [from, to] = item.turnRange ?? [-135, 135];
+      // At rest the drawing stands at the start of its turn: the shape is drawn upright, turned by it.
+      layer._children.Layout.rotation = from;
+      out.bindings[`${layer.name}Turn`] = rangeBinding(`${layer.name}Turn`, source, `Parts.${layer.name}.Layout.rotation`, from, to);
+    }
+    if (item.moveX && source) out.bindings[`${layer.name}MoveX`] = rangeBinding(`${layer.name}MoveX`, source, `Parts.${layer.name}.Layout.offsetX`, 0, item.moveX * k);
+    if (item.moveY && source) out.bindings[`${layer.name}MoveY`] = rangeBinding(`${layer.name}MoveY`, source, `Parts.${layer.name}.Layout.offsetY`, 0, item.moveY * k);
+    if (item.wrapY && source) {
       // Back to the top at the very end of the travel, on top of the move.
       out.bindings[`${layer.name}Wrap`] = { ...rangeBinding(`${layer.name}Wrap`, source, `Parts.${layer.name}.Layout.offsetY`, 0, item.wrapY * k, 0.9995, 1), add: true };
     }
-    if (item.lit != null) {
+    if (item.growX && source) {
+      // A bar as long as the reading: its full width at the top of the travel, nothing at the foot.
+      out.bindings[`${layer.name}Grow`] = rangeBinding(`${layer.name}Grow`, source, `Parts.${layer.name}.Layout.width`, 0, b.width);
+    }
+    if (item.lit != null && source) {
       layer.opacity = 0;
-      out.bindings[`${layer.name}Lit`] = rangeBinding(`${layer.name}Lit`, source, `Parts.${layer.name}.opacity`, 0, num(item.opacity, 1), item.lit - 0.0005, item.lit);
+      // Lit from its own point of the travel: at it (a tick lit up to the value), or only past it.
+      const [lo, hi] = item.litAbove ? [item.lit, item.lit + 0.0005] : [item.lit - 0.0005, item.lit];
+      out.bindings[`${layer.name}Lit`] = rangeBinding(`${layer.name}Lit`, source, `Parts.${layer.name}.opacity`, 0, num(item.opacity, 1), lo, hi);
     }
     return layer;
   };
 
   const arcLayer = (item) => {
-    const k = s * size;
+    const k = place.k(true);
     const radius = item.arc.radius * k;
     const thickness = Math.max(1, item.arc.thickness * k);
     const centre = at(AROUND, true);
     const extent = 2 * radius + thickness;
     const b = { x: centre[0] - extent / 2, y: centre[1] - extent / 2, width: extent, height: extent };
-    const layer = createPartNode(named(item.name), {
+    const layer = createPartNode(nameOf(item), {
       role: item.arc.follows ? 'indicator' : 'track', kind: 'arcTrack', zIndex: depthIndex, opacity: num(item.opacity, 1), layout: pxBox(b),
       meta: { arcTrack: { startAngle: item.arc.start, sweepAngle: item.arc.sweep, direction: 'cw', thickness: r3(thickness), cap: 'butt', colour: item.colour } },
       sections: { Background: background('00000000', null) },
     });
-    if (item.arc.follows) out.bindings[`${layer.name}Sweep`] = rangeBinding(`${layer.name}Sweep`, source, `Parts.${layer.name}.meta.arcTrack.sweepAngle`, 0, item.arc.follows);
+    if (item.arc.follows && source) out.bindings[`${layer.name}Sweep`] = rangeBinding(`${layer.name}Sweep`, source, `Parts.${layer.name}.meta.arcTrack.sweepAngle`, 0, item.arc.follows);
     return layer;
   };
 
   const textLayer = (item) => {
     const scaled = !item.out;
-    const k = s * (scaled ? size : 1);
+    const k = place.k(scaled);
     const [x, y] = at([item.x, item.y], scaled);
     const fontSize = item.size * k;
     const text = deepClone(SECTION_DEFAULTS.Text);
     text.content = item.readout ? '' : String(item.text);
     text._children.Fill.colour = item.colour;
     text._children.Font.size = r3(fontSize);
-    text._children.Font.weightValue = 400;
-    text._children.Font.weight = 'Regular';
+    const weight = num(item.weight, 400);
+    text._children.Font.weightValue = weight;
+    text._children.Font.weight = weight >= 600 ? 'Bold' : 'Regular';
     text._children.Font.family = item.family || c.family || 'sans-serif';
+    if (item.spacing) text._children.Font.letterSpacing = r3(item.spacing);
     const anchor = item.anchor ?? 'middle';
     text._children.Position.justification = anchor === 'start' ? 'left' : (anchor === 'end' ? 'right' : 'centred');
     // A baseline at y: the glyphs' middle about a third of the size above it.
@@ -629,19 +634,61 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     const b = anchor === 'start' ? { x: x - 8, y: middle - fontSize, width: span, height: fontSize * 2 }
       : anchor === 'end' ? { x: x - span + 8, y: middle - fontSize, width: span, height: fontSize * 2 }
         : { x: x - span / 2, y: middle - fontSize, width: span, height: fontSize * 2 };
-    const layer = createPartNode(named(item.name), { role: 'label', kind: 'rectangle', zIndex: depthIndex, opacity: num(item.opacity, 1), layout: pxBox(b), sections: { Text: text } });
-    if (item.readout) {
+    const layer = createPartNode(nameOf(item), { role: 'label', kind: 'rectangle', zIndex: depthIndex, opacity: num(item.opacity, 1), layout: pxBox(b), sections: { Text: text } });
+    if (item.readout && channel) {
       out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
       out.partNames.labelValue = [...(out.partNames.labelValue ?? []), layer.name];
     }
     return layer;
   };
 
-  for (const item of draw(c)) {
+  const made = [];
+  for (const item of items) {
     if (!item) continue;
     const layer = item.text ? textLayer(item) : item.arc ? arcLayer(item) : shapeLayer(item);
+    made.push(layer);
     out.parts.push(layer);
     depthIndex += 1;
+    index += 1;
   }
+  return made;
+}
+
+/**
+ * The layers that draw `resolved`'s form, or null when it names none drawn here. `drag` is the
+ * knob's drag as its parts would give it (knobLayers' `behavior`): the panel turns a knob in a form
+ * as it turns the same knob in parts. Returns knobLayers' shape: `{ parts, bindings, partNames,
+ * behavior, handles }`.
+ */
+export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, channel, prefix, zIndex, uniqueName, drag = null }) {
+  const core = resolved?._children?.Core ?? {};
+  const form = String(core.controlForm ?? '');
+  const direction = form.startsWith('new-') ? PHYSICAL_DIRECTIONS.find((entry) => `new-${entry.id}` === form) : null;
+  const draw = DRAWINGS[form] ?? (direction ? (c) => synthItems(direction, c) : null);
+  if (!draw) return null;
+  const width = Math.max(1, box.width);
+  const height = Math.max(1, box.height);
+
+  // The frame fitted to the box as the SVG fits its viewBox (xMidYMid meet); the form's Size scales
+  // the drawing about the knob's centre, not its readout.
+  const s = Math.min(width / 160, height / 170);
+  const ox = (width - 160 * s) / 2;
+  const oy = (height - 170 * s) / 2;
+  const c = formColours(resolved, styled);
+  const place = {
+    at: ([x, y], scaled) => {
+      const k = scaled ? c.size : 1;
+      return [ox + s * (80 + k * (x - 80)), oy + s * (76 + k * (y - 76))];
+    },
+    k: (scaled) => s * (scaled ? c.size : 1),
+  };
+  // The readout under the knob, outside the group the Size scales.
+  c.readout = c.showValue ? { name: 'readout', text: true, readout: true, x: 80, y: 164, size: 12, colour: c.legend, family: 'monospace', out: true } : null;
+
+  const out = { parts: [], bindings: {}, partNames: {}, behavior: drag ? { ...drag } : { geometry: 'circular', dragMode: 'circular', startAngle: -135, sweepAngle: 270, direction: 'cw', centerX: 50, centerY: 50 }, handles: [{ role: 'current', channel, pointer: 'pointerCurrent', label: 'labelCurrent' }] };
+  drawingLayers(draw(c), {
+    place, origin: { x: box.x, y: box.y }, named: (suffix) => uniqueName(`${prefix}_${suffix}`), zIndex,
+    source: `channel.${channel}.normalized`, channel, c, width, out,
+  });
   return out;
 }

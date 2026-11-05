@@ -533,16 +533,22 @@ components):
      The forms' metal and dome are the drawings' own, written as white then black over the part's
      colour (the same over any colour, as strong as the form's Depth), which brings the Soft,
      Carbon, Console and Machined sets' keys to their forms' drawings (their starters regenerated).
-     Refused by name, pointing to Convert to Parts first (`formPartsDiffer`), which gives a control
-     that converts exactly: the synth sets' buttons, switches and meters whose parts differ from
-     their drawings (a different well, edge or scale, 2.5 to 17 %; the ones that match are listed
-     by kind, `SYNTH_PARTS_MATCH`).
+     The synth sets' buttons, switches and meters come in as their drawings too
+     (`utils/synthDeviceDrawings.js`, `utils/deviceDrawingLayers.js`), in the frame ControlAnatomy
+     draws them in (a button's 160 by 100 with its caption under it, or laid out in the box's own
+     pixels where the caption does not fit; a meter's 160 by 100). A button or switch is drawn
+     twice, at rest and pressed or on, with the same shapes in the same order, and what differs
+     (a key moved down, a lamp lit, a rocker tipped, an edge lit) is its layers' state while pressed
+     or on. A meter's needle swings over its own arc about its own foot, its bar grows with the
+     reading and the mark at its end moves with it, and each cell lights past its own point, as the
+     drawings' `<` compares them; unlit cells drawn alike share a layer. No classic design is
+     refused now but the two illustrated sets'.
      Checked against the panel on Graphite: the twelve base knobs 48 of 48 (four readings, at most
      0.27 % of pixels apart); the 36 synth knobs 144 of 144 (at most 0.54 %); the base buttons 12
      of 12, switches 12 of 12 off and on (0.12 %), meters 12 of 12 at four readings (0.26 %); a
      cushion and a rocker drawn in their parts against their layers, 0.00 %. The synth sets'
-     devices: buttons 19 of 36 (unpressed, 1.7 %), switches 16 of 36 (off and on, 2 %), meters 22
-     of 36 (four readings, 1.9 %); the rest refused. Every offered set's own devices, drawn in their
+     devices as their drawings: buttons 36 of 36 (0.40 %), switches 36 of 36 off and on (0.46 %),
+     meters 36 of 36 at four readings (0.78 %). Every offered set's own devices, drawn in their
      parts, after these changes (strict): buttons 64 of 64 in both sizes, switches 128 of 128,
      meters 256 of 256.
 

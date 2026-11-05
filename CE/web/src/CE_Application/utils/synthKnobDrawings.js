@@ -27,14 +27,14 @@ const turn = (inner, extra = '') => `<g data-turn="80 76"${extra}>${inner}</g>`;
 const linear = (x2, y2, stops) => ({ type: 'linear', x1: 0, y1: 0, x2, y2, stops });
 const radial = (cx, cy, r, stops) => ({ type: 'radial', cx, cy, r, stops });
 
-const SERIES_1 = (d) => ({
+export const SERIES_1 = (d) => ({
   cap: radial(0.35, 0.2, 0.95, [[0, 'FFFFFF', d * 0.34], [0.35, '$face', 1], [0.78, '$face', 1], [1, '141819', 1]]),
   metal: linear(0.8, 1, [[0, 'E2E5E5', 1], [0.24, '$face', 1], [0.5, 'E5E8E8', 1], [0.7, '$face', 1], [1, '454C4E', 1]]),
   edge: linear(0.2, 1, [[0, '9B9F9E', 1], [0.12, '$face', 1], [1, '111719', 1]]),
   well: linear(0, 1, [[0, '090D0F', 1], [1, '$housing', 1]]),
   glass: linear(0.65, 1, [[0, 'EEFAFF', 0.4], [0.46, '$face', 0.1], [0.49, 'E5F5FF', 0.22], [1, '$face', 0.1]]),
 });
-const SERIES_2 = (d) => ({
+export const SERIES_2 = (d) => ({
   cap: radial(0.32, 0.2, 0.9, [[0, 'FFFFFF', d * 0.45], [0.3, '$face', 1], [0.8, '$face', 1], [1, '263238', 1]]),
   dish: radial(0.7, 0.85, 0.9, [[0, 'EFF3EE', 1], [0.4, '$face', 1], [1, '485156', 1]]),
   metal: linear(0.65, 1, [[0, 'E5EAE8', 1], [0.3, '$face', 1], [0.53, 'C9D2D2', 1], [1, '38484C', 1]]),
@@ -42,7 +42,7 @@ const SERIES_2 = (d) => ({
   well: linear(0.2, 1, [[0, '080E13', 1], [0.65, '$housing', 1], [1, '5B6B73', 1]]),
   lens: linear(0.5, 1, [[0, 'FFFFFF', 0.25], [0.48, 'FFFFFF', 0.02], [0.5, 'FFFFFF', 0.15], [1, '$face', 0.05]]),
 });
-const SERIES_3 = (d) => ({
+export const SERIES_3 = (d) => ({
   dome: radial(0.3, 0.18, 0.86, [[0, 'FFFFFF', 0.9 * d], [0.22, '$face', 1], [0.67, '$face', 1], [1, '080D10', 1]]),
   dish: radial(0.66, 0.76, 0.88, [[0, '11191C', 1], [0.42, '$face', 1], [0.72, 'DCE4E1', 0.7 * d], [1, '202A2E', 1]]),
   side: linear(0, 1, [[0, '$face', 1], [0.25, '1B2427', 1], [1, '05090B', 1]]),

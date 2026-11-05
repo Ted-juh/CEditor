@@ -161,7 +161,7 @@ function inOwnColours(recipe, colours) {
 // on Graphite, the last five (the cushion and hexagonal keys; the rocker, latch and strap switches)
 // had shapes their parts only approximated and keys their drawings redraw when on, and are drawn
 // outlines now (utils/deviceShapes.js `path`, `shapePathOn`). Kept for a form that may need it. The
-// knobs' forms are not here: they come in as their drawings (utils/formDrawingLayers.js).
+// knobs' forms, and the synth sets' forms of every kind, come in as their drawings.
 const PARTS_DIFFER = {
   Button: new Set(),
   ToggleButton: new Set(),
@@ -176,34 +176,13 @@ function formFamily(type) {
   return type;
 }
 
-// The synth sets' forms (`new-<set id>`, drawn by PhysicalAnatomy and the two series after it) whose
-// parts draw them as their drawings do, by kind and set id; measured as above (2026-11-04, on Graphite
-// in the form's own colours: the sets' default ones). Any other synth form's
-// parts differ: the devices leave out a line or a lit border here and there, or draw a well or a
-// scale another way (models/directionDeviceParts.js). The knobs come in as their drawings
-// (utils/synthKnobDrawings.js), so none is listed.
-const SYNTH_PARTS_MATCH = {
-  // Unpressed (a button holds its value only while pressed): 19 of 36, at most 1.7 % of pixels apart.
-  Button: new Set(['brassworks', 'bakelite', 'hi-fi', 'porcelain', 'flightdeck', 'stompbox', 'switchboard', 'chronograph',
-    'cassette-deck', 'diesel', 'gemstone', 'leatherbound', 'heritage', 'compact-rack', 'valve-console', 'deep-flute',
-    'concave-studio', 'coin-edge', 'castellated']),
-  // Off and on: 16 of 36, at most 2 %.
-  ToggleButton: new Set(['hi-fi', 'porcelain', 'stompbox', 'switchboard', 'chronograph', 'cassette-deck', 'diesel', 'gemstone',
-    'leatherbound', 'heritage', 'compact-rack', 'valve-console', 'deep-flute', 'concave-studio', 'coin-edge', 'castellated']),
-  // At four readings: 22 of 36, at most 1.9 %.
-  Meter: new Set(['bakelite', 'porcelain', 'flightdeck', 'stompbox', 'switchboard', 'chronograph', 'cassette-deck', 'diesel',
-    'gemstone', 'leatherbound', 'valve-console', 'chicken-head', 'turret-stack', 'deep-flute', 'concave-studio', 'hex-drive',
-    'coin-edge', 'gimbal-ring', 'lever-dial', 'castellated', 'floating-halo', 'prism-cap']),
-  // Their parts, 6 to 16 % apart; drawn instead.
-  Knob: new Set(),
-};
-
-/** Whether `form`'s parts draw a control of `type` otherwise than the form's drawing does. */
+/**
+ * Whether `form`'s parts draw a control of `type` otherwise than the form's drawing does. The synth
+ * sets' forms are not asked: every one comes in as its drawing (utils/formDrawingLayers.js,
+ * utils/deviceDrawingLayers.js).
+ */
 export function formPartsDiffer(type, form) {
-  const family = formFamily(String(type ?? ''));
-  const name = String(form ?? '');
-  if (PARTS_DIFFER[family]?.has(name)) return true;
-  return name.startsWith('new-') && !isIllustratedForm(name) && SYNTH_PARTS_MATCH[family]?.has(name.slice(4)) !== true;
+  return PARTS_DIFFER[formFamily(String(type ?? ''))]?.has(String(form ?? '')) === true;
 }
 
 /**

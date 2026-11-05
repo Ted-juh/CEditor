@@ -1771,7 +1771,7 @@ export function batLampLayers({ name, box, colours, tints, zIndex, opacity = 1, 
 }
 
 /** Where the device frame's units land in the control's box: `{ x, y, scale }`, and the caption. */
-function deviceFrameIn(width, height, caption, letterSpacing) {
+export function deviceFrameIn(width, height, caption, letterSpacing) {
   const lay = buttonAnatomyLayout(width, height, caption, { letterSpacing });
   if (lay) {
     const [x, y, scale] = (/translate\(([-\d.]+) ([-\d.]+)\) scale\(([-\d.]+)\)/.exec(lay.device) ?? [0, 0, 0, 1]).slice(1).map(Number);

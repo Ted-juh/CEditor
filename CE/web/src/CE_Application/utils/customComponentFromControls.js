@@ -62,6 +62,7 @@ import { surfaceShadows } from './surfaceEffects.js';
 import { getSliderDefaultValues, getSliderMax, getSliderMin, getSliderValueMode } from './sliderBehavior.js';
 import { formLayersRefusal, formPartsDiffer, withFormAsParts } from '../models/formAsParts.js';
 import { DRAWN_KNOB_FORMS, knobFormDrawingLayers } from './formDrawingLayers.js';
+import { drawnDeviceDirection, synthDeviceDrawingLayers } from './deviceDrawingLayers.js';
 import { resolveContentBox } from '../editor/canvasControlContentBox.js';
 import { iconPlacement } from '../editor/iconLook.js';
 
@@ -379,6 +380,8 @@ function whyNotButtonLayers(control, resolved, measure) {
   if (kind !== 'toggle' && kind !== 'momentary') return `a ${kind.replace(/_/g, '-')} button, which comes in as a toggle or a momentary button only`;
   if (behavior.repeating === true || behavior.pressToTalk === true || behavior.press_to_talk === true) return 'a repeating or press-to-talk button';
   const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
+  // A synth set's form comes in as its drawing (deviceDrawingLayers.js), its caption with it.
+  if (form && drawnDeviceDirection(core.controlType, form)) return scriptOrPortRefusal(kids);
   if (form) return formLayersRefusal(core.controlType, form);
   // Drawn as a device, the control's own plate, text, icon and lamp are not drawn: its parts are.
   if (buttonDeviceDrawn(resolved)) return buttonDeviceLayersRefusal(resolved);
@@ -394,12 +397,21 @@ function whyNotButtonLayers(control, resolved, measure) {
   return '';
 }
 
+/** A script of its own, or a device binding on a port other than its value (`ports`), by name; or ''. */
+function scriptOrPortRefusal(kids, ports = true) {
+  if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
+  const others = ports ? (kids.DeviceBindings?.bindings ?? []).map((binding) => String(binding?.port ?? 'value')).filter((port) => port !== 'value') : [];
+  if (others.length) return `a device binding on its ${others[0]} port`;
+  return '';
+}
+
 /** Why this meter cannot become layers that draw as it does, or ''. */
 function whyNotMeterLayers(control, resolved) {
   const kids = control._children;
   const core = kids.Core ?? {};
   if (core.visible === false) return 'hidden';
   const form = anatomyForm(core.controlType, resolved?._children?.Core?.controlForm ?? core.controlForm);
+  if (form && drawnDeviceDirection(core.controlType, form)) return scriptOrPortRefusal(kids, false);
   if (form) return formLayersRefusal(core.controlType, form);
   if ((kids.Scripts?.scripts ?? []).some((script) => String(script?.source ?? '').trim())) return 'a script of its own';
   return meterDeviceDrawn(resolved) ? meterDeviceLayersRefusal(resolved) : plainMeterLayersRefusal(resolved);
@@ -880,12 +892,12 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
   };
   const name = nameOf(control);
   if (METER_TYPES.includes(type)) {
-    // A meter drawn with device parts: a layer per part, moving with the reading; no grab areas.
+    // A meter drawn with device parts: a layer per part, moving with the reading; no grab areas. In
+    // a synth set's form: its drawing (deviceDrawingLayers.js).
     const channel = uniquePartName(name, taken);
-    const built = (meterDeviceDrawn(resolved) ? meterDeviceLayers : plainMeterLayers)({
-      resolved, styled, rect, channel, prefix: channel, zIndex,
-      uniqueName: (wanted) => uniquePartName(wanted, taken),
-    });
+    const layersOf = { resolved, styled, rect, channel, prefix: channel, zIndex, uniqueName: (wanted) => uniquePartName(wanted, taken) };
+    const built = (drawnDeviceDirection(type, resolved?._children?.Core?.controlForm) && synthDeviceDrawingLayers({ ...layersOf, kind: 'meter' }))
+      || (meterDeviceDrawn(resolved) ? meterDeviceLayers : plainMeterLayers)(layersOf);
     const cfg = resolved?._children?.Meter ?? {};
     // On a decibel scale its layers read the value on that scale, as the meter places it.
     readOnDecibelScale(built.bindings, channel, cfg);
@@ -897,6 +909,21 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
     seedLayersAt(built.parts, built.bindings, travel, { peak: meterDeviceDrawn(resolved) ? travel : null });
     for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
     return Object.assign(built.parts, { metered: { channel, ...built } });
+  }
+  if (BUTTON_TYPES.includes(type) && drawnDeviceDirection(type, resolved?._children?.Core?.controlForm)) {
+    // A button or switch in a synth set's form: its drawing, at rest and pressed or on
+    // (deviceDrawingLayers.js), its caption the control's text as the drawing sets it.
+    const channel = uniquePartName(name, taken);
+    const toggle = String(resolved?._children?.Behavior?.buttonType ?? 'momentary') === 'toggle';
+    const built = synthDeviceDrawingLayers({
+      resolved, styled, rect, channel, prefix: channel, zIndex,
+      uniqueName: (wanted) => uniquePartName(wanted, taken),
+      kind: toggle ? 'toggle' : 'button', caption: String(resolved._children.Text?.content ?? ''),
+    });
+    if (built) {
+      for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
+      return Object.assign(built.parts, { buttoned: { channel, plate: '', text: built.partNames.caption?.[0] ?? '', device: built } });
+    }
   }
   if (BUTTON_TYPES.includes(type) && buttonDeviceDrawn(resolved)) {
     // A button or switch drawn as a device: a layer per part, the caption as text.
@@ -1243,7 +1270,7 @@ function formAsLayers(control, set) {
   // A base knob form stays named, its own or its set's: it comes in as its drawing
   // (formDrawingLayers.js), which its parts are not.
   // A form whose parts draw it otherwise stays named too, and is refused by name (formPartsDiffer).
-  const kept = (form) => (type === 'Knob' && DRAWN_KNOB_FORMS.includes(form)) || formPartsDiffer(type, form);
+  const kept = (form) => (type === 'Knob' && DRAWN_KNOB_FORMS.includes(form)) || Boolean(drawnDeviceDirection(type, form)) || formPartsDiffer(type, form);
   if (kept(anatomyForm(type, control?._children?.Core?.controlForm))) return control;
   const own = withFormAsParts(control, set);
   if (own !== control) return own;
