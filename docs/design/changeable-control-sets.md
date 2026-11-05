@@ -785,11 +785,13 @@ The owner asked for the text to be separate: a knob is a knob, as a Label is a L
 
 **Built** in three steps (the owner chose option B, then: placement by rule, Alt+click, convert):
 
-- **Shows** (`utils/labelShows.js`). A Label shows its own words, or the name, value, min, max,
-  unit, start or end of a control: the one it names, else the one it is attached to. The words
-  are the control's own printing (its readout format, a meter's prefix and suffix); the canvas reads
-  the control as authored, Preview, the player and the plug-in its live value. A set letters a
-  shown Label as it letters that part of a knob, where the author has not.
+- **Shows** (`utils/labelShows.js`, the words in `utils/labelText.js`). A Label shows its own
+  words, or the name, value, min, max, unit, start or end of a control: the one it names, else the
+  one it is attached to. The words are the control's own printing (its value format, a meter's
+  prefix and suffix); the canvas reads the control as authored, Preview, the player and the plug-in
+  its live value. A set letters a shown Label as it letters that part of a knob, where the author
+  has not. The words are apart from the model because they read the interaction runtime, and the
+  set resolution that reads the model must load in the plain-Node export tools.
 - **Attached to** (`utils/attachedLabels.js`). A Label attached to a control moves with it however
   it is moved (every store write that moves a control goes through `withAttachedFollowing`), is
   copied with it and attached to the copy, goes into a container with it, and is deleted with it.
@@ -797,9 +799,10 @@ The owner asked for the text to be separate: a knob is a knob, as a Label is a L
   tab lists them and adds them (`utils/attachedLabelFactory.js`): the name above, the value below
   (in the middle when the knob reads it there), min and max beside the ends of the arc or under the
   ends of the track.
-- **The knob draws no text.** The renderer, Preview's and the Test Bench's hit-testing, and Create
-  Component from Selection all lay the track out with no room kept for text
-  (`sliderTextRoom`), so they agree; only the labels riding the handles are still the control's.
+- **The knob draws no text.** Its track keeps no room for any; only the labels riding the handles
+  are still the control's. The circle a knob is drawn round is worked out once
+  (`utils/knobTrack.js`, from the control as drawn, its set applied), and the renderer, Preview's
+  and the Test Bench's hit tests, the riding labels and Create Component from Selection all ask it.
   A value Label selected with its knob comes in as a text layer bound to the knob's channel.
 
 The starters were re-exported with value Labels and attached titles; a panel generated from a
@@ -814,6 +817,14 @@ none itself (`textShownOwners`): a key drawn from its parts then gives the capti
 device, and a flat key its face. The text stays the button's, so scripts and states still set it.
 A flat button's face legend stays its own unless the author asks for a Label; illustrated sets and
 the classic forms print theirs as part of the drawing.
+
+**What the old text left behind is gone** (the owner: CEditor is in beta, existing panels need not
+carry over). The settings for text a knob or a meter no longer draws are out of the model, the set
+recipes and the shipped sets and starters: a knob's show readout, show min/max and the placement,
+gap and offset of its title, value and ends; a meter's show value, label and label position. What
+was left of the readout's placement is `Behavior.valueLabelPlacement`, 'below' or 'center': where
+the Labels tab puts a value Label. `ce.components.meter` lost `label()`, `labelPosition()` and
+`showValue()`; a script reaches a meter's reading and caption as the Labels they are.
 
 ## Bringing designs in: Photoshop and Blender
 
