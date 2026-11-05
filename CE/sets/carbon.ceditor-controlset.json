@@ -11,7 +11,7 @@
     "license": "MIT",
     "homepage": ""
   },
-  "fingerprint": "5711644b",
+  "fingerprint": "cc86061a",
   "set": {
     "id": "carbon",
     "name": "Carbon",
@@ -437,11 +437,12 @@
             "Background.Fill.gradientEnabled": false,
             "Background.Border.enabled": false,
             "Background.Corners.radius": 0,
-            "shape": "ellipse",
+            "shape": "path",
+            "shapePath": "M0 0.282 Q0.5 -0.282 1 0.282 L1 0.736 Q0.5 1.264 0 0.736 Z",
             "Layout.x": 11.88,
-            "Layout.y": 18.75,
+            "Layout.y": 21.88,
             "Layout.width": 76.25,
-            "Layout.height": 72.5
+            "Layout.height": 68.75
           },
           "key": {
             "visible": true,
@@ -450,13 +451,13 @@
             "Background.Fill.gradientEnabled": false,
             "Background.Border.enabled": false,
             "Background.Corners.radius": 0,
-            "shape": "pillow",
+            "shape": "path",
+            "shapePath": "M0 0.355 Q0.5 -0.355 1 0.355 L1 0.892 Q0.5 0.312 0 0.892 Z",
+            "shapePathOn": "M0 0.183 Q0.5 0.978 1 0.183 L1 0.742 Q0.5 1.258 0 0.742 Z",
             "Layout.x": 17.5,
-            "Layout.y": 17.5,
+            "Layout.y": 18.13,
             "Layout.width": 65,
-            "Layout.height": 50,
-            "swing": 180,
-            "travelY": 10
+            "Layout.height": 58.13
           },
           "symbol": {
             "visible": true,
@@ -465,13 +466,12 @@
             "Background.Fill.gradientEnabled": false,
             "Background.Border.enabled": false,
             "Background.Corners.radius": 0,
+            "shape": "path",
+            "shapePath": "M0 0 L1 0 L1 0.2 L0 0.2 Z M0 0.4 L1 0.4 L1 0.6 L0 0.6 Z M0 0.8 L1 0.8 L1 1 L0 1 Z",
             "Layout.x": 41.25,
-            "Layout.y": 38.75,
+            "Layout.y": 40.63,
             "Layout.width": 17.5,
-            "Layout.height": 22.5,
-            "pattern": "lines",
-            "patternCount": 3,
-            "follows": "key"
+            "Layout.height": 18.75
           }
         }
       },
