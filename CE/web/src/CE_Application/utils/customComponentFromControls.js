@@ -994,8 +994,10 @@ function partsFor(control, resolved, rect, zIndex, taken, { styled = resolved, a
     // A range's or a band's handles each stand at their own value.
     const handles = built.handles ?? [];
     const defaults = handles.length > 1 ? getSliderDefaultValues(behavior) : null;
+    // The control's own value of a range (no handle of its own) stands where the panel keeps it, at
+    // the start (getSliderDefaultValues), as a cap that turns with it shows.
     const travel = defaults
-      ? Object.fromEntries(handles.map((handle) => [handle.channel, travelOf(Number(defaults[handle.role]))]))
+      ? { [channel]: travelOf(Number(defaults.current)), ...Object.fromEntries(handles.map((handle) => [handle.channel, travelOf(Number(defaults[handle.role]))])) }
       : travelOf(value);
     seedLayersAt(built.parts, built.bindings, travel);
     for (const part of built.parts) part.opacity = Number(part.opacity ?? 1) * common.opacity;
@@ -1364,7 +1366,11 @@ function knobSections(values, bounds, allParts = {}) {
     const min = Number.isFinite(Number(behavior.min)) ? Number(behavior.min) : 0;
     let max = Number.isFinite(Number(behavior.max)) ? Number(behavior.max) : 1;
     if (max <= min) max = min + 1;
-    const rawDefault = Number(behavior.defaultCurrentValue ?? behavior.defaultValue);
+    // A range's own value is where the panel keeps it, at the start (getSliderDefaultValues); a band's
+    // is its value between the two, kept between them unless they may cross.
+    const rawDefault = (layered?.handles?.length ?? 0) > 1
+      ? Number(getSliderDefaultValues(resolved?._children?.Behavior ?? behavior).current)
+      : Number(behavior.defaultCurrentValue ?? behavior.defaultValue);
     const defaultValue = Math.min(max, Math.max(min, Number.isFinite(rawDefault) ? rawDefault : min));
     const unit = String(behavior.unit ?? '').trim();
     out.channels[channelName] = createValueChannel(channelName, {

@@ -390,6 +390,9 @@ test('handles that may pass each other or wrap round come in as layers, drawn fr
   assert.ok(Math.abs(sweepOf(wrapping, 0.2, 0.7) - 135) < 0.01);
   assert.ok(Math.abs(sweepOf(wrapping, 0.7, 0.2) - (360 - 135)) < 0.01);
   assert.ok(Math.abs(sweepOf(wrapping, 0.5, 0.45) - (360 - 13.5)) < 0.01, 'round the circle when it wraps');
+  // The control's own value stands where the panel keeps a range's, at the start: a cap that turns
+  // with it points there.
+  assert.equal(wrapping.component._children.ValueChannels._children.Range.defaultValue, 20);
   const crossing = plan([rangeOf('Knob', { allowHandleCross: true, sweepAngle: 270 })]);
   assert.ok(Math.abs(sweepOf(crossing, 0.5, 0.45) - 270) < 0.01, 'no more than the sweep when it does not');
   assert.ok(Math.abs(sweepOf(crossing, 0.8, 0.2) - 198) < 0.01);
