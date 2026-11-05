@@ -1584,15 +1584,6 @@
     text-shadow: 0 1px 0 rgba(0, 0, 0, 0.25);
   }
 
-  .slider-readout {
-    text-align: center;
-  }
-
-  .slider-title {
-    text-align: center;
-    letter-spacing: 0.2px;
-  }
-
   .slider-debug-chip {
     position: absolute;
     right: 4px;
