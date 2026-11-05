@@ -578,7 +578,10 @@ components):
      fill, that fill by position and that light by level, 4 of 4 each; a fill by position in
      hexagons, in outlined columns and in an outlined ellipse, 4 of 4 each; a bar on a see-through
      track across (Graphite, Ceramic) 8 of 8 and upright 4 of 4; Ceramic and Graphite with scale
-     labels 8 of 8, Ceramic with scale labels, ticks and readout 4 of 4.
+     labels 8 of 8, Ceramic with scale labels, ticks and readout 4 of 4. Every offered set's own
+     meter after these changes 256 of 256, and with its indicator coloured by level, blended, 256 of
+     256; every set's button 64 of 64 in both sizes and switch 128 of 128 (the text-layer change is
+     theirs too).
      Still refused, waiting on designer fields (mock-up sent): a range whose handles may pass each
      other or wrap round the end, whose fill and lit ticks need a binding that reads one value less
      another (Minus); and button types beyond a toggle and a momentary press (Fires: after a hold,
