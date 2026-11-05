@@ -482,7 +482,8 @@ test('a control in a classic form comes in as layers: a knob as its drawing, the
     Core: { id: 'f1', name: 'Formed', controlForm: form, ...core }, Transform: { x: 0, y: 0, ...size },
   });
   const knobBox = { width: 120, height: 140 };
-  for (const [type, form, size] of [['Knob', 'disc', knobBox], ['Knob', 'scallop', knobBox], ['Button', 'piano'], ['ToggleButton', 'lever'], ['Meter', 'vu', { width: 200, height: 125 }]]) {
+  for (const [type, form, size] of [['Knob', 'disc', knobBox], ['Knob', 'scallop', knobBox], ['Button', 'piano'], ['ToggleButton', 'lever'], ['Meter', 'vu', { width: 200, height: 125 }],
+    ['Button', 'cushion'], ['MomentaryButton', 'hexkey'], ['ToggleButton', 'rocker'], ['ToggleButton', 'latch'], ['ToggleButton', 'strap']]) {
     const result = plan([inForm(type, form, size)]);
     assert.ok(result.ok, `${type} ${form}: ${JSON.stringify(result.refused)}`);
     assert.equal(result.asParts?.length ?? 0, 0, `${type} ${form}: ${result.asParts?.[0]?.reason}`);
@@ -519,13 +520,30 @@ test('a control in a classic form comes in as layers: a knob as its drawing, the
   const knobInForm = inForm('Knob', 'disc', knobBox);
   plan([knobInForm]);
   assert.equal(knobInForm._children.Core.controlForm, 'disc');
+  // A key the drawing redraws when on (the rocker tips, the latch sinks): its outline is a state.
+  const rocker = plan([inForm('ToggleButton', 'rocker')]).component;
+  const onOutline = Object.values(rocker._children.States?._children ?? {})
+    .flatMap((state) => Object.entries(state.patches?.parts ?? {}))
+    .find(([name, patch]) => /key$/.test(name) && patch['meta.pathData']);
+  assert.ok(onOutline, 'the rocker key takes its tipped outline when on');
+  assert.notEqual(onOutline[1]['meta.pathData'], rocker._children.Parts._children[onOutline[0]].meta.pathData);
   // A form whose parts draw it otherwise than its drawing is refused by name, pointing to Convert
   // to Parts, which gives a control that converts exactly.
-  for (const [type, form] of [['Button', 'cushion'], ['MomentaryButton', 'hexkey'], ['ToggleButton', 'rocker'], ['Knob', 'new-brassworks'], ['Meter', 'new-pinstripe']]) {
+  for (const [type, form] of [['Meter', 'new-pinstripe']]) {
     const differs = plan([inForm(type, form, type === 'Knob' ? knobBox : undefined)]);
     assert.equal(differs.ok, false, `${type} ${form}`);
     assert.match(differs.refused?.[0]?.reason ?? '', new RegExp(`"${form}" control form, which its parts do not draw exactly; Core › Control design › Convert to Parts first`));
   }
+  // A synth set's knob comes in as its drawing too (its markup, utils/synthKnobDrawings.js): the
+  // sculpted ones with the drop shadow their drawing casts, blurred and turning with the knob.
+  const valve = plan([inForm('Knob', 'new-valve-console', knobBox)]);
+  assert.ok(valve.ok && !(valve.asParts ?? []).length, JSON.stringify(valve.refused ?? valve.asParts));
+  const valveParts = Object.values(valve.component._children.Parts._children);
+  const valveBindings = Object.values(valve.component._children.Bindings?._children ?? valve.component.bindings ?? {});
+  const castShadow = valveParts.find((part) => /shadow/.test(part.name));
+  assert.ok(castShadow?._children?.Effects?._children?.Filters?.blur > 0, 'a blurred shadow');
+  assert.ok(valveBindings.some((b) => b.target === `Parts.${castShadow.name}.Layout.rotation`), 'the shadow turns with the knob');
+  assert.ok(valveParts.some((part) => part._children.Background?._children?.Fill?.gradientEnabled), 'the dome and the side keep their gradients');
   // A synth set's form whose parts draw it as its drawing does comes in as those parts.
   for (const [type, form, size] of [['Button', 'new-hi-fi'], ['ToggleButton', 'new-diesel'], ['Meter', 'new-gimbal-ring', { width: 200, height: 125 }]]) {
     const matches = plan([inForm(type, form, size)]);

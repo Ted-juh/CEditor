@@ -140,3 +140,111 @@ export function rotatePathData(data, degrees, cx = 0, cy = 0) {
   const sin = Math.sin(t);
   return transformPathData(data, [cos, sin, -sin, cos, cx - cos * cx + sin * cy, cy - sin * cx - cos * cy]);
 }
+
+// --- points along a path ------------------------------------------------------------------------
+
+const RAD = Math.PI / 180;
+
+/** SVG path data (M L H V Q A Z, absolute or relative) as lists of points, curves cut fine. */
+export function flattenPath(d) {
+  const tokens = String(d).match(/[a-z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? [];
+  const lists = [];
+  let current = null;
+  let cmd = '';
+  let i = 0;
+  let x = 0;
+  let y = 0;
+  const take = () => Number(tokens[i++]);
+  const push = (px, py) => { current.push([px, py]); x = px; y = py; };
+  while (i < tokens.length) {
+    if (/^[a-z]$/i.test(tokens[i])) cmd = tokens[i++];
+    const rel = cmd === cmd.toLowerCase();
+    const C = cmd.toUpperCase();
+    if (C === 'Z') {
+      if (current) { current.closed = true; [x, y] = current[0]; }
+      current = null;
+      continue;
+    }
+    if (C === 'M') {
+      const nx = take() + (rel ? x : 0);
+      const ny = take() + (rel ? y : 0);
+      current = [];
+      lists.push(current);
+      push(nx, ny);
+      cmd = rel ? 'l' : 'L';
+      continue;
+    }
+    if (!current) { current = [[x, y]]; lists.push(current); }
+    if (C === 'L') { const nx = take() + (rel ? x : 0); const ny = take() + (rel ? y : 0); push(nx, ny); }
+    else if (C === 'H') push(take() + (rel ? x : 0), y);
+    else if (C === 'V') push(x, take() + (rel ? y : 0));
+    else if (C === 'Q') {
+      const qx = take() + (rel ? x : 0); const qy = take() + (rel ? y : 0);
+      const ex = take() + (rel ? x : 0); const ey = take() + (rel ? y : 0);
+      const sx = x; const sy = y;
+      for (let t = 1; t <= 24; t += 1) {
+        const u = t / 24;
+        push((1 - u) ** 2 * sx + 2 * (1 - u) * u * qx + u * u * ex, (1 - u) ** 2 * sy + 2 * (1 - u) * u * qy + u * u * ey);
+      }
+    } else if (C === 'A') {
+      const rx = take(); const ry = take(); const rot = take(); const large = take(); const sweep = take();
+      const ex = take() + (rel ? x : 0); const ey = take() + (rel ? y : 0);
+      for (const p of arcPoints(x, y, rx, ry, rot, large, sweep, ex, ey)) push(p[0], p[1]);
+    } else {
+      i += 1;
+    }
+  }
+  return lists;
+}
+
+// An SVG elliptical arc, endpoint to endpoint, as points after the first (SVG's implementation notes,
+// F.6.5: endpoint to centre).
+function arcPoints(x1, y1, rxIn, ryIn, rotation, large, sweep, x2, y2) {
+  let rx = Math.abs(rxIn);
+  let ry = Math.abs(ryIn);
+  if (!rx || !ry) return [[x2, y2]];
+  const phi = rotation * RAD;
+  const cos = Math.cos(phi);
+  const sin = Math.sin(phi);
+  const dx = (x1 - x2) / 2;
+  const dy = (y1 - y2) / 2;
+  const x1p = cos * dx + sin * dy;
+  const y1p = -sin * dx + cos * dy;
+  const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
+  if (lambda > 1) { rx *= Math.sqrt(lambda); ry *= Math.sqrt(lambda); }
+  const sign = Number(large) === Number(sweep) ? -1 : 1;
+  const num2 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;
+  const coef = sign * Math.sqrt(Math.max(0, num2 / (rx * rx * y1p * y1p + ry * ry * x1p * x1p)));
+  const cxp = (coef * rx * y1p) / ry;
+  const cyp = (-coef * ry * x1p) / rx;
+  const cx = cos * cxp - sin * cyp + (x1 + x2) / 2;
+  const cy = sin * cxp + cos * cyp + (y1 + y2) / 2;
+  const angle = (ux, uy, vx, vy) => {
+    const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
+    return a;
+  };
+  const t1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
+  let dt = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
+  if (!Number(sweep) && dt > 0) dt -= 2 * Math.PI;
+  if (Number(sweep) && dt < 0) dt += 2 * Math.PI;
+  const steps = Math.max(8, Math.ceil(Math.abs(dt) / (2 * RAD)));
+  const out = [];
+  for (let s = 1; s <= steps; s += 1) {
+    const t = t1 + (dt * s) / steps;
+    out.push([cx + cos * rx * Math.cos(t) - sin * ry * Math.sin(t), cy + sin * rx * Math.cos(t) + cos * ry * Math.sin(t)]);
+  }
+  out[out.length - 1] = [x2, y2];
+  return out;
+}
+
+
+/** The box a path's outline fills, its curves followed (SVG's getBBox, not its control points). */
+export function pathBounds(d) {
+  const xs = [];
+  const ys = [];
+  for (const list of flattenPath(d)) for (const [x, y] of list) { xs.push(x); ys.push(y); }
+  if (!xs.length) return { x: 0, y: 0, w: 0, h: 0 };
+  const x = Math.min(...xs);
+  const y = Math.min(...ys);
+  return { x, y, w: Math.max(...xs) - x, h: Math.max(...ys) - y };
+}

@@ -13,6 +13,7 @@
 // the 160 by 80 device frame, as percentages of it; a key travels the 2.4 units the forms pressed it.
 
 import { directionDeviceParts } from './directionDeviceParts.js';
+import { pathBounds, transformPathData } from '../utils/svgPathScale.js';
 
 export const BUTTON_FORMS_AS_PARTS = ['tile', 'crosskey', 'fold', 'cushion', 'glasskey', 'touch', 'piano', 'rubber', 'hexkey', 'typewriter', 'guardkey', 'pixelkey'];
 export const TOGGLE_FORMS_AS_PARTS = ['slide', 'knife', 'bookmark', 'rocker', 'orbit', 'split', 'latch', 'strap', 'bolt', 'lever', 'guard', 'binary'];
@@ -37,20 +38,52 @@ const edge = (colour, thickness) => ({ 'Background.Border.enabled': true, 'Backg
 const shape = (kind, depth) => (depth == null ? { shape: kind } : { shape: kind, shapeDepth: depth });
 const radius = (r) => ({ 'Background.Corners.radius': r });
 const pressed = { travelY: pct(2.4, H) };
+// The forms press their keys 4 units deep at full Depth.
+const pressedAt = (depth = 60) => ({ travelY: pct((4 * depth) / 100, H) });
+/**
+ * A part drawn as the form drew it (deviceShapes.js `path`): its outline, and its outline pressed or
+ * on where the drawing redraws it, each in 0..1 of a box round both, that box its layout.
+ */
+function drawn(d, dOn = '') {
+  const a = pathBounds(d);
+  const b = dOn ? pathBounds(dOn) : a;
+  const x = Math.min(a.x, b.x);
+  const y = Math.min(a.y, b.y);
+  const w = Math.max(a.x + a.w, b.x + b.w) - x;
+  const h = Math.max(a.y + a.h, b.y + b.h) - y;
+  const unit = (path) => transformPathData(path, [1 / w, 0, 0, 1 / h, -x / w, -y / h]);
+  return { shape: 'path', shapePath: unit(d), ...(dOn ? { shapePathOn: unit(dOn) } : {}), ...at(x, y, w, h) };
+}
 const follows = { follows: 'key' };
 const clear = '00000000';
 // An ink a little through, as the forms drew their housings' edges.
 const faint = (colour, alpha) => (/^[0-9a-f]{8}$/i.test(String(colour))
   ? `${Math.round(alpha * 255).toString(16).padStart(2, '0').toUpperCase()}${String(colour).slice(2)}`
   : colour);
-// The forms' two finishes, laid over a part's own colour so they shade any colour: a turned metal
-// face, light at the top and dark at the foot; a dome lit from the top left.
-const METAL = { type: 'linear', angle: 180, edge: 0, stops: [
-  { color: '7AFFFFFF', position: 0 }, { color: '00FFFFFF', position: 42 }, { color: '00000000', position: 55 }, { color: '64000000', position: 100 },
-] };
-const DOME = { type: 'radial', centerX: 32, centerY: 25, radiusX: 80, radiusY: 80, edge: 0, stops: [
-  { color: '82FFFFFF', position: 0 }, { color: '00FFFFFF', position: 45 }, { color: '5C000000', position: 100 },
-] };
+// The forms' two finishes (ControlAnatomy's metal and dome), laid over a part's own colour so they
+// shade any colour. The drawings painted white, the face, then black, over the face, which SVG blends
+// colour and opacity apart; over a face that is the same as white whose opacity falls as
+// a·(1 − u) and then black whose opacity rises as a·u (a the drawing's opacity at that point, u the
+// way along), which needs no face at all: a turned metal face, light at the top and dark at the foot;
+// a dome lit from the top left. As strong as the form's Depth (60 % by default).
+function finish(type, { white, whiteTo, black, blackFrom }, extra) {
+  const hex = (a) => Math.round(Math.max(0, Math.min(1, a)) * 255).toString(16).padStart(2, '0').toUpperCase();
+  const at = (p) => Math.round(p * 100) / 100;
+  const stops = [];
+  for (let i = 0; i <= 10; i += 1) {
+    const u = i / 10;
+    stops.push({ color: `${hex((white + (1 - white) * u) * (1 - u))}FFFFFF`, position: at(u * whiteTo) });
+  }
+  for (let i = 0; i <= 10; i += 1) {
+    const u = i / 10;
+    stops.push({ color: `${hex((1 - (1 - black) * u) * u)}000000`, position: at(blackFrom + u * (100 - blackFrom)) });
+  }
+  return { type, edge: 0, ...extra, stops };
+}
+const metal = (depth = 60) => finish('linear', { white: 0.8 * depth / 100, whiteTo: 42, black: 0.65 * depth / 100, blackFrom: 55 }, { angle: 180 });
+const dome = (depth = 60) => finish('radial', { white: 0.85 * depth / 100, whiteTo: 45, black: 0.6 * depth / 100, blackFrom: 45 }, { centerX: 32, centerY: 25, radiusX: 80, radiusY: 80 });
+const METAL = metal();
+const DOME = dome();
 /** The finishes by name, for the Button and Switch tabs' Shading (sections/ButtonPartsEditor.svelte). */
 export const DEVICE_SHADINGS = Object.freeze({ metal: METAL, dome: DOME });
 const shaded = (gradient) => ({ 'Background.Fill.gradientEnabled': true, 'Background.Fill.gradient': gradient, 'Background.Fill.gradientOpacity': 100 });
@@ -75,9 +108,10 @@ const BUTTONS = {
     symbol: { ...part(ink), ...at(30, 40.5, 79, 3), ...follows },
   }),
   // A soft cushion with a dome on it, a short bar in the middle.
-  cushion: ({ ink }) => ({
-    key: { ...part(ROLES.face, shaded(DOME)), ...shape('pillow'), ...at(9, 3, 142, 69), activeColour: ROLES.accent, ...pressed },
-    symbol: { ...part(ink, radius(2.5)), ...at(67, 35.5, 26, 5), ...follows },
+  cushion: ({ ink, depth }) => ({
+    key: { ...part(ROLES.face, shaded(dome(depth))), ...drawn('M17 27Q25 0 80 9Q135 0 143 27Q158 68 115 72H45Q2 69 17 27Z'), activeColour: ROLES.accent, ...pressedAt(depth) },
+    // The drawing's bar, a line 5 wide with round ends.
+    symbol: { ...part(ink, radius(2.5)), ...at(64.5, 35.5, 31, 5), ...follows },
   }),
   // A glass disc, a ring in it that fills in the accent when pressed.
   glasskey: ({ ink }) => ({
@@ -103,9 +137,9 @@ const BUTTONS = {
     symbol: { ...part(ink), ...at(49, 21.5, 62, 28), pattern: 'lines', patternCount: 4, opacity: 0.25, ...follows },
   }),
   // A hexagonal plunger in a hexagonal housing, turned metal, a dot in the middle.
-  hexkey: ({ ink }) => ({
-    housing: { ...part(ROLES.housing, edge(faint(ink, 0.35), 1)), ...shape('hexagon', 22), ...at(14, 5, 132, 70) },
-    key: { ...part(ROLES.face, shaded(METAL)), ...shape('hexagon', 21), ...at(24, 12, 112, 54), activeColour: ROLES.accent, ...pressed },
+  hexkey: ({ ink, depth }) => ({
+    housing: { ...part(ROLES.housing, edge(faint(ink, 0.35), 1)), ...drawn('M43 5H117L146 40 117 75H43L14 40Z') },
+    key: { ...part(ROLES.face, shaded(metal(depth))), ...drawn('M48 12H112L136 40 112 66H48L24 40Z'), activeColour: ROLES.accent, ...pressedAt(depth) },
     indicator: { ...part(ROLES.accent), ...shape('ellipse'), ...at(71, 30, 18, 18), ...follows },
   }),
   // A typewriter key on its shadow, a ring printed on it.
@@ -147,10 +181,12 @@ const SWITCHES = {
     housing: { ...part(ROLES.face, edge(ink, 2)), ...at(27, 19, 106, 43) },
     key: { ...part(ROLES.accent, edge(ink, 2)), ...shape('ribbon', 18), ...at(37, 8, 30, 67), travelX: pct(51, W) },
   }),
-  // A moulded rocker on its shadow; on, it tips the other way and its dot moves across.
-  rocker: ({ ink }) => ({
+  // A moulded rocker on its shadow; on, it tips the other way (the drawing redraws it) and its dot
+  // moves across; a turned metal panel set into it.
+  rocker: ({ ink, depth }) => ({
     housing: { ...part(ink), ...shape('ellipse'), ...at(21, 9, 118, 64), opacity: 0.3 },
-    key: { ...part(ROLES.face, shaded(METAL)), ...shape('pillow'), ...at(28, 14, 105, 56), 'Layout.rotation': 6, swing: -12 },
+    key: { ...part(ROLES.face), ...drawn('M28 27Q80 4 133 34L128 59Q80 91 31 61Z', 'M28 34Q80 -7 133 27L128 61Q80 77 31 59Z') },
+    symbol: { ...part(clear, shaded(metal(depth))), ...shape('ellipse'), ...at(30, 18, 100, 46) },
     indicator: { ...part(ROLES.accent), ...shape('ellipse'), ...at(44, 33, 12, 12), travelX: pct(60, W) },
   }),
   // A bead on a ring; on, it runs to the other side, and the legend reads I.
@@ -167,22 +203,25 @@ const SWITCHES = {
     symbol: { ...part(ROLES.accent), ...at(26, 54, 38, 4), ...follows },
     legend: { ...part(ink), ...at(25, 31, 40, 20), offText: 'O', onText: 'I', fontSize: 12, ...follows },
   }),
-  // A console latch in its well; on, the cap sinks and its bar lights.
+  // A console latch in its well, its cap skewed; on, the cap sinks square and its bar lights. Two
+  // faint grip lines across it.
   latch: ({ ink }) => ({
     housing: { ...part(ROLES.housing, { ...edge(faint(ink, 0.35), 1), ...radius(3) }), ...at(42, 7, 76, 68) },
-    key: { ...part(ROLES.face), ...at(48, 9, 64, 52), travelY: pct(10, H) },
-    symbol: { ...part(ink), ...at(58, 19, 44, 8), activeColour: ROLES.accent, ...follows },
+    key: { ...part(ROLES.face), ...drawn('M48 9H112V59L48 68Z', 'M48 19H112V67H48Z') },
+    symbol: { ...part(ink), ...at(58, 19, 44, 8), activeColour: ROLES.accent, travelY: pct(9, H) },
+    indicator: { ...part(ink), ...drawn('M58 46.5H102V47.5H58Z M58 51.5H102V52.5H58Z'), opacity: 0.3 },
   }),
-  // A rubber strap over a dark band; on, it flips and drops.
+  // A rubber strap over a dark band; on, it flips and drops (the drawing redraws it). Three ribs
+  // across the middle.
   strap: ({ ink }) => ({
-    housing: { ...part(ink), ...shape('ellipse'), ...at(19, 15, 122, 58) },
-    key: { ...part(ROLES.face), ...shape('pillow'), ...at(28, 14, 104, 40), swing: 180, travelY: pct(8, H) },
-    symbol: { ...part(ROLES.accent), ...at(66, 31, 28, 18), pattern: 'lines', patternCount: 3, ...follows },
+    housing: { ...part(ink), ...drawn('M19 33Q80 2 141 33V58Q80 87 19 58Z') },
+    key: { ...part(ROLES.face), ...drawn('M28 31Q80 -2 132 31V56Q80 29 28 56Z', 'M28 23Q80 60 132 23V49Q80 73 28 49Z') },
+    symbol: { ...part(ROLES.accent), ...drawn('M66 32.5H94V35.5H66Z M66 38.5H94V41.5H66Z M66 44.5H94V47.5H66Z') },
   }),
   // A sliding bolt in its keeper; on, it slides across, its handle with it.
-  bolt: ({ ink }) => ({
+  bolt: ({ ink, depth }) => ({
     housing: { ...part(ROLES.face, edge(ink, 3)), ...at(15, 25, 130, 35) },
-    key: { ...part(ROLES.face, { ...edge(ink, 1), ...shaded(METAL) }), ...at(18, 33, 91, 19), travelX: pct(32, W) },
+    key: { ...part(ROLES.face, { ...edge(ink, 1), ...shaded(metal(depth)) }), ...at(18, 33, 91, 19), travelX: pct(32, W) },
     symbol: { ...part(ink), ...at(48, 18, 12, 45), ...follows },
     indicator: { ...part(ROLES.accent), ...at(50.5, 18, 7, 25), ...follows },
   }),
@@ -218,7 +257,7 @@ export function buttonFormsAsParts(type) {
  * is still drawn by code. `ink` is the set's ink against its surface; `face` and `housing` its
  * surface and track as literals, for a synth set's glass.
  */
-export function buttonFormFamily(type, form, { ink = 'FF20282C', face, housing } = {}) {
+export function buttonFormFamily(type, form, { ink = 'FF20282C', face, housing, depth = 60 } = {}) {
   const recipes = type === 'ToggleButton' ? SWITCHES : (buttonFormsAsParts(type).length ? BUTTONS : null);
   const recipe = recipes?.[String(form ?? '')];
   if (!recipe) {
@@ -227,5 +266,5 @@ export function buttonFormFamily(type, form, { ink = 'FF20282C', face, housing }
     return parts ? { component: { 'Text.Fill.colour': ROLES.legend }, parts } : null;
   }
   // The caption in the legend colour, as the forms set it.
-  return { component: { 'Text.Fill.colour': ROLES.legend }, parts: recipe({ ink }) };
+  return { component: { 'Text.Fill.colour': ROLES.legend }, parts: recipe({ ink, depth: Number.isFinite(Number(depth)) ? Number(depth) : 60 }) };
 }

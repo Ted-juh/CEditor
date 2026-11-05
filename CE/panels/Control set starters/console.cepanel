@@ -454,9 +454,9 @@
           "_children": {
             "housing": {"visible":true,"_children":{"Layout":{"x":26.25,"y":8.75,"width":47.5,"height":85},"Background":{"_children":{"Fill":{"colour":"FF2A2C30"},"Border":{"enabled":true,"colour":"59F2F2F2"},"Corners":{"radius":3}}}}},
             "guard": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF4F4F4"}}}}},
-            "key": {"visible":true,"travelY":12.5,"_children":{"Layout":{"x":30,"y":11.25,"width":40,"height":65},"Background":{"_children":{"Fill":{"colour":"FF3B3D42"}}}}},
-            "symbol": {"visible":true,"follows":"key","activeColour":"FFD8DADF","_children":{"Layout":{"x":36.25,"y":23.75,"width":27.5,"height":10},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}},
-            "indicator": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFD8DADF"}}}}},
+            "key": {"visible":true,"shape":"path","shapePath":"M0 0 L1 0 L1 0.847 L0 1 Z","shapePathOn":"M0 0.169 L1 0.169 L1 0.983 L0 0.983 Z","_children":{"Layout":{"x":30,"y":11.25,"width":40,"height":73.75},"Background":{"_children":{"Fill":{"colour":"FF3B3D42"}}}}},
+            "symbol": {"visible":true,"travelY":11.25,"activeColour":"FFD8DADF","_children":{"Layout":{"x":36.25,"y":23.75,"width":27.5,"height":10},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}},
+            "indicator": {"visible":true,"opacity":0.3,"shape":"path","shapePath":"M0 0 L1 0 L1 0.167 L0 0.167 Z M0 0.833 L1 0.833 L1 1 L0 1 Z","_children":{"Layout":{"x":36.25,"y":58.13,"width":27.5,"height":7.5},"Background":{"_children":{"Fill":{"colour":"FFF2F2F2"}}}}},
             "legend": {"_children":{"Background":{"_children":{"Fill":{"colour":"FFF4F4F4"}}}}}
           }
         },

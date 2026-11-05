@@ -25,6 +25,9 @@
 //   bevel      a key cut away at its two bottom corners, `depth` % of the height up and two fifths of
 //              that in (the synth sets' piano keys)
 //   octagon    a rectangle with its four corners cut `depth` % of its shorter side
+//   path       a drawn outline (`shapePath`: SVG path data in 0..1 of the box, several outlines
+//              allowed), the classic forms' own curves and slants; pressed or on, `shapePathOn` if it
+//              has one, as a rocker tips or a latch sinks in its drawing
 //
 // `pattern` repeats the shape in its box: 'lines' as `count` bars across, 'grid' as `count` by
 // `rows` cells, 'columns' as `count` bars side by side. The grooves of a rubber pad, the dots of a
@@ -32,8 +35,10 @@
 // at the box's left edge and the last ends at its right; `cellWidth` and `cellHeight` say how much
 // of its pitch a cell fills, in %.
 
-export const DEVICE_SHAPES = ['rect', 'ellipse', 'diamond', 'hexagon', 'flap', 'corner', 'pillow', 'bracket', 'crosshair', 'pair', 'ribbon', 'ring', 'arch', 'ticket', 'pointer', 'bow', 'bevel', 'octagon'];
+export const DEVICE_SHAPES = ['rect', 'ellipse', 'diamond', 'hexagon', 'flap', 'corner', 'pillow', 'bracket', 'crosshair', 'pair', 'ribbon', 'ring', 'arch', 'ticket', 'pointer', 'bow', 'bevel', 'octagon', 'path'];
 export const DEVICE_PATTERNS = ['solid', 'lines', 'grid', 'columns'];
+
+import { transformPathData } from './svgPathScale.js';
 
 const f = (value) => Number(Number(value).toFixed(2));
 const clamp = (value, min, max) => Math.max(min, Math.min(max, Number(value) || 0));
@@ -71,13 +76,28 @@ function pillow(x, y, w, h) {
     : `${op}${px(n[0])} ${py(n[1])}`)).join(' ')} Z`;
 }
 
-/** The shape's path in its box. `depth` is a percentage; `radius` is in the drawing's units. */
-export function deviceShapePath(kind, x, y, w, h, { depth = 20, radius = 0 } = {}) {
+/**
+ * The options deviceShapePath takes for `part`: its depth and corner, and its drawn outline, the one
+ * for pressed or on where it has one and `active` says so.
+ */
+export function deviceShapeOptions(part, radius = 0, active = false) {
+  const drawn = String((active && String(part?.shapePathOn ?? '').trim()) ? part.shapePathOn : (part?.shapePath ?? '')).trim();
+  return { depth: part?.shapeDepth, radius, path: drawn };
+}
+
+/**
+ * The shape's path in its box. `depth` is a percentage; `radius` is in the drawing's units; `path`
+ * is a drawn outline in 0..1 of the box (the `path` kind; a rectangle where it has none).
+ */
+export function deviceShapePath(kind, x, y, w, h, { depth = 20, radius = 0, path = '' } = {}) {
   const width = Math.max(0, Number(w) || 0);
   const height = Math.max(0, Number(h) || 0);
   if (!width || !height) return '';
   const d = clamp(depth, 0, 95) / 100;
   switch (String(kind ?? 'rect')) {
+    case 'path':
+      if (String(path ?? '').trim()) return transformPathData(path, [width, 0, 0, height, x, y]);
+      return rect(x, y, width, height, radius);
     case 'ellipse':
       return ellipse(x, y, width, height);
     case 'diamond':

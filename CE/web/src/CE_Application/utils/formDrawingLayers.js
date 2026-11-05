@@ -26,9 +26,15 @@ import { createPartNode } from './customComponentFactory.js';
 import { deepClone } from './deepClone.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { unpremultipliedStops } from './gradientStops.js';
+import { flattenPath } from './svgPathScale.js';
+import { drawingItems } from './svgDrawingItems.js';
+import { synthKnobDrawing } from './synthKnobDrawings.js';
+import { PHYSICAL_DIRECTIONS } from '../models/physicalControlSets.js';
 
-/** The forms drawn here: the twelve base knob forms. */
-export const DRAWN_KNOB_FORMS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
+/** The twelve base knob forms, drawn here item by item. */
+export const BASE_DRAWN_KNOB_FORMS = ['disc', 'pointer', 'tab', 'pebble', 'halo', 'lens', 'skirt', 'roller', 'vernier', 'tuning', 'scallop', 'encoder'];
+/** The forms drawn here: the twelve base knob forms and the 36 synth sets' (their markup, utils/synthKnobDrawings.js). */
+export const DRAWN_KNOB_FORMS = [...BASE_DRAWN_KNOB_FORMS, ...PHYSICAL_DIRECTIONS.map((direction) => `new-${direction.id}`)];
 
 const num = (value, fallback) => {
   const n = Number(value);
@@ -70,98 +76,6 @@ function rect(x, y, w, h, rx = 0) {
 
 function ellipse(cx, cy, rx, ry, n = 48) {
   return [Array.from({ length: n }, (_, i) => [cx + Math.cos((i / n) * 2 * Math.PI) * rx, cy + Math.sin((i / n) * 2 * Math.PI) * ry])];
-}
-
-/** SVG path data (M L H V Q A Z, absolute or relative) as lists of points, curves cut fine. */
-export function flattenPath(d) {
-  const tokens = String(d).match(/[a-z]|-?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?/gi) ?? [];
-  const lists = [];
-  let current = null;
-  let cmd = '';
-  let i = 0;
-  let x = 0;
-  let y = 0;
-  const take = () => Number(tokens[i++]);
-  const push = (px, py) => { current.push([px, py]); x = px; y = py; };
-  while (i < tokens.length) {
-    if (/^[a-z]$/i.test(tokens[i])) cmd = tokens[i++];
-    const rel = cmd === cmd.toLowerCase();
-    const C = cmd.toUpperCase();
-    if (C === 'Z') {
-      if (current) { current.closed = true; [x, y] = current[0]; }
-      current = null;
-      continue;
-    }
-    if (C === 'M') {
-      const nx = take() + (rel ? x : 0);
-      const ny = take() + (rel ? y : 0);
-      current = [];
-      lists.push(current);
-      push(nx, ny);
-      cmd = rel ? 'l' : 'L';
-      continue;
-    }
-    if (!current) { current = [[x, y]]; lists.push(current); }
-    if (C === 'L') { const nx = take() + (rel ? x : 0); const ny = take() + (rel ? y : 0); push(nx, ny); }
-    else if (C === 'H') push(take() + (rel ? x : 0), y);
-    else if (C === 'V') push(x, take() + (rel ? y : 0));
-    else if (C === 'Q') {
-      const qx = take() + (rel ? x : 0); const qy = take() + (rel ? y : 0);
-      const ex = take() + (rel ? x : 0); const ey = take() + (rel ? y : 0);
-      const sx = x; const sy = y;
-      for (let t = 1; t <= 24; t += 1) {
-        const u = t / 24;
-        push((1 - u) ** 2 * sx + 2 * (1 - u) * u * qx + u * u * ex, (1 - u) ** 2 * sy + 2 * (1 - u) * u * qy + u * u * ey);
-      }
-    } else if (C === 'A') {
-      const rx = take(); const ry = take(); const rot = take(); const large = take(); const sweep = take();
-      const ex = take() + (rel ? x : 0); const ey = take() + (rel ? y : 0);
-      for (const p of arcPoints(x, y, rx, ry, rot, large, sweep, ex, ey)) push(p[0], p[1]);
-    } else {
-      i += 1;
-    }
-  }
-  return lists;
-}
-
-// An SVG elliptical arc, endpoint to endpoint, as points after the first (SVG's implementation notes,
-// F.6.5: endpoint to centre).
-function arcPoints(x1, y1, rxIn, ryIn, rotation, large, sweep, x2, y2) {
-  let rx = Math.abs(rxIn);
-  let ry = Math.abs(ryIn);
-  if (!rx || !ry) return [[x2, y2]];
-  const phi = rotation * RAD;
-  const cos = Math.cos(phi);
-  const sin = Math.sin(phi);
-  const dx = (x1 - x2) / 2;
-  const dy = (y1 - y2) / 2;
-  const x1p = cos * dx + sin * dy;
-  const y1p = -sin * dx + cos * dy;
-  const lambda = (x1p * x1p) / (rx * rx) + (y1p * y1p) / (ry * ry);
-  if (lambda > 1) { rx *= Math.sqrt(lambda); ry *= Math.sqrt(lambda); }
-  const sign = Number(large) === Number(sweep) ? -1 : 1;
-  const num2 = rx * rx * ry * ry - rx * rx * y1p * y1p - ry * ry * x1p * x1p;
-  const coef = sign * Math.sqrt(Math.max(0, num2 / (rx * rx * y1p * y1p + ry * ry * x1p * x1p)));
-  const cxp = (coef * rx * y1p) / ry;
-  const cyp = (-coef * ry * x1p) / rx;
-  const cx = cos * cxp - sin * cyp + (x1 + x2) / 2;
-  const cy = sin * cxp + cos * cyp + (y1 + y2) / 2;
-  const angle = (ux, uy, vx, vy) => {
-    const a = Math.atan2(ux * vy - uy * vx, ux * vx + uy * vy);
-    return a;
-  };
-  const t1 = angle(1, 0, (x1p - cxp) / rx, (y1p - cyp) / ry);
-  let dt = angle((x1p - cxp) / rx, (y1p - cyp) / ry, (-x1p - cxp) / rx, (-y1p - cyp) / ry);
-  if (!Number(sweep) && dt > 0) dt -= 2 * Math.PI;
-  if (Number(sweep) && dt < 0) dt += 2 * Math.PI;
-  const steps = Math.max(8, Math.ceil(Math.abs(dt) / (2 * RAD)));
-  const out = [];
-  for (let s = 1; s <= steps; s += 1) {
-    const t = t1 + (dt * s) / steps;
-    out.push([cx + cos * rx * Math.cos(t) - sin * ry * Math.sin(t), cy + sin * rx * Math.cos(t) + cos * ry * Math.sin(t)]);
-  }
-  out[out.length - 1] = [x2, y2];
-  return out;
 }
 
 const path = (d) => flattenPath(d).map((pts) => dedupe(pts));
@@ -463,6 +377,81 @@ function rangeBinding(name, source, target, outputMin, outputMax, inputMin = 0, 
   };
 }
 
+// --- the synth sets' knobs: their markup (utils/synthKnobDrawings.js) read into items --------------
+
+/** A markup colour ("$face", "#20282c", "white") as a layer's colour: a role kept, else AARRGGBB. */
+function markupColour(token, c) {
+  const text = String(token ?? '').trim();
+  if (!text || text === 'none') return '';
+  if (text.startsWith('$')) return c[text.slice(1)] ?? '';
+  if (text === 'white') return 'FFFFFFFF';
+  if (text === 'black') return 'FF000000';
+  return literal(text) ?? '';
+}
+
+/** A gradient stop's colour, "$face" or "RRGGBB", as RRGGBB: a stop holds a colour, not a role. */
+function gradientColour(token, c) {
+  const text = String(token ?? '');
+  if (text.startsWith('$')) return String(c.literals?.[text.slice(1)] ?? 'FF808080').slice(2);
+  return text.replace(/^#/, '').toUpperCase();
+}
+
+function synthItems(direction, c) {
+  const drawing = synthKnobDrawing(direction, { detail: c.detail, depth: c.depthShare, showValue: c.showValue });
+  if (!drawing) return [];
+  const items = drawingItems(drawing.markup, {
+    colour: (token) => markupColour(token, c),
+    gradients: drawing.gradients,
+    shadow: drawing.shadow ?? null,
+    glow: drawing.glow ?? null,
+  });
+  if (drawing.readout) items.push({ name: 'readout', text: true, readout: true, x: 80, y: drawing.readout.y, size: 12, colour: c.legend, family: 'monospace', out: true });
+  return items;
+}
+
+/**
+ * An SVG gradient (`{ type, x1, y1, x2, y2 | cx, cy, r, stops: [[offset, colour, opacity]] }`, its
+ * coordinates fractions of `on`, the shape's box) as a layer's gradient over `layer`, its own box:
+ * both in the component's pixels. A linear one's value is linear across the shape's box however
+ * long or tall that is, so it is a CSS gradient at the angle its value rises fastest, its stops
+ * placed where the CSS line meets them; a radial one an ellipse in the layer's percentages. Its
+ * stops are blended as SVG blends them (unpremultipliedStops).
+ */
+function layerGradient(def, on, layer, colourOf) {
+  const stops = (def.stops ?? []).map(([offset, colour, opacity]) => {
+    const alpha = Math.round(clamp(opacity, 0, 1) * 255).toString(16).padStart(2, '0').toUpperCase();
+    return { offset, color: `${alpha}${colourOf(colour)}` };
+  });
+  const placed = (positionOf) => unpremultipliedStops(stops.map((stop) => ({ color: stop.color, position: r3(positionOf(stop.offset)) })));
+  if (def.type === 'radial') {
+    const cx = on.x + num(def.cx, 0.5) * on.w;
+    const cy = on.y + num(def.cy, 0.5) * on.h;
+    return {
+      type: 'radial', edge: 0, angle: 90,
+      centerX: r3(((cx - layer.x) / layer.w) * 100), centerY: r3(((cy - layer.y) / layer.h) * 100),
+      radiusX: r3(((num(def.r, 0.5) * on.w) / layer.w) * 100), radiusY: r3(((num(def.r, 0.5) * on.h) / layer.h) * 100),
+      stops: placed((offset) => offset * 100),
+    };
+  }
+  const x1 = num(def.x1, 0); const y1 = num(def.y1, 0);
+  const dx = num(def.x2, 1) - x1; const dy = num(def.y2, 0) - y1;
+  const l2 = dx * dx + dy * dy || 1;
+  const valueAt = ([x, y]) => (((x - on.x) / on.w - x1) * dx + ((y - on.y) / on.h - y1) * dy) / l2;
+  const gx = dx / (on.w * l2);
+  const gy = dy / (on.h * l2);
+  const theta = Math.atan2(gx, -gy);
+  const dir = [Math.sin(theta), -Math.cos(theta)];
+  const length = Math.abs(layer.w * dir[0]) + Math.abs(layer.h * dir[1]);
+  const centre = [layer.x + layer.w / 2, layer.y + layer.h / 2];
+  const t0 = valueAt([centre[0] - (dir[0] * length) / 2, centre[1] - (dir[1] * length) / 2]);
+  const t1 = valueAt([centre[0] + (dir[0] * length) / 2, centre[1] + (dir[1] * length) / 2]);
+  const span = t1 - t0 || 1;
+  return {
+    type: 'linear', edge: 0, angle: r3((theta * 180) / Math.PI), centerX: 50, centerY: 50, radiusX: 50, radiusY: 50,
+    stops: placed((offset) => ((offset - t0) / span) * 100),
+  };
+}
+
 /**
  * The layers that draw `resolved`'s form, or null when it names none drawn here. `drag` is the
  * knob's drag as its parts would give it (knobLayers' `behavior`): the panel turns a knob in a form
@@ -473,7 +462,8 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
   const core = resolved?._children?.Core ?? {};
   const styledCore = styled?._children?.Core ?? core;
   const form = String(core.controlForm ?? '');
-  const draw = DRAWINGS[form];
+  const direction = form.startsWith('new-') ? PHYSICAL_DIRECTIONS.find((entry) => `new-${entry.id}` === form) : null;
+  const draw = DRAWINGS[form] ?? (direction ? (c) => synthItems(direction, c) : null);
   if (!draw) return null;
   const width = Math.max(1, box.width);
   const height = Math.max(1, box.height);
@@ -514,6 +504,10 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     max: resolved?._children?.Behavior?.max ?? 1,
   };
   const faceLiteral = shownLiteral('formFaceColour', 'FFDEDBD2');
+  const housingLiteral = shownLiteral('formHousingColour', 'FF171A20');
+  c.literals = { face: faceLiteral, housing: housingLiteral, ink: shownLiteral('formInkColour', 'FF20282C'), accent: shownLiteral('formAccentColour', 'FF40BCCC') };
+  c.literals.legend = literal(core.formLabelColour) ?? c.literals.ink;
+  c.depthShare = depth;
   // The drawing's dome (radial, lit from the upper left) and brushed metal (top to bottom), over
   // the shape's own box: SVG's objectBoundingBox, the gradient's own percentages.
   c.dome = {
@@ -540,14 +534,16 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     const scaled = !item.out;
     const k = s * (scaled ? size : 1);
     // Each subpath in the box's pixels: a polygon's points, a circle's centre and radius.
-    const subpaths = item.shape.map((sub) => (Array.isArray(sub)
-      ? { pts: sub.map((p) => at(p, scaled)) }
-      : { circle: [...at([sub.circle[0], sub.circle[1]], scaled), sub.circle[2] * k] }));
+    const subpaths = item.shape.map((sub) => {
+      if (Array.isArray(sub)) return { pts: sub.map((p) => at(p, scaled)) };
+      if (sub.ellipse) return { ellipse: [...at([sub.ellipse[0], sub.ellipse[1]], scaled), sub.ellipse[2] * k, sub.ellipse[3] * k] };
+      return { ellipse: [...at([sub.circle[0], sub.circle[1]], scaled), sub.circle[2] * k, sub.circle[2] * k] };
+    });
     const xs = [];
     const ys = [];
     for (const sub of subpaths) {
       if (sub.pts) for (const [x, y] of sub.pts) { xs.push(x); ys.push(y); }
-      else { const [cx, cy, r] = sub.circle; xs.push(cx - r, cx + r); ys.push(cy - r, cy + r); }
+      else { const [cx, cy, rx, ry] = sub.ellipse; xs.push(cx - rx, cx + rx); ys.push(cy - ry, cy + ry); }
     }
     const b = { x: Math.min(...xs), y: Math.min(...ys) };
     b.width = Math.max(0.001, Math.max(...xs) - b.x);
@@ -556,19 +552,33 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     const uy = (y) => r3((y - b.y) / b.height);
     const pathData = subpaths.map((sub) => {
       if (sub.pts) return `${sub.pts.map(([x, y], i) => `${i ? 'L' : 'M'}${ux(x)} ${uy(y)}`).join(' ')} Z`;
-      const [cx, cy, r] = sub.circle;
-      const rx = r3(r / b.width);
-      const ry = r3(r / b.height);
-      return `M${ux(cx - r)} ${uy(cy)} A${rx} ${ry} 0 1 0 ${ux(cx + r)} ${uy(cy)} A${rx} ${ry} 0 1 0 ${ux(cx - r)} ${uy(cy)} Z`;
+      const [cx, cy, ex, ey] = sub.ellipse;
+      const rx = r3(ex / b.width);
+      const ry = r3(ey / b.height);
+      return `M${ux(cx - ex)} ${uy(cy)} A${rx} ${ry} 0 1 0 ${ux(cx + ex)} ${uy(cy)} A${rx} ${ry} 0 1 0 ${ux(cx - ex)} ${uy(cy)} Z`;
     }).join(' ');
+    // A drawing's gradient, on the box SVG measured it on (the shape's own), redrawn on this layer's.
+    let gradient = item.gradient ?? null;
+    if (item.svgGradient) {
+      const g = item.svgGradient.box;
+      const [gx, gy] = at([g.x, g.y], scaled);
+      gradient = layerGradient(item.svgGradient.def, { x: gx, y: gy, w: Math.max(0.001, g.w * k), h: Math.max(0.001, g.h * k) }, { x: b.x, y: b.y, w: b.width, h: b.height }, (token) => gradientColour(token, c));
+    }
     const layout = pxBox(b);
     if (item.turn) Object.assign(layout, pivotIn(b, at(item.turn, scaled)));
     const layer = createPartNode(named(item.name), {
       role: item.turn || item.moveX || item.moveY || item.lit != null ? 'indicator' : 'custom',
       kind: 'path', zIndex: depthIndex, opacity: num(item.opacity, 1),
       layout, meta: { pathData, closed: true },
-      sections: { Background: background(item.colour ?? null, item.gradient ?? null) },
+      sections: { Background: background(item.colour ?? null, gradient) },
     });
+    // A blur: a drop shadow's or a glow's, in the drawing's units.
+    if (item.blur) {
+      const effects = deepClone(SECTION_DEFAULTS.Effects);
+      effects._children.Shadows.items = [];
+      effects._children.Filters.blur = r3(item.blur * k);
+      layer._children.Effects = effects;
+    }
     if (item.turn) out.bindings[`${layer.name}Turn`] = rangeBinding(`${layer.name}Turn`, source, `Parts.${layer.name}.Layout.rotation`, -135, 135);
     if (item.moveX) out.bindings[`${layer.name}MoveX`] = rangeBinding(`${layer.name}MoveX`, source, `Parts.${layer.name}.Layout.offsetX`, 0, item.moveX * k);
     if (item.moveY) out.bindings[`${layer.name}MoveY`] = rangeBinding(`${layer.name}MoveY`, source, `Parts.${layer.name}.Layout.offsetY`, 0, item.moveY * k);
@@ -610,7 +620,7 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     text._children.Font.size = r3(fontSize);
     text._children.Font.weightValue = 400;
     text._children.Font.weight = 'Regular';
-    text._children.Font.family = item.family || 'sans-serif';
+    text._children.Font.family = item.family || c.family || 'sans-serif';
     const anchor = item.anchor ?? 'middle';
     text._children.Position.justification = anchor === 'start' ? 'left' : (anchor === 'end' ? 'right' : 'centred');
     // A baseline at y: the glyphs' middle about a third of the size above it.
@@ -619,7 +629,7 @@ export function knobFormDrawingLayers({ resolved, styled = resolved, rect: box, 
     const b = anchor === 'start' ? { x: x - 8, y: middle - fontSize, width: span, height: fontSize * 2 }
       : anchor === 'end' ? { x: x - span + 8, y: middle - fontSize, width: span, height: fontSize * 2 }
         : { x: x - span / 2, y: middle - fontSize, width: span, height: fontSize * 2 };
-    const layer = createPartNode(named(item.name), { role: 'label', kind: 'rectangle', zIndex: depthIndex, opacity: 1, layout: pxBox(b), sections: { Text: text } });
+    const layer = createPartNode(named(item.name), { role: 'label', kind: 'rectangle', zIndex: depthIndex, opacity: num(item.opacity, 1), layout: pxBox(b), sections: { Text: text } });
     if (item.readout) {
       out.bindings[`${layer.name}Text`] = { _type: 'Binding', name: `${layer.name}Text`, enabled: true, source: `channel.${channel}.display`, mapMode: 'direct', target: `Parts.${layer.name}.Text.content` };
       out.partNames.labelValue = [...(out.partNames.labelValue ?? []), layer.name];

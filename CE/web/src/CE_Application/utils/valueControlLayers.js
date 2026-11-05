@@ -45,7 +45,7 @@ import { REVEAL_ALL_MASK_SRC } from './partMask.js';
 import { decibelPosition, meterArcAngle, meterFillColourAt, meterSegmentCenter, meterTickLabel, meterTicks, meterZones } from './meterLayout.js';
 import { normalLineHeight } from './textLineHeight.js';
 import { unpremultipliedStops } from './gradientStops.js';
-import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
+import { deviceShapeOptions, deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { buttonAnatomyLayout } from './anatomyLayout.js';
 import { scalePathData, transformPathData } from './svgPathScale.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
@@ -1893,11 +1893,15 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       if (Object.keys(on).length) out.onPatches[layer.name] = on;
     } else {
       const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
-      const d = devicePatternCells(String(part.pattern ?? 'solid'), 0, 0, box.w, box.h, { count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight })
-        .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius }))
+      const outlineOf = (active) => devicePatternCells(String(part.pattern ?? 'solid'), 0, 0, box.w, box.h, { count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight })
+        .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, deviceShapeOptions(part, radius, active)))
         .filter(Boolean)
         .join(' ');
+      const d = outlineOf(false);
       if (!d) continue;
+      // A drawn outline of its own for pressed or on (`shapePathOn`): the layer's path then, a state.
+      const dOn = outlineOf(true);
+      const pathOn = dOn !== d ? scalePathData(dOn, 1 / box.w, 1 / box.h) : '';
       const border = part?._children?.Background?._children?.Border ?? {};
       const bw = border.enabled === true && num(border.thickness, 0) > 0 ? num(border.thickness, 0) * S : 0;
       background._children.Border = { ...(background._children.Border ?? {}), enabled: bw > 0, thickness: r3(bw) };
@@ -1934,8 +1938,11 @@ export function buttonDeviceLayers({ resolved, styled = resolved, rect, channel,
       const on = {};
       if (String(part.activeColour ?? '').trim()) on['Background.Fill.colour'] = styledPart.activeColour ?? part.activeColour;
       if (part.activeOpacity != null) on.opacity = num(part.activeOpacity, 1);
+      if (pathOn) on['meta.pathData'] = pathOn;
       if (Object.keys(on).length) out.onPatches[layer.name] = on;
-      if (extra && part.activeOpacity != null) out.onPatches[extra.name] = { opacity: num(part.activeOpacity, 1) };
+      const edgeOn = { ...(part.activeOpacity != null ? { opacity: num(part.activeOpacity, 1) } : {}), ...(pathOn ? { 'meta.pathData': pathOn } : {}) };
+      if (extra && Object.keys(edgeOn).length) out.onPatches[extra.name] = edgeOn;
+      if (shadow && pathOn) out.onPatches[shadow.name] = { ...(out.onPatches[shadow.name] ?? {}), 'meta.pathData': pathOn };
     }
     for (const each of [shadow, layer, extra].filter(Boolean)) {
       each.zIndex = depth;
@@ -2248,7 +2255,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       const { background, bw } = backgroundOf(styledPart, part);
       for (const length of lengths) {
         const d = devicePatternCells('columns', box.x, box.y, box.w, box.h, { count: length, cellWidth: part.cellWidth ?? 92 })
-          .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius }))
+          .map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, deviceShapeOptions(part, radius)))
           .filter(Boolean)
           .join(' ');
         if (!d) continue;
@@ -2279,7 +2286,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         const index = bottom ? cell.rows - 1 - cell.row : cell.col;
         const count = bottom ? cell.rows : cell.cols;
         const t = index / count;
-        const d = deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius });
+        const d = deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, deviceShapeOptions(part, radius));
         if (!d) return;
         const cellBox = { x: cell.x, y: cell.y, w: cell.w, h: cell.h };
         const base = backgroundOf(styledPart, part);
@@ -2287,7 +2294,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
         const lit = backgroundOf(styledPart, part, zoneMode === 'position' ? meterZoneColour((index + 0.5) / count, meter) : litColour);
         // Lit, the cell stands where the part's lit offset moves it.
         const litBox = { ...cellBox, x: cellBox.x + offset.x, y: cellBox.y + offset.y };
-        const litD = deviceShapePath(part.shape, litBox.x, litBox.y, litBox.w, litBox.h, { depth: part.shapeDepth, radius });
+        const litD = deviceShapePath(part.shape, litBox.x, litBox.y, litBox.w, litBox.h, deviceShapeOptions(part, radius));
         // A cell is lit when its level (its index over the count) is at or under the reading.
         for (const plain of pathLayers(`${name}${i}`, d, cellBox, base.background, { opacity, bw: base.bw })) {
           add(name, plain);
@@ -2329,7 +2336,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
           cellBackground._children.Corners.radius = r3(radius * S);
           layer = createPartNode(named(`${name}${i}`), { role: 'fill', kind: 'roundedRectangle', zIndex: depth, opacity, layout: pxBox(end, origin), sections: { Background: cellBackground } });
         } else {
-          const d = deviceShapePath(part.shape, 0, 0, cell.w, cell.h, { depth: part.shapeDepth, radius });
+          const d = deviceShapePath(part.shape, 0, 0, cell.w, cell.h, deviceShapeOptions(part, radius));
           layer = createPartNode(named(`${name}${i}`), {
             role: 'fill', kind: 'path', zIndex: depth, opacity, layout: pxBox(end, origin),
             meta: { pathData: scalePathData(d, 1 / Math.max(0.001, cell.w), 1 / Math.max(0.001, cell.h)), closed: true }, sections: { Background: cellBackground },
@@ -2429,7 +2436,7 @@ export function meterDeviceLayers({ resolved, styled = resolved, rect, channel, 
       const radius = num(part?._children?.Background?._children?.Corners?.radius, 0);
       const d = devicePatternCells(String(part.pattern ?? 'solid'), box.x, box.y, box.w, box.h, {
         count: part.patternCount, rows: part.patternRows, cellWidth: part.cellWidth, cellHeight: part.cellHeight,
-      }).map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, { depth: part.shapeDepth, radius })).filter(Boolean).join(' ');
+      }).map((cell) => deviceShapePath(part.shape, cell.x, cell.y, cell.w, cell.h, deviceShapeOptions(part, radius))).filter(Boolean).join(' ');
       if (d) {
         const litColour = String(styledPart.activeColour ?? part.activeColour ?? '').trim() || fill.colour;
         const litOpacity = part.activeOpacity != null ? num(part.activeOpacity, 1) : opacity;

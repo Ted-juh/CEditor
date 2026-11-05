@@ -16,7 +16,7 @@
 //   labels      [{ x, y, text, size, anchor }]: a scale's numerals, centred on (x, y), upright and
 //               already where the part's rotation puts them (drawn outside its transform)
 
-import { deviceShapePath, devicePatternCells } from './deviceShapes.js';
+import { deviceShapeOptions, deviceShapePath, devicePatternCells } from './deviceShapes.js';
 import { meterFillColourAt, meterZones } from './meterLayout.js';
 import { METER_FRAME } from '../models/meterDeviceParts.js';
 
@@ -235,10 +235,8 @@ export function meterPartDrawing(name, part, { p = 0, peak = null, figures = '0'
     ? meterZoneColour(motion === 'clip' ? held : reading, meter)
     : null;
 
-  const shape = (x, y, w, h) => deviceShapePath(part?.shape, x, y, w, h, {
-    depth: part?.shapeDepth,
-    radius: num(part?._children?.Background?._children?.Corners?.radius, 0),
-  });
+  const shape = (x, y, w, h) => deviceShapePath(part?.shape, x, y, w, h,
+    deviceShapeOptions(part, num(part?._children?.Background?._children?.Corners?.radius, 0)));
 
   if (name === 'legend') {
     const text = legendText(part, reading, figures);

@@ -40,7 +40,7 @@
   const SHAPE_LABELS = {
     rect: 'Rectangle', ellipse: 'Ellipse', diamond: 'Diamond', hexagon: 'Hexagon', flap: 'Folded Sheet', corner: 'Fold',
     pillow: 'Cushion', bracket: 'Guard Bracket', crosshair: 'Crosshair', pair: 'Pair', ribbon: 'Ribbon', ring: 'Ring',
-    arch: 'Arch', ticket: 'Paper Tally', pointer: 'Pointer', bow: 'Bow', bevel: 'Bevelled Key', octagon: 'Octagon',
+    arch: 'Arch', ticket: 'Paper Tally', pointer: 'Pointer', bow: 'Bow', bevel: 'Bevelled Key', octagon: 'Octagon', path: 'Drawn Outline',
   };
   const PATTERN_LABELS = { solid: 'Solid', lines: 'Lines', grid: 'Grid' };
   const word = (text) => text.charAt(0).toUpperCase() + text.slice(1);
@@ -166,7 +166,7 @@
             {#each DEVICE_SHAPES as id (id)}<option value={id}>{SHAPE_LABELS[id] ?? word(id)}</option>{/each}
           </select>
         </PropertyCell>
-        <PropertyCell label="Depth %" compact path={`${prefix}.shapeDepth`} disabled={['rect', 'ellipse', 'diamond'].includes(shapeKind)} hint="How deep a fold, a bracket or a ring is, as a percentage of the part.">
+        <PropertyCell label="Depth %" compact path={`${prefix}.shapeDepth`} disabled={['rect', 'ellipse', 'diamond', 'path'].includes(shapeKind)} hint="How deep a fold, a bracket or a ring is, as a percentage of the part.">
           <NumberCell label="Depth %" value={numberOr(part.shapeDepth, 20)} defaultValue={20} step={1} min={0} max={100} onchange={(v) => set(`${prefix}.shapeDepth`, v)} />
         </PropertyCell>
         <PropertyCell label="Corner" compact path={`${prefix}.Background.Corners.radius`} disabled={!['rect', 'pillow'].includes(shapeKind)} hint="How round its corners are, in the device's units.">

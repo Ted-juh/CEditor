@@ -8,7 +8,7 @@
    */
   import SliderShapeFill from './SliderShapeFill.svelte';
   import { BUTTON_DEVICE_PARTS, DEVICE_FRAME } from '../models/buttonDeviceParts.js';
-  import { deviceShapePath, devicePatternCells } from '../utils/deviceShapes.js';
+  import { deviceShapeOptions, deviceShapePath, devicePatternCells } from '../utils/deviceShapes.js';
   import { materialActive } from '../utils/materialFilter.js';
   import { numberOr } from '../utils/primitives.js';
   import { renderedDevicePartSpec, renderedFrame, renderedLooks, requestRenderedLook } from '../utils/renderedLook.js';
@@ -64,7 +64,7 @@
     const radius = numberOr(part?._children?.Background?._children?.Corners?.radius, 0);
     // A cell's share of its pitch too, as a meter's: the fine rules across an edge-lit key.
     return devicePatternCells(String(part?.pattern ?? 'solid'), box.x, box.y, box.w, box.h, { count: part?.patternCount, rows: part?.patternRows, cellWidth: part?.cellWidth, cellHeight: part?.cellHeight })
-      .map((cell) => deviceShapePath(part?.shape, cell.x, cell.y, cell.w, cell.h, { depth: part?.shapeDepth, radius }))
+      .map((cell) => deviceShapePath(part?.shape, cell.x, cell.y, cell.w, cell.h, deviceShapeOptions(part, radius, active)))
       .filter(Boolean)
       .join(' ');
   }

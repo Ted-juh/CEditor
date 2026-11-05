@@ -362,7 +362,9 @@ close round the cap, and **Numbers** prints numbers round it, evenly **From** on
 another: 6 from 0 to 10 is a synth panel's 0 2 4 6 8 10. The Button and Switch
 tabs show one part at a time: pick **Housing**, **Guard**, **Actuator** (called **Key** on a button),
 **Symbol**, **Indicator** or **Legend** in the row at the top (a green dot marks a part that is drawn),
-then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid),
+then its **Shape** (outline, depth, corner, and a pattern that repeats it in lines or a grid; a
+**Drawn Outline** is a classic design's own curve, kept as the design drew it, and may change when
+the part is pressed or on, as a rocker tips),
 **Position** (in % of the device, with its rotation and the pivot it turns about), **Appearance**
 (fill, opacity, finish, border and shading, and a drop **Shadow** under it, with its **Softness** and
 colour) and what it does **When On** or **When Pressed**: how far
@@ -1115,9 +1117,9 @@ or the control that stayed on the panel. The **Interact** card says what such a 
 the component, or a knob or slider on the panel. A control drawn in a classic design (**Core › Control
 design**: Flat disc, Moulded pebble, Studio needle and the rest) comes in as layers that draw that design in its
 own colours: a knob as the drawing itself, shape by shape, its pointer or cap turning with the value;
-a button, switch or meter as the design's parts. Designs whose parts differ from their drawing
-are refused by name (the synth sets' knobs, and some of their buttons, switches and meters, among
-them); **Convert to Parts** on the control first gives one that converts exactly. A counter's
+a button, switch or meter as the design's parts. Some of the synth sets' buttons, switches and
+meters draw their parts a little differently from their drawing, and are refused by name;
+**Convert to Parts** on the control first gives one that converts exactly. A counter's
 digits are written by a **Counter Figures** binding on the **React** tab: one figure of the reading
 to each window, and each count of figures its own windows. A meter that holds its peak (**Peak
 Hold**, a **Clip Lamp**, a part that shows the peak) keeps it on its value, held and falling as the

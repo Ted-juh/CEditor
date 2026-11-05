@@ -78,7 +78,7 @@ export function withFormAsParts(control, set = null) {
 // its pattern, its motion, its finish.
 export const FORM_PART_KEYS = [
   'outline', 'outlineCount', 'outlineDepth', 'outlineRotation', 'turns',
-  'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
+  'shape', 'shapeDepth', 'shapePath', 'shapePathOn', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing', 'pivotX', 'pivotY',
   'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize', 'opacity', 'Layout.rotation',
   'Background.Effects.Material.enabled',
   // A knob plate's shadow, perspective and grooves, a bar pointer's taper and second bar
@@ -107,7 +107,7 @@ export function formAsPartsRecipe(type, form, set = null, colours = null) {
   if (type === 'Meter' || type === 'ProgressBar') {
     return meterFormFamily(type, form, { ink, divisions, face, housing });
   }
-  return buttonFormFamily(type, form, { ink, face, housing });
+  return buttonFormFamily(type, form, { ink, face, housing, ...(colours?.depth != null ? { depth: colours.depth } : {}) });
 }
 
 // The roles the recipes write (the same four in each recipe module), and the Core field and
@@ -132,7 +132,12 @@ export function ownColours(control, set = null) {
     return resolveColourLiteral(text, set ?? undefined, fallback);
   };
   const ink = literal(core.formInkColour, 'FF20282C');
-  const out = { ink, divisions: Math.max(4, Math.min(48, Math.round(Number(core.formDivisions)) || 12)) };
+  const out = {
+    ink,
+    divisions: Math.max(4, Math.min(48, Math.round(Number(core.formDivisions)) || 12)),
+    // The form's Depth, how strong its shading and how deep its press.
+    depth: Math.max(0, Math.min(100, Number.isFinite(Number(core.formDepth)) ? Number(core.formDepth) : 60)),
+  };
   for (const [, key, field, fallback] of ROLE_FIELDS) out[key] = literal(core[field], fallback ?? ink);
   return out;
 }
@@ -150,18 +155,16 @@ function inOwnColours(recipe, colours) {
   return swap(recipe);
 }
 
-// The forms whose parts draw them otherwise than the form's own drawing (editor/ControlAnatomy.svelte
-// and the synth sets' drawings), by the control kind whose forms they are. Measured with
-// browser-checks/knobLayers.mjs, a control in each form against its layers, on Graphite: the parts
-// approximate a shape the drawing curves its own way (a pillow for a moulded cushion, a hexagon for
-// a hexagonal plunger), or tip and flip a key the drawing redraws, or skew a cap the parts keep
-// square. Their parts are close in spirit, not in pixels, so a copy made from them would not look
-// like the control: Create Component from Selection refuses them by name, and Convert to Parts on
-// the control first gives one that converts exactly. The knob's base forms are not here: they come
-// in as their drawing (utils/formDrawingLayers.js).
+// The base forms whose parts draw them otherwise than the form's own drawing (editor/ControlAnatomy.svelte),
+// by the control kind whose forms they are, refused by name with Convert to Parts suggested first.
+// None now: measured with browser-checks/knobLayers.mjs, a control in each form against its layers
+// on Graphite, the last five (the cushion and hexagonal keys; the rocker, latch and strap switches)
+// had shapes their parts only approximated and keys their drawings redraw when on, and are drawn
+// outlines now (utils/deviceShapes.js `path`, `shapePathOn`). Kept for a form that may need it. The
+// knobs' forms are not here: they come in as their drawings (utils/formDrawingLayers.js).
 const PARTS_DIFFER = {
-  Button: new Set(['cushion', 'hexkey']),
-  ToggleButton: new Set(['rocker', 'latch', 'strap']),
+  Button: new Set(),
+  ToggleButton: new Set(),
   Meter: new Set(),
   Knob: new Set(),
 };
@@ -176,9 +179,9 @@ function formFamily(type) {
 // The synth sets' forms (`new-<set id>`, drawn by PhysicalAnatomy and the two series after it) whose
 // parts draw them as their drawings do, by kind and set id; measured as above (2026-11-04, on Graphite
 // in the form's own colours: the sets' default ones). Any other synth form's
-// parts differ: the sets' knobs as parts are a little smaller in the box than their drawings and
-// keep their light still where the drawings turn it (models/directionKnobParts.js), and their
-// devices leave out a line or a lit border here and there (models/directionDeviceParts.js).
+// parts differ: the devices leave out a line or a lit border here and there, or draw a well or a
+// scale another way (models/directionDeviceParts.js). The knobs come in as their drawings
+// (utils/synthKnobDrawings.js), so none is listed.
 const SYNTH_PARTS_MATCH = {
   // Unpressed (a button holds its value only while pressed): 19 of 36, at most 1.7 % of pixels apart.
   Button: new Set(['brassworks', 'bakelite', 'hi-fi', 'porcelain', 'flightdeck', 'stompbox', 'switchboard', 'chronograph',
@@ -191,7 +194,7 @@ const SYNTH_PARTS_MATCH = {
   Meter: new Set(['bakelite', 'porcelain', 'flightdeck', 'stompbox', 'switchboard', 'chronograph', 'cassette-deck', 'diesel',
     'gemstone', 'leatherbound', 'valve-console', 'chicken-head', 'turret-stack', 'deep-flute', 'concave-studio', 'hex-drive',
     'coin-edge', 'gimbal-ring', 'lever-dial', 'castellated', 'floating-halo', 'prism-cap']),
-  // None: 8 to 16 % apart.
+  // Their parts, 6 to 16 % apart; drawn instead.
   Knob: new Set(),
 };
 

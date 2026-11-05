@@ -7557,7 +7557,7 @@ const DEFINE_SPECS = {
       'look', 'renderProfile', 'renderCount', 'renderDepth', 'renderTaper', 'renderHeight', 'renderTop',
       'renderMaterial', 'renderTopMaterial', 'renderTopColour', 'renderCorner',
       // A button's or a switch's device parts (models/buttonDeviceParts.js).
-      'shape', 'shapeDepth', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
+      'shape', 'shapeDepth', 'shapePath', 'shapePathOn', 'pattern', 'patternCount', 'patternRows', 'travelX', 'travelY', 'swing',
       'pivotX', 'pivotY', 'follows', 'activeColour', 'activeOpacity', 'offText', 'onText', 'fontSize',
       // A meter's parts (models/meterDeviceParts.js).
       'motion', 'fillFrom', 'lightFrom', 'source', 'cellWidth', 'cellHeight', 'zoneFrom', 'zoneColours', 'clipFrom', 'textSource', 'legendText', 'fontFamily',

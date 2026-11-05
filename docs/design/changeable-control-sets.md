@@ -514,22 +514,37 @@ components):
      (`unpremultipliedStops`, every 2.5 % and at each stop): SVG blends a stop's colour and its
      opacity apart, CSS premultiplied, and between a clear white and an opaque face the two part by
      a fifth of the shading (the pebble, lens, roller and scallop 2.4 to 7.9 % apart before).
+     The synth sets' knobs (`new-<set>`) come in as their drawings too, read from markup: the knob
+     branch of each drawing written out once as SVG (`utils/synthKnobDrawings.js`), with marks where
+     the drawing used the value (a group that turns, an arc to the value, ticks that light), and
+     read shape by shape (`utils/svgDrawingItems.js`: circles, ellipses, rects, paths, polygons and
+     text, groups and their turns, fills and strokes, gradients by id). An SVG gradient is redrawn on
+     the layer's own box from the shape's, where SVG measured it (a linear one's value rises across
+     that box at an angle CSS can draw, its stops placed where the CSS line meets them; a radial one
+     an ellipse in the layer's percentages), so a gradient on a stroke keeps its place. A group's
+     drop shadow is its silhouette (the shapes marked to cast, hulled, or an outline drawn for it),
+     lower, blurred, under it and turning with it, as the filter ran in the group's turned space;
+     cast by a fill clear in places it is as clear there, the gradient's opacities in black. A glow
+     is a blurred copy under the shape. Ticks drawn alike and not crossing share a layer.
+     The five base buttons and switches whose parts only approximated their drawings are drawn
+     outlines now: a device part takes a `path` shape (`shapePath`, SVG path data in 0..1 of its
+     box, several outlines allowed; `shapePathOn` for pressed or on, a state on its layer, as the
+     rocker tips, the latch sinks and the strap flips), Drawn Outline on the Button and Meter tabs.
+     The forms' metal and dome are the drawings' own, written as white then black over the part's
+     colour (the same over any colour, as strong as the form's Depth), which brings the Soft,
+     Carbon, Console and Machined sets' keys to their forms' drawings (their starters regenerated).
      Refused by name, pointing to Convert to Parts first (`formPartsDiffer`), which gives a control
-     that converts exactly: the forms whose parts draw them otherwise than their drawings. The
-     cushion and hexagonal keys (a pillow and a hexagon where the drawings curve their own way; 5 to
-     17 %), the rocker, latch and strap switches (a key the drawing redraws or skews when on; 2.5 to
-     16 %), and the synth sets' forms (`new-<set>`) whose parts differ from their drawings: every
-     knob (a little smaller than its drawing, its light kept still where the drawing turns it, a
-     ring or a line left out; 6 to 16 %), and the buttons, switches and meters the parts draw with
-     a different well, edge or scale (2.5 to 17 %). The synth forms that match are listed by kind
-     (`SYNTH_PARTS_MATCH`), any other synth form counting as one that differs.
-     Checked against the panel on Graphite: the twelve knobs 48 of 48 (four readings, at most 0.27 %
-     of pixels apart), the base buttons 10 of 12, switches 9 of 12 off and on, meters 12 of 12 at
-     four readings (0.26 %), the five others refused; a cushion and a rocker drawn in their parts
-     against their layers, 0.00 %. The synth sets' forms: buttons 19 of 36 (unpressed, 1.7 %),
-     switches 16 of 36 (off and on, 2 %), meters 22 of 36 (four readings, 1.9 %), knobs none; the
-     rest refused. Every offered set's own devices, drawn in their parts, after the gradient change
-     (strict): buttons 64 of 64 in both sizes, switches 128 of 128, meters 256 of 256.
+     that converts exactly: the synth sets' buttons, switches and meters whose parts differ from
+     their drawings (a different well, edge or scale, 2.5 to 17 %; the ones that match are listed
+     by kind, `SYNTH_PARTS_MATCH`).
+     Checked against the panel on Graphite: the twelve base knobs 48 of 48 (four readings, at most
+     0.27 % of pixels apart); the 36 synth knobs 144 of 144 (at most 0.54 %); the base buttons 12
+     of 12, switches 12 of 12 off and on (0.12 %), meters 12 of 12 at four readings (0.26 %); a
+     cushion and a rocker drawn in their parts against their layers, 0.00 %. The synth sets'
+     devices: buttons 19 of 36 (unpressed, 1.7 %), switches 16 of 36 (off and on, 2 %), meters 22
+     of 36 (four readings, 1.9 %); the rest refused. Every offered set's own devices, drawn in their
+     parts, after these changes (strict): buttons 64 of 64 in both sizes, switches 128 of 128,
+     meters 256 of 256.
 
    Run after these, against the panel: every set's button 64 of 64 (strict), every set's switch
    turned 20 degrees and scaled 0.9 128 of 128, a meter of each kind 136 of 136 upright and turned

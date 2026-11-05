@@ -44,7 +44,7 @@
   const SHAPE_LABELS = {
     rect: 'Rectangle', ellipse: 'Ellipse', diamond: 'Diamond', hexagon: 'Hexagon', flap: 'Folded Sheet', corner: 'Fold',
     pillow: 'Cushion', bracket: 'Guard Bracket', crosshair: 'Crosshair', pair: 'Pair', ribbon: 'Ribbon', ring: 'Ring',
-    arch: 'Arch', ticket: 'Paper Tally', pointer: 'Pointer', bow: 'Bow', bevel: 'Bevelled Key', octagon: 'Octagon',
+    arch: 'Arch', ticket: 'Paper Tally', pointer: 'Pointer', bow: 'Bow', bevel: 'Bevelled Key', octagon: 'Octagon', path: 'Drawn Outline',
   };
   const PATTERNS = [['solid', 'Solid'], ['lines', 'Lines'], ['grid', 'Grid'], ['columns', 'Columns'], ['digits', 'Figures']];
   const MOTIONS = [['none', 'None'], ['fill', 'Fill'], ['slide', 'Slide'], ['swing', 'Swing'], ['light', 'Light'], ['clip', 'Clip Lamp']];
