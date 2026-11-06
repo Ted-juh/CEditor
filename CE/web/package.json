@@ -68,6 +68,7 @@
     "lucide-svelte": "^1.0.1",
     "paper": "^0.12.18",
     "paperjs-offset": "^2.2.1",
+    "pdfjs-dist": "^6.4.299",
     "quickjs-emscripten-core": "0.32.0",
     "rbush": "^4.0.1",
     "ses": "2.3.0",

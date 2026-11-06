@@ -1,0 +1,538 @@
+<title>Four More Ways In</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ---------------------------------------------------------------------------
+   Layout: one reading column; each mock-up on a dark plate that scrolls sideways
+   on a phone. Palette from the app, as in the other mock-ups here: properties
+   panel #1E1E1E on #2A2A2A, fields #1A1A1A, labels #5B9BD5, dock #15181B,
+   accent teal #14B8A6. A single dark look on purpose: it is the app's. The Figma
+   window is drawn in Figma's own light chrome.
+   NOTHING HERE IS BUILT.
+--------------------------------------------------------------------------- */
+:root{
+  color-scheme:dark;
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333; --raised:#20262B;
+  --ink:#DDD; --ink-1:#E8EEF5; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --teal-ink:#8FEDE3; --teal-ground:#0B2320;
+  --warn:#E5A029; --warn-ink:#F1D8A1; --warn-ground:#241d10; --warn-rule:#4A3A1C;
+  --bad:#D98C8C; --bad-ground:#2A1616; --bad-rule:#5A2E2E;
+  --sel:#173449; --tabbar:#111A21; --chip:#12171A;
+  --fig-bg:#FFFFFF; --fig-ink:#1E1E1E; --fig-mute:#808080; --fig-rule:#E6E6E6; --fig-blue:#0D99FF; --fig-soft:#F5F5F5; --fig-warn:#B86200;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink-1);font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-block:0 96px;
+      padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hero{padding-block:48px 28px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1.4 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(28px,4.4vw,44px)/1.08 var(--sans);letter-spacing:-.02em;margin:14px 0 0;max-width:24ch;text-wrap:balance}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:34ch;text-wrap:balance}
+h3{font:600 17px/1.35 var(--sans);margin:40px 0 0;text-wrap:balance}
+.lede{font-size:clamp(16px,1.7vw,18px);line-height:1.55;color:var(--ink-2);max-width:66ch;margin:16px 0 0}
+p{max-width:68ch;color:var(--ink-2);margin:12px 0 0;font-size:15px}
+p b,li b,td b{color:var(--ink-1);font-weight:600}
+ul,ol{max-width:68ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:12px 0 0}
+li{margin-top:8px}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px;overflow-wrap:anywhere}
+.bar{margin-top:22px;border:1px solid var(--warn-rule);background:var(--warn-ground);border-radius:6px;padding:12px 14px;color:var(--warn-ink);font-size:14px;max-width:74ch}
+.bar b{color:var(--warn)}
+.toc{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr));gap:12px;margin-top:26px}
+.toc a{display:block;text-decoration:none;border:1px solid var(--rule);border-radius:8px;padding:12px 14px;background:var(--ground-2);color:var(--ink-2);font-size:14px;line-height:1.45}
+.toc a:hover,.toc a:focus-visible{border-color:var(--teal-dim);outline:none}
+.toc a b{display:block;color:var(--ink-1);font-size:15px;margin-bottom:3px}
+.toc a .sz{font:600 10px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--teal)}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+.plate{margin-top:20px}
+.scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:10px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:80ch;margin:0;min-width:0;flex:1 1 30ch}
+.rec{font:600 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--teal);border:1px solid var(--teal-dim);border-radius:3px;padding:3px 6px;margin-left:8px;vertical-align:2px;white-space:nowrap}
+.alt{font:600 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);border:1px solid var(--rule-2);border-radius:3px;padding:3px 6px;margin-left:8px;vertical-align:2px;white-space:nowrap}
+
+/* ---- tables -------------------------------------------------------------- */
+.tablewrap{overflow-x:auto;margin-top:16px}
+table{border-collapse:collapse;font-size:14px;min-width:560px;width:100%;max-width:980px}
+th{font:600 10px/1.3 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);text-align:left;padding:8px 10px;border-bottom:1px solid var(--rule-2)}
+td{padding:9px 10px;border-bottom:1px solid var(--rule);color:var(--ink-2);vertical-align:top;line-height:1.5}
+td:first-child{color:var(--ink-1);font-weight:500;white-space:nowrap}
+
+/* ---- app chrome, drawn ---------------------------------------------------- */
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink);min-width:760px}
+.row{display:flex;gap:16px;align-items:flex-start}
+.menu{background:#202428;border:1px solid #3A434A;border-radius:6px;box-shadow:0 10px 30px #0008;padding:5px;width:330px;flex:none}
+.mi{display:flex;align-items:center;gap:8px;padding:6px 10px;border-radius:4px;color:var(--ink-2);font-size:11.5px}
+.mi .k{margin-left:auto;color:var(--ink-4);font:500 10px/1 var(--mono)}
+.mi.hot{background:var(--sel);color:#EAF5FF}
+.mi.new{color:var(--teal-ink)}
+.mi.new::after{content:"new";margin-left:auto;font:600 8.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--teal);border:1px solid var(--teal-dim);border-radius:3px;padding:2px 4px}
+.mi.ren::after{content:"renamed";margin-left:auto;font:600 8.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--warn);border:1px solid var(--warn-rule);border-radius:3px;padding:2px 4px}
+.msep{height:1px;background:#333;margin:4px 6px}
+.mhead{font:600 9px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);padding:8px 10px 6px}
+
+.dialog{background:#1B1F23;border:1px solid #3A434A;border-radius:6px;width:390px;flex:none;overflow:hidden}
+.dialog .dh{padding:8px 12px;border-bottom:1px solid var(--rule);color:var(--ink-1);font-weight:600;font-size:11.5px}
+.dialog .db{padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.file{display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:4px;color:var(--ink-2)}
+.file.sel{background:var(--sel);color:#EAF5FF}
+.file .ext{font:600 8.5px/1 var(--mono);letter-spacing:.08em;border:1px solid #3A434A;border-radius:3px;padding:3px 4px;color:#9AA5AD;width:34px;text-align:center}
+.file .dim{margin-left:auto;color:var(--ink-4);font-family:var(--mono);font-size:10px}
+.dialog .df{padding:8px 12px;border-top:1px solid var(--rule);display:flex;gap:8px;align-items:center;color:var(--ink-3)}
+.dialog .df .sel2{border:1px solid var(--rule-2);background:var(--field);border-radius:3px;padding:4px 7px;font-family:var(--mono);font-size:10px;color:var(--ink-2)}
+.btn{border:1px solid var(--rule-2);border-radius:3px;padding:4px 10px;color:var(--ink-2);font-weight:600;background:var(--field)}
+.btn.go{border-color:var(--teal-dim);color:var(--teal-ink);background:var(--teal-ground)}
+.btn.r{margin-left:auto}
+
+.toast{border-radius:6px;padding:10px 12px;font-size:11.5px;line-height:1.5;max-width:520px;border:1px solid var(--teal-dim);background:#0B1F1D;color:#A8E6DE}
+.toast b{color:var(--teal-ink)}
+.toast.err{border-color:var(--bad-rule);background:var(--bad-ground);color:#F0C8C8}
+.toast.err b{color:#F5D5D5}
+.toast .t{font:600 9px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;display:block;margin-bottom:6px;opacity:.8}
+.stack{display:flex;flex-direction:column;gap:12px;min-width:0}
+
+/* ---- designer ------------------------------------------------------------- */
+.designer{display:grid;grid-template-columns:42px 1fr 300px;gap:10px;min-width:960px}
+.tools{background:var(--panel);border:1px solid var(--rule);border-radius:5px;display:flex;flex-direction:column;align-items:center;gap:4px;padding:6px 0}
+.tool{width:30px;height:28px;border-radius:4px;display:grid;place-items:center;color:#9AA5AD;font:600 10px/1 var(--mono)}
+.tool svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.5}
+.tool.on{background:var(--teal-ground);color:var(--teal-ink);outline:1px solid var(--teal-dim)}
+.tool.new3d{color:var(--teal-ink);outline:1.5px dashed var(--teal);outline-offset:1px}
+.board{background:#101214;border:1px solid var(--rule);border-radius:5px;display:flex;flex-direction:column}
+.boardbar{display:flex;gap:10px;align-items:center;padding:6px 10px;border-bottom:1px solid var(--rule);color:var(--ink-3);font-size:10.5px}
+.boardbar strong{color:var(--ink-1)}
+.boardbar .st{margin-left:auto;font-family:var(--mono);font-size:10px;color:var(--teal-ink)}
+.art{flex:1;display:grid;place-items:center;padding:26px;background:
+  linear-gradient(45deg,#15181a 25%,transparent 25%,transparent 75%,#15181a 75%) 0 0/16px 16px,
+  linear-gradient(45deg,#15181a 25%,transparent 25%,transparent 75%,#15181a 75%) 8px 8px/16px 16px,#121416}
+.artboard{width:230px;height:230px;background:#2B3036;border-radius:4px;display:grid;place-items:center;position:relative;box-shadow:0 0 0 1px #3A434A}
+.sel-ring{position:absolute;inset:22px;border:1px dashed var(--label);border-radius:4px;pointer-events:none}
+.sel-ring i{position:absolute;width:7px;height:7px;background:#fff;border:1px solid var(--label)}
+.sel-ring i:nth-child(1){left:-4px;top:-4px}.sel-ring i:nth-child(2){right:-4px;top:-4px}.sel-ring i:nth-child(3){left:-4px;bottom:-4px}.sel-ring i:nth-child(4){right:-4px;bottom:-4px}
+
+/* a knob drawn in CSS, standing in for a render */
+.knob3d{width:170px;height:170px;border-radius:50%;position:relative;
+  background:radial-gradient(circle at 50% 50%,transparent 61%,#0007 66%,transparent 71%),
+             repeating-conic-gradient(from 0deg,#2E3236 0 5deg,#45494E 5deg 10deg);
+  box-shadow:8px 12px 18px #0009, inset 0 0 0 2px #1B1D20}
+.knob3d::before{content:"";position:absolute;inset:16px;border-radius:50%;
+  background:radial-gradient(circle at 38% 32%,#4A4F55,#2A2D31 70%);box-shadow:0 3px 6px #0008, inset 0 1px 0 #6A7076}
+.knob3d .top{position:absolute;inset:40px;border-radius:50%;
+  background:repeating-conic-gradient(from 0deg at 50% 50%,#B9BEC4 0 2deg,#D7DBDF 2deg 4deg,#A9AEB4 4deg 6deg),radial-gradient(circle at 40% 35%,#EEF0F2,#9DA2A8);
+  background-blend-mode:multiply;box-shadow:inset 0 2px 3px #FFF8, inset 0 -3px 5px #0006, 0 2px 4px #0007}
+.knob3d .ptr{position:absolute;left:50%;top:12px;width:6px;height:44px;margin-left:-3px;border-radius:3px;background:linear-gradient(90deg,#C55A11,#F08A3E 50%,#B04E0C);box-shadow:2px 3px 3px #0008;transform:rotate(-38deg);transform-origin:50% 73px}
+.knob3d.brass .top{background:repeating-conic-gradient(from 0deg at 50% 50%,#B88A3A 0 2deg,#D9AE5C 2deg 4deg,#A87C30 4deg 6deg),radial-gradient(circle at 40% 35%,#F4D79A,#9C7230)}
+.knob3d.red::before{background:radial-gradient(circle at 38% 32%,#C0443C,#7A1E1A 70%)}
+.knob3d.chicken .top{display:none}
+.knob3d.chicken::before{inset:12px}
+.knob3d.chicken .ptr{width:46px;height:110px;margin-left:-23px;top:18px;border-radius:23px 23px 18px 18px;background:radial-gradient(circle at 40% 30%,#3C3F43,#141517 75%);transform:rotate(-38deg);transform-origin:50% 67px;box-shadow:6px 8px 10px #000A, inset 0 1px 0 #6A6F75}
+.knob3d.chicken .ptr::after{content:"";position:absolute;left:50%;top:8px;width:4px;height:34px;margin-left:-2px;border-radius:2px;background:#EDEDED}
+
+.side{display:flex;flex-direction:column;gap:10px;min-width:0}
+.layers{background:var(--panel);border:1px solid var(--rule-2);border-radius:4px;overflow:hidden}
+.lhead{font:600 9px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--label);padding:8px 9px;border-bottom:1px solid var(--rule)}
+.lrow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #242424;font-size:11px}
+.lrow:last-child{border-bottom:0}
+.lrow .thumb{width:20px;height:20px;border:1px solid #3A434A;border-radius:3px;background:#12171A;flex:none}
+.lrow .nm{flex:1;min-width:0;color:var(--ink-2);font-weight:600}
+.lrow.sel{background:var(--sel);box-shadow:inset 2px 0 0 var(--label)}
+.lrow.sel .nm{color:#EAF5FF}
+.lrow.child{padding-left:30px}
+.lrow.child .nm{font-weight:500}
+.lrow .mo{font:500 9.5px/1 var(--mono);color:var(--ink-4)}
+.ltag{font:600 8px/1 var(--mono);letter-spacing:.08em;padding:3px 5px;border-radius:3px;border:1px solid #3A434A;color:#9AA5AD}
+.ltag.d3{border-color:var(--teal-dim);color:var(--teal-ink)}
+.ltag.vec{border-color:#3D4A57;color:#B9C8D4}
+
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:var(--tabbar);border-bottom:1px solid var(--rule);align-items:center;flex-wrap:wrap}
+.dtabs span{border:1px solid transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:6px 8px;border-radius:4px}
+.dtabs span.on{border-color:var(--teal-dim);background:var(--teal-ground);color:var(--teal-ink)}
+.dtabs span.newtab{outline:1.5px dashed var(--teal);outline-offset:1px}
+.context{display:flex;align-items:center;gap:8px;padding:7px 10px;border-bottom:1px solid var(--rule);color:var(--ink-3);font-size:10.5px}
+.context strong{color:var(--ink-1)}
+.grp{padding:8px 10px;border-bottom:1px solid var(--rule)}
+.grp:last-child{border-bottom:0}
+.gh{font:600 9px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--label);margin-bottom:7px}
+.f{display:grid;grid-template-columns:86px 1fr;gap:6px;align-items:center;margin-top:5px}
+.f>span{color:var(--ink-3);font-size:10.5px}
+.v{border:1px solid var(--rule-2);background:var(--field);border-radius:3px;padding:4px 7px;font:500 10px/1.2 var(--mono);color:var(--ink-2);display:flex;align-items:center;gap:6px;min-width:0}
+.v .sw{width:14px;height:12px;border-radius:2px;border:1px solid #0008;flex:none}
+.v .chev{margin-left:auto;color:var(--ink-4)}
+.seg{display:flex;border:1px solid var(--rule-2);border-radius:3px;overflow:hidden}
+.seg i{font-style:normal;flex:1;text-align:center;padding:4px 0;font:600 9.5px/1.2 var(--sans);color:var(--ink-3);background:var(--field);border-right:1px solid var(--rule-2)}
+.seg i:last-child{border-right:0}
+.seg i.on{background:var(--teal-ground);color:var(--teal-ink)}
+.note{color:var(--ink-3);font-size:10.5px;line-height:1.5;margin-top:6px}
+.note b{color:var(--ink-2)}
+
+/* ---- Figma, drawn in its own light chrome --------------------------------- */
+.figma{display:grid;grid-template-columns:1fr 330px;gap:0;min-width:820px;border-radius:8px;overflow:hidden;border:1px solid #2C2C2C;font:400 11px/1.45 var(--sans)}
+.fcanvas{background:#E5E5E5;display:grid;place-items:center;padding:30px;position:relative}
+.fframe{background:#2B3036;width:220px;height:220px;display:grid;place-items:center;position:relative;outline:1.5px solid var(--fig-blue)}
+.fframe::before{content:"Knob / Vintage";position:absolute;left:0;top:-18px;color:var(--fig-blue);font-size:10.5px;font-weight:600}
+.fwin{background:var(--fig-bg);color:var(--fig-ink);display:flex;flex-direction:column;border-left:1px solid #D0D0D0}
+.fwin .ft{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--fig-rule);font-weight:600}
+.fwin .ft .x{margin-left:auto;color:var(--fig-mute);font-weight:400}
+.fsec{padding:10px 12px;border-bottom:1px solid var(--fig-rule)}
+.fsec .fl{font-size:10px;font-weight:600;color:var(--fig-mute);margin-bottom:6px}
+.frow{display:flex;align-items:center;gap:8px;padding:4px 0}
+.frow .ic{width:14px;height:14px;border:1.5px solid #B3B3B3;border-radius:3px;flex:none}
+.frow .ic.cmp{border-color:#9747FF;transform:rotate(45deg);border-radius:2px;width:11px;height:11px;margin:0 1px}
+.frow .n{font-weight:500;min-width:96px}
+.frow .d{color:var(--fig-mute)}
+.frow .d.w{color:var(--fig-warn)}
+.fopts{display:flex;flex-direction:column;gap:6px}
+.chk{display:flex;align-items:center;gap:7px}
+.chk i{width:12px;height:12px;border-radius:2px;background:var(--fig-blue);display:inline-block;position:relative;flex:none}
+.chk i::after{content:"";position:absolute;left:3.5px;top:1px;width:3px;height:6px;border:solid #fff;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+.chk i.off{background:#fff;border:1px solid #B3B3B3}
+.chk i.off::after{display:none}
+.fbtn{margin:12px;margin-top:auto;background:var(--fig-blue);color:#fff;border-radius:6px;text-align:center;padding:8px;font-weight:600}
+.fhint{margin:0 12px 12px;color:var(--fig-mute);font-size:10.5px}
+
+/* ---- the pipeline ---------------------------------------------------------- */
+.flow{display:flex;gap:10px;align-items:stretch;flex-wrap:wrap;margin-top:18px}
+.step{flex:1 1 180px;min-width:0;background:var(--ground-2);border:1px solid var(--rule);border-radius:8px;padding:12px 13px}
+.step .sk{font:600 9.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--teal)}
+.step b{display:block;color:var(--ink-1);font-size:14.5px;margin-top:6px}
+.step p{font-size:13.5px;margin-top:6px;color:var(--ink-3)}
+.arrow{align-self:center;color:var(--ink-4);font-size:18px}
+
+/* ---- decisions -------------------------------------------------------------- */
+.decisions{display:flex;flex-direction:column;gap:14px;margin-top:20px;max-width:900px}
+.dec{border:1px solid var(--rule);border-radius:8px;background:var(--ground-2);padding:14px 16px}
+.dec .q{font-weight:600;color:var(--ink-1);font-size:15.5px}
+.dec .q .id{font:600 11px/1 var(--mono);color:var(--teal);margin-right:8px}
+.opts{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr));gap:10px;margin-top:10px}
+.opt{border:1px solid var(--rule-2);border-radius:6px;padding:10px 12px;font-size:13.5px;color:var(--ink-3);line-height:1.5;min-width:0}
+.opt b{display:block;color:var(--ink-1);font-size:14px;margin-bottom:3px}
+.opt.r{border-color:var(--teal-dim);background:#0B1D1B}
+.opt.r b::after{content:"Recommended";margin-left:8px;font:600 9px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--teal);vertical-align:2px}
+@media (prefers-reduced-motion:no-preference){.toc a{transition:border-color .15s}}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow"><b>Mock-ups</b> · Bringing designs in · 2026-11-06</div>
+  <h1>Four more ways in: Illustrator, Figma, 3D parts and glTF</h1>
+  <p class="lede">The four routes the design record lists as next (<code>docs/design/changeable-control-sets.md</code>, "Native files" and "Order"), drawn as they would look in CEditor, with the questions that need your answer before they are built. Everything that has no screen of its own (the PDF reader, the glTF reader, the layer splitting) can be built while you look at this.</p>
+  <div class="bar"><b>Nothing here is built.</b> Each section shows the screens; the decisions are at the end, each with a recommended answer. Say which you approve, or what to change.</div>
+  <nav class="toc" aria-label="Sections">
+    <a href="#ai"><span class="sz">1 · Medium</span><b>Illustrator and PDF files</b>Open an .ai or a .pdf where an SVG opens today.</a>
+    <a href="#figma"><span class="sz">2 · Small</span><b>A Figma plugin</b>Export a frame for CEditor from inside Figma, names kept.</a>
+    <a href="#level3"><span class="sz">3 · Large</span><b>CEditor's own 3D parts</b>A knob built from settings and rendered, no other program.</a>
+    <a href="#gltf"><span class="sz">4 · Large, on top of 3</span><b>glTF models</b>Blender's exchange format, each object a part you can change.</a>
+  </nav>
+</header>
+
+<!-- ======================================================================= -->
+<section class="sec" id="ai">
+  <div class="kicker">1 · Illustrator and PDF</div>
+  <h2>An .ai file opens wherever an SVG does</h2>
+  <p>An Illustrator file saved with <b>Create PDF Compatible File</b> (Illustrator's default) carries a PDF copy of the artwork. CEditor reads that copy with pdf.js (Mozilla, Apache 2.0), turns it into an SVG in memory, and hands it to the SVG import that exists, so panels, Update Panel and components all work the same way. Any PDF opens the same way, from Affinity, Inkscape or anywhere else.</p>
+
+  <h3>The File menu <span class="rec">Recommended: A</span></h3>
+  <div class="plate"><div class="scroll"><div class="ui row">
+    <div class="menu" aria-label="Option A">
+      <div class="mhead">A · the SVG items take PDF and .ai too</div>
+      <div class="mi">New Panel</div>
+      <div class="mi">Open Panel</div>
+      <div class="msep"></div>
+      <div class="mi ren hot">New Panel from Vector Artwork...</div>
+      <div class="mi ren">Update Panel from Vector Artwork...</div>
+      <div class="mi">New Panel from Photoshop Artwork...</div>
+      <div class="mi">Update Panel from Photoshop Artwork...</div>
+      <div class="msep"></div>
+      <div class="mi">New Custom Component</div>
+      <div class="mi">Import Component...</div>
+      <div class="mi ren">New Component from Vector Artwork...</div>
+      <div class="mi">New Component from Photoshop Artwork...</div>
+    </div>
+    <div class="dialog" aria-label="The file dialog">
+      <div class="dh">New Panel from Vector Artwork</div>
+      <div class="db">
+        <div class="file"><span class="ext">AI</span>Synth front.ai<span class="dim">2.4 MB</span></div>
+        <div class="file sel"><span class="ext">PDF</span>Synth front.pdf<span class="dim">1.1 MB</span></div>
+        <div class="file"><span class="ext">SVG</span>Synth front.svg<span class="dim">640 KB</span></div>
+      </div>
+      <div class="df">Files of type <span class="sel2">SVG, PDF, Illustrator (.svg .pdf .ai)</span><span class="btn go r">Open</span></div>
+    </div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Option A</span><p class="ct">Three items renamed from "SVG Artwork" to "Vector Artwork"; no new items. The file dialog takes the three types. Option B would add three items, "...from Illustrator or PDF Artwork", beside the SVG ones: nine artwork items instead of six.</p></div>
+
+  <h3>What the import says</h3>
+  <div class="plate"><div class="scroll"><div class="ui stack">
+    <div class="toast"><span class="t">Imported</span><b>A dial of 6 layers</b>, read from the PDF part of <b>Knob vintage.ai</b>. Named from its top-level layers: pointer, cap, skirt, shadow, lamp on, lamp off. The pointer turns about the knob's middle.</div>
+    <div class="toast"><span class="t">Imported</span><b>A panel with 14 controls</b> from <b>Synth front.pdf</b>, page 1 of 1. The placeholders came from the layer named components and were typed by their colour and shape (red circles: knobs; long red rectangles: sliders), since a PDF keeps no names for them: knob 1 to knob 9, slider 1 to slider 4, button 1. Rename them in the Layers list.</div>
+    <div class="toast err"><span class="t">Not imported</span><b>Knob old.ai was saved without PDF compatibility</b>, so its artwork is only in Illustrator's own format, which CEditor cannot read. In Illustrator, choose File › Save As, tick <b>Create PDF Compatible File</b>, and open it again; or use File › Export As › SVG.</div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Notices</span><p class="ct">The same notice the SVG and Photoshop imports give, with where the names came from. A PDF keeps the top-level layers' names and nothing below them, so the two conventions that need names say how they were met.</p></div>
+
+  <h3>What comes in</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>In the file</th><th>In CEditor</th></tr></thead>
+    <tbody>
+      <tr><td>Top-level layers</td><td>Layer groups, by their names: <code>components</code> for a panel's placeholders, <code>pointer</code>, <code>cap</code>, <code>lamp on</code> for a component's parts. Hidden layers stay hidden.</td></tr>
+      <tr><td>Paths, fills, strokes</td><td>Vector layers, as the SVG import makes them. Dashes, joins, caps and even-odd fills kept.</td></tr>
+      <tr><td>Gradients</td><td>Linear and radial gradients. A freeform or mesh gradient, which a PDF stores as a mesh, becomes a picture.</td></tr>
+      <tr><td>Clipping masks</td><td>The layer's mask, as for SVG.</td></tr>
+      <tr><td>Opacity and blend modes</td><td>Kept, as in the Photoshop import.</td></tr>
+      <tr><td>Placed and embedded images</td><td>Picture layers.</td></tr>
+      <tr><td>Text</td><td>Text where the PDF says the font, its size and colour; otherwise its outlines, so it looks right but is no longer editable as text.</td></tr>
+      <tr><td>CMYK colour</td><td>Converted as Acrobat shows it without colour management (pdf.js's own conversion).</td></tr>
+      <tr><td>Sublayers and object names</td><td>Not read. Illustrator keeps them only in its private data, which is undocumented. Name a moving part as a top-level layer, or export SVG.</td></tr>
+      <tr><td>Artboards</td><td>A PDF page each. A file with several asks which one.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ======================================================================= -->
+<section class="sec" id="figma">
+  <div class="kicker">2 · Figma</div>
+  <h2>A plugin that exports a frame for CEditor</h2>
+  <p>Figma's own file format is undocumented and changes without notice, so CEditor does not read it. Figma's supported way is a plugin: a small program that runs inside Figma. This one, <b>CEditor Export</b>, does what the Blender add-on does: it lists what each layer of the selected frame will do in CEditor, warns about what will not come across, and saves an SVG with every layer's name kept, which <b>New Component from Vector Artwork</b> or <b>New Panel from Vector Artwork</b> opens as it is. Nothing changes in CEditor itself.</p>
+
+  <div class="plate"><div class="scroll"><div class="figma" aria-label="The plugin in Figma">
+    <div class="fcanvas"><div class="fframe"><div class="knob3d" style="width:150px;height:150px"><div class="top" style="inset:34px"></div><div class="ptr" style="height:36px;transform-origin:50% 63px"></div></div></div></div>
+    <div class="fwin">
+      <div class="ft">CEditor Export<span class="x">×</span></div>
+      <div class="fsec">
+        <div class="fl">Selected: Knob / Vintage (component set, 2 variants)</div>
+        <div class="frow"><span class="ic"></span><span class="n">pointer</span><span class="d">turns with the value</span></div>
+        <div class="frow"><span class="ic"></span><span class="n">cap</span><span class="d">stays put</span></div>
+        <div class="frow"><span class="ic"></span><span class="n">skirt</span><span class="d">stays put</span></div>
+        <div class="frow"><span class="ic"></span><span class="n">shadow</span><span class="d">stays put, drop shadow kept</span></div>
+        <div class="frow"><span class="ic cmp"></span><span class="n">State=On</span><span class="d">shown when on (lamp on)</span></div>
+        <div class="frow"><span class="ic cmp"></span><span class="n">State=Off</span><span class="d">shown when off (lamp off)</span></div>
+        <div class="frow"><span class="ic"></span><span class="n">Ellipse 12</span><span class="d w">no name: comes in as a layer that stays put</span></div>
+      </div>
+      <div class="fsec">
+        <div class="fl">Export</div>
+        <div class="fopts">
+          <div class="chk"><i></i>Keep text as text</div>
+          <div class="chk"><i></i>Variants as states (on, off, pressed)</div>
+          <div class="chk"><i class="off"></i>Flatten effects into pictures</div>
+        </div>
+      </div>
+      <div class="fbtn">Save SVG for CEditor</div>
+      <div class="fhint">Then in CEditor: File › New Component from Vector Artwork.</div>
+    </div>
+  </div></div></div>
+  <div class="cap"><span class="cn">In Figma</span><p class="ct">The plugin's window beside the canvas. It reads CEditor's own words for what moves (the same list the add-on and the importers share), so a Figma layer named <code>pointer</code> turns as a Photoshop one does. Variants of a component set become the states CEditor already reads from names. Installed once from <code>tools/figma-plugin/manifest.json</code> (Figma › Plugins › Development › Import plugin from manifest); it needs no account, token or network.</p></div>
+  <p>A live link instead (<b>Update from Figma</b>, pulling a frame by its link through Figma's web API) is possible later. It needs your Figma access token and the network, and gains only that you skip saving the file.</p>
+</section>
+
+<!-- ======================================================================= -->
+<section class="sec" id="level3">
+  <div class="kicker">3 · CEditor's own 3D parts</div>
+  <h2>A knob built from settings, rendered, and changeable down to its shape</h2>
+  <p>A <b>3D part</b> in the Component Designer is a small scene: a body, a top, a pointer, a lamp, each an object with a shape, a material and a motion. CEditor renders it from straight above, lit by the set's lamp, and turns it into the same layers the Blender add-on writes: each object's colour, its shading and highlights, the light on it and its gloss, its shadow, its frames for the angles it turns through. From there everything that works for a Blender knob works for it, the recolouring of this week included, and an exported plug-in draws it with nothing new.</p>
+
+  <div class="plate"><div class="scroll"><div class="ui designer" aria-label="The Component Designer with a 3D part">
+    <div class="tools">
+      <div class="tool"><svg viewBox="0 0 16 16"><path d="M3 2l9 6-4 1 2 5-2 1-2-5-3 3z"/></svg></div>
+      <div class="tool"><svg viewBox="0 0 16 16"><rect x="2.5" y="3.5" width="11" height="9"/></svg></div>
+      <div class="tool"><svg viewBox="0 0 16 16"><ellipse cx="8" cy="8" rx="5.5" ry="5.5"/></svg></div>
+      <div class="tool"><svg viewBox="0 0 16 16"><path d="M8 2.5v11M3 13.5h10"/></svg></div>
+      <div class="tool">T</div>
+      <div class="tool on new3d">3D</div>
+      <div class="tool"><svg viewBox="0 0 16 16"><path d="M2 13l4-9 3 6 2-3 3 6z"/></svg></div>
+    </div>
+    <div class="board">
+      <div class="boardbar"><strong>Knob, 3D</strong> · 64 × 64 · value 0.36<span class="st">Rendered · 0.6 s · 23 layers</span></div>
+      <div class="art"><div class="artboard"><div class="knob3d"><div class="top"></div><div class="ptr"></div></div><div class="sel-ring"><i></i><i></i><i></i><i></i></div></div></div>
+    </div>
+    <div class="side">
+      <div class="layers">
+        <div class="lhead">Layers</div>
+        <div class="lrow"><span class="thumb"></span><span class="nm">label</span><span class="ltag vec">TEXT</span></div>
+        <div class="lrow sel"><span class="thumb" style="background:radial-gradient(circle,#BFC3C8 30%,#3A3E43 32%)"></span><span class="nm">knob</span><span class="ltag d3">3D</span></div>
+        <div class="lrow child"><span class="nm">pointer</span><span class="mo">turns</span></div>
+        <div class="lrow child sel"><span class="nm">top</span><span class="mo">turns · round</span></div>
+        <div class="lrow child"><span class="nm">body</span><span class="mo">turns · round</span></div>
+        <div class="lrow child"><span class="nm">skirt</span><span class="mo">stays</span></div>
+        <div class="lrow"><span class="thumb"></span><span class="nm">plate</span><span class="ltag vec">RECT</span></div>
+      </div>
+      <div class="dock">
+        <div class="dtabs"><span>Layout</span><span>Colors</span><span>Effects</span><span class="on newtab">3D</span><span>Interact</span></div>
+        <div class="context">Editing <strong>knob › top</strong></div>
+        <div class="grp">
+          <div class="gh">Shape</div>
+          <div class="f"><span>Kind</span><div class="seg"><i class="on">Turned</i><i>Block</i><i>Pointer</i></div></div>
+          <div class="f"><span>Side</span><div class="seg"><i>Smooth</i><i class="on">Knurled</i><i>Fluted</i></div></div>
+          <div class="f"><span>Ridges</span><div class="v">60</div></div>
+          <div class="f"><span>Diameter</span><div class="v">52 % of the part</div></div>
+          <div class="f"><span>Height</span><div class="v">18 % · taper 4 %</div></div>
+          <div class="f"><span>Top</span><div class="seg"><i>Flat</i><i class="on">Insert</i><i>Dome</i><i>Dish</i></div></div>
+        </div>
+        <div class="grp">
+          <div class="gh">Material</div>
+          <div class="f"><span>Finish</span><div class="v">Spun metal<span class="chev">▾</span></div></div>
+          <div class="f"><span>Colour</span><div class="v"><span class="sw" style="background:#C9CDD2"></span>Accent (set role)<span class="chev">▾</span></div></div>
+          <div class="f"><span>Roughness</span><div class="v">22 %</div></div>
+        </div>
+        <div class="grp">
+          <div class="gh">Motion</div>
+          <div class="f"><span>With the value</span><div class="seg"><i>Stays</i><i class="on">Turns</i><i>Slides</i><i>Lamp</i></div></div>
+          <div class="note"><b>Round</b>: its light stays put as it turns, so it is rendered once. The pointer, which is not round, is rendered every 27 degrees, as the add-on renders it.</div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Designer</span><p class="ct">A new <b>3D</b> tool in the tool strip places a 3D part, starting as a knob (skirt, body, top, pointer). Its objects are listed under it in the Layers list with what they do; a new <b>3D</b> tab in the dock edits the selected object. The shapes are piece E's vocabulary (turned bodies, knurled or fluted, tops, blocks), now with a pointer of its own (line, bar, chicken-head, dot) and lamps. The light is the set's lamp. <b>Add Object</b> and <b>Remove</b> sit at the bottom of the tab.</p></div>
+
+  <h3>What happens when you change something</h3>
+  <div class="flow">
+    <div class="step"><span class="sk">Colour</span><b>Instant</b><p>The colour is a colour layer with its light written beside it, worked out again in the new colour as for a Blender knob. No render.</p></div>
+    <div class="step"><span class="sk">Value</span><b>Instant</b><p>The turning objects are frames that follow the value, as an imported dial's pointer does. No render.</p></div>
+    <div class="step"><span class="sk">Shape, finish, lamp</span><b>A render</b><p>Estimated at half a second to two seconds on a graphics card, the old layers shown meanwhile; on Linux, whose webview has no graphics card, several seconds. Measured once it is built.</p></div>
+    <div class="step"><span class="sk">Export</span><b>Nothing new</b><p>The layers are kept with the component, so the plug-in draws pictures, as it draws an imported knob.</p></div>
+  </div>
+
+  <h3>Three examples from the same settings</h3>
+  <div class="plate"><div class="scroll"><div class="ui row" style="gap:28px;min-width:640px">
+    <div style="text-align:center"><div class="knob3d" style="width:140px;height:140px"><div class="top" style="inset:33px"></div><div class="ptr" style="height:36px;transform-origin:50% 60px"></div></div><p style="font-size:12px;margin-top:10px">Knurled skirt, spun aluminium top</p></div>
+    <div style="text-align:center"><div class="knob3d brass red" style="width:140px;height:140px"><div class="top" style="inset:33px"></div><div class="ptr" style="height:36px;transform-origin:50% 60px;transform:rotate(52deg)"></div></div><p style="font-size:12px;margin-top:10px">The same knob: body red, top brass</p></div>
+    <div style="text-align:center"><div class="knob3d chicken" style="width:140px;height:140px"><div class="ptr" style="width:38px;height:92px;margin-left:-19px;top:15px;transform-origin:50% 55px"></div></div><p style="font-size:12px;margin-top:10px">Pointer kind: chicken-head</p></div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Drawn</span><p class="ct">Sketched in CSS here to show the range; the real ones are rendered.</p></div>
+</section>
+
+<!-- ======================================================================= -->
+<section class="sec" id="gltf">
+  <div class="kicker">4 · glTF</div>
+  <h2>A model from Blender, each object a part you can change</h2>
+  <p>glTF is the exchange format Blender, and most 3D programs, export (File › Export › glTF 2.0; a <code>.glb</code>, or a <code>.gltf</code> with its <code>.bin</code> and textures). CEditor reads its meshes and materials and makes the same 3D part as section 3, with the file's objects in place of the built ones: the names say what moves, by the same words as everywhere else, and each object's material (colour, metal, roughness) can be changed. The shapes stay the file's: CEditor does not edit meshes.</p>
+
+  <div class="plate"><div class="scroll"><div class="ui row">
+    <div class="menu">
+      <div class="mi">New Custom Component</div>
+      <div class="mi">Import Component...</div>
+      <div class="mi">New Component from Vector Artwork...</div>
+      <div class="mi">New Component from Photoshop Artwork...</div>
+      <div class="mi new hot">New Component from 3D Model...</div>
+      <div class="mi">Open Component from Library...</div>
+    </div>
+    <div class="stack">
+      <div class="toast"><span class="t">Imported</span><b>A dial with a 3D part of 5 objects</b> from <b>Chicken head.glb</b>: pointer (turns with the value; not round, so rendered every 27 degrees), cap and skirt (stay put), lamp (lights with the Lamp value), panel (the surface it stands on; its shadow and light are made for whatever panel the control is on).</div>
+      <div class="toast err"><span class="t">Imported, with notes</span>Two objects have no name CEditor reads (<b>Cylinder.002</b>, <b>Torus</b>): they stay put. The file's camera and lights are not used: CEditor looks straight down and lights with the set's lamp.</div>
+    </div>
+  </div></div></div>
+
+  <div class="plate"><div class="scroll"><div class="ui designer" style="grid-template-columns:42px 1fr 300px">
+    <div class="tools"><div class="tool">↖</div><div class="tool">▭</div><div class="tool">◯</div><div class="tool on">3D</div></div>
+    <div class="board">
+      <div class="boardbar"><strong>Chicken head</strong> · from Chicken head.glb<span class="st">Rendered · 1.4 s · 31 layers</span></div>
+      <div class="art"><div class="artboard"><div class="knob3d chicken"><div class="ptr"></div></div></div></div>
+    </div>
+    <div class="side">
+      <div class="layers">
+        <div class="lhead">Layers</div>
+        <div class="lrow sel"><span class="thumb" style="background:radial-gradient(circle,#2A2C2F 40%,#45494E 42%)"></span><span class="nm">Chicken head</span><span class="ltag d3">3D</span></div>
+        <div class="lrow child sel"><span class="nm">pointer</span><span class="mo">turns · mesh</span></div>
+        <div class="lrow child"><span class="nm">skirt</span><span class="mo">stays · mesh</span></div>
+        <div class="lrow child"><span class="nm">lamp</span><span class="mo">lamp · mesh</span></div>
+        <div class="lrow child"><span class="nm">Cylinder.002</span><span class="mo">stays · mesh</span></div>
+      </div>
+      <div class="dock">
+        <div class="dtabs"><span>Layout</span><span>Colors</span><span>Effects</span><span class="on">3D</span><span>Interact</span></div>
+        <div class="context">Editing <strong>Chicken head › pointer</strong></div>
+        <div class="grp">
+          <div class="gh">Shape</div>
+          <div class="note">From the file: 2,860 triangles. <b>Replace Model...</b> reads a new version of the file and keeps what you set here, matched by object name.</div>
+        </div>
+        <div class="grp">
+          <div class="gh">Material</div>
+          <div class="f"><span>Finish</span><div class="v">Gloss plastic (from the file)<span class="chev">▾</span></div></div>
+          <div class="f"><span>Colour</span><div class="v"><span class="sw" style="background:#1C1D1F"></span>#1C1D1F<span class="chev">▾</span></div></div>
+          <div class="f"><span>Metal</span><div class="v">0 %</div></div>
+          <div class="f"><span>Roughness</span><div class="v">35 %</div></div>
+        </div>
+        <div class="grp">
+          <div class="gh">Motion</div>
+          <div class="f"><span>With the value</span><div class="seg"><i>Stays</i><i class="on">Turns</i><i>Slides</i><i>Lamp</i></div></div>
+          <div class="f"><span>Pivot</span><div class="v">The object's origin<span class="chev">▾</span></div></div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Result</span><p class="ct">The same part and tab as section 3; a file's object has no Shape settings, only where it came from, and <b>Replace Model</b> for a new version of the file.</p></div>
+
+  <h3>How close to Blender</h3>
+  <p>CEditor's renderer draws as Blender's real-time engine (Eevee) does, not as Cycles: soft shadows and reflections of a studio room, but no light bouncing between parts, so the skirt under a brass cap is not warmed by it. For a knob that has to look exactly like Blender's own render, the add-on route stays: it writes Cycles' light into the file.</p>
+</section>
+
+<!-- ======================================================================= -->
+<section class="sec" id="decisions">
+  <div class="kicker">Decisions</div>
+  <h2>What needs your answer</h2>
+  <div class="decisions">
+    <div class="dec">
+      <div class="q"><span class="id">D1</span>How do .ai and PDF files go into the File menu?</div>
+      <div class="opts">
+        <div class="opt r"><b>A · Rename the SVG items</b>"New Panel from Vector Artwork...", "Update Panel from Vector Artwork...", "New Component from Vector Artwork...", each opening SVG, PDF and .ai.</div>
+        <div class="opt"><b>B · Items of their own</b>Three more items beside the SVG ones; the menu grows from six artwork items to nine.</div>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="q"><span class="id">D2</span>Where do an Illustrator file's names come from?</div>
+      <div class="opts">
+        <div class="opt r"><b>Top-level layers only</b>What the PDF part keeps. A moving part is named as a top-level layer; for named placeholders on a panel, SVG export as today.</div>
+        <div class="opt"><b>Also Illustrator's private data</b>Sublayer and object names, read from an undocumented, compressed format that Adobe changes between versions. Larger, and fragile.</div>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="q"><span class="id">D3</span>How does Figma come in?</div>
+      <div class="opts">
+        <div class="opt r"><b>A plugin that saves an SVG</b>Runs in Figma, checks the names, saves an SVG with them; CEditor unchanged. No token, no network.</div>
+        <div class="opt"><b>A plugin that writes a component file</b>Skips the SVG step, but duplicates the SVG import inside the plugin and has to follow every change to CEditor's file format.</div>
+        <div class="opt"><b>A live link through Figma's web API</b>Update from Figma by link. Needs your access token and the network. Possible later on top of the plugin.</div>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="q"><span class="id">D4</span>What renders 3D parts and glTF models?</div>
+      <div class="opts">
+        <div class="opt r"><b>three.js, in the editor only</b>MIT, the standard web 3D library: reads glTF, draws physically based materials and soft shadows, and builds turned bodies from a profile. About 700 KB, loaded only when a 3D part is open; never in the plug-in.</div>
+        <div class="opt"><b>Extend piece E's shader</b>Already draws turned bodies, but it describes shapes as formulas and cannot draw a mesh, so glTF would need a second renderer anyway.</div>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="q"><span class="id">D5</span>How is a 3D part kept and drawn?</div>
+      <div class="opts">
+        <div class="opt r"><b>Rendered into layers, as the add-on writes them</b>Colour changes and the value are instant; the plug-in, the Player and the filmstrip baker draw it with what they have. A shape change is a render.</div>
+        <div class="opt"><b>Drawn live, baked to a filmstrip at export</b>Every change in the editor is a render, colour included; the plug-in carries a picture for every step of the value, many times larger.</div>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="q"><span class="id">D6</span>Do the sets' rendered knobs (piece E) move to the new renderer?</div>
+      <div class="opts">
+        <div class="opt r"><b>Not now</b>They keep their shader and their look; every set stays as it is. A set can use a 3D part later, as it can name a library component today.</div>
+        <div class="opt"><b>Yes, one renderer</b>One look everywhere, but every rendered set knob changes how it looks, and the export bake for them is redone.</div>
+      </div>
+    </div>
+    <div class="dec">
+      <div class="q"><span class="id">D7</span>In what order?</div>
+      <div class="opts">
+        <div class="opt r"><b>1, 2, then 3 with 4 on top</b>Illustrator and PDF; the Figma plugin; the 3D part with built shapes; glTF objects in the same part. Each one finished, documented and pushed before the next.</div>
+        <div class="opt"><b>As listed, 4 before 3</b>glTF first, built shapes after. glTF alone needs the whole 3D part all the same, so it saves nothing.</div>
+      </div>
+    </div>
+  </div>
+
+  <h3>What would help from you</h3>
+  <ul>
+    <li><b>An Illustrator file with top-level layers</b> (a knob, or a panel with a <code>components</code> layer), if you have Illustrator: the test files here will be PDFs written to Illustrator's layout, and a real one is the check that matters.</li>
+    <li><b>A glTF of a knob from your Blender scene</b>, if you have one: the test model here is the add-on's test knob, exported.</li>
+    <li>Figma: nothing. The plugin is tested here against a stand-in for Figma's API; you would be the first to run it in Figma.</li>
+  </ul>
+</section>
+</div>

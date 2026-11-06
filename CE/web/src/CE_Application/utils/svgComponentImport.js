@@ -438,7 +438,11 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const style = { ...inherited };
     const own = ownStyle(node, classes);
     for (const property of INHERITED) if (own[property] != null && own[property] !== 'inherit') style[property] = own[property];
-    if (own.display === 'none' || style.visibility === 'hidden') return;
+    // A layer switched off in the file it came from (utils/pdfArtwork.js marks one so): its parts come
+    // in hidden, as a hidden Photoshop layer does (often the lit or pressed look), not dropped.
+    const switchedOff = node.attributes?.['data-ceditor-hidden'] === 'true';
+    if ((own.display === 'none' && !switchedOff) || style.visibility === 'hidden') return;
+    if (switchedOff) style.switchedOff = true;
     const m = multiply(matrix, parseTransform(node.attributes?.transform));
     const alpha = opacity * opacityOf(own.opacity);
     const name = objectName(node);
@@ -469,19 +473,12 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
       visit(target.name === 'symbol' ? { ...target, name: 'g' } : target, shifted, style, alpha, chain, here, depth + 1);
       return;
     }
-    if (SHAPES.has(node.name)) {
-      shapeLayer(node, m, style, alpha, label, chain, here);
-      return;
-    }
-    if (node.name === 'text') {
-      textLayer(node, m, style, alpha, label, chain, here);
-      return;
-    }
-    if (node.name === 'image') {
-      imageLayer(node, m, alpha, label, chain, here);
-      return;
-    }
-    note('unknown', `<${node.name}>`);
+    const before = layers.length;
+    if (SHAPES.has(node.name)) shapeLayer(node, m, style, alpha, label, chain, here);
+    else if (node.name === 'text') textLayer(node, m, style, alpha, label, chain, here);
+    else if (node.name === 'image') imageLayer(node, m, alpha, label, chain, here);
+    else note('unknown', `<${node.name}>`);
+    if (style.switchedOff) for (let i = before; i < layers.length; i += 1) layers[i].part.visible = false;
   };
 
   const shapeLayer = (node, m, style, alpha, label, chain, stack) => {
