@@ -11,7 +11,8 @@
  *                                                              angle is the middle of the range
  *   moves    fader, thumb, handle, slide                       slide along the track with the value
  *   track    track, slot, rail, groove                         where a fader runs (its long side)
- *   pivot    pivot, centre, center, axis                       where turning layers turn about
+ *   pivot    pivot, centre, center, axis                       where turning layers turn about;
+ *                                                              "<layer> pivot", where that one does
  *   on       lamp, led, light, lit, glow, on                   shown when the value is on
  *   off      off, unlit                                        shown when it is off
  *   pressed  pressed, down                                     shown while it is held
@@ -39,6 +40,7 @@ const ROLE_WORDS = [
   ['turns', ['pointer', 'indicator', 'needle', 'rotor', 'marker', 'turns', 'rotate', 'rotates']],
   ['track', ['track', 'slot', 'rail', 'groove']],
 ];
+const PIVOT_WORDS = ROLE_WORDS.find(([role]) => role === 'pivot')[1];
 const BUTTON_WORDS = ['button', 'btn', 'momentary', 'trigger', 'push', 'key'];
 
 /** The words of a name: split at anything not a letter or digit, and where lower case meets upper. */
@@ -138,7 +140,20 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers 
     const biggest = candidates.length ? area(candidates[0].box) : 0;
     const large = new Set(candidates.filter((layer) => area(layer.box) >= 0.5 * biggest));
     const body = [...layers].reverse().find((layer) => large.has(layer)) ?? holders[0];
-    const pivot = roles.pivot.length ? centre(roles.pivot[0].box)
+    // A pivot named after a turning layer ("pointer shadow pivot") is that layer's own. A shadow cast
+    // by a light that stays put turns about a point beside the axis, half its reach towards where it
+    // falls, so it stays on the side away from the light whichever way the pointer points.
+    const ownName = (layer) => layer.names?.[0] ?? layer.name ?? layer.part.name;
+    const withoutPivot = (label) => nameWords(label).filter((word) => !PIVOT_WORDS.includes(word)).join(' ');
+    const ownPivots = new Map();
+    const shared = [];
+    for (const mark of roles.pivot) {
+      const named = withoutPivot(ownName(mark));
+      const owner = named && roles.turns.find((layer) => !ownPivots.has(layer) && withoutPivot(ownName(layer)) === named);
+      if (owner) ownPivots.set(owner, centre(mark.box));
+      else shared.push(mark);
+    }
+    const pivot = shared.length ? centre(shared[0].box)
       : body ? centre(body.box)
         : roles.turns.length === 1 && area(roles.turns[0].box) > 0.25 * width * height ? centre(roles.turns[0].box)
           : { x: width / 2, y: height / 2 };
@@ -146,8 +161,9 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers 
       const layout = layer.part._children.Layout;
       const w = Math.max(1, layer.box.width);
       const h = Math.max(1, layer.box.height);
-      layout.pivotX = Math.round(((pivot.x - layer.box.x) / w) * 10000) / 100;
-      layout.pivotY = Math.round(((pivot.y - layer.box.y) / h) * 10000) / 100;
+      const about = ownPivots.get(layer) ?? pivot;
+      layout.pivotX = Math.round(((about.x - layer.box.x) / w) * 10000) / 100;
+      layout.pivotY = Math.round(((about.y - layer.box.y) / h) * 10000) / 100;
       bindings[`${layer.part.name}Turn`] = rangeBinding(`${layer.part.name}Turn`, `channel.${channelName}.normalized`, `Parts.${layer.part.name}.Layout.rotation`, -135, 135, 'deg');
     }
     for (const layer of roles.pivot) layer.part.visible = false;

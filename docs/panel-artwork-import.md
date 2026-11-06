@@ -132,7 +132,7 @@ Component Designer to change and save (`utils/svgComponentImport.js`, `utils/psd
 | Name | Does |
 |---|---|
 | `pointer`, `indicator`, `needle`, `rotor`, `marker`, `turns` | turns with the value, -135° to 135°, the drawn angle in the middle |
-| `pivot`, `centre`, `axis` | where those turn; without it, the middle of the knob they sit on |
+| `pivot`, `centre`, `axis` | where those turn; without it, the middle of the knob they sit on. Named after a turning layer as well (`pointer shadow pivot`), where that one layer turns |
 | `fader`, `thumb`, `handle`, `slide` | slides along the `track` (`slot`, `rail`), the value 0 at the bottom or left |
 | `lamp`, `led`, `light`, `on` / `off` | shown when the value is on / off |
 | `pressed`, `down` | shown while it is held |
@@ -163,8 +163,11 @@ held out, and written as the layers its look adds up from:
 | `<name> highlights` | linear dodge | its reflections, and light brighter than its colour |
 | `<name> lit` | linear dodge | a lamp's glow; a switch or button shows it when on |
 | `shadow` | normal | the shadow on the panel: black, its darkness as opacity |
+| `bounce` | linear dodge | light the parts throw on the panel, a metal cap's glare |
+| `<lamp> glow` | linear dodge | a lamp's light on the panel, shown with the lamp lit |
 | `<name> shadow`, `<name> reflection` | normal, linear dodge | a turning or sliding part's shadow and reflection on the panel and the parts under it, which move with it |
 | `pivot` | normal, hidden | where turning parts turn |
+| `<name> shadow pivot` | normal, hidden | where a turning part's shadow turns |
 
 A part named `rotor` (a round, knurled or fluted cap) has its colour turn and its light stay; a
 lamp's body keeps a name without its role word (`lens`), so only its glow lights. The pointer is
@@ -172,19 +175,46 @@ modelled pointing up, the middle of its travel; the camera looks straight down (
 it is orthographic, else one is made); without a panel object, a plane is put under the control to
 catch its shadow. The renders run in a scene of their own, and the author's is left as it was.
 
+**The panel.** CEditor lays a component's layers straight onto the panel it is on (a layer's blend
+mode reaches the panel, nothing composites the component on its own first), so a layer of light
+brightens the panel itself. The scene's panel is taken to be the one the control goes on in CEditor
+(**For this panel** in the export, on by default): its look as the scene renders it, with nothing on
+it, is what the layers are laid on while they are made. The knob's outline is then mixed as Cycles
+mixes it, in linear light, where a browser mixes in sRGB; a lit lamp's outermost pixels, which
+Cycles shows lit while the panel still shows through, are lit as on that panel; and the light the
+parts and the lamps throw on it (`bounce`, `<lamp> glow`) is written. On a panel that looks
+different, those are what they were on the scene's. Without a panel object, or with the option off,
+the outline is mixed as any transparent picture's is, the lamp's edge as on black, and no light on
+the panel is written.
+
+**A turning part's shadow** falls the same way whichever way the part points, since the light stays
+put. It turns about a point of its own (`<name> shadow pivot`), half its reach from the axis towards
+where it falls, worked out from the light that lights the part most and the part's height. On a flat
+surface under one light that is exact: the shadow is the part's outline swept along the light, and
+it turns about the middle of the sweep. A metal cap's shadow is partly its shine blocked, and darkens
+more or less as the part turns, which a layer made at rest does not; the part's reflection in a
+metal cap is made at rest too, and turns with it.
+
 **How exact.** `tools/blender/test_ceditor_layers.py` (run with `blender -b --factory-startup
---python tools/blender/test_ceditor_layers.py`) builds a knob, writes it, renders Blender's own image
-of it and checks that the layers stacked as CEditor stacks them give it back: a level or two in 255
-on the knob, the edges where parts meet included, and a few on a dark, grey or light panel with the
-shadow. Where a part covers only some of a pixel its whole look is in its colour layer (a multiply
-there would reach what is beside it); the light layers come in over the next three pixels, and a
-layer under a part goes two pixels on under its edge, so that the layers still add up when the
-browser scales them (the test draws them twice the size) or turns them. Not exact, since it depends
-on the panel CEditor puts the control on: the outline against the panel is blended in sRGB, as every
-transparent picture's is; a lit lamp's outermost pixels keep the lamp's colour; the light a lamp
-throws on the panel is not written. `--fixture` writes the small file the web suite reads
-(`test/fixtures/blender-knob.psd`), checked by `test/blenderLayersImport.test.js` for what turns,
-about where, in which modes, and for CEditor's compositor drawing it as the add-on composed it.
+--python tools/blender/test_ceditor_layers.py`) builds a knob, writes it, renders Blender's own
+images of it and checks the layers against them, stacked as CEditor stacks them:
+
+- the knob itself, the edges where its parts meet included: a level or two in 255;
+- on the panel it was modelled on, the whole picture, outline, shadow, lit lamp and its light on the
+  panel included: within a few levels (the 99th percentile 5);
+- on a dark, grey and light panel, the knob and its shadow away from the outline and the lamp;
+- drawn twice the size, as a browser scales each layer before it blends them;
+- turned 120 degrees: the pointer's shadow where Blender casts it (1.6 px off at 160 px; turned about
+  the axis it was 10 px off, on the side towards the light), and the cap round the pointer.
+
+Where a part covers only some of a pixel its whole look is in its colour layer (a multiply there would
+reach what is beside it); the light layers come in over the next three pixels, and a layer under a
+part goes two pixels on under its edge, so that the layers still add up when the browser scales them
+or turns them. Cycles' shadow catcher gives the shadow for what a part leaves of a pixel, not the
+pixel as a whole; the shadow layer, under the parts, darkens just that. `--fixture` writes the small
+file the web suite reads (`test/fixtures/blender-knob.psd`), checked by
+`test/blenderLayersImport.test.js` for what turns, about where (the shadow about its own point), in
+which modes, and for CEditor's compositor drawing it as the add-on composed it.
 
 ## Update Panel from SVG Artwork
 

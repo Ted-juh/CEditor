@@ -12,9 +12,12 @@
 #   <name> highlights  its reflections, and light brighter than its colour (linear dodge)
 #   <name> lit         a lamp's own glow (linear dodge); a switch or button shows it when on
 #   shadow             the knob's shadow on the panel (black, its darkness as opacity)
+#   bounce             light the parts throw on the panel, a metal cap's glare (linear dodge)
+#   <lamp> glow        a lamp's light on the panel (linear dodge), shown with the lamp lit
 #   <name> shadow      a moving part's shadow on the panel and on the parts under it
 #   <name> reflection  a moving part's reflection in the shiny parts under it (linear dodge)
 #   pivot              where turning parts turn about (a dot CEditor hides)
+#   <name> shadow pivot  where a turning part's shadow turns about (a dot CEditor hides)
 #
 # Stacked as listed, the layers give back Cycles' render to a level or two in 255, the edges where
 # parts meet included, and each stays changeable in CEditor: a colour layer is retinted while its
@@ -23,11 +26,23 @@
 # layers come in over the next few pixels, and the layers under a part go on a little way under its
 # edge, so that the layers still add up when CEditor draws them larger or smaller, or turned.
 #
-# What no layer can give exactly, since it depends on the panel CEditor puts the control on: the
-# outline against the panel is blended in sRGB, as every transparent picture's is (Blender's own
-# PNGs too), where Cycles mixes in linear light; a lit lamp's outermost pixels, which Cycles shows lit
-# as far out as a quarter of a pixel, keep the lamp's colour rather than letting a light panel
-# through; and the light a lamp throws on the panel is not written at all.
+# The panel. CEditor lays a component's layers straight onto the panel it is on, so a layer of light
+# brightens the panel itself. The scene's panel is taken to be that panel ("For this panel", on by
+# default): its look as the scene renders it, nothing on it, is what the layers are laid on while they
+# are made. The outline is then mixed as Cycles mixes it, in linear light, where a browser mixes in
+# sRGB; a lit lamp's outermost pixels, which Cycles shows lit out to where the lamp covers a quarter
+# of a pixel while the panel still shows through, are lit as on it; and the light the parts and the
+# lamps throw on it is written. On the scene's panel the layers then give Blender's whole render back
+# within a few levels. On a panel that looks different, those three are what they were on the
+# scene's; without a panel object, or with the option off, the outline is mixed as any transparent
+# picture's is, the lamp's edge as on black, and no light on the panel is written.
+#
+# A turning part's shadow. The light stays put while the part turns, so the shadow falls the same way
+# whichever way the part points: it turns about a point of its own, half its reach from the axis
+# towards where it falls (from the light that lights the part most, and the part's height). Exact on
+# a flat cap under one light; a metal cap's shadow, which is partly its shine blocked, darkens more or
+# less as the part turns, which a layer made at rest does not. The part's reflection in a metal cap
+# is made at rest too, and turns with it.
 #
 # Needs numpy, which Blender's own builds carry.
 #
@@ -68,7 +83,7 @@ import textwrap
 import zlib
 
 import bpy
-from bpy.props import IntProperty, StringProperty
+from bpy.props import BoolProperty, IntProperty, StringProperty
 from bpy_extras.io_utils import ExportHelper
 
 try:
@@ -278,7 +293,8 @@ def part_look(p, lamp=False):
     highlights = np.clip(srgb(without_glow) - e_colour * shade, 0.0, 1.0)
     glow = np.clip(srgb(total) - srgb(without_glow), 0.0, 1.0)
     return {"alpha": alpha, "colour": e_colour, "shade": shade, "highlights": highlights, "glow": glow,
-            "whole": srgb(without_glow if lamp else total), "shown": srgb(p["Combined"][..., :3])}
+            "whole": srgb(without_glow if lamp else total), "shown": srgb(p["Combined"][..., :3]),
+            "lit": p["Combined"][..., :3]}
 
 
 def unover(coverages):
@@ -447,13 +463,16 @@ def write_psd(path, width, height, layers, merged):
 class Saved:
     """Object settings changed for a render, put back afterwards."""
 
+    FIELDS = ("hide_render", "is_holdout", "is_shadow_catcher", "visible_camera", "visible_diffuse", "visible_glossy")
+
     def __init__(self, objects):
-        self.values = {o.name: (o.hide_render, o.is_holdout, o.is_shadow_catcher, o.visible_camera) for o in objects}
+        self.values = {o.name: tuple(getattr(o, f) for f in self.FIELDS) for o in objects}
         self.objects = list(objects)
 
     def restore(self):
         for o in self.objects:
-            o.hide_render, o.is_holdout, o.is_shadow_catcher, o.visible_camera = self.values[o.name]
+            for field, value in zip(self.FIELDS, self.values[o.name]):
+                setattr(o, field, value)
 
 
 def bounds(objects):
@@ -466,7 +485,40 @@ def bounds(objects):
     return lo, hi
 
 
-def export_layers(scene, filepath, size=512, samples=128, report=print):
+def shadow_reach(scene, objects):
+    """How far, and which way (world, flat), the shadow of `objects` falls from them on what they stand
+    on: from the light that lights them most, their height over its slant. None without a light, or
+    with one from straight above or nearly level."""
+    from mathutils import Vector
+    lo, hi = bounds(objects)
+    middle = (lo + hi) / 2
+    best, direction = 0.0, None
+    for light in scene.objects:
+        if light.type != "LIGHT" or not renders(light):
+            continue
+        data = light.data
+        if data.type == "SUN":
+            travel = (light.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
+            strength = data.energy
+        else:
+            offset = middle - light.matrix_world.translation
+            if offset.length < 1e-6:
+                continue
+            travel = offset.normalized()
+            strength = data.energy / max(offset.length_squared, 1e-6)
+        if strength > best:
+            best, direction = strength, travel
+    if direction is None or direction.z > -0.05:
+        return None
+    height = hi.z - lo.z
+    reach = Vector((direction.x, direction.y, 0.0)) * (-height / direction.z)
+    return reach if reach.length > 1e-6 else None
+
+
+def export_layers(scene, filepath, size=512, samples=128, report=print, for_panel=True):
+    """Write the scene's control as a layered PSD at `filepath`. `for_panel`: when the scene has a
+    panel of its own, take it as the look of the panel CEditor puts the control on (see the notes at
+    the top). Returns what was written, and the pictures the tests compare."""
     if np is None:
         raise RuntimeError("This Blender has no numpy: use a build from blender.org, which includes it.")
     plan = plan_scene(scene)
@@ -535,14 +587,16 @@ def export_layers(scene, filepath, size=512, samples=128, report=print):
         drawn = [o for o in temp.collection.objects if o.type in DRAWN_TYPES]
         count = [0]
 
-        def render(show, holdout=(), catchers=(), unseen=()):
+        def render(show, holdout=(), catchers=(), unseen=(), unlit=()):
             """Render with `show` visible, `holdout` cutting holes in them, `catchers` catching their
-            shadows, and `unseen` there for the light (casting shadows, in reflections) but not seen."""
+            shadows, `unseen` there for the light (casting shadows, in reflections) but not seen, and
+            `unlit` throwing no light on the rest (seen, and casting shadows, but not lighting)."""
             for o in drawn:
                 o.hide_render = not (o in show or o in holdout or o in catchers or o in unseen)
                 o.is_holdout = o in holdout
                 o.is_shadow_catcher = o in catchers
                 o.visible_camera = o not in unseen
+                o.visible_diffuse = o.visible_glossy = o not in unlit
             count[0] += 1
             r.filepath = os.path.join(workdir, f"pass{count[0]:03d}_")
             bpy.ops.render.render(write_still=True, scene=temp.name)
@@ -554,18 +608,43 @@ def export_layers(scene, filepath, size=512, samples=128, report=print):
             groups.setdefault(render_group(o), []).append(o)
         order = lambda objs: sorted(objs, key=lambda o: (bounds([o])[1].z, o.name))
         still = order(groups.get("still", []))
+        lamps = [o for o in still if role_of(o.name) == "on"]
         layers = []
         merged = np.zeros((height, width, 4), dtype=np.float32)
         black = np.zeros((height, width, 3), dtype=np.float32)
 
+        # The panel the control sits on, as the scene shows it with nothing on it: the look CEditor's
+        # panel is taken to have when `for_panel`. The layers are then made for it where the panel
+        # shows through them: the outline mixed as Cycles mixes it, the lit lamp's edge, the light the
+        # parts throw on it. CEditor lays a component's layers straight onto the panel, so a layer of
+        # light adds to the panel itself.
+        bare = None
+        if for_panel and plan["panel"] is not None:
+            look = render([panel])["Combined"]
+            covered = look[..., 3:4] > 0.5
+            colour = srgb(look[..., :3] / np.maximum(look[..., 3:4], 1e-6))
+            fallback = np.median(colour[covered[..., 0]], axis=0) if covered.any() else np.full(3, 0.5)
+            bare = np.where(covered, colour, fallback).astype(np.float32)
+        on_panel = None if bare is None else np.concatenate([bare, np.ones_like(bare[..., :1])], axis=-1)
+
         def add(name, rgb, alpha, blend="norm", hidden=False):
-            nonlocal merged
+            nonlocal merged, on_panel
             rgba = rgba8(rgb, alpha)
             if blank(rgba):
                 return
             layers.append({"name": name, "rgba": rgba, "blend": blend, "hidden": hidden})
             if not hidden:
                 merged = blend_over(merged, rgba.astype(np.float32) / 255.0, blend)
+                if on_panel is not None:
+                    on_panel = blend_over(on_panel, rgba.astype(np.float32) / 255.0, blend)
+
+        def beneath():
+            """What a layer added now is laid on, straight sRGB, and where that is opaque: on the
+            scene's panel, everywhere; otherwise where the layers so far cover the pixel."""
+            if on_panel is not None:
+                return on_panel[..., :3], np.ones(on_panel.shape[:2], dtype=bool)
+            a = merged[..., 3:4]
+            return np.where(a > 0, merged[..., :3] / np.maximum(a, 1e-6), 0.0), a[..., 0] > 0.999
 
         def add_part(o, look, opacity):
             role = role_of(o.name)
@@ -584,9 +663,8 @@ def export_layers(scene, filepath, size=512, samples=128, report=print):
             # scaled (CEditor draws components at every size) never meets the change at one stroke.
             whole = opacity > 254.5 / 255
             depth = inward(whole)[..., None]
-            a = merged[..., 3]
-            under = np.where(a[..., None] > 0, merged[..., :3] / np.maximum(a[..., None], 1e-6), 0.0)
-            edge = np.where(~whole & (a > 0.999), edge_opacity(look["whole"], opacity, under), opacity)
+            under, opaque = beneath()
+            edge = np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity)
             glow = 0.0 if role == "on" else look["glow"]
             shading = 1.0 - depth + depth * look["shade"]
             colour = np.where(depth >= 1.0, look["colour"],
@@ -597,34 +675,57 @@ def export_layers(scene, filepath, size=512, samples=128, report=print):
                 add(f"{still_name} shading", look["shade"], depth, "mul ")
             add(f"{still_name} highlights", *light(look["highlights"], depth), "lddg")
             if role == "on":
-                # A lamp's glow, out to its edge: there, what the lit pixel shows less what its body
-                # gives it unlit.
+                # A lamp's glow, out to its edge. There Cycles shows the lit lamp brighter than white
+                # over part of the pixel and what is under it over the rest: the light to add is that,
+                # less what the pixel shows unlit.
                 rgb, alpha = light(look["glow"], whole)
-                edge_rgb, edge_alpha = light_over_clear(np.clip(look["shown"] - edge[..., None] * look["whole"], 0.0, 1.0))
+                if on_panel is not None:
+                    lit = srgb(np.clip(look["lit"] + (1.0 - look["alpha"][..., None]) * linear(under), 0.0, 1.0))
+                    unlit = beneath()[0]
+                else:
+                    lit, unlit = look["shown"], edge[..., None] * look["whole"]
+                edge_rgb, edge_alpha = light_over_clear(np.clip(lit - unlit, 0.0, 1.0))
                 add(f"{o.name} lit", np.where(whole[..., None], rgb, edge_rgb), np.where(whole, alpha, edge_alpha), "lddg")
             else:
                 add(f"{still_name} emission", *light(look["glow"], depth), "lddg")
             report(f"{o.name}: rendered")
 
-        def add_group(objs, name, shadow, holdout, unseen):
+        def share(shadow, left):
+            """What the parts do to the light on what is under them, as a share of it: below 1 their
+            shadow, above 1 their reflection or the light they give. Cycles gives it for what the
+            parts leave of a pixel (where a part covers some of it, the rest), and the shadow layer,
+            under the parts, darkens just that. Where they leave too little of a pixel to tell from
+            (a few of its samples), and under them, it is what is beside them."""
+            catcher = shadow.get("Shadow Catcher")
+            if catcher is None:
+                return None
+            seen = left > 0.15
+            ratio = np.where(seen[..., None], np.maximum(catcher[..., :3], 0.0), 1.0)
+            return carry_in([ratio], seen, ~seen)[0]
+
+        def add_group(objs, name, shadow, holdout, unseen, panel_light=False, lit_shadow=None):
             """A group's shadow and reflection, then its parts, bottom up, each rendered with the others
-            held out."""
+            held out. `panel_light`: the light it throws on the panel too (the group under everything
+            else, whose shadow render sees only the panel). `lit_shadow`: the shadow render again with
+            its lamps lighting (`shadow` then has them dark), for their light on the panel."""
             shadow_name, reflection_name = f"{name}shadow", f"{name}reflection"
             looks = [part_look(render([o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen),
                                lamp=role_of(o.name) == "on") for o in objs]
             opacities, above, left = unover([look["alpha"] for look in looks])
-            catcher = shadow.get("Shadow Catcher")
-            if catcher is not None:
-                # What the parts do to the light on what is under them, as a share of it: below 1 their
-                # shadow, above 1 their reflection. The parts' own pixels are 1, so where a part covers
-                # some of a pixel, the rest of it has what is left over; and where they leave too little
-                # of it to tell from (a few of the pixel's samples), and under them, what is beside them.
-                spread = left[..., None]
-                seen = left > 0.15
-                ratio = np.where(spread > 1e-3, np.maximum(catcher[..., :3] - (1.0 - spread), 0.0) / np.maximum(spread, 1e-3), 1.0)
-                ratio = np.where(seen[..., None], ratio, 1.0)
-                ratio = carry_in([ratio], seen, ~seen)[0]
+            ratio = share(shadow, left)
+            if ratio is not None:
                 add(shadow_name, black, 1.0 - srgb(np.clip(luma(np.minimum(ratio, 1.0)), 0.0, 1.0)))
+                if bare is not None and panel_light:
+                    # On the panel: the light the parts throw on it (a metal cap's glare), and the
+                    # lamps' light, which shows when they are lit. Each is what the panel shows with
+                    # it less what it shows without, on the scene's panel.
+                    on = luma(ratio)[..., None] > 1.0
+                    target = srgb(linear(bare) * ratio)
+                    add(f"{name}bounce", *light_over_clear(np.where(on, np.clip(target - beneath()[0], 0.0, 1.0), 0.0)), "lddg")
+                    lit_ratio = share(lit_shadow, left) if lit_shadow is not None else None
+                    if lit_ratio is not None:
+                        glow = np.clip(srgb(linear(bare) * lit_ratio) - srgb(linear(bare) * ratio), 0.0, 1.0)
+                        add(f"{lamps[0].name} glow", *light_over_clear(glow), "lddg")
                 # Their reflection in a part under them that shines: what it adds to that part's light.
                 a = merged[..., 3:4]
                 under = np.where(a > 0, merged[..., :3] / np.maximum(a, 1e-6), 0.0)
@@ -633,32 +734,55 @@ def export_layers(scene, filepath, size=512, samples=128, report=print):
             for o, look, opacity, over in zip(objs, looks, opacities, above):
                 # Under the parts above it, where they cover the pixel whole, the part goes on a little
                 # way past its own edge (a part under another's edge has none of its own there).
-                keys = ["colour", "shade", "highlights", "glow", "whole", "shown"]
+                keys = ["colour", "shade", "highlights", "glow", "whole", "shown", "lit"]
                 carried = carry_in([opacity] + [look[k] for k in keys], opacity > 1e-3, over < 1e-3)
                 look = dict(look, **dict(zip(keys, carried[1:])))
                 add_part(o, look, carried[0])
 
-        # The panel's shadow under what stays put, then what stays put, bottom up.
+        from bpy_extras.object_utils import world_to_camera_view
+
+        def at_pixel(point):
+            v = world_to_camera_view(temp, cam, point)
+            return v.x * width, (1 - v.y) * height
+
+        def mark(name, point):
+            """A hidden 2 by 2 dot centred on `point` (world), for CEditor's import to find."""
+            x, y = at_pixel(point)
+            px, py = int(round(x)), int(round(y))
+            dot = np.zeros((height, width), dtype=np.float32)
+            dot[max(0, py - 1):py + 1, max(0, px - 1):px + 1] = 1.0
+            add(name, black + 1.0, dot, hidden=True)
+
+        # The panel's shadow under what stays put, then what stays put, bottom up. With lamps, the
+        # shadow is rendered with them dark, and again lit, for their light on the panel.
         if still:
-            add_group(still, "", render(still, catchers=[panel]), holdout=[panel], unseen=[])
+            if bare is not None and lamps:
+                dark = render(still, catchers=[panel], unlit=lamps)
+                lit_shadow = render(still, catchers=[panel])
+            else:
+                dark, lit_shadow = render(still, catchers=[panel]), None
+            add_group(still, "", dark, holdout=[panel], unseen=[], panel_light=True, lit_shadow=lit_shadow)
         # Each moving group: its shadow on the panel and on what stays put, then its parts, lit by
         # what stays put without being seen with it.
         for group in ("turns", "moves", "off", "pressed"):
             objs = order(groups.get(group, []))
             if objs:
                 add_group(objs, f"{objs[0].name} ", render(objs, catchers=[panel] + still), holdout=[panel], unseen=still)
-        # Where turning parts turn about.
+        # Where turning parts turn about, and where their shadow does: a shadow cast by a light that
+        # stays put falls the same way whichever way the parts point, so it turns about a point half
+        # its reach from the axis, towards where it falls (CEditor's import reads "<layer> pivot").
         if groups.get("turns"):
-            from bpy_extras.object_utils import world_to_camera_view
-            centre = plan["pivot"].matrix_world.translation if plan["pivot"] else order(groups["turns"])[0].matrix_world.translation
-            v = world_to_camera_view(temp, cam, centre)
-            px, py = int(round(v.x * width)), int(round((1 - v.y) * height))
-            dot = np.zeros((height, width), dtype=np.float32)
-            dot[max(0, py - 1):py + 1, max(0, px - 1):px + 1] = 1.0
-            add("pivot", black + 1.0, dot, hidden=True)
+            turning = order(groups["turns"])
+            centre = plan["pivot"].matrix_world.translation if plan["pivot"] else turning[0].matrix_world.translation
+            mark("pivot", centre)
+            reach = shadow_reach(scene, turning)
+            shadow_name = f"{turning[0].name} shadow"
+            if reach is not None and any(layer["name"] == shadow_name for layer in layers):
+                mark(f"{shadow_name} pivot", centre + reach / 2)
         write_psd(filepath, width, height, layers, merged)
         return {"width": width, "height": height, "layers": [(l["name"], l["blend"]) for l in layers], "renders": count[0],
-                "notes": plan["notes"], "merged": merged, "pixels": {l["name"]: l["rgba"] for l in layers}}
+                "notes": plan["notes"], "merged": merged, "pixels": {l["name"]: l["rgba"] for l in layers},
+                "panel": bare, "on_panel": on_panel}
     finally:
         saved.restore()
         for o in made:
@@ -690,10 +814,16 @@ class CEDITOR_OT_export_layers(bpy.types.Operator, ExportHelper):
     filter_glob: StringProperty(default="*.psd", options={"HIDDEN"})
     size: IntProperty(name="Size", description="The longer side of the image, in pixels", default=512, min=32, max=4096)
     samples: IntProperty(name="Samples", description="Cycles samples for each render", default=128, min=1, max=16384)
+    for_panel: BoolProperty(
+        name="For this panel",
+        description="The scene's panel is the panel the control goes on in CEditor: its outline, a lit lamp's edge and "
+                    "the light on the panel are made for it. Off: they are made for no panel in particular",
+        default=True)
 
     def execute(self, context):
         try:
-            result = export_layers(context.scene, self.filepath, self.size, self.samples, report=lambda m: None)
+            result = export_layers(context.scene, self.filepath, self.size, self.samples, report=lambda m: None,
+                                   for_panel=self.for_panel)
         except Exception as error:
             self.report({"ERROR"}, str(error))
             return {"CANCELLED"}

@@ -1012,10 +1012,27 @@ What building the add-on found, against Level 1 as written above:
 - **A turning part's reflection.** A metal cap mirrors the pointer's end; rendered without the
   pointer, the cap lacked it. The shadow catcher's ratio over 1 is that light, written as a layer
   that turns with the pointer.
-- **What a layer cannot carry**, since it depends on the panel the control is put on: the outline
-  against the panel is blended in sRGB (as every transparent picture's is); a lamp brighter than
-  white lights its edge pixels where Cycles also lets a light panel through; the light a lamp throws
-  on the panel is not written. In a dial, a lamp's lit layer is not wired to anything (only switches
+- **The panel.** CEditor lays a component's layers straight onto the panel (measured: a part's blend
+  mode reaches the panel surface, no element between composites the component on its own), so a
+  layer of light brightens the panel. The scene's panel is taken to be the one the control goes on
+  ("For this panel", on by default), and three things that depend on it are made for it: the outline
+  mixed as Cycles mixes it, in linear light; a lit lamp's outermost pixels, lit as on it; and the
+  light the parts and the lamps throw on it, as layers (the lamps' shown when they are lit). On that
+  panel the layers give Blender's whole render back within a few levels, in the test and in the
+  editor itself (a 320 px knob on a panel of the scene's colour: mean 0.9, 99th percentile 4, at
+  rest and turned with the wheel). Off, or with no panel object, they are made for no panel in
+  particular.
+- **Cycles' shadow catcher** gives the shadow for what a part leaves of a pixel, not the pixel as a
+  whole. Taken for the whole, the shadow under a part's outline came out black, 40 levels off on the
+  panel.
+- **A turning part's shadow** turned about the axis swung round with the part and, at half a turn,
+  fell on the side towards the light. Shadows now turn about a point of their own, half their reach
+  from the axis towards where they fall (the light that lights the part most, and the part's height):
+  the import reads a pivot named after a layer ("pointer shadow pivot") as that layer's own. Exact on
+  a flat surface under one light; on a metal cap the shadow is partly its shine blocked, and how dark
+  it is changes as the part turns, which a layer made at rest does not; the part's reflection in the
+  cap is made at rest as well.
+- In a dial, a lamp's lit layer and its light on the panel are not wired to anything (only switches
   and buttons light theirs).
 
 ## Recommended order

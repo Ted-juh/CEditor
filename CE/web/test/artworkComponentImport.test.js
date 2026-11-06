@@ -180,6 +180,36 @@ test('a Photoshop knob: every layer a picture layer, its blend mode, opacity and
   assert.equal(bindings(plan)[0].target, 'Parts.Pointer.Layout.rotation');
 });
 
+test('a pivot named after a turning layer is that layer\'s own: a shadow turns about a point beside the axis', () => {
+  // The Blender add-on writes "pointer shadow pivot": the shadow of a pointer lit from one side turns
+  // about a point half its reach from the axis, so it stays on the side away from the light.
+  const bytes = writePsdUint8Array({
+    width: 100,
+    height: 100,
+    children: [
+      solid('body', 10, 10, 80, 80, [120, 120, 120, 255]),
+      solid('pointer shadow', 50, 14, 6, 30, [0, 0, 0, 128]),
+      solid('pointer', 47, 12, 6, 30, [230, 230, 230, 255]),
+      solid('pivot', 49, 49, 2, 2, [255, 255, 255, 255], { hidden: true }),
+      solid('pointer shadow pivot', 51, 50, 2, 2, [255, 255, 255, 255], { hidden: true }),
+      solid('knob axis', 0, 0, 2, 2, [255, 255, 255, 255], { hidden: true }),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes);
+  assert.equal(plan.ok, true, plan.error);
+  const p = parts(plan);
+  const about = (name) => {
+    const { x, y, width, height, pivotX, pivotY } = p[name]._children.Layout;
+    return [Math.round((x + (pivotX / 100) * width) * 100) / 100, Math.round((y + (pivotY / 100) * height) * 100) / 100];
+  };
+  assert.deepEqual(about('pointer'), [50, 50], 'the shared pivot');
+  assert.deepEqual(about('pointer_shadow'), [52, 51], 'its own');
+  assert.deepEqual(bindings(plan).map((b) => b.target).sort(), ['Parts.pointer.Layout.rotation', 'Parts.pointer_shadow.Layout.rotation']);
+  // Named after nothing that turns ("knob axis"), a pivot is a shared one, and the first shared one
+  // ("pivot") is used; every pivot is a mark, hidden.
+  for (const name of ['pivot', 'pointer_shadow_pivot', 'knob_axis']) assert.equal(p[name].visible, false, name);
+});
+
 test('a Photoshop layer\'s mask is its own; its clipped layers are in its picture; its styles drawn', () => {
   const mask = solid('', 0, 0, 20, 20, [0, 0, 0, 255]);
   for (let y = 0; y < 20; y += 1) for (let x = 10; x < 20; x += 1) mask.imageData.data[(y * 20 + x) * 4] = 255;

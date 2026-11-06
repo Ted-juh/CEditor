@@ -64,15 +64,15 @@ def knob_scene():
     bpy.context.object.name = "cap"
     bpy.context.object.data.materials.append(material("cap", (0.8, 0.8, 0.82), metallic=1.0, roughness=0.32))
     bpy.ops.object.shade_smooth()
-    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.36, 0.675))
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0.36, 0.71))
     pointer = bpy.context.object
     pointer.name = "pointer"
-    pointer.scale = (0.07, 0.36, 0.05)
+    pointer.scale = (0.07, 0.36, 0.12)
     pointer.data.materials.append(material("pointer", (0.95, 0.95, 0.9), roughness=0.5))
     # The pointer turns about the knob's axis: its origin there.
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     pointer.data.transform(__import__("mathutils").Matrix.Translation((0, 0.36, 0)))
-    pointer.location = (0, 0, 0.675)
+    pointer.location = (0, 0, 0.71)
     bpy.ops.mesh.primitive_cylinder_add(vertices=48, radius=0.11, depth=0.06, location=(1.0, -1.0, 0.03))
     bpy.context.object.name = "lamp"
     bpy.context.object.data.materials.append(material("lamp", (0.3, 0.03, 0.02), roughness=0.3, glow=(1, 0.06, 0.03), strength=5))
@@ -93,13 +93,14 @@ def knob_scene():
     return scene
 
 
-def reference(scene, size, samples):
-    """Blender's own image of the knob over a transparent panel that catches its shadow."""
-    scene.objects["panel"].is_shadow_catcher = True
+def reference(scene, size, samples, tag="caught", catcher=True):
+    """Blender's own image of the knob: over a transparent panel that catches its shadow (`catcher`),
+    or on its panel as the scene shows it."""
+    scene.objects["panel"].is_shadow_catcher = catcher
     r = scene.render
     r.engine = "CYCLES"
     r.resolution_x = r.resolution_y = size
-    r.film_transparent = True
+    r.film_transparent = catcher
     r.image_settings.file_format = "OPEN_EXR_MULTILAYER"
     r.image_settings.color_depth = "32"
     r.image_settings.exr_codec = "NONE"
@@ -107,12 +108,53 @@ def reference(scene, size, samples):
     scene.cycles.samples = samples
     scene.cycles.use_denoising = False
     scene.cycles.use_adaptive_sampling = False
-    r.filepath = os.path.join(OUT, "reference_")
+    r.filepath = os.path.join(OUT, f"{tag}-")
     bpy.ops.render.render(write_still=True)
-    name = sorted(f for f in os.listdir(OUT) if f.startswith("reference_"))[-1]
+    name = sorted(f for f in os.listdir(OUT) if f.startswith(f"{tag}-"))[-1]
     combined = addon.passes_of(addon.read_exr(os.path.join(OUT, name)), scene.view_layers[0].name)["Combined"]
     scene.objects["panel"].is_shadow_catcher = False
     return combined
+
+
+def stacked(layers, pixels, under, turn=0.0, pivots=None):
+    """The layers laid onto `under` (straight RGB, opaque) as CEditor lays them, straight onto the
+    panel; with the turning ones turned `turn` degrees clockwise about their pivots (`pivots`: a
+    layer's own, by name, or "pivot")."""
+    out = np.concatenate([under, np.ones_like(under[..., :1])], axis=-1).astype(np.float32)
+    for name, blend in layers:
+        role = addon.role_of(name)
+        if role == "pivot":
+            continue
+        rgba = pixels[name] / 255.0
+        if turn and role == "turns":
+            rgba = turned(rgba, turn, pivots.get(name, pivots["pivot"]))
+        out = addon.blend_over(out, rgba, blend)
+    return out[..., :3]
+
+
+def turned(rgba, degrees, about):
+    """`rgba` (straight, 0..1) turned `degrees` clockwise on screen about `about` (x, y in pixels),
+    as a browser turns a picture: bilinear, premultiplied."""
+    h, w = rgba.shape[:2]
+    p = rgba.astype(np.float32).copy()
+    p[..., :3] *= p[..., 3:4]
+    t = math.radians(degrees)
+    qy, qx = np.mgrid[0:h, 0:w] + 0.5
+    sx = about[0] + (qx - about[0]) * math.cos(t) + (qy - about[1]) * math.sin(t) - 0.5
+    sy = about[1] - (qx - about[0]) * math.sin(t) + (qy - about[1]) * math.cos(t) - 0.5
+    x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
+    fx, fy = (sx - x0)[..., None], (sy - y0)[..., None]
+    def at(y, x):
+        inside = ((x >= 0) & (x < w) & (y >= 0) & (y < h))[..., None]
+        return np.where(inside, p[np.clip(y, 0, h - 1), np.clip(x, 0, w - 1)], 0.0)
+    q = (at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy
+    a = q[..., 3:4]
+    return np.concatenate([np.where(a > 0, q[..., :3] / np.maximum(a, 1e-6), 0.0), a], axis=-1)
+
+
+def dot_centre(rgba):
+    ys, xs = np.nonzero(rgba[..., 3])
+    return float(xs.mean() + 0.5), float(ys.mean() + 0.5)
 
 
 scene = knob_scene()
@@ -135,20 +177,27 @@ check(names.index("cap") < names.index("pointer shadow"), "the pointer's shadow 
 check(blends.get("pointer reflection") == "lddg", "the pointer's reflection in the metal cap adds")
 check("lens" in names and addon.role_of("lens") == "", "the lamp's body is there whether it is lit or not")
 check(blends.get("lamp lit") == "lddg" and addon.role_of("lamp lit") == "on", "the lamp's glow adds, a layer of its own")
+check(blends.get("lamp glow") == "lddg" and addon.role_of("lamp glow") == "on", "the lamp's light on the panel adds, shown with the lamp lit")
+check(blends.get("bounce") == "lddg" and addon.role_of("bounce") == "", "the light the metal cap throws on the panel adds, and stays")
 moving = [n for n in names if addon.role_of(n) == "turns"]
-check(sorted(moving) == sorted(n for n in names if n.startswith("pointer")), f"what turns is the pointer's layers: {moving}")
-check(all(addon.role_of(n) in ("", "pivot") for n in names if not n.startswith("pointer") and n != "lamp lit"), "everything else stays put")
+check(sorted(moving) == sorted(n for n in names if n.startswith("pointer") and not n.endswith("pivot")), f"what turns is the pointer's layers: {moving}")
+check(all(addon.role_of(n) in ("", "pivot") for n in names if not n.startswith("pointer") and n not in ("lamp lit", "lamp glow")), "everything else stays put")
 
 # The right way up: the pointer was modelled pointing up, and turns about the middle of the image.
 ys, xs = np.nonzero(result["pixels"]["pointer"][..., 3])
 check(ys.mean() < SIZE * 0.4 and abs(xs.mean() - SIZE / 2) < 1.5, f"the pointer points up, as it was modelled (its middle at {xs.mean():.1f}, {ys.mean():.1f})")
-ys, xs = np.nonzero(result["pixels"]["pivot"][..., 3])
-check(abs(xs.mean() + 0.5 - SIZE / 2) < 1 and abs(ys.mean() + 0.5 - SIZE / 2) < 1, f"the pivot is on the knob's axis ({xs.mean() + 0.5:.1f}, {ys.mean() + 0.5:.1f})")
+pivots = {"pivot": dot_centre(result["pixels"]["pivot"]), "pointer shadow": dot_centre(result["pixels"]["pointer shadow pivot"])}
+check(abs(pivots["pivot"][0] - SIZE / 2) < 1 and abs(pivots["pivot"][1] - SIZE / 2) < 1, f"the pivot is on the knob's axis {pivots['pivot']}")
+# The pointer's shadow turns about a point of its own: half its reach from the axis, towards where it
+# falls (the sun's slant over the pointer's height), so it stays on the side away from the sun.
+px = SIZE / 2.6  # pixels to a metre
+reach = addon.shadow_reach(scene, [scene.objects["pointer"]])
+expected = (SIZE / 2 + reach.x / 2 * px, SIZE / 2 - reach.y / 2 * px)
+check(math.dist(pivots["pointer shadow"], expected) < 1,
+      f"the pointer's shadow turns about its own point, half its reach from the axis: {pivots['pointer shadow']}, {expected}")
 
 merged = result["merged"]
 ref = reference(scene, SIZE, SAMPLES)
-if os.environ.get("CEDITOR_LAYERS_DEBUG"):
-    np.save(os.path.join(OUT, "ref.npy"), ref); np.save(os.path.join(OUT, "merged.npy"), merged)
 check(ref.shape == merged.shape, f"the reference is the same size ({ref.shape[1]} x {ref.shape[0]})")
 a_ref, a_mix = ref[..., 3], merged[..., 3]
 
@@ -162,19 +211,35 @@ check(solid.sum() > SIZE * SIZE * 0.3, f"the knob covers {int(solid.sum())} pixe
 mean, p99 = float(diff.mean()), float(np.percentile(diff, 99))
 check(mean < 1 and p99 < 4, f"the layers give Blender's render of the knob back: mean {mean:.2f}, 99th percentile {p99:.1f} of 255 levels")
 
-# On a panel, its shadow included. Cycles mixes in linear light and CEditor in sRGB, as browsers and
-# Photoshop do: the layers are made to give Cycles' mix, but at the knob's outline that depends on the
-# panel CEditor puts it on, so the outline is mixed as any transparent picture's is, and left out here.
+# On the panel it was modelled on, as CEditor lays the layers, straight onto the panel: Blender's whole
+# render, the outline mixed as Cycles mixes it, the shadow, the lamp lit and its light on the panel.
+bare = result["panel"]
+full = reference(scene, SIZE, SAMPLES, "onpanel", catcher=False)
+want = np.round(addon.srgb(full[..., :3]) * 255)
+got = np.round(result["on_panel"][..., :3] * 255)
+laid = np.abs(np.round(stacked(result["layers"], result["pixels"], bare) * 255) - got).max()
+check(laid <= 1, f"the layers laid onto the panel are the picture the export made of them (within {laid:.0f} level)")
+d = np.abs(want - got).max(-1)
 yy, xx = np.mgrid[0:SIZE, 0:SIZE]
-px = SIZE / 2.6  # pixels to a metre
-outline = (np.abs(np.hypot(yy + 0.5 - SIZE / 2, xx + 0.5 - SIZE / 2) - px) < 1.5) | \
-          (np.abs(np.hypot(yy + 0.5 - SIZE / 2 - px, xx + 0.5 - SIZE / 2 - px) - 0.11 * px) < 1.5)
+lamp = np.hypot(yy + 0.5 - SIZE / 2 - px, xx + 0.5 - SIZE / 2 - px) < 0.11 * px + 4
+mean, p99 = float(d.mean()), float(np.percentile(d, 99))
+check(mean < 1 and p99 < 6, f"on its own panel the layers give Blender's whole render back: mean {mean:.2f}, 99th percentile {p99:.1f}, at most {d.max():.0f}")
+check(float(np.percentile(d[lamp], 95)) < 8, f"and the lit lamp and its light on the panel: 95th percentile {np.percentile(d[lamp], 95):.1f}")
+if os.environ.get("CEDITOR_LAYERS_DEBUG"):
+    np.save(os.path.join(OUT, "full.npy"), full); np.save(os.path.join(OUT, "on_panel.npy"), result["on_panel"]); np.save(os.path.join(OUT, "bare.npy"), bare)
+
+# On panels of other colours: the knob and its shadow, laid onto them as onto the scene's. The outline,
+# the lit lamp's edge and the light on the panel are made for the scene's panel; they are left out.
+outline = (np.abs(np.hypot(yy + 0.5 - SIZE / 2, xx + 0.5 - SIZE / 2) - px) < 1.5) | lamp
+for name in ("bounce", "lamp glow"):
+    outline |= result["pixels"][name][..., 3] > 0
 for tone, panel in (("dark", 0.2), ("grey", 0.5), ("light", 0.8)):
+    flat = np.full((SIZE, SIZE, 3), panel, dtype=np.float32)
     want = np.round(addon.srgb(ref[..., :3] + (1 - a_ref[..., None]) * addon.linear(np.float32(panel))) * 255)
-    got = np.round((merged[..., :3] + (1 - a_mix[..., None]) * panel) * 255)
+    got = np.round(stacked(result["layers"], result["pixels"], flat) * 255)
     d = np.abs(want - got).max(-1)[~outline]
     mean, p99 = float(d.mean()), float(np.percentile(d, 99))
-    check(mean < 1 and p99 < 8, f"on a {tone} panel, its shadow too, away from its outline: mean {mean:.2f}, 99th percentile {p99:.1f}")
+    check(mean < 1 and p99 < 8, f"on a {tone} panel, its shadow too, away from its outline and the lamp: mean {mean:.2f}, 99th percentile {p99:.1f}")
 
 # Drawn larger, as CEditor draws a component at any size and on a screen of two pixels to the point:
 # the browser scales each layer before it blends them, and the layers must still add up to the
@@ -194,33 +259,80 @@ def larger(rgba):
     return np.concatenate([np.where(a > 0, p[..., :3] / np.maximum(a, 1e-6), 0.0), a], axis=-1)
 
 
-def on_grey(rgba, premultiplied):
-    a = rgba[..., 3:4]
-    return np.round(((rgba[..., :3] if premultiplied else rgba[..., :3] * a) + (1 - a) * 0.5) * 255)
-
-
-scaled = np.zeros((2 * SIZE, 2 * SIZE, 4), dtype=np.float32)
+opaque = lambda rgb: np.concatenate([rgb, np.ones_like(rgb[..., :1])], axis=-1)
+scaled = larger(opaque(bare))
 for name, blend in result["layers"]:
-    if name != "pivot":
+    if addon.role_of(name) != "pivot":
         scaled = addon.blend_over(scaled, larger(result["pixels"][name] / 255.0), blend)
-covered = merged[..., 3:4]
-picture = larger(np.concatenate([np.where(covered > 0, merged[..., :3] / np.maximum(covered, 1e-6), 0.0), covered], axis=-1))
-d = np.abs(on_grey(scaled, True) - on_grey(picture, False)).max(-1)
+picture = larger(opaque(result["on_panel"][..., :3]))
+d = np.abs(np.round(scaled[..., :3] * 255) - np.round(picture[..., :3] * 255)).max(-1)
 if os.environ.get("CEDITOR_LAYERS_DEBUG"):
     np.save(os.path.join(OUT, "scaled.npy"), d)
     np.savez(os.path.join(OUT, "pixels.npz"), **result["pixels"])
 # Where two layers both fade across the same pixels (the skirt's outline over its shadow, the pointer's
 # over its own), scaling each and then laying one over the other is not quite scaling the two laid
-# together: a few levels, as for any picture with a drop shadow. The lit lamp's edge, made to look
-# right where light cannot be added exactly, is left out (see the add-on's notes).
-yy2, xx2 = np.mgrid[0:2 * SIZE, 0:2 * SIZE] / 2.0
-d = d[np.hypot(yy2 + 0.25 - SIZE / 2 - px, xx2 + 0.25 - SIZE / 2 - px) > 0.11 * px + 1.5]
+# together: a few levels, as for any picture with a drop shadow.
 check(float(np.percentile(d, 99.9)) < 14 and d.max() < 24, f"drawn twice the size, the layers still add up to the picture: 99.9th percentile {np.percentile(d, 99.9):.1f}, at most {d.max():.0f} levels")
 
-# On black a lit lamp's edge is as Cycles shows it, lit out to where it covers a quarter of a pixel.
-lamp_edge = np.abs(np.hypot(yy + 0.5 - SIZE / 2 - px, xx + 0.5 - SIZE / 2 - px) - 0.11 * px) < 1.5
-d = np.abs(np.round(addon.srgb(ref[..., :3]) * 255) - np.round(merged[..., :3] * 255)).max(-1)[lamp_edge]
-check(d.max() <= 3, f"on black, the lit lamp's edge is as Cycles shows it: at most {d.max():.0f} levels")
+# Turned: where Blender casts the pointer's shadow with the pointer turned, against the shadow layer
+# turned as CEditor turns it. Turned about the axis, the shadow swings round with the pointer, and at
+# half a turn falls on the side towards the sun; about its own point it stays on the side away.
+TURN = 120
+pointer = scene.objects["pointer"]
+pointer.rotation_euler.z = math.radians(-TURN)  # clockwise on screen, seen from above
+catchers = [o.name for o in scene.objects if o.type == "MESH" and o.name != "pointer"]  # only the pointer casts
+for name in catchers:
+    scene.objects[name].is_shadow_catcher = True
+scene.view_layers[0].cycles.use_pass_shadow_catcher = True
+scene.render.film_transparent = True
+scene.render.filepath = os.path.join(OUT, "cast-")
+bpy.ops.render.render(write_still=True)
+cast = addon.passes_of(addon.read_exr(os.path.join(OUT, sorted(f for f in os.listdir(OUT) if f.startswith("cast-"))[-1])),
+                       scene.view_layers[0].name)["Shadow Catcher"]
+for name in catchers:
+    scene.objects[name].is_shadow_catcher = False
+turned_full = np.round(addon.srgb(reference(scene, SIZE, SAMPLES, "turned", catcher=False)[..., :3]) * 255)
+pointer.rotation_euler.z = 0.0
+hidden = turned(result["pixels"]["pointer"] / 255.0, TURN, pivots["pivot"])[..., 3] > 0.5
+
+
+def centre_of(darkness):
+    """Where a shadow is, weighted by its darkness, outside the pointer that hides some of it."""
+    w = np.where(hidden, 0.0, darkness)
+    w = np.where(w > 0.2 * w.max(), w, 0.0)
+    return float((w * (xx + 0.5)).sum() / w.sum()), float((w * (yy + 0.5)).sum() / w.sum())
+
+
+blender = centre_of(1.0 - addon.luma(np.clip(cast[..., :3], 0.0, 1.0)))
+if os.environ.get("CEDITOR_LAYERS_DEBUG"):
+    np.save(os.path.join(OUT, "cast.npy"), 1.0 - addon.luma(np.clip(cast[..., :3], 0.0, 1.0)))
+    np.save(os.path.join(OUT, "own.npy"), turned(result["pixels"]["pointer shadow"] / 255.0, TURN, pivots["pointer shadow"])[..., 3])
+    np.save(os.path.join(OUT, "hidden.npy"), hidden)
+shadow = result["pixels"]["pointer shadow"] / 255.0
+own = centre_of(turned(shadow, TURN, pivots["pointer shadow"])[..., 3])
+axis = centre_of(turned(shadow, TURN, pivots["pivot"])[..., 3])
+check(math.dist(own, blender) < 2.5 and math.dist(axis, blender) > 2 * math.dist(own, blender),
+      f"turned {TURN} degrees, the pointer's shadow falls where Blender casts it: {math.dist(own, blender):.1f} px off about "
+      f"its own point, {math.dist(axis, blender):.1f} px about the axis")
+
+# Round the turned pointer, on the cap: its own pixels and their edge left out (a sharp edge turned is
+# resampled, and the pointer's reflection in the cap is made at rest).
+def grown(mask, steps):
+    for _ in range(steps):
+        mask = np.pad(mask, 1)[2:, 1:-1] | np.pad(mask, 1)[:-2, 1:-1] | np.pad(mask, 1)[1:-1, 2:] | np.pad(mask, 1)[1:-1, :-2] | mask
+    return mask
+
+
+on_it = turned(result["pixels"]["pointer"] / 255.0, TURN, pivots["pivot"])[..., 3] > 0
+around = grown(on_it, int(round(0.12 * px))) & ~grown(on_it, 2)
+means = {}
+for how, about in (("own", pivots), ("axis", {"pivot": pivots["pivot"]})):
+    turned_layers = np.round(stacked(result["layers"], result["pixels"], bare, TURN, about) * 255)
+    means[how] = float(np.abs(turned_layers - turned_full).max(-1)[around].mean())
+    if how == "own" and os.environ.get("CEDITOR_LAYERS_DEBUG"):
+        np.save(os.path.join(OUT, "turned_full.npy"), turned_full); np.save(os.path.join(OUT, "turned_layers.npy"), turned_layers)
+check(means["own"] < 4 and means["own"] <= means["axis"] + 0.05,
+      f"and round the turned pointer the cap is Blender's to a mean {means['own']:.2f} levels ({means['axis']:.2f} with the shadow turned about the axis)")
 
 # The scene is left as it was: no scene, object or setting of the export's is left behind.
 check([s.name for s in bpy.data.scenes] == [scene.name], "the export's own scene is gone")
