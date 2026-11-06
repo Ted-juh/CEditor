@@ -1,7 +1,10 @@
 # Blender knobs in CEditor: where it stands
 
-Status, 2026-11-06: **built and measured; three defects found in review, not yet fixed.** Read this
-first in a fresh session, then `CLAUDE.md`. The design record is
+Status, 2026-11-06: **built and measured; of the three defects found in review, the import notice is
+fixed, and the other two are designed with mock-ups waiting for the owner's approval**
+([`blender-knob-fixes-design.md`](blender-knob-fixes-design.md),
+[`blender-knob-fixes-mockups.html`](blender-knob-fixes-mockups.html)). Read this first in a fresh
+session, then `CLAUDE.md`. The design record is
 [`changeable-control-sets.md`](changeable-control-sets.md) (section *Bringing designs in*); the user
 documentation is [`../panel-artwork-import.md`](../panel-artwork-import.md) (section *A knob modelled
 in Blender*).
@@ -17,6 +20,9 @@ render, on any panel and at any angle, measured rather than judged by eye.
 
 ## Branch and state
 
+- Work continues on branch `claude/new-session-ofvsj0`, which carries all of
+  `ccr-4944badf-4smz0y` (below) and, on top, the import notice's fix and the design and mock-ups
+  for defects 1 and 3.
 - Branch `ccr-4944badf-4smz0y`. `main` is at `87d0eedc` (the merge of changeable control sets);
   the branch carries, on top of it, `20a7382b` (the add-on), `bad257ce` (ignore `__pycache__`),
   `f1380d80` (made for the scene's panel; a turning part's shadow keeps its side), `a5fcc1cc` (the
@@ -81,9 +87,12 @@ The pieces, and where they live:
 - **A part under another's edge** (a skirt under the cap's rim) keeps its whole look in its colour
   layer: inside means the part covers the pixel whole by itself.
 
-## Defects found in review (fix first)
+## Defects found in review
 
-1. **Recolouring an imported picture layer does not work.** The manual says "change a part's colour
+1. **Recolouring an imported picture layer does not work.** *Designed, waiting for approval:* a
+   colour per picture (`Fill.imageColour`, `Image.colour`) worked out on its pixels, exact for the
+   add-on's colour layers once it writes a colour share; the Colors dock and look bar edit it. See
+   `blender-knob-fixes-design.md`. The review's description: The manual says "change a part's colour
    with its tint". A picture layer's tint (`Background.Fill.imageTint`) is drawn by `buildLayerStyle`
    (`utils/backgroundCSS.js`) as an inset box-shadow wash at 30 %, over the layer's whole box: set
    red on the skirt, it painted a red rectangle over the knob and the panel corners round it
@@ -96,11 +105,16 @@ The pieces, and where they live:
    its own shape (multiply by a colour masked by the picture's alpha, or a colour matrix), what it
    means for a colour layer whose edge band holds the lit look, how it reaches a part of frames, and
    that the Colors dock edits it (the owner's rule: colours go through the Colors dock).
-2. **The import notice counts the file's layers, not the component's.** "A dial of 71 layers" for a
+2. **Fixed.** `buildArtworkComponent` returns the number of parts it made and both importers report
+   it; the test knob reads "A dial of 19 layers" (its file holds 49), checked in
+   `test/blenderLayersImport.test.js`. The review's description: **The import notice counts the
+   file's layers, not the component's.** "A dial of 71 layers" for a
    component the designer shows as 21: `planPsdComponentImport` returns `layers: layers.length`
    before `framesFromAngles` folds each angle set into one part. Count the parts. Small; fix with a
    test (`test/blenderLayersImport.test.js` matches `A dial of \d+ layers`).
-3. **The dial's Lamp value is listed under "NOT WIRED UP"** in the Interact card ("no behavior drives
+3. *Designed, waiting for approval:* a section "Set by the panel" in the Interact card for values
+   something uses and nothing on the component moves (option A), or a reworded list (option B). The
+   review's description: **The dial's Lamp value is listed under "NOT WIRED UP"** in the Interact card ("no behavior drives
    it (fine for output-only values)"). True, since the panel sets it, but it reads as a fault. Wording
    or presentation; UI, so a mock-up first.
 
@@ -173,7 +187,8 @@ menu does.
 
 ## What next
 
-Fix the three defects (the recolour one needs a mock-up and the owner's approval). Then, from the
+Once the owner has answered the questions in `blender-knob-fixes-design.md`, build defects 1 and 3
+in the order given there. Then, from the
 design record's order: Illustrator `.ai` through its PDF part (pdf.js) if Illustrator files are wanted
 directly; a Figma plugin if Figma is; Level 3 (CEditor's own 3D parts, with piece E); Level 2 (glTF)
 when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; a

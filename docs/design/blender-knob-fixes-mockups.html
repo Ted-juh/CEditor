@@ -1,0 +1,375 @@
+<title>Blender Knob Fixes</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+/* ---------------------------------------------------------------------------
+   Layout: one reading column; each mock-up on a dark plate that scrolls sideways
+   on a phone. Palette from the app, as in the other mock-ups here: properties
+   panel #1E1E1E on #2A2A2A, fields #1A1A1A, labels #5B9BD5, dock #15181B,
+   accent teal #14B8A6. A single dark look on purpose: it is the app's.
+   NOTHING HERE IS BUILT. The design is blender-knob-fixes-design.md.
+--------------------------------------------------------------------------- */
+:root{
+  color-scheme:dark;
+  --ground:#0f1113; --ground-2:#141719; --panel:#1E1E1E; --dock:#15181B;
+  --field:#1A1A1A; --rule:#2A2A2A; --rule-2:#333; --raised:#20262B;
+  --ink:#DDD; --ink-1:#E8EEF5; --ink-2:#B9C8D4; --ink-3:#8A949C; --ink-4:#616C75;
+  --label:#5B9BD5; --teal:#14B8A6; --teal-dim:#0E7C70; --teal-ink:#8FEDE3; --teal-ground:#0B2320;
+  --warn:#E5A029; --warn-ink:#F1D8A1; --warn-ground:#241d10; --warn-rule:#4A3A1C;
+  --bad:#D98C8C; --orange:#E5A029; --sel:#173449; --tabbar:#111A21; --chip:#12171A;
+  --sans:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink-1);font:400 16px/1.6 var(--sans);-webkit-font-smoothing:antialiased}
+.wrap{max-width:1180px;margin:0 auto;padding-block:0 96px;
+      padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.hero{padding-block:48px 28px;border-bottom:1px solid var(--rule)}
+.eyebrow{font:600 11px/1.4 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--ink-4)}
+.eyebrow b{color:var(--teal);font-weight:600}
+h1{font:700 clamp(28px,4.4vw,44px)/1.08 var(--sans);letter-spacing:-.02em;margin:14px 0 0;max-width:22ch;text-wrap:balance}
+h2{font:700 clamp(22px,2.8vw,30px)/1.15 var(--sans);letter-spacing:-.015em;margin:0;max-width:30ch;text-wrap:balance}
+h3{font:600 17px/1.35 var(--sans);margin:40px 0 0;text-wrap:balance}
+.lede{font-size:clamp(16px,1.7vw,18px);line-height:1.55;color:var(--ink-2);max-width:64ch;margin:16px 0 0}
+p{max-width:66ch;color:var(--ink-2);margin:12px 0 0;font-size:15px}
+p b,li b{color:var(--ink-1);font-weight:600}
+ul,ol{max-width:66ch;color:var(--ink-2);font-size:15px;padding-left:20px;margin:12px 0 0}
+li{margin-top:8px}
+code{font:500 13px/1 var(--mono);color:var(--teal);background:#14b8a614;padding:2px 5px;border-radius:3px;overflow-wrap:anywhere}
+.bar{margin-top:22px;border:1px solid var(--warn-rule);background:var(--warn-ground);border-radius:6px;padding:12px 14px;color:var(--warn-ink);font-size:14px;max-width:70ch}
+.bar b{color:var(--warn)}
+.bar.ok{border-color:var(--teal-dim);background:#0B1F1D;color:#A8E6DE}
+.bar.ok b{color:var(--teal)}
+.sec{padding-top:64px}
+.kicker{font:600 11px/1 var(--mono);letter-spacing:.15em;text-transform:uppercase;color:var(--teal);margin-bottom:12px}
+.plate{margin-top:20px}
+.scroll{overflow-x:auto;background:var(--ground-2);border:1px solid var(--rule);border-radius:10px;padding:18px}
+.cap{display:flex;gap:14px;margin-top:10px;align-items:baseline;flex-wrap:wrap}
+.cap .cn{font:600 11px/1.5 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--ink-4);white-space:nowrap}
+.cap .ct{color:var(--ink-3);font-size:14px;max-width:80ch;margin:0;min-width:0;flex:1 1 30ch}
+
+/* ---- today: screenshots -------------------------------------------------- */
+.shots{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:18px;margin-top:20px}
+.shot{margin:0;min-width:0}
+.shot.wide{grid-column:1/-1}
+.shot .frame{background:var(--ground-2);border:1px solid var(--rule);border-radius:8px;padding:10px;overflow-x:auto}
+.shot img{display:block;max-width:none;height:auto;border-radius:3px}
+.shot img.fit{max-width:100%}
+.shot figcaption{color:var(--ink-3);font-size:13.5px;margin-top:8px;line-height:1.5}
+.shot figcaption b{color:var(--ink-1);font-weight:600}
+.tag-today{font:600 9.5px/1 var(--mono);letter-spacing:.1em;text-transform:uppercase;color:var(--bad);margin-right:6px}
+
+/* ---- the renders --------------------------------------------------------- */
+.renders{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px}
+.render{margin:0;min-width:0}
+.render img{display:block;width:100%;max-width:192px;aspect-ratio:1;border-radius:6px;image-rendering:auto}
+.render figcaption{margin-top:7px;font:500 12px/1.45 var(--sans);color:var(--ink-2)}
+.render figcaption .hex{display:inline-flex;align-items:center;gap:5px;font:500 11px/1 var(--mono);color:var(--ink-3)}
+.render figcaption .hex i{width:10px;height:10px;border-radius:2px;border:1px solid #0006;display:inline-block}
+.render.bug figcaption{color:var(--bad)}
+
+/* ---- app chrome, drawn ---------------------------------------------------- */
+.ui{font:400 11px/1.4 var(--sans);color:var(--ink);min-width:740px}
+.lookbar{display:flex;align-items:center;gap:8px;background:var(--panel);border:1px solid var(--rule);border-radius:5px;padding:6px 8px}
+.lb{display:flex;align-items:center;gap:6px;height:28px;padding:0 8px;border:1px solid var(--rule-2);border-radius:4px;background:var(--field);font:600 10.5px/1 var(--sans);color:var(--ink)}
+.lb .sw{width:22px;height:18px;border-radius:3px;border:1px solid #0008}
+.lb .val{font:500 10px/1 var(--mono);color:var(--ink-3)}
+.lb.slider{gap:10px}
+.lb.slider .track{width:120px;height:6px;border-radius:3px;background:linear-gradient(90deg,var(--teal-dim),var(--teal))}
+.lb.slider .knob{width:12px;height:12px;border-radius:50%;background:#EEE;margin-left:-16px}
+.lb.ghost{border-style:dashed;color:var(--ink-3);font-weight:500}
+.lb.link{border-color:var(--teal-dim);background:var(--teal-ground);color:var(--teal-ink)}
+.lb.layer{margin-left:auto;border-color:#3D4A57;color:var(--ink-2)}
+.kind{font:600 9px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);padding:0 4px}
+.new{outline:1.5px solid var(--teal);outline-offset:2px}
+
+.dock{background:var(--dock);border:1px solid var(--rule);border-radius:5px;overflow:hidden;margin-top:12px}
+.dtabs{display:flex;gap:2px;padding:5px 6px;background:var(--tabbar);border-bottom:1px solid var(--rule);align-items:center}
+.dtabs span{border:1px solid transparent;color:#96A6B2;font:600 10px/1 var(--sans);padding:6px 9px;border-radius:4px}
+.dtabs span.on{border-color:var(--teal-dim);background:var(--teal-ground);color:var(--teal-ink)}
+.context{display:flex;align-items:center;gap:10px;padding:7px 10px;border-bottom:1px solid var(--rule);color:var(--ink-3);font-size:10.5px}
+.context strong{color:var(--ink-1)}
+.context .done{margin-left:auto;display:flex;gap:6px}
+.context .done span{border:1px solid var(--rule-2);border-radius:3px;padding:3px 8px;color:var(--ink-2);font-weight:600}
+.context .done span.go{border-color:var(--teal-dim);color:var(--teal-ink);background:var(--teal-ground)}
+.drawn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 10px;border-bottom:1px solid var(--rule);background:#12161A}
+.drawn .pair{display:flex;align-items:center;gap:7px}
+.drawn .lbl{font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4)}
+.drawn .sw{width:30px;height:20px;border-radius:3px;border:1px solid #0008}
+.drawn .hx{font:500 10px/1 var(--mono);color:var(--ink-2)}
+.drawn .arrow{color:var(--ink-4);font-size:13px}
+.drawn .btn{border:1px solid var(--rule-2);border-radius:3px;padding:4px 8px;color:var(--ink-2);font-weight:600;background:var(--field)}
+.drawn .btn.right{margin-left:auto}
+.drawn .note{flex-basis:100%;color:var(--ink-3);font-size:10.5px}
+.picker{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:12px;padding:10px}
+.sv{height:132px;border-radius:4px;background:linear-gradient(0deg,#000,transparent),linear-gradient(90deg,#fff,#E11);position:relative}
+.sv i{position:absolute;left:78%;top:30%;width:11px;height:11px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #0008}
+.hue{height:10px;border-radius:5px;margin-top:9px;background:linear-gradient(90deg,#f00,#ff0,#0f0,#0ff,#00f,#f0f,#f00)}
+.side .lbl{font:600 8.5px/1 var(--mono);letter-spacing:.13em;text-transform:uppercase;color:var(--ink-4);margin:2px 0 6px}
+.side .field{border:1px solid var(--rule-2);background:var(--field);border-radius:3px;padding:5px 7px;font:500 10px/1 var(--mono);color:var(--ink-2);width:max-content}
+.roles{display:flex;flex-direction:column;gap:5px;margin-top:12px}
+.role-row{display:flex;align-items:center;gap:8px}
+.role-row span{width:58px;color:var(--ink-3);font-size:10px}
+.role-row b{width:16px;height:16px;border-radius:3px;border:1px solid #0008;display:inline-block;margin-right:3px}
+.role-row b.on{outline:2px solid var(--teal);outline-offset:1px}
+.colors-idle{padding:14px 12px;color:var(--ink-3);font-size:11px;line-height:1.6;max-width:60ch}
+.colors-idle .lb{display:inline-flex;margin-top:8px}
+
+.layers{background:var(--panel);border:1px solid var(--rule-2);border-radius:4px;overflow:hidden;max-width:340px}
+.lrow{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid #242424;font-size:11px}
+.lrow:last-child{border-bottom:0}
+.lrow .thumb{width:20px;height:20px;border:1px solid #3A434A;border-radius:3px;background:#12171A}
+.lrow .nm{flex:1;min-width:0;color:var(--ink-2);font-weight:600}
+.lrow.sel{background:var(--sel);box-shadow:inset 2px 0 0 var(--label)}
+.lrow.sel .nm{color:#EAF5FF}
+.ltag{font:600 8px/1 var(--mono);letter-spacing:.08em;padding:3px 5px;border-radius:3px;border:1px solid #3A434A;color:#9AA5AD}
+.ltag.pic{border-color:#2D5A7A;color:#9CC8EA}
+.ltag.frm{border-color:#5A4A2D;color:#E8C890}
+.ltag.lit{border-color:#3D3D3D;color:#8A8A8A;font-style:italic}
+
+/* ---- Interact card, drawn ------------------------------------------------ */
+.icard{background:var(--panel);border:1px solid var(--rule);border-radius:5px;max-width:540px;min-width:420px;font:400 11px/1.45 var(--sans);color:var(--ink)}
+.ihead{display:flex;align-items:baseline;gap:8px;padding:9px 12px;border-bottom:1px solid var(--rule)}
+.ihead strong{font-size:12px;color:var(--ink-1)}
+.ihead em{font-style:normal;color:var(--ink-3);font-size:10px}
+.ihead .fold{margin-left:auto;color:var(--ink-4)}
+.isec{padding:10px 12px;border-bottom:1px solid var(--rule)}
+.isec:last-child{border-bottom:0}
+.isec-h{display:flex;align-items:center;gap:8px;font:600 9px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:var(--label);margin-bottom:9px}
+.isec-h.warn{color:var(--warn)}
+.isec-h small{font:400 10px/1.3 var(--sans);letter-spacing:0;text-transform:none;color:var(--ink-4)}
+.vrow{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:baseline}
+.vtag{font:600 8.5px/1 var(--mono);padding:3px 6px;border-radius:9px;border:1px solid #2D5A7A;color:#9CC8EA;align-self:center}
+.vname{font-weight:600;color:var(--ink-1);font-size:11.5px}
+.vname span{font:500 10px/1 var(--mono);color:var(--ink-4);margin-left:6px}
+.vdesc{grid-column:2;color:var(--ink-2)}
+.vfrom{grid-column:2;display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:4px}
+.vfrom em{font-style:normal;color:var(--ink-4);font-size:10px}
+.select{border:1px solid var(--rule-2);background:var(--field);border-radius:3px;padding:4px 8px;color:var(--ink-2);font-size:10.5px}
+.select::after{content:" ▾";color:var(--ink-4)}
+.onoff{display:inline-flex;border:1px solid var(--rule-2);border-radius:3px;overflow:hidden}
+.onoff span{padding:3px 8px;color:var(--ink-3);font-size:10px}
+.onoff span.on{background:var(--teal-ground);color:var(--teal-ink)}
+.orow{display:grid;grid-template-columns:auto auto minmax(0,1fr);gap:8px;align-items:baseline;margin-top:6px}
+.otag{font:600 8.5px/1 var(--mono);padding:3px 6px;border-radius:9px;border:1px solid var(--warn-rule);color:var(--orange)}
+.otag.plain{border-color:#3A434A;color:#9AA5AD}
+.orow strong{color:var(--ink-1)}
+.orow em{font-style:normal;color:var(--warn-ink)}
+.orow em.plain{color:var(--ink-2)}
+
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,430px),1fr));gap:18px;margin-top:20px}
+.two > div{min-width:0}
+.opt{font:600 10px/1 var(--mono);letter-spacing:.12em;text-transform:uppercase;color:var(--ink-4);margin-bottom:8px}
+.opt b{color:var(--teal)}
+
+.qs{counter-reset:q;list-style:none;padding:0;max-width:72ch}
+.qs li{counter-increment:q;position:relative;padding:12px 14px 12px 46px;margin-top:10px;background:var(--ground-2);border:1px solid var(--rule);border-radius:8px}
+.qs li::before{content:counter(q);position:absolute;left:14px;top:12px;width:22px;height:22px;border-radius:50%;background:var(--teal-ground);border:1px solid var(--teal-dim);color:var(--teal-ink);font:600 11px/20px var(--mono);text-align:center}
+.qs .rec{display:block;margin-top:6px;color:var(--teal-ink);font-size:14px}
+.formula{font:500 clamp(13px,1.7vw,15px)/1.6 var(--mono);color:var(--ink-1);background:var(--ground-2);border:1px solid var(--rule);border-left:3px solid var(--teal);border-radius:6px;padding:12px 16px;margin-top:16px;max-width:66ch;overflow-x:auto}
+.formula small{display:block;color:var(--ink-3);font:400 13px/1.5 var(--sans);margin-top:4px}
+footer{margin-top:64px;padding-top:18px;border-top:1px solid var(--rule);color:var(--ink-4);font-size:13px}
+</style>
+
+<div class="wrap">
+
+<header class="hero">
+  <div class="eyebrow"><b>Mock-ups</b> · Blender knobs · review defects 1 and 3 · 2026-11-06</div>
+  <h1>A picture layer's colour, and a value the panel sets</h1>
+  <p class="lede">Two of the three defects the review of the Blender knob work found are interface changes. This page shows what the Component Designer does today, what it would do, and the questions to settle before anything is built.</p>
+  <div class="bar"><b>Nothing on this page is built.</b> Screenshots marked “today” are of the editor on this branch, with the test knob (<code>CE/web/test/fixtures/blender-knob.psd</code>) imported. The knob pictures under “What it would look like” are real pixels: the test knob's layers, recoloured by the formula below and composited as CEditor composites them.</div>
+  <div class="bar ok"><b>Defect 2 is fixed.</b> The import notice counts the component's layers, not the file's. The test knob now reads “A dial of 19 layers”; its file holds 49.</div>
+</header>
+
+<!-- ======================================================================= -->
+<section class="sec" id="recolour">
+  <div class="kicker">Defect 1</div>
+  <h2>Change the colour of a picture layer</h2>
+  <p>The manual promises that a part's colour changes and its light stays as Blender rendered it. Today no control in the Component Designer does that.</p>
+
+  <h3>Today</h3>
+  <div class="shots">
+    <figure class="shot wide">
+      <div class="frame"><img class="fit" src="blender-knob-fixes/today-lookbar.png" width="752" height="46" alt="The look bar with the skirt layer selected: Fill, Gradient, Stroke, Corners and Opacity."></div>
+      <figcaption><span class="tag-today">Today</span>The skirt selected. The look bar offers <b>Fill, Gradient, Stroke and Corners</b>. A picture layer draws none of them.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="frame"><img class="fit" src="blender-knob-fixes/today-colors-dock.png" width="548" height="125" alt="The Colors dock reading Editing: skirt › Fill, with the colour picker below."></div>
+      <figcaption><span class="tag-today">Today</span>The Colors dock reads <b>Editing: skirt › Fill</b>. A colour picked here goes to the fill, which a picture layer does not draw, so nothing on the canvas changes. A part of frames, such as the pointer, has no colour property at all.</figcaption>
+    </figure>
+    <figure class="shot">
+      <div class="frame"><img src="blender-knob-fixes/today-wash.png" width="192" height="192" alt="The knob with a pale red rectangle over the skirt's box, covering the panel corners."></div>
+      <figcaption><span class="tag-today">Today</span>The only colour a picture has is <code>Fill.imageTint</code>, set from a script: a red wash at 30&nbsp;% over the layer's whole box, panel corners included. The designer shows no control for it.</figcaption>
+    </figure>
+  </div>
+
+  <h3>What it would look like</h3>
+  <div class="plate"><div class="scroll">
+    <div class="renders">
+      <figure class="render"><img src="blender-knob-fixes/as-drawn.png" width="192" height="192" alt="The test knob as Blender rendered it: a pale skirt, a metal cap, an orange pointer."><figcaption>As drawn<br><span class="hex"><i style="background:#C1C1BC"></i>skirt #C1C1BC</span></figcaption></figure>
+      <figure class="render"><img src="blender-knob-fixes/skirt-red.png" width="192" height="192" alt="The knob with a red skirt, its shading and highlights unchanged."><figcaption>Skirt red<br><span class="hex"><i style="background:#B22222"></i>#B22222</span></figcaption></figure>
+      <figure class="render"><img src="blender-knob-fixes/skirt-blue.png" width="192" height="192" alt="The knob with a blue skirt."><figcaption>Skirt blue<br><span class="hex"><i style="background:#285AAA"></i>#285AAA</span></figcaption></figure>
+      <figure class="render"><img src="blender-knob-fixes/skirt-black.png" width="192" height="192" alt="The knob with a near-black skirt."><figcaption>Skirt black<br><span class="hex"><i style="background:#1C1C1E"></i>#1C1C1E</span></figcaption></figure>
+      <figure class="render"><img src="blender-knob-fixes/pointer-white.png" width="192" height="192" alt="The knob with a black skirt and a white pointer."><figcaption>Pointer white, a part of frames<br><span class="hex"><i style="background:#F0F0E8"></i>#F0F0E8, all 11 frames</span></figcaption></figure>
+      <figure class="render"><img src="blender-knob-fixes/cap-brass.png" width="192" height="192" alt="The knob with a brass-coloured metal cap; its brightest glint stays white."><figcaption>Metal cap brass (question 2)<br><span class="hex"><i style="background:#CDA046"></i>#CDA046</span></figcaption></figure>
+      <figure class="render"><img src="blender-knob-fixes/dark-panel-red.png" width="192" height="192" alt="The red-skirted knob on a near-black panel."><figcaption>Skirt red, dark panel<br><span class="hex"><i style="background:#1C1C20"></i>panel #1C1C20</span></figcaption></figure>
+    </div>
+  </div></div>
+  <div class="cap"><span class="cn">Real pixels</span><p class="ct">Only the colour layers changed. Every shading, highlight and shadow layer, and the light on the panel, is the file's own. At 96&nbsp;px, the size of the test file, enlarged.</p></div>
+
+  <h3>The designer, with the skirt selected</h3>
+  <div class="plate"><div class="scroll"><div class="ui">
+    <div class="lookbar">
+      <span class="kind">picture layer</span>
+      <span class="lb new">Colour <span class="sw" style="background:#B22222"></span><span class="val">#B22222</span></span>
+      <span class="lb slider">Opacity <span class="track"></span><span class="knob"></span><span class="val">100%</span></span>
+      <span class="lb layer">LAYER ▾</span>
+    </div>
+    <div class="dock">
+      <div class="dtabs"><span class="on">Colors</span><span>Gradient</span><span>Effects</span><span>Mask</span><span>Render</span><span>Text</span><span>Assets</span></div>
+      <div class="context">Editing: <strong>skirt › Colour</strong><span class="done"><span>Cancel</span><span class="go">Done</span></span></div>
+      <div class="drawn new">
+        <span class="pair"><span class="lbl">Drawn</span><span class="sw" style="background:#C1C1BC"></span><span class="hx">#C1C1BC</span></span>
+        <span class="arrow">→</span>
+        <span class="pair"><span class="lbl">Now</span><span class="sw" style="background:#B22222"></span><span class="hx">#B22222</span></span>
+        <span class="btn">Pick from the picture</span>
+        <span class="btn right">Back to as drawn</span>
+        <span class="note">The drawn colour becomes the new one; lighter and darker pixels keep their proportion to it. Its shading and highlights stay as rendered.</span>
+      </div>
+      <div class="picker">
+        <div><div class="sv"><i></i></div><div class="hue"></div></div>
+        <div class="side">
+          <div class="lbl">Format</div><div class="field">Hex · #B22222</div>
+          <div class="roles">
+            <div class="lbl">Set colours · the panel's set</div>
+            <div class="role-row"><span>Panel</span><b style="background:#2A2F35"></b><b style="background:#3A4048"></b><b style="background:#4A525A"></b></div>
+            <div class="role-row"><span>Controls</span><b style="background:#30363C"></b><b style="background:#14B8A6"></b><b class="on" style="background:#B22222" title="Body"></b><b style="background:#D8D8DA" title="Knob / fader cap"></b><b style="background:#F0F0E8" title="Marker"></b></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Plate A</span><p class="ct">The look bar shows what a picture layer has: its <b>Colour</b> and its opacity. Selecting the layer opens the Colors dock on <b>skirt › Colour</b>, as it opens on Fill for a shape now. The new strip under the header shows the colour the picture was drawn in and the one it has now. <b>Pick from the picture</b> sets which drawn colour is the one to change (for a picture of more than one colour). A colour-set role works as it does for a fill: linked here to the set's <b>Body</b>, so a control set's palette recolours imported knobs. Outlined in teal: what is new.</p></div>
+
+  <div class="two">
+    <div>
+      <div class="opt">Plate B · <b>a light layer selected</b></div>
+      <div class="scroll"><div class="ui" style="min-width:420px">
+        <div class="lookbar">
+          <span class="kind">light layer</span>
+          <span class="lb link new">Edit skirt's colour</span>
+          <span class="lb slider">Opacity <span class="track" style="width:70px"></span><span class="knob"></span><span class="val">100%</span></span>
+        </div>
+        <div class="dock">
+          <div class="context">Editing: <strong>nothing</strong></div>
+          <div class="colors-idle new"><b style="color:var(--ink-1)">skirt_shading</b> is light: what Blender's lights do to the skirt, multiplied over it. It has no colour of its own to change.<br><span class="lb link">Edit skirt's colour</span></div>
+        </div>
+      </div></div>
+      <p style="font-size:14px">Shading, highlights, shadows, reflections and the light on the panel are light layers. Selecting one points to the layer it lights rather than offering a fill it does not draw.</p>
+    </div>
+    <div>
+      <div class="opt">Plate C · <b>the Layers list says what each layer is</b> (optional)</div>
+      <div class="scroll"><div class="ui" style="min-width:340px">
+        <div class="layers">
+          <div class="lrow"><span class="thumb"></span><span class="nm">pointer</span><span class="ltag frm new">FRAMES</span></div>
+          <div class="lrow"><span class="thumb"></span><span class="nm">cap_highlights</span><span class="ltag lit">LIGHT</span></div>
+          <div class="lrow"><span class="thumb"></span><span class="nm">cap</span><span class="ltag pic">PICTURE</span></div>
+          <div class="lrow"><span class="thumb"></span><span class="nm">skirt_shading</span><span class="ltag lit">LIGHT</span></div>
+          <div class="lrow sel"><span class="thumb"></span><span class="nm">skirt</span><span class="ltag pic new">PICTURE</span></div>
+          <div class="lrow"><span class="thumb"></span><span class="nm">bounce</span><span class="ltag lit">LIGHT</span></div>
+        </div>
+      </div></div>
+      <p style="font-size:14px">Today every row says <b>RECT</b> and the footer says “rectangle layer”. A picture, a part of frames and a light layer would each say so. Question 3.</p>
+    </div>
+  </div>
+
+  <h3>How it works</h3>
+  <div class="formula">new = drawn pixel + (new colour − drawn colour) × share<small>Per pixel and per channel, alpha untouched. The share is the pixel divided by the drawn colour unless the file says otherwise, so the drawn colour becomes the new one and every other pixel keeps its proportion to it.</small></div>
+  <ul>
+    <li><b>One property for each picture.</b> <code>Background.Fill.imageColour</code> on a picture layer and <code>Image.colour</code> on a part of frames: a colour or a colour-set role, empty for as drawn. Beside it the drawn colour, measured on import from the pixels the layer covers whole, and changed by Pick from the picture.</li>
+    <li><b>Exact at the edge too, for Blender parts.</b> At a part's edge the add-on keeps its whole lit look in the colour layer (see the handoff). There the add-on would also write how much of the colour shows through the light (<code>&lt;name&gt; colour share</code>, a hidden layer CEditor reads and does not make a part of). With it the formula gives Blender's own result at the edge. Without it (older files, other pictures), the edge is scaled with the rest, its white glints tinted for a pixel or two.</li>
+    <li><b>Worked out on the picture once per colour</b>, then the outline mixing on top, the way <code>utils/linearEdges.js</code> works now. The editor, the Player, exported plug-ins and the filmstrip baker all draw the recoloured picture. Nothing new is asked of CSS.</li>
+    <li><b>The Colors dock edits it</b>, through the same colour target a fill uses: one layer, or several (“3 layers › Colour”).</li>
+  </ul>
+
+  <h3>What stays approximate</h3>
+  <ul>
+    <li>The light a part throws on the panel (<code>bounce</code>) keeps the drawn colour's tint. On the test knob that is a faint grey; under a saturated part it would show.</li>
+    <li>A picture of several colours changes as a whole, in proportion. To change one colour of several, keep it a layer of its own in Photoshop or Blender.</li>
+  </ul>
+
+  <h3>Questions</h3>
+  <ol class="qs">
+    <li><b>The old Tint.</b> Keep <code>imageTint</code> as the 30&nbsp;% wash it is for panel backgrounds and textures, and add the recolour beside it; or turn the tint itself into the recolour everywhere, which changes how existing panels look?<span class="rec">Recommended: keep the wash, add the recolour. Existing panels stay as they are.</span></li>
+    <li><b>Metal.</b> A metal's reflections carry its colour (a brass cap glints gold); a plastic's are white. Should a metal part's highlights change with its colour? The add-on knows which parts are metal and could mark them in the file.<span class="rec">Recommended: yes, for the parts the add-on marks as metal. The brass render above leaves them white.</span></li>
+    <li><b>Layer tags.</b> Show PICTURE, FRAMES and LIGHT in the Layers list (Plate C) now, or leave it for later?<span class="rec">Recommended: now. It is small, and the light layers' “Edit skirt's colour” relies on the same knowledge.</span></li>
+    <li><b>Colour-set roles.</b> Let a picture's colour follow a role of the control set (Plate A), as a fill can?<span class="rec">Recommended: yes. It is what makes an imported knob part of a changeable control set. A later step could link them on import by name: a skirt or body to Body, a cap to Knob / fader cap, a pointer to Marker.</span></li>
+  </ol>
+</section>
+
+<!-- ======================================================================= -->
+<section class="sec" id="lamp">
+  <div class="kicker">Defect 3</div>
+  <h2>A value the panel sets is not a fault</h2>
+  <p>An imported dial with a lamp has a second value, <b>Lamp</b>, on or off, that lights the lamp's layers. Nothing on the component drives it: the panel does, through a binding, a script or Value From. The Interact card lists it under <b>Not wired up</b>, the section for broken wiring.</p>
+
+  <div class="shots">
+    <figure class="shot">
+      <div class="frame"><img class="fit" src="blender-knob-fixes/today-interact.png" width="534" height="485" alt="The Interact card: the mainValue dial cluster, then a Not wired up section listing channel lamp, its explanation wrapped into a column one word wide."></div>
+      <figcaption><span class="tag-today">Today</span>Under <b>Not wired up</b>: “channel lamp · no behavior drives it (fine for output-only values)”, squeezed into a column a word wide. The wording reads as a fault and says “channel” and “behavior”, which the rest of the card no longer does.</figcaption>
+    </figure>
+  </div>
+
+  <div class="two">
+    <div>
+      <div class="opt">Option A · <b>recommended</b> · a section of its own</div>
+      <div class="scroll"><div class="icard">
+        <div class="ihead"><strong>mainValue</strong><em>number · dial · 1 grab area</em><span class="fold">+</span></div>
+        <div class="isec new">
+          <div class="isec-h">Set by the panel <small>· no grab area moves these</small></div>
+          <div class="vrow">
+            <span class="vtag">On/Off</span>
+            <span class="vname">Lamp<span>lamp</span></span>
+            <span class="vdesc">Lights lamp_lit, lamp_glow and lamp_glow_shine. Starts on.</span>
+            <span class="vfrom"><em>Value From</em><span class="select">its own: a binding or a script sets it</span><span class="onoff"><span>Off</span><span class="on">On</span></span></span>
+          </div>
+        </div>
+      </div></div>
+      <p style="font-size:14px">A value goes here when nothing on the component moves it and something uses it: a binding or a state reads it, or it follows a control (Value From, the picker the flat list already has). The On/Off shows how it starts. <b>Not wired up</b> is then hidden for this knob, as nothing is broken.</p>
+    </div>
+    <div>
+      <div class="opt">Option B · smaller · reworded in place</div>
+      <div class="scroll"><div class="icard">
+        <div class="ihead"><strong>mainValue</strong><em>number · dial · 1 grab area</em><span class="fold">+</span></div>
+        <div class="isec">
+          <div class="isec-h">Values without a grab area</div>
+          <div class="orow"><span class="otag plain">value</span><strong>Lamp</strong><em class="plain">Set by the panel. Lights lamp_lit, lamp_glow and lamp_glow_shine.</em></div>
+        </div>
+      </div></div>
+      <p style="font-size:14px">The list stays where it is with a neutral title, each row's text on the full width. Smaller, but a real fault (below) would then sit in the same list as a value that is fine.</p>
+    </div>
+  </div>
+
+  <h3>What stays under Not wired up</h3>
+  <div class="plate"><div class="scroll"><div class="icard">
+    <div class="isec">
+      <div class="isec-h warn">Not wired up</div>
+      <div class="orow"><span class="otag">behaviour</span><strong>spin</strong><em>Its value is missing.</em></div>
+      <div class="orow"><span class="otag">grab area</span><strong>topZone</strong><em>Moves nothing: its behaviour and value are missing.</em></div>
+      <div class="orow"><span class="otag">value</span><strong>spare</strong><em>Nothing sets it and nothing uses it.</em></div>
+    </div>
+  </div></div></div>
+  <div class="cap"><span class="cn">Option A</span><p class="ct">Examples, not the test knob. The section keeps the faults, with the text on the full width. A value with nothing setting it and nothing using it is still listed, because it is probably left over.</p></div>
+
+  <h3>Question</h3>
+  <ol class="qs">
+    <li><b>Option A or B,</b> and the section's name: “Set by the panel”, or something else? Value From inline in Simple mode, or only in Advanced as now?<span class="rec">Recommended: Option A, “Set by the panel”, Value From inline. Imported dials with lamps are where most authors will meet this.</span></li>
+  </ol>
+</section>
+
+<footer>
+  On approval: the recolour first (the property, the pixel pass, the Colors dock target and look bar, then the add-on's colour share and metal mark), then the Interact card. The design and test plan are in <code>docs/design/blender-knob-fixes-design.md</code>.
+</footer>
+</div>
