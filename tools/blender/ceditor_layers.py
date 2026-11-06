@@ -10,46 +10,54 @@
 #   <name>             its own colour, unlit (normal)
 #   <name> shading     what the lights and the room do to that colour (multiply)
 #   <name> highlights  its reflections, and light brighter than its colour (linear dodge)
-#   <name> lit         a lamp's own glow (linear dodge); a switch or button shows it when on
+#   <name> lit         a lamp's own glow (linear dodge); shown when the lamp is on
 #   shadow             the knob's shadow on the panel (black, its darkness as opacity)
-#   bounce             light the parts throw on the panel, a metal cap's glare (linear dodge)
-#   <lamp> glow        a lamp's light on the panel (linear dodge), shown with the lamp lit
+#   bounce             light the parts throw on the panel, a metal cap's glare (colour dodge), and
+#   bounce shine       the panel's shine reflecting it (linear dodge)
+#   <lamp> glow        a lamp's light on the panel (colour dodge), and "<lamp> glow shine" (linear
+#                      dodge), shown when the lamp is on
 #   <name> shadow      a moving part's shadow on the panel and on the parts under it
 #   <name> reflection  a moving part's reflection in the shiny parts under it (linear dodge)
-#   <name> reflection at <angle>  a turning part's, rendered with it turned that far (one each
-#                      27 degrees, those away from rest hidden)
 #   pivot              where turning parts turn about (a dot CEditor hides)
 #   <name> shadow pivot  where a turning part's shadow turns about (a dot CEditor hides)
 #
+# A part that turns whole is written at each of several angles, "<name> at <angle>", "<name> shading
+# at <angle>", "<name> shadow at <angle>", "<name> reflection at <angle>" and so on (see below).
+#
 # Stacked as listed, the layers give back Cycles' render to a level or two in 255, the edges where
 # parts meet included, and each stays changeable in CEditor: a colour layer is retinted while its
-# light stays as rendered. Where a part covers only some of a pixel, its look there is all in its
-# colour layer, since a multiply or an add would reach what is beside it in the pixel too; the light
-# layers come in over the next few pixels, and the layers under a part go on a little way under its
-# edge, so that the layers still add up when CEditor draws them larger or smaller, or turned.
+# light stays as rendered. Where a part covers only some of a pixel, by itself (at its edge, and under
+# another's), its look there is all in its colour layer, since a multiply or an add would reach what
+# is beside it in the pixel too; the light layers come in over the next few pixels, and the layers
+# under a part go on a little way under its edge, so that the layers still add up when CEditor draws
+# them larger or smaller, or turned.
 #
-# The panel. CEditor lays a component's layers straight onto the panel it is on, so a layer of light
-# brightens the panel itself. The scene's panel is taken to be that panel ("For this panel", on by
-# default): its look as the scene renders it, nothing on it, is what the layers are laid on while they
-# are made. The outline is then mixed as Cycles mixes it, in linear light, where a browser mixes in
-# sRGB; a lit lamp's outermost pixels, which Cycles shows lit out to where the lamp covers a quarter
-# of a pixel while the panel still shows through, are lit as on it; and the light the parts and the
-# lamps throw on it is written. On the scene's panel the layers then give Blender's whole render back
-# within a few levels. On a panel that looks different, those three are what they were on the
-# scene's; without a panel object, or with the option off, the outline is mixed as any transparent
-# picture's is, the lamp's edge as on black, and no light on the panel is written.
+# The panel. CEditor lays a component's layers straight onto the panel it is on, so what depends on
+# the panel is worked out for the panel, whatever its colour:
+#   - The light on it brightens it in proportion, as light on a surface does: what its colour scatters
+#     is written as colour dodge, a multiple of what is there (at full opacity: colour dodge reaches
+#     white before its opacity mixes it, and fainter it would stop short on a light panel), and what
+#     its shine reflects as light added, the same on any panel. Both are measured from the panel's
+#     own passes, rendered with the parts there unseen and without them. Over nothing (Photoshop's
+#     own view of the file, with no panel under it) the colour dodge shows as a dark patch.
+#   - The outline. Where a part covers some of a pixel, Cycles mixes it with what is behind in linear
+#     light, a browser in sRGB. CEditor mixes it for the panel under the control (its colour, or a
+#     plate filled with a colour under it): the parts that stay put are written as they cover each
+#     pixel, and named in the file's XMP for CEditor to mix.
+#   - A lit lamp's outermost pixels, which Cycles shows lit out to where the lamp covers a quarter of
+#     a pixel while the panel still shows through, are lit as on the scene's panel ("For this panel",
+#     on by default; off, or without a panel object, as on black).
 #
-# A turning part's shadow. The light stays put while the part turns, so the shadow falls the same way
-# whichever way the part points: it turns about a point of its own, half its reach from the axis
-# towards where it falls (from the light that lights the part most, and the part's height). Exact on
-# a flat cap under one light; a metal cap's shadow, which is partly its shine blocked, darkens more or
-# less as the part turns, which a layer made at rest does not.
-#
-# A turning part's reflection. Turned, other faces of the part catch the light, so its reflection in
-# a metal cap is not the one at rest turned: it is rendered with the part turned every 27 degrees (a
-# tenth of a dial's travel), each written turned back to rest as "<name> reflection at <angle>", and
-# CEditor's import turns each with the part and fades from one to the next as it turns. Between two
-# angles the reflection is the two mixed, where Blender would render one of its own.
+# A turning part. The light stays put while the part turns, so what it does with the light changes:
+# its own light (the side towards the sun lit, the sun's glint on it), its shadow, its reflection in
+# a metal cap. It is rendered with the part turned every 27 degrees (a tenth of a dial's travel), and
+# each is written turned back to rest, "... at <angle>"; CEditor's import makes each set one part of
+# frames, whose frame follows the value, the two it falls between mixed. A finer step measured no
+# nearer to Blender (13.5 and 9 degrees: the same to a tenth of a level, at twice and three times the
+# export time): what is left is the picture turned twice, back to rest here and on again in the
+# browser, so the turn back is through a Lanczos window rather than bilinear. Its shadow turns about
+# a point of its own, half its reach from the axis towards where it falls (from the light that lights
+# the part most, and the part's height), so it stays on the side away from the light.
 #
 # Needs numpy, which Blender's own builds carry.
 #
@@ -353,6 +361,19 @@ def light(added, strength):
     return added, np.where(added.max(-1) >= 0.5 / 255, np.asarray(strength, dtype=np.float32), 0.0)
 
 
+def dodge(multiple):
+    """Light on the panel as a layer that brightens what is under it in proportion (colour dodge),
+    which is what light on a surface does: twice the light, twice as bright, whatever its colour.
+    Photoshop's and CSS's colour dodge give B / (1 - s), short of white, before the layer's opacity
+    mixes it with B; so only at full opacity, s = 1 - 1 / `multiple`, is it B times the multiple on
+    any panel (laid fainter, its colour stronger, it reaches white on a light panel before it should).
+    Written where it brightens anything by a level or more. Laid over nothing (Photoshop's own view of
+    the file, without a panel under it) it shows as a dark patch."""
+    k = np.maximum(multiple, 1.0)
+    alpha = np.where((k - 1.0).max(-1) >= 1.0 / 255.0, 1.0, 0.0)
+    return np.where(alpha[..., None] > 0, 1.0 - 1.0 / k, 0.0), alpha
+
+
 def light_over_clear(added):
     """Light to add where what is under it is part clear: its colour the light at full strength and
     its opacity how strong, as CSS's plus-lighter adds both (Photoshop's Linear Dodge lays the colour
@@ -361,15 +382,30 @@ def light_over_clear(added):
     return np.where(alpha[..., None] > 0, added / np.maximum(alpha[..., None], 1e-6), 0.0), alpha
 
 
-# A turning part's reflection, rendered with the part turned to these angles (degrees clockwise from
-# rest, over the -135 to 135 a CEditor dial turns): a step of 27 is a tenth of the dial's travel.
+# A turning part, rendered with it turned to angles a step apart (degrees clockwise from rest, over the
+# -135 to 135 a CEditor dial turns).
 TURN_STEP = 27
-TURN_ANGLES = tuple(range(-135, 136, TURN_STEP))
 
 
-def turned(image, degrees, about):
+def turn_angles(step=TURN_STEP):
+    """The angles a turning part is rendered at: from rest, a step at a time, out to the dial's ends."""
+    count = int(math.floor(135 / step + 1e-9))
+    return tuple(round(k * step, 6) for k in range(-count, count + 1))
+
+
+TURN_ANGLES = turn_angles()
+
+
+def angle_name(angle):
+    return f"{angle:g}"
+
+
+def turned(image, degrees, about, sharp=False):
     """`image` (height, width, 4: straight colour and opacity) turned `degrees` clockwise on screen
-    about `about` (x, y in pixels), as a browser turns a picture: bilinear, premultiplied."""
+    about `about` (x, y in pixels), premultiplied: bilinear, as a browser turns a picture, or with
+    `sharp` through a Lanczos window three pixels wide. A frame the add-on turns back to rest is turned
+    again by the browser, and two bilinear turns blur a narrow part's highlight twice: on the test
+    pointer, 8 pixels wide, its mean 6.5 levels off, 4.0 with the first turn sharp."""
     h, w = image.shape[:2]
     p = image.astype(np.float32).copy()
     p[..., :3] *= p[..., 3:4]
@@ -384,7 +420,22 @@ def turned(image, degrees, about):
         inside = ((x >= 0) & (x < w) & (y >= 0) & (y < h))[..., None]
         return np.where(inside, p[np.clip(y, 0, h - 1), np.clip(x, 0, w - 1)], 0.0)
 
-    q = (at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy
+    if sharp:
+        window = lambda d: np.where(np.abs(d) < 3, np.sinc(d) * np.sinc(d / 3), 0.0)
+        q = np.zeros_like(p)
+        total = np.zeros(p.shape[:2] + (1,), dtype=np.float32)
+        for j in range(-2, 4):
+            wy = window(fy - j)
+            for i in range(-2, 4):
+                weight = wy * window(fx - i)
+                q += at(y0 + j, x0 + i) * weight
+                total += weight
+        q = q / np.maximum(total, 1e-6)
+        # The window rings a little past a sharp edge: no light where nothing covers, none past opaque.
+        q[..., 3:4] = np.clip(q[..., 3:4], 0.0, 1.0)
+        q[..., :3] = np.clip(q[..., :3], 0.0, q[..., 3:4])
+    else:
+        q = (at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy
     a = q[..., 3:4]
     return np.concatenate([np.where(a > 0, q[..., :3] / np.maximum(a, 1e-6), 0.0), a], axis=-1)
 
@@ -433,7 +484,12 @@ def blend_over(dst, src, mode):
         out[..., :3] = np.minimum(dst[..., :3] + sc * sa, 1.0)
         out[..., 3:4] = np.minimum(da + sa, 1.0)
         return out
-    mixed = sc * dc if mode == "mul " else sc
+    if mode == "mul ":
+        mixed = sc * dc
+    elif mode == "div ":  # colour dodge
+        mixed = np.where(dc <= 0, 0.0, np.where(sc >= 1.0, 1.0, np.minimum(1.0, dc / np.maximum(1.0 - sc, 1e-6))))
+    else:
+        mixed = sc
     rgb = sa * (1 - da) * sc + sa * da * mixed + (1 - sa) * da * dc
     return np.concatenate([rgb, sa + da * (1 - sa)], axis=-1)
 
@@ -454,8 +510,24 @@ def _unicode_name(name):
     return b"8BIM" + b"luni" + struct.pack(">I", len(body)) + body
 
 
-def write_psd(path, width, height, layers, merged):
-    """`layers`, bottom first: `{name, rgba (h, w, 4) uint8, blend ('norm', 'mul ', 'lddg'), hidden}`."""
+XMP_NAMESPACE = "https://github.com/Ted-juh/CEditor/ns/layers/1.0/"
+
+
+def _xmp(linear_edges):
+    """The file's XMP: the layers whose edge CEditor mixes for the panel under them."""
+    escape = lambda text: text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    items = "".join(f"<rdf:li>{escape(name)}</rdf:li>" for name in linear_edges)
+    return ('<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/">'
+            '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
+            f'<rdf:Description rdf:about="" xmlns:ceditor="{XMP_NAMESPACE}">'
+            f'<ceditor:linearEdges><rdf:Bag>{items}</rdf:Bag></ceditor:linearEdges>'
+            '</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>').encode("utf-8")
+
+
+def write_psd(path, width, height, layers, merged, linear_edges=()):
+    """`layers`, bottom first: `{name, rgba (h, w, 4) uint8, blend ('norm', 'mul ', 'lddg', 'div '), hidden}`.
+    `linear_edges`: the names of the layers whose edge CEditor mixes for the panel under them, in the
+    file's XMP."""
     records, channel_data = [], []
     for layer in layers:
         rgba = layer["rgba"]
@@ -487,7 +559,11 @@ def write_psd(path, width, height, layers, merged):
     with open(path, "wb") as f:
         f.write(b"8BPS" + struct.pack(">H", 1) + b"\0" * 6 + struct.pack(">HIIHH", 4, height, width, 8, 3))
         f.write(struct.pack(">I", 0))  # colour mode data
-        f.write(struct.pack(">I", 0))  # image resources
+        resources = b""
+        if linear_edges:
+            xmp = _xmp(linear_edges)
+            resources = b"8BIM" + struct.pack(">H", 1060) + b"\0\0" + struct.pack(">I", len(xmp)) + xmp + b"\0" * (len(xmp) % 2)
+        f.write(struct.pack(">I", len(resources)) + resources)  # image resources
         f.write(struct.pack(">I", len(section)) + section)
         f.write(struct.pack(">H", 0) + planes)
 
@@ -550,10 +626,11 @@ def shadow_reach(scene, objects):
     return reach if reach.length > 1e-6 else None
 
 
-def export_layers(scene, filepath, size=512, samples=128, report=print, for_panel=True):
+def export_layers(scene, filepath, size=512, samples=128, report=print, for_panel=True, turn_step=TURN_STEP):
     """Write the scene's control as a layered PSD at `filepath`. `for_panel`: when the scene has a
-    panel of its own, take it as the look of the panel CEditor puts the control on (see the notes at
-    the top). Returns what was written, and the pictures the tests compare."""
+    panel of its own, light a lamp's edge as on it (see the notes at the top). `turn_step`: the
+    degrees between the angles a turning part is rendered at. Returns what was written, and the
+    pictures the tests compare."""
     if np is None:
         raise RuntimeError("This Blender has no numpy: use a build from blender.org, which includes it.")
     plan = plan_scene(scene)
@@ -621,6 +698,7 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
 
         drawn = [o for o in temp.collection.objects if o.type in DRAWN_TYPES]
         count = [0]
+        angles = turn_angles(turn_step)
 
         def render(show, holdout=(), catchers=(), unseen=(), unlit=()):
             """Render with `show` visible, `holdout` cutting holes in them, `catchers` catching their
@@ -648,21 +726,21 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
         merged = np.zeros((height, width, 4), dtype=np.float32)
         black = np.zeros((height, width, 3), dtype=np.float32)
 
-        # The panel the control sits on, as the scene shows it with nothing on it: the look CEditor's
-        # panel is taken to have when `for_panel`. The layers are then made for it where the panel
-        # shows through them: the outline mixed as Cycles mixes it, the lit lamp's edge, the light the
-        # parts throw on it. CEditor lays a component's layers straight onto the panel, so a layer of
-        # light adds to the panel itself.
-        bare = None
-        if for_panel and plan["panel"] is not None:
-            look = render([panel])["Combined"]
-            covered = look[..., 3:4] > 0.5
-            colour = srgb(look[..., :3] / np.maximum(look[..., 3:4], 1e-6))
-            fallback = np.median(colour[covered[..., 0]], axis=0) if covered.any() else np.full(3, 0.5)
-            bare = np.where(covered, colour, fallback).astype(np.float32)
+        # The panel the control sits on, as the scene shows it with nothing on it: what the light on it
+        # is measured against, and with `for_panel` the panel a lit lamp's edge is made for. `on_panel`
+        # is the layers on it as CEditor draws them (the outline mixed for it), for the tests.
+        panel_alone = render([panel])
+        look = panel_alone["Combined"]
+        covered = look[..., 3:4] > 0.5
+        colour = srgb(look[..., :3] / np.maximum(look[..., 3:4], 1e-6))
+        fallback = np.median(colour[covered[..., 0]], axis=0) if covered.any() else np.full(3, 0.5)
+        panel_look = np.where(covered, colour, fallback).astype(np.float32)
+        bare = panel_look if for_panel and plan["panel"] is not None else None
         on_panel = None if bare is None else np.concatenate([bare, np.ones_like(bare[..., :1])], axis=-1)
 
-        def add(name, rgb, alpha, blend="norm", hidden=False):
+        def add(name, rgb, alpha, blend="norm", hidden=False, panel_alpha=None):
+            """A layer, and the pictures of them so far. `panel_alpha`: its opacity as CEditor draws it on
+            the scene's panel, where that is not the one written (an edge it mixes for the panel)."""
             nonlocal merged, on_panel
             rgba = rgba8(rgb, alpha)
             if blank(rgba):
@@ -671,7 +749,8 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             if not hidden:
                 merged = blend_over(merged, rgba.astype(np.float32) / 255.0, blend)
                 if on_panel is not None:
-                    on_panel = blend_over(on_panel, rgba.astype(np.float32) / 255.0, blend)
+                    shown = rgba if panel_alpha is None else rgba8(rgb, panel_alpha)
+                    on_panel = blend_over(on_panel, shown.astype(np.float32) / 255.0, blend)
 
         def beneath():
             """What a layer added now is laid on, straight sRGB, and where that is opaque: on the
@@ -681,7 +760,15 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             a = merged[..., 3:4]
             return np.where(a > 0, merged[..., :3] / np.maximum(a, 1e-6), 0.0), a[..., 0] > 0.999
 
-        def add_part(o, look, opacity):
+        linear_edges = []
+
+        def add_part(o, look, opacity, at_angles=None, stays=False):
+            """`at_angles`: for a part that turns whole, {angle: its look rendered turned that far, turned
+            back to rest}; it is then written at each angle, "<name> at <angle>", "<name> shading at
+            <angle>" and so on. Its colour inside is the same at every angle; at its edge, where the
+            colour layer holds its whole look, and in its light layers, it is as lit at that angle.
+            `stays`: a part that stays put, whose edge CEditor mixes for what is under it there (see the
+            notes at the top): written as it covers each pixel, and named in the file for it."""
             role = role_of(o.name)
             # A lamp's body is always there; only its glow lights with the control. A rotor's colour
             # turns, its light stays. Everything else keeps its name, and with it its part.
@@ -696,16 +783,41 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             # what is beside the part in the pixel too. Between the two, over a few pixels, the light
             # layers come in and the colour layer gives up the light they bring, so that a picture
             # scaled (CEditor draws components at every size) never meets the change at one stroke.
-            whole = opacity > 254.5 / 255
+            # Inside: the part covers the pixel whole itself, not only with the parts above it. Under
+            # another part's edge (a pale skirt round a cap), its light worked out from a few samples is
+            # not its light: there its look as rendered goes in its colour layer, as at its own edge.
+            whole = (opacity > 254.5 / 255) & (look["alpha"] > 254.5 / 255)
             depth = inward(whole)[..., None]
             under, opaque = beneath()
             edge = np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity)
-            glow = 0.0 if role == "on" else look["glow"]
-            shading = 1.0 - depth + depth * look["shade"]
-            colour = np.where(depth >= 1.0, look["colour"],
-                              np.clip((look["whole"] - depth * (look["highlights"] + glow)) / np.maximum(shading, 1e-4), 0.0, 1.0))
-            add(still_name if role == "on" else o.name, colour, edge)
+
+            def colour_of(seen):
+                glow = 0.0 if role == "on" else seen["glow"]
+                shading = 1.0 - depth + depth * seen["shade"]
+                return np.where(depth >= 1.0, look["colour"],
+                                np.clip((seen["whole"] - depth * (seen["highlights"] + glow)) / np.maximum(shading, 1e-4), 0.0, 1.0))
+            if at_angles:
+                for angle, seen in at_angles.items():
+                    add(f"{o.name} at {angle_name(angle)}", colour_of(seen), edge, hidden=angle != 0)
+            elif stays:
+                colour_name = still_name if role == "on" else o.name
+                add(colour_name, colour_of(look), opacity, panel_alpha=np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity))
+                linear_edges.append(colour_name)
+            else:
+                add(still_name if role == "on" else o.name, colour_of(look), edge)
             depth = depth[..., 0]
+            if at_angles:
+                inside = depth > 0
+                shades = {angle: np.where(inside[..., None], seen["shade"], 1.0) for angle, seen in at_angles.items()}
+                if not all(np.allclose(shade[inside], 1.0, atol=1 / 255) for shade in shades.values()):
+                    for angle, shade in shades.items():
+                        add(f"{still_name} shading at {angle_name(angle)}", shade, depth, "mul ", hidden=angle != 0)
+                for angle, seen in at_angles.items():
+                    add(f"{still_name} highlights at {angle_name(angle)}", *light(seen["highlights"], depth), "lddg", hidden=angle != 0)
+                for angle, seen in at_angles.items():
+                    add(f"{still_name} emission at {angle_name(angle)}", *light(seen["glow"], depth), "lddg", hidden=angle != 0)
+                report(f"{o.name}: rendered at {len(at_angles)} angles")
+                return
             if not np.allclose(look["shade"][depth > 0], 1.0, atol=1 / 255):
                 add(f"{still_name} shading", look["shade"], depth, "mul ")
             add(f"{still_name} highlights", *light(look["highlights"], depth), "lddg")
@@ -738,55 +850,103 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             ratio = np.where(seen[..., None], np.maximum(catcher[..., :3], 0.0), 1.0)
             return carry_in([ratio], seen, ~seen)[0]
 
-        def add_group(objs, name, shadow, holdout, unseen, panel_light=False, lit_shadow=None, turn=None):
+        def add_group(objs, name, shadow, holdout, unseen, panel_light=(), lit_shadow=None, turn=None):
             """A group's shadow and reflection, then its parts, bottom up, each rendered with the others
-            held out. `panel_light`: the light it throws on the panel too (the group under everything
-            else, whose shadow render sees only the panel). `lit_shadow`: the shadow render again with
-            its lamps lighting (`shadow` then has them dark), for their light on the panel. `turn`:
-            for parts that turn, their shadow render with them turned to an angle."""
+            held out. `panel_light`: the panel's renders with the group there unseen, its lamps dark and
+            lit, for the light it throws on the panel (the group under everything else). `lit_shadow`:
+            the shadow render again with its lamps lighting (`shadow` then has them dark). `turn`: for
+            parts that turn, a render with them turned to an angle."""
             shadow_name, reflection_name = f"{name}shadow", f"{name}reflection"
             before = merged.copy()
-            looks = [part_look(render([o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen),
-                               lamp=role_of(o.name) == "on") for o in objs]
+            look_of = lambda o, passes: part_look(passes, lamp=role_of(o.name) == "on")
+            looks = [look_of(o, render([o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen)) for o in objs]
             opacities, above, left = unover([look["alpha"] for look in looks])
             ratio = share(shadow, left)
+            darkness = lambda share_of_light: 1.0 - srgb(np.clip(luma(np.minimum(share_of_light, 1.0)), 0.0, 1.0))
+            # Parts that turn: rendered turned to each angle as well, what they do to the light under them
+            # (their shadow, their reflection) and their own look. Each is written turned back to rest,
+            # "... at <angle>", and CEditor's import makes each set one part whose frame follows the value
+            # (see the notes at the top). A rotor's light stays put, and so is made once.
+            turned_shares, turned_looks = {}, {}
+            if turn is not None:
+                covered = np.concatenate([black, (1.0 - left)[..., None]], axis=-1)
+                whole_turns = [o for o in objs if not is_rotor(o.name)]
+                for angle in angles:
+                    if not angle:
+                        continue
+                    left_there = 1.0 - turned(covered, angle, axis_px)[..., 3]
+                    turned_shares[angle] = share(turn(angle, objs, catchers=[panel] + still), left_there)
+                    for o in whole_turns:
+                        passes = turn(angle, [o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen)
+                        seen = look_of(o, passes)
+                        back = lambda values: turned(np.concatenate([values, seen["alpha"][..., None]], axis=-1), -angle, axis_px, sharp=True)
+                        kept = {key: back(seen[key]) for key in ("whole", "shade", "highlights", "glow")}
+                        rest = looks[objs.index(o)]
+                        # Where the part turned back does not quite cover what it covers at rest (its
+                        # edge, resampled), its look at rest.
+                        turned_looks.setdefault(o.name, {})[angle] = {
+                            key: np.where(value[..., 3:4] > 0.5, value[..., :3], rest[key]) for key, value in kept.items()}
             if ratio is not None:
-                add(shadow_name, black, 1.0 - srgb(np.clip(luma(np.minimum(ratio, 1.0)), 0.0, 1.0)))
-                if bare is not None and panel_light:
-                    # On the panel: the light the parts throw on it (a metal cap's glare), and the
-                    # lamps' light, which shows when they are lit. Each is what the panel shows with
-                    # it less what it shows without, on the scene's panel.
-                    on = luma(ratio)[..., None] > 1.0
-                    target = srgb(linear(bare) * ratio)
-                    add(f"{name}bounce", *light_over_clear(np.where(on, np.clip(target - beneath()[0], 0.0, 1.0), 0.0)), "lddg")
-                    lit_ratio = share(lit_shadow, left) if lit_shadow is not None else None
-                    if lit_ratio is not None:
-                        glow = np.clip(srgb(linear(bare) * lit_ratio) - srgb(linear(bare) * ratio), 0.0, 1.0)
-                        add(f"{lamps[0].name} glow", *light_over_clear(glow), "lddg")
+                if turned_shares and shadow_pivot_px is not None:
+                    # Its shadow at each angle, turned back about the point it turns about.
+                    for angle in angles:
+                        alpha = darkness(turned_shares[angle] if angle else ratio)
+                        if angle:
+                            alpha = turned(np.concatenate([black, alpha[..., None]], axis=-1), -angle, shadow_pivot_px, sharp=True)[..., 3]
+                        add(f"{shadow_name} at {angle_name(angle)}", black, alpha, hidden=angle != 0)
+                else:
+                    add(shadow_name, black, darkness(ratio))
+            if ratio is not None and panel_light:
+                # On the panel: the light the parts throw on it (a metal cap's glare), and the lamps'
+                # light, which shows when they are lit. Light on a surface is in two parts, and the
+                # panel's own passes, rendered with the parts there unseen and without them, give
+                # each. What its colour scatters (diffuse) is a multiple of what is there, written as
+                # colour dodge, so that on a dark panel it brightens it a little and on a light one a
+                # lot. What its shine reflects (gloss) is the same on any panel, written as light
+                # added, "... shine". Each is measured on the scene's panel, and holds on another of
+                # the same finish.
+                lit_ratio = share(lit_shadow, left) if lit_shadow is not None else None
+                regions = [luma(ratio) > 1.0 + 1 / 255]
+                names = [f"{name}bounce"]
+                if lit_ratio is not None:
+                    regions.append(luma(lit_ratio) > luma(ratio) * (1.0 + 1 / 255))
+                    names.append(f"{lamps[0].name} glow")
+
+                def lighting(passes):
+                    part = lambda key: passes[key][..., :3] if key in passes else np.zeros_like(black)
+                    return part("DiffDir") + part("DiffInd"), (part("GlossDir") + part("GlossInd")) * part("GlossCol")
+                base = linear(panel_look)
+                gloss = lighting(panel_alone)[1]
+                steps = [panel_alone] + list(panel_light)
+                for (without, with_it), region, layer_name in zip(zip(steps, steps[1:]), regions, names):
+                    (d0, g0), (d1, g1) = lighting(without), lighting(with_it)
+                    region = region[..., None]
+                    scattered = np.where(region & (d0 > 1e-6), np.maximum(d1 / np.maximum(d0, 1e-6), 1.0), 1.0)
+                    shine = np.where(region, np.clip(g1 - g0, 0.0, None), 0.0)
+                    # The panel's own gloss is in what it shows, and the multiple is of the rest.
+                    lit_base = base + (base - gloss).clip(0.0, None) * (scattered - 1.0)
+                    shown_before = srgb(base)
+                    add(layer_name, *dodge(np.where(shown_before > 1e-4, srgb(lit_base) / np.maximum(shown_before, 1e-4), 1.0)), "div ")
+                    add(f"{layer_name} shine", *light_over_clear(np.clip(srgb(lit_base + shine) - srgb(lit_base), 0.0, 1.0)), "lddg")
+                    base = lit_base + shine
+                    gloss = gloss + shine
+            if ratio is not None:
                 # Their reflection in a part under them that shines: what it adds to that part's light.
                 a = before[..., 3:4]
                 under = np.where(a > 0, before[..., :3] / np.maximum(a, 1e-6), 0.0)
                 where = a[..., 0] > 0.999
                 reflect = lambda share_of_light: np.clip(srgb(linear(under) * np.maximum(share_of_light, 1.0)) - under, 0.0, 1.0)
                 added = reflect(ratio)
-                if turn is not None and (added.max(-1)[where] >= 0.5 / 255).any():
+                if turned_shares and (added.max(-1)[where] >= 0.5 / 255).any():
                     # A turning part's reflection is not the same at every angle: other faces of it catch
-                    # the light. It is rendered with the part turned to angles a step apart, and each is
-                    # written turned back to where the part rests, "<name> reflection at <angle>":
-                    # CEditor's import turns each with the part and fades from one to the next as it
-                    # turns. Away from rest they are hidden, so the file shows the part at rest.
-                    covered = np.concatenate([black, (1.0 - left)[..., None]], axis=-1)
-                    for angle in TURN_ANGLES:
-                        if angle:
-                            left_there = 1.0 - turned(covered, angle, axis_px)[..., 3]
-                            share_there = share(turn(angle), left_there)
-                        else:
-                            share_there = ratio
+                    # the light. Away from rest the layers are hidden, so the file shows the part at rest.
+                    for angle in angles:
+                        share_there = turned_shares[angle] if angle else ratio
                         rgb, alpha = light(reflect(share_there), where)
                         if angle:
-                            back = turned(np.concatenate([rgb, alpha[..., None]], axis=-1), -angle, axis_px)
+                            back = turned(np.concatenate([rgb, alpha[..., None]], axis=-1), -angle, axis_px, sharp=True)
                             rgb, alpha = back[..., :3], back[..., 3]
-                        add(f"{reflection_name} at {angle}", rgb, alpha, "lddg", hidden=angle != 0)
+                        add(f"{reflection_name} at {angle_name(angle)}", rgb, alpha, "lddg", hidden=angle != 0)
                 else:
                     add(reflection_name, *light(added, where), "lddg")
             for o, look, opacity, over in zip(objs, looks, opacities, above):
@@ -795,7 +955,10 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 keys = ["colour", "shade", "highlights", "glow", "whole", "shown", "lit"]
                 carried = carry_in([opacity] + [look[k] for k in keys], opacity > 1e-3, over < 1e-3)
                 look = dict(look, **dict(zip(keys, carried[1:])))
-                add_part(o, look, carried[0])
+                at_angles = None
+                if o.name in turned_looks:
+                    at_angles = {angle: turned_looks[o.name][angle] if angle else look for angle in angles}
+                add_part(o, look, carried[0], at_angles, stays=bool(panel_light))
 
         from bpy_extras.object_utils import world_to_camera_view
 
@@ -814,34 +977,43 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
         # The panel's shadow under what stays put, then what stays put, bottom up. With lamps, the
         # shadow is rendered with them dark, and again lit, for their light on the panel.
         if still:
-            if bare is not None and lamps:
+            if lamps:
                 dark = render(still, catchers=[panel], unlit=lamps)
                 lit_shadow = render(still, catchers=[panel])
             else:
                 dark, lit_shadow = render(still, catchers=[panel]), None
-            add_group(still, "", dark, holdout=[panel], unseen=[], panel_light=True, lit_shadow=lit_shadow)
+            # The panel as it shows with the parts there (unseen): their glare, and the lamps' light.
+            panel_light = [render([panel], unseen=still, unlit=lamps)] + ([render([panel], unseen=still)] if lamps else [])
+            add_group(still, "", dark, holdout=[panel], unseen=[], panel_light=panel_light, lit_shadow=lit_shadow)
         # Where turning parts turn about: the pivot object, or the first turning part's origin.
         turning = order(groups.get("turns", []))
         centre = (plan["pivot"].matrix_world.translation if plan["pivot"] else turning[0].matrix_world.translation).copy() if turning else None
         axis_px = at_pixel(centre) if turning else None
 
-        def turned_shadow(objs):
-            """The shadow render of `objs` with them turned `angle` degrees clockwise as the camera
-            sees them, about the axis; put back after."""
+        def turned_render(objs):
+            """A render with `objs` turned `angle` degrees clockwise as the camera sees them, about the
+            axis, and put back after: `at(angle, show, holdout, catchers, unseen)`."""
             from mathutils import Matrix, Vector
             view = (cam.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
 
-            def at(angle):
+            def at(angle, show, **how):
                 spin = Matrix.Translation(centre) @ Matrix.Rotation(math.radians(angle), 4, view) @ Matrix.Translation(-centre)
                 rest = [o.matrix_world.copy() for o in objs]
                 try:
                     for o in objs:
                         o.matrix_world = spin @ o.matrix_world
-                    return render(objs, catchers=[panel] + still)
+                    return render(show, **how)
                 finally:
                     for o, matrix in zip(objs, rest):
                         o.matrix_world = matrix
             return at
+
+        # Where a turning part's shadow turns about: a shadow cast by a light that stays put falls the
+        # same way whichever way the part points, so it turns about a point half its reach from the
+        # axis, towards where it falls (CEditor's import reads "<layer> pivot").
+        reach = shadow_reach(scene, turning) if turning else None
+        shadow_pivot = (centre + reach / 2) if reach is not None else None
+        shadow_pivot_px = at_pixel(shadow_pivot) if shadow_pivot is not None else axis_px
 
         # Each moving group: its shadow on the panel and on what stays put, then its parts, lit by
         # what stays put without being seen with it.
@@ -849,18 +1021,18 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             objs = order(groups.get(group, []))
             if objs:
                 add_group(objs, f"{objs[0].name} ", render(objs, catchers=[panel] + still), holdout=[panel], unseen=still,
-                          turn=turned_shadow(objs) if group == "turns" else None)
-        # Where turning parts turn about, and where their shadow does: a shadow cast by a light that
-        # stays put falls the same way whichever way the parts point, so it turns about a point half
-        # its reach from the axis, towards where it falls (CEditor's import reads "<layer> pivot").
+                          turn=turned_render(objs) if group == "turns" else None)
+        # Where turning parts turn about, and where their shadow does.
         if turning:
             mark("pivot", centre)
-            reach = shadow_reach(scene, turning)
             shadow_name = f"{turning[0].name} shadow"
-            if reach is not None and any(layer["name"] == shadow_name for layer in layers):
-                mark(f"{shadow_name} pivot", centre + reach / 2)
-        write_psd(filepath, width, height, layers, merged)
-        return {"width": width, "height": height, "layers": [(l["name"], l["blend"]) for l in layers], "renders": count[0],
+            if shadow_pivot is not None and any(layer["name"] == shadow_name or layer["name"].startswith(f"{shadow_name} at ") for layer in layers):
+                mark(f"{shadow_name} pivot", shadow_pivot)
+        written = {layer["name"] for layer in layers}
+        linear_edges = [name for name in linear_edges if name in written]
+        write_psd(filepath, width, height, layers, merged, linear_edges)
+        return {"width": width, "height": height, "layers": [(l["name"], l["blend"]) for l in layers], "renders": count[0], "turn_step": turn_step,
+                "linear_edges": linear_edges,
                 "notes": plan["notes"], "merged": merged, "pixels": {l["name"]: l["rgba"] for l in layers},
                 "panel": bare, "on_panel": on_panel}
     finally:
@@ -896,8 +1068,8 @@ class CEDITOR_OT_export_layers(bpy.types.Operator, ExportHelper):
     samples: IntProperty(name="Samples", description="Cycles samples for each render", default=128, min=1, max=16384)
     for_panel: BoolProperty(
         name="For this panel",
-        description="The scene's panel is the panel the control goes on in CEditor: its outline, a lit lamp's edge and "
-                    "the light on the panel are made for it. Off: they are made for no panel in particular",
+        description="A lit lamp's outermost pixels are lit as on the scene's panel, the one the control goes on in CEditor. "
+                    "Off: as on black. (The outline and the light on the panel CEditor works out for any panel)",
         default=True)
 
     def execute(self, context):

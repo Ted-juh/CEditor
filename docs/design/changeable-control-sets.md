@@ -1009,34 +1009,55 @@ What building the add-on found, against Level 1 as written above:
   ring once CEditor scaled the layers, which it always does (zoom, panel size, a screen of two pixels
   to the point). The add-on's test now draws the layers twice the size and holds them to the picture
   scaled.
-- **A turning part's reflection.** A metal cap mirrors the pointer's end; rendered without the
-  pointer, the cap lacked it. The shadow catcher's ratio over 1 is that light, written as a layer
-  that turns with the pointer. Turned, it is not the one at rest turned: other faces of the pointer
-  catch the sun, and the streak where its end did at rest is gone (99th percentile 57 levels off
-  beside the pointer, turned 120 degrees). It is now rendered with the pointer turned every 27
-  degrees, each written turned back to rest ("pointer reflection at 54"); the import turns each with
-  the pointer and fades from the one rendered nearest to the next (8 levels).
-- **The panel.** CEditor lays a component's layers straight onto the panel (measured: a part's blend
-  mode reaches the panel surface, no element between composites the component on its own), so a
-  layer of light brightens the panel. The scene's panel is taken to be the one the control goes on
-  ("For this panel", on by default), and three things that depend on it are made for it: the outline
-  mixed as Cycles mixes it, in linear light; a lit lamp's outermost pixels, lit as on it; and the
-  light the parts and the lamps throw on it, as layers (the lamps' shown when they are lit). On that
-  panel the layers give Blender's whole render back within a few levels, in the test and in the
-  editor itself (a 320 px knob on a panel of the scene's colour: mean 0.9, 99th percentile 4, at
-  rest and turned with the wheel). Off, or with no panel object, they are made for no panel in
-  particular.
+- **A turning part.** A metal cap mirrors the pointer's end; rendered without the pointer, the cap
+  lacked it. The shadow catcher's ratio over 1 is that light, written as a layer that turns with the
+  pointer. Turned, neither it nor the pointer's own light is the one at rest turned: the side of a
+  rounded pointer towards the sun, its glint, the streak where its end catches the sun all move.
+  The pointer, its shadow and its reflection are now rendered every 27 degrees, each written turned
+  back to rest ("pointer at 54", "pointer shadow at 54", ...), and the import makes each set one part
+  of frames whose frame follows the value (utils/imageFrames.js). Two layers faded against each
+  other would not do: two shadows, or two multiplies, at half strength each let a quarter more
+  through than one, and the knob brightened between every two angles; a part of frames adds the two
+  frames inside itself, each at its share (plus-lighter), which is their mix, and then lays that on
+  the panel in its own mode. Turned 120 degrees, the pointer's light went from a mean 63 levels off
+  to 11, its reflection beside it from 10 to 6 (99th percentile), the cap round it from 1.4 to 0.9.
+- **How fine a step.** Measured at 27, 13.5 and 9 degrees, at six angles between frames: the pointer
+  13.8, 13.5 and 13.6 levels off, its reflection 4.8, 4.7 and 4.4, at 30, 54 and 81 seconds an
+  export. What was left was not the mix between two angles but the picture turned twice, back to
+  rest in the add-on and on again in the browser: two bilinear turns alone cost a mean 6.5 levels
+  inside an 8 pixel pointer. The add-on now turns it back through a Lanczos window (4.0), and the
+  step stays at 27.
+- **The light on the panel** was made for the scene's panel and added, so on a dark panel it was too
+  bright and on a light one too faint (15 to 20 levels off). Light on a surface is a multiple of it,
+  as colour dodge is; but colour dodge reaches white before its opacity mixes it, so it is written at
+  full opacity (fainter, with its colour stronger, it stopped short on a light panel: 31 levels). What
+  the panel's shine reflects does not scale with its colour, and is written apart, added; both are
+  measured from the panel's own passes, rendered with the parts there unseen and without them. On a
+  dark, a light and a red panel the light is now within 2 to 6 levels.
+- **The outline** is mixed in CEditor. Where a part covers some of a pixel, Cycles mixes it in linear
+  light and a browser in sRGB; no blend mixes in linear light, and what is behind is the panel the
+  control is put on, so the file cannot carry it. The add-on writes the parts that stay put as they
+  cover each pixel and names them in the file's XMP; CEditor sets those edge pixels' opacity for the
+  colour under the control (the panel's, or a filled plate's) and the component's own layers under
+  the part (utils/linearEdges.js). A pale skirt on a dark panel: a mean 11 levels off mixed in sRGB,
+  1.5 mixed for it.
+- **A part under another's edge.** Where a cap covers most of a pixel, the skirt under it has only a
+  few samples there, and its light worked out from them is not its light (it read lit where the
+  skirt is in the cap's shadow): the export took the pixel for the skirt's inside, the skirt and the
+  cap covering it whole together, and a light ring showed round the cap, 24 levels. Inside now means
+  the part covers the pixel whole by itself; there its look as rendered goes in its colour layer.
 - **Cycles' shadow catcher** gives the shadow for what a part leaves of a pixel, not the pixel as a
   whole. Taken for the whole, the shadow under a part's outline came out black, 40 levels off on the
   panel.
 - **A turning part's shadow** turned about the axis swung round with the part and, at half a turn,
   fell on the side towards the light. Shadows now turn about a point of their own, half their reach
   from the axis towards where they fall (the light that lights the part most, and the part's height):
-  the import reads a pivot named after a layer ("pointer shadow pivot") as that layer's own. Exact on
-  a flat surface under one light; on a metal cap the shadow is partly its shine blocked, and how dark
-  it is changes as the part turns, which a layer made at rest does not.
-- In a dial, a lamp's lit layer and its light on the panel are not wired to anything (only switches
-  and buttons light theirs).
+  the import reads a pivot named after a layer ("pointer shadow pivot") as that layer's own.
+- **A lamp on a dial** lights with a value of its own, Lamp, on or off as the file shows it, for the
+  panel to set; a switch's and a button's light with their value.
+- What stays made for the scene's panel: a lit lamp's outermost pixels, which Cycles shows lit out to
+  where the lamp covers a quarter of a pixel ("For this panel"). Between two rendered angles a
+  turning part is the two mixed, where Blender renders one of its own.
 
 ## Recommended order
 

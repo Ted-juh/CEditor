@@ -667,9 +667,10 @@ part of the drawing still a layer you can change.
    light, on) shows when the value is on, **off** when it is off, and **pressed** while it is held.
    A layer named **pivot** marks where a pointer turns; without one, it turns about the middle of
    the knob it sits on. A pivot named after a turning layer as well (**pointer shadow pivot**) marks
-   where that one layer turns. A turning layer drawn as it looks turned, named with its angle
-   (**pointer reflection at 27**, **at -27**), shows only near that angle and fades into the next
-   one as the knob turns. A name counts inside a group's name too.
+   where that one layer turns. Pictures of a turning layer drawn as it looks turned, named with
+   their angle (**pointer reflection at 27**, **at -27**), become one layer of frames: it shows the
+   one for the knob's angle, mixed into the next as the knob turns. A name counts inside a group's
+   name too.
 2. Choose **File → New Component from SVG Artwork...** or **New Component from Photoshop Artwork...**.
 
 The control opens in the Component Designer, ready to use and to change:
@@ -705,18 +706,21 @@ small add-on that comes with CEditor.
 
 Each object comes in as its colour, with its shading multiplied over it and its highlights added:
 change a part's colour with its tint and its light stays as Blender rendered it. The shadow on the
-panel is a layer, and so are a turning part's shadow and its reflection in the parts under it,
-which turn with it. The shadow turns about a point of its own beside the axis, so it stays on the
-side away from the light whichever way the pointer points. The reflection is rendered with the
-pointer turned every 27 degrees, and the one nearest the pointer's angle shows, so a metal cap
-mirrors the pointer as it turns. Blender's camera looks straight down (the
-scene's own, when it is orthographic). A lamp's glow is a layer of its own, and so is its light on
-the panel; in a switch or a button both show when the switch is on.
+panel is a layer. The pointer is rendered turned every 27 degrees, and so are its shadow and its
+reflection in the parts under it: each comes in as one layer of frames that turns with the value
+and shows the frame for the pointer's angle, the two either side mixed, so the side of the pointer
+towards the light stays lit, and a metal cap mirrors it, as it turns. Recolour such a layer with its
+**Effects › Filters**. The shadow turns about a point of its own beside the axis, so it stays on the
+side away from the light whichever way the pointer points. Blender's camera looks straight down
+(the scene's own, when it is orthographic).
 
-The object called **panel** in the scene is taken to be the panel the control goes on in CEditor
-(**For this panel** in the export, on by default): the knob's outline, a lit lamp's edge and the
-light on the panel are made for it, so on a panel that looks like it the control looks as Blender
-rendered it. Turn the option off when the control is for panels of many colours.
+A lamp's glow is a layer of its own, and so is its light on the panel; in a switch or a button they
+show when the switch is on, and on a knob they light with a value of their own, **Lamp**, which the
+panel sets with a binding or a script. Light on the panel brightens whatever panel the control is
+put on in proportion, as light does, a little on a dark panel and a lot on a light one. And CEditor
+mixes the knob's outline with the colour under it as Blender does, so it looks right on a panel of
+any colour, or on a plate filled with one. **For this panel** in the export (on by default) lights a
+lit lamp's outermost pixels as on the scene's own panel.
 
 ### Layer masks
 

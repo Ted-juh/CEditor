@@ -18,7 +18,8 @@
  *   pressed  pressed, down                                     shown while it is held
  *
  * A turning layer named "... at <angle>" is drawn as it looks with the part turned that far (degrees
- * clockwise from rest); several of one name fade from one to the next as the part turns.
+ * clockwise from rest). Pictures of one name become one part, a frame an angle, whose frame follows
+ * the value (utils/imageFrames.js); other layers of one name fade from one to the next.
  *
  * A keyword counts anywhere in a layer's name, or in the name of a group it is in, as a whole word:
  * "Pointer copy 2", "knob/pointer" and "pointerShadow" all turn; "spotlight" does not light.
@@ -30,7 +31,8 @@
  * component is edited there like any other.
  */
 import { createControl } from '../models/componentTypes.js';
-import { createValueChannel, makeInteractive } from './customComponentFactory.js';
+import { createPartNode, createValueChannel, makeInteractive } from './customComponentFactory.js';
+import { deepClone } from './deepClone.js';
 
 const ROLE_WORDS = [
   ['pivot', ['pivot', 'centre', 'center', 'axis']],
@@ -90,6 +92,98 @@ function rangeBinding(name, source, target, outputMin, outputMax, outputUnit = '
 const centre = (box) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
 const area = (box) => box.width * box.height;
 
+/** A picture layer's picture, or '' for a layer that is anything else (a vector, text, a masked picture). */
+function pictureOf(part) {
+  const fill = part?._children?.Background?._children?.Fill;
+  if (part?.kind !== 'rectangle' || part.mask || part._children?.Image || part._children?.Text) return '';
+  return fill?.imageEnabled === true && fill.solidEnabled === false && fill.gradientEnabled !== true ? String(fill.imageSrc ?? '') : '';
+}
+
+const blendOf = (part) => part?._children?.Effects?._children?.Blend?.mode ?? 'normal';
+
+/**
+ * A turning picture drawn at several angles ("pointer reflection at -27", "... at 0", "... at 27":
+ * as it is with the part turned that far, drawn turned back to rest), made one part that is each of
+ * them in turn: a part of frames (utils/imageFrames.js), the frame following the value and the two
+ * it falls between mixed. Laid as layers of their own and faded against each other, a shadow or a
+ * multiply shows through by a quarter more half way between two, and the part would brighten
+ * between every two angles; a part of frames mixes them first.
+ *
+ * Returns the layers with each such set one layer, in the place of its lowest, and the angles of
+ * each part made. A set that is not all pictures of one blend mode is left as layers.
+ */
+function framesFromAngles(layers) {
+  const sets = new Map();
+  layers.forEach((layer, index) => {
+    if (artworkRole(layer.names ?? [layer.name]) !== 'turns') return;
+    const own = layer.names?.[0] ?? layer.name ?? layer.part.name;
+    const at = AT_ANGLE.exec(own);
+    if (!at || !pictureOf(layer.part)) return;
+    const base = own.slice(0, at.index).trim();
+    const key = nameWords(base).join(' ');
+    if (!sets.has(key)) sets.set(key, []);
+    sets.get(key).push({ layer, index, angle: Number(at[1]), base });
+  });
+  const replaced = new Map();
+  const angles = new Map();
+  const taken = new Set(layers.map((layer) => layer.part.name));
+  for (const set of sets.values()) {
+    const distinct = new Set(set.map((each) => each.angle));
+    if (distinct.size < 2 || distinct.size !== set.length) continue;
+    if (new Set(set.map((each) => blendOf(each.layer.part))).size !== 1) continue;
+    set.sort((a, b) => a.angle - b.angle);
+    const x0 = Math.min(...set.map(({ layer }) => layer.box.x));
+    const y0 = Math.min(...set.map(({ layer }) => layer.box.y));
+    const x1 = Math.max(...set.map(({ layer }) => layer.box.x + layer.box.width));
+    const y1 = Math.max(...set.map(({ layer }) => layer.box.y + layer.box.height));
+    const box = { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) };
+    const share = (value, whole) => Math.round((value / whole) * 1e6) / 1e4;
+    const frameOf = ({ layer }) => ({
+      source: pictureOf(layer.part),
+      x: share(layer.box.x - box.x, box.width), y: share(layer.box.y - box.y, box.height),
+      width: share(layer.box.width, box.width), height: share(layer.box.height, box.height),
+    });
+    // Angles a step apart (the smallest gap) over the dial's travel, the -135 to 135 degrees it turns:
+    // an angle the set has no layer at (the add-on leaves out one that drew nothing) is a frame of
+    // nothing, so that nothing stands in for it, and so are the ends beyond the first and the last.
+    // Angles off one such step are the frames as they are.
+    const drawnAngles = set.map((each) => each.angle);
+    const step = Math.min(...drawnAngles.slice(1).map((angle, i) => angle - drawnAngles[i]));
+    const onStep = drawnAngles.every((angle) => Math.abs((angle - drawnAngles[0]) / step - Math.round((angle - drawnAngles[0]) / step)) < 1e-6);
+    const list = onStep ? [] : drawnAngles;
+    if (onStep) {
+      const start = drawnAngles[0] - step * Math.floor((drawnAngles[0] + 135) / step + 1e-9);
+      for (let angle = start; angle <= 135 + 1e-9; angle += step) list.push(Math.round(angle * 1e6) / 1e6);
+    }
+    const nothing = { source: '', x: 0, y: 0, width: 100, height: 100 };
+    const frames = list.map((angle) => {
+      const drawn = set.find((each) => Math.abs(each.angle - angle) < 1e-6);
+      return drawn ? frameOf(drawn) : nothing;
+    });
+    // At rest, the dial in the middle of its travel: the angle 0, or between the two either side.
+    const after = list.findIndex((angle) => angle >= 0);
+    const rest = after <= 0 ? (after === 0 ? 0 : list.length - 1)
+      : after - 1 + (0 - list[after - 1]) / (list[after] - list[after - 1]);
+    const first = set[0].layer;
+    for (const { layer } of set) taken.delete(layer.part.name);
+    const effects = first.part._children.Effects;
+    const part = createPartNode(uniqueLayerName(set[0].base, taken), {
+      role: 'image', kind: 'rectangle', opacity: Math.max(...set.map(({ layer }) => layer.part.opacity ?? 1)), visible: true,
+      layout: { x: box.x, y: box.y, width: box.width, height: box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
+      sections: {
+        Image: { _type: 'Image', mode: 'frames', frames, frameIndex: Math.round(rest * 1e4) / 1e4, blendFrames: true, interpolation: 'smooth' },
+        ...(effects ? { Effects: deepClone(effects) } : {}),
+      },
+    });
+    angles.set(part.name, list);
+    const lowest = Math.min(...set.map((each) => each.index));
+    replaced.set(lowest, { name: set[0].base, part, box, names: [set[0].base, ...(first.names?.slice(1) ?? [])] });
+    for (const each of set) if (each.index !== lowest) replaced.set(each.index, null);
+  }
+  if (!replaced.size) return { layers, angles };
+  return { layers: layers.flatMap((layer, index) => (replaced.has(index) ? (replaced.get(index) ? [replaced.get(index)] : []) : [layer])), angles };
+}
+
 /**
  * The component, from `layers` bottom first: `{ name, part, box, names }`, where `part` is the part
  * node (its Layout in px from the artwork's top left), `box` its bounds in those px and `names` its
@@ -98,7 +192,8 @@ const area = (box) => box.width * box.height;
  * `{ component, kind, report }`: kind is 'dial', 'fader', 'switch', 'button' or 'artwork'; report
  * lists what each role found, by layer name, for the import's summary.
  */
-export function buildArtworkComponent({ name = 'Artwork', width, height, layers = [], fileName = '' }) {
+export function buildArtworkComponent({ name = 'Artwork', width, height, layers: drawn = [], fileName = '' }) {
+  const { layers, angles: frameAngles } = framesFromAngles(drawn);
   const component = createControl('CustomComponent');
   const children = component._children;
   children.Core.name = String(name).trim() || 'Artwork';
@@ -175,11 +270,45 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers 
       bindings[`${layer.part.name}Turn`] = rangeBinding(`${layer.part.name}Turn`, `channel.${channelName}.normalized`, `Parts.${layer.part.name}.Layout.rotation`, -135, 135, 'deg');
     }
     for (const layer of roles.pivot) layer.part.visible = false;
-    // A turning layer drawn at one of several angles ("pointer reflection at 27": a part's reflection
-    // as it is with the part turned 27 degrees clockwise, drawn turned back to rest) shows near its
-    // angle: it fades in from the angle a step before and out by the angle a step after, so between
-    // two the picture is the two mixed, each turned with the part. The step is the smallest between
-    // two of a set's angles; one missing (it drew nothing) leaves nothing in its place.
+    // A part of frames, one an angle (framesFromAngles): its frame follows the value, the dial turning
+    // -135 to 135 degrees over 0 to 1. Angles a step apart, one binding; otherwise one a gap, each
+    // adding its share of a frame.
+    for (const [part, list] of frameAngles) {
+      const at = (angle) => (angle + 135) / 270;
+      const gaps = list.slice(1).map((angle, i) => angle - list[i]);
+      const even = gaps.every((gap) => Math.abs(gap - gaps[0]) < 1e-6);
+      const target = `Parts.${part}.Image.frameIndex`;
+      const source = `channel.${channelName}.normalized`;
+      if (even) {
+        bindings[`${part}Frame`] = { ...rangeBinding(`${part}Frame`, source, target, 0, list.length - 1), inputMin: at(list[0]), inputMax: at(list[list.length - 1]) };
+      } else {
+        gaps.forEach((_, i) => {
+          bindings[`${part}Frame${i + 1}`] = { ...rangeBinding(`${part}Frame${i + 1}`, source, target, 0, 1), inputMin: at(list[i]), inputMax: at(list[i + 1]), ...(i ? { add: true } : {}) };
+        });
+      }
+    }
+    // A lamp on a dial (lamp, led, light, lit, glow): lit by a value of its own, on or off, for the
+    // panel to set (a binding, a script, the device); "off" layers the other way. The dial's value
+    // turns it; nothing about the dial lights it. It starts as the file shows it: on when its lit
+    // layers are shown there (the Blender add-on writes a lamp lit), off when they are hidden.
+    if (roles.on.length || roles.off.length) {
+      const lit = roles.on.length ? roles.on.some((layer) => layer.part.visible !== false) : roles.off.every((layer) => layer.part.visible === false);
+      channels.lamp = createValueChannel('lamp', { label: 'Lamp', type: 'bool', min: 0, max: 1, step: 1, defaultValue: lit });
+      const lampSource = 'channel.lamp.normalized';
+      const wire = (layer, suffix, shownWhenLit) => {
+        const full = layer.part.opacity ?? 1;
+        layer.part.visible = true;
+        layer.part.opacity = lit === shownWhenLit ? full : 0;
+        bindings[`${layer.part.name}${suffix}`] = rangeBinding(`${layer.part.name}${suffix}`, lampSource, `Parts.${layer.part.name}.opacity`,
+          shownWhenLit ? 0 : full, shownWhenLit ? full : 0);
+      };
+      for (const layer of roles.on) wire(layer, 'On', true);
+      for (const layer of roles.off) wire(layer, 'Off', false);
+    }
+    // A turning layer drawn at one of several angles that is not a picture (a vector drawn at each)
+    // shows near its angle: it fades in from the angle a step before and out by the angle a step
+    // after, so between two the picture is the two laid one over the other. The step is the smallest
+    // between two of a set's angles; one missing (it drew nothing) leaves nothing in its place.
     const sets = new Map();
     for (const layer of roles.turns) {
       const at = AT_ANGLE.exec(ownName(layer));
@@ -274,7 +403,11 @@ export function describeArtworkComponent({ kind, report }, layerCount) {
   const list = (items) => items.slice(0, 3).join(', ') + (items.length > 3 ? ` and ${items.length - 3} more` : '');
   const layers = `${layerCount} layer${layerCount === 1 ? '' : 's'}`;
   switch (kind) {
-    case 'dial': return `A dial of ${layers}: ${list(report.turns)} turn${report.turns.length === 1 ? 's' : ''} with the value.`;
+    case 'dial': {
+      const lamps = [...(report.on ?? []), ...(report.off ?? [])];
+      const lit = lamps.length ? ` ${list(lamps)} light${lamps.length === 1 ? 's' : ''} with a value of ${lamps.length === 1 ? 'its' : 'their'} own, Lamp.` : '';
+      return `A dial of ${layers}: ${list(report.turns)} turn${report.turns.length === 1 ? 's' : ''} with the value.${lit}`;
+    }
     case 'fader': return `A fader of ${layers}: ${list(report.moves)} move${report.moves.length === 1 ? 's' : ''} along ${report.track[0] ?? 'the artwork'}.`;
     case 'switch': case 'button': {
       const lit = [...report.on, ...report.off, ...report.pressed];

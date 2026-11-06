@@ -156,6 +156,7 @@
   } from '../utils/transformMath.js';
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext, untrack } from 'svelte';
+  import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
   import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
   import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
@@ -523,8 +524,31 @@
   // directly rather than through CanvasControl, so authoring always sees real, separate layers.
   // That is not an accident of this code, but it is load-bearing, and componentCreatorParts.test.js
   // is what stops it becoming one.
+  // A picture marked to have its edge mixed in linear light (utils/linearEdges.js, the Blender add-on's
+  // parts that stay put): drawn with that edge worked out for the colour under this control, once
+  // its pictures are read; until then, and wherever nothing is marked, as it is.
+  const contextPanel = getContext(PANEL_SURFACE_CONTEXT_KEY) ?? null;
+  let edgeParts = $derived.by(() => {
+    const parts = Object.values(documentControl?._children?.Parts?._children ?? {});
+    return parts.some(hasLinearEdges) ? parts.sort((left, right) => numberOr(left?.zIndex, 0) - numberOr(right?.zIndex, 0)) : null;
+  });
+  let edgeBackdrop = $derived(edgeParts
+    ? colourUnderControl(typeof contextPanel === 'function' ? contextPanel() : $activePanel, documentControl)
+    : null);
+  let edgeSources = $state(null);
+  $effect(() => {
+    const parts = edgeParts;
+    const backdrop = edgeBackdrop;
+    if (!parts || !backdrop) {
+      edgeSources = null;
+      return undefined;
+    }
+    let live = true;
+    linearEdgeSources(parts, backdrop).then((sources) => { if (live) edgeSources = sources.size ? sources : null; });
+    return () => { live = false; };
+  });
   let renderedPartEntries = $derived.by(() =>
-    bakeStaticPartEntries(renderControl, visiblePartEntries, displayW, displayH));
+    bakeStaticPartEntries(renderControl, withEdgeSources(visiblePartEntries, edgeSources), displayW, displayH));
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
   // The layer's colour code, if it has one. This is where colour coding actually earns its keep:
   // in the dock you already know which layer you are looking at, on the canvas you do not, and

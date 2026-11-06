@@ -36,6 +36,7 @@
   import { createTransitionTracker } from '../utils/transitionSelection.js';
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
+  import { isFramesImage, imageFrameLayers, imageFrameLayerStyle } from '../utils/imageFrames.js';
 
   let {
     part = null,
@@ -468,6 +469,14 @@
       'pointer-events:auto',
     ].join('; ');
   });
+
+  // A part that is one of several pictures (utils/imageFrames.js): the one the value chooses, or the
+  // two it falls between, mixed inside the part before the part is laid on what is under it.
+  let frameLayers = $derived(image ? imageFrameLayers(image) : []);
+  let frameStyles = $derived(frameLayers.map((layer) => imageFrameLayerStyle(layer, {
+    mixed: frameLayers.length > 1,
+    smooth: String(image?.interpolation ?? 'nearest') !== 'nearest',
+  })));
 
   let imageStyle = $derived.by(() => {
     if (!image) return '';
@@ -1105,7 +1114,13 @@
       />
     {/if}
 
-    {#if image}
+    {#if isFramesImage(image)}
+      <div class="interactive-part-frames" style="position:absolute; inset:0; isolation:isolate; pointer-events:none">
+        {#each frameStyles as style}
+          <div style={style}></div>
+        {/each}
+      </div>
+    {:else if image}
       <div class="interactive-part-image" style={imageStyle}></div>
     {/if}
 

@@ -8,6 +8,7 @@
   import { onDestroy, setContext, untrack, tick } from 'svelte';
   import { choiceKeyIndex } from '../utils/choiceKeyboard.js';
   import { CONTROL_SET_CONTEXT_KEY, CONTROL_SET_LAMP_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY, controlSetForPanel } from '../models/controlSets.js';
+  import { PANEL_SURFACE_CONTEXT_KEY } from '../utils/linearEdges.js';
   import { resolveControlFamily, resolveControlForSet } from '../models/controlSetFamilies.js';
   import { materialActive } from '../utils/materialFilter.js';
   import MaterialFilter from '../../CE_Panel/components/MaterialFilter.svelte';
@@ -352,6 +353,7 @@
   // than the editor's store because the Player renders a document the editor's panel list has
   // never seen — CanvasControl prefers this when present (stores/controlSets.js).
   setContext(CONTROL_SET_CONTEXT_KEY, () => controlSetForPanel(panel));
+  setContext(PANEL_SURFACE_CONTEXT_KEY, () => panel);
   // A set pinned to one control is looked up among the panel's own sets too (the Player has no
   // library: a set the panel uses is carried in the document).
   const panelSetSources = () => ({ document: panel?.controlSets ?? [] });

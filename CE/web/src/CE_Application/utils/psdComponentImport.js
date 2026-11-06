@@ -40,6 +40,7 @@ import { combinedPathData, psdGradient, vectorFillOf, vectorStrokeOf } from './p
 import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { pngDataUrl } from './pngEncode.js';
 import { createPartNode } from './customComponentFactory.js';
+import { linearEdgeNames } from './linearEdges.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { deepClone } from './deepClone.js';
 import { buildArtworkComponent, uniqueLayerName } from './artworkComponent.js';
@@ -330,7 +331,9 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   };
   walk(psd.children, 1, [], false);
 
-  // The records as parts.
+  // The records as parts. A picture the file names for it (the Blender add-on's parts that stay put)
+  // has its edge mixed for the panel under it as light mixes (utils/linearEdges.js).
+  const linearEdges = linearEdgeNames(psd.imageResources?.xmpMetadata);
   const layers = [];
   for (const record of records) {
     const effects = record.shadows.length || record.css !== 'normal' ? blendEffects(record.css) : null;
@@ -357,6 +360,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
         role: 'image', kind: 'rectangle', opacity: round(record.alpha, 3), visible: record.visible, layout,
         sections: { Background: pictureBackground(pngDataUrl(record.box.width, record.box.height, record.pixels)), ...(effects ? { Effects: effects } : {}) },
       });
+      if (linearEdges.has(record.label)) part._children.Background._children.Fill.imageEdges = 'linear';
     }
     if (record.mask) part.mask = record.mask;
     layers.push({ name: record.label, part, box: record.box, names: record.chain });

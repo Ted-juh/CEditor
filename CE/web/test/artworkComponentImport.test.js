@@ -11,6 +11,7 @@ import { planSvgComponentImport } from '../src/CE_Application/utils/svgComponent
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 import { artworkRole, describeArtworkComponent, nameWords } from '../src/CE_Application/utils/artworkComponent.js';
 import { applyCustomBindings } from '../src/CE_Application/utils/interactionRuntime.js';
+import { imageFrameLayers, imageFrameLayerStyle } from '../src/CE_Application/utils/imageFrames.js';
 import { parsePathData, modelBounds } from '../src/CE_Application/utils/bezierPath.js';
 
 const parts = (plan) => plan.component._children.Parts._children;
@@ -173,7 +174,18 @@ test('a Photoshop knob: every layer a picture layer, its blend mode, opacity and
   assert.equal(p.shade.opacity, 0.502);
   assert.equal(p.glint._children.Effects._children.Blend.mode, 'overlay', 'the nearest mode the editor has');
   assert.ok(plan.warnings.some((line) => /nearest/.test(line) && /glint/.test(line)));
-  assert.equal(p.lamp_on.visible, false, 'hidden in Photoshop, hidden here');
+  // A lamp on a dial lights with a value of its own, Lamp; hidden in Photoshop, it starts off.
+  const lamp = plan.component._children.ValueChannels._children.lamp;
+  assert.deepEqual([lamp.type, lamp.defaultValue], ['bool', false]);
+  assert.equal(p.lamp_on.opacity, 0, 'hidden in Photoshop, off here');
+  const lampAt = (on) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': 0.5, 'channel.lamp.normalized': on ? 1 : 0 } });
+    const part = control._children.Parts._children.lamp_on;
+    return part.visible !== false ? part.opacity : 0;
+  };
+  assert.deepEqual([lampAt(false), lampAt(true)], [0, 1]);
+  assert.match(describeArtworkComponent(plan, plan.layers), /lamp on lights with a value of its own, Lamp\.$/);
   // The pointer turns about the body's centre, not the backdrop's.
   const layout = p.Pointer._children.Layout;
   assert.ok(Math.abs(layout.x + (layout.pivotX / 100) * layout.width - 50) < 0.01);
@@ -211,9 +223,10 @@ test('a pivot named after a turning layer is that layer\'s own: a shadow turns a
   for (const name of ['pivot', 'pointer_shadow_pivot', 'knob_axis']) assert.equal(p[name].visible, false, name);
 });
 
-test('a turning layer drawn at several angles fades from one to the next as the part turns', () => {
+test('a turning picture drawn at several angles is one part of frames, mixed from one to the next as it turns', () => {
   // The Blender add-on writes a pointer's reflection in a metal cap as it is at each of several angles
-  // ("pointer reflection at 27"), each turned back to rest, those away from rest hidden.
+  // ("pointer reflection at 27"), each turned back to rest, those away from rest hidden; one that drew
+  // nothing it leaves out (here, 54).
   const bytes = writePsdUint8Array({
     width: 100,
     height: 100,
@@ -221,38 +234,79 @@ test('a turning layer drawn at several angles fades from one to the next as the 
       solid('body', 10, 10, 80, 80, [120, 120, 120, 255]),
       solid('pointer reflection at -27', 40, 30, 20, 20, [200, 200, 200, 255], { hidden: true }),
       solid('pointer reflection at 0', 40, 30, 20, 20, [210, 210, 210, 255]),
-      solid('pointer reflection at 27', 40, 30, 20, 20, [220, 220, 220, 255], { hidden: true }),
+      solid('pointer reflection at 27', 42, 28, 16, 24, [220, 220, 220, 255], { hidden: true }),
       solid('pointer reflection at 81', 40, 30, 20, 20, [230, 230, 230, 255], { hidden: true }),
       solid('pointer', 47, 12, 6, 30, [230, 230, 230, 255]),
     ],
   }, { noBackground: true, generateThumbnail: false });
   const plan = planPsdComponentImport(bytes);
   assert.equal(plan.ok, true, plan.error);
-  const names = ['pointer_reflection_at_minus_27', 'pointer_reflection_at_0', 'pointer_reflection_at_27', 'pointer_reflection_at_81'];
   const p = parts(plan);
-  for (const name of names) {
-    assert.equal(p[name].visible, true, `${name}: shown, by its opacity`);
-    assert.ok(bindings(plan).some((b) => b.target === `Parts.${name}.Layout.rotation`), `${name} turns`);
-  }
-  // Its opacity at an angle, as the component draws it: the value 0 to 1 is -135 to 135 degrees.
-  const opacityAt = (degrees) => {
+  assert.deepEqual(Object.keys(p), ['body', 'pointer_reflection', 'pointer']);
+  const part = p.pointer_reflection;
+  assert.equal(part.visible, true);
+  const image = part._children.Image;
+  assert.equal(image.mode, 'frames');
+  assert.equal(image.blendFrames, true);
+  // A frame each 27 degrees over the dial's travel, -135 to 135: those drawn, and nothing elsewhere.
+  assert.deepEqual(image.frames.map((frame) => Boolean(frame.source)), [false, false, false, false, true, true, true, false, true, false, false]);
+  // Each frame where it was drawn, in % of the part (the one at 27 is taller and narrower).
+  const layout = part._children.Layout;
+  assert.deepEqual([layout.x, layout.y, layout.width, layout.height], [40, 28, 20, 24]);
+  assert.deepEqual(['x', 'y', 'width', 'height'].map((k) => Math.round(image.frames[6][k] * 10) / 10), [10, 0, 80, 100]);
+  assert.deepEqual(['x', 'y', 'width', 'height'].map((k) => Math.round(image.frames[5][k] * 10) / 10), [0, 8.3, 100, 83.3]);
+  assert.ok(bindings(plan).some((b) => b.target === 'Parts.pointer_reflection.Layout.rotation'), 'it turns');
+  // Which frames show at an angle, and how much, as the component draws it: the value 0 to 1 is -135
+  // to 135 degrees.
+  const sharesAt = (degrees) => {
     const control = structuredClone(plan.component);
     applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': (degrees + 135) / 270 } });
-    return Object.fromEntries(names.map((name) => [name.replace('pointer_reflection_at_', '').replace('minus_', '-'), Math.round(control._children.Parts._children[name].opacity * 1000) / 1000]));
+    const drawn = control._children.Parts._children.pointer_reflection._children.Image;
+    return Object.fromEntries(imageFrameLayers(drawn).map(({ frame, opacity }) => [
+      [-27, 0, 27, 81][[4, 5, 6, 8].indexOf(drawn.frames.indexOf(frame))], Math.round(opacity * 1000) / 1000]));
   };
-  assert.deepEqual(opacityAt(0), { '-27': 0, 0: 1, 27: 0, 81: 0 }, 'at rest, the one drawn at rest');
-  assert.deepEqual(opacityAt(13.5), { '-27': 0, 0: 0.5, 27: 0.5, 81: 0 }, 'half way, half each');
-  assert.deepEqual(opacityAt(-27), { '-27': 1, 0: 0, 27: 0, 81: 0 });
-  assert.deepEqual(opacityAt(-135), { '-27': 0, 0: 0, 27: 0, 81: 0 }, 'beyond the first, by a step and more: none');
-  // The step is the smallest between two angles (27): the one at 81 shows from 54 to 108 only, and
-  // where none was drawn (54) nothing stands in.
-  assert.deepEqual(opacityAt(54), { '-27': 0, 0: 0, 27: 0, 81: 0 });
-  assert.deepEqual(opacityAt(67.5), { '-27': 0, 0: 0, 27: 0, 81: 0.5 });
+  assert.deepEqual(imageFrameLayers(image).map(({ frame }) => frame), [image.frames[5]], 'as imported: the one drawn at rest');
+  assert.deepEqual(sharesAt(0), { 0: 1 }, 'at rest, the one drawn at rest');
+  assert.deepEqual(sharesAt(13.5), { 0: 0.5, 27: 0.5 }, 'half way, half each');
+  assert.deepEqual(sharesAt(-27), { '-27': 1 });
+  assert.deepEqual(sharesAt(-135), {}, 'beyond the first by a step and more: none');
+  // Where none was drawn (54) nothing stands in, and half way to the next, half of it.
+  assert.deepEqual(sharesAt(54), {});
+  assert.deepEqual(sharesAt(67.5), { 81: 0.5 });
+  // Angles off one step (drawn by hand at -20, 0 and 50): the frames as they are, the value moving
+  // from one to the next over the gap between them.
+  const uneven = planPsdComponentImport(writePsdUint8Array({ width: 40, height: 40, children: [
+    solid('body', 0, 0, 40, 40, [120, 120, 120, 255]),
+    ...[-20, 0, 50].map((angle, i) => solid(`needle glint at ${angle}`, 18, 2, 4, 18, [200 + i * 20, 200, 200, 255])),
+  ] }, { noBackground: true, generateThumbnail: false }));
+  const glint = (degrees) => {
+    const control = structuredClone(uneven.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': (degrees + 135) / 270 } });
+    return Math.round(control._children.Parts._children.needle_glint._children.Image.frameIndex * 1000) / 1000;
+  };
+  assert.equal(parts(uneven).needle_glint._children.Image.frames.length, 3);
+  assert.deepEqual([-90, -20, -10, 0, 25, 50, 120].map(glint), [0, 0, 0.5, 1, 1.5, 2, 2]);
   // A single layer "at" an angle is just a turning layer.
   const single = planPsdComponentImport(writePsdUint8Array({ width: 40, height: 40, children: [
     solid('body', 0, 0, 40, 40, [120, 120, 120, 255]), solid('needle at 10', 18, 2, 4, 18, [250, 250, 250, 255]),
   ] }, { noBackground: true, generateThumbnail: false }));
   assert.deepEqual(bindings(single).map((b) => b.target), ['Parts.needle_at_10.Layout.rotation']);
+});
+
+test('frames are mixed by adding their shares inside the part, so a shadow or a multiply between two is their mix', () => {
+  const frames = [{ source: 'a.png' }, { source: '' }, { source: 'c.png', x: 10, y: 0, width: 80, height: 100 }];
+  const at = (frameIndex, blendFrames = true) => imageFrameLayers({ mode: 'frames', frames, frameIndex, blendFrames })
+    .map(({ frame, opacity }) => [frame.source, Math.round(opacity * 1000) / 1000]);
+  assert.deepEqual(at(0), [['a.png', 1]]);
+  assert.deepEqual(at(0.25), [['a.png', 0.75]], 'the frame of nothing draws nothing, the other its share');
+  assert.deepEqual(at(1.6), [['c.png', 0.6]]);
+  assert.deepEqual(at(5), [['c.png', 1]], 'past the last, the last');
+  assert.deepEqual(at(0.4, false), [['a.png', 1]], 'without blending, the nearest');
+  const style = imageFrameLayerStyle({ frame: frames[2], opacity: 0.6 }, { mixed: true });
+  assert.match(style, /left:10%; top:0%; width:80%; height:100%/);
+  assert.match(style, /opacity:0\.6/);
+  assert.match(style, /mix-blend-mode:plus-lighter/);
+  assert.doesNotMatch(imageFrameLayerStyle({ frame: frames[0], opacity: 1 }), /mix-blend-mode/);
 });
 
 test('a Photoshop layer\'s mask is its own; its clipped layers are in its picture; its styles drawn', () => {

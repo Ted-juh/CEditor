@@ -7,6 +7,7 @@ import { numberOr, clamp } from './primitives.js';
 import { rotationCoverScale } from './backgroundCSS.js';
 
 import { deepClone } from './deepClone.js';
+import { isFramesImage, imageFrameLayers } from './imageFrames.js';
 export const FILMSTRIP_BAKE_WARN_PIXELS = 32_000_000;
 export const FILMSTRIP_BAKE_MAX_PIXELS = 96_000_000;
 export const FILMSTRIP_BAKE_MAX_DIMENSION = 32_767;
@@ -493,7 +494,35 @@ function loadImage(source) {
   return promise;
 }
 
+/** A part that is one of several pictures (utils/imageFrames.js): the one chosen, or two mixed by adding. */
+async function drawImageFrames(ctx, layers, frame) {
+  const place = (target, image, { x = 0, y = 0, width = 100, height = 100 }) => target.drawImage(image,
+    (frame.width * numberOr(x, 0)) / 100, (frame.height * numberOr(y, 0)) / 100,
+    (frame.width * numberOr(width, 100)) / 100, (frame.height * numberOr(height, 100)) / 100);
+  const images = await Promise.all(layers.map((layer) => loadImage(layer.frame.source).catch(() => null)));
+  if (layers.length === 1) {
+    if (images[0]) place(ctx, images[0], layers[0].frame);
+    return;
+  }
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.ceil(frame.width));
+  canvas.height = Math.max(1, Math.ceil(frame.height));
+  const mix = canvas.getContext('2d');
+  layers.forEach((layer, i) => {
+    if (!images[i]) return;
+    mix.globalAlpha = layer.opacity;
+    mix.globalCompositeOperation = i ? 'lighter' : 'source-over';
+    place(mix, images[i], layer.frame);
+  });
+  ctx.drawImage(canvas, 0, 0, frame.width, frame.height);
+}
+
 async function drawImageSection(ctx, imageSection, frame) {
+  if (isFramesImage(imageSection)) {
+    const frameLayers = imageFrameLayers(imageSection);
+    if (frameLayers.length) await drawImageFrames(ctx, frameLayers, frame);
+    return;
+  }
   const source = String(imageSection?.source ?? '');
   if (!source) return;
   const image = await loadImage(source);
