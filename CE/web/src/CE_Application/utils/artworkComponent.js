@@ -19,7 +19,8 @@
  *
  * A turning layer named "... at <angle>" is drawn as it looks with the part turned that far (degrees
  * clockwise from rest). Pictures of one name become one part, a frame an angle, whose frame follows
- * the value (utils/imageFrames.js); other layers of one name fade from one to the next.
+ * the value (utils/imageFrames.js); an SVG's are made pictures for it (utils/svgComponentImport.js).
+ * Other layers of one name (a Photoshop shape or text layer) fade from one to the next.
  *
  * A keyword counts anywhere in a layer's name, or in the name of a group it is in, as a whole word:
  * "Pointer copy 2", "knob/pointer" and "pointerShadow" all turn; "spotlight" does not light.
@@ -50,6 +51,13 @@ const PIVOT_WORDS = ROLE_WORDS.find(([role]) => role === 'pivot')[1];
 // "... at 27", "... at -54°": a turning layer drawn at that angle, in degrees clockwise from rest.
 const AT_ANGLE = /\s+at\s+(-?\d+(?:\.\d+)?)\s*(?:°|deg(?:rees)?)?\s*$/i;
 const BUTTON_WORDS = ['button', 'btn', 'momentary', 'trigger', 'push', 'key'];
+
+/** A name that says a layer is drawn at an angle ("pointer shadow at -27"): `{ base, angle }`, or null. */
+export function drawnAtAngle(name) {
+  const own = String(name ?? '');
+  const at = AT_ANGLE.exec(own);
+  return at ? { base: own.slice(0, at.index).trim(), angle: Number(at[1]) } : null;
+}
 
 /** The words of a name: split at anything not a letter or digit, and where lower case meets upper. */
 export function nameWords(name) {

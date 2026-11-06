@@ -293,6 +293,49 @@ test('a turning picture drawn at several angles is one part of frames, mixed fro
   assert.deepEqual(bindings(single).map((b) => b.target), ['Parts.needle_at_10.Layout.rotation']);
 });
 
+test('an SVG drawn at several angles is one part of frames too: each a picture of itself, as the file draws it', () => {
+  // Illustrator's layer names (data-name); the shadow blurred by a filter and multiplied, the one at
+  // 27 switched off as a PDF's hidden layer comes in (utils/pdfArtwork.js).
+  const shadow = (angle, extra = '') => `<g id="s${angle + 100}" data-name="pointer shadow at ${angle}" style="mix-blend-mode:multiply" opacity="0.6"${extra}>`
+    + `<rect x="48" y="14" width="4" height="30" filter="url(#soft)" transform="rotate(${angle} 50 50)"/></g>`;
+  const plan = planSvgComponentImport(`<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100">
+  <defs><filter id="soft"><feGaussianBlur stdDeviation="2"/></filter></defs>
+  <circle id="body" cx="50" cy="50" r="40" fill="#555"/>
+  <g id="pointer" fill="#123456">
+    ${shadow(-27)}${shadow(0)}${shadow(27, ' display="none" data-ceditor-hidden="true"')}
+    <rect data-name="needle" x="48.5" y="12" width="3" height="30" fill="#fff"/>
+  </g></svg>`, { fileName: 'knob.svg' });
+  assert.equal(plan.ok, true, plan.error);
+  const p = parts(plan);
+  assert.deepEqual(Object.keys(p), ['body', 'pointer_shadow', 'needle'], 'the three shadows one part, in the place of the lowest');
+  const part = p.pointer_shadow;
+  assert.equal(part.visible, true);
+  assert.equal(part._children.Effects._children.Blend.mode, 'multiply', 'the blend mode the layers had');
+  const image = part._children.Image;
+  assert.equal(image.mode, 'frames');
+  assert.deepEqual(image.frames.map((frame) => Boolean(frame.source)), [false, false, false, false, true, true, true, false, false, false, false]);
+  // Each frame the element as the file has it: its own transform, opacity and filter, the paint its
+  // group hands down, the filter's definition, and the hidden one shown.
+  const [atMinus, atRest, atPlus] = [4, 5, 6].map((i) => svgOf(image.frames[i].source));
+  assert.match(atMinus, /rotate\(-27 50 50\)/);
+  assert.match(atRest, /<filter id="soft">/);
+  assert.match(atRest, /filter="url\(#soft\)"/);
+  assert.match(atRest, /fill="#123456"/);
+  assert.match(atRest, /opacity="0.6"/);
+  assert.doesNotMatch(atPlus, /display="none"/);
+  // The blur's room round the shapes: the box is wider than the 4 px bar.
+  assert.ok(part._children.Layout.width > 20, `the frames' box: ${part._children.Layout.width}`);
+  // It turns, and its frame follows the value; nothing faded.
+  assert.ok(bindings(plan).some((b) => b.target === 'Parts.pointer_shadow.Layout.rotation'));
+  assert.ok(bindings(plan).some((b) => b.target === 'Parts.pointer_shadow.Image.frameIndex'));
+  assert.ok(!bindings(plan).some((b) => /Fade/.test(b.name ?? '')), 'no layers faded against each other');
+  // The needle, drawn once, stays a vector.
+  assert.equal(p.needle.kind, 'path');
+  // One drawn at a single angle is a vector as before.
+  const single = planSvgComponentImport('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect id="needle at 10" x="18" y="2" width="4" height="18" fill="#fff"/></svg>');
+  assert.equal(parts(single).needle_at_10.kind, 'path');
+});
+
 test('frames are mixed by adding their shares inside the part, so a shadow or a multiply between two is their mix', () => {
   const frames = [{ source: 'a.png' }, { source: '' }, { source: 'c.png', x: 10, y: 0, width: 80, height: 100 }];
   const at = (frameIndex, blendFrames = true) => imageFrameLayers({ mode: 'frames', frames, frameIndex, blendFrames })

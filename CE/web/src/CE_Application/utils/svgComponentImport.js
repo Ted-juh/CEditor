@@ -4,8 +4,11 @@
  * The SVG panel importer (utils/svgPanelImport.js) makes a panel: the artwork one picture behind
  * controls placed on it. This makes the drawing itself the control: every shape a layer of a custom
  * component, still a vector, so its colours, gradient, stroke, size and position stay editable in the
- * Component Designer, and nothing is a picture. Illustrator, Inkscape, Affinity Designer, Figma and
- * Sketch all write SVG.
+ * Component Designer. Illustrator, Inkscape, Affinity Designer, Figma and Sketch all write SVG.
+ *
+ * One thing is made a picture: a turning layer drawn at several angles ("pointer shadow at 27"), each
+ * angle a picture of itself as the file draws it, so the set is one part of frames mixed exactly as
+ * it turns (utils/artworkComponent.js), not vectors faded against each other.
  *
  *   rect, circle, ellipse, line, polyline, polygon, path   a path layer (kind 'path', `meta.pathData`
  *                                                          in 0..1 of its box: utils/penPath.js),
@@ -35,7 +38,7 @@ import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { createPartNode } from './customComponentFactory.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { deepClone } from './deepClone.js';
-import { buildArtworkComponent, uniqueLayerName } from './artworkComponent.js';
+import { artworkRole, buildArtworkComponent, drawnAtAngle, nameWords, uniqueLayerName } from './artworkComponent.js';
 
 const IDENTITY = [1, 0, 0, 1, 0, 0];
 const SKIPPED = new Set(['defs', 'clipPath', 'mask', 'symbol', 'metadata', 'title', 'desc', 'style', 'script',
@@ -44,6 +47,8 @@ const SHAPES = new Set(['rect', 'circle', 'ellipse', 'line', 'polyline', 'polygo
 // Inherited as SVG inherits them; opacity is not, it multiplies down the tree.
 const INHERITED = ['fill', 'stroke', 'stroke-width', 'fill-opacity', 'stroke-opacity', 'fill-rule', 'visibility',
   'font-size', 'font-family', 'font-weight', 'text-anchor', 'display'];
+const CSS_BLEND_MODES = new Set(['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn',
+  'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity', 'plus-lighter']);
 const NAMED = {
   black: '000000', white: 'ffffff', red: 'ff0000', lime: '00ff00', green: '008000', blue: '0000ff', yellow: 'ffff00',
   cyan: '00ffff', aqua: '00ffff', magenta: 'ff00ff', fuchsia: 'ff00ff', gray: '808080', grey: '808080', silver: 'c0c0c0',
@@ -389,6 +394,32 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     + ` width="${round(Math.max(1, box.width))}" height="${round(Math.max(1, box.height))}" viewBox="${round(box.x, 3)} ${round(box.y, 3)} ${round(Math.max(1e-3, box.width), 3)} ${round(Math.max(1e-3, box.height), 3)}"`
     + ` preserveAspectRatio="none"><defs>${defsText}</defs>${content}</svg>`);
 
+  // Turning layers drawn at several angles ("pointer shadow at -27", "... at 0", "... at 27"): each
+  // becomes a picture of itself, cut from the file as SVG draws it, so that the set is one part of
+  // frames mixed exactly as it turns (utils/artworkComponent.js, utils/imageFrames.js). Kept as
+  // vectors they could only be faded against each other, and a shadow or a multiply would show by a
+  // quarter more half way between two angles. The sets: their names' angles, by what they are of.
+  const angleSets = new Map();
+  const findAngles = (node, names, depth = 0) => {
+    if (!node?.name || depth > 64 || SKIPPED.has(node.name)) return;
+    const name = objectName(node);
+    const chain = name ? [name, ...names] : names;
+    const at = name ? drawnAtAngle(name) : null;
+    if (at && artworkRole(chain) === 'turns') {
+      const key = nameWords(at.base).join(' ');
+      if (!angleSets.has(key)) angleSets.set(key, new Set());
+      angleSets.get(key).add(at.angle);
+      return;
+    }
+    for (const child of node.children ?? []) findAngles(child, chain, depth + 1);
+  };
+  findAngles(root, []);
+  const drawnAsFrame = (name, chain) => {
+    const at = drawnAtAngle(name);
+    return !!at && artworkRole(chain) === 'turns' && (angleSets.get(nameWords(at.base).join(' '))?.size ?? 0) >= 2;
+  };
+  let measuring = 0;
+
   const layers = [];
   const taken = new Set();
   const warnings = [];
@@ -462,6 +493,11 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
       else note('missing', label);
     }
 
+    if (!measuring && name && drawnAsFrame(name, chain) && Number.isFinite(node.start) && Number.isFinite(node.end)
+      && !/<use\b/.test(source.slice(node.start, node.end))) {
+      angleLayer(node, { matrix, inherited, opacity, names, stack, depth, own, label, chain, switchedOff, hidden: !!style.switchedOff });
+      return;
+    }
     if (node.name === 'g' || node.name === 'svg' || node.name === 'a' || node.name === 'switch') {
       for (const child of node.children ?? []) visit(child, m, style, alpha, chain, here, depth + 1);
       return;
@@ -479,6 +515,61 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     else if (node.name === 'image') imageLayer(node, m, alpha, label, chain, here);
     else note('unknown', `<${node.name}>`);
     if (style.switchedOff) for (let i = before; i < layers.length; i += 1) layers[i].part.visible = false;
+  };
+
+  /**
+   * A turning layer drawn at one of several angles, as a picture: the element as the file has it,
+   * under its groups' transform and the paint they hand down, over the box its shapes cover (and
+   * the room a filter takes round them). Its groups' clips and masks are its mask; its own are in it.
+   */
+  const angleLayer = (node, { matrix, inherited, opacity, names, stack, depth, own, label, chain, switchedOff, hidden }) => {
+    // Where it draws: the layers it would have made, measured and taken back.
+    const mark = layers.length;
+    measuring += 1;
+    try {
+      visit(node, matrix, inherited, opacity, names, stack, depth);
+    } finally {
+      measuring -= 1;
+    }
+    const made = layers.splice(mark);
+    for (const layer of made) taken.delete(layer.part.name);
+    if (!made.length) return;
+    let markup = source.slice(node.start, node.end);
+    // A layer switched off in the file comes in hidden (below), not blank.
+    if (switchedOff) markup = markup.replace(/^(<[^>]*?)\sdisplay\s*=\s*["']none["']/, '$1').replace(/^(<[^>]*?style\s*=\s*["'][^"']*?)display\s*:\s*none;?/, '$1');
+    const x0 = Math.min(...made.map((layer) => layer.box.x));
+    const y0 = Math.min(...made.map((layer) => layer.box.y));
+    const x1 = Math.max(...made.map((layer) => layer.box.x + layer.box.width));
+    const y1 = Math.max(...made.map((layer) => layer.box.y + layer.box.height));
+    // A filter (a blurred shadow) draws past the shapes, by up to a tenth of them each way as SVG
+    // gives it room by default.
+    const filtered = /\bfilter\s*[=:]/.test(markup);
+    const padX = filtered ? (x1 - x0) * 0.1 + 2 : 1;
+    const padY = filtered ? (y1 - y0) * 0.1 + 2 : 1;
+    const box = { x: round(x0 - padX, 3), y: round(y0 - padY, 3), width: round(x1 - x0 + padX * 2, 3), height: round(y1 - y0 + padY * 2, 3) };
+    const handed = INHERITED.filter((property) => property !== 'display' && property !== 'visibility' && inherited[property] != null)
+      .map((property) => ` ${property}="${String(inherited[property]).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join('');
+    const section = deepClone(SECTION_DEFAULTS.Background);
+    Object.assign(section._children.Fill, { solidEnabled: false, imageEnabled: true, imageSrc: picture(box, `<g transform="${matrixText(matrix)}"${handed}>${markup}</g>`), imageFit: 'stretch', imageOpacity: 100 });
+    section._children.Border.enabled = false;
+    section._children.Corners.radius = 0;
+    // Its blend mode is the layer's: inside the picture there is nothing under it to blend with.
+    const blend = String(own['mix-blend-mode'] ?? node.attributes?.['mix-blend-mode'] ?? '').trim();
+    const sections = { Background: section };
+    if (CSS_BLEND_MODES.has(blend) && blend !== 'normal') {
+      sections.Effects = deepClone(SECTION_DEFAULTS.Effects);
+      sections.Effects._children.Blend.mode = blend;
+    }
+    const part = createPartNode(uniqueLayerName(label, taken), {
+      role: 'image',
+      kind: 'rectangle',
+      opacity: round(opacity, 3),
+      layout: { x: box.x, y: box.y, width: box.width, height: box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
+      sections,
+    });
+    if (hidden) part.visible = false;
+    applyMasks(part, box, stack);
+    layers.push({ name: label, part, box, names: chain });
   };
 
   const shapeLayer = (node, m, style, alpha, label, chain, stack) => {

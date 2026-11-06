@@ -183,7 +183,7 @@ reflection, shine or bounce) has none, and points to the layer it lights. `Fill.
 |---|---|
 | `pointer`, `indicator`, `needle`, `rotor`, `marker`, `turns` | turns with the value, -135° to 135°, the drawn angle in the middle |
 | `pivot`, `centre`, `axis` | where those turn; without it, the middle of the knob they sit on. Named after a turning layer as well (`pointer shadow pivot`), where that one layer turns |
-| `... at <angle>` | a turning layer drawn as it looks turned that far (`pointer reflection at -27`, `at 27`, `at 54`): pictures of one name become one part of frames that turns with the value, its frame following it and the two either side mixed; other layers fade from one to the next |
+| `... at <angle>` | a turning layer drawn as it looks turned that far (`pointer reflection at -27`, `at 27`, `at 54`): pictures of one name become one part of frames that turns with the value, its frame following it and the two either side mixed. In an SVG, PDF or Illustrator file each such layer or group is made a picture of itself as the file draws it (its filters and blend mode too), so it is a part of frames as well; only a Photoshop shape or text layer drawn at angles fades from one to the next |
 | `fader`, `thumb`, `handle`, `slide` | slides along the `track` (`slot`, `rail`), the value 0 at the bottom or left |
 | `lamp`, `led`, `light`, `on` / `off` | shown when the value is on / off; on a dial, with a value of their own, **Lamp** |
 | `pressed`, `down` | shown while it is held |
