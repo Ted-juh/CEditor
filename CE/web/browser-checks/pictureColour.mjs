@@ -81,6 +81,10 @@ try {
   assert.match(lampText, /Lamp/);
   assert.match(lampText, /Shows lamp_glow, lamp_glow_shine and lamp_lit when on\.|Shows .*lamp_lit.* when on\./);
   assert.equal(await page.getByText('Not wired up', { exact: false }).count(), 0, 'nothing is listed as not wired up');
+  // It can follow a knob or slider on the panel too, on once that is past half way.
+  const lampFrom = setByPanel.locator('[data-value="lamp"] .value-from select');
+  assert.equal(await lampFrom.count(), 1, 'the Lamp offers Value From');
+  assert.equal(await lampFrom.inputValue(), '', 'its own value until it is told otherwise');
   console.log('  ok  Interact: the Lamp is set by the panel, nothing is not wired up');
 
   // The skirt: a picture layer, its colour in the look bar and the dock.
@@ -139,6 +143,32 @@ try {
   await kit.settle(500);
   assert.match(await page.locator('.context-label >> visible=true').first().innerText(), /skirt › Colour/);
   console.log('  ok  skirt_shading: light, naming the skirt, whose colour it opens');
+
+  // Baked into a filmstrip (Assets › bake), at rest: as the canvas draws it, where the knob covers the
+  // pixel whole (its shading multiplied, its light added; before, each went on as plain paint).
+  const insideKnob = [[16, 48], [80, 48], [58, 40], [48, 20]];
+  const baked = await page.evaluate(async ({ data, points, size }) => {
+    const file = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const { planPsdComponentImport } = await window.__ceImport('/src/CE_Application/utils/psdComponentImport.js');
+    const { bakeCustomComponentFilmstrip } = await window.__ceImport('/src/CE_Application/utils/customComponentFilmstripBaker.js');
+    const strip = await bakeCustomComponentFilmstrip(planPsdComponentImport(file, { fileName: 'blender-knob.psd' }).component, { frameCount: 3, valueSource: 'mainValue' });
+    const image = new Image();
+    image.src = strip.source;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.width;
+    canvas.height = image.height;
+    const context = canvas.getContext('2d');
+    context.drawImage(image, 0, 0);
+    // The middle frame: the dial at rest.
+    return points.map(([x, y]) => [...context.getImageData(x, size + y, 1, 1).data]);
+  }, { data: bytes, points: insideKnob, size: SIZE });
+  for (const [i, [x, y]] of insideKnob.entries()) {
+    const shown = await pixelAt(x, y);
+    assert.equal(baked[i][3], 255, `baked at ${x}, ${y}: covered whole`);
+    assert.ok(near(baked[i].slice(0, 3), shown, 10), `baked at ${x}, ${y}: ${baked[i].slice(0, 3)}, the canvas ${shown}`);
+  }
+  console.log('  ok  baked into a filmstrip, the knob is as the canvas draws it: its shading and light in their modes');
 
   assert.deepEqual(kit.failures, [], 'the page must not throw');
   console.log('pictureColour: a picture layer\'s colour changes with its light kept');

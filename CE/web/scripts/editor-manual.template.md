@@ -730,7 +730,8 @@ side away from the light whichever way the pointer points. Blender's camera look
 A lamp's glow is a layer of its own, and so is its light on the panel; in a switch or a button they
 show when the switch is on, and on a knob they light with a value of their own, **Lamp**, which the
 panel sets with a binding or a script. The **Interact** card lists it under **Set by the panel**,
-with the layers it shows and whether it starts on or off. Light on the panel brightens whatever panel the control is
+with the layers it shows and whether it starts on or off; its **Value From** can make it follow a
+knob or slider on the panel instead, on once that is past half way. Light on the panel brightens whatever panel the control is
 put on in proportion, as light does, a little on a dark panel and a lot on a light one. And CEditor
 mixes the knob's outline with the colour under it as Blender does, so it looks right on a panel of
 any colour, or on a plate filled with one. **For this panel** in the export (on by default) lights a

@@ -38,10 +38,22 @@ function cssFilterFor(filters) {
   return parts.length ? parts.join(' ') : 'none';
 }
 
+const CANVAS_BLENDS = new Set(['multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']);
+
+/**
+ * A CSS blend mode as a canvas compositing operation: the same name, but `normal` is the canvas's
+ * `source-over` (a canvas ignores "normal" and keeps whatever was set before) and `plus-lighter`,
+ * the add they draw light with (the Blender add-on's highlights), is its `lighter`. Anything else
+ * draws as normal.
+ */
+export function canvasBlendMode(mode) {
+  const blend = String(mode ?? 'normal').trim().toLowerCase();
+  if (blend === 'plus-lighter' || blend === 'linear-dodge') return 'lighter';
+  return CANVAS_BLENDS.has(blend) ? blend : 'source-over';
+}
+
 function applyBlendMode(ctx, mode) {
-  const blend = String(mode ?? 'normal');
-  const supported = new Set(['normal', 'multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light', 'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']);
-  ctx.globalCompositeOperation = supported.has(blend) ? blend : 'source-over';
+  ctx.globalCompositeOperation = canvasBlendMode(mode);
 }
 
 function section(control, name) {
@@ -598,6 +610,30 @@ function drawText(ctx, part, frame) {
 
 async function drawPart(ctx, part, width, height) {
   if (!part || part.visible === false) return;
+  // A part with a blend mode of its own (Effects › Blend: the Blender add-on's shading multiplies,
+  // its light adds) is drawn on its own and laid onto what is under it in that mode, as CSS lays it
+  // (mix-blend-mode). Drawn straight on, each multiply and add went on as normal paint: a Blender
+  // knob baked dark and flat.
+  const blend = canvasBlendMode(part?._children?.Effects?._children?.Blend?.mode);
+  if (blend !== 'source-over') {
+    const at = ctx.getTransform();
+    const own = document.createElement('canvas');
+    own.width = Math.max(1, Math.ceil(width * at.a));
+    own.height = Math.max(1, Math.ceil(height * at.d));
+    const ownCtx = own.getContext('2d');
+    ownCtx.scale(at.a, at.d);
+    await drawPartContent(ownCtx, part, width, height);
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, at.e, at.f);
+    ctx.globalCompositeOperation = blend;
+    ctx.drawImage(own, 0, 0);
+    ctx.restore();
+    return;
+  }
+  await drawPartContent(ctx, part, width, height);
+}
+
+async function drawPartContent(ctx, part, width, height) {
   const frame = partFrame(part, width, height);
   if (frame.width <= 0 || frame.height <= 0) return;
   const layout = part?._children?.Layout ?? {};

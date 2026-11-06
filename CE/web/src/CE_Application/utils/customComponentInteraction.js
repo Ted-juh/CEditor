@@ -732,7 +732,11 @@ export function sourcedCustomValues(control, values = {}, readControl = null) {
     }
     if (fraction == null) continue;
     next ??= { ...(values ?? {}) };
-    next[name] = numberOr(channel.min, 0) + fraction * (numberOr(channel.max, 1) - numberOr(channel.min, 0));
+    // An on/off value (a dial's Lamp) is on once its source is half way along: a fraction would read
+    // as off whatever it was (normalizeCustomChannelValue counts only `true`).
+    next[name] = ['bool', 'boolean'].includes(String(channel?.type ?? '').trim().toLowerCase())
+      ? fraction >= 0.5
+      : numberOr(channel.min, 0) + fraction * (numberOr(channel.max, 1) - numberOr(channel.min, 0));
   }
   return next ?? values;
 }

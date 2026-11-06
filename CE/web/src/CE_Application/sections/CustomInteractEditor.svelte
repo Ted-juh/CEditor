@@ -365,7 +365,7 @@
   {#if setByPanel.length}
     <PropertySection title="Set by the panel" icon={SlidersHorizontal}>
       <div class="panel-values" data-testid="set-by-panel">
-        <p class="panel-values-hint">No grab area moves these. A binding or a script on the panel sets them{#if setByPanel.some(isNumber)}, or a knob or slider they follow{/if}.</p>
+        <p class="panel-values-hint">No grab area moves these. A binding or a script on the panel sets them, or a knob or slider they follow.</p>
         {#each setByPanel as name (name)}
           {@const channel = channels?._children?.[name] ?? {}}
           <div class="panel-value" data-value={name}>
@@ -375,14 +375,18 @@
               <em>{panelValueText(name)}{#if describeValueSource(control, name, $activePanel?.controls ?? [])}{' '}{capitalised(describeValueSource(control, name, $activePanel?.controls ?? []))}.{/if}</em>
             {/if}
             <div class="panel-value-set">
-              {#if isOnOff(name)}
+              {#if isOnOff(name) && !String(channel.valueSource ?? '').trim()}
+                <!-- How it starts, while it is its own: following something, that decides. -->
                 <span class="set-label">Starts</span>
                 <span class="onoff" role="group" aria-label="How {name} starts">
                   <button type="button" class:on={!channel.defaultValue} aria-pressed={!channel.defaultValue} onclick={() => setChannelField(name, 'defaultValue', false)}>Off</button>
                   <button type="button" class:on={!!channel.defaultValue} aria-pressed={!!channel.defaultValue} onclick={() => setChannelField(name, 'defaultValue', true)}>On</button>
                 </span>
-              {:else if isNumber(name)}
-                <label class="value-from" title="Where this value is taken from: its own (a binding or a script sets it), another value of this component, or a knob or slider on the panel.">
+              {/if}
+              {#if isOnOff(name) || isNumber(name)}
+                <label class="value-from" title={isOnOff(name)
+                  ? 'Where it is taken from: its own (a binding or a script sets it), or another value of this component or a knob or slider on the panel, on once that is past half way.'
+                  : 'Where this value is taken from: its own (a binding or a script sets it), another value of this component, or a knob or slider on the panel.'}>
                   <span class="set-label">Value From</span>
                   <select value={String(channel.valueSource ?? '')} onchange={(event) => setChannelField(name, 'valueSource', event.currentTarget.value)}>
                     {#each valueSourceChoices(control, name, $activePanel?.controls ?? []) as choice (choice.value)}

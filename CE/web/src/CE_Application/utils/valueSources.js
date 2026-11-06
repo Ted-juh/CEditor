@@ -70,11 +70,14 @@ export function valueSourceChoices(component, channelName, panelControls) {
 export function describeValueSource(component, channelName, panelControls) {
   const source = String(channelsOf(component)[channelName]?.valueSource ?? '').trim();
   if (!source) return '';
+  // An on/off value is on once its source is half way along (customComponentInteraction.js).
+  const onOff = ['bool', 'boolean'].includes(String(channelsOf(component)[channelName]?.type ?? '').trim().toLowerCase());
+  const follows = (name, what) => (onOff ? `on when ${name}, ${what}, is past half way` : `follows ${name}, ${what}`);
   if (source.startsWith('channel:')) {
     const name = source.slice(8);
     const channel = channelsOf(component)[name];
-    return channel ? `follows ${String(channel.label ?? '').trim() || name}, a value of this component` : `follows ${name}, a value this component no longer has`;
+    return channel ? follows(String(channel.label ?? '').trim() || name, 'a value of this component') : `follows ${name}, a value this component no longer has`;
   }
   const control = panelValueSources(panelControls, component).find((entry) => entry.id === source);
-  return control ? `follows ${control.name}, a ${control.noun} on the panel` : 'follows a control that is not on this panel';
+  return control ? follows(control.name, `a ${control.noun} on the panel`) : 'follows a control that is not on this panel';
 }

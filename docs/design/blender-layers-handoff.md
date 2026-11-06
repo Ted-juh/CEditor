@@ -136,8 +136,8 @@ The pieces, and where they live:
   change along its travel (the same frames idea would apply per position).
 - An SVG drawn at several angles ("needle at 27" as vectors) still fades separate layers, which is
   inexact for shadows and multiplies.
-- The filmstrip baker (Assets › bake) ignores a part's blend mode altogether (predates this), so a
-  Blender knob bakes wrongly into a filmstrip. It does recolour.
+- The filmstrip baker (Assets › bake) draws a part's blend mode and its colour since the fixes, but
+  not the outline mixing (a filmstrip has no panel under it).
 - A part in another colour: a darker colour's weak channels come out a few levels short of Blender
   where the part is glossy (its gloss was measured on the colour as drawn, and Blender adds it in
   linear light); the light a part throws on the panel (`bounce`) and a shiny part's reflection of it

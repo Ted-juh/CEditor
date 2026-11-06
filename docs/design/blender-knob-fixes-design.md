@@ -33,10 +33,15 @@ Where it differs from the design below, and what was measured.
   highlights held only what filled its colour to white, and recoloured brass the glint went dark
   (Blender keeps it near white). For a metal the highlights now hold the light past white up to a
   whole white (`srgb_beyond`); shown, the two still add to white.
-- **The Lamp.** An on/off value has no Value From in the model (the flat list offers it for numbers
-  only), so its row says what it shows and how it starts (Off / On, the value's default); a number set
-  by the panel has Value From inline. The card's other rows use its words (value, behaviour, grab
-  area) and the full width.
+- **The Lamp.** An on/off value had no Value From (the flat list offered it for numbers only, and a
+  followed fraction read as off). It now follows too, on once its source is past half way
+  (`sourcedCustomValues`), and the card and the flat list offer it; its row says what it shows, how it
+  starts while it is its own (Off / On) and what it follows. The card's other rows use its words
+  (value, behaviour, grab area) and the full width.
+- **The filmstrip baker** laid every part on as plain paint, its blend mode ignored: a Blender knob
+  baked nearly black (12 levels where the canvas shows 204). A part with a blend mode is now drawn on
+  its own and laid on in that mode, as CSS lays it (`plus-lighter` as the canvas's `lighter`), and a
+  baked frame matches the canvas inside the knob within 10 levels.
 - **The dock** names a light layer in its header ("skirt_shading › light, no colour of its own") and
   shows **Now** from the layer's stored colour, so a colour set by a script or a role shows too.
 
