@@ -24,6 +24,14 @@ Taken by the owner, 2026-11-06, each the recommended answer of the mock-ups:
 7. **D7 · Order:** Illustrator and PDF; the Figma plugin; the 3D part with built shapes; glTF objects in
    the same part. Each finished, documented and pushed before the next.
 
+## CI
+
+Started by hand on `claude/new-session-ofvsj0`. Run 532, on `9bcdcab` (Illustrator and PDF), was green
+in all four jobs. Run 533, on `ff480b7` (3D parts in the designer), failed one web test of 7,627: the
+store called `structuredClone` directly, which `deepCloneProxySafety` forbids (`0933866` uses
+`deepClone`); its browser checks, `scene3d` among them, passed on Windows. Run 534, on `0933866` (all
+four routes), was green in all four jobs.
+
 ## 1. Illustrator and PDF — built
 
 An Illustrator file saved with Create PDF Compatible File (Illustrator's default) carries a PDF copy of
