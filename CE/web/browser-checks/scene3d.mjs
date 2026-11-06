@@ -3,11 +3,13 @@
  * drawn with the 3D tool, rendered by three.js into the Blender add-on's layers and merged into the
  * component; its objects listed under it in the Layers list and edited in the dock's 3D tab; given a
  * grab area on the component's value; its colour changed at once, its box moved with what it made, and
- * its shape changed by a render.
+ * its shape changed by a render. And File › New Component from 3D Model with the add-on test's knob as
+ * Blender exports it to glTF (test/fixtures/blender-knob.glb).
  *
  *   node browser-checks/scene3d.mjs
  */
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { boot } from './behaviourKit.mjs';
 
 const kit = await boot({ width: 1600, height: 1000 });
@@ -34,15 +36,25 @@ const control = () => page.evaluate(async () => {
   return JSON.parse(JSON.stringify(value?._children ?? {}));
 });
 
+/** Wait for the 3D part `knob` of the component open in the designer to be rendered; the 3D tab's status line then. */
 async function waitRendered(label) {
-  let status = '';
+  let state = null;
   for (let i = 0; i < 360; i += 1) {
-    status = await page.locator('[data-testid="scene3d-status"]').first().innerText().catch(() => '');
-    if (/could not|WebGL/.test(status)) break;
-    if (/^Rendered/.test(status)) return status;
+    state = await page.evaluate(async () => {
+      const { scene3dRenders } = await window.__ceImport('/src/CE_Application/stores/scene3dActions.js');
+      const { standaloneComponentControl } = await window.__ceImport('/src/CE_Application/stores/controls.js');
+      let renders; scene3dRenders.subscribe((v) => { renders = v; })();
+      let control; standaloneComponentControl.subscribe((v) => { control = v; })();
+      return renders[`${control?._children?.Core?.id}:knob`] ?? null;
+    });
+    if (state?.status === 'failed') break;
+    if (state?.status === 'ready') {
+      await kit.settle(300);
+      return page.locator('[data-testid="scene3d-status"]').first().innerText({ timeout: 2000 }).catch(() => `Rendered · ${(state.milliseconds / 1000).toFixed(1)} s · ${state.layers} layers`);
+    }
     await kit.settle(500);
   }
-  throw new Error(`${label}: not rendered (${status})`);
+  throw new Error(`${label}: not rendered (${JSON.stringify(state)})`);
 }
 
 try {
@@ -121,8 +133,28 @@ try {
   assert.equal(children.Parts._children.knob.meta.scene3d.objects[2].shape.top, 'dome');
   assert.equal(Object.keys(children.Parts._children).filter((name) => name.startsWith('knob__')).length, made.length, 'replaced, not added');
   console.log(`  ok  its shape: rendered again (${second}), its parts replaced`);
+
+  // A model from Blender (glTF): its objects by their names, the pointer turning, the lamp lighting.
+  const glb = readFileSync(new URL('../test/fixtures/blender-knob.glb', import.meta.url)).toString('base64');
+  const model = await page.evaluate(async (data) => {
+    const bytes = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const { importModelComponent } = await window.__ceImport('/src/CE_Application/stores/scene3dActions.js');
+    const { currentNotifications } = await window.__ceImport('/src/CE_Application/stores/scriptUi.js');
+    const name = await importModelComponent(bytes, '/models/Blender knob.glb');
+    return { name, notice: currentNotifications().at(-1)?.message ?? '' };
+  }, glb);
+  assert.equal(model.name, 'knob');
+  assert.match(model.notice, /^A 3D part of 4 objects from Blender knob\.glb: pointer \(turns with the value\); skirt and cap \(stays put\); lamp \(lights with the Lamp value\)\. panel, the surface it stands on/);
+  const third = await waitRendered('model');
+  assert.deepEqual(await page.locator('[data-testid="scene3d-object"]').allInnerTexts(), ['skirt\nstays · mesh', 'cap\nstays · mesh', 'pointer\nturns · mesh', 'lamp\nlamp · mesh']);
+  children = await control();
+  const modelParts = Object.keys(children.Parts._children).filter((name) => name.startsWith('knob__'));
+  assert.ok(modelParts.includes('knob__pointer') && modelParts.includes('knob__lens_lamp_lit'), modelParts.join(', '));
+  assert.equal(children.Parts._children.knob__pointer._children.Image.mode, 'frames');
+  assert.ok(children.ValueChannels._children.lamp, 'the lamp lights with a value of its own');
+  console.log(`  ok  a Blender model (glTF): ${third}, its objects by their names, the pointer in frames, the lamp on a value of its own`);
   assert.deepEqual(kit.failures, [], 'the page must not throw');
-  console.log('scene3d: a 3D part is drawn, rendered, listed, recoloured, moved and reshaped');
+  console.log('scene3d: a 3D part is drawn, rendered, listed, recoloured, moved and reshaped; a glTF model comes in as one');
 } finally {
   await kit.close();
 }

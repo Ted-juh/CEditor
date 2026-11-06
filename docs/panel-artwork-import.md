@@ -195,6 +195,30 @@ Listed in the Console: what was drawn close to rather than exactly (Photoshop's 
 approximate adjustments), Selective Color and Color Lookup adjustments (not applied), adjustment
 layers inside groups with their own blend mode, and references to anything not in the file.
 
+## New Component from 3D Model (glTF)
+
+**File › New Component from 3D Model…** opens a glTF file, the exchange format Blender writes with
+File › Export › glTF 2.0 (a `.glb`, or a `.gltf` and the files it names beside it, which the desktop
+app reads from there; the browser cannot, and asks for a `.glb`). It makes a component whose 3D part
+(the Component Designer's, rendered by CEditor with three.js) is the model's objects
+(`utils/scene3dGltf.js`):
+
+- Each top-level object is an object of the 3D part, moving by the words of its name, as the other
+  importers read them: `pointer` turns, `lamp` lights with a value of its own, everything else stays
+  put. One named `pivot`, `axis` or `centre` is where the knob turns; without one, a turning object's
+  origin; without that, the middle.
+- Its material: the base colour (in sRGB), metalness and roughness, which the 3D tab can change. Its
+  shape is the file's.
+- An object named `panel` (`ground`, `floor`, `backdrop`) is the surface it stands on and is not drawn:
+  the panel the control is placed on stands in for it, its shadow and all.
+- The model is turned from glTF's y up to look down on it, and fitted to the 3D part's square about the
+  knob's axis. Its camera, lights and textures are not used, and the notice says so.
+
+The model is kept in the component (as the file's bytes), so it renders again when a setting changes.
+It draws as a real-time renderer does: soft shadows and a studio's reflections, but no light bouncing
+from one part onto another, so it is close to Blender's Eevee, not to Cycles. For a knob that must look
+as Cycles draws it, the add-on below writes Cycles' light into the file.
+
 ## A control drawn in Figma: the CEditor Export plugin
 
 Figma's own file format is undocumented and changes without notice, so CEditor does not read it.

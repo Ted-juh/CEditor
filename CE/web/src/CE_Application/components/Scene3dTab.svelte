@@ -13,7 +13,7 @@
   import { activateColorTarget } from '../stores/colorTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import {
-    addScene3dObject, removeScene3dObject, renderScene3dPart, scene3dRenders, scene3dSelection, setScene3dColour, setScene3dObject,
+    addScene3dObject, removeScene3dObject, renderScene3dPart, replaceScene3dModel, scene3dRenders, scene3dSelection, setScene3dColour, setScene3dObject,
   } from '../stores/scene3dActions.js';
   import { describeObject, FINISH_LABELS, FINISHES, isRound, normalizeScene3d, starterKnob } from '../utils/scene3dModel.js';
   import { isScene3dPart, scene3dOwner } from '../utils/scene3dMerge.js';
@@ -91,7 +91,7 @@
 
       <div class="group-head">Shape</div>
       {#if object.shape.kind === 'mesh'}
-        <p class="note">From the file{object.shape.triangles ? `: ${object.shape.triangles.toLocaleString()} triangles` : ''}. CEditor does not change a model's shape; its material and motion are yours.</p>
+        <p class="note">From {recipe.source?.fileName || 'the file'}{object.shape.triangles ? `: ${object.shape.triangles.toLocaleString()} triangles` : ''}. CEditor does not change a model's shape; its material and motion are yours. <button type="button" class="inline" onclick={() => replaceScene3dModel(target.controlId, sceneName)}>Replace Model…</button></p>
       {:else}
         <PropertyCell label="Kind" span={2} hint="A turned body (a knob's skirt, body or top), a block (a key, a fader cap), or a pointer.">
           <select class="val" value={object.shape.kind} onchange={(e) => shape('kind', e.target.value)}>
@@ -206,6 +206,7 @@
   .scene-grid { display: grid; gap: 7px 9px; padding: 10px 12px; grid-template-columns: repeat(4, minmax(0, 1fr)); align-content: start; max-width: 720px; }
   .group-head { grid-column: 1 / -1; font: 600 9px/1 ui-monospace, monospace; letter-spacing: .14em; text-transform: uppercase; color: #5B9BD5; margin-top: 6px; }
   .note { grid-column: 1 / -1; color: #999; font-size: 11px; margin: 0; }
+  .note .inline { margin-left: 4px; border: 1px solid #333; border-radius: 3px; background: #1a1a1a; color: #bbb; padding: 2px 8px; font: 600 11px/1.2 inherit; cursor: pointer; }
   .swatch { width: 100%; min-height: 22px; border: 1px solid #0008; border-radius: 3px; cursor: pointer; }
   .actions { display: flex; gap: 6px; padding: 0 12px 8px; }
   .actions button { border: 1px solid #333; border-radius: 3px; background: #1a1a1a; color: #bbb; padding: 4px 10px; font: 600 11px/1.2 inherit; cursor: pointer; }

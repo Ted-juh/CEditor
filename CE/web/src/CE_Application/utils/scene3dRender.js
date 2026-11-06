@@ -30,6 +30,10 @@ export function loadThree() {
   return threeModules;
 }
 
+// Each render is handed back to the page between: without a graphics card one takes a fraction of a
+// second, and a part's dozens would hold the editor still for as many seconds.
+const yieldToPage = () => new Promise((resolve) => setTimeout(resolve, 0));
+
 const hexRgb = (argb) => [1, 3, 5].map((i) => parseInt(String(argb).slice(2).slice(i - 1, i + 1), 16) / 255);
 
 // --- Shapes ---------------------------------------------------------------------------------------------
@@ -232,7 +236,18 @@ export async function renderScene3d(recipeIn, { width, height, scale = 2, lamp =
     // Each object's mesh, under a group that turns it about the axis.
     const placed = recipe.objects.map((object) => {
       const pivot = new THREE.Group();
-      const mesh = object.shape.kind === 'mesh' ? (meshes[object.shape.node] ?? meshes[object.name])?.clone(true) : objectMesh(three, object, size, holdout);
+      let mesh;
+      if (object.shape.kind === 'mesh') {
+        // A model's object, its axis at the origin and its farthest point at 1 (utils/scene3dGltf.js).
+        const model = (meshes[object.shape.node] ?? meshes[object.name])?.clone(true);
+        if (model) {
+          mesh = new THREE.Group();
+          mesh.add(model);
+          mesh.scale.setScalar((size / 2) * 0.97);
+        }
+      } else {
+        mesh = objectMesh(three, object, size, holdout);
+      }
       if (mesh) pivot.add(mesh);
       scene.add(pivot);
       const each = [];
@@ -246,7 +261,8 @@ export async function renderScene3d(recipeIn, { width, height, scale = 2, lamp =
     const target = new THREE.WebGLRenderTarget(W, H, { type: THREE.FloatType, format: THREE.RGBAFormat, colorSpace: THREE.LinearSRGBColorSpace });
     const pixels = new Float32Array(W * H * 4);
     /** The scene as it is set, read back and averaged down: { rgb (premultiplied), alpha }. */
-    const read = () => {
+    const read = async () => {
+      await yieldToPage();
       renderer.setRenderTarget(target);
       renderer.clear();
       renderer.render(scene, camera);
@@ -276,16 +292,16 @@ export async function renderScene3d(recipeIn, { width, height, scale = 2, lamp =
     const perCovered = (rgb, alpha) => Float32Array.from(rgb, (v, i) => (alpha[(i / 3) | 0] > 1e-4 ? v / alpha[(i / 3) | 0] : 0));
 
     /** An object's passes, with the others held out and the panel away. */
-    const passesOf = (entry) => {
+    const passesOf = async (entry) => {
       panel.visible = false;
       for (const other of placed) if (other !== entry) setMaterial(other, holdout, -1);
       const object = entry.object;
       setMaterial(entry, new THREE.MeshBasicMaterial({ color: colourOf(object) }));
-      const flat = read();
+      const flat = await read();
       setMaterial(entry, physical(object, new THREE.Color(1, 1, 1)));
-      const white = read();
+      const white = await read();
       setMaterial(entry, physical(object, new THREE.Color(0, 0, 0)));
-      const black = read();
+      const black = await read();
       const alpha = flat.alpha;
       const colour = perCovered(flat.rgb, alpha);
       const lit = perCovered(white.rgb, alpha);
@@ -303,14 +319,14 @@ export async function renderScene3d(recipeIn, { width, height, scale = 2, lamp =
      * How much `casting` darken the panel (and `alsoSeen`, drawn) by their shadows: 0 to 1, linear.
      * `bare`: the same without their shadows, when it is already made (it does not change as they turn).
      */
-    const shadowOf = (casting, alsoSeen = [], bareMade = null) => {
+    const shadowOf = async (casting, alsoSeen = [], bareMade = null) => {
       for (const entry of placed) setMaterial(entry, alsoSeen.includes(entry) ? physical(entry.object, colourOf(entry.object)) : unseen);
       panel.visible = true;
       panel.material = panelMaterial;
       for (const entry of placed) for (const mesh of entry.meshes) mesh.castShadow = casting.includes(entry);
-      const lit = read();
+      const lit = await read();
       for (const entry of placed) for (const mesh of entry.meshes) mesh.castShadow = false;
-      const bare = bareMade ?? read();
+      const bare = bareMade ?? await read();
       lastBare = bare;
       for (const entry of placed) for (const mesh of entry.meshes) mesh.castShadow = true;
       const out = new Float32Array(n);
@@ -338,8 +354,11 @@ export async function renderScene3d(recipeIn, { width, height, scale = 2, lamp =
 
     // What stays put: at rest, the turning objects away (they cast their own shadows, below).
     for (const entry of turning) entry.pivot.visible = false;
-    const objects = still.map((entry) => ({ name: layerNameOf(entry.object), motion: kindOf(entry.object), metal: (entry.object.material.metalness ?? FINISH_MATERIAL[entry.object.material.finish].metalness * 100) > 50, passes: passesOf(entry) }));
-    const shadow = still.length ? shadowOf(still) : null;
+    const objects = [];
+    for (const entry of still) {
+      objects.push({ name: layerNameOf(entry.object), motion: kindOf(entry.object), metal: (entry.object.material.metalness ?? FINISH_MATERIAL[entry.object.material.finish].metalness * 100) > 50, passes: await passesOf(entry) });
+    }
+    const shadow = still.length ? await shadowOf(still) : null;
     for (const entry of turning) entry.pivot.visible = true;
 
     // What turns, at each angle, turned back to rest; and its shadow on the panel and what stays put.
@@ -355,11 +374,11 @@ export async function renderScene3d(recipeIn, { width, height, scale = 2, lamp =
       let bare = null;
       for (const angle of TURN_ANGLES) {
         for (const entry of turning) entry.pivot.rotation.z = (-angle * Math.PI) / 180;
-        const darkness = shadowOf(turning, still, bare);
+        const darkness = await shadowOf(turning, still, bare);
         bare = lastBare;
         turnShadows[angle] = angle ? turnImage(new Float32Array(n * 3), darkness, w, h, -angle, shadowPivot).alpha : darkness;
         for (const entry of turning) {
-          const passes = passesOf(entry);
+          const passes = await passesOf(entry);
           if (!angle) { atAngle[entry.object.name][0] = passes; continue; }
           const back = (values, k = 3, factor = 1) => turnImage(Float32Array.from(values, (v) => v / factor), passes.alpha, w, h, -angle, axis, k);
           const colour = back(passes.colour);

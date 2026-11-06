@@ -7,8 +7,10 @@
 # give that image back, on its own and on a panel; that the pointer, its shadow and its reflection
 # are the layers that turn; that the image is the right way up; and that the pivot is on the knob's
 # axis. --fixture writes the small file CE/web/test/fixtures/blender-knob.psd that
-# the web suite imports (test/blenderLayersImport.test.js). Needs a Blender with numpy (blender.org's
-# builds have it). Exits 1 on a failure.
+# the web suite imports (test/blenderLayersImport.test.js). --gltf writes the same knob as glTF
+# (CE/web/test/fixtures/blender-knob.glb), as File > Export > glTF 2.0 does, for CEditor's 3D part
+# import (test/scene3dGltf.test.js), and stops there. Needs a Blender with numpy (blender.org's builds
+# have it). Exits 1 on a failure.
 
 import base64
 import importlib.util
@@ -29,7 +31,7 @@ np = addon.np
 
 args = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 FIXTURE = "--fixture" in args
-args = [a for a in args if a != "--fixture"]
+args = [a for a in args if a not in ("--fixture", "--gltf")]
 OUT = args[0] if args else tempfile.mkdtemp(prefix="ceditor-layers-test-")
 os.makedirs(OUT, exist_ok=True)
 failures = []
@@ -212,6 +214,14 @@ def dot_centre(rgba):
     ys, xs = np.nonzero(rgba[..., 3])
     return float(xs.mean() + 0.5), float(ys.mean() + 0.5)
 
+
+if "--gltf" in sys.argv:
+    # The knob as glTF Binary, Blender's own exporter, its camera and lights left out.
+    knob_scene()
+    target = os.path.normpath(os.path.join(HERE, "..", "..", "CE", "web", "test", "fixtures", "blender-knob.glb"))
+    bpy.ops.export_scene.gltf(filepath=target, export_format="GLB", export_cameras=False, export_lights=False, export_apply=True)
+    print(f"wrote {target} ({os.path.getsize(target)} bytes)")
+    sys.exit(0)
 
 scene = knob_scene()
 # CEDITOR_LAYERS_SIZE and CEDITOR_LAYERS_SAMPLES make a quick run while working on it; the checks are

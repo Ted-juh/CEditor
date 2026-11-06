@@ -111,7 +111,12 @@ export function normalizeScene3d(recipe = {}) {
     taken.add(name.toLowerCase());
   }
   const out = { version: 1, objects };
-  if (recipe.source && typeof recipe.source === 'object') out.source = { fileName: String(recipe.source.fileName ?? ''), asset: String(recipe.source.asset ?? '') };
+  if (recipe.source && typeof recipe.source === 'object') {
+    // The glTF it came from, as a data URL, and the files a .gltf names beside it.
+    out.source = { fileName: String(recipe.source.fileName ?? ''), asset: String(recipe.source.asset ?? '') };
+    const siblings = recipe.source.siblings && typeof recipe.source.siblings === 'object' ? recipe.source.siblings : null;
+    if (siblings && Object.keys(siblings).length) out.source.siblings = Object.fromEntries(Object.entries(siblings).map(([uri, url]) => [uri, String(url)]));
+  }
   return out;
 }
 

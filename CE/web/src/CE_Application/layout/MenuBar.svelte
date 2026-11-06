@@ -48,6 +48,7 @@
   import { newPanelFromSvgArtwork, updatePanelFromSvgArtwork } from '../stores/svgPanelImportActions.js';
   import { newPanelFromPsdArtwork, updatePanelFromPsdArtwork } from '../stores/psdPanelImportActions.js';
   import { newComponentFromSvgArtwork, newComponentFromPsdArtwork } from '../stores/artworkComponentActions.js';
+  import { newComponentFrom3dModel } from '../stores/scene3dActions.js';
   import WorkspacePicker from './WorkspacePicker.svelte';
   import { floating } from '../utils/floatingUi.js';
 
@@ -188,6 +189,8 @@
       // editable, and the layers named pointer, fader or lamp wired to move (utils/artworkComponent.js).
       { label: 'New Component from Vector Artwork...', action: () => newComponentFromSvgArtwork() },
       { label: 'New Component from Photoshop Artwork...', action: () => newComponentFromPsdArtwork() },
+      // A glTF model as a 3D part: its objects rendered by CEditor, each changeable (stores/scene3dActions.js).
+      { label: 'New Component from 3D Model...', action: () => newComponentFrom3dModel() },
       { label: 'Open Component from Library...', action: () => openSavedCustomComponent() },
       { type: 'separator' },
       { label: 'New Device Profile', action: () => newDeviceProfile() },

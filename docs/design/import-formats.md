@@ -1,6 +1,6 @@
 # Four more ways in: Illustrator, Figma, 3D parts and glTF
 
-*Decided 2026-11-06; #1, #2 and #3 built.* The routes for bringing designs in that
+*Decided 2026-11-06; all four built.* The routes for bringing designs in that
 [changeable-control-sets.md](changeable-control-sets.md) ("Native files" and "Order") lists as next:
 Illustrator files read directly, Figma, CEditor's own 3D parts (Level 3, with piece E) and glTF models
 (Level 2). The mock-ups the owner approved are [import-formats-mockups.html](import-formats-mockups.html).
@@ -151,7 +151,35 @@ its own colour within 3 levels, the import, the merge and its wiring); `browser-
 (three.js in Chromium: drawn with the tool, rendered, listed, recoloured at once, moved, reshaped).
 About 11 seconds a render here, in software WebGL, for a part 80 pixels across.
 
-## 4. glTF models — next
+## 4. glTF models — built
 
-The same 3D part with objects from a glTF file: meshes and their materials read by three's
-GLTFLoader, each object a part by its name's words, its material editable, its shape the file's.
+File › New Component from 3D Model (`stores/scene3dActions.js` `newComponentFrom3dModel`): a `.glb`, or a
+`.gltf` whose buffers and pictures the desktop app reads from beside it (`gltfSiblings`; in a browser,
+a reason to export `.glb`), read by three's GLTFLoader (`utils/scene3dGltf.js`).
+
+- **The recipe** (`gltfRecipe`): the scene's top-level nodes with meshes are the objects (`shape.kind:
+  'mesh'`, the node's name and its triangle count), moving by their names' words; their material's base
+  colour (three gives it in its linear working space; written in sRGB), metalness and roughness, kept as
+  numbers with a finish that names them. A node named for the panel is left out, one named pivot (or
+  axis, centre) marks the axis. The file is kept in the recipe as a data URL (`source.asset`, with a
+  .gltf's side files), so a later render reads it again (`meshesForRecipe`, once a file).
+- **The meshes** (`gltfMeshes`): glTF is y up; turned a quarter about x so that up is towards the
+  camera; the axis put at the origin (the pivot node, else the first turning node's origin, else the
+  middle) and scaled so that the farthest point across or down is 1, the part's square: a lamp in a
+  corner beside a knob keeps the knob large. The renderer scales that to the part.
+- **What is not used**: the file's cameras, lights and textures (each object takes its material's
+  colour). A model's object is as any other in the 3D tab, its shape excepted; Replace Model reads a new
+  version and keeps the material and motion set on objects of the same name.
+- **The fixture**: `test/fixtures/blender-knob.glb`, the add-on test's knob as Blender's own exporter
+  writes it (`test_ceditor_layers.py -- --gltf`), so the model read here is what a Blender user's is.
+
+Tested: `test/scene3dGltf.test.js` (the knob's objects and their motions, the panel left out, the cap
+metal, the meshes turned, centred and fitted, a .gltf's side files, the notice);
+`browser-checks/scene3d.mjs` imports it in Chromium, renders it (34 seconds in software WebGL) and
+checks the objects, the pointer's frames and the lamp's value. Found on the way: a render ran as one
+block, and without a graphics card a model held the editor still for half a minute; each render is now
+handed back to the page between.
+
+What stays approximate, for after: a turning part's light on the parts beside it and its reflection in
+a metal (no light bouncing in a real-time renderer); a sliding object (a fader cap), which the 3D part
+does not move yet; a lamp's light on the panel.

@@ -737,6 +737,17 @@ to turn it by. What it makes is ordinary layers, so the Player and an exported p
 no 3D at all. It draws as Blender's real-time renderer does, not as its ray tracer: no light bounces
 from one part onto another.
 
+**From a model.** **File → New Component from 3D Model...** opens a glTF file (`.glb`, or a `.gltf`
+with the files it names beside it), which Blender writes with **File → Export → glTF 2.0** and most 3D
+programs can too. It makes a component whose 3D part is the model's objects: each moves by its name,
+as everywhere else (**pointer** turns, **lamp** lights, everything else stays put), and takes its
+colour, metalness and roughness from the file; the 3D tab changes them, and its motion, but not its
+shape. An object named **panel** (or ground, floor, backdrop) is the surface it stands on: the panel
+the control is placed on stands in for it. The file's camera and lights are not used, nor its
+textures. **Replace Model...** in the 3D tab reads a new version of the file and keeps what was set on
+each object of the same name. For a knob that must look exactly as Blender's own renderer draws it,
+use the add-on below instead.
+
 ### A control drawn in Figma
 
 The **CEditor Export** plugin saves a Figma frame as an SVG with every layer's name kept. It comes
@@ -1603,6 +1614,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Import Component...** | | Brings in a `.ceditor-component.json` (or library) file and opens a single component. Dropping the file on the window does the same. |
 | **New Component from Vector Artwork...** | | Makes a control from an SVG, PDF or Illustrator drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
 | **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer; a knob modelled in Blender comes in this way too, see [A knob modelled in Blender](#a-knob-modelled-in-blender). |
+| **New Component from 3D Model...** | | Makes a control of a glTF model's objects, rendered by CEditor; see [A 3D part](#a-3d-part). |
 | **Open Component from Library...** | | Opens a component from your library in its own tab. |
 | **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |
 | **Open Device Profile** | | Opens a loaded device profile in the designer. |

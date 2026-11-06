@@ -18,6 +18,11 @@ import { applyControlPatch, replaceControlsById, standaloneComponentControl, upd
 import { activeControlSet } from './controlSets.js';
 import { cerror, cinfo } from './console.js';
 import { notify } from './scriptUi.js';
+import { browseImage, isJuceAvailable, onImageBrowsed } from '../bridge/bridge.js';
+import { createComponentDocument } from './componentWorkspace.js';
+import { setActiveEditorTab } from './panels.js';
+import { displayTabRequest } from './displayTab.js';
+import { linkedPicturePath, readFileAsDataUrl } from './artworkComponentActions.js';
 import { flatControls } from '../utils/containment.js';
 import { partFrame } from '../utils/customDesignSurfaceGeometry.js';
 import { numberOr } from '../utils/primitives.js';
@@ -155,7 +160,9 @@ async function renderOnce(controlId, part) {
       import('../utils/scene3dLayers.js'),
       import('../utils/psdComponentImport.js'),
     ]);
-    const built = await renderScene3d(recipe, { width: frame.width, height: frame.height, scale, lamp });
+    // A model's objects, read from its glTF (once a file).
+    const meshes = recipe.source?.asset ? await (await import('../utils/scene3dGltf.js')).meshesForRecipe(recipe) : {};
+    const built = await renderScene3d(recipe, { width: frame.width, height: frame.height, scale, lamp, meshes });
     const plan = planPsdComponentImport(scenePsdBytes(built), { fileName: `${part}.psd` });
     if (!plan.ok) throw new Error(plan.error);
     // The component as it is now: it may have changed while the render ran.
@@ -278,4 +285,136 @@ export function removeScene3dObject(controlId, part, index) {
   recipe.objects.splice(index, 1);
   writeRecipe(controlId, part, recipe);
   scene3dSelection.set({ controlId, part, index: Math.max(0, index - 1) });
+}
+
+// --- 3D models (glTF) ---------------------------------------------------------------------------------
+
+const MODEL_TYPES = /\.(glb|gltf)$/i;
+let modelRequests = 0;
+let pendingModel = null;
+let modelListening = false;
+
+const bytesOfDataUrl = (url) => {
+  const comma = String(url ?? '').indexOf(',');
+  return Uint8Array.from(atob(String(url).slice(comma + 1)), (c) => c.charCodeAt(0));
+};
+function dataUrlOf(bytes, type) {
+  let binary = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return `data:${type};base64,${btoa(binary)}`;
+}
+
+/**
+ * Ask for a glTF model, then `handle(bytes, filePath, readSibling)`: the app's own dialog (and the
+ * files a .gltf names beside it read from disk), or the browser's (which cannot read those).
+ */
+export function chooseModel(handle) {
+  if (!isJuceAvailable()) {
+    if (typeof window === 'undefined' || !window.document) return;
+    const input = window.document.createElement('input');
+    input.type = 'file';
+    input.accept = '.glb,.gltf,model/gltf-binary,model/gltf+json';
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (file) await handle(new Uint8Array(await file.arrayBuffer()), file.name, null);
+    };
+    input.click();
+    return;
+  }
+  if (!modelListening) {
+    modelListening = true;
+    onImageBrowsed(async (payload) => {
+      if (!pendingModel || payload?.requestId !== pendingModel.requestId) return;
+      const { handle: then } = pendingModel;
+      pendingModel = null;
+      const filePath = String(payload?.filePath ?? '').trim();
+      if (!filePath) return;
+      if (!MODEL_TYPES.test(filePath)) { notify('Choose a .glb or .gltf file.', { kind: 'warn' }); return; }
+      const url = await readFileAsDataUrl(filePath);
+      if (!url) { notify('Could not read the model.', { kind: 'error', duration: 0 }); return; }
+      await then(bytesOfDataUrl(url), filePath, (uri) => readFileAsDataUrl(linkedPicturePath(uri, filePath)));
+    });
+  }
+  pendingModel = { requestId: `scene3dmodel_${++modelRequests}`, handle };
+  browseImage(pendingModel.requestId, { patterns: '*.glb;*.gltf', title: '3D model (glTF)' });
+}
+
+/** A model's objects as a recipe, and what to say of them: { recipe, report, fileName } or null with the reason reported. */
+export async function readModel(bytes, filePath, readSibling = null) {
+  const fileName = String(filePath ?? '').split(/[\\/]/).pop() || 'Model.glb';
+  try {
+    const { gltfRecipe, gltfSiblings, readGltf } = await import('../utils/scene3dGltf.js');
+    const siblings = await gltfSiblings(bytes, readSibling);
+    const binary = bytes[0] === 0x67 && bytes[1] === 0x6c && bytes[2] === 0x54 && bytes[3] === 0x46;
+    const asset = dataUrlOf(bytes, binary ? 'model/gltf-binary' : 'model/gltf+json');
+    const scene = await readGltf({ asset, siblings });
+    const { recipe, report } = gltfRecipe(scene, { fileName, source: { asset, siblings } });
+    if (!recipe.objects.length) throw new Error('The file has no objects to draw.');
+    return { recipe, report, fileName };
+  } catch (error) {
+    const message = `${fileName} could not be read: ${error?.message ?? error}`;
+    cerror('[3D model]', message);
+    notify(message, { kind: 'error', duration: 0 });
+    return null;
+  }
+}
+
+const MOTION_WORDS = { turns: 'turns with the value', stays: 'stays put', lamp: 'lights with the Lamp value' };
+
+/** What the import says of a model: the objects and what they do, and what was not used. */
+export function describeModel(report, fileName) {
+  const groups = new Map();
+  for (const { name, motion } of report.objects) groups.set(motion, [...(groups.get(motion) ?? []), name]);
+  const list = (names) => (names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]);
+  const parts = ['turns', 'stays', 'lamp'].filter((motion) => groups.has(motion)).map((motion) => `${list(groups.get(motion))} (${MOTION_WORDS[motion]})`);
+  const lines = [`A 3D part of ${report.objects.length} object${report.objects.length === 1 ? '' : 's'} from ${fileName}: ${parts.join('; ')}.`];
+  if (report.panel.length) lines.push(`${list(report.panel)}, the surface it stands on, is the panel the control is placed on.`);
+  if (report.unnamed.length) lines.push(`${list(report.unnamed)} ${report.unnamed.length === 1 ? 'has' : 'have'} no name CEditor reads, and stay${report.unnamed.length === 1 ? 's' : ''} put; rename ${report.unnamed.length === 1 ? 'it' : 'them'} in the 3D tab.`);
+  if (report.textures) lines.push('Its textures are not drawn: each object takes its material\'s colour.');
+  lines.push('The file\'s camera and lights are not used: CEditor looks straight down and lights with the set\'s lamp.');
+  return lines;
+}
+
+/** File › New Component from 3D Model: a component whose 3D part is the model's objects. */
+export function newComponentFrom3dModel() {
+  chooseModel(async (bytes, filePath, readSibling) => importModelComponent(bytes, filePath, readSibling));
+}
+
+/** A model's bytes as a new component, opened in the Component Designer. Returns its 3D part's name, or ''. */
+export async function importModelComponent(bytes, filePath, readSibling = null) {
+  const read = await readModel(bytes, filePath, readSibling);
+  if (!read) return '';
+  const document = createComponentDocument({ name: read.fileName.replace(/\.(glb|gltf)$/i, '') });
+  if (!document?.id) return '';
+  setActiveEditorTab({ type: 'component', id: document.id });
+  const artboard = artboardOf(document.control);
+  const side = Math.min(artboard.width, artboard.height) - 20;
+  const name = addScene3dPart(document.id, { x: Math.round((artboard.width - side) / 2), y: Math.round((artboard.height - side) / 2), width: side, height: side }, { recipe: read.recipe });
+  if (name) {
+    applyControlPatch(document.id, { 'Designer.selectedLayer': name, 'Designer.selectedLayers': [name], 'Designer.selectedSurfaceKind': 'layer' });
+    displayTabRequest.set({ tab: 'scene3d' });
+  }
+  const lines = describeModel(read.report, read.fileName);
+  cinfo(`[3D model] ${lines.join(' ')}`);
+  notify(lines.join(' '), { kind: read.report.unnamed.length || read.report.textures ? 'warn' : 'info', duration: 0 });
+  return name;
+}
+
+/**
+ * A new version of a 3D part's model: its objects read again, what was set on an object kept where the
+ * new file has one of that name (its material and motion), and rendered.
+ */
+export function replaceScene3dModel(controlId, part) {
+  chooseModel(async (bytes, filePath, readSibling) => {
+    const read = await readModel(bytes, filePath, readSibling);
+    const recipe = scene3dRecipe(controlId, part);
+    if (!read || !recipe) return;
+    const before = new Map(recipe.objects.map((object) => [object.name, object]));
+    read.recipe.objects = read.recipe.objects.map((object) => {
+      const was = before.get(object.name);
+      return was ? { ...object, material: was.material, motion: was.motion } : object;
+    });
+    writeRecipe(controlId, part, read.recipe);
+    notify(`${part}: the model is now ${read.fileName}; ${read.recipe.objects.filter((o) => before.has(o.name)).length} of its ${read.recipe.objects.length} objects kept what was set on them.`, { kind: 'info', duration: 6000 });
+  });
 }
