@@ -7,7 +7,7 @@
  * in linear light, and what is behind is the panel the control is put on, so the file cannot carry the
  * answer: CEditor works it out for the panel. A picture layer marked for it (the Blender add-on marks
  * the parts that stay put, `Background.Fill.imageEdges: 'linear'`) has its partly covered pixels'
- * opacity set so that the browser's sRGB mix gives Cycles' linear one, over the panel's colour under
+ * colour and opacity set so that the browser's sRGB mix gives Cycles' linear one, over the panel's colour under
  * the control and the component's own layers under the part (its shadow, the light on the panel).
  *
  * The pure part works on pixels (and is what the tests hold); `linearEdgeSources` decodes the parts'
@@ -59,20 +59,23 @@ function laid(under, c, a, mode) {
 }
 
 /**
- * The opacity that gives an edge pixel of colour `c` covering `coverage` of it, laid over `under`
- * (straight sRGB) in sRGB, as it is mixed in linear light. Where the two are near alike it stays.
+ * The colour and opacity that give an edge pixel of colour `c` covering `coverage` of it, laid over
+ * `under` (straight sRGB) in sRGB, as it is mixed in linear light, in each channel: the opacity the
+ * coverage, raised only as far as a channel needs to stay within 0 and 1, and the colour what then
+ * gives the mix. `{ colour: [r, g, b], alpha }`, all 0 to 1. One opacity alone cannot do it for a
+ * saturated colour over a different one (a part made red, over a grey panel): its red pulls one way,
+ * its green and blue the other. The Blender add-on mixes its preview so (ceditor_layers.py edge_mix).
  */
-export function linearEdgeAlpha(c, coverage, under) {
+export function linearEdgeMix(c, coverage, under) {
   const target = c.map((v, i) => toSrgb(coverage * toLinear(v) + (1 - coverage) * toLinear(under[i])));
-  let dot = 0;
-  let norm = 0;
+  let alpha = coverage;
   for (let i = 0; i < 3; i += 1) {
-    const span = c[i] - under[i];
-    dot += (target[i] - under[i]) * span;
-    norm += span * span;
+    if (target[i] > under[i]) alpha = Math.max(alpha, (target[i] - under[i]) / Math.max(1 - under[i], 1e-6));
+    else if (target[i] < under[i]) alpha = Math.max(alpha, (under[i] - target[i]) / Math.max(under[i], 1e-6));
   }
-  if (norm <= 3 * (2 / 255) ** 2) return coverage;
-  return Math.min(1, Math.max(0, dot / norm));
+  alpha = Math.min(1, Math.max(0, alpha));
+  const colour = alpha > 0 ? target.map((t, i) => Math.min(1, Math.max(0, under[i] + (t - under[i]) / alpha))) : c.slice(0, 3);
+  return { colour, alpha };
 }
 
 /**
@@ -109,10 +112,14 @@ export function mixEdgesInLinearLight(layers, backdrop) {
           under = laid(under, [below.pixels[bi] / 255, below.pixels[bi + 1] / 255, below.pixels[bi + 2] / 255], ba, below.blend ?? 'normal');
         }
         const c = [pixels[at] / 255, pixels[at + 1] / 255, pixels[at + 2] / 255];
-        const solved = linearEdgeAlpha(c, (alpha / 255) * opacity, under) / opacity;
-        const byte = Math.max(1, Math.min(255, Math.round(solved * 255)));
-        if (byte === alpha) continue;
+        const mixed = linearEdgeMix(c, (alpha / 255) * opacity, under);
+        const byte = Math.max(1, Math.min(255, Math.round((mixed.alpha / opacity) * 255)));
+        const rgb = mixed.colour.map((v) => Math.round(v * 255));
+        if (byte === alpha && rgb.every((v, i) => v === pixels[at + i])) continue;
         if (!changed) changed = new Uint8ClampedArray(pixels);
+        changed[at] = rgb[0];
+        changed[at + 1] = rgb[1];
+        changed[at + 2] = rgb[2];
         changed[at + 3] = byte;
       }
     }

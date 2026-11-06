@@ -165,12 +165,14 @@ def drawn(layers, pixels, turn=0.0, at_rest_only=False):
     `at_rest_only`: each part of frames only as it is at rest, as before the add-on rendered them at
     every angle."""
     for name, blend, frames in parts_of(layers):
-        # A pivot is a mark, and a part's lighting and gloss hidden layers the import reads: none is drawn.
-        if addon.role_of(name) == "pivot" or name.endswith((" lighting", " gloss")):
+        # A pivot is a mark, and the light the add-on writes beside the layers hidden layers the import
+        # reads: none is drawn.
+        if addon.role_of(name) == "pivot" or name.endswith((" lighting", " gloss", " base")) or " from " in name:
             continue
         rgba = pixels[name] / 255.0 if frames is None else frame_at(frames, pixels, 0.0 if at_rest_only else turn)
         if rgba is not None:
-            yield name, blend, rgba
+            # A layer whose blend a recolour changed (the shadow made a multiply).
+            yield name, (pixels.get("__blends__") or {}).get(name, blend), rgba
 
 
 LINEAR = set()  # the layers the file names for CEditor to mix their edge for the panel under them
@@ -190,7 +192,9 @@ def stacked(layers, pixels, under, turn=0.0, pivots=None, at_rest_only=False, mi
             a = rgba[..., 3]
             partial = (a > 0) & (a < 1)
             rgba = rgba.copy()
-            rgba[..., 3] = np.where(partial, addon.edge_opacity(rgba[..., :3], a, out[..., :3]), a)
+            mixed_rgb, mixed_alpha = addon.edge_mix(rgba[..., :3], a, out[..., :3])
+            rgba[..., :3] = np.where(partial[..., None], mixed_rgb, rgba[..., :3])
+            rgba[..., 3] = np.where(partial, mixed_alpha, a)
         out = addon.blend_over(out, rgba, blend)
     return out[..., :3]
 
@@ -316,7 +320,8 @@ outline = np.abs(np.hypot(yy + 0.5 - SIZE / 2, xx + 0.5 - SIZE / 2) - px) < 1.5
 outline |= np.abs(np.hypot(yy + 0.5 - SIZE / 2 - px, xx + 0.5 - SIZE / 2 - px) - 0.11 * px) < 1.5
 on_panel_light = np.zeros((SIZE, SIZE), dtype=bool)
 for name in ("bounce", "lamp glow"):
-    on_panel_light |= result["pixels"][name][..., 3] > 0
+    # Where it brightens the panel (the bounce layer covers wider, adding nothing, for a recolour).
+    on_panel_light |= (result["pixels"][name][..., 3] > 0) & (result["pixels"][name][..., :3].max(-1) > 0)
 check(blends.get("bounce") == "div " and blends.get("lamp glow") == "div ", "the light on the panel brightens it in proportion (colour dodge)")
 
 
@@ -381,21 +386,92 @@ def decoded(code):
     return np.where(code > 0, np.power(2.0, code * 16.0 / 255.0 - 8.0), 0.0)
 
 
-def in_colour(pixels, name, colour, was, with_light=True):
-    """`pixels` with `name` in the colour the material `colour` (linear) gives its colour layer, where
-    `was` gave it the colour it was drawn in (Blender's diffuse colour is a few percent under the base
-    colour), picked as an 8-bit colour; and the layers that go with it. `with_light` False: the colour
-    layer changed in proportion instead, and its light layers left as rendered (what CEditor does for
-    a picture with no light written beside it)."""
-    out = dict(pixels)
-    layer = pixels[name]
+def drawn_of(layer):
+    """The colour a colour layer was drawn in, as CEditor measures it (pictureRecolour.js drawnColour)."""
     a = layer[..., 3]
     inside = a >= int(a.max()) - 2
-    drawn = np.array([np.sort(layer[..., c][inside])[int(inside.sum()) // 2] for c in range(3)], dtype=np.float32)
+    return np.array([np.sort(layer[..., c][inside])[int(inside.sum()) // 2] for c in range(3)], dtype=np.float32)
+
+
+def decoded_bounce(code):
+    return decoded(code) / 16.0
+
+
+def regroup(pixels, out, name, picked, extra_light=0.0, extra_gloss=0.0):
+    """`name`'s colour, shading and highlights layers worked out again in `picked` (8-bit) as CEditor
+    works them out (pictureRecolour.js recolourGroupPixels), with `extra_light` and `extra_gloss` added
+    to the light on it and its gloss (light another part throws on it, changed with that part's
+    colour); into `out`."""
+    layer = pixels[name]
+    a = layer[..., 3]
+    drawn = drawn_of(layer)
+    covered = a > 0
+    members = {light for light, colour_name in result["colour_of"] if colour_name == name}
+    shading = pixels.get(next((n for n in members if n.endswith("shading")), ""))
+    highlights = pixels.get(next((n for n in members if n.endswith("highlights")), ""))
+    s_alpha = (shading[..., 3:4] / 255.0) if shading is not None else 0.0
+    h_alpha = (highlights[..., 3:4] / 255.0) if highlights is not None else np.zeros_like(a[..., None], dtype=np.float32)
+    ref = addon.linear(drawn / 255.0)
+    new = addon.linear(picked / 255.0)
+    own = np.where(h_alpha >= 1.0, addon.linear(layer[..., :3] / 255.0), ref)
+    c = np.where(ref > 1e-4, own * new / np.maximum(ref, 1e-4), new)
+    lit = c * np.maximum(decoded(pixels[f"{name} lighting"][..., :3]) + extra_light, 0.0)
+    total = lit + np.maximum(decoded(pixels[f"{name} gloss"][..., :3]) + extra_gloss, 0.0)
+    e = addon.srgb(c)
+    shade = np.where(e > 1e-4, np.clip(addon.srgb_beyond(lit) / np.maximum(e, 1e-4), 0.0, 1.0), 1.0)
+    beyond = addon.srgb_beyond(total) if name in result["metal"] else addon.srgb(total)
+    shine = np.clip(beyond - e * shade, 0.0, 1.0)
+    colour_now = np.clip((addon.srgb(total) - h_alpha * shine) / np.maximum(1.0 - s_alpha + s_alpha * shade, 1e-4), 0.0, 1.0)
+    keep = lambda new_rgb, old: np.where(covered[..., None] & (old[..., 3:4] > 0), np.concatenate([addon.to8(new_rgb), old[..., 3:4]], axis=-1), old)
+    out[name] = keep(colour_now, layer)
+    for member in members:
+        if member.endswith(("shading", "highlights")) and member in pixels:
+            out[member] = keep(shade if member.endswith("shading") else shine, pixels[member])
+
+
+def bounce_in(pixels, out, name, ratio):
+    """The panel's shadow, bounce and shine layers with the light `name` throws on it changed by
+    `ratio` (its colour's, in linear light), as CEditor changes them (pictureRecolour.js
+    recolourBouncePixels): the panel's light scaled where it comes off the part's colour, the shadow a
+    multiply where the panel is to be darker than without the parts, the bounce where it is to be
+    lighter."""
+    if f"bounce from {name}" not in pixels:
+        return
+    shadow = pixels["shadow"].astype(np.float32) / 255.0
+    dodge = pixels["bounce"].astype(np.float32) / 255.0
+    sheen = pixels["bounce shine"].astype(np.float32) / 255.0
+    base = decoded(pixels["bounce base"][..., :3])
+    reach = pixels["bounce base"][..., 3] > 0
+    multiple = np.where(dodge[..., 3:4] > 0, 1.0 / np.maximum(1.0 - dodge[..., :3], 1e-6), 1.0)
+    shown = addon.srgb(base)
+    now = np.clip((1.0 - shadow[..., 3:4]) * multiple * shown, 0.0, 1.0)
+    light = 1.0 + (ratio - 1.0) * decoded_bounce(pixels[f"bounce from {name}"][..., :3])
+    factor = np.where(shown > 1e-4, addon.srgb(addon.linear(now) * np.maximum(light, 0.0)) / np.maximum(shown, 1e-4), 1.0)
+    s_dodge, _ = addon.dodge(np.maximum(factor, 1.0))
+    shone = np.clip(sheen[..., :3] * sheen[..., 3:4] + (ratio - 1.0) * decoded_bounce(pixels[f"bounce shine from {name}"][..., :3]), 0.0, 1.0)
+    a_shine = np.maximum(shone.max(-1), 1.0 / 255.0)
+    rgb = np.clip(shone / a_shine[..., None], 0.0, 1.0)
+    here = reach[..., None]
+    out["shadow"] = np.where(here, addon.rgba8(np.minimum(factor, 1.0), np.ones_like(base[..., 0])), pixels["shadow"])
+    out["bounce"] = np.where(here, addon.rgba8(s_dodge, np.ones_like(base[..., 0])), pixels["bounce"])
+    out["bounce shine"] = np.where(here, addon.rgba8(rgb, a_shine), pixels["bounce shine"])
+    # Black at an opacity is the same as a multiply by black at that opacity: the shadow a multiply now.
+    out["__blends__"] = {**out.get("__blends__", {}), "shadow": "mul "}
+
+
+def in_colour(pixels, name, colour, was, with_light=True, bounce=True):
+    """`pixels` with `name` in the colour the material `colour` (linear) gives its colour layer, where
+    `was` gave it the colour it was drawn in (Blender's diffuse colour is a few percent under the base
+    colour), picked as an 8-bit colour; the layers that go with it; and, with `bounce`, the parts and
+    the panel it lights, lit in its new colour. `with_light` False: the colour layer changed in
+    proportion instead, and its light layers left as rendered (what CEditor does for a picture with no
+    light written beside it)."""
+    out = dict(pixels)
+    layer = pixels[name]
+    drawn = drawn_of(layer)
     albedo = addon.linear(drawn / 255.0) / np.maximum(np.asarray(was[:3], dtype=np.float32), 1e-6)
     picked = np.round(addon.srgb(np.asarray(colour, dtype=np.float32) * albedo) * 255)
-    covered = a > 0
-    members = {light: colour_name for light, colour_name in result["colour_of"] if colour_name == name}
+    members = {light for light, colour_name in result["colour_of"] if colour_name == name}
     followers = [light for light in members if not light.endswith(("shading", "highlights"))]
 
     def in_proportion(rgba):
@@ -410,25 +486,16 @@ def in_colour(pixels, name, colour, was, with_light=True):
     if not with_light:
         out[name] = in_proportion(layer)
         return out, drawn
-    shading = pixels.get(next((n for n in members if n.endswith("shading")), ""))
-    highlights = pixels.get(next((n for n in members if n.endswith("highlights")), ""))
-    s_alpha = (shading[..., 3:4] / 255.0) if shading is not None else 0.0
-    h_alpha = (highlights[..., 3:4] / 255.0) if highlights is not None else np.zeros_like(a[..., None], dtype=np.float32)
-    ref = addon.linear(drawn / 255.0)
-    new = addon.linear(picked / 255.0)
-    own = np.where(h_alpha >= 1.0, addon.linear(layer[..., :3] / 255.0), ref)
-    c = np.where(ref > 1e-4, own * new / np.maximum(ref, 1e-4), new)
-    lit = c * decoded(pixels[f"{name} lighting"][..., :3])
-    total = lit + decoded(pixels[f"{name} gloss"][..., :3])
-    e = addon.srgb(c)
-    shade = np.where(e > 1e-4, np.clip(addon.srgb_beyond(lit) / np.maximum(e, 1e-4), 0.0, 1.0), 1.0)
-    beyond = addon.srgb_beyond(total) if name in result["metal"] else addon.srgb(total)
-    shine = np.clip(beyond - e * shade, 0.0, 1.0)
-    colour_now = np.clip((addon.srgb(total) - h_alpha * shine) / np.maximum(1.0 - s_alpha + s_alpha * shade, 1e-4), 0.0, 1.0)
-    keep = lambda new_rgb, old: np.where(covered[..., None] & (old[..., 3:4] > 0), np.concatenate([addon.to8(new_rgb), old[..., 3:4]], axis=-1), old)
-    out[name] = keep(colour_now, layer)
-    for member, picture in ((n, pixels[n]) for n in members if n.endswith(("shading", "highlights")) and n in pixels):
-        out[member] = keep(shade if member.endswith("shading") else shine, picture)
+    regroup(pixels, out, name, picked)
+    if bounce:
+        ref = addon.linear(drawn / 255.0)
+        ratio = np.where(ref > 1e-4, addon.linear(picked / 255.0) / np.maximum(ref, 1e-4), 1.0)
+        for other in [n for n in pixels if n.endswith(f" lighting from {name}")]:
+            receiver = other[: -len(f" lighting from {name}")]
+            regroup(pixels, out, receiver, drawn_of(pixels[receiver]),
+                    (ratio - 1.0) * decoded_bounce(pixels[other][..., :3]),
+                    (ratio - 1.0) * decoded_bounce(pixels[f"{receiver} gloss from {name}"][..., :3]))
+        bounce_in(pixels, out, name, ratio)
     return out, drawn
 
 
@@ -462,8 +529,8 @@ for part, colour in (("skirt", (0.42, 0.02, 0.018)), ("cap", (0.62, 0.36, 0.06))
     body = own & (result["pixels"][f"{part} highlights"][..., 3] > 0)
     edge = own & ~body
     # Just outside it, where nothing of it is drawn: the light it throws on what is beside it (the
-    # panel by the skirt, the skirt by the cap), which Blender lights in the new colour and the layers
-    # keep as rendered.
+    # panel by the skirt, the skirt by the cap), which Blender lights in its new colour, and so do the
+    # layers, by what the add-on writes of it.
     beside = grown_by(result["pixels"][part][..., 3] > 0, 3) & ~(result["pixels"][part][..., 3] > 0)
     for other in ("pointer at 0", "pointer shadow at 0"):
         beside &= ~grown_by(result["pixels"][other][..., 3] > 0, 2)
@@ -471,19 +538,25 @@ for part, colour in (("skirt", (0.42, 0.02, 0.018)), ("cap", (0.62, 0.36, 0.06))
         beside &= result["pixels"]["skirt"][..., 3] == 255
     got = np.round(stacked(result["layers"], pixels_now, bare) * 255)
     d = np.abs(want - got).max(-1)
+    unthrown = np.abs(want - np.round(stacked(result["layers"], in_colour(result["pixels"], part, colour, was, bounce=False)[0], bare) * 255)).max(-1)
     plain = np.abs(want - np.round(stacked(result["layers"], in_colour(result["pixels"], part, colour, was, with_light=False)[0], bare) * 255)).max(-1)
+    # Around it, out to where its light on the panel and the parts beside it still shows.
+    around = grown_by(result["pixels"][part][..., 3] > 0, int(round(0.25 * px)))
+    for other in ("pointer at 0", "pointer shadow at 0"):
+        around &= ~grown_by(result["pixels"][other][..., 3] > 0, 2)
     if os.environ.get("CEDITOR_LAYERS_DEBUG"):
         np.savez(os.path.join(OUT, f"recoloured-{part}.npz"), want=want, got=got, own=own)
     print(f"  {part} in a new colour: where it covers the pixel mean {d[body].mean():.2f}, p99 {np.percentile(d[body], 99):.1f}; "
-          f"its edge {d[edge].mean():.2f}; beside it {d[beside].mean():.2f}; in proportion, its light as rendered: {plain[body].mean():.2f}, "
-          f"p99 {np.percentile(plain[body], 99):.1f}; as drawn again: at most {same.max():.0f}")
+          f"its edge {d[edge].mean():.2f}; beside it {d[beside].mean():.2f} ({unthrown[beside].mean():.2f} with its light on them as rendered); "
+          f"around it {d[around].mean():.2f}, p99 {np.percentile(d[around], 99):.1f} ({unthrown[around].mean():.2f}, {np.percentile(unthrown[around], 99):.1f}); "
+          f"in proportion: {plain[body].mean():.2f}, p99 {np.percentile(plain[body], 99):.1f}; as drawn again: at most {same.max():.0f}")
     check(float(same.max()) <= 3, f"{part}, worked out again in its own colour, is the picture as written: at most {same.max():.0f} levels")
     check(float(d[body].mean()) < 2 and float(np.percentile(d[body], 99)) < 6,
           f"{part} in a new colour is Blender's render of it: mean {d[body].mean():.2f}, 99th percentile {np.percentile(d[body], 99):.1f} levels where "
           f"it covers the pixel, glint and all (changed in proportion with its light as rendered, {plain[body].mean():.2f} and {np.percentile(plain[body], 99):.1f})")
-    # Its edge is partly what is beside it, lit by it in its old colour: no further off than that.
-    check(float(d[edge].mean()) <= float(d[beside].mean()) + 2,
-          f"and its edge within what it throws on what is beside it: mean {d[edge].mean():.2f} levels, {d[beside].mean():.2f} just beside it")
+    check(float(d[beside].mean()) < 2 and float(d[edge].mean()) < 3,
+          f"and what it lights beside it, lit in its new colour: mean {d[beside].mean():.2f} levels just beside it "
+          f"({unthrown[beside].mean():.2f} with its light on them as rendered), {d[edge].mean():.2f} at its edge")
 
 # Drawn larger, as CEditor draws a component at any size and on a screen of two pixels to the point:
 # the browser scales each layer before it blends them, and the layers must still add up to the
@@ -510,7 +583,10 @@ for name, blend, rgba in drawn(result["layers"], result["pixels"]):
     if name in LINEAR:  # CEditor mixes the edge at the picture's own size; the browser then scales it
         a = rgba[..., 3]
         rgba = rgba.copy()
-        rgba[..., 3] = np.where((a > 0) & (a < 1), addon.edge_opacity(rgba[..., :3], a, under_1x[..., :3]), a)
+        partial = (a > 0) & (a < 1)
+        mixed_rgb, mixed_alpha = addon.edge_mix(rgba[..., :3], a, under_1x[..., :3])
+        rgba[..., :3] = np.where(partial[..., None], mixed_rgb, rgba[..., :3])
+        rgba[..., 3] = np.where(partial, mixed_alpha, a)
     under_1x = addon.blend_over(under_1x, rgba, blend)
     scaled = addon.blend_over(scaled, larger(rgba), blend)
 picture = larger(opaque(result["on_panel"][..., :3]))

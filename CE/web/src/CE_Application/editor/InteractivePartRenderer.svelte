@@ -123,7 +123,8 @@
 
   let layout = $derived(part?._children?.Layout ?? null);
   let background = $derived(colouredPart?._children?.Background ?? null);
-  let effects = $derived(part?._children?.Effects ?? null);
+  // From the recoloured part: the panel's shadow, recoloured, is a multiply (withRecolouredPicture).
+  let effects = $derived(colouredPart?._children?.Effects ?? null);
   let text = $derived(part?._children?.Text ?? null);
   let image = $derived(colouredPart?._children?.Image ?? null);
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own

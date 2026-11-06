@@ -119,6 +119,26 @@ export function lightMapOf(label) {
   return match ? { of: `${match[1]}${match[3] ?? ''}`, kind: match[2].toLowerCase() } : null;
 }
 
+/**
+ * The light a file writes of one part thrown on another, by name (the Blender add-on's hidden layers):
+ * "skirt lighting from cap" and "skirt gloss from cap" (on the skirt, off the cap's colour), "bounce
+ * from skirt" (the share of the panel's light there off the skirt's colour), "bounce shine from skirt"
+ * and "bounce base" (the scene's panel under the bounce). `{ of, kind, from }`, kind 'lighting',
+ * 'gloss', 'light', 'shine' or 'base'; null for any other name.
+ */
+export function bounceMapOf(label) {
+  const text = String(label ?? '').trim();
+  let match = /^(.*?)\s+(lighting|gloss)\s+from\s+(.+)$/i.exec(text);
+  if (match) return { of: match[1], kind: match[2].toLowerCase(), from: match[3] };
+  match = /^(.*?)\s+shine\s+from\s+(.+)$/i.exec(text);
+  if (match) return { of: match[1], kind: 'shine', from: match[2] };
+  match = /^(.*?)\s+from\s+(.+)$/i.exec(text);
+  if (match) return { of: match[1], kind: 'light', from: match[2] };
+  match = /^(.*?)\s+base$/i.exec(text);
+  if (match) return { of: match[1], kind: 'base', from: '' };
+  return null;
+}
+
 /** The role of a light layer that goes with a colour layer, by its name: 'shading', 'highlights' or ''. */
 export function lightRoleOf(name) {
   const own = words(name);
@@ -156,6 +176,80 @@ export function decodeLight(code) {
   return code ? 2 ** ((code * 16) / 255 - 8) : 0;
 }
 
+/** Light a part throws on another, from its 8 bits (ceditor_layers.py bounce_code): 1/4096 to 16. */
+export function decodeBounce(code) {
+  return decodeLight(code) / 16;
+}
+
+/**
+ * The panel's light under a component worked out again with parts in new colours, as the Blender
+ * add-on lays it (ceditor_layers.py add_group): the shadow (black at an opacity), the bounce over it
+ * (colour dodge, a multiple of the panel), the shine added. `base`: the scene's panel look (linear,
+ * light_code), in the bounce layer's box; `emitters`: `[{ ratio, light, shine }]`, each part's change
+ * of colour (linear, per channel) and the share of the panel's light that comes off its colour and
+ * what it adds to the shine (bounce_code), in the bounce box. Each picture `{ pixels, box }`.
+ *
+ * The panel's light there, as shown, is scaled where it comes off a part's colour; the shadow becomes
+ * a multiply carrying it where the panel is now darker than with no parts (`shadow` returned as the
+ * colour to multiply by, opaque: a black layer at an opacity is a multiply by black at that opacity,
+ * so where nothing changes it is drawn as before), and the bounce where it is lighter.
+ */
+export function recolourBouncePixels({ base, bounce: dodge, shine = null, shadow = null, emitters }) {
+  const { box } = dodge;
+  const out = {
+    bounce: new Uint8ClampedArray(dodge.pixels),
+    shine: shine ? new Uint8ClampedArray(shine.pixels) : null,
+    shadow: shadow ? new Uint8ClampedArray(shadow.pixels) : null,
+  };
+  const indexIn = (sheet, x, y) => {
+    if (!sheet) return -1;
+    const sx = x + box.x - sheet.box.x;
+    const sy = y + box.y - sheet.box.y;
+    if (sx < 0 || sy < 0 || sx >= sheet.box.width || sy >= sheet.box.height) return -1;
+    return (sy * sheet.box.width + sx) * 4;
+  };
+  for (let y = 0; y < box.height; y += 1) {
+    for (let x = 0; x < box.width; x += 1) {
+      const i = (y * box.width + x) * 4;
+      if (!base[i + 3]) continue;
+      const di = i;
+      const hi = indexIn(shine, x, y);
+      const si = indexIn(shadow, x, y);
+      const shade = si >= 0 ? shadow.pixels[si + 3] / 255 : 0;
+      const sheenAlpha = hi >= 0 ? shine.pixels[hi + 3] / 255 : 0;
+      const shone = [0, 0, 0];
+      const factor = [0, 0, 0];
+      for (let c = 0; c < 3; c += 1) {
+        const multiple = dodge.pixels[di + 3] ? 1 / Math.max(1 - dodge.pixels[di + c] / 255, 1e-6) : 1;
+        const shown = srgbOf(decodeLight(base[i + c]));
+        const now = clamp01((1 - shade) * multiple * shown);
+        let light = 1;
+        let added = hi >= 0 ? (shine.pixels[hi + c] / 255) * sheenAlpha : 0;
+        for (const { ratio, light: share, shine: sheen } of emitters) {
+          light += (ratio[c] - 1) * decodeBounce(share[i + c]);
+          added += (ratio[c] - 1) * decodeBounce(sheen[i + c]);
+        }
+        factor[c] = shown > 1e-4 ? srgbOf(toLinear(now) * Math.max(0, light)) / shown : 1;
+        shone[c] = clamp01(added);
+      }
+      for (let c = 0; c < 3; c += 1) out.bounce[di + c] = Math.round((1 - 1 / Math.max(factor[c], 1)) * 255);
+      out.bounce[di + 3] = 255;
+      if (si >= 0) {
+        for (let c = 0; c < 3; c += 1) out.shadow[si + c] = Math.round(Math.min(factor[c], 1) * 255);
+        out.shadow[si + 3] = 255;
+      }
+      if (hi >= 0) {
+        // At least one step of opacity, so the layer still covers the pixel; its colour what it adds
+        // over that, so a shine fainter than a step adds no more than it is.
+        const alpha = Math.max(1, Math.round(Math.max(...shone) * 255));
+        for (let c = 0; c < 3; c += 1) out.shine[hi + c] = Math.round(Math.min(1, shone[c] / (alpha / 255)) * 255);
+        out.shine[hi + 3] = alpha;
+      }
+    }
+  }
+  return out;
+}
+
 /**
  * A part's colour layer and the light layers that go with it, worked out again in `colour`, as the
  * Blender add-on works them out (ceditor_layers.py add_part, part_look). Each picture `{ pixels, box }`,
@@ -170,7 +264,7 @@ export function decodeLight(code) {
  * look. Returns `{ colour, shading, highlights }`, each RGBA in its own box (null for one not given),
  * opacities untouched.
  */
-export function recolourGroupPixels({ colour, drawn, metal = false, layer, lighting, gloss, shading = null, highlights = null }) {
+export function recolourGroupPixels({ colour, drawn, metal = false, layer, lighting, gloss, shading = null, highlights = null, bounce = [] }) {
   const { box } = layer;
   const out = {
     colour: new Uint8ClampedArray(layer.pixels),
@@ -198,8 +292,15 @@ export function recolourGroupPixels({ colour, drawn, metal = false, layer, light
       for (let c = 0; c < 3; c += 1) {
         const own = hA >= 1 ? toLinear(layer.pixels[i + c] / 255) : ref[c];
         const part = ref[c] > 1e-4 ? (own * next[c]) / ref[c] : next[c];
-        const lit = part * decodeLight(lighting[i + c]);
-        const look = lit + decodeLight(gloss[i + c]);
+        // Light other parts throw on it by way of their colours, changed with them.
+        let light = decodeLight(lighting[i + c]);
+        let sheen = decodeLight(gloss[i + c]);
+        for (const { ratio, lighting: from, gloss: fromGloss } of bounce) {
+          light += (ratio[c] - 1) * decodeBounce(from[i + c]);
+          sheen += (ratio[c] - 1) * decodeBounce(fromGloss[i + c]);
+        }
+        const lit = part * Math.max(0, light);
+        const look = lit + Math.max(0, sheen);
         const e = srgbOf(part);
         const shade = e > 1e-4 ? clamp01(srgbBeyond(lit) / e) : 1;
         const added = clamp01(beyond(look) - e * shade);
@@ -251,6 +352,10 @@ export function pictureColourSettings(part) {
       path: 'Background.Fill.imageColour', drawnPath: 'Background.Fill.imageColourDrawn', colour: String(fill.imageColour ?? ''), drawn: String(fill.imageColourDrawn ?? ''),
       follows: String(fill.imageColourFollows ?? ''), role: String(fill.imageColourRole ?? ''), metal: fill.imageColourMetal === true,
       lit: Boolean(fill.imageColourLighting && fill.imageColourGloss),
+      // The light other parts throw on it by way of their colours ({ part: { lighting, gloss } }), and
+      // for the panel's bounce layer, the scene's panel under it.
+      bounce: fill.imageColourBounce && typeof fill.imageColourBounce === 'object' ? fill.imageColourBounce : null,
+      panelBase: String(fill.imageColourBase ?? ''),
     };
   }
   return null;
@@ -292,13 +397,18 @@ function sheetOf(part) {
 export function pictureColour(part) {
   const settings = pictureColourSettings(part);
   if (!settings) return null;
-  const colour = colourRgb(settings.colour);
+  // The panel's bounce, shine and shadow under a component, lit by parts in new colours.
+  const panel = part?._colourPanel;
+  if (panel) return panel.emitters.length ? { kind: 'panel', role: panel.role, panel, key: `panel|${panel.key}|${panel.role}` } : null;
   // A picture that came in without its drawn colour (not from a Photoshop file) has it measured when
   // it is drawn (`drawn` null).
   const drawn = colourRgb(settings.drawn);
-  if (!colour || (drawn && colour.every((value, c) => value === drawn[c]))) return null;
-  const head = `${colour.join(',')}>${drawn ? drawn.join(',') : 'measured'}`;
   const group = part?._colourGroup;
+  // A part lit by another in a new colour is worked out again in its own colour too.
+  const lit = Boolean(group?.bounce?.length);
+  const colour = colourRgb(settings.colour) ?? (lit ? drawn : null);
+  if (!colour || (drawn && !lit && colour.every((value, c) => value === drawn[c]))) return null;
+  const head = `${colour.join(',')}>${drawn ? drawn.join(',') : 'measured'}`;
   if (group && drawn) {
     const frames = isFramesImage(imageOf(part)) ? imageOf(part).frames.length : 0;
     return { kind: 'group', role: group.role, group, colour, drawn, frames, key: `${head}|${group.key}|${group.role}` };
@@ -316,6 +426,11 @@ function withFill(part, changes) {
   return { ...part, _children: { ...part._children, Background: { ...background, _children: { ...background._children, Fill: { ...background._children.Fill, ...changes } } } } };
 }
 
+function withBlend(part, mode) {
+  const effects = part._children.Effects ?? { _type: 'Effects', _children: {} };
+  return { ...part, _children: { ...part._children, Effects: { ...effects, _children: { ...effects._children, Blend: { ...(effects._children?.Blend ?? {}), mode } } } } };
+}
+
 function withImage(part, changes) {
   return { ...part, _children: { ...part._children, Image: { ...part._children.Image, ...changes } } };
 }
@@ -330,7 +445,19 @@ function withImage(part, changes) {
 export function withColourFollows(entries, all = null) {
   const byName = all instanceof Map ? all : new Map(all ? Object.entries(all) : entries);
   const settingsOf = new Map([...byName].map(([name, part]) => [name, pictureColourSettings(part)]));
-  if (![...settingsOf.values()].some((own) => own?.follows || own?.lit)) return entries;
+  if (![...settingsOf.values()].some((own) => own?.follows || own?.lit || own?.panelBase)) return entries;
+  // A part's change of colour, in linear light, per channel; null for a part as drawn.
+  const ratioOf = (name) => {
+    const own = settingsOf.get(name);
+    const colour = colourRgb(own?.colour);
+    const drawn = colourRgb(own?.drawn);
+    if (!colour || !drawn || colour.every((value, c) => value === drawn[c])) return null;
+    return colour.map((value, c) => (toLinear(drawn[c] / 255) > 1e-4 ? toLinear(value / 255) / toLinear(drawn[c] / 255) : 1));
+  };
+  const thrown = (maps) => Object.entries(maps ?? {})
+    .map(([from, given]) => ({ from, ratio: ratioOf(from), ...given }))
+    .filter((each) => each.ratio);
+  const thrownKey = (list) => list.map((each) => `${each.from}:${each.ratio.map((v) => v.toFixed(5)).join(',')}`).join(';');
   const members = new Map();
   for (const [name, own] of settingsOf) {
     if (!own?.follows || !own.role) continue;
@@ -339,6 +466,7 @@ export function withColourFollows(entries, all = null) {
     members.set(own.follows, group);
   }
   const groups = new Map();
+  const panels = new Map();
   const groupOf = (leaderName) => {
     if (groups.has(leaderName)) return groups.get(leaderName);
     const lead = settingsOf.get(leaderName);
@@ -346,9 +474,9 @@ export function withColourFollows(entries, all = null) {
     if (lead?.lit) {
       const own = members.get(leaderName) ?? {};
       const sheet = (name) => (name && byName.has(name) ? sheetOf(byName.get(name)) : null);
-      group = { leader: sheet(leaderName), shading: sheet(own.shading), highlights: sheet(own.highlights), metal: lead.metal };
+      group = { leader: sheet(leaderName), shading: sheet(own.shading), highlights: sheet(own.highlights), metal: lead.metal, bounce: thrown(lead.bounce) };
       const keyOf = (frames) => (frames ? frames.map((f) => `${sourceKey(f.src)}/${sourceKey(f.lighting)}/${sourceKey(f.gloss)}@${f.box.x},${f.box.y}`).join(';') : '-');
-      group.key = `${leaderName}:${group.metal ? 'metal' : ''}|${keyOf(group.leader)}|${keyOf(group.shading)}|${keyOf(group.highlights)}`;
+      group.key = `${leaderName}:${group.metal ? 'metal' : ''}|${keyOf(group.leader)}|${keyOf(group.shading)}|${keyOf(group.highlights)}|${thrownKey(group.bounce)}`;
     }
     groups.set(leaderName, group);
     return group;
@@ -367,8 +495,28 @@ export function withColourFollows(entries, all = null) {
     const leaderName = own.follows && own.role ? own.follows : (own.lit ? name : '');
     const group = leaderName ? groupOf(leaderName) : null;
     if (group) next = { ...next, _colourGroup: { ...group, role: leaderName === name ? 'colour' : own.role } };
+    // The panel's bounce layer, its shine and the shadow under them (following it as 'shine' and
+    // 'shadow'), lit by the parts in their new colours.
+    const panelName = own.panelBase ? name : (own.follows && ['shine', 'shadow'].includes(own.role) && settingsOf.get(own.follows)?.panelBase ? own.follows : '');
+    const panel = panelName ? panelOf(panelName) : null;
+    if (panel) next = { ...next, _colourPanel: { ...panel, role: panelName === name ? 'bounce' : own.role } };
     return [name, next];
   });
+
+  function panelOf(name) {
+    if (panels.has(name)) return panels.get(name);
+    const own = settingsOf.get(name);
+    const member = (role) => [...settingsOf].find(([, each]) => each?.follows === name && each.role === role)?.[0] ?? '';
+    const single = (part) => (part && byName.has(part) ? sheetOf(byName.get(part))[0] : null);
+    const panel = {
+      base: own.panelBase, bounce: single(name), shine: single(member('shine')), shadow: single(member('shadow')),
+      emitters: Object.entries(own.bounce ?? {}).map(([from, given]) => ({ from, ratio: ratioOf(from), light: given.light, shine: given.shine })).filter((each) => each.ratio),
+    };
+    const at = (sheet) => (sheet ? `${sourceKey(sheet.src)}@${sheet.box.x},${sheet.box.y}` : '-');
+    panel.key = `${name}|${sourceKey(panel.base)}|${at(panel.bounce)}|${at(panel.shine)}|${at(panel.shadow)}|${thrownKey(panel.emitters)}`;
+    panels.set(name, panel);
+    return panel;
+  }
 }
 
 /**
@@ -378,7 +526,10 @@ export function withColourFollows(entries, all = null) {
 export function withRecolouredPicture(part, made) {
   const wanted = pictureColour(part);
   if (!wanted || !made || made.key !== wanted.key) return part;
-  const { _colourGroup: _, ...plain } = part;
+  const { _colourGroup: _, _colourPanel: __, ...stripped } = part;
+  // The shadow under the panel's bounce, made a multiply (black at an opacity is the same as a multiply
+  // by black at that opacity, so it draws as before where nothing changed).
+  const plain = made.blend ? withBlend(stripped, made.blend) : stripped;
   if (made.kind === 'frames') {
     const frames = imageOf(plain).frames.map((frame, i) => (made.frames[i] ? { ...frame, source: made.frames[i] } : frame));
     return withImage(plain, { frames, colour: '' });
@@ -433,9 +584,15 @@ function groupFrame(want, index) {
     const sheet = (picture, frame) => (frame && fits(picture, frame.box) ? { pixels: picture.pixels, box: frame.box } : null);
     const shadingSheet = sheet(shading, at(group.shading));
     const highlightsSheet = sheet(highlights, at(group.highlights));
+    // Light other parts throw on it, in its box (a part that stays put: one frame).
+    const thrownMaps = index === 0 ? await Promise.all((group.bounce ?? []).map(async (each) => ({
+      ratio: each.ratio, lighting: await picturePixels(each.lighting), gloss: await picturePixels(each.gloss),
+    }))) : [];
+    const bounce = thrownMaps.filter((each) => fits(each.lighting, lead.box) && fits(each.gloss, lead.box))
+      .map((each) => ({ ratio: each.ratio, lighting: each.lighting.pixels, gloss: each.gloss.pixels }));
     const result = recolourGroupPixels({
       colour, drawn, metal: group.metal, layer: { pixels: layer.pixels, box: lead.box }, lighting: lighting.pixels, gloss: gloss.pixels,
-      shading: shadingSheet, highlights: highlightsSheet,
+      shading: shadingSheet, highlights: highlightsSheet, bounce,
     });
     return {
       colour: pngDataUrl(lead.box.width, lead.box.height, result.colour),
@@ -445,11 +602,42 @@ function groupFrame(want, index) {
   })());
 }
 
+const madePanels = new Map();
+
+/** The panel's bounce, shine and shadow under a component, lit by parts in new colours: data URLs. */
+function panelPictures(panel) {
+  if (madePanels.has(panel.key)) return madePanels.get(panel.key);
+  return remember(madePanels, panel.key, (async () => {
+    if (!panel.bounce?.src || !panel.base) return {};
+    const decode = (src) => (src ? picturePixels(src) : null);
+    const [base, bounce, shine, shadow, ...maps] = await Promise.all([
+      decode(panel.base), decode(panel.bounce.src), decode(panel.shine?.src), decode(panel.shadow?.src),
+      ...panel.emitters.flatMap((each) => [decode(each.light), decode(each.shine)]),
+    ]);
+    const box = panel.bounce.box;
+    const fits = (picture, frame = { box }) => picture && picture.width === frame.box.width && picture.height === frame.box.height;
+    if (!fits(base) || !fits(bounce) || maps.some((map) => !fits(map))) return {};
+    const sheet = (picture, frame) => (frame && fits(picture, frame) ? { pixels: picture.pixels, box: frame.box } : null);
+    const result = recolourBouncePixels({
+      base: base.pixels, bounce: { pixels: bounce.pixels, box }, shine: sheet(shine, panel.shine), shadow: sheet(shadow, panel.shadow),
+      emitters: panel.emitters.map((each, i) => ({ ratio: each.ratio, light: maps[i * 2].pixels, shine: maps[i * 2 + 1].pixels })),
+    });
+    const encode = (pixels, frame) => (pixels && frame ? pngDataUrl(frame.box.width, frame.box.height, pixels) : '');
+    return { bounce: encode(result.bounce, panel.bounce), shine: encode(result.shine, panel.shine), shadow: encode(result.shadow, panel.shadow) };
+  })());
+}
+
 /** The pictures `pictureColour(part)` asks for, made: `{ key, kind, src }` or `{ key, kind, frames }`. */
 export function recolourPicture(wanted) {
   if (typeof document === 'undefined' || !wanted) return Promise.resolve(null);
   if (made.has(wanted.key)) return made.get(wanted.key);
   return remember(made, wanted.key, (async () => {
+    if (wanted.kind === 'panel') {
+      const pictures = await panelPictures(wanted.panel);
+      const src = pictures[wanted.role];
+      if (!src) return null;
+      return { key: wanted.key, kind: 'fill', src, ...(wanted.role === 'shadow' ? { blend: 'multiply' } : {}) };
+    }
     if (wanted.kind === 'group') {
       const count = Math.max(1, wanted.frames);
       const sheets = { colour: wanted.group.leader, shading: wanted.group.shading, highlights: wanted.group.highlights };

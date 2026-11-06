@@ -134,7 +134,8 @@ as the median of the pixels the layer covers most; measured when drawn for a pic
 another way). A picture with the light on it written beside it (`…Lighting`, `…Gloss`, from the
 Blender add-on, below) is worked out again in the new colour together with its shading and
 highlights (`…Follows` it with `…Role`), as the add-on works them out, so it is lit as Blender would
-light it. Any other picture is changed in proportion, each pixel, each channel, alpha untouched:
+light it; so is what it lights beside it, another part or the panel, with the light the add-on wrote
+of it there (`…Bounce`). Any other picture is changed in proportion, each pixel, each channel, alpha untouched:
 `new = old × colour / drawn`, so the drawn colour becomes the new one and the rest keep their
 proportion to it; so too a layer that only follows another's colour (a turning part's reflection in
 a metal). Worked out on the pixels once per colour, before the outline mixing and the baking of
@@ -178,11 +179,13 @@ held out, and written as the layers its look adds up from:
 |---|---|---|
 | `<name>` | normal | its own colour, unlit (a metal's is what it reflects) |
 | `<name> lighting`, `<name> gloss` | normal, hidden | the light on it without its colour, and the light it reflects whatever its colour, in linear light (8 bits over 1/256 to 256, a step of 4 %); read with it on import, not layers of their own |
+| `<name> lighting from <part>`, `<name> gloss from <part>` | normal, hidden | the light another part throws on it by way of that part's colour, and what it adds to its gloss, in the same 8 bits; read with it on import |
 | `<name> shading` | multiply | what the lights and the room do to that colour |
 | `<name> highlights` | linear dodge | its reflections, and light brighter than its colour |
 | `<name> lit` | linear dodge | a lamp's glow, shown when the lamp is on |
 | `shadow` | normal | the shadow on the panel: black, its darkness as opacity |
 | `bounce`, `bounce shine` | colour dodge, linear dodge | light the parts throw on the panel (a metal cap's glare): what the panel's colour scatters, and what its shine reflects |
+| `bounce from <part>`, `bounce shine from <part>`, `bounce base` | normal, hidden | the share of the panel's light that comes off that part's colour, and what it adds to the shine (8 bits over 1/4096 to 16); the panel's look under them; read with the bounce on import |
 | `<lamp> glow`, `<lamp> glow shine` | colour dodge, linear dodge | a lamp's light on the panel, the same two ways, shown when the lamp is on |
 | `<name> shadow`, `<name> reflection` | normal, linear dodge | a sliding part's shadow and reflection on the panel and the parts under it, which move with it |
 | `<name> at <angle>`, `<name> shading at <angle>`, ... | as above | a part that turns whole, its shadow and its reflection, rendered with it turned that far: one each 27 degrees, those away from rest hidden |
@@ -234,6 +237,19 @@ changes with the metal's colour in proportion; `<ceditor:metal>` names the metal
 past white is kept in their highlights. Cycles' light passes are per sample the part covers, unlike
 its colour passes, and are not divided by its coverage.
 
+**The light it throws.** A part's colour lights what is beside it too: a red skirt casts red on the
+panel by it, a brass cap a warm light on the skirt under its rim. So the add-on renders each part
+that stays put again colourless (its base colour black, its gloss kept), and writes the difference:
+on each other part, the light and gloss that come off that part's colour
+(`skirt lighting from cap`); on the panel, the share of its light there that comes off it and what
+it adds to the shine (`bounce from skirt`), with the panel's look under them (`bounce base`). Given
+a new colour, CEditor scales each by the change of colour, in linear light, channel by channel: a
+part it lights is worked out again with that light added, in its own colour; on the panel, the light
+there is scaled and the shadow, the bounce and its shine are worked out again for it: the shadow a
+multiply where the panel must darken (black at an opacity is a multiply by black at that opacity),
+the bounce where it must brighten. The bounce and its shine cover every pixel such light reaches,
+adding nothing where there is none. A part that turns keeps its drawn colour in the light it throws.
+
 **A turning part.** The light stays put while the part turns, so what it does with the light
 changes: its own light (the side towards the sun lit, the sun's glint on it), its shadow on the
 panel and the cap, its reflection in a metal cap. Each is rendered with the part turned every 27
@@ -260,15 +276,15 @@ layers against them, laid as CEditor lays them:
 - on a dark, a light and a red panel, Blender rendering the knob on each: the whole picture within a
   mean 0.9 to 1.4, the 99th percentile 6; the light on the panel within 2 to 6 levels at the 99th
   percentile (made for the scene's panel and added, as the add-on wrote it before, 15 to 17); the
-  outline mixed for the panel within a mean 1.5 to 4.4 (in sRGB, 5.7 to 11.1);
+  outline mixed for the panel within a mean 1.4 to 4.4 (in sRGB, 5.7 to 11.1);
 - drawn twice the size, as a browser scales each layer before it blends them;
 - in another colour, against Blender rendering the knob with that material changed, where the part
   covers the pixel: the skirt red within a mean 1.45 levels, the 99th percentile 4, and the metal cap
   brass within 1.1 and 5, its glint included (changed in proportion with their light as rendered,
   8.1 and 15, and 8.1 and 105); worked out again in the colour each was drawn in, within 3 levels of
-  the file. At a part's edge, and just beside it, the light it throws on what is next to it (the panel
-  by the skirt, the skirt by the cap) is lit in the new colour by Blender and kept as rendered by the
-  layers: the edge within that, 5 and 7 levels at the mean, beside it 4.6 and 10;
+  the file. Just beside each, what it lights (the panel by the skirt, the skirt by the cap) is lit in
+  the new colour as Blender lights it: within a mean 1.8 and 1.5 levels (with the light it throws
+  kept as rendered, 4.6 and 10.4), the part's edge 2.6 and 1.2;
 - turned 120 degrees: the pointer's shadow where Blender casts it (0.2 px off at 160 px; the shadow
   at rest turned about the axis is 6 px off, on the side towards the light); the pointer's own light
   within a mean 11 levels (its light at rest, turned, 63); its reflection in the cap beside it at
@@ -283,10 +299,11 @@ parts, darkens just that. `--fixture` writes the small file the web suite reads
 (`test/fixtures/blender-knob.psd`), checked by `test/blenderLayersImport.test.js` for what turns,
 about where (the shadow about its own point), in which modes, which frame shows as the pointer
 turns, the parts whose outline CEditor mixes, the lamp's value, each colour layer's drawn colour,
-light, gloss and light layers, and for CEditor's compositor drawing it as the add-on composed it.
-`--fixture` also writes Blender's renders of the knob with the skirt red and the cap brass
-(`test/fixtures/blender-knob-recoloured.json`), to which the suite holds CEditor's own recolour
-(within a mean 1.4 and 1.1, the 99th percentile 4 and 5);
+light, gloss and light layers, the light each part throws on the others and on the panel, and for
+CEditor's compositor drawing it as the add-on composed it. `--fixture` also writes Blender's renders
+of the knob with the skirt red and the cap brass (`test/fixtures/blender-knob-recoloured.json`), to
+which the suite holds CEditor's own recolour (within a mean 1.4 and 1.1, the 99th percentile 4 and 5)
+and what each lights beside it (the panel by the skirt, the skirt by the cap: a mean 2.2 and 1.5 levels);
 `browser-checks/pictureColour.mjs` changes the skirt's colour in the editor and on a panel.
 
 ## Update Panel from SVG Artwork

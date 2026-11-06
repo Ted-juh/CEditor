@@ -21,7 +21,7 @@ import { applyCustomBindings } from '../src/CE_Application/utils/interactionRunt
 import { deriveInteractClusters, describeValueUse } from '../src/CE_Application/utils/customComponentClusters.js';
 import { imageFrameLayers } from '../src/CE_Application/utils/imageFrames.js';
 import { hasLinearEdges, mixEdgesInLinearLight } from '../src/CE_Application/utils/linearEdges.js';
-import { colourRgb, litLayerOf, pictureColour, pictureLayerKind, recolourGroupPixels, withColourFollows } from '../src/CE_Application/utils/pictureRecolour.js';
+import { colourRgb, decodeLight, litLayerOf, pictureColour, pictureLayerKind, recolourBouncePixels, recolourGroupPixels, withColourFollows } from '../src/CE_Application/utils/pictureRecolour.js';
 import { inflateSync } from 'node:zlib';
 
 /** A PNG's pixels (8-bit RGBA, not interlaced, as CEditor's encoder writes them). */
@@ -137,10 +137,10 @@ test('a Blender knob comes in as a dial: the pointer, its shadow and its reflect
   assert.deepEqual(wiring.orphans, { channels: [], behaviors: [], zones: [] });
   const use = describeValueUse(plan.component, 'lamp');
   assert.deepEqual([use.parts.sort(), use.shows], [['lamp_glow', 'lamp_glow_shine', 'lamp_lit'], true]);
-  // The notice counts the component's layers as the designer lists them, not the file's 77: the 33
-  // layers of the pointer, its shadow and its reflection at their angles are three, and the 28 of the
-  // light on the parts and their gloss are not layers at all.
-  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 77);
+  // The notice counts the component's layers as the designer lists them, not the file's 94: the 33
+  // layers of the pointer, its shadow and its reflection at their angles are three, and the 45 hidden
+  // ones of the light on the parts and on the panel are not layers at all.
+  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 94);
   assert.equal(plan.layers, Object.keys(parts).length);
   assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of 19 layers: pointer shadow, pointer reflection, pointer turn with the value\. .* with a value of their own, Lamp\.$/);
 });
@@ -170,9 +170,22 @@ test('a Blender part comes in with the light on it, its gloss, its light layers 
   assert.deepEqual([role('skirt_shading'), role('skirt_highlights'), role('cap_highlights'), role('lens_highlights')],
     [['skirt', 'shading'], ['skirt', 'highlights'], ['cap', 'highlights'], ['lens', 'highlights']]);
   assert.deepEqual([parts.pointer_reflection._children.Image.colourFollows, parts.pointer_reflection._children.Image.colourRole], ['cap', undefined]);
+  // The light each part throws on the others, and the share of the panel's light off each, beside them;
+  // the panel's shine and the shadow go with its bounce.
+  assert.deepEqual(Object.keys(fill('skirt').imageColourBounce).sort(), ['cap', 'lens']);
+  assert.match(fill('skirt').imageColourBounce.cap.lighting, /^data:image\/png;base64,/);
+  assert.match(fill('skirt').imageColourBounce.cap.gloss, /^data:image\/png;base64,/);
+  // The lens sits on the cap and throws nothing on the panel, so the file has no map of it there.
+  assert.deepEqual(Object.keys(fill('bounce').imageColourBounce).sort(), ['cap', 'skirt']);
+  assert.ok(fill('bounce').imageColourBase && fill('bounce').imageColourBounce.skirt.light && fill('bounce').imageColourBounce.skirt.shine);
+  assert.deepEqual([role('bounce_shine'), role('shadow')], [['bounce', 'shine'], ['bounce', 'shadow']]);
   fill('cap').imageColour = 'FFCDA046';
   const followed = Object.fromEntries(withColourFollows(Object.entries(parts)));
   assert.deepEqual(['cap', 'cap_shading', 'cap_highlights'].map((name) => followed[name]._colourGroup?.role), ['colour', 'shading', 'highlights']);
+  // The skirt, as drawn, is lit by the cap in its new colour; so is the panel.
+  assert.deepEqual(followed.skirt._colourGroup.bounce.map((each) => each.from), ['cap']);
+  assert.equal(pictureColour(followed.skirt).kind, 'group');
+  assert.deepEqual(['bounce', 'bounce_shine', 'shadow'].map((name) => pictureColour(followed[name])?.role), ['bounce', 'shine', 'shadow']);
   assert.deepEqual(pictureColour(followed.cap_highlights).colour, [205, 160, 70]);
   assert.deepEqual(pictureColour(followed.pointer_reflection).kind, 'frames', 'the reflection changed in proportion');
 });
@@ -245,6 +258,126 @@ test('in another colour a Blender part is as Blender renders it, where it covers
     const p99 = diffs[Math.floor(diffs.length * 0.99)];
     assert.ok(diffs.length > 300, `${name}: ${diffs.length} pixels compared`);
     assert.ok(mean < 2 && p99 < 6, `${name} in ${references[name].colour}: mean ${mean.toFixed(2)}, 99th percentile ${p99} levels against Blender`);
+  }
+});
+
+test('what a part lights beside it is lit in its new colour: the panel by the red skirt, the skirt by the brass cap', () => {
+  const references = JSON.parse(readFileSync(new URL('./fixtures/blender-knob-recoloured.json', import.meta.url), 'utf8'));
+  const plan = planPsdComponentImport(bytes, { fileName: 'blender-knob.psd' });
+  const parts = plan.component._children.Parts._children;
+  const decode = (src) => decodePng(Buffer.from(src.split(',')[1], 'base64'));
+  const fillOf = (name) => parts[name]._children.Background._children.Fill;
+  const boxOf = (name) => { const { x, y, width, height } = parts[name]._children.Layout; return { x, y, width, height }; };
+  const sheet = (name) => ({ pixels: decode(fillOf(name).imageSrc).pixels, box: boxOf(name) });
+  const toLin = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const toSrgb = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * Math.max(0, x) ** (1 / 2.4) - 0.055);
+  const ratioOf = (name) => {
+    const picked = colourRgb(references[name].colour);
+    const drawn = colourRgb(fillOf(name).imageColourDrawn);
+    return picked.map((v, c) => toLin(v / 255) / toLin(drawn[c] / 255));
+  };
+  /** Where a part covers the artwork (a frame of frames at rest), as a mask. */
+  const covers = (name) => {
+    const image = parts[name]._children.Image;
+    let picture;
+    let box = boxOf(name);
+    if (image?.mode === 'frames') {
+      const frame = image.frames[Math.round(image.frameIndex)];
+      picture = decode(frame.source);
+      box = { x: Math.round(box.x + (frame.x / 100) * box.width), y: Math.round(box.y + (frame.y / 100) * box.height), width: picture.width, height: picture.height };
+    } else picture = decode(fillOf(name).imageSrc);
+    const out = new Uint8Array(SIZE * SIZE);
+    for (let y = 0; y < picture.height; y += 1) for (let x = 0; x < picture.width; x += 1) {
+      if (picture.pixels[(y * picture.width + x) * 4 + 3] && y + box.y < SIZE && x + box.x < SIZE) out[(y + box.y) * SIZE + x + box.x] = 1;
+    }
+    return out;
+  };
+  const grown = (mask, steps) => {
+    let m = mask;
+    for (let s = 0; s < steps; s += 1) {
+      m = m.map((_, i) => {
+        const x = i % SIZE; const y = Math.floor(i / SIZE);
+        for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+          const xx = x + dx; const yy = y + dy;
+          if (xx >= 0 && yy >= 0 && xx < SIZE && yy < SIZE && m[yy * SIZE + xx]) return 1;
+        }
+        return 0;
+      });
+    }
+    return m;
+  };
+  const inBox = (box, x, y) => box && x >= box.x && y >= box.y && x < box.x + box.width && y < box.y + box.height;
+  const at = (box, x, y) => ((y - box.y) * box.width + (x - box.x)) * 4;
+  const others = grown(covers('pointer').map((v, i) => v | covers('pointer_shadow')[i] | covers('lamp_glow')[i]), 2);
+  const summary = (diffs) => ({ mean: diffs.reduce((a, b) => a + b, 0) / diffs.length, n: diffs.length });
+
+  // The red skirt: the panel just beside it, lit by its new colour (its shadow a multiply, its bounce and shine).
+  {
+    const reference = Buffer.from(references.skirt.rgb, 'base64');
+    const box = boxOf('bounce');
+    const result = recolourBouncePixels({
+      base: decode(fillOf('bounce').imageColourBase).pixels, bounce: sheet('bounce'), shine: sheet('bounce_shine'), shadow: sheet('shadow'),
+      emitters: [{ ratio: ratioOf('skirt'), light: decode(fillOf('bounce').imageColourBounce.skirt.light).pixels, shine: decode(fillOf('bounce').imageColourBounce.skirt.shine).pixels }],
+    });
+    const base = decode(fillOf('bounce').imageColourBase).pixels;
+    const skirt = covers('skirt');
+    const beside = grown(skirt, 3).map((v, i) => v & !skirt[i] & !others[i]);
+    const diffs = [];
+    const shadowBox = boxOf('shadow');
+    const shineBox = boxOf('bounce_shine');
+    for (let y = 0; y < SIZE; y += 1) for (let x = 0; x < SIZE; x += 1) {
+      if (!beside[y * SIZE + x] || !inBox(box, x, y)) continue;
+      const i = at(box, x, y);
+      if (!base[i + 3]) continue;
+      let worst = 0;
+      for (let c = 0; c < 3; c += 1) {
+        const shown = toSrgb(decodeLight(base[i + c]));
+        const multiply = inBox(shadowBox, x, y) ? result.shadow[at(shadowBox, x, y) + c] / 255 : 1;
+        const multiple = 1 / Math.max(1 - result.bounce[i + c] / 255, 1e-6);
+        const s = inBox(shineBox, x, y) ? at(shineBox, x, y) : -1;
+        const added = s >= 0 ? (result.shine[s + c] / 255) * (result.shine[s + 3] / 255) : 0;
+        const now = Math.min(255, (shown * multiply * multiple + added) * 255);
+        worst = Math.max(worst, Math.abs(Math.round(now) - reference[(y * SIZE + x) * 3 + c]));
+      }
+      diffs.push(worst);
+    }
+    const { mean, n } = summary(diffs);
+    assert.ok(n > 200 && mean < 2.5, `the panel beside the red skirt: ${n} pixels, mean ${mean.toFixed(2)} levels against Blender`);
+  }
+
+  // The brass cap: the skirt just beside it, lit by the cap's new colour.
+  {
+    const reference = Buffer.from(references.cap.rgb, 'base64');
+    const drawn = colourRgb(fillOf('skirt').imageColourDrawn);
+    const thrown = fillOf('skirt').imageColourBounce.cap;
+    const result = recolourGroupPixels({
+      colour: drawn, drawn, layer: sheet('skirt'), lighting: decode(fillOf('skirt').imageColourLighting).pixels, gloss: decode(fillOf('skirt').imageColourGloss).pixels,
+      shading: parts.skirt_shading ? sheet('skirt_shading') : null, highlights: sheet('skirt_highlights'),
+      bounce: [{ ratio: ratioOf('cap'), lighting: decode(thrown.lighting).pixels, gloss: decode(thrown.gloss).pixels }],
+    });
+    const cap = covers('cap');
+    const beside = grown(cap, 3).map((v, i) => v & !cap[i] & !others[i]);
+    const colourBox = boxOf('skirt');
+    const highlightsBox = boxOf('skirt_highlights');
+    const shadingBox = parts.skirt_shading ? boxOf('skirt_shading') : null;
+    const diffs = [];
+    for (let y = 0; y < SIZE; y += 1) for (let x = 0; x < SIZE; x += 1) {
+      if (!beside[y * SIZE + x] || !inBox(colourBox, x, y) || !inBox(highlightsBox, x, y)) continue;
+      const v = at(colourBox, x, y);
+      const h = at(highlightsBox, x, y);
+      const hA = result.highlights[h + 3] / 255;
+      if (result.colour[v + 3] < 255 || !hA) continue;
+      const sIdx = shadingBox && inBox(shadingBox, x, y) ? at(shadingBox, x, y) : -1;
+      const sA = sIdx >= 0 ? result.shading[sIdx + 3] / 255 : 0;
+      let worst = 0;
+      for (let c = 0; c < 3; c += 1) {
+        const now = Math.min(255, result.colour[v + c] * (1 - sA + sA * (sIdx >= 0 ? result.shading[sIdx + c] / 255 : 1)) + hA * result.highlights[h + c]);
+        worst = Math.max(worst, Math.abs(Math.round(now) - reference[(y * SIZE + x) * 3 + c]));
+      }
+      diffs.push(worst);
+    }
+    const { mean, n } = summary(diffs);
+    assert.ok(n > 100 && mean < 2.5, `the skirt beside the brass cap: ${n} pixels, mean ${mean.toFixed(2)} levels against Blender`);
   }
 });
 

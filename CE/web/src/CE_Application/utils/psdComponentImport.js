@@ -41,7 +41,7 @@ import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { pngDataUrl } from './pngEncode.js';
 import { createPartNode } from './customComponentFactory.js';
 import { linearEdgeNames } from './linearEdges.js';
-import { colourOfNames, drawnColour, lightMapOf, metalNames } from './pictureRecolour.js';
+import { bounceMapOf, colourOfNames, drawnColour, lightMapOf, metalNames } from './pictureRecolour.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { deepClone } from './deepClone.js';
 import { buildArtworkComponent, uniqueLayerName } from './artworkComponent.js';
@@ -359,6 +359,16 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     lights.set(map.of, { ...lights.get(map.of), [map.kind]: record });
     record.lightMap = true;
   }
+  // The light one part throws on another by way of its colour, and the panel's under them (hidden
+  // layers the add-on writes: "skirt lighting from cap", "bounce from skirt", "bounce base"), for a
+  // part lit in another's new colour. Not parts either.
+  const thrown = new Map();
+  for (const record of records) {
+    const map = record.type === 'picture' && !record.lightMap && record.visible === false ? bounceMapOf(record.label) : null;
+    if (!map) continue;
+    thrown.set(map.of, [...(thrown.get(map.of) ?? []), { ...map, record }]);
+    record.lightMap = true;
+  }
   const xmp = psd.imageResources?.xmpMetadata;
   const metal = metalNames(xmp);
   const layers = [];
@@ -399,12 +409,38 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
         fill.imageColourGloss = laid(light.gloss);
       }
       if (metal.has(record.label) || metal.has(record.label.replace(/\s+at\s+\S+\s*$/i, ''))) fill.imageColourMetal = true;
+      const onIt = thrown.get(record.label);
+      if (onIt) {
+        const laid = (map) => pngDataUrl(record.box.width, record.box.height, placed(map.pixels, map.box, record.box));
+        const byPart = {};
+        for (const { kind, from, record: map } of onIt) {
+          if (kind === 'base') fill.imageColourBase = laid(map);
+          else byPart[from] = { ...byPart[from], [kind]: laid(map) };
+        }
+        // Keyed by the layer it comes off, made its part's name below.
+        if (Object.keys(byPart).length) fill.imageColourBounce = byPart;
+      }
     }
     if (record.mask) part.mask = record.mask;
     layers.push({ name: record.label, part, box: record.box, names: record.chain });
   }
 
   if (!layers.length) return { ok: false, error: 'The Photoshop file has no layers with pixels to make layers of.' };
+  // The light thrown on a part keyed by the part it comes off; the panel's shine and shadow go with its
+  // bounce layer.
+  const partNamed = new Map(layers.map((layer) => [layer.name, layer.part.name]));
+  for (const layer of layers) {
+    const fill = layer.part._children.Background?._children?.Fill;
+    if (!fill?.imageColourBounce) continue;
+    fill.imageColourBounce = Object.fromEntries(Object.entries(fill.imageColourBounce)
+      .filter(([from]) => partNamed.has(from)).map(([from, maps]) => [partNamed.get(from), maps]));
+    if (!fill.imageColourBase) continue;
+    const members = [[`${layer.name} shine`, 'shine'], [layer.name.replace(/bounce$/i, 'shadow'), 'shadow']];
+    for (const [label, role] of members) {
+      const member = layers.find((each) => each.name === label && each !== layer)?.part._children.Background?._children?.Fill;
+      if (member) Object.assign(member, { imageColourFollows: layer.part.name, imageColourRole: role });
+    }
+  }
   const warnings = [];
   const list = (set) => [...set].slice(0, 5).join(', ') + (set.size > 5 ? ` and ${set.size - 5} more` : '');
   if (report.drawn.size) warnings.push(`Layer styles drawn into the pictures, close to Photoshop's: ${list(report.drawn)}.`);

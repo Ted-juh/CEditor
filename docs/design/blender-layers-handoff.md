@@ -49,7 +49,7 @@ the layers, laid as CEditor lays them, to the render. In levels of 255, at 160 p
 | On the panel it was modelled on, the whole picture | mean 0.8, p99 5 | |
 | On a dark, a light and a red panel (Blender rendering each) | mean 0.9 to 1.4, p99 5 to 6 | |
 | The light on those panels (cap glare, lamp light) | p99 2 to 6 | 15 to 17 |
-| The knob's outline on those panels | mean 1.5 to 4.4 | 5.7 to 11.1 |
+| The knob's outline on those panels | mean 1.4 to 4.4 | 5.7 to 11.1 |
 | Turned 120°: the pointer's own light | mean 11 | 63 |
 | Turned 120°: its reflection in the cap | p99 6 | 10 |
 | Turned 120°: the cap round it, its shadow included | mean 0.9 | 1.4 |
@@ -96,7 +96,8 @@ The pieces, and where they live:
    Layers list says Picture, Frames or Light. The add-on writes the light on each part and its gloss,
    and CEditor works its colour, shading and highlights out again in the new colour: against Blender
    with the material changed, where the part covers the pixel, the skirt red a mean 1.45 levels, the
-   metal cap brass 1.1, its glint included. The review's description: The manual says "change a part's colour
+   metal cap brass 1.1, its glint included; and what each lights beside it with it, the panel by the
+   red skirt 1.8, the skirt by the brass cap 1.5. The review's description: The manual says "change a part's colour
    with its tint". A picture layer's tint (`Background.Fill.imageTint`) is drawn by `buildLayerStyle`
    (`utils/backgroundCSS.js`) as an inset box-shadow wash at 30 %, over the layer's whole box: set
    red on the skirt, it painted a red rectangle over the knob and the panel corners round it
@@ -140,10 +141,12 @@ The pieces, and where they live:
   inexact for shadows and multiplies.
 - The filmstrip baker (Assets › bake) draws a part's blend mode and its colour since the fixes, but
   not the outline mixing (a filmstrip has no panel under it).
-- A part in another colour: the light it throws on what is beside it (the panel's `bounce`, the
-  skirt by a brass cap) and a shiny part's reflection of it keep the colour as drawn (4.6 and 10
-  levels at the mean just beside the test knob's skirt and cap); a picture of several colours changes
-  as a whole; a glowing part's glow at its very edge is not worked out again.
+- A part in another colour: a turning part (the pointer) keeps its drawn colour in the light it
+  throws on the rest and in its reflection in the cap (what a part that stays put throws on what is
+  beside it, the panel's `bounce` and the skirt by a brass cap, is worked out again since the third
+  round: 1.8 and 1.5 levels at the mean just beside the test knob's skirt and cap, 4.6 and 10.4
+  before); a picture of several colours changes as a whole; a glowing part's glow at its very edge is
+  not worked out again.
 
 ## Not verified
 
@@ -196,8 +199,7 @@ menu does.
 
 From the design record's order: Illustrator `.ai` through its PDF part (pdf.js) if Illustrator files are wanted
 directly; a Figma plugin if Figma is; Level 3 (CEditor's own 3D parts, with piece E); Level 2 (glTF)
-when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; the
-light a recoloured part throws on what is beside it (each part's bounce rendered on its own); a
+when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; a
 lamp edge that holds on any panel; a CI job for the Blender test.
 
 ## The owner's working rules, beyond CLAUDE.md

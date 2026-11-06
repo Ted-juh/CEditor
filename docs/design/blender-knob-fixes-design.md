@@ -38,6 +38,36 @@ Where it differs from the design below, and what was measured.
   light passes are per covered sample and must not be divided by coverage (at a part's edge that made
   the light sixty times too bright), and a gloss made to absorb the light's 8-bit rounding carries it
   onto a new colour's weak channels as noise.
+- **The light it throws** (third round). A part's colour lights what is beside it, and the layers
+  kept that light as rendered: just beside the red skirt the panel was 4.6 levels off Blender at the
+  mean, just beside the brass cap the skirt 10.4 (its blue). The add-on now renders each part of a
+  group again colourless (`colourless`: the Principled base colour, or a Diffuse colour, black and
+  unlinked; the gloss kept) and writes the difference: on each other part, the light and the gloss
+  off that part's colour (`<name> lighting from <part>`, `<name> gloss from <part>`, hidden, in
+  `light_code`); on the panel, the share of the panel's diffuse light off it, σ = (lit − lit
+  without its colour) / lit, carried in under the parts' rims, and what it adds to the shine
+  (`bounce from <part>`, `bounce shine from <part>`, hidden, in `bounce_code`, sixteen times finer),
+  with the panel's look under them (`bounce base`). CEditor scales each by the part's change of
+  colour, r = lin(new) / lin(drawn) per channel: a part it lights gets (r − 1)·Δ added to its light
+  and gloss and is split again in its own colour (`recolourGroupPixels`, `bounce`); the panel's
+  light is scaled by 1 + Σ(r − 1)σ and the shadow, the bounce and its shine worked out again for it
+  (`recolourBouncePixels`): black at an opacity is a multiply by black at that opacity, so the
+  shadow becomes a multiply that darkens where the panel must, and the colour dodge brightens where
+  it must. Over the reach of such light the add-on writes the bounce at full opacity and the shine
+  at least one step, adding nothing where there is none, so CEditor has a pixel to write to.
+  The import keys the maps to the parts they come from (`imageColourBounce`), and the panel's shine
+  and the shadow follow the bounce (`imageColourFollows`, roles `shine` and `shadow`); a group with
+  no colour of its own is worked out again when a part beside it changes colour. A part that turns
+  (the pointer) is not among them: it is rendered at each angle, and its light on the rest keeps its
+  drawn colour.
+  Three things on the way: a stays-part's edge mixed with one opacity for all three channels cannot
+  reach a saturated colour over a grey panel, so each channel is now exact (`linearEdgeMix`,
+  `edge_mix`: the opacity the coverage, raised only as far as a channel needs to stay within 0 and
+  1); a shine fainter than a step of opacity, written at that step at full strength, added a level
+  where there was less than half of one, so its colour is what it adds over that step; and in the
+  Component Designer a recoloured part took its picture from the recoloured part but its effects
+  from the original (`InteractivePartRenderer`), so the panel's shadow, now a multiply, was drawn
+  plain and turned the artboard pale beside the knob (`pictureColour.mjs` caught it).
 - **The XMP** names each colour layer's shading and highlights (`<ceditor:colourOf>`,
   `skirt shading=skirt`), a turning part's reflection that falls mostly in a metal part
   (`pointer reflection=cap`, changed in proportion by the metal's colour), and the metal parts
@@ -64,11 +94,15 @@ JavaScript to Blender's renders in `test/fixtures/blender-knob-recoloured.json` 
 | The skirt, pale grey to red | 1.45 | 4 | 8.1, 15 | 6.8, 12 |
 | The metal cap, silver to brass, glint included | 1.1 | 5 | 8.1, 105 | 5.5, 52 at the glint |
 
-What is left is the light a part throws on what is beside it, which Blender lights in the new colour
-and the layers keep as rendered: just beside the red skirt the panel is 4.6 levels off at the mean,
-just beside the brass cap the skirt 10 (its blue), and a part's edge, partly what is beside it, is
-within that (5.1 and 7.0). Closing it would mean the add-on rendering each part's bounce on the
-others separately.
+Just beside the part, where nothing of it is drawn, what it lights, against Blender in the new colour:
+
+| Lit by the recoloured part | Mean just beside | At its edge | Its light kept as rendered |
+|---|---|---|---|
+| The panel by the red skirt | 1.8 | 2.6 | 4.6 |
+| The skirt by the brass cap | 1.5 | 1.2 | 10.4 |
+
+The web suite's own JavaScript, at 96 px: 2.2 and 1.5 (each pixel's largest channel difference; its
+average per channel, signed, is under 0.8).
 
 Checked: the web suite, `browser-checks/pictureColour.mjs` (the Interact card; the skirt selected,
 its colour changed in the designer and on a panel, nothing beside it painted, back to as drawn; a
@@ -174,7 +208,8 @@ Pure functions in a new `utils/pictureRecolour.js`, tested in node on pixels:
 
 ### What stays approximate
 
-- The light a part throws on the panel (`bounce`) keeps the drawn colour's tint.
+- The light a part throws on the panel (`bounce`) keeps the drawn colour's tint. (Closed in the
+  third round, under As built.)
 - A picture of several colours changes as a whole, in proportion.
 - A metal's reflections stay as rendered unless question 2 is answered yes.
 

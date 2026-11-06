@@ -118,7 +118,10 @@ try {
   const lightBefore = skirtBefore[0] / 193;
   const lightAfter = skirtAfter[0] / 178;
   assert.ok(Math.abs(lightBefore - lightAfter) < 0.12, `its shading kept: ${lightBefore.toFixed(2)} of its colour before, ${lightAfter.toFixed(2)} after`);
-  assert.ok(near(await pixelAt(...beside), besideBefore, 3), 'beside it, the artboard as it was: no wash over the layer\'s box');
+  // Beside it only the light the skirt throws changes, by a level or two: no wash over the layer's box,
+  // and the panel's shadow, recoloured, still a multiply (drawn plain it turns the artboard pale).
+  const besideAfter = await pixelAt(...beside);
+  assert.ok(near(besideAfter, besideBefore, 3), `beside it, the artboard as it was but for the skirt's light: ${besideAfter} against ${besideBefore}`);
   assert.match(await page.locator('[data-testid="picture-colour"] >> visible=true').first().innerText(), /NOW\s*#B22222|Now\s*#B22222/i, 'the dock says what it is drawn in now');
   console.log(`  ok  red: the skirt ${skirtAfter} where it was ${skirtBefore}, its shading kept, nothing beside it painted`);
 

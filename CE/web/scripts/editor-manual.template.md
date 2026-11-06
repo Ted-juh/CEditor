@@ -722,7 +722,8 @@ change a part's colour (see [Importing a control you drew](#importing-a-control-
 lit as Blender would light it in that colour, its edge included: the add-on writes the light on each
 part beside it, and CEditor works the part's shading and highlights out again with the new colour. A
 metal's reflections are its colour: a metal cap's glint, and the pointer's reflection in it, take its
-new colour. The light a part throws on what is beside it keeps the colour it was drawn in. The shadow
+new colour. So does the light a part that stays put throws on what is beside it: a red skirt casts
+red on the panel by it, and a brass cap a warm light on the skirt under its rim. The shadow
 on the panel is a layer. The pointer is rendered turned every 27 degrees, and so are its shadow and its
 reflection in the parts under it: each comes in as one layer of frames that turns with the value
 and shows the frame for the pointer's angle, the two either side mixed, so the side of the pointer

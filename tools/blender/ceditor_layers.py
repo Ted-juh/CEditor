@@ -11,12 +11,19 @@
 #   <name> lighting    hidden: the light on it, without its colour, and
 #   <name> gloss       hidden: its gloss, the light it reflects whatever its colour: both in linear
 #                      light (see light_code), for CEditor to work its look out in another colour
+#   <name> lighting from <part>, <name> gloss from <part>
+#                      hidden: the light another part throws on it by way of its colour, and what
+#                      that adds to its gloss (see colourless), for CEditor to change with that
+#                      part's colour
 #   <name> shading     what the lights and the room do to that colour (multiply)
 #   <name> highlights  its reflections, and light brighter than its colour (linear dodge)
 #   <name> lit         a lamp's own glow (linear dodge); shown when the lamp is on
 #   shadow             the knob's shadow on the panel (black, its darkness as opacity)
 #   bounce             light the parts throw on the panel, a metal cap's glare (colour dodge), and
 #   bounce shine       the panel's shine reflecting it (linear dodge)
+#   bounce from <part>, bounce shine from <part>, bounce base
+#                      hidden: the share of the panel's light that comes off that part's colour, and
+#                      what it adds to the shine (see bounce_code); the panel's look under them
 #   <lamp> glow        a lamp's light on the panel (colour dodge), and "<lamp> glow shine" (linear
 #                      dodge), shown when the lamp is on
 #   <name> shadow      a moving part's shadow on the panel and on the parts under it
@@ -54,6 +61,11 @@
 #     names each colour layer's shading and highlights (<ceditor:colourOf>, "cap highlights=cap"),
 #     the parts that are metal (<ceditor:metal>, whose glint is light past white), and a turning
 #     part's reflection that falls in a metal, which changes with the metal's colour.
+#   - The light a part throws. A part's colour lights what is beside it (a red skirt casts red on the
+#     panel by it, a brass cap a warm light on the skirt under its rim). Each part is rendered again
+#     colourless, and the difference is written: on the other parts, the light and gloss off its
+#     colour; on the panel, the share of the light there off it. CEditor scales each by the part's
+#     change of colour, and works the parts and the panel it lights out again.
 #   - A lit lamp's outermost pixels, which Cycles shows lit out to where the lamp covers a quarter of
 #     a pixel while the panel still shows through, are lit as on the scene's panel ("For this panel",
 #     on by default; off, or without a panel object, as on black).
@@ -151,6 +163,34 @@ def without_role_words(name, fallback):
     """The name with every role word taken out (a layer that must not move or light), or `fallback`."""
     kept = [w for w in name_words(name) if w not in ALL_ROLE_WORDS]
     return " ".join(kept) or fallback
+
+
+def colourless(o):
+    """Make `o`'s colour black for a render, its gloss kept (the Base Color of its Principled BSDFs,
+    the Color of its Diffuse ones, links and all): what lights the rest by way of its colour is then
+    gone, and the difference is that light. Returns a function that puts everything back."""
+    saved = []
+    for slot in o.material_slots:
+        m = slot.material
+        if m is None or not m.use_nodes:
+            continue
+        for node in m.node_tree.nodes:
+            name = "Base Color" if node.type == "BSDF_PRINCIPLED" else "Color" if node.type == "BSDF_DIFFUSE" else None
+            if name is None or name not in node.inputs:
+                continue
+            socket = node.inputs[name]
+            links = [(link.from_socket, link.to_socket) for link in m.node_tree.links if link.to_socket == socket]
+            saved.append((m, socket, tuple(socket.default_value), links))
+            for link in [link for link in m.node_tree.links if link.to_socket == socket]:
+                m.node_tree.links.remove(link)
+            socket.default_value = (0.0, 0.0, 0.0, 1.0)
+
+    def restore():
+        for m, socket, value, links in saved:
+            socket.default_value = value
+            for from_socket, to_socket in links:
+                m.node_tree.links.new(from_socket, to_socket)
+    return restore
 
 
 def is_rotor(name):
@@ -286,6 +326,11 @@ def light_code(x):
     x = np.asarray(x, dtype=np.float32)
     code = np.clip(np.round((np.log2(np.maximum(x, 2.0 ** -8)) + 8.0) * 255.0 / 16.0), 1.0, 255.0)
     return np.where(x >= 2.0 ** -8, code, 0.0) / 255.0
+
+
+def bounce_code(x):
+    """Light a part throws on another, as 8 bits: `light_code` sixteen times finer, 1/4096 to 16."""
+    return light_code(np.asarray(x, dtype=np.float32) * 16.0)
 
 
 def light_decode(code):
@@ -512,6 +557,22 @@ def edge_opacity(colour, opacity, under):
     norm = (span * span).sum(-1)
     solved = np.clip(((target - under) * span).sum(-1) / np.maximum(norm, 1e-9), 0.0, 1.0)
     return np.where(norm > 3 * (2 / 255) ** 2, solved, opacity)
+
+
+def edge_mix(colour, opacity, under):
+    """The colour and opacity that give an edge pixel as Cycles mixes it, in linear light, when it is
+    laid over `under` (straight sRGB) in sRGB, in each channel: the opacity the coverage, raised only
+    as far as a channel needs to stay within 0 and 1, and the colour what then gives the mix. One
+    opacity alone (edge_opacity) cannot do it for a saturated colour over a different one, red over
+    grey pulling its red one way and its green and blue the other. CEditor mixes the outline of the
+    parts that stay put so (utils/linearEdges.js linearEdgeMix)."""
+    a = opacity[..., None]
+    target = srgb(a * linear(colour) + (1.0 - a) * linear(under))
+    need = np.where(target > under, (target - under) / np.maximum(1.0 - under, 1e-6),
+                    np.where(target < under, (under - target) / np.maximum(under, 1e-6), 0.0))
+    alpha = np.clip(np.maximum(opacity, need.max(-1)), 0.0, 1.0)
+    rgb = np.where(alpha[..., None] > 0, np.clip(under + (target - under) / np.maximum(alpha[..., None], 1e-6), 0.0, 1.0), colour)
+    return rgb, alpha
 
 
 def blank(rgba):
@@ -790,9 +851,10 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
         bare = panel_look if for_panel and plan["panel"] is not None else None
         on_panel = None if bare is None else np.concatenate([bare, np.ones_like(bare[..., :1])], axis=-1)
 
-        def add(name, rgb, alpha, blend="norm", hidden=False, panel_alpha=None):
-            """A layer, and the pictures of them so far. `panel_alpha`: its opacity as CEditor draws it on
-            the scene's panel, where that is not the one written (an edge it mixes for the panel)."""
+        def add(name, rgb, alpha, blend="norm", hidden=False, panel_alpha=None, panel_rgb=None):
+            """A layer, and the pictures of them so far. `panel_alpha`, `panel_rgb`: its opacity and colour
+            as CEditor draws it on the scene's panel, where they are not the ones written (an edge it
+            mixes for the panel)."""
             nonlocal merged, on_panel
             rgba = rgba8(rgb, alpha)
             if blank(rgba):
@@ -801,7 +863,7 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             if not hidden:
                 merged = blend_over(merged, rgba.astype(np.float32) / 255.0, blend)
                 if on_panel is not None:
-                    shown = rgba if panel_alpha is None else rgba8(rgb, panel_alpha)
+                    shown = rgba if panel_alpha is None else rgba8(rgb if panel_rgb is None else panel_rgb, panel_alpha)
                     on_panel = blend_over(on_panel, shown.astype(np.float32) / 255.0, blend)
 
         def beneath():
@@ -817,7 +879,11 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
         metal_names = []
         metal_cover = {}
 
-        def add_part(o, look, opacity, at_angles=None, stays=False):
+        def colour_name_of(o):
+            """The name its colour layer is written under: a lamp's body without its role word."""
+            return without_role_words(o.name, "lens") if role_of(o.name) == "on" else o.name
+
+        def add_part(o, look, opacity, at_angles=None, stays=False, bounce=None):
             """`at_angles`: for a part that turns whole, {angle: its look rendered turned that far, turned
             back to rest}; it is then written at each angle, "<name> at <angle>", "<name> shading at
             <angle>" and so on. Its colour inside is the same at every angle; at its edge, where the
@@ -874,6 +940,13 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 gloss = np.clip(seen["bare"] - own * seen["light"], 0.0, None)
                 add(f"{name} lighting{suffix}", light_code(seen["light"]), covered, hidden=True)
                 add(f"{name} gloss{suffix}", light_code(gloss), covered, hidden=True)
+                # The light each other part throws on it by way of its colour: the light on it, and its
+                # gloss, less what they are with that part colourless.
+                for k, colourless_look in (bounce or {}).items() if not suffix else ():
+                    light_k = np.clip(seen["light"] - colourless_look["light"], 0.0, None)
+                    gloss_k = np.clip(gloss - np.clip(colourless_look["bare"] - own * colourless_look["light"], 0.0, None), 0.0, None)
+                    add(f"{name} lighting from {colour_name_of(k)}", bounce_code(light_k), covered, hidden=True)
+                    add(f"{name} gloss from {colour_name_of(k)}", bounce_code(gloss_k), covered, hidden=True)
 
             if at_angles:
                 colour_name = o.name
@@ -885,7 +958,10 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             elif stays:
                 colour_name = still_name if role == "on" else o.name
                 layer = colour_layer(look)
-                add(colour_name, layer, opacity, panel_alpha=np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity))
+                partial = ~whole & opaque
+                mixed_rgb, mixed_alpha = edge_mix(look["whole"], opacity, under)
+                add(colour_name, layer, opacity, panel_alpha=np.where(partial, mixed_alpha, opacity),
+                    panel_rgb=np.where(partial[..., None], mixed_rgb, layer))
                 add_light(colour_name, "", look, layer, opacity, drawn_of(layer, opacity))
                 linear_edges.append(colour_name)
             else:
@@ -959,6 +1035,21 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             look_of = lambda o, passes: part_look(passes, lamp=role_of(o.name) == "on")
             looks = [look_of(o, render([o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen)) for o in objs]
             opacities, above, left = unover([look["alpha"] for look in looks])
+            # The light each part throws on the others and on the panel by way of its colour: each
+            # rendered again with that part colourless, the difference (see colourless). CEditor scales
+            # it by the part's change of colour, and the parts it lights are lit in its new colour.
+            bounce_on = {}
+            panel_without = {}
+            if panel_light and len(objs) + 1 > 1:
+                for k in objs:
+                    restore = colourless(k)
+                    try:
+                        for r in objs:
+                            if r is not k:
+                                bounce_on.setdefault(r.name, {})[k] = look_of(r, render([r], holdout=[x for x in objs if x is not r] + holdout, unseen=unseen))
+                        panel_without[k] = render([panel], unseen=still, unlit=lamps)
+                    finally:
+                        restore()
             ratio = share(shadow, left)
             darkness = lambda share_of_light: 1.0 - srgb(np.clip(luma(np.minimum(share_of_light, 1.0)), 0.0, 1.0))
             # Parts that turn: rendered turned to each angle as well, what they do to the light under them
@@ -1021,7 +1112,7 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 base = linear(panel_look)
                 gloss = lighting(panel_alone)[1]
                 steps = [panel_alone] + list(panel_light)
-                for (without, with_it), region, layer_name in zip(zip(steps, steps[1:]), regions, names):
+                for step, ((without, with_it), region, layer_name) in enumerate(zip(zip(steps, steps[1:]), regions, names)):
                     (d0, g0), (d1, g1) = lighting(without), lighting(with_it)
                     region = region[..., None]
                     scattered = np.where(region & (d0 > 1e-6), np.maximum(d1 / np.maximum(d0, 1e-6), 1.0), 1.0)
@@ -1029,8 +1120,45 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                     # The panel's own gloss is in what it shows, and the multiple is of the rest.
                     lit_base = base + (base - gloss).clip(0.0, None) * (scattered - 1.0)
                     shown_before = srgb(base)
-                    add(layer_name, *dodge(np.where(shown_before > 1e-4, srgb(lit_base) / np.maximum(shown_before, 1e-4), 1.0)), "div ")
-                    add(f"{layer_name} shine", *light_over_clear(np.clip(srgb(lit_base + shine) - srgb(lit_base), 0.0, 1.0)), "lddg")
+                    multiple = np.where(shown_before > 1e-4, srgb(lit_base) / np.maximum(shown_before, 1e-4), 1.0)
+                    shone = np.clip(srgb(lit_base + shine) - srgb(lit_base), 0.0, 1.0)
+                    if step == 0 and panel_without:
+                        # What each part throws on the panel by way of its colour: the share of the
+                        # panel's light at each pixel that comes off its colour (its shadow's fill
+                        # included), and what it adds to the shine; with the panel's look under it. The
+                        # bounce and shine layers then cover every pixel it reaches, adding nothing where
+                        # there is none. In another colour CEditor scales that share of the light, the
+                        # shadow made a multiply where the panel must darken and the bounce where it must
+                        # brighten (utils/pictureRecolour.js recolourBouncePixels).
+                        reach = np.zeros(region.shape[:2], dtype=bool)
+                        for k, without_k in panel_without.items():
+                            dk, gk = lighting(without_k)
+                            via = np.where(d1 > 1e-6, np.clip((d1 - dk) / np.maximum(d1, 1e-6), 0.0, 1.0), 0.0)
+                            scattered_k = np.where(region & (d0 > 1e-6), np.maximum(dk / np.maximum(d0, 1e-6), 1.0), 1.0)
+                            lit_k = base + (base - gloss).clip(0.0, None) * (scattered_k - 1.0)
+                            shine_k = np.where(region, np.clip(gk - g0, 0.0, None), 0.0)
+                            sheen = np.clip(shone - np.clip(srgb(lit_k + shine_k) - srgb(lit_k), 0.0, 1.0), 0.0, 1.0)
+                            # Where the parts cover some of a pixel, the panel there is measured over the
+                            # whole pixel, the strip under a part's rim with it, lit almost only by the
+                            # part: what shows of it is the panel just beside, whose share is carried in.
+                            open_panel = left > 0.999
+                            via, sheen = carry_in([via, sheen], open_panel, ~open_panel, rings=2)
+                            near = (via.max(-1) >= 2.0 ** -12) | (sheen.max(-1) >= 2.0 ** -12)
+                            reach |= near
+                            name_k = colour_name_of(k)
+                            add(f"{layer_name} from {name_k}", bounce_code(via), near.astype(np.float32), hidden=True)
+                            add(f"{layer_name} shine from {name_k}", bounce_code(sheen), near.astype(np.float32), hidden=True)
+                        add(f"{layer_name} base", light_code(base), reach.astype(np.float32), hidden=True)
+                        s_dodge, a_dodge = dodge(multiple)
+                        add(layer_name, s_dodge, np.where(reach, 1.0, a_dodge), "div ")
+                        # Over the reach the shine is at least one step of opacity, its colour what it
+                        # adds over that, so that it adds no more than it should where it is fainter.
+                        a_shine = np.where(reach, np.maximum(shone.max(-1), 1.0 / 255.0), shone.max(-1))
+                        rgb_shine = np.where(a_shine[..., None] > 0, np.clip(shone / np.maximum(a_shine[..., None], 1e-6), 0.0, 1.0), 0.0)
+                        add(f"{layer_name} shine", rgb_shine, a_shine, "lddg")
+                    else:
+                        add(layer_name, *dodge(multiple), "div ")
+                        add(f"{layer_name} shine", *light_over_clear(shone), "lddg")
                     base = lit_base + shine
                     gloss = gloss + shine
             if ratio is not None:
@@ -1068,7 +1196,7 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 at_angles = None
                 if o.name in turned_looks:
                     at_angles = {angle: turned_looks[o.name][angle] if angle else look for angle in angles}
-                add_part(o, look, carried[0], at_angles, stays=bool(panel_light))
+                add_part(o, look, carried[0], at_angles, stays=bool(panel_light), bounce=bounce_on.get(o.name))
 
         from bpy_extras.object_utils import world_to_camera_view
 
