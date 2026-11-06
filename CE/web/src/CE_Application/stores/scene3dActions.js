@@ -24,6 +24,7 @@ import { setActiveEditorTab } from './panels.js';
 import { displayTabRequest } from './displayTab.js';
 import { linkedPicturePath, readFileAsDataUrl } from './artworkComponentActions.js';
 import { flatControls } from '../utils/containment.js';
+import { deepClone } from '../utils/deepClone.js';
 import { partFrame } from '../utils/customDesignSurfaceGeometry.js';
 import { numberOr } from '../utils/primitives.js';
 import { layerNameOf, normalizeObject, normalizeScene3d, scene3dKey, starterKnob } from '../utils/scene3dModel.js';
@@ -204,7 +205,7 @@ export function followScene3dFrame(controlId, part) {
   const dx = frame.x - was.x;
   const dy = frame.y - was.y;
   if (Math.abs(dx) < 0.01 && Math.abs(dy) < 0.01) return '';
-  const next = structuredClone(control);
+  const next = deepClone(control);
   for (const each of Object.values(next._children.Parts._children)) {
     if (each?.meta?.scene3dOf !== part) continue;
     const layout = each._children?.Layout;
@@ -270,7 +271,7 @@ export function addScene3dObject(controlId, part, from = null) {
   const recipe = scene3dRecipe(controlId, part);
   if (!recipe) return;
   const base = from != null && recipe.objects[from]
-    ? structuredClone(recipe.objects[from])
+    ? deepClone(recipe.objects[from])
     : { name: 'disc', shape: { kind: 'turned', diameter: 40, base: 0, height: 20 }, material: { finish: 'satin-plastic', colour: 'FF5B5F66' }, motion: 'stays' };
   base.name = `${base.name} copy`;
   recipe.objects.push(base);
