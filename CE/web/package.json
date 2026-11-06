@@ -72,6 +72,7 @@
     "quickjs-emscripten-core": "0.32.0",
     "rbush": "^4.0.1",
     "ses": "2.3.0",
+    "three": "^0.186.1",
     "wasmoon": "^1.16.0",
     "woff2-encoder": "^2.0.0"
   }
