@@ -184,7 +184,8 @@ reflection, shine or bounce) has none, and points to the layer it lights. `Fill.
 | `pointer`, `indicator`, `needle`, `rotor`, `marker`, `turns` | turns with the value, -135° to 135°, the drawn angle in the middle |
 | `pivot`, `centre`, `axis` | where those turn; without it, the middle of the knob they sit on. Named after a turning layer as well (`pointer shadow pivot`), where that one layer turns |
 | `... at <angle>` | a turning layer drawn as it looks turned that far (`pointer reflection at -27`, `at 27`, `at 54`): pictures of one name become one part of frames that turns with the value, its frame following it and the two either side mixed. In an SVG, PDF or Illustrator file each such layer or group is made a picture of itself as the file draws it (its filters and blend mode too), so it is a part of frames as well; only a Photoshop shape or text layer drawn at angles fades from one to the next |
-| `fader`, `thumb`, `handle`, `slide` | slides along the `track` (`slot`, `rail`), the value 0 at the bottom or left |
+| `fader`, `thumb`, `handle`, `slide` | slides along the `track` (`slot`, `rail`), the value 0 at the bottom or left; every sliding layer (its shadow too) goes as far as the part itself, the largest of them that is not light |
+| `... at <n>%` | a sliding layer drawn as it looks that far along its travel, drawn back where it is in the file (`fader shadow at 40%`): layers of one name become one part of frames that slides with the value, its frame following it and the two either side mixed |
 | `lamp`, `led`, `light`, `on` / `off` | shown when the value is on / off; on a dial, with a value of their own, **Lamp** |
 | `pressed`, `down` | shown while it is held |
 
@@ -272,7 +273,8 @@ held out, and written as the layers its look adds up from:
 | `bounce`, `bounce shine` | colour dodge, linear dodge | light the parts throw on the panel (a metal cap's glare): what the panel's colour scatters, and what its shine reflects |
 | `bounce from <part>`, `bounce shine from <part>`, `bounce base` | normal, hidden | the share of the panel's light that comes off that part's colour, and what it adds to the shine (8 bits over 1/4096 to 16); the panel's look under them; read with the bounce on import |
 | `<lamp> glow`, `<lamp> glow shine` | colour dodge, linear dodge | a lamp's light on the panel, the same two ways, shown when the lamp is on |
-| `<name> shadow`, `<name> reflection` | normal, linear dodge | a sliding part's shadow and reflection on the panel and the parts under it, which move with it |
+| `<name> shadow`, `<name> reflection` | normal, linear dodge | a moving part's shadow and reflection on the panel and the parts under it, which move with it |
+| `<name> at 40%`, `<name> shadow at 40%`, ... | as above | a part that slides, its shadow and its reflection, rendered with it that far along its travel: one each tenth, moved back to where it was modelled, all but the one nearest it hidden |
 | `<name> at <angle>`, `<name> shading at <angle>`, ... | as above | a part that turns whole, its shadow and its reflection, rendered with it turned that far: one each 27 degrees, those away from rest hidden |
 | `<name> reflection from <part> at <angle>`, `<name> reflection base at <angle>` | normal, hidden | the share of a turning part's reflection (the light it throws on the parts under it) that comes off that part's colour (8 bits over 1/4096 to 16), and the look under it; read with each frame of the reflection on import |
 | `pivot` | normal, hidden | where turning parts turn |
@@ -361,6 +363,16 @@ Blender (13.5 and 9 degrees: the same to a tenth of a level, at twice and three 
 time); what is left is the picture turned twice, back to rest in the add-on and on again in the
 browser, which softens a narrow part's glint, and the add-on turns it back through a Lanczos window
 for that.
+
+**A sliding part.** A fader's cap lit by a light near the panel is lit more at one end of its travel
+than the other, and its shadow and its reflection fall on the track differently. It is rendered at
+every tenth of its travel and written moved back to where it was modelled, `... at 40%`, all but the
+one nearest that hidden; the import makes each set one part of frames that slides with the value,
+its frame following it. The travel is the one the import gives a fader: along the track's long side,
+from the cap's box at the track's bottom or left (the value 0, `0%`) to its top or right (`100%`);
+every sliding layer, its shadow and reflection too, goes as far as the cap. Measured on a test fader
+lit by a lamp near the top of its slot, slid from where it was modelled (0.24) to 0.8: within 1.7
+levels of Blender's render on the cap, 22.8 with its light as rendered where it was modelled.
 
 **How exact.** `tools/blender/test_ceditor_layers.py` (run with `blender -b --factory-startup
 --python tools/blender/test_ceditor_layers.py`) builds a knob (a pale skirt, a metal cap, a rounded

@@ -50,13 +50,27 @@ const ROLE_WORDS = [
 const PIVOT_WORDS = ROLE_WORDS.find(([role]) => role === 'pivot')[1];
 // "... at 27", "... at -54°": a turning layer drawn at that angle, in degrees clockwise from rest.
 const AT_ANGLE = /\s+at\s+(-?\d+(?:\.\d+)?)\s*(?:°|deg(?:rees)?)?\s*$/i;
+// "... at 40%": a sliding layer drawn with the part that far along its travel, 0 % at the bottom or
+// the left (where the value is 0).
+const AT_POSITION = /\s+at\s+(\d+(?:\.\d+)?)\s*%\s*$/i;
+// Each kind of layer drawn at several places: the role that moves it, its name's pattern, and the
+// span its value covers (a dial turns -135 to 135 degrees, a fader slides 0 to 100 % of its travel).
+const DRAWN_AT = [
+  { kind: 'angle', role: 'turns', pattern: AT_ANGLE, lo: -135, hi: 135 },
+  { kind: 'position', role: 'moves', pattern: AT_POSITION, lo: 0, hi: 100 },
+];
 const BUTTON_WORDS = ['button', 'btn', 'momentary', 'trigger', 'push', 'key'];
 
-/** A name that says a layer is drawn at an angle ("pointer shadow at -27"): `{ base, angle }`, or null. */
+/**
+ * A name that says a layer is drawn at an angle ("pointer shadow at -27"): `{ base, angle }`; or at a
+ * place along a fader's travel ("fader shadow at 40%"): `{ base, position }`; else null.
+ */
 export function drawnAtAngle(name) {
   const own = String(name ?? '');
   const at = AT_ANGLE.exec(own);
-  return at ? { base: own.slice(0, at.index).trim(), angle: Number(at[1]) } : null;
+  if (at) return { base: own.slice(0, at.index).trim(), angle: Number(at[1]) };
+  const along = AT_POSITION.exec(own);
+  return along ? { base: own.slice(0, along.index).trim(), position: Number(along[1]) } : null;
 }
 
 /** The words of a name: split at anything not a letter or digit, and where lower case meets upper. */
@@ -124,14 +138,16 @@ const blendOf = (part) => part?._children?.Effects?._children?.Blend?.mode ?? 'n
 function framesFromAngles(layers) {
   const sets = new Map();
   layers.forEach((layer, index) => {
-    if (artworkRole(layer.names ?? [layer.name]) !== 'turns') return;
+    const role = artworkRole(layer.names ?? [layer.name]);
     const own = layer.names?.[0] ?? layer.name ?? layer.part.name;
-    const at = AT_ANGLE.exec(own);
-    if (!at || !pictureOf(layer.part)) return;
+    const drawnAt = DRAWN_AT.find((each) => each.role === role && each.pattern.test(own));
+    if (!drawnAt || !pictureOf(layer.part)) return;
+    const at = drawnAt.pattern.exec(own);
     const base = own.slice(0, at.index).trim();
-    const key = nameWords(base).join(' ');
+    const key = `${drawnAt.kind}:${nameWords(base).join(' ')}`;
     if (!sets.has(key)) sets.set(key, []);
-    sets.get(key).push({ layer, index, angle: Number(at[1]), base });
+    // `angle`: where it was drawn, an angle or a place along the travel.
+    sets.get(key).push({ layer, index, angle: Number(at[1]), base, span: drawnAt });
   });
   const replaced = new Map();
   const angles = new Map();
@@ -160,24 +176,26 @@ function framesFromAngles(layers) {
         ...(fill.imageColourUnder && fill.imageColourThrown ? { under: fill.imageColourUnder, thrown: { ...fill.imageColourThrown } } : {}),
       };
     };
-    // Angles a step apart (the smallest gap) over the dial's travel, the -135 to 135 degrees it turns:
-    // an angle the set has no layer at (the add-on leaves out one that drew nothing) is a frame of
-    // nothing, so that nothing stands in for it, and so are the ends beyond the first and the last.
-    // Angles off one such step are the frames as they are.
+    // Angles a step apart (the smallest gap) over the dial's travel, the -135 to 135 degrees it turns
+    // (a fader's places over its 0 to 100 %): an angle the set has no layer at (the add-on leaves out
+    // one that drew nothing) is a frame of nothing, so that nothing stands in for it, and so are the
+    // ends beyond the first and the last. Angles off one such step are the frames as they are.
+    const { lo, hi } = set[0].span;
     const drawnAngles = set.map((each) => each.angle);
     const step = Math.min(...drawnAngles.slice(1).map((angle, i) => angle - drawnAngles[i]));
     const onStep = drawnAngles.every((angle) => Math.abs((angle - drawnAngles[0]) / step - Math.round((angle - drawnAngles[0]) / step)) < 1e-6);
     const list = onStep ? [] : drawnAngles;
     if (onStep) {
-      const start = drawnAngles[0] - step * Math.floor((drawnAngles[0] + 135) / step + 1e-9);
-      for (let angle = start; angle <= 135 + 1e-9; angle += step) list.push(Math.round(angle * 1e6) / 1e6);
+      const start = drawnAngles[0] - step * Math.floor((drawnAngles[0] - lo) / step + 1e-9);
+      for (let angle = start; angle <= hi + 1e-9; angle += step) list.push(Math.round(angle * 1e6) / 1e6);
     }
     const nothing = { source: '', x: 0, y: 0, width: 100, height: 100 };
     const frames = list.map((angle) => {
       const drawn = set.find((each) => Math.abs(each.angle - angle) < 1e-6);
       return drawn ? frameOf(drawn) : nothing;
     });
-    // At rest, the dial in the middle of its travel: the angle 0, or between the two either side.
+    // At rest, the dial in the middle of its travel: the angle 0, or between the two either side (a
+    // fader at the value it starts at, 0: its place 0 %).
     const after = list.findIndex((angle) => angle >= 0);
     const rest = after <= 0 ? (after === 0 ? 0 : list.length - 1)
       : after - 1 + (0 - list[after - 1]) / (list[after] - list[after - 1]);
@@ -196,7 +214,7 @@ function framesFromAngles(layers) {
         ...(effects ? { Effects: deepClone(effects) } : {}),
       },
     });
-    angles.set(part.name, list);
+    angles.set(part.name, { list, kind: set[0].span.kind });
     for (const { layer } of set) renamed.set(layer.part.name, part.name);
     const lowest = Math.min(...set.map((each) => each.index));
     replaced.set(lowest, { name: set[0].base, part, box, names: [set[0].base, ...(first.names?.slice(1) ?? [])] });
@@ -319,7 +337,8 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers:
     // A part of frames, one an angle (framesFromAngles): its frame follows the value, the dial turning
     // -135 to 135 degrees over 0 to 1. Angles a step apart, one binding; otherwise one a gap, each
     // adding its share of a frame.
-    for (const [part, list] of frameAngles) {
+    for (const [part, { list, kind: drawnKind }] of frameAngles) {
+      if (drawnKind !== 'angle') continue;
       const at = (angle) => (angle + 135) / 270;
       const gaps = list.slice(1).map((angle, i) => angle - list[i]);
       const even = gaps.every((gap) => Math.abs(gap - gaps[0]) < 1e-6);
@@ -388,8 +407,13 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers:
     const wired = makeInteractive('slider', { name: 'main', partName: (roles.track[0] ?? largest).part.name, geometry: vertical ? 'vertical' : 'horizontal' });
     Object.assign(behaviors, wired.behaviors);
     Object.assign(hitZones, wired.hitZones);
-    for (const layer of roles.moves) {
-      const box = layer.box;
+    // Every layer that slides goes as far as the part itself (the largest that is not its light: a
+    // shadow or a reflection is larger, and would otherwise go less far than the part it goes with).
+    const lightWords = new Set(['shading', 'shade', 'highlights', 'highlight', 'shadow', 'reflection', 'shine', 'bounce', 'emission', 'glow', 'lit']);
+    const own = roles.moves.filter((layer) => !nameWords(layer.names?.[0] ?? layer.name).some((word) => lightWords.has(word)));
+    const lead = [...(own.length ? own : roles.moves)].sort((a, b) => area(b.box) - area(a.box))[0];
+    const box = lead?.box;
+    for (const layer of box ? roles.moves : []) {
       if (vertical) {
         const atMin = track.y + track.height - box.height - box.y;
         const atMax = track.y - box.y;
@@ -398,6 +422,21 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers:
         const atMin = track.x - box.x;
         const atMax = track.x + track.width - box.width - box.x;
         bindings[`${layer.part.name}Move`] = rangeBinding(`${layer.part.name}Move`, `channel.${channelName}.normalized`, `Parts.${layer.part.name}.Layout.offsetX`, Math.round(atMin * 100) / 100, Math.round(atMax * 100) / 100, 'px');
+      }
+    }
+    // A part of frames, one a place along the travel (the Blender add-on's "fader at 40%"): its frame
+    // follows the value as it slides, the two either side mixed.
+    for (const [part, { list, kind: drawnKind }] of frameAngles) {
+      if (drawnKind !== 'position') continue;
+      const source = `channel.${channelName}.normalized`;
+      const target = `Parts.${part}.Image.frameIndex`;
+      const gaps = list.slice(1).map((place, i) => place - list[i]);
+      if (gaps.every((gap) => Math.abs(gap - gaps[0]) < 1e-6)) {
+        bindings[`${part}Frame`] = { ...rangeBinding(`${part}Frame`, source, target, 0, list.length - 1), inputMin: list[0] / 100, inputMax: list[list.length - 1] / 100 };
+      } else {
+        list.slice(1).forEach((place, i) => {
+          bindings[`${part}Frame${i + 1}`] = { ...rangeBinding(`${part}Frame${i + 1}`, source, target, 0, 1), inputMin: list[i] / 100, inputMax: place / 100, ...(i ? { add: true } : {}) };
+        });
       }
     }
   } else if (kind === 'switch' || kind === 'button') {

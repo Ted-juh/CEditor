@@ -6,7 +6,9 @@
 # Blender's own image of the same knob, and checks that the layers stacked as CEditor stacks them
 # give that image back, on its own and on a panel; that the pointer, its shadow and its reflection
 # are the layers that turn; that the image is the right way up; and that the pivot is on the knob's
-# axis. --fixture writes the small file CE/web/test/fixtures/blender-knob.psd that
+# axis. Then a fader (a slot, a cap, a lamp near its top end): written at each place along its travel,
+# and slid as CEditor slides it, against Blender rendering it slid there. Run by hand in the release
+# checks (.github/workflows/release-checks.yml, blender-layers). --fixture writes the small file CE/web/test/fixtures/blender-knob.psd that
 # the web suite imports (test/blenderLayersImport.test.js). --gltf writes the same knob as glTF
 # (CE/web/test/fixtures/blender-knob.glb), as File > Export > glTF 2.0 does, for CEditor's 3D part
 # import (test/scene3dGltf.test.js), and stops there. Needs a Blender with numpy (blender.org's builds
@@ -793,6 +795,131 @@ bare_names = [n for n, _ in bare["layers"]]
 check(any("No panel" in n for n in bare["notes"]) and any("camera" in n for n in bare["notes"]), "without a panel or a camera it says so")
 check(bare_names[0] == "shadow" and "pointer at 0" in bare_names, f"and still writes the knob and its shadow: {', '.join(bare_names)}")
 check(not any(o.name.startswith("CEditor") for o in bpy.data.objects), "and takes the panel and camera it put in out again")
+
+# A fader: a slot with a cap on it, lit by the sun and by a lamp near its top end, so that the cap's
+# light, its shadow and its gloss change as it slides. Written at each place along its travel
+# ("fader at 40%", moved back to where it was modelled), it is the part of frames CEditor slides, the
+# frame following the value; against Blender rendering it slid there, and against the one frame it
+# was rendered at before, slid.
+def fader_scene():
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    bpy.ops.mesh.primitive_plane_add(size=6, location=(0, 0, 0))
+    bpy.context.object.name = "panel"
+    bpy.context.object.data.materials.append(material("panel", (0.2, 0.2, 0.22), roughness=0.5))
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, 0, 0.01))
+    bpy.context.object.name = "slot"
+    bpy.context.object.scale = (0.12, 2.0, 0.02)
+    bpy.context.object.data.materials.append(material("slot", (0.03, 0.03, 0.035), roughness=0.3))
+    # The cap modelled a third of the way up its travel.
+    bpy.ops.mesh.primitive_cube_add(size=1, location=(0, -0.45, 0.16))
+    cap = bpy.context.object
+    cap.name = "fader"
+    cap.scale = (0.5, 0.26, 0.3)
+    cap.data.materials.append(material("fader", (0.75, 0.75, 0.72), roughness=0.3))
+    bpy.ops.object.modifier_add(type="BEVEL")
+    cap.modifiers["Bevel"].width = 0.04
+    cap.modifiers["Bevel"].segments = 3
+    bpy.ops.object.light_add(type="SUN", location=(0, 0, 5), rotation=(math.radians(30), math.radians(-20), 0))
+    bpy.context.object.data.energy = 2.0
+    bpy.ops.object.light_add(type="POINT", location=(0.9, 1.4, 0.7))
+    bpy.context.object.data.energy = 60
+    world = bpy.data.worlds.new("world")
+    scene.world = world
+    world.use_nodes = True
+    world.node_tree.nodes["Background"].inputs["Color"].default_value = (0.35, 0.36, 0.4, 1)
+    world.node_tree.nodes["Background"].inputs["Strength"].default_value = 0.5
+    bpy.ops.object.camera_add(location=(0, 0, 10))
+    camera = bpy.context.object
+    camera.data.type = "ORTHO"
+    camera.data.ortho_scale = 4.6
+    scene.camera = camera
+    scene.render.resolution_x = scene.render.resolution_y = 100
+    return scene
+
+
+AT_PLACE = re.compile(r"^(.*) at (\d+(?:\.\d+)?)%$")
+F_SIZE = 128 if not FIXTURE else 96
+scene = fader_scene()
+slid = addon.export_layers(scene, os.path.join(OUT, "fader.psd"), size=F_SIZE, samples=SAMPLES, report=lambda m: None)
+f_names = [n for n, _ in slid["layers"]]
+f_pixels = slid["pixels"]
+places = {}
+for name in f_names:
+    at = AT_PLACE.match(name)
+    if at:
+        places.setdefault(at.group(1), []).append(float(at.group(2)))
+check({"fader", "fader shadow"} <= set(places) and len(places["fader"]) == 11 and all(blend == dict(slid["layers"])[f"{base} at {p:g}%"]
+      for base in places for p in places[base] for blend in [dict(slid["layers"])[f"{base} at {places[base][0]:g}%"]]),
+      f"the fader, its shadow and its light are written at each place along its travel: {sorted((b, len(v)) for b, v in places.items())}")
+shown = [n for n in f_names if AT_PLACE.match(n) and AT_PLACE.match(n).group(1) == "fader" and n not in slid["hidden"]]
+check(len(shown) == 1, f"the file shows it at one place, the one nearest where it was modelled: {shown}")
+
+
+def box_of(alpha8):
+    ys, xs = np.nonzero(alpha8 > 0)
+    return int(xs.min()), int(ys.min()), int(xs.max()) - int(xs.min()) + 1, int(ys.max()) - int(ys.min()) + 1
+
+
+track = box_of(f_pixels["slot"][..., 3])
+cap_box = box_of(f_pixels[shown[0]][..., 3])
+travel = track[3] - cap_box[3]
+at_rest = (track[1] + track[3] - cap_box[3] - cap_box[1]) / travel
+
+
+def fader_stack(value, rest_only=False):
+    """The layers as CEditor lays them with the fader at `value` (0 at the bottom): each set of places
+    one part of frames, the two either side of the value mixed, and what slides moved by CEditor's
+    offset (from the cap at the bottom of the slot to the top)."""
+    out = np.concatenate([slid["panel"], np.ones_like(slid["panel"][..., :1])], axis=-1).astype(np.float32)
+    dy = (track[1] + track[3] - cap_box[3] - cap_box[1]) - travel * value
+    done = set()
+    for name, blend in slid["layers"]:
+        if name in slid["hidden"] and not AT_PLACE.match(name):
+            continue
+        at = AT_PLACE.match(name)
+        base = at.group(1) if at else name
+        if base in done or base.endswith((" lighting", " gloss", " base")) or " from " in base:
+            continue
+        done.add(base)
+        if at:
+            if rest_only:
+                rgba = f_pixels[shown[0].replace("fader", base, 1)] / 255.0
+            else:
+                total = None
+                for p in places[base]:
+                    w = max(0.0, 1.0 - abs(value * 100 - p) / 10.0)
+                    if w:
+                        q = f_pixels[f"{base} at {p:g}%"] / 255.0
+                        q = np.concatenate([q[..., :3] * q[..., 3:4], q[..., 3:4]], axis=-1) * w
+                        total = q if total is None else total + q
+                a = total[..., 3:4]
+                rgba = np.concatenate([np.where(a > 0, total[..., :3] / np.maximum(a, 1e-6), 0.0), a], axis=-1)
+        else:
+            rgba = f_pixels[name] / 255.0
+        if addon.role_of(base) == "moves":
+            rgba = addon.moved(rgba, 0.0, dy)
+        out = addon.blend_over(out, rgba, blend)
+    return np.round(out[..., :3] * 255)
+
+
+VALUE = 0.8
+cap = scene.objects["fader"]
+world_per_px = scene.camera.data.ortho_scale / F_SIZE
+cap.location.y -= ((track[1] + track[3] - cap_box[3] - cap_box[1]) - travel * VALUE) * world_per_px
+blender_there = np.round(addon.srgb(reference(scene, F_SIZE, SAMPLES, "slid", catcher=False)[..., :3]) * 255)
+frames_there, rest_there = fader_stack(VALUE), fader_stack(VALUE, rest_only=True)
+cap_there = addon.moved(f_pixels[shown[0]] / 255.0, 0.0, (track[1] + track[3] - cap_box[3] - cap_box[1]) - travel * VALUE)[..., 3] > 0
+near_cap = grown_by(cap_there, int(round(0.08 * F_SIZE)))
+d_frames = np.abs(frames_there - blender_there).max(-1)
+d_rest = np.abs(rest_there - blender_there).max(-1)
+inside_cap = cap_there & ~grown_by(~cap_there, 2)
+print(f"  fader slid to {VALUE:g} (modelled at {at_rest:.2f}): on the cap mean {d_frames[inside_cap].mean():.2f} ({d_rest[inside_cap].mean():.2f} as at rest); "
+      f"round it mean {d_frames[near_cap].mean():.2f}, p99 {np.percentile(d_frames[near_cap], 99):.1f} "
+      f"({d_rest[near_cap].mean():.2f}, {np.percentile(d_rest[near_cap], 99):.1f})")
+check(float(d_frames[inside_cap].mean()) < 0.5 * float(d_rest[inside_cap].mean()) and float(d_frames[near_cap].mean()) < 3,
+      f"slid to {VALUE:g}, the fader is lit as Blender lights it there: mean {d_frames[inside_cap].mean():.2f} levels on the cap, "
+      f"{d_frames[near_cap].mean():.2f} round it with its shadow ({d_rest[inside_cap].mean():.2f} and {d_rest[near_cap].mean():.2f} with its light as at rest, slid)")
 
 if FIXTURE:
     target = os.path.normpath(os.path.join(HERE, "..", "..", "CE", "web", "test", "fixtures", "blender-knob.psd"))

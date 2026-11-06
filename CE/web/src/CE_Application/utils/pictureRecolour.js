@@ -134,8 +134,8 @@ export function lightMapOf(label) {
  */
 export function bounceMapOf(label) {
   // A turning part's, at an angle ("pointer reflection from pointer at 27", "pointer reflection base
-  // at 27"): for the layer of that angle.
-  const angled = /^(.*\S)(\s+at\s+-?\d+(?:\.\d+)?)\s*$/i.exec(String(label ?? '').trim());
+  // at 27"), or a sliding one's at a place ("... at 40%"): for the layer of that angle or place.
+  const angled = /^(.*\S)(\s+at\s+-?\d+(?:\.\d+)?%?)\s*$/i.exec(String(label ?? '').trim());
   if (angled) {
     const map = bounceMapOf(angled[1]);
     return map ? { ...map, of: `${map.of}${angled[2]}` } : null;

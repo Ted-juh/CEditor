@@ -336,6 +336,49 @@ test('an SVG drawn at several angles is one part of frames too: each a picture o
   assert.equal(parts(single).needle_at_10.kind, 'path');
 });
 
+test('a fader drawn at places along its travel is one part of frames that slides, its frame following the value', () => {
+  // The Blender add-on writes a sliding part as it is at each place ("fader at 40%"), moved back to
+  // where it was modelled, the one nearest that shown; its shadow larger than the cap.
+  const places = [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100];
+  const bytes = writePsdUint8Array({
+    width: 40,
+    height: 120,
+    children: [
+      solid('slot', 15, 10, 10, 100, [20, 20, 22, 255]),
+      ...places.map((place) => solid(`fader shadow at ${place}%`, 3, 58, 34, 26, [0, 0, 0, 120], { hidden: place !== 50 })),
+      ...places.map((place) => solid(`fader at ${place}%`, 5, 60, 30, 20, [150 + place, 150, 150, 255], { hidden: place !== 50 })),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes, { fileName: 'fader.psd' });
+  assert.equal(plan.ok, true, plan.error);
+  assert.equal(plan.kind, 'fader');
+  const p = parts(plan);
+  assert.deepEqual(Object.keys(p), ['slot', 'fader_shadow', 'fader']);
+  for (const name of ['fader', 'fader_shadow']) {
+    const image = p[name]._children.Image;
+    assert.equal(image.mode, 'frames', name);
+    assert.equal(image.frames.length, 11, name);
+    assert.equal(image.frameIndex, 0, `${name}: at the value it starts at, 0, the place 0 %`);
+    assert.equal(p[name].visible, true);
+  }
+  // Every layer that slides goes as far as the cap: its shadow too, though its box is larger.
+  const by = Object.fromEntries(bindings(plan).map((b) => [b.name, b]));
+  for (const name of ['fader', 'fader_shadow']) {
+    const move = by[`${name}Move`];
+    assert.equal(move.target, `Parts.${name}.Layout.offsetY`);
+    assert.deepEqual([move.outputMin, move.outputMax], [30, -50], `${name}: from the cap at the slot's bottom to its top`);
+  }
+  // Its frame follows the value: 0 to 1 is 0 to 100 % of the travel.
+  const frameAt = (value) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': value } });
+    return ['fader', 'fader_shadow'].map((name) => Math.round(control._children.Parts._children[name]._children.Image.frameIndex * 100) / 100);
+  };
+  assert.deepEqual(frameAt(0), [0, 0]);
+  assert.deepEqual(frameAt(0.45), [4.5, 4.5]);
+  assert.deepEqual(frameAt(1), [10, 10]);
+});
+
 test('frames are mixed by adding their shares inside the part, so a shadow or a multiply between two is their mix', () => {
   const frames = [{ source: 'a.png' }, { source: '' }, { source: 'c.png', x: 10, y: 0, width: 80, height: 100 }];
   const at = (frameIndex, blendFrames = true) => imageFrameLayers({ mode: 'frames', frames, frameIndex, blendFrames })

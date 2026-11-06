@@ -59,6 +59,8 @@ the layers, laid as CEditor lays them, to the render. In levels of 255, at 160 p
 | The skirt red, the cap brass, where each covers the pixel | mean 1.4, 0.9 | 1.5, 1.1 |
 | The orange pointer made blue, on it | mean 1.4 | 18.2 |
 | Its reflection in the cap, where the colour changes it by 3 or more | mean 1.7, p99 5 | 4.6, 10 (as drawn) |
+| A fader (128 px, a lamp near its top end) slid from 0.24 to 0.8: on the cap | mean 1.7 | 22.8 (its rest frame, slid) |
+| The same, round the cap, its shadow included | mean 2.0, p99 12 | 7.8, 37 |
 
 In the editor itself (a 320 px knob, screenshots against Blender's renders): mean 1.0, p99 4 at rest
 and turned 118.8° with the wheel; on a plate of a dark panel's colour mean 1.1, p99 6, its outline
@@ -130,7 +132,8 @@ The pieces, and where they live:
 ## What stays approximate (documented)
 
 - A lit lamp's outermost pixels are lit as on the scene's own panel ("For this panel" in the export).
-- Between two rendered angles a turning part is the two mixed, where Blender renders one of its own.
+- Between two rendered angles a turning part is the two mixed, where Blender renders one of its own;
+  so is a sliding part between two rendered places (every tenth of its travel).
 - The outline is mixed for a solid colour: under a gradient, a picture or a texture on the panel it is
   mixed for the panel's colour; only top-level controls are looked at for a plate (a control inside a
   container is not looked into); the layers under the part are taken as stored, so a lamp's light
@@ -140,8 +143,6 @@ The pieces, and where they live:
 - In Photoshop's own view of the file, with no panel under it, the colour dodge layers show as dark
   patches.
 - The frames of a part of frames cannot be edited one by one in the UI.
-- A sliding part (a fader) is rendered at rest only: its own light, shadow and reflection do not
-  change along its travel (the same frames idea would apply per position).
 - The filmstrip baker (Assets › bake) draws a part's blend mode and its colour since the fixes, but
   not the outline mixing (a filmstrip has no panel under it).
 - A part in another colour: a picture of several colours changes as a whole; a glowing part's glow at its very edge is
@@ -196,10 +197,11 @@ menu does.
 
 ## What next
 
-From the design record's order: Illustrator `.ai` through its PDF part (pdf.js) if Illustrator files are wanted
-directly; a Figma plugin if Figma is; Level 3 (CEditor's own 3D parts, with piece E); Level 2 (glTF)
-when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; a
-lamp edge that holds on any panel; a CI job for the Blender test.
+The four ways in from the design record are built (Illustrator and PDF, the Figma plugin, CEditor's
+own 3D parts, glTF: `docs/design/import-formats.md`), and so are frames per place for a fader and the
+Blender test in the hand-run release checks (`release-checks.yml`, `blender-layers`). Left, if
+wanted: a lamp edge that holds on any panel; the light a turning part throws on the panel (under a
+level on the test knob, so not written).
 
 ## The owner's working rules, beyond CLAUDE.md
 

@@ -36,7 +36,8 @@
 #   <name> shadow pivot  where a turning part's shadow turns about (a dot CEditor hides)
 #
 # A part that turns whole is written at each of several angles, "<name> at <angle>", "<name> shading
-# at <angle>", "<name> shadow at <angle>", "<name> reflection at <angle>" and so on (see below).
+# at <angle>", "<name> shadow at <angle>", "<name> reflection at <angle>" and so on; a part that slides
+# at each of several places along its travel, "<name> at 40%" and so on (see below).
 #
 # Stacked as listed, the layers give back Cycles' render to a level or two in 255, the edges where
 # parts meet included, and each stays changeable in CEditor: a colour layer is retinted while its
@@ -88,6 +89,14 @@
 # browser, so the turn back is through a Lanczos window rather than bilinear. Its shadow turns about
 # a point of its own, half its reach from the axis towards where it falls (from the light that lights
 # the part most, and the part's height), so it stays on the side away from the light.
+#
+# A sliding part (a fader's cap). A light near the panel lights it more at one end of its travel than
+# the other, and its shadow and its reflection fall on the track differently: it is rendered at every
+# tenth of its travel and each is written moved back to where it was modelled, "... at 40%", the one
+# nearest that shown; CEditor's import makes each set one part of frames that slides with the value,
+# its frame following it. The travel is CEditor's: along the track's long side (the first part named
+# track, slot, rail or groove, else the whole picture), from the part's box at the track's bottom or
+# left (the value 0, 0 %) to its top or right (100 %).
 #
 # Needs numpy, which Blender's own builds carry.
 #
@@ -494,6 +503,16 @@ def turn_angles(step=TURN_STEP):
 TURN_ANGLES = turn_angles()
 
 
+# A sliding part, rendered at places along its travel a step apart (percent of the travel, 0 where
+# CEditor's value is 0: the bottom or the left of the track).
+SLIDE_STEP = 10
+
+
+def slide_places(step=SLIDE_STEP):
+    """The places a sliding part is rendered at, in percent of its travel."""
+    return [round(k * step, 6) for k in range(int(round(100 / step)) + 1)]
+
+
 def angle_name(angle):
     return f"{angle:g}"
 
@@ -505,12 +524,26 @@ def turned(image, degrees, about, sharp=False):
     again by the browser, and two bilinear turns blur a narrow part's highlight twice: on the test
     pointer, 8 pixels wide, its mean 6.5 levels off, 4.0 with the first turn sharp."""
     h, w = image.shape[:2]
-    p = image.astype(np.float32).copy()
-    p[..., :3] *= p[..., 3:4]
     t = math.radians(degrees)
     qy, qx = np.mgrid[0:h, 0:w] + 0.5
     sx = about[0] + (qx - about[0]) * math.cos(t) + (qy - about[1]) * math.sin(t) - 0.5
     sy = about[1] - (qx - about[0]) * math.sin(t) + (qy - about[1]) * math.cos(t) - 0.5
+    return resampled(image, sx, sy, sharp)
+
+
+def moved(image, dx, dy, sharp=False):
+    """`image` moved `dx` right and `dy` down on screen (pixels, any fraction), as `turned` turns it."""
+    h, w = image.shape[:2]
+    qy, qx = np.mgrid[0:h, 0:w] + 0.5
+    return resampled(image, qx - dx - 0.5, qy - dy - 0.5, sharp)
+
+
+def resampled(image, sx, sy, sharp=False):
+    """`image` (straight colour and opacity) read at (`sx`, `sy`) for each pixel, premultiplied:
+    bilinear, or with `sharp` through a Lanczos window three pixels wide."""
+    h, w = image.shape[:2]
+    p = image.astype(np.float32).copy()
+    p[..., :3] *= p[..., 3:4]
     x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
     fx, fy = (sx - x0)[..., None], (sy - y0)[..., None]
 
@@ -886,15 +919,17 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
         colour_of = []
         metal_names = []
         metal_cover = {}
+        coverage = {}  # each part's coverage at rest, by name
 
         def colour_name_of(o):
             """The name its colour layer is written under: a lamp's body without its role word."""
             return without_role_words(o.name, "lens") if role_of(o.name) == "on" else o.name
 
-        def add_part(o, look, opacity, at_angles=None, stays=False, bounce=None):
+        def add_part(o, look, opacity, at_angles=None, stays=False, bounce=None, motion=None):
             """`at_angles`: for a part that turns whole, {angle: its look rendered turned that far, turned
             back to rest}; it is then written at each angle, "<name> at <angle>", "<name> shading at
-            <angle>" and so on. Its colour inside is the same at every angle; at its edge, where the
+            <angle>" and so on (`motion` names them, and says which the file shows: for a part that
+            slides, {place: its look there, moved back to rest}, "<name> at 40%"). Its colour inside is the same at every angle; at its edge, where the
             colour layer holds its whole look, and in its light layers, it is as lit at that angle.
             `stays`: a part that stays put, whose edge CEditor mixes for what is under it there (see the
             notes at the top): written as it covers each pixel, and named in the file for it."""
@@ -965,13 +1000,17 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                     add(f"{name} lighting from {colour_name_of(k)}", bounce_code(light_k), covered, hidden=True)
                     add(f"{name} gloss from {colour_name_of(k)}", bounce_code(gloss_k), covered, hidden=True)
 
+            label = motion["label"] if motion else angle_name
+            shown = motion["shown"] if motion else 0
             if at_angles:
                 colour_name = o.name
+                # CEditor measures the colour it was drawn in on its frame at 0 (the angle at rest; a
+                # fader's place where the value is 0).
                 rest_drawn = drawn_of(colour_layer(at_angles[0]), edge) if 0 in at_angles else None
                 for angle, seen in at_angles.items():
                     layer = colour_layer(seen)
-                    add(f"{o.name} at {angle_name(angle)}", layer, edge, hidden=angle != 0)
-                    add_light(o.name, f" at {angle_name(angle)}", seen, layer, edge, rest_drawn if rest_drawn is not None else drawn_of(layer, edge))
+                    add(f"{o.name} at {label(angle)}", layer, edge, hidden=angle != shown)
+                    add_light(o.name, f" at {label(angle)}", seen, layer, edge, rest_drawn if rest_drawn is not None else drawn_of(layer, edge))
             elif stays:
                 colour_name = still_name if role == "on" else o.name
                 layer = colour_layer(look)
@@ -999,14 +1038,14 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 shades = {angle: np.where(inside[..., None], seen["shade"], 1.0) for angle, seen in at_angles.items()}
                 if not all(np.allclose(shade[inside], 1.0, atol=1 / 255) for shade in shades.values()):
                     for angle, shade in shades.items():
-                        add(f"{still_name} shading at {angle_name(angle)}", shade, depth, "mul ", hidden=angle != 0)
+                        add(f"{still_name} shading at {label(angle)}", shade, depth, "mul ", hidden=angle != shown)
                 # Over the whole inside, adding nothing where there is none, so that CEditor can add
                 # light anywhere inside when the colour changes.
                 for angle, seen in at_angles.items():
-                    add(f"{still_name} highlights at {angle_name(angle)}", seen["highlights"], depth, "lddg", hidden=angle != 0)
+                    add(f"{still_name} highlights at {label(angle)}", seen["highlights"], depth, "lddg", hidden=angle != shown)
                 for angle, seen in at_angles.items():
-                    add(f"{still_name} emission at {angle_name(angle)}", *light(seen["glow"], depth), "lddg", hidden=angle != 0)
-                report(f"{o.name}: rendered at {len(at_angles)} angles")
+                    add(f"{still_name} emission at {label(angle)}", *light(seen["glow"], depth), "lddg", hidden=angle != shown)
+                report(f"{o.name}: rendered at {len(at_angles)} {motion['what'] if motion else 'angles'}")
                 return
             if not np.allclose(look["shade"][depth > 0], 1.0, atol=1 / 255):
                 add(f"{still_name} shading", look["shade"], depth, "mul ")
@@ -1041,16 +1080,19 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             ratio = np.where(seen[..., None], np.maximum(catcher[..., :3], 0.0), 1.0)
             return carry_in([ratio], seen, ~seen)[0]
 
-        def add_group(objs, name, shadow, holdout, unseen, panel_light=(), lit_shadow=None, turn=None):
+        def add_group(objs, name, shadow, holdout, unseen, panel_light=(), lit_shadow=None, motion=None):
             """A group's shadow and reflection, then its parts, bottom up, each rendered with the others
             held out. `panel_light`: the panel's renders with the group there unseen, its lamps dark and
             lit, for the light it throws on the panel (the group under everything else). `lit_shadow`:
-            the shadow render again with its lamps lighting (`shadow` then has them dark). `turn`: for
-            parts that turn, a render with them turned to an angle."""
+            the shadow render again with its lamps lighting (`shadow` then has them dark). `motion`: for
+            parts that turn or slide, where they are rendered and how to get there and back (see
+            turning and sliding below)."""
             shadow_name, reflection_name = f"{name}shadow", f"{name}reflection"
             before = merged.copy()
             look_of = lambda o, passes: part_look(passes, lamp=role_of(o.name) == "on")
             looks = [look_of(o, render([o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen)) for o in objs]
+            for o, look in zip(objs, looks):
+                coverage[o.name] = look["alpha"]
             opacities, above, left = unover([look["alpha"] for look in looks])
             # The light each part throws on the others and on the panel by way of its colour: each
             # rendered again with that part colourless, the difference (see colourless). CEditor scales
@@ -1074,18 +1116,19 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             # "... at <angle>", and CEditor's import makes each set one part whose frame follows the value
             # (see the notes at the top). A rotor's light stays put, and so is made once.
             turned_shares, turned_looks = {}, {}
-            if turn is not None:
+            stops, rest_key = (motion["keys"], motion["rest"]) if motion else ([], None)
+            if motion is not None:
                 covered = np.concatenate([black, (1.0 - left)[..., None]], axis=-1)
-                whole_turns = [o for o in objs if not is_rotor(o.name)]
-                for angle in angles:
-                    if not angle:
+                whole_turns = motion["whole"](objs)
+                for angle in stops:
+                    if angle == rest_key:
                         continue
-                    left_there = 1.0 - turned(covered, angle, axis_px)[..., 3]
-                    turned_shares[angle] = share(turn(angle, objs, catchers=[panel] + still), left_there)
+                    left_there = 1.0 - motion["forward"](covered, angle)[..., 3]
+                    turned_shares[angle] = share(motion["render"](angle, objs, catchers=[panel] + still), left_there)
                     for o in whole_turns:
-                        passes = turn(angle, [o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen)
+                        passes = motion["render"](angle, [o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen)
                         seen = look_of(o, passes)
-                        back = lambda values: turned(np.concatenate([values, seen["alpha"][..., None]], axis=-1), -angle, axis_px, sharp=True)
+                        back = lambda values: motion["back"](np.concatenate([values, seen["alpha"][..., None]], axis=-1), angle)
                         kept = {key: back(seen[key]) for key in ("whole", "shade", "highlights", "glow")}
                         # Light can be many times white, and a turn keeps colour within its opacity:
                         # turned at a 256th, and back.
@@ -1102,26 +1145,27 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             # colourless (see colourless), at each angle. CEditor scales the difference by the part's
             # change of colour, as for the light a part that stays put throws.
             turned_without = {}
-            if turn is not None and unseen:
+            if motion is not None and unseen:
                 for k in objs:
                     restore = colourless(k)
                     try:
-                        for angle in angles:
-                            if angle:
-                                left_there = 1.0 - turned(covered, angle, axis_px)[..., 3]
-                                turned_without.setdefault(k, {})[angle] = share(turn(angle, objs, catchers=[panel] + still), left_there)
+                        for angle in stops:
+                            if angle != rest_key:
+                                left_there = 1.0 - motion["forward"](covered, angle)[..., 3]
+                                turned_without.setdefault(k, {})[angle] = share(motion["render"](angle, objs, catchers=[panel] + still), left_there)
                             else:
                                 turned_without.setdefault(k, {})[angle] = share(render(objs, catchers=[panel] + still), left)
                     finally:
                         restore()
             if ratio is not None:
-                if turned_shares and shadow_pivot_px is not None:
-                    # Its shadow at each angle, turned back about the point it turns about.
-                    for angle in angles:
-                        alpha = darkness(turned_shares[angle] if angle else ratio)
-                        if angle:
-                            alpha = turned(np.concatenate([black, alpha[..., None]], axis=-1), -angle, shadow_pivot_px, sharp=True)[..., 3]
-                        add(f"{shadow_name} at {angle_name(angle)}", black, alpha, hidden=angle != 0)
+                if turned_shares:
+                    # Its shadow at each angle, turned back about the point it turns about (at each
+                    # place, moved back).
+                    for angle in stops:
+                        alpha = darkness(ratio if angle == rest_key else turned_shares[angle])
+                        if angle != rest_key:
+                            alpha = motion["back"](np.concatenate([black, alpha[..., None]], axis=-1), angle, motion["shadow_about"])[..., 3]
+                        add(f"{shadow_name} at {motion['label'](angle)}", black, alpha, hidden=angle != motion["shown"])
                 else:
                     add(shadow_name, black, darkness(ratio))
             if ratio is not None and panel_light:
@@ -1212,8 +1256,8 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 if turned_shares and (added.max(-1)[where] >= 0.5 / 255).any():
                     # A turning part's reflection is not the same at every angle: other faces of it catch
                     # the light. Away from rest the layers are hidden, so the file shows the part at rest.
-                    for angle in angles:
-                        share_there = turned_shares[angle] if angle else ratio
+                    for angle in stops:
+                        share_there = ratio if angle == rest_key else turned_shares[angle]
                         reflected = reflect(share_there)
                         rgb, alpha = light(reflected, where)
                         # The share of it that comes off each turning part's colour, as a multiple of the
@@ -1229,8 +1273,8 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                                for k, without in turned_without.items()}
                         near = where & ((reflected.max(-1) >= 0.5 / 255) | np.any([v.max(-1) >= 2.0 ** -12 for v in via.values()] or [False], axis=0))
                         base = linear(under)
-                        if angle:
-                            back = lambda values, a: turned(np.concatenate([values, np.asarray(a, dtype=np.float32)[..., None]], axis=-1), -angle, axis_px, sharp=True)
+                        if angle != rest_key:
+                            back = lambda values, a: motion["back"](np.concatenate([values, np.asarray(a, dtype=np.float32)[..., None]], axis=-1), angle)
                             turned_back = back(rgb, alpha)
                             rgb, alpha = turned_back[..., :3], turned_back[..., 3]
                             covered_back = back(base, near)
@@ -1238,11 +1282,12 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                             # Light up to sixteen times what is under it, turned at a sixteenth, and back.
                             via = {k: back(v / 16.0, near)[..., :3] * 16.0 for k, v in via.items()}
                             near = covered_back[..., 3] > 0.5
-                        add(f"{reflection_name} at {angle_name(angle)}", rgb, alpha, "lddg", hidden=angle != 0)
+                        label = motion["label"](angle)
+                        add(f"{reflection_name} at {label}", rgb, alpha, "lddg", hidden=angle != motion["shown"])
                         if via and near.any():
-                            add(f"{reflection_name} base at {angle_name(angle)}", light_code(base), near.astype(np.float32), hidden=True)
+                            add(f"{reflection_name} base at {label}", light_code(base), near.astype(np.float32), hidden=True)
                             for k, v in via.items():
-                                add(f"{reflection_name} from {colour_name_of(k)} at {angle_name(angle)}", bounce_code(v), near.astype(np.float32), hidden=True)
+                                add(f"{reflection_name} from {colour_name_of(k)} at {label}", bounce_code(v), near.astype(np.float32), hidden=True)
                 else:
                     add(reflection_name, *light(added, where), "lddg")
             for o, look, opacity, over in zip(objs, looks, opacities, above):
@@ -1253,8 +1298,8 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 look = dict(look, **dict(zip(keys, carried[1:])))
                 at_angles = None
                 if o.name in turned_looks:
-                    at_angles = {angle: turned_looks[o.name][angle] if angle else look for angle in angles}
-                add_part(o, look, carried[0], at_angles, stays=bool(panel_light), bounce=bounce_on.get(o.name))
+                    at_angles = {angle: look if angle == rest_key else turned_looks[o.name][angle] for angle in stops}
+                add_part(o, look, carried[0], at_angles, stays=bool(panel_light), bounce=bounce_on.get(o.name), motion=motion)
 
         from bpy_extras.object_utils import world_to_camera_view
 
@@ -1311,13 +1356,79 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
         shadow_pivot = (centre + reach / 2) if reach is not None else None
         shadow_pivot_px = at_pixel(shadow_pivot) if shadow_pivot is not None else axis_px
 
+        def turning_motion(objs):
+            """Parts that turn: rendered every `turn_step` degrees, each turned back to rest about the
+            axis (its shadow about its own point), "<name> at 27"; a rotor's light stays put."""
+            return {"keys": angles, "rest": 0, "shown": 0, "label": angle_name, "what": "angles",
+                    "render": turned_render(objs),
+                    "forward": lambda image, angle: turned(image, angle, axis_px),
+                    "back": lambda image, angle, about=None: turned(image, -angle, about or axis_px, sharp=True),
+                    "shadow_about": shadow_pivot_px,
+                    "whole": lambda group: [o for o in group if not is_rotor(o.name)]}
+
+        def box_of(alpha):
+            """The pixels a layer covers, as CEditor's import measures them: (x, y, width, height)."""
+            ys, xs = np.nonzero(to8(alpha) > 0)
+            return (int(xs.min()), int(ys.min()), int(xs.max()) - int(xs.min()) + 1, int(ys.max()) - int(ys.min()) + 1) if len(xs) else None
+
+        def sliding_motion(objs):
+            """Parts that slide: rendered at places a step apart along the track (every `SLIDE_STEP`
+            percent of the travel), each moved back to where it was modelled, "<name> at 40%". The
+            travel is CEditor's: along the track's long side (the first part named track, slot, rail or
+            groove; else the whole picture), from the part's box at its bottom or left to its top or
+            right, the part's box the largest of the group's. None when it has nowhere to go."""
+            track_part = next((o for o in still if role_of(o.name) == "track" and o.name in coverage), None)
+            track = box_of(coverage[track_part.name]) if track_part else (0, 0, width, height)
+            boxes = [box_of(look) for look in (coverage.get(o.name) for o in objs) if look is not None]
+            boxes = [b for b in boxes if b]
+            if not track or not boxes:
+                return None
+            box = max(boxes, key=lambda b: b[2] * b[3])
+            vertical = track[3] >= track[2]
+            travel = (track[3] - box[3]) if vertical else (track[2] - box[2])
+            if travel < 2:
+                return None
+            # Where it was modelled, as a share of the travel (the value CEditor would show it at).
+            at_rest = (track[1] + track[3] - box[3] - box[1]) / travel if vertical else (box[0] - track[0]) / travel
+            offset = lambda place: (0.0, travel * (at_rest - place / 100.0)) if vertical else (travel * (place / 100.0 - at_rest), 0.0)
+            from mathutils import Matrix, Vector
+            right = cam.matrix_world.to_3x3() @ Vector((1, 0, 0))
+            up = cam.matrix_world.to_3x3() @ Vector((0, 1, 0))
+            anchor = objs[0].matrix_world.translation.copy()
+            # Pixels a world unit along the camera's right and up make on screen, to move by pixels.
+            px = [np.subtract(at_pixel(anchor + axis), at_pixel(anchor)) for axis in (right, up)]
+            solve = np.linalg.inv(np.array([[px[0][0], px[1][0]], [px[0][1], px[1][1]]], dtype=np.float64))
+
+            def at(place, show, **how):
+                a, b = solve @ np.array(offset(place), dtype=np.float64)
+                shift = Matrix.Translation(right * float(a) + up * float(b))
+                rest = [o.matrix_world.copy() for o in objs]
+                try:
+                    for o in objs:
+                        o.matrix_world = shift @ o.matrix_world
+                    return render(show, **how)
+                finally:
+                    for o, matrix in zip(objs, rest):
+                        o.matrix_world = matrix
+            places = slide_places()
+            return {"keys": places, "rest": None, "shown": min(places, key=lambda p: abs(p - 100.0 * at_rest)), "what": "places",
+                    "label": lambda place: f"{place:g}%", "render": at,
+                    "forward": lambda image, place: moved(image, *offset(place)),
+                    "back": lambda image, place, about=None: moved(image, *(-v for v in offset(place)), sharp=True),
+                    "shadow_about": None, "whole": lambda group: list(group)}
+
         # Each moving group: its shadow on the panel and on what stays put, then its parts, lit by
-        # what stays put without being seen with it.
+        # what stays put without being seen with it. A group that turns is written at each angle, one
+        # that slides at each place along its track.
         for group in ("turns", "moves", "off", "pressed"):
             objs = order(groups.get(group, []))
             if objs:
-                add_group(objs, f"{objs[0].name} ", render(objs, catchers=[panel] + still), holdout=[panel], unseen=still,
-                          turn=turned_render(objs) if group == "turns" else None)
+                if group == "moves":
+                    # Its coverage at rest, for its travel: the render add_group makes first.
+                    for o in objs:
+                        coverage[o.name] = part_look(render([o], holdout=[x for x in objs if x is not o] + [panel], unseen=still))["alpha"]
+                motion = turning_motion(objs) if group == "turns" else sliding_motion(objs) if group == "moves" else None
+                add_group(objs, f"{objs[0].name} ", render(objs, catchers=[panel] + still), holdout=[panel], unseen=still, motion=motion)
         # Where turning parts turn about, and where their shadow does.
         if turning:
             mark("pivot", centre)
