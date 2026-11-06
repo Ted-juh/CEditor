@@ -29,7 +29,9 @@ render, on any panel and at any angle, measured rather than judged by eye.
   merge only when the owner asks, and run `npm run build` with
   `NODE_OPTIONS=--max-old-space-size=6144` first.
 - CI on this branch is started by hand (Actions › CI › Run workflow on the branch). Runs 525, 526
-  and 527 were green; 528, on `aa902a74`, was running when this was written.
+  and 527 were green; 528, on `aa902a74`, was running when this was written. Run 529, on
+  `claude/new-session-ofvsj0` at `418c630` (the fixes, on/off Value From and the baker's blend
+  modes), was green in all four jobs, the Windows build and its C++ tests included.
 - Everything checked locally on `aa902a74`: the web suite 7574 of 7579 (none failing, 5 skipped),
   the 40 browser checks, lint, the add-on's test 50 of 50 (160 px) and 48 of 48 (the fixture's
   96 px), Blender 4.0.2. Since the fixes: the add-on's test 59 of 59 and 57 of 57, the browser
