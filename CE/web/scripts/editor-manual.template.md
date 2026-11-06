@@ -710,6 +710,23 @@ drawn** gives it its own colours again. A layer of frames changes all its frames
 shine) has no colour of its own: the look bar and the dock say so and offer **Edit skirt's colour**
 for the layer it lights. The **Layers** list marks each layer **Picture**, **Frames** or **Light**.
 
+### A control drawn in Figma
+
+The **CEditor Export** plugin saves a Figma frame as an SVG with every layer's name kept. It comes
+with CEditor, in `tools/figma-plugin` beside the program; in Figma choose **Plugins → Development →
+Import plugin from manifest...** and pick `manifest.json` there, once.
+
+1. Select the frame, component or component set that is the control, and run **CEditor Export**.
+   Its window lists each layer and what it will do in CEditor (turns with the value, shown when on,
+   stays put), and warns about a layer with Figma's own name (**Ellipse 12**) and about effects.
+2. With **Variants as states** on, a component set's variants become the control's looks: the one
+   whose property says on (**State=On**, **On=true**) is shown when on, off when off, pressed while
+   held. **Keep text as text** keeps text editable. **Flatten effects into pictures** keeps drop
+   shadows and blurs, which CEditor does not draw from an SVG, by saving each layer that has one as a
+   picture of it.
+3. Choose **Save SVG for CEditor**, then in CEditor **File → New Component from Vector Artwork...**
+   (or **New Panel from Vector Artwork...** for a frame with a **components** layer).
+
 ### A knob modelled in Blender
 
 A knob, a fader or a switch modelled in Blender comes in the same way, every part a layer, through a

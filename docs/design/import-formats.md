@@ -1,6 +1,6 @@
 # Four more ways in: Illustrator, Figma, 3D parts and glTF
 
-*Decided 2026-11-06; #1 built.* The routes for bringing designs in that
+*Decided 2026-11-06; #1 and #2 built.* The routes for bringing designs in that
 [changeable-control-sets.md](changeable-control-sets.md) ("Native files" and "Order") lists as next:
 Illustrator files read directly, Figma, CEditor's own 3D parts (Level 3, with piece E) and glTF models
 (Level 2). The mock-ups the owner approved are [import-formats-mockups.html](import-formats-mockups.html).
@@ -69,11 +69,36 @@ a dial, a hidden layer as a switch's lit look, a PDF panel's placeholders), `tes
 `browser-checks/vectorArtwork.mjs` (pdf.js as the editor loads it, in Chromium). Not tested: a file from
 Illustrator itself; the fixtures follow its layout, and a real one is the check that matters.
 
-## 2. Figma — next
+## 2. Figma — built
 
-A plugin in `tools/figma-plugin/` (manifest, code, window) that lists what each layer of the selected
-frame will do in CEditor, by the words the importers share, turns a component set's variants into the
-states CEditor reads from names, and saves an SVG with every layer's name kept.
+`tools/figma-plugin/` (`manifest.json`, `code.js`, `ui.html`), shipped by the installer beside the
+Blender add-on. The manifest declares `documentAccess: dynamic-page` (required of new plugins) and no
+network. `code.js` runs in Figma's sandbox: no object spread, and UTF-8 by hand, since the sandbox has
+no TextDecoder.
+
+- **The window** (`ui.html`, Figma's own colours through `themeColors`) is sent what
+  `describeSelection` makes of the selection: each top-level layer and what it will do, by a copy of
+  the importer's words that `test/figmaPlugin.test.js` holds to `artworkComponent.js`; Figma's own
+  names (`Ellipse 12`) flagged; effects noted.
+- **Whole** (the default): `exportAsync({ format: 'SVG', svgIdAttribute: true })`, layer names as ids,
+  text as text unless the option is off.
+- **Variants as states**: `stateVariants` reads each variant's properties (Figma's, or its name
+  `State=On, Size=Large`) and keeps the default and the variants that differ from it only in their
+  state; each is exported and stacked in a `<g id="on">`, `off`, `pressed`, or under the set's name for
+  the one at rest. Definitions are prefixed per variant so that two exports in one SVG cannot collide;
+  ids that say a state (a lamp, `State=Off`) are dropped inside a state's group, since the importer
+  takes a layer's own name before its group's, but an id a definition is referred to by is kept: the
+  first version dropped a gradient called `…_Off` and its look with it, which the test caught.
+- **Flatten effects into pictures**: `layerByLayer` exports each visible layer on its own, placed by
+  its render bounds (effects included) against the frame's box; a layer with a visible effect as a PNG
+  at twice the size. Not with a mask layer among them: that frame is exported whole.
+- **Saving**: the SVG is handed to the window as bytes, which saves it through a download link named
+  after the frame (`Knob / Vintage` → `Knob - Vintage.svg`).
+
+Tested: `test/figmaPlugin.test.js` runs `code.js` in a sandbox with a stand-in for `figma` (the words,
+the manifest, the window's rows and notes, a frame as a dial, on and off variants as a switch, a pressed
+variant as a button, flattening, the messages, UTF-8), its SVG read by `planSvgComponentImport`; the
+window was driven once in Chromium (rows, notes, options, Save, the download). Not run in Figma itself.
 
 ## 3 and 4. 3D parts and glTF — after
 

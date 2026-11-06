@@ -195,6 +195,35 @@ Listed in the Console: what was drawn close to rather than exactly (Photoshop's 
 approximate adjustments), Selective Color and Color Lookup adjustments (not applied), adjustment
 layers inside groups with their own blend mode, and references to anything not in the file.
 
+## A control drawn in Figma: the CEditor Export plugin
+
+Figma's own file format is undocumented and changes without notice, so CEditor does not read it.
+`tools/figma-plugin` is a Figma plugin (Figma's supported way out), imported once in Figma from its
+`manifest.json` (Plugins › Development › Import plugin from manifest). It needs no account, token or
+network, and says so in its manifest. It does for Figma what the Blender add-on below does for
+Blender:
+
+- Its window lists each layer of the selected frame, component or component set and what it will do
+  in CEditor, by the words above (it keeps a copy, which `test/figmaPlugin.test.js` holds to the
+  importer's), and warns about a layer with Figma's own name (`Ellipse 12`: it stays put) and about
+  effects.
+- **Save SVG for CEditor** saves the selection as Figma writes SVG, each layer's name its `id`, which
+  the importer reads as the name; File › New Component (or New Panel) from Vector Artwork opens it.
+- **Variants as states** (on by default): a component set's variant whose property says on
+  (`State=On`, `On=true`, `Lit`) is drawn as a group named `on`, shown when on; off as `off`; pressed
+  or down as `pressed`, shown while held; the variant at rest as it is. Inside a state's group, names
+  that say a state of their own (a `lamp` in the off look, the variant's own `State=Off`) are dropped,
+  so the group's state is the one that counts. Variants that differ in anything else (`Size=Large`)
+  are left out; the default's are used.
+- **Flatten effects into pictures** (off by default): the importer does not draw SVG filters, so a
+  drop shadow, an inner shadow or a blur would be lost. With this on, each layer is saved on its own,
+  and one with an effect as a picture of how Figma renders it, effect and all, where Figma draws it. A
+  frame with a mask layer is saved whole, since a mask between layers would be lost.
+- **Keep text as text** (on by default): text as SVG text, else as outlines.
+
+It is tested here against a stand-in for Figma's plugin API and its window in Chromium; it has not run
+in Figma itself.
+
 ## A knob modelled in Blender: the CEditor Layers add-on
 
 `tools/blender/ceditor_layers.py`, installed in Blender (Edit › Preferences › Add-ons › Install),

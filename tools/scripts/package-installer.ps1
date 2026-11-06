@@ -345,7 +345,15 @@ function Stage-ExportPipeline([string]$RepoRoot, [string]$StageDir) {
     New-Item -ItemType Directory -Path $blenderDst -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $toolsSrc "blender\ceditor_layers.py") -Destination $blenderDst -Force
 
-    Write-Host "Staged export pipeline + toolchain scripts + Blender add-on -> $toolsDst"
+    # The Figma plugin, imported in Figma from its manifest (Plugins > Development > Import plugin from
+    # manifest): it saves a frame as an SVG for File > New Component from Vector Artwork.
+    $figmaDst = Join-Path $toolsDst "figma-plugin"
+    New-Item -ItemType Directory -Path $figmaDst -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "figma-plugin\manifest.json") -Destination $figmaDst -Force
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "figma-plugin\code.js") -Destination $figmaDst -Force
+    Copy-Item -LiteralPath (Join-Path $toolsSrc "figma-plugin\ui.html") -Destination $figmaDst -Force
+
+    Write-Host "Staged export pipeline + toolchain scripts + Blender add-on + Figma plugin -> $toolsDst"
 }
 
 function Stage-NodeRuntime([string]$StageDir) {
