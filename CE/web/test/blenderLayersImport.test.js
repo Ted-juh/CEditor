@@ -17,6 +17,7 @@ import { readPsd } from 'ag-psd';
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 import { compositePsd } from '../src/CE_Application/utils/psdComposite.js';
 import { describeArtworkComponent } from '../src/CE_Application/utils/artworkComponent.js';
+import { applyCustomBindings } from '../src/CE_Application/utils/interactionRuntime.js';
 
 const bytes = new Uint8Array(readFileSync(new URL('./fixtures/blender-knob.psd', import.meta.url)));
 const SIZE = 96;
@@ -28,30 +29,46 @@ test('a Blender knob comes in as a dial: the pointer, its shadow and its reflect
   assert.deepEqual([plan.width, plan.height], [SIZE, SIZE]);
   assert.deepEqual(plan.warnings, []);
   const parts = plan.component._children.Parts._children;
+  // The pointer's reflection in the metal cap, rendered every 27 degrees the pointer turns.
+  const angles = [-135, -108, -81, -54, -27, 0, 27, 54, 81, 108, 135];
+  const reflections = angles.map((angle) => `pointer_reflection_at_${angle < 0 ? `minus_${-angle}` : angle}`);
   assert.deepEqual(Object.keys(parts), [
     'shadow', 'bounce', 'lamp_glow', 'lens', 'lens_highlights', 'lamp_lit', 'skirt', 'skirt_shading', 'skirt_highlights',
-    'cap', 'cap_shading', 'cap_highlights', 'pointer_shadow', 'pointer_reflection', 'pointer', 'pivot', 'pointer_shadow_pivot',
+    'cap', 'cap_shading', 'cap_highlights', 'pointer_shadow', ...reflections, 'pointer', 'pivot', 'pointer_shadow_pivot',
   ]);
   // A colour layer is drawn as it is; its light is multiplied into it or added to it, and the light
   // on the panel (the cap's glare, the lamp's) added to the panel.
   const blend = (name) => parts[name]._children.Effects?._children?.Blend?.mode ?? 'normal';
   for (const name of ['shadow', 'lens', 'skirt', 'cap', 'pointer_shadow', 'pointer']) assert.equal(blend(name), 'normal', name);
   for (const name of ['skirt_shading', 'cap_shading']) assert.equal(blend(name), 'multiply', name);
-  for (const name of ['bounce', 'lamp_glow', 'lens_highlights', 'lamp_lit', 'skirt_highlights', 'cap_highlights', 'pointer_reflection']) {
+  for (const name of ['bounce', 'lamp_glow', 'lens_highlights', 'lamp_lit', 'skirt_highlights', 'cap_highlights', ...reflections]) {
     assert.equal(blend(name), 'plus-lighter', name);
   }
   // What turns, with the value: the pointer and its reflection about the knob's axis, the middle of the
   // picture; its shadow about its own point beside it, towards where it falls, so it stays on the side
   // away from the light.
-  const turning = Object.values(plan.component._children.Bindings._children);
-  assert.deepEqual(turning.map((b) => b.target).sort(), ['pointer', 'pointer_reflection', 'pointer_shadow'].map((n) => `Parts.${n}.Layout.rotation`));
+  const turning = Object.values(plan.component._children.Bindings._children).filter((b) => b.target.endsWith('.rotation'));
+  assert.deepEqual(turning.map((b) => b.target).sort(), ['pointer', ...reflections, 'pointer_shadow'].map((n) => `Parts.${n}.Layout.rotation`).sort());
   for (const binding of turning) assert.deepEqual([binding.outputMin, binding.outputMax], [-135, 135]);
+  // Which reflection shows, as the pointer turns: the one rendered nearest, the two either side mixed
+  // between them.
+  const opacityAt = (degrees) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': (degrees + 135) / 270 } });
+    return reflections.map((name) => Math.round(control._children.Parts._children[name].opacity * 100) / 100);
+  };
+  const only = (index, weight = 1) => reflections.map((_, i) => (i === index ? weight : 0));
+  assert.deepEqual(reflections.map((name) => parts[name].opacity), only(5), 'as imported: the one at rest');
+  assert.deepEqual(opacityAt(0), only(5));
+  assert.deepEqual(opacityAt(-135), only(0));
+  assert.deepEqual(opacityAt(108), only(9));
+  assert.deepEqual(opacityAt(121.5), reflections.map((_, i) => (i === 9 || i === 10 ? 0.5 : 0)), 'half way, half each');
   const about = (name) => {
     const { x, y, width, height, pivotX, pivotY } = parts[name]._children.Layout;
     return [x + (pivotX / 100) * width, y + (pivotY / 100) * height];
   };
   const centre = (name) => { const { x, y, width, height } = parts[name]._children.Layout; return [x + width / 2, y + height / 2]; };
-  for (const name of ['pointer', 'pointer_reflection']) {
+  for (const name of ['pointer', ...reflections]) {
     assert.ok(Math.hypot(about(name)[0] - SIZE / 2, about(name)[1] - SIZE / 2) < 0.05, `${name}: turns about ${about(name)}`);
   }
   const own = about('pointer_shadow');
@@ -61,7 +78,7 @@ test('a Blender knob comes in as a dial: the pointer, its shadow and its reflect
   // The pointer was modelled pointing up, and comes in pointing up.
   assert.ok(parts.pointer._children.Layout.y + parts.pointer._children.Layout.height <= SIZE / 2, 'above the axis');
   for (const name of ['pivot', 'pointer_shadow_pivot']) assert.equal(parts[name].visible, false, `${name} is a mark, not a picture`);
-  assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of 17 layers: pointer shadow, pointer reflection, pointer turn with the value/);
+  assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of 27 layers: pointer shadow, pointer reflection at -135, /);
 });
 
 test('CEditor draws the layers as the add-on composed them', () => {

@@ -1011,7 +1011,11 @@ What building the add-on found, against Level 1 as written above:
   scaled.
 - **A turning part's reflection.** A metal cap mirrors the pointer's end; rendered without the
   pointer, the cap lacked it. The shadow catcher's ratio over 1 is that light, written as a layer
-  that turns with the pointer.
+  that turns with the pointer. Turned, it is not the one at rest turned: other faces of the pointer
+  catch the sun, and the streak where its end did at rest is gone (99th percentile 57 levels off
+  beside the pointer, turned 120 degrees). It is now rendered with the pointer turned every 27
+  degrees, each written turned back to rest ("pointer reflection at 54"); the import turns each with
+  the pointer and fades from the one rendered nearest to the next (8 levels).
 - **The panel.** CEditor lays a component's layers straight onto the panel (measured: a part's blend
   mode reaches the panel surface, no element between composites the component on its own), so a
   layer of light brightens the panel. The scene's panel is taken to be the one the control goes on
@@ -1030,8 +1034,7 @@ What building the add-on found, against Level 1 as written above:
   from the axis towards where they fall (the light that lights the part most, and the part's height):
   the import reads a pivot named after a layer ("pointer shadow pivot") as that layer's own. Exact on
   a flat surface under one light; on a metal cap the shadow is partly its shine blocked, and how dark
-  it is changes as the part turns, which a layer made at rest does not; the part's reflection in the
-  cap is made at rest as well.
+  it is changes as the part turns, which a layer made at rest does not.
 - In a dial, a lamp's lit layer and its light on the panel are not wired to anything (only switches
   and buttons light theirs).
 

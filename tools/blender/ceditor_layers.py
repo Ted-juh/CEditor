@@ -16,6 +16,8 @@
 #   <lamp> glow        a lamp's light on the panel (linear dodge), shown with the lamp lit
 #   <name> shadow      a moving part's shadow on the panel and on the parts under it
 #   <name> reflection  a moving part's reflection in the shiny parts under it (linear dodge)
+#   <name> reflection at <angle>  a turning part's, rendered with it turned that far (one each
+#                      27 degrees, those away from rest hidden)
 #   pivot              where turning parts turn about (a dot CEditor hides)
 #   <name> shadow pivot  where a turning part's shadow turns about (a dot CEditor hides)
 #
@@ -41,8 +43,13 @@
 # whichever way the part points: it turns about a point of its own, half its reach from the axis
 # towards where it falls (from the light that lights the part most, and the part's height). Exact on
 # a flat cap under one light; a metal cap's shadow, which is partly its shine blocked, darkens more or
-# less as the part turns, which a layer made at rest does not. The part's reflection in a metal cap
-# is made at rest too, and turns with it.
+# less as the part turns, which a layer made at rest does not.
+#
+# A turning part's reflection. Turned, other faces of the part catch the light, so its reflection in
+# a metal cap is not the one at rest turned: it is rendered with the part turned every 27 degrees (a
+# tenth of a dial's travel), each written turned back to rest as "<name> reflection at <angle>", and
+# CEditor's import turns each with the part and fades from one to the next as it turns. Between two
+# angles the reflection is the two mixed, where Blender would render one of its own.
 #
 # Needs numpy, which Blender's own builds carry.
 #
@@ -352,6 +359,34 @@ def light_over_clear(added):
     over instead; nothing in between gives both)."""
     alpha = added.max(-1)
     return np.where(alpha[..., None] > 0, added / np.maximum(alpha[..., None], 1e-6), 0.0), alpha
+
+
+# A turning part's reflection, rendered with the part turned to these angles (degrees clockwise from
+# rest, over the -135 to 135 a CEditor dial turns): a step of 27 is a tenth of the dial's travel.
+TURN_STEP = 27
+TURN_ANGLES = tuple(range(-135, 136, TURN_STEP))
+
+
+def turned(image, degrees, about):
+    """`image` (height, width, 4: straight colour and opacity) turned `degrees` clockwise on screen
+    about `about` (x, y in pixels), as a browser turns a picture: bilinear, premultiplied."""
+    h, w = image.shape[:2]
+    p = image.astype(np.float32).copy()
+    p[..., :3] *= p[..., 3:4]
+    t = math.radians(degrees)
+    qy, qx = np.mgrid[0:h, 0:w] + 0.5
+    sx = about[0] + (qx - about[0]) * math.cos(t) + (qy - about[1]) * math.sin(t) - 0.5
+    sy = about[1] - (qx - about[0]) * math.sin(t) + (qy - about[1]) * math.cos(t) - 0.5
+    x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
+    fx, fy = (sx - x0)[..., None], (sy - y0)[..., None]
+
+    def at(y, x):
+        inside = ((x >= 0) & (x < w) & (y >= 0) & (y < h))[..., None]
+        return np.where(inside, p[np.clip(y, 0, h - 1), np.clip(x, 0, w - 1)], 0.0)
+
+    q = (at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy
+    a = q[..., 3:4]
+    return np.concatenate([np.where(a > 0, q[..., :3] / np.maximum(a, 1e-6), 0.0), a], axis=-1)
 
 
 def inward(full, width=3):
@@ -703,12 +738,14 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             ratio = np.where(seen[..., None], np.maximum(catcher[..., :3], 0.0), 1.0)
             return carry_in([ratio], seen, ~seen)[0]
 
-        def add_group(objs, name, shadow, holdout, unseen, panel_light=False, lit_shadow=None):
+        def add_group(objs, name, shadow, holdout, unseen, panel_light=False, lit_shadow=None, turn=None):
             """A group's shadow and reflection, then its parts, bottom up, each rendered with the others
             held out. `panel_light`: the light it throws on the panel too (the group under everything
             else, whose shadow render sees only the panel). `lit_shadow`: the shadow render again with
-            its lamps lighting (`shadow` then has them dark), for their light on the panel."""
+            its lamps lighting (`shadow` then has them dark), for their light on the panel. `turn`:
+            for parts that turn, their shadow render with them turned to an angle."""
             shadow_name, reflection_name = f"{name}shadow", f"{name}reflection"
+            before = merged.copy()
             looks = [part_look(render([o], holdout=[x for x in objs if x is not o] + holdout, unseen=unseen),
                                lamp=role_of(o.name) == "on") for o in objs]
             opacities, above, left = unover([look["alpha"] for look in looks])
@@ -727,10 +764,31 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                         glow = np.clip(srgb(linear(bare) * lit_ratio) - srgb(linear(bare) * ratio), 0.0, 1.0)
                         add(f"{lamps[0].name} glow", *light_over_clear(glow), "lddg")
                 # Their reflection in a part under them that shines: what it adds to that part's light.
-                a = merged[..., 3:4]
-                under = np.where(a > 0, merged[..., :3] / np.maximum(a, 1e-6), 0.0)
-                added = np.clip(srgb(linear(under) * np.maximum(ratio, 1.0)) - under, 0.0, 1.0)
-                add(reflection_name, *light(added, a[..., 0] > 0.999), "lddg")
+                a = before[..., 3:4]
+                under = np.where(a > 0, before[..., :3] / np.maximum(a, 1e-6), 0.0)
+                where = a[..., 0] > 0.999
+                reflect = lambda share_of_light: np.clip(srgb(linear(under) * np.maximum(share_of_light, 1.0)) - under, 0.0, 1.0)
+                added = reflect(ratio)
+                if turn is not None and (added.max(-1)[where] >= 0.5 / 255).any():
+                    # A turning part's reflection is not the same at every angle: other faces of it catch
+                    # the light. It is rendered with the part turned to angles a step apart, and each is
+                    # written turned back to where the part rests, "<name> reflection at <angle>":
+                    # CEditor's import turns each with the part and fades from one to the next as it
+                    # turns. Away from rest they are hidden, so the file shows the part at rest.
+                    covered = np.concatenate([black, (1.0 - left)[..., None]], axis=-1)
+                    for angle in TURN_ANGLES:
+                        if angle:
+                            left_there = 1.0 - turned(covered, angle, axis_px)[..., 3]
+                            share_there = share(turn(angle), left_there)
+                        else:
+                            share_there = ratio
+                        rgb, alpha = light(reflect(share_there), where)
+                        if angle:
+                            back = turned(np.concatenate([rgb, alpha[..., None]], axis=-1), -angle, axis_px)
+                            rgb, alpha = back[..., :3], back[..., 3]
+                        add(f"{reflection_name} at {angle}", rgb, alpha, "lddg", hidden=angle != 0)
+                else:
+                    add(reflection_name, *light(added, where), "lddg")
             for o, look, opacity, over in zip(objs, looks, opacities, above):
                 # Under the parts above it, where they cover the pixel whole, the part goes on a little
                 # way past its own edge (a part under another's edge has none of its own there).
@@ -762,18 +820,40 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             else:
                 dark, lit_shadow = render(still, catchers=[panel]), None
             add_group(still, "", dark, holdout=[panel], unseen=[], panel_light=True, lit_shadow=lit_shadow)
+        # Where turning parts turn about: the pivot object, or the first turning part's origin.
+        turning = order(groups.get("turns", []))
+        centre = (plan["pivot"].matrix_world.translation if plan["pivot"] else turning[0].matrix_world.translation).copy() if turning else None
+        axis_px = at_pixel(centre) if turning else None
+
+        def turned_shadow(objs):
+            """The shadow render of `objs` with them turned `angle` degrees clockwise as the camera
+            sees them, about the axis; put back after."""
+            from mathutils import Matrix, Vector
+            view = (cam.matrix_world.to_3x3() @ Vector((0, 0, -1))).normalized()
+
+            def at(angle):
+                spin = Matrix.Translation(centre) @ Matrix.Rotation(math.radians(angle), 4, view) @ Matrix.Translation(-centre)
+                rest = [o.matrix_world.copy() for o in objs]
+                try:
+                    for o in objs:
+                        o.matrix_world = spin @ o.matrix_world
+                    return render(objs, catchers=[panel] + still)
+                finally:
+                    for o, matrix in zip(objs, rest):
+                        o.matrix_world = matrix
+            return at
+
         # Each moving group: its shadow on the panel and on what stays put, then its parts, lit by
         # what stays put without being seen with it.
         for group in ("turns", "moves", "off", "pressed"):
             objs = order(groups.get(group, []))
             if objs:
-                add_group(objs, f"{objs[0].name} ", render(objs, catchers=[panel] + still), holdout=[panel], unseen=still)
+                add_group(objs, f"{objs[0].name} ", render(objs, catchers=[panel] + still), holdout=[panel], unseen=still,
+                          turn=turned_shadow(objs) if group == "turns" else None)
         # Where turning parts turn about, and where their shadow does: a shadow cast by a light that
         # stays put falls the same way whichever way the parts point, so it turns about a point half
         # its reach from the axis, towards where it falls (CEditor's import reads "<layer> pivot").
-        if groups.get("turns"):
-            turning = order(groups["turns"])
-            centre = plan["pivot"].matrix_world.translation if plan["pivot"] else turning[0].matrix_world.translation
+        if turning:
             mark("pivot", centre)
             reach = shadow_reach(scene, turning)
             shadow_name = f"{turning[0].name} shadow"

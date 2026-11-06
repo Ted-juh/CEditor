@@ -13,6 +13,7 @@
 import importlib.util
 import math
 import os
+import re
 import sys
 import tempfile
 
@@ -116,40 +117,34 @@ def reference(scene, size, samples, tag="caught", catcher=True):
     return combined
 
 
-def stacked(layers, pixels, under, turn=0.0, pivots=None):
+def shown(name, turn=0.0):
+    """How much of a layer CEditor shows with the knob turned `turn` degrees: a turning part's
+    reflection rendered at an angle ("... at 27") fades in from the angle a step before it and out by
+    the one a step after, as the import wires it; every other layer whole."""
+    at = re.search(r" at (-?\d+)$", name)
+    return 1.0 if not at else max(0.0, 1.0 - abs(turn - int(at.group(1))) / addon.TURN_STEP)
+
+
+def stacked(layers, pixels, under, turn=0.0, pivots=None, at_rest_only=False):
     """The layers laid onto `under` (straight RGB, opaque) as CEditor lays them, straight onto the
     panel; with the turning ones turned `turn` degrees clockwise about their pivots (`pivots`: a
-    layer's own, by name, or "pivot")."""
+    layer's own, by name, or "pivot"). `at_rest_only`: the reflection rendered at rest, turned, as
+    it was before it was rendered at every angle."""
     out = np.concatenate([under, np.ones_like(under[..., :1])], axis=-1).astype(np.float32)
     for name, blend in layers:
         role = addon.role_of(name)
-        if role == "pivot":
+        weight = shown(name, 0.0 if at_rest_only else turn)
+        if role == "pivot" or weight == 0:
             continue
         rgba = pixels[name] / 255.0
+        rgba[..., 3] *= weight
         if turn and role == "turns":
-            rgba = turned(rgba, turn, pivots.get(name, pivots["pivot"]))
+            rgba = addon.turned(rgba, turn, pivots.get(name, pivots["pivot"]))
         out = addon.blend_over(out, rgba, blend)
     return out[..., :3]
 
 
-def turned(rgba, degrees, about):
-    """`rgba` (straight, 0..1) turned `degrees` clockwise on screen about `about` (x, y in pixels),
-    as a browser turns a picture: bilinear, premultiplied."""
-    h, w = rgba.shape[:2]
-    p = rgba.astype(np.float32).copy()
-    p[..., :3] *= p[..., 3:4]
-    t = math.radians(degrees)
-    qy, qx = np.mgrid[0:h, 0:w] + 0.5
-    sx = about[0] + (qx - about[0]) * math.cos(t) + (qy - about[1]) * math.sin(t) - 0.5
-    sy = about[1] - (qx - about[0]) * math.sin(t) + (qy - about[1]) * math.cos(t) - 0.5
-    x0, y0 = np.floor(sx).astype(int), np.floor(sy).astype(int)
-    fx, fy = (sx - x0)[..., None], (sy - y0)[..., None]
-    def at(y, x):
-        inside = ((x >= 0) & (x < w) & (y >= 0) & (y < h))[..., None]
-        return np.where(inside, p[np.clip(y, 0, h - 1), np.clip(x, 0, w - 1)], 0.0)
-    q = (at(y0, x0) * (1 - fx) + at(y0, x0 + 1) * fx) * (1 - fy) + (at(y0 + 1, x0) * (1 - fx) + at(y0 + 1, x0 + 1) * fx) * fy
-    a = q[..., 3:4]
-    return np.concatenate([np.where(a > 0, q[..., :3] / np.maximum(a, 1e-6), 0.0), a], axis=-1)
+turned = addon.turned
 
 
 def dot_centre(rgba):
@@ -174,7 +169,9 @@ check(blends.get("cap shading") == "mul ", "the cap's shading multiplies its col
 check(blends.get("cap highlights") == "lddg", "the metal cap's reflections add")
 check("pointer shadow" in names and names.index("pointer shadow") < names.index("pointer"), "the pointer's shadow is under the pointer")
 check(names.index("cap") < names.index("pointer shadow"), "the pointer's shadow falls on the cap")
-check(blends.get("pointer reflection") == "lddg", "the pointer's reflection in the metal cap adds")
+reflections = [n for n in names if n.startswith("pointer reflection at ")]
+check([int(n.rsplit(" ", 1)[1]) for n in reflections] == list(addon.TURN_ANGLES) and all(blends[n] == "lddg" for n in reflections),
+      f"the pointer's reflection in the metal cap adds, rendered every {addon.TURN_STEP} degrees it turns: {len(reflections)} layers")
 check("lens" in names and addon.role_of("lens") == "", "the lamp's body is there whether it is lit or not")
 check(blends.get("lamp lit") == "lddg" and addon.role_of("lamp lit") == "on", "the lamp's glow adds, a layer of its own")
 check(blends.get("lamp glow") == "lddg" and addon.role_of("lamp glow") == "on", "the lamp's light on the panel adds, shown with the lamp lit")
@@ -262,7 +259,7 @@ def larger(rgba):
 opaque = lambda rgb: np.concatenate([rgb, np.ones_like(rgb[..., :1])], axis=-1)
 scaled = larger(opaque(bare))
 for name, blend in result["layers"]:
-    if addon.role_of(name) != "pivot":
+    if addon.role_of(name) != "pivot" and shown(name):
         scaled = addon.blend_over(scaled, larger(result["pixels"][name] / 255.0), blend)
 picture = larger(opaque(result["on_panel"][..., :3]))
 d = np.abs(np.round(scaled[..., :3] * 255) - np.round(picture[..., :3] * 255)).max(-1)
@@ -316,7 +313,7 @@ check(math.dist(own, blender) < 2.5 and math.dist(axis, blender) > 2 * math.dist
       f"its own point, {math.dist(axis, blender):.1f} px about the axis")
 
 # Round the turned pointer, on the cap: its own pixels and their edge left out (a sharp edge turned is
-# resampled, and the pointer's reflection in the cap is made at rest).
+# resampled).
 def grown(mask, steps):
     for _ in range(steps):
         mask = np.pad(mask, 1)[2:, 1:-1] | np.pad(mask, 1)[:-2, 1:-1] | np.pad(mask, 1)[1:-1, 2:] | np.pad(mask, 1)[1:-1, :-2] | mask
@@ -331,6 +328,17 @@ for how, about in (("own", pivots), ("axis", {"pivot": pivots["pivot"]})):
     means[how] = float(np.abs(turned_layers - turned_full).max(-1)[around].mean())
     if how == "own" and os.environ.get("CEDITOR_LAYERS_DEBUG"):
         np.save(os.path.join(OUT, "turned_full.npy"), turned_full); np.save(os.path.join(OUT, "turned_layers.npy"), turned_layers)
+# The pointer's reflection in the metal cap, round the pointer: rendered at angles a step apart and
+# faded from one to the next, against the one rendered at rest and turned (a bright streak where the
+# end of the pointer caught the sun at rest, and does not turned).
+ring = grown(on_it, int(round(0.06 * px))) & ~on_it
+worst = {}
+for how, rest_only in (("angles", False), ("rest", True)):
+    picture = np.round(stacked(result["layers"], result["pixels"], bare, TURN, pivots, at_rest_only=rest_only) * 255)
+    worst[how] = float(np.percentile(np.abs(picture - turned_full).max(-1)[ring], 99))
+check(worst["angles"] < 0.6 * worst["rest"],
+      f"and the pointer's reflection in the cap is where Blender shows it: 99th percentile {worst['angles']:.0f} levels round the pointer, "
+      f"{worst['rest']:.0f} with the reflection rendered at rest and turned")
 check(means["own"] < 4 and means["own"] <= means["axis"] + 0.05,
       f"and round the turned pointer the cap is Blender's to a mean {means['own']:.2f} levels ({means['axis']:.2f} with the shadow turned about the axis)")
 

@@ -667,7 +667,9 @@ part of the drawing still a layer you can change.
    light, on) shows when the value is on, **off** when it is off, and **pressed** while it is held.
    A layer named **pivot** marks where a pointer turns; without one, it turns about the middle of
    the knob it sits on. A pivot named after a turning layer as well (**pointer shadow pivot**) marks
-   where that one layer turns. A name counts inside a group's name too.
+   where that one layer turns. A turning layer drawn as it looks turned, named with its angle
+   (**pointer reflection at 27**, **at -27**), shows only near that angle and fades into the next
+   one as the knob turns. A name counts inside a group's name too.
 2. Choose **File → New Component from SVG Artwork...** or **New Component from Photoshop Artwork...**.
 
 The control opens in the Component Designer, ready to use and to change:
@@ -705,7 +707,9 @@ Each object comes in as its colour, with its shading multiplied over it and its 
 change a part's colour with its tint and its light stays as Blender rendered it. The shadow on the
 panel is a layer, and so are a turning part's shadow and its reflection in the parts under it,
 which turn with it. The shadow turns about a point of its own beside the axis, so it stays on the
-side away from the light whichever way the pointer points. Blender's camera looks straight down (the
+side away from the light whichever way the pointer points. The reflection is rendered with the
+pointer turned every 27 degrees, and the one nearest the pointer's angle shows, so a metal cap
+mirrors the pointer as it turns. Blender's camera looks straight down (the
 scene's own, when it is orthographic). A lamp's glow is a layer of its own, and so is its light on
 the panel; in a switch or a button both show when the switch is on.
 

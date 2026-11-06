@@ -133,6 +133,7 @@ Component Designer to change and save (`utils/svgComponentImport.js`, `utils/psd
 |---|---|
 | `pointer`, `indicator`, `needle`, `rotor`, `marker`, `turns` | turns with the value, -135° to 135°, the drawn angle in the middle |
 | `pivot`, `centre`, `axis` | where those turn; without it, the middle of the knob they sit on. Named after a turning layer as well (`pointer shadow pivot`), where that one layer turns |
+| `... at <angle>` | a turning layer drawn as it looks turned that far (`pointer reflection at -27`, `at 27`, `at 54`): it turns with the value like the others, and shows only near its angle, fading into the next one's |
 | `fader`, `thumb`, `handle`, `slide` | slides along the `track` (`slot`, `rail`), the value 0 at the bottom or left |
 | `lamp`, `led`, `light`, `on` / `off` | shown when the value is on / off |
 | `pressed`, `down` | shown while it is held |
@@ -166,6 +167,7 @@ held out, and written as the layers its look adds up from:
 | `bounce` | linear dodge | light the parts throw on the panel, a metal cap's glare |
 | `<lamp> glow` | linear dodge | a lamp's light on the panel, shown with the lamp lit |
 | `<name> shadow`, `<name> reflection` | normal, linear dodge | a turning or sliding part's shadow and reflection on the panel and the parts under it, which move with it |
+| `<name> reflection at <angle>` | linear dodge | a turning part's reflection, rendered with it turned that far: one each 27 degrees, those away from rest hidden |
 | `pivot` | normal, hidden | where turning parts turn |
 | `<name> shadow pivot` | normal, hidden | where a turning part's shadow turns |
 
@@ -192,8 +194,13 @@ put. It turns about a point of its own (`<name> shadow pivot`), half its reach f
 where it falls, worked out from the light that lights the part most and the part's height. On a flat
 surface under one light that is exact: the shadow is the part's outline swept along the light, and
 it turns about the middle of the sweep. A metal cap's shadow is partly its shine blocked, and darkens
-more or less as the part turns, which a layer made at rest does not; the part's reflection in a
-metal cap is made at rest too, and turns with it.
+more or less as the part turns, which a layer made at rest does not.
+
+**A turning part's reflection** in a metal cap is not the one at rest turned: turned, other faces of
+the part catch the light. It is rendered with the part turned every 27 degrees (a tenth of a dial's
+travel), and each is written turned back to rest, `<name> reflection at <angle>`. CEditor turns each
+with the part and shows the one rendered nearest, fading from one to the next; between two angles the
+reflection is the two mixed, where Blender would render one of its own.
 
 **How exact.** `tools/blender/test_ceditor_layers.py` (run with `blender -b --factory-startup
 --python tools/blender/test_ceditor_layers.py`) builds a knob, writes it, renders Blender's own
@@ -205,7 +212,9 @@ images of it and checks the layers against them, stacked as CEditor stacks them:
 - on a dark, grey and light panel, the knob and its shadow away from the outline and the lamp;
 - drawn twice the size, as a browser scales each layer before it blends them;
 - turned 120 degrees: the pointer's shadow where Blender casts it (1.6 px off at 160 px; turned about
-  the axis it was 10 px off, on the side towards the light), and the cap round the pointer.
+  the axis it was 10 px off, on the side towards the light), the cap round the pointer, and the
+  pointer's reflection in the cap beside it (the 99th percentile 8 levels; made at rest and turned it
+  was 57, a bright streak where the pointer's end caught the sun at rest and does not turned).
 
 Where a part covers only some of a pixel its whole look is in its colour layer (a multiply there would
 reach what is beside it); the light layers come in over the next three pixels, and a layer under a
@@ -214,7 +223,8 @@ or turns them. Cycles' shadow catcher gives the shadow for what a part leaves of
 pixel as a whole; the shadow layer, under the parts, darkens just that. `--fixture` writes the small
 file the web suite reads (`test/fixtures/blender-knob.psd`), checked by
 `test/blenderLayersImport.test.js` for what turns, about where (the shadow about its own point), in
-which modes, and for CEditor's compositor drawing it as the add-on composed it.
+which modes, which reflection shows as the pointer turns, and for CEditor's compositor drawing it as
+the add-on composed it.
 
 ## Update Panel from SVG Artwork
 

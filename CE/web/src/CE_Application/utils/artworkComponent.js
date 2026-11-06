@@ -17,6 +17,9 @@
  *   off      off, unlit                                        shown when it is off
  *   pressed  pressed, down                                     shown while it is held
  *
+ * A turning layer named "... at <angle>" is drawn as it looks with the part turned that far (degrees
+ * clockwise from rest); several of one name fade from one to the next as the part turns.
+ *
  * A keyword counts anywhere in a layer's name, or in the name of a group it is in, as a whole word:
  * "Pointer copy 2", "knob/pointer" and "pointerShadow" all turn; "spotlight" does not light.
  *
@@ -41,6 +44,8 @@ const ROLE_WORDS = [
   ['track', ['track', 'slot', 'rail', 'groove']],
 ];
 const PIVOT_WORDS = ROLE_WORDS.find(([role]) => role === 'pivot')[1];
+// "... at 27", "... at -54°": a turning layer drawn at that angle, in degrees clockwise from rest.
+const AT_ANGLE = /\s+at\s+(-?\d+(?:\.\d+)?)\s*(?:°|deg(?:rees)?)?\s*$/i;
 const BUTTON_WORDS = ['button', 'btn', 'momentary', 'trigger', 'push', 'key'];
 
 /** The words of a name: split at anything not a letter or digit, and where lower case meets upper. */
@@ -63,7 +68,10 @@ export function artworkRole(names = []) {
 
 /** A part name the designer can bind to: letters, digits and underscores, unique, not a number first. */
 export function uniqueLayerName(wanted, taken) {
-  const base = String(wanted ?? '').replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'layer';
+  // A minus before a number is a word of its own ("at -27", "gain -6"): dropped, it would make the
+  // name of the one at 27, or at 6.
+  const base = String(wanted ?? '').replace(/(^|[^A-Za-z0-9])-(?=\d)/g, '$1minus_')
+    .replace(/[^A-Za-z0-9_]+/g, '_').replace(/^_+|_+$/g, '') || 'layer';
   const first = /^[0-9]/.test(base) ? `layer_${base}` : base;
   let name = first;
   for (let n = 2; taken.has(name); n += 1) name = `${first}_${n}`;
@@ -167,6 +175,36 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers 
       bindings[`${layer.part.name}Turn`] = rangeBinding(`${layer.part.name}Turn`, `channel.${channelName}.normalized`, `Parts.${layer.part.name}.Layout.rotation`, -135, 135, 'deg');
     }
     for (const layer of roles.pivot) layer.part.visible = false;
+    // A turning layer drawn at one of several angles ("pointer reflection at 27": a part's reflection
+    // as it is with the part turned 27 degrees clockwise, drawn turned back to rest) shows near its
+    // angle: it fades in from the angle a step before and out by the angle a step after, so between
+    // two the picture is the two mixed, each turned with the part. The step is the smallest between
+    // two of a set's angles; one missing (it drew nothing) leaves nothing in its place.
+    const sets = new Map();
+    for (const layer of roles.turns) {
+      const at = AT_ANGLE.exec(ownName(layer));
+      if (!at) continue;
+      const base = withoutPivot(ownName(layer).slice(0, at.index));
+      if (!sets.has(base)) sets.set(base, []);
+      sets.get(base).push({ layer, angle: Number(at[1]) });
+    }
+    for (const set of sets.values()) {
+      const angles = [...new Set(set.map((each) => each.angle))].sort((a, b) => a - b);
+      if (angles.length < 2) continue;
+      const step = Math.min(...angles.slice(1).map((angle, i) => angle - angles[i]));
+      for (const { layer, angle } of set) {
+        // Where on the value it is fully shown (the dial turns -135 to 135 degrees over 0 to 1).
+        const name = layer.part.name;
+        const peak = (angle + 135) / 270;
+        const width = step / 270;
+        const full = layer.part.opacity ?? 1;
+        // Shown as at rest until the value says otherwise (the dial starts in the middle, at 0).
+        layer.part.visible = true;
+        layer.part.opacity = full * Math.max(0, 1 - Math.abs(angle) / step);
+        bindings[`${name}FadeIn`] = { ...rangeBinding(`${name}FadeIn`, `channel.${channelName}.normalized`, `Parts.${name}.opacity`, 0, full), inputMin: peak - width, inputMax: peak };
+        bindings[`${name}FadeOut`] = { ...rangeBinding(`${name}FadeOut`, `channel.${channelName}.normalized`, `Parts.${name}.opacity`, 0, -full), inputMin: peak, inputMax: peak + width, add: true };
+      }
+    }
   } else if (kind === 'fader') {
     // Along the track's long side, or the artwork's; the value 0 at the bottom or the left.
     const track = roles.track[0]?.box ?? { x: 0, y: 0, width, height };

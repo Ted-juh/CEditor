@@ -10,6 +10,7 @@ import { inflateSync } from 'node:zlib';
 import { planSvgComponentImport } from '../src/CE_Application/utils/svgComponentImport.js';
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 import { artworkRole, describeArtworkComponent, nameWords } from '../src/CE_Application/utils/artworkComponent.js';
+import { applyCustomBindings } from '../src/CE_Application/utils/interactionRuntime.js';
 import { parsePathData, modelBounds } from '../src/CE_Application/utils/bezierPath.js';
 
 const parts = (plan) => plan.component._children.Parts._children;
@@ -208,6 +209,50 @@ test('a pivot named after a turning layer is that layer\'s own: a shadow turns a
   // Named after nothing that turns ("knob axis"), a pivot is a shared one, and the first shared one
   // ("pivot") is used; every pivot is a mark, hidden.
   for (const name of ['pivot', 'pointer_shadow_pivot', 'knob_axis']) assert.equal(p[name].visible, false, name);
+});
+
+test('a turning layer drawn at several angles fades from one to the next as the part turns', () => {
+  // The Blender add-on writes a pointer's reflection in a metal cap as it is at each of several angles
+  // ("pointer reflection at 27"), each turned back to rest, those away from rest hidden.
+  const bytes = writePsdUint8Array({
+    width: 100,
+    height: 100,
+    children: [
+      solid('body', 10, 10, 80, 80, [120, 120, 120, 255]),
+      solid('pointer reflection at -27', 40, 30, 20, 20, [200, 200, 200, 255], { hidden: true }),
+      solid('pointer reflection at 0', 40, 30, 20, 20, [210, 210, 210, 255]),
+      solid('pointer reflection at 27', 40, 30, 20, 20, [220, 220, 220, 255], { hidden: true }),
+      solid('pointer reflection at 81', 40, 30, 20, 20, [230, 230, 230, 255], { hidden: true }),
+      solid('pointer', 47, 12, 6, 30, [230, 230, 230, 255]),
+    ],
+  }, { noBackground: true, generateThumbnail: false });
+  const plan = planPsdComponentImport(bytes);
+  assert.equal(plan.ok, true, plan.error);
+  const names = ['pointer_reflection_at_minus_27', 'pointer_reflection_at_0', 'pointer_reflection_at_27', 'pointer_reflection_at_81'];
+  const p = parts(plan);
+  for (const name of names) {
+    assert.equal(p[name].visible, true, `${name}: shown, by its opacity`);
+    assert.ok(bindings(plan).some((b) => b.target === `Parts.${name}.Layout.rotation`), `${name} turns`);
+  }
+  // Its opacity at an angle, as the component draws it: the value 0 to 1 is -135 to 135 degrees.
+  const opacityAt = (degrees) => {
+    const control = structuredClone(plan.component);
+    applyCustomBindings(control, { customChannels: { 'channel.mainValue.normalized': (degrees + 135) / 270 } });
+    return Object.fromEntries(names.map((name) => [name.replace('pointer_reflection_at_', '').replace('minus_', '-'), Math.round(control._children.Parts._children[name].opacity * 1000) / 1000]));
+  };
+  assert.deepEqual(opacityAt(0), { '-27': 0, 0: 1, 27: 0, 81: 0 }, 'at rest, the one drawn at rest');
+  assert.deepEqual(opacityAt(13.5), { '-27': 0, 0: 0.5, 27: 0.5, 81: 0 }, 'half way, half each');
+  assert.deepEqual(opacityAt(-27), { '-27': 1, 0: 0, 27: 0, 81: 0 });
+  assert.deepEqual(opacityAt(-135), { '-27': 0, 0: 0, 27: 0, 81: 0 }, 'beyond the first, by a step and more: none');
+  // The step is the smallest between two angles (27): the one at 81 shows from 54 to 108 only, and
+  // where none was drawn (54) nothing stands in.
+  assert.deepEqual(opacityAt(54), { '-27': 0, 0: 0, 27: 0, 81: 0 });
+  assert.deepEqual(opacityAt(67.5), { '-27': 0, 0: 0, 27: 0, 81: 0.5 });
+  // A single layer "at" an angle is just a turning layer.
+  const single = planPsdComponentImport(writePsdUint8Array({ width: 40, height: 40, children: [
+    solid('body', 0, 0, 40, 40, [120, 120, 120, 255]), solid('needle at 10', 18, 2, 4, 18, [250, 250, 250, 255]),
+  ] }, { noBackground: true, generateThumbnail: false }));
+  assert.deepEqual(bindings(single).map((b) => b.target), ['Parts.needle_at_10.Layout.rotation']);
 });
 
 test('a Photoshop layer\'s mask is its own; its clipped layers are in its picture; its styles drawn', () => {
