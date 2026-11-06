@@ -8,6 +8,8 @@
 # the layers its look adds up from, in CEditor's blend modes:
 #
 #   <name>             its own colour, unlit (normal)
+#   <name> colour share  hidden: how much of that colour shows in each pixel of it, for CEditor to
+#                      change the colour with its light kept (1 inside; at its edge, its shading)
 #   <name> shading     what the lights and the room do to that colour (multiply)
 #   <name> highlights  its reflections, and light brighter than its colour (linear dodge)
 #   <name> lit         a lamp's own glow (linear dodge); shown when the lamp is on
@@ -44,6 +46,11 @@
 #     light, a browser in sRGB. CEditor mixes it for the panel under the control (its colour, or a
 #     plate filled with a colour under it): the parts that stay put are written as they cover each
 #     pixel, and named in the file's XMP for CEditor to mix.
+#   - The colour. CEditor changes a part's colour by its colour layer: the colour it was drawn in
+#     taken to the new one, each pixel by its colour share, so that at the edge, where the colour
+#     layer holds the part's look as lit, the new colour is lit as the old one was. A metal's
+#     reflections are its colour: its highlights, and a turning part's reflection in it, are named
+#     in the file's XMP as taking its colour (<ceditor:colourOf>), and change with it.
 #   - A lit lamp's outermost pixels, which Cycles shows lit out to where the lamp covers a quarter of
 #     a pixel while the panel still shows through, are lit as on the scene's panel ("For this panel",
 #     on by default; off, or without a panel object, as on black).
@@ -269,6 +276,12 @@ def srgb(x):
     return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(x, 1.0 / 2.4) - 0.055)
 
 
+def srgb_beyond(x):
+    """sRGB, its curve carried on past white: how far beyond white a light is, in its terms."""
+    x = np.maximum(x, 0.0)
+    return np.where(x <= 0.0031308, x * 12.92, 1.055 * np.power(x, 1.0 / 2.4) - 0.055)
+
+
 def to8(x):
     return np.clip(np.round(x * 255.0), 0, 255).astype(np.uint8)
 
@@ -305,11 +318,15 @@ def part_look(p, lamp=False):
     without_glow = np.clip(total - rgb("Emit") * inv, 0.0, None)
     e_colour = srgb(colour)
     shade = np.where(e_colour > 1e-4, np.clip(srgb(lit) / np.maximum(e_colour, 1e-4), 0.0, 1.0), 1.0)
-    highlights = np.clip(srgb(without_glow) - e_colour * shade, 0.0, 1.0)
+    # Where a metal's reflection is brighter than white (a glint), its highlights hold that light as it
+    # is, up to a whole white, not only what fills the colour up to white: shown, the two add to white
+    # all the same; recoloured (its highlights take its colour), a glint Blender shows white stays so.
+    beyond = np.where(metal, srgb_beyond(without_glow), srgb(without_glow))
+    highlights = np.clip(beyond - e_colour * shade, 0.0, 1.0)
     glow = np.clip(srgb(total) - srgb(without_glow), 0.0, 1.0)
     return {"alpha": alpha, "colour": e_colour, "shade": shade, "highlights": highlights, "glow": glow,
             "whole": srgb(without_glow if lamp else total), "shown": srgb(p["Combined"][..., :3]),
-            "lit": p["Combined"][..., :3]}
+            "lit": p["Combined"][..., :3], "metal": metal[..., 0].astype(np.float32)}
 
 
 def unover(coverages):
@@ -513,21 +530,24 @@ def _unicode_name(name):
 XMP_NAMESPACE = "https://github.com/Ted-juh/CEditor/ns/layers/1.0/"
 
 
-def _xmp(linear_edges):
-    """The file's XMP: the layers whose edge CEditor mixes for the panel under them."""
+def _xmp(linear_edges, colour_of=()):
+    """The file's XMP: the layers whose edge CEditor mixes for the panel under them, and the light
+    layers that take a colour layer's colour ("cap highlights=cap": a metal's reflections)."""
     escape = lambda text: text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
     items = "".join(f"<rdf:li>{escape(name)}</rdf:li>" for name in linear_edges)
+    follows = "".join(f"<rdf:li>{escape(light)}={escape(colour)}</rdf:li>" for light, colour in colour_of)
     return ('<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/">'
             '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">'
             f'<rdf:Description rdf:about="" xmlns:ceditor="{XMP_NAMESPACE}">'
             f'<ceditor:linearEdges><rdf:Bag>{items}</rdf:Bag></ceditor:linearEdges>'
-            '</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>').encode("utf-8")
+            + (f'<ceditor:colourOf><rdf:Bag>{follows}</rdf:Bag></ceditor:colourOf>' if follows else "")
+            + '</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end="w"?>').encode("utf-8")
 
 
-def write_psd(path, width, height, layers, merged, linear_edges=()):
+def write_psd(path, width, height, layers, merged, linear_edges=(), colour_of=()):
     """`layers`, bottom first: `{name, rgba (h, w, 4) uint8, blend ('norm', 'mul ', 'lddg', 'div '), hidden}`.
-    `linear_edges`: the names of the layers whose edge CEditor mixes for the panel under them, in the
-    file's XMP."""
+    `linear_edges`: the names of the layers whose edge CEditor mixes for the panel under them, and
+    `colour_of`: (light layer, colour layer) pairs, the light taking the colour's, in the file's XMP."""
     records, channel_data = [], []
     for layer in layers:
         rgba = layer["rgba"]
@@ -560,8 +580,8 @@ def write_psd(path, width, height, layers, merged, linear_edges=()):
         f.write(b"8BPS" + struct.pack(">H", 1) + b"\0" * 6 + struct.pack(">HIIHH", 4, height, width, 8, 3))
         f.write(struct.pack(">I", 0))  # colour mode data
         resources = b""
-        if linear_edges:
-            xmp = _xmp(linear_edges)
+        if linear_edges or colour_of:
+            xmp = _xmp(linear_edges, colour_of)
             resources = b"8BIM" + struct.pack(">H", 1060) + b"\0\0" + struct.pack(">I", len(xmp)) + xmp + b"\0" * (len(xmp) % 2)
         f.write(struct.pack(">I", len(resources)) + resources)  # image resources
         f.write(struct.pack(">I", len(section)) + section)
@@ -761,6 +781,8 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             return np.where(a > 0, merged[..., :3] / np.maximum(a, 1e-6), 0.0), a[..., 0] > 0.999
 
         linear_edges = []
+        colour_of = []
+        metal_cover = {}
 
         def add_part(o, look, opacity, at_angles=None, stays=False):
             """`at_angles`: for a part that turns whole, {angle: its look rendered turned that far, turned
@@ -791,20 +813,43 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
             under, opaque = beneath()
             edge = np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity)
 
-            def colour_of(seen):
+            def colour_layer(seen):
                 glow = 0.0 if role == "on" else seen["glow"]
                 shading = 1.0 - depth + depth * seen["shade"]
                 return np.where(depth >= 1.0, look["colour"],
                                 np.clip((seen["whole"] - depth * (seen["highlights"] + glow)) / np.maximum(shading, 1e-4), 0.0, 1.0))
+
+            def add_share(name, seen, alpha):
+                """How much of the part's colour shows in each pixel of its colour layer, as a hidden layer
+                beside it: the colour layer is (colour x shading + highlights - depth x the light the
+                layers over it add) / (1 - depth + depth x shading), and changes with the colour by
+                shading / (1 - depth + depth x shading): 1 inside, its shading at its edge. CEditor
+                changes its colour by it (utils/pictureRecolour.js). Left out where it is 1 throughout."""
+                shading = 1.0 - depth + depth * seen["shade"]
+                share = np.where(depth >= 1.0, 1.0, np.clip(seen["shade"] / np.maximum(shading, 1e-4), 0.0, 1.0))
+                covered = to8(alpha) > 0
+                if np.any(share[covered] < 1.0 - 0.5 / 255):
+                    add(name, share, covered.astype(np.float32), hidden=True)
+
             if at_angles:
+                colour_name = o.name
                 for angle, seen in at_angles.items():
-                    add(f"{o.name} at {angle_name(angle)}", colour_of(seen), edge, hidden=angle != 0)
+                    add(f"{o.name} at {angle_name(angle)}", colour_layer(seen), edge, hidden=angle != 0)
+                    add_share(f"{o.name} colour share at {angle_name(angle)}", seen, edge)
             elif stays:
                 colour_name = still_name if role == "on" else o.name
-                add(colour_name, colour_of(look), opacity, panel_alpha=np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity))
+                add(colour_name, colour_layer(look), opacity, panel_alpha=np.where(~whole & opaque, edge_opacity(look["whole"], opacity, under), opacity))
+                add_share(f"{colour_name} colour share", look, opacity)
                 linear_edges.append(colour_name)
             else:
-                add(still_name if role == "on" else o.name, colour_of(look), edge)
+                colour_name = still_name if role == "on" else o.name
+                add(colour_name, colour_layer(look), edge)
+                add_share(f"{colour_name} colour share", look, edge)
+            # A metal's reflections are its colour: its highlights take the colour layer's colour.
+            covered = look["alpha"] > 0.5
+            if covered.any() and float(look["metal"][covered].mean()) > 0.5:
+                colour_of.append((f"{still_name} highlights", colour_name))
+                metal_cover[colour_name] = whole
             depth = depth[..., 0]
             if at_angles:
                 inside = depth > 0
@@ -937,6 +982,13 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 where = a[..., 0] > 0.999
                 reflect = lambda share_of_light: np.clip(srgb(linear(under) * np.maximum(share_of_light, 1.0)) - under, 0.0, 1.0)
                 added = reflect(ratio)
+                # A multiple of the light on what is under it: in a metal part, that metal's colour. When
+                # most of it is in one, it takes that part's colour, as the part's own highlights do.
+                weight = added.max(-1) * where
+                for metal_name, cover in metal_cover.items():
+                    if weight.sum() > 0 and float((weight * cover).sum()) > 0.6 * float(weight.sum()):
+                        colour_of.append((reflection_name, metal_name))
+                        break
                 if turned_shares and (added.max(-1)[where] >= 0.5 / 255).any():
                     # A turning part's reflection is not the same at every angle: other faces of it catch
                     # the light. Away from rest the layers are hidden, so the file shows the part at rest.
@@ -1030,9 +1082,12 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 mark(f"{shadow_name} pivot", shadow_pivot)
         written = {layer["name"] for layer in layers}
         linear_edges = [name for name in linear_edges if name in written]
-        write_psd(filepath, width, height, layers, merged, linear_edges)
+        has = lambda base: base in written or any(name.startswith(f"{base} at ") for name in written)
+        colour_of = [(light, colour) for light, colour in colour_of if has(light) and has(colour)]
+        write_psd(filepath, width, height, layers, merged, linear_edges, colour_of)
         return {"width": width, "height": height, "layers": [(l["name"], l["blend"]) for l in layers], "renders": count[0], "turn_step": turn_step,
-                "linear_edges": linear_edges,
+                "linear_edges": linear_edges, "colour_of": colour_of,
+                "hidden": [l["name"] for l in layers if l.get("hidden")],
                 "notes": plan["notes"], "merged": merged, "pixels": {l["name"]: l["rgba"] for l in layers},
                 "panel": bare, "on_panel": on_panel}
     finally:

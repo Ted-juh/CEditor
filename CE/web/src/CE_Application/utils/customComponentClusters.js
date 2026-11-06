@@ -30,9 +30,10 @@ function behaviorChannels(behavior) {
  * zones so generated zones appear inside their cluster). Defaults to the
  * authored HitZones.
  *
- * Returns { clusters, orphans } where each cluster is:
+ * Returns { clusters, setByPanel, orphans } where each cluster is:
  *   { id, kind: 'channel'|'behavior', label, channels: [name],
  *     behaviors: [name], zones: [{ name, generated, shared }] }
+ * setByPanel lists the values nothing on the component moves that it uses or that follow a control,
  * and orphans is { channels: [name], behaviors: [name], zones: [name] }.
  */
 export function deriveInteractClusters(control, options = {}) {
@@ -119,12 +120,44 @@ export function deriveInteractClusters(control, options = {}) {
     }
   }
 
+  // A value nothing on the component moves is set by the panel when something on the component uses
+  // it (a binding or a state reads `channel.<name>.`) or it follows a control (its Value From): an
+  // imported dial's Lamp. Not wired up is for a value nothing sets and nothing uses.
+  const setByPanel = orphanChannels.filter((channel) => isUsed(control, channel) || Boolean(String(channelMap[channel]?.valueSource ?? '').trim()));
+
   return {
     clusters,
+    setByPanel,
     orphans: {
-      channels: orphanChannels,
+      channels: orphanChannels.filter((channel) => !setByPanel.includes(channel)),
       behaviors: orphanBehaviors,
       zones: orphanZones,
     },
   };
+}
+
+function isUsed(control, channel) {
+  const readers = JSON.stringify([control?._children?.Bindings ?? {}, control?._children?.States ?? {}]);
+  return readers.includes(`channel.${channel}.`);
+}
+
+/**
+ * What a value set by the panel changes, for the Interact card: the layers its bindings reach
+ * (`parts`, in order), whether all it does to them is show or hide them (`shows`), and the states that
+ * read it (`states`).
+ */
+export function describeValueUse(control, channel) {
+  const parts = [];
+  let shows = true;
+  for (const binding of Object.values(children(control, 'Bindings'))) {
+    if (!String(binding?.source ?? '').startsWith(`channel.${channel}.`)) continue;
+    const target = /^Parts\.([^.]+)\.(.+)$/.exec(String(binding?.target ?? ''));
+    if (!target) { shows = false; continue; }
+    if (!parts.includes(target[1])) parts.push(target[1]);
+    if (!['opacity', 'visible'].includes(target[2])) shows = false;
+  }
+  const states = Object.entries(children(control, 'States'))
+    .filter(([, state]) => JSON.stringify(state ?? {}).includes(`channel.${channel}.`))
+    .map(([name]) => name);
+  return { parts, shows: shows && parts.length > 0, states };
 }

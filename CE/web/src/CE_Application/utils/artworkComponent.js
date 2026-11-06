@@ -138,11 +138,15 @@ function framesFromAngles(layers) {
     const y1 = Math.max(...set.map(({ layer }) => layer.box.y + layer.box.height));
     const box = { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) };
     const share = (value, whole) => Math.round((value / whole) * 1e6) / 1e4;
-    const frameOf = ({ layer }) => ({
-      source: pictureOf(layer.part),
-      x: share(layer.box.x - box.x, box.width), y: share(layer.box.y - box.y, box.height),
-      width: share(layer.box.width, box.width), height: share(layer.box.height, box.height),
-    });
+    const frameOf = ({ layer }) => {
+      const colourShare = layer.part._children.Background._children.Fill.imageColourShare;
+      return {
+        source: pictureOf(layer.part),
+        x: share(layer.box.x - box.x, box.width), y: share(layer.box.y - box.y, box.height),
+        width: share(layer.box.width, box.width), height: share(layer.box.height, box.height),
+        ...(colourShare ? { share: colourShare } : {}),
+      };
+    };
     // Angles a step apart (the smallest gap) over the dial's travel, the -135 to 135 degrees it turns:
     // an angle the set has no layer at (the add-on leaves out one that drew nothing) is a frame of
     // nothing, so that nothing stands in for it, and so are the ends beyond the first and the last.
@@ -165,13 +169,16 @@ function framesFromAngles(layers) {
     const rest = after <= 0 ? (after === 0 ? 0 : list.length - 1)
       : after - 1 + (0 - list[after - 1]) / (list[after] - list[after - 1]);
     const first = set[0].layer;
+    // Its colour is changed from the colour of the frame at rest (utils/pictureRecolour.js).
+    const atRest = [...set].sort((a, b) => Math.abs(a.angle) - Math.abs(b.angle))[0].layer;
+    const colourDrawn = String(atRest.part._children.Background._children.Fill.imageColourDrawn ?? '');
     for (const { layer } of set) taken.delete(layer.part.name);
     const effects = first.part._children.Effects;
     const part = createPartNode(uniqueLayerName(set[0].base, taken), {
       role: 'image', kind: 'rectangle', opacity: Math.max(...set.map(({ layer }) => layer.part.opacity ?? 1)), visible: true,
       layout: { x: box.x, y: box.y, width: box.width, height: box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
       sections: {
-        Image: { _type: 'Image', mode: 'frames', frames, frameIndex: Math.round(rest * 1e4) / 1e4, blendFrames: true, interpolation: 'smooth' },
+        Image: { _type: 'Image', mode: 'frames', frames, frameIndex: Math.round(rest * 1e4) / 1e4, blendFrames: true, interpolation: 'smooth', colour: '', colourDrawn },
         ...(effects ? { Effects: deepClone(effects) } : {}),
       },
     });
@@ -192,8 +199,20 @@ function framesFromAngles(layers) {
  * `{ component, kind, report }`: kind is 'dial', 'fader', 'switch', 'button' or 'artwork'; report
  * lists what each role found, by layer name, for the import's summary.
  */
-export function buildArtworkComponent({ name = 'Artwork', width, height, layers: drawn = [], fileName = '' }) {
+export function buildArtworkComponent({ name = 'Artwork', width, height, layers: drawn = [], fileName = '', colourOf = null }) {
   const { layers, angles: frameAngles } = framesFromAngles(drawn);
+  // Light that takes a part's colour (a metal's highlights; the Blender add-on says which, as
+  // `colourOf`, light layer to colour layer, by name): it follows that part's colour
+  // (utils/pictureRecolour.js).
+  const named = (label) => layers.find((layer) => nameWords(layer.name).join(' ') === nameWords(label).join(' '));
+  for (const [light, colourLayer] of colourOf ?? []) {
+    const follower = named(light);
+    const leader = named(colourLayer);
+    if (!follower || !leader || follower === leader) continue;
+    const image = follower.part._children.Image;
+    if (image) image.colourFollows = leader.part.name;
+    else if (follower.part._children.Background) follower.part._children.Background._children.Fill.imageColourFollows = leader.part.name;
+  }
   const component = createControl('CustomComponent');
   const children = component._children;
   children.Core.name = String(name).trim() || 'Artwork';

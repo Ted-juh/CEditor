@@ -8,6 +8,7 @@ import { rotationCoverScale } from './backgroundCSS.js';
 
 import { deepClone } from './deepClone.js';
 import { isFramesImage, imageFrameLayers } from './imageFrames.js';
+import { pictureColourSources, withColourFollows, withPictureColourSources } from './pictureRecolour.js';
 export const FILMSTRIP_BAKE_WARN_PIXELS = 32_000_000;
 export const FILMSTRIP_BAKE_MAX_PIXELS = 96_000_000;
 export const FILMSTRIP_BAKE_MAX_DIMENSION = 32_767;
@@ -716,11 +717,15 @@ export async function bakeCustomComponentFilmstrip(control, options = {}) {
       .filter(([, part]) => part?.visible !== false)
       .sort((left, right) => numberOr(left?.[1]?.zIndex, 0) - numberOr(right?.[1]?.zIndex, 0));
 
+    // Pictures in their colours (utils/pictureRecolour.js), a metal's highlights following it.
+    const followed = withColourFollows(parts, new Map(Object.entries(resolvedControl?._children?.Parts?._children ?? {})));
+    const coloured = withPictureColourSources(followed, await pictureColourSources(followed));
+
     ctx.save();
     ctx.translate(frameX, frameY);
     ctx.clearRect(0, 0, normalized.outputFrameWidth, normalized.outputFrameHeight);
     ctx.scale(normalized.outputScale, normalized.outputScale);
-    for (const [, part] of parts) {
+    for (const [, part] of coloured) {
       await drawPart(ctx, part, normalized.frameWidth, normalized.frameHeight);
     }
     ctx.restore();

@@ -6,6 +6,7 @@ import { isPolygonKind, clipPathForKind } from './shapeGeometry.js';
 import { clampNumber } from './customDesignSurfaceGeometry.js';
 import { capitalised, carriedControlWord, identifierWords, stateConditionWords } from './authorWords.js';
 import { SLIDER_CONTROL_KIND } from './sliderControlPart.js';
+import { pictureLayerKind } from './pictureRecolour.js';
 
 export function isEditablePart(part) {
   if (!part) return false;
@@ -179,6 +180,10 @@ export function layerKind(part) {
 }
 
 export function layerKindLabel(part) {
+  // A picture, a part of frames and light say so (utils/pictureRecolour.js): every one of an imported
+  // knob's layers read "Rect", the box it is drawn in.
+  const picture = pictureLayerKind(part, part?.name);
+  if (picture) return { picture: 'Picture', frames: 'Frames', light: 'Light' }[picture];
   const kind = layerKind(part);
   // A combined shape (utils/booleanGroups.js) is named for what it does.
   if (kind === 'boolean') {

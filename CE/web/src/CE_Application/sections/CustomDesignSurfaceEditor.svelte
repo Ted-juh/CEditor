@@ -30,6 +30,7 @@
   import { isSurfaceEditorShortcutAllowed } from '../utils/editorShortcutFocus.js';
   import PropertyToggle from '../properties/PropertyToggle.svelte';
   import InteractiveTestSurface from '../components/InteractiveTestSurface.svelte';
+  import { withColourFollows } from '../utils/pictureRecolour.js';
   import InteractivePartRenderer from '../editor/InteractivePartRenderer.svelte';
   import {
     CUSTOM_ASSISTANT_RECIPES,
@@ -55,7 +56,8 @@
   import { normalizeCustomArpeggiator } from '../utils/customComponentArpeggiator.js';
   import { resolveStateScopedControl } from '../utils/interactionRuntime.js';
   import { createInteractionPreviewSession } from '../stores/interactionPreview.js';
-  import { componentDesignerPreviewRequest, componentDesignerStatus, resetComponentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { componentDesignerPreviewRequest, componentDesignerStatus, designerLayerRequest, resetComponentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { designerFillTarget, designerLayerLook } from '../stores/designerColourTarget.js';
   import {
     ENVELOPE_SHAPE_PRESETS,
     RENDERER_COLOR_PRESETS,
@@ -197,6 +199,8 @@
   );
   // What the artboard draws: a combined shape stands in for its operands.
   let partEntries = $derived(allPartEntries.filter(([, part]) => part?.visible !== false && !isBooleanOperand(part)));
+  // As the artboard draws them: a metal's highlights in its colour (utils/pictureRecolour.js).
+  let drawnEntries = $derived(withColourFollows(partEntries, new Map(allPartEntries)));
   let shapeTools = $state(null);
   let shapeBusy = $state(false);
   // Operands being edited are shown faintly where they are, so a hole can be seen while it is moved.
@@ -319,6 +323,9 @@
   let selectedKitFrame = $derived.by(() => kitFrame(selectedKitEntry));
   let selectedPart = $derived(parts?._children?.[selectedLayer] ?? null);
   let selectedAuthoredPart = $derived(authoredParts?._children?.[selectedLayer] ?? null);
+  // What the selected layer is, for its colour: a picture, a part of frames, light, or a shape
+  // (utils/pictureRecolour.js). A picture's colour is its own; light has none.
+  let selectedLook = $derived(selectedAuthoredPart ? designerLayerLook(selectedLayer, selectedAuthoredPart, authoredParts?._children) : null);
   let selectedZone = $derived(hitZones?._children?.[selectedHitZone] ?? null);
   let selectedAuthoredZone = $derived(authoredHitZones?._children?.[selectedHitZone] ?? null);
   let activeSelectionKind = $derived(
@@ -510,6 +517,7 @@
     if (activeSelectionKind === 'hitZone' && selectedZone) {
       return `${selectedZone?.shape ?? 'zone'} / ${selectedZone?.action ?? 'action'}`;
     }
+    if (selectedPart && selectedLook?.kind) return { picture: 'picture layer', frames: 'layer of frames', light: 'light layer' }[selectedLook.kind];
     if (selectedPart) return `${selectedPart?.kind ?? selectedPart?.role ?? 'part'} layer`;
     return 'Pick a layer or hit zone on the canvas';
   });
@@ -630,8 +638,11 @@
         ? 'Generated part'
         : '',
       // For the dock (the selected layers' fill) and the status bar (this surface's zoom and snap).
-      controlId: core?.id ?? '', fill: selectedFill?.colour ?? '', zoom: surfaceZoom, snapEnabled, snapSize: numberOr(snapSize, 10),
+      controlId: core?.id ?? '', fill: selectedLookFill(), zoom: surfaceZoom, snapEnabled, snapSize: numberOr(snapSize, 10),
       layers: activeSelectionKind === 'layer' ? selectedLayerNames.filter((name) => isEditablePart(authoredParts?._children?.[name])) : [],
+      looks: activeSelectionKind === 'layer'
+        ? selectedLayerNames.filter((name) => authoredParts?._children?.[name]).map((name) => designerLayerLook(name, authoredParts._children[name], authoredParts._children))
+        : [],
     });
   });
 
@@ -1121,9 +1132,10 @@
     const previewWidth = Math.max(1, numberOr(previewTransform?.width, artboardWidth));
     const previewHeight = Math.max(1, numberOr(previewTransform?.height, artboardHeight));
     attachBooleanInputs(getSection(materialized, 'Parts')?._children);
-    const previewParts = drawnPartEntries(Object.entries(getSection(materialized, 'Parts')?._children ?? {}))
+    const previewParts = withColourFollows(drawnPartEntries(Object.entries(getSection(materialized, 'Parts')?._children ?? {}))
       .filter(([, part]) => part?.visible !== false)
-      .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0));
+      .sort((left, right) => Number(left?.[1]?.zIndex ?? 0) - Number(right?.[1]?.zIndex ?? 0)),
+    new Map(Object.entries(getSection(materialized, 'Parts')?._children ?? {})));
     return {
       ...entry,
       index,
@@ -1893,6 +1905,31 @@
    * Both halves are needed. Un-hiding without the tab request lands the user on whatever tab they
    * left open; the tab request without un-hiding switches a panel nobody can see.
    */
+  // Where the dock's picker starts: a picture's colour, or the colour it was drawn in; a fill's colour.
+  function selectedLookFill() {
+    if (selectedLook?.kind === 'picture' || selectedLook?.kind === 'frames') return selectedLook.colour || selectedLook.drawn || '';
+    return selectedFill?.colour ?? '';
+  }
+
+  // The look bar's Colour: the dock on the selected pictures' colour, as selecting them arms it.
+  function openPictureColour() {
+    if (!core?.id) return;
+    const layers = selectedLayerNames.filter((name) => isEditablePart(authoredParts?._children?.[name]));
+    const looks = layers.map((name) => designerLayerLook(name, authoredParts._children[name], authoredParts._children));
+    const target = designerFillTarget({ kind: 'Layer', controlId: core.id, layers, looks });
+    if (!target) return;
+    activateColorTarget(target, selectedLookFill() || 'FF5B9BD5');
+    revealDisplayDock('colors');
+  }
+
+  // A layer the dock asks for (a light layer's "Edit <layer>'s colour").
+  $effect(() => {
+    const request = $designerLayerRequest;
+    if (!request || request.controlId !== core?.id) return;
+    designerLayerRequest.set(null);
+    if (authoredParts?._children?.[request.name]) untrack(() => selectLayer(request.name));
+  });
+
   function revealDisplayDock(tab) {
     displayDockHidden = false;
     displayTabRequest.set({ tab });
@@ -3608,7 +3645,8 @@
       {selectedCorners} {selectedText} {selectedTextFill} {selectedTextFont}
       {componentScriptsEnabled} {componentScriptList}
       {setLayerProperty} {openLayerColour} {openLayerGradient} {toggleFillGradient}
-      {openComponentScripts}
+      {openComponentScripts} {selectedLook} {openPictureColour}
+      selectLayerByName={selectLayer}
     >
       <!-- In the look bar, not over the canvas: see SurfaceLookBar. -->
       {#snippet notice()}
@@ -3762,7 +3800,7 @@
               ></div>
             {/if}
 
-            {#each partEntries as [name, part] (name)}
+            {#each drawnEntries as [name, part] (name)}
               <InteractivePartRenderer
                 part={renderPartForFrame(name, part)}
                 parentWidth={artboardWidth}

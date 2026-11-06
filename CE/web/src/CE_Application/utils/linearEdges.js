@@ -30,7 +30,8 @@ export function withEdgeSources(entries, sources) {
     if (!src) return [name, part];
     const background = part._children.Background;
     const fill = background._children.Fill;
-    return [name, { ...part, _children: { ...part._children, Background: { ...background, _children: { ...background._children, Fill: { ...fill, imageSrc: src } } } } }];
+    // Mixed from the picture in its colour (utils/pictureRecolour.js), so not to be recoloured again.
+    return [name, { ...part, _children: { ...part._children, Background: { ...background, _children: { ...background._children, Fill: { ...fill, imageSrc: src, imageColour: '' } } } } }];
   });
 }
 
@@ -177,7 +178,8 @@ export function hasLinearEdges(part) {
 
 const decoded = new Map();
 
-function pixelsOf(src) {
+/** A picture's pixels, decoded once (straight RGBA, through a canvas): `{ width, height, pixels }`, or null. */
+export function picturePixels(src) {
   if (decoded.has(src)) return decoded.get(src);
   const promise = new Promise((resolve) => {
     const image = new Image();
@@ -212,7 +214,7 @@ export async function linearEdgeSources(parts, backdrop) {
   const key = `${backdrop.map((v) => Math.round(v * 255)).join(',')}|${pictures.map((part) => `${part.name}:${part.visible !== false}:${part.opacity ?? 1}:${part._children.Background._children.Fill.imageSrc.length}:${part._children.Background._children.Fill.imageSrc.slice(-24)}`).join('|')}`;
   if (made.has(key)) return made.get(key);
   const promise = (async () => {
-    const read = await Promise.all(pictures.map((part) => pixelsOf(part._children.Background._children.Fill.imageSrc)));
+    const read = await Promise.all(pictures.map((part) => picturePixels(part._children.Background._children.Fill.imageSrc)));
     const layers = pictures.map((part, i) => {
       const layout = part._children.Layout ?? {};
       const blend = part._children.Effects?._children?.Blend?.mode ?? 'normal';

@@ -59,6 +59,25 @@ test('the dock does not write the hidden panel from the designer, and says what 
   const dock = readFileSync(new URL('../src/CE_Application/panels/DisplayPanel.svelte', import.meta.url), 'utf8');
   assert.match(dock, /if \(designerOpen\) return;\s*\n\s*\/\/ Default — write to panel bgColour/);
   assert.match(dock, /if \(panel && !designerOpen\) \{\s*updatePanel\(panel\.id, \{ bgGradient: newGradient/);
-  assert.match(dock, /\(designerOpen \? 'No layer selected' : 'Panel background'\)/);
+  assert.match(dock, /\(designerOpen \? \(lightLook \? `\$\{lightLook\.name\} › light, no colour of its own` : 'No layer selected'\) : 'Panel background'\)/);
   assert.match(dock, /if \(!t\._designerFill\) handleTabClick/, 'selecting a layer does not take the dock off its tab');
+});
+
+test('a picture layer\'s target is its own colour, light has none, and a mixed selection writes each its own', () => {
+  const looks = [
+    { name: 'skirt', kind: 'picture', colourPath: 'Background.Fill.imageColour', drawnPath: 'Background.Fill.imageColourDrawn' },
+    { name: 'pointer', kind: 'frames', colourPath: 'Image.colour', drawnPath: 'Image.colourDrawn' },
+    { name: 'skirt_shading', kind: 'light', lights: 'skirt' },
+    { name: 'face', kind: '' },
+  ];
+  const skirt = designerFillTarget(open(['skirt'], { looks }));
+  assert.deepEqual([skirt.path, skirt.label], ['Parts.skirt.Background.Fill.imageColour', 'skirt › Colour']);
+  assert.deepEqual(skirt._picture, { name: 'skirt', controlId: 'knob', drawnPath: 'Parts.skirt.Background.Fill.imageColourDrawn' });
+  assert.equal(designerFillTarget(open(['pointer'], { looks })).path, 'Parts.pointer.Image.colour');
+  assert.equal(designerFillTarget(open(['skirt_shading'], { looks })), null, 'light has no colour of its own');
+  const both = designerFillTarget(open(['skirt', 'skirt_shading', 'pointer'], { looks }));
+  assert.equal(both.label, '2 layers › Colour', 'the light layer is left out');
+  const mixed = designerFillTarget(open(['skirt', 'face'], { looks }));
+  assert.equal(mixed.label, '2 layers › Fill and colour');
+  assert.equal(mixed.acceptsRoles, true, 'a set\'s role links each');
 });

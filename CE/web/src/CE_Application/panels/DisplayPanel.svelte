@@ -50,7 +50,10 @@
   import { ROLE_GROUPS, roleLabel } from '../models/setEditing.js';
   import { makeTokenReference, resolveColourLiteral, tokenNameOf } from '../models/controlSets.js';
   import { gradientTarget, applyGradientToTarget, clearGradientTarget } from '../stores/gradientTarget.js';
-  import { componentDesignerStatus } from '../stores/componentDesignerStatus.js';
+  import { componentDesignerStatus, designerLayerRequest } from '../stores/componentDesignerStatus.js';
+  import { updateControlProperty } from '../stores/controls.js';
+  import { picturePixels } from '../utils/linearEdges.js';
+  import { drawnColour, rgbColour } from '../utils/pictureRecolour.js';
   import { designerFillTarget, followDesignerFill } from '../stores/designerColourTarget.js';
   import { displayTabRequest } from '../stores/displayTab.js';
   import { setPanelVisibility } from '../stores/panelVisibility.js';
@@ -376,6 +379,66 @@
     void $colorTarget;
     followDesignerFill(designerFill, $componentDesignerStatus?.fill);
   });
+  // A picture's colour (utils/pictureRecolour.js): the colour it was drawn in, which becomes the one
+  // picked, beside the picker. A picture that came in without it has it measured, for showing.
+  let pictureTarget = $derived($colorTarget?._picture ?? null);
+  let pictureLook = $derived(pictureTarget
+    ? (($componentDesignerStatus?.looks ?? []).find((look) => look.name === pictureTarget.name) ?? null)
+    : null);
+  let measuredDrawn = $state('');
+  $effect(() => {
+    const look = pictureLook;
+    measuredDrawn = '';
+    if (!look || look.drawn || !look.source) return undefined;
+    let live = true;
+    picturePixels(look.source).then((picture) => { if (live && picture) measuredDrawn = drawnColour(picture.pixels); });
+    return () => { live = false; };
+  });
+  let drawnHex = $derived(String(pictureLook?.drawn || measuredDrawn || 'FF808080').slice(-6).toUpperCase());
+  let pictureHasColour = $derived(Boolean(String(pictureLook?.colour ?? '').trim()));
+  // What it is drawn in now: its colour as stored (a role as the set gives it), or as drawn.
+  let nowHex = $derived(pictureHasColour
+    ? String(resolveColourLiteral(pictureLook.colour, colorTargetSet($colorTarget) ?? undefined, 'FF' + drawnHex)).slice(-6).toUpperCase()
+    : drawnHex);
+  let pickingFromPicture = $state(false);
+  $effect(() => { void pictureTarget?.name; pickingFromPicture = false; });
+
+  // Pick from the picture: the colour clicked on the picture as drawn is the one to change.
+  async function pickDrawnColour(event) {
+    const look = pictureLook;
+    const target = pictureTarget;
+    if (!look?.source || !target) return;
+    const box = event.currentTarget.getBoundingClientRect();
+    const picture = await picturePixels(look.source);
+    if (!picture || !box.width || !box.height) return;
+    const x = Math.max(0, Math.min(picture.width - 1, Math.floor(((event.clientX - box.left) / box.width) * picture.width)));
+    const y = Math.max(0, Math.min(picture.height - 1, Math.floor(((event.clientY - box.top) / box.height) * picture.height)));
+    const at = (y * picture.width + x) * 4;
+    if (!picture.pixels[at + 3]) return;
+    updateControlProperty(target.controlId, target.drawnPath, rgbColour([picture.pixels[at], picture.pixels[at + 1], picture.pixels[at + 2]]));
+    pickingFromPicture = false;
+  }
+
+  // Back to as drawn: no colour of its own, the picture as it is.
+  function pictureAsDrawn() {
+    const target = $colorTarget;
+    if (!target?._picture) return;
+    updateControlProperty(target.controlId, target.path, '');
+    colorTargetDirty = true;
+    linkedRole = '';
+    userPickedColor = drawnHex;
+    userPickedAlpha = 1;
+  }
+
+  // A light layer selected alone: no colour of its own; the dock says which layer it lights.
+  let lightLook = $derived.by(() => {
+    const looks = $componentDesignerStatus?.looks ?? [];
+    return looks.length === 1 && looks[0].kind === 'light' ? looks[0] : null;
+  });
+  function editLitLayer() {
+    if (lightLook?.lights) designerLayerRequest.set({ controlId: $componentDesignerStatus.controlId, name: lightLook.lights });
+  }
+
   // Drag quantisation for the colour bands. 0 = smooth (no design tool ships
   // a snapping colour picker by default); persisted so a chosen step sticks.
   const STEP_SIZE_STORAGE_KEY = 'ce.displayPanel.stepSize';
@@ -867,7 +930,7 @@
   let colorContextLabel = $derived.by(() => {
     if (editingGradientStop !== null) return `Gradient stop ${editingGradientStop + 1}`;
     if (pickingNotepadColor) return 'Notepad text colour';
-    return describeTarget($colorTarget) ?? (designerOpen ? 'No layer selected' : 'Panel background');
+    return describeTarget($colorTarget) ?? (designerOpen ? (lightLook ? `${lightLook.name} › light, no colour of its own` : 'No layer selected') : 'Panel background');
   });
   // In the designer with nothing selected the picker colours nothing (applyColor returns), so the tab
   // says how to give it something instead of drawing a full picker that does nothing.
@@ -1102,9 +1165,42 @@
             <button class="context-done" onclick={handleColorDone}>Done</button>
           {/if}
         </div>
-        {#if colorsIdle}
+        {#if colorsIdle && lightLook}
+          <div class="colors-idle light-note" data-testid="light-layer-note">
+            <p><strong>{lightLook.name}</strong> is light: what the lights do to the layers under it. It has no colour of its own to change.</p>
+            {#if lightLook.lights}
+              <button type="button" class="pc-btn go" onclick={editLitLayer}>Edit {lightLook.lights}'s colour</button>
+            {/if}
+          </div>
+        {:else if colorsIdle}
           <p class="colors-idle">Select a layer on the canvas and its fill opens here. A stroke or text colour opens from its swatch in the bar above the canvas.</p>
         {:else}
+        {#if pictureTarget && editingGradientStop === null && !pickingNotepadColor}
+          <div class="picture-colour" data-testid="picture-colour">
+            <span class="pc-pair" title="The colour the picture was drawn in">
+              <span class="pc-label">Drawn</span><span class="pc-swatch" style="background:#{drawnHex}"></span><span class="pc-hex">#{drawnHex}</span>
+            </span>
+            <span class="pc-arrow" aria-hidden="true">→</span>
+            <span class="pc-pair" title="The colour it is drawn in now">
+              <span class="pc-label">Now</span><span class="pc-swatch" style="background:#{nowHex}"></span><span class="pc-hex">#{nowHex}</span>
+            </span>
+            <button type="button" class="pc-btn" class:on={pickingFromPicture} aria-pressed={pickingFromPicture}
+              disabled={!pictureLook?.source} onclick={() => { pickingFromPicture = !pickingFromPicture; }}
+              title="Choose which colour of the picture is the one to change">Pick from the picture</button>
+            <button type="button" class="pc-btn right" disabled={!pictureHasColour} onclick={pictureAsDrawn}
+              title="No colour of its own: the picture as it was drawn">Back to as drawn</button>
+            {#if pickingFromPicture && pictureLook?.source}
+              <div class="pc-pick">
+                <button type="button" class="pc-picture" onclick={pickDrawnColour} aria-label="The picture as drawn: click the colour to change">
+                  <img src={pictureLook.source} alt="" draggable="false" />
+                </button>
+                <span>Click the colour in the picture that is to change. The rest changes with it, in proportion.</span>
+              </div>
+            {:else}
+              <p class="pc-note">The drawn colour becomes the new one; lighter and darker pixels keep their proportion to it. Its shading and highlights stay as they are.</p>
+            {/if}
+          </div>
+        {/if}
         <div class="colors-layout">
           <div class="colors-preview" class:split={editingGradientStop !== null || pickingNotepadColor}>
             <ColorChooser
@@ -1358,6 +1454,40 @@
 </div>
 
 <style>
+  .picture-colour {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid #2A2A2A;
+    background: #12161A;
+    font-size: 10.5px;
+  }
+  .pc-pair { display: inline-flex; align-items: center; gap: 6px; }
+  .pc-label { font: 600 8.5px/1 var(--font-mono, ui-monospace, monospace); letter-spacing: 0.13em; text-transform: uppercase; color: #616C75; }
+  .pc-swatch { width: 28px; height: 18px; border-radius: 3px; border: 1px solid #0008; }
+  .pc-hex { font: 500 10px/1 var(--font-mono, ui-monospace, monospace); color: #B9C8D4; }
+  .pc-arrow { color: #616C75; }
+  .pc-btn {
+    border: 1px solid #333; border-radius: 3px; background: #1A1A1A; color: #B9C8D4;
+    font: 600 10.5px/1 inherit; padding: 5px 8px; cursor: pointer;
+  }
+  .pc-btn:hover:not(:disabled) { border-color: #4A5560; color: #E8EEF5; }
+  .pc-btn:disabled { opacity: 0.45; cursor: default; }
+  .pc-btn:focus-visible { outline: 2px solid #14B8A6; outline-offset: 1px; }
+  .pc-btn.on, .pc-btn.go { border-color: #0E7C70; background: #0B2320; color: #8FEDE3; }
+  .pc-btn.right { margin-left: auto; }
+  .pc-note { flex-basis: 100%; margin: 0; color: #8A949C; font-size: 10.5px; line-height: 1.45; }
+  .pc-pick { flex-basis: 100%; display: flex; align-items: center; gap: 10px; color: #8A949C; font-size: 10.5px; line-height: 1.45; }
+  .pc-picture {
+    flex: 0 0 auto; width: 120px; height: 120px; padding: 4px; border: 1px solid #333; border-radius: 4px; cursor: crosshair;
+    background: repeating-conic-gradient(#2A2E33 0% 25%, #1E2226 0% 50%) 0 0 / 12px 12px;
+  }
+  .pc-picture img { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; pointer-events: none; }
+  .light-note p { margin: 0 0 10px; }
+  .light-note strong { color: #E8EEF5; }
+
   .colors-idle {
     margin: 0;
     padding: 14px 16px;

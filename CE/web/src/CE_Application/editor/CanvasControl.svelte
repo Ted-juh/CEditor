@@ -157,6 +157,7 @@
   import { sortControlsForHitTest } from '../utils/controlOrder.js';
   import { getContext, setContext, untrack } from 'svelte';
   import { PANEL_SURFACE_CONTEXT_KEY, colourUnderControl, hasLinearEdges, linearEdgeSources, withEdgeSources } from '../utils/linearEdges.js';
+  import { pictureColour, pictureColourSources, withColourFollows, withPictureColourSources } from '../utils/pictureRecolour.js';
   import { activeControlSet, controlSetSources, CONTROL_SET_CONTEXT_KEY, CONTROL_SET_SOURCES_CONTEXT_KEY } from '../stores/controlSets.js';
   import { CONTROL_SET_LAMP_CONTEXT_KEY, resolveToken } from '../models/controlSets.js';
   import { SERIES_ROLES, chromeTone } from '../models/instrumentDesigns.js';
@@ -524,6 +525,22 @@
   // directly rather than through CanvasControl, so authoring always sees real, separate layers.
   // That is not an accident of this code, but it is load-bearing, and componentCreatorParts.test.js
   // is what stops it becoming one.
+  // A picture in a colour of its own (utils/pictureRecolour.js): drawn recoloured once its pixels are
+  // worked out, before the outline is mixed and before the parts that never change are baked, so both
+  // see the colour; until then the part recolours itself.
+  let followedPartEntries = $derived(withColourFollows(visiblePartEntries, new Map(Object.entries(renderParts?._children ?? {}))));
+  let colourSources = $state(null);
+  $effect(() => {
+    const entries = followedPartEntries;
+    if (!entries.some(([, part]) => pictureColour(part))) {
+      colourSources = null;
+      return undefined;
+    }
+    let live = true;
+    pictureColourSources(entries).then((sources) => { if (live) colourSources = sources.size ? sources : null; });
+    return () => { live = false; };
+  });
+  let colouredPartEntries = $derived(withPictureColourSources(followedPartEntries, colourSources));
   // A picture marked to have its edge mixed in linear light (utils/linearEdges.js, the Blender add-on's
   // parts that stay put): drawn with that edge worked out for the colour under this control, once
   // its pictures are read; until then, and wherever nothing is marked, as it is.
@@ -544,11 +561,16 @@
       return undefined;
     }
     let live = true;
-    linearEdgeSources(parts, backdrop).then((sources) => { if (live) edgeSources = sources.size ? sources : null; });
+    (async () => {
+      // In their colours first: the edge is mixed for the colour it is drawn in.
+      const entries = withColourFollows(parts.map((part) => [part.name, part]));
+      const coloured = withPictureColourSources(entries, await pictureColourSources(entries)).map(([, part]) => part);
+      return linearEdgeSources(coloured, backdrop);
+    })().then((sources) => { if (live) edgeSources = sources.size ? sources : null; });
     return () => { live = false; };
   });
   let renderedPartEntries = $derived.by(() =>
-    bakeStaticPartEntries(renderControl, withEdgeSources(visiblePartEntries, edgeSources), displayW, displayH));
+    bakeStaticPartEntries(renderControl, withEdgeSources(colouredPartEntries, edgeSources), displayW, displayH));
   let isSelected = $derived(core?.id != null && $selectedComponentIds.has(core.id));
   // The layer's colour code, if it has one. This is where colour coding actually earns its keep:
   // in the dock you already know which layer you are looking at, on the canvas you do not, and

@@ -37,6 +37,7 @@
   import { systemReducedMotion } from '../stores/reducedMotion.js';
   import { animationDeclaration, colourVariables } from '../utils/keyframeAnimation.js';
   import { isFramesImage, imageFrameLayers, imageFrameLayerStyle } from '../utils/imageFrames.js';
+  import { pictureColour, recolourPicture, withRecolouredPicture } from '../utils/pictureRecolour.js';
 
   let {
     part = null,
@@ -103,11 +104,28 @@
     return `${transitionDeclaration(bucket, { target: 'part' })} ${colourTransitionVar(bucket?.colour ?? null)}`.trim();
   }
 
+  // A picture in a colour of its own (utils/pictureRecolour.js) that reaches here not yet recoloured
+  // (the Component Designer, the state sheets; on the canvas CanvasControl does it first): drawn as it
+  // is until its pixels are worked out, then in its colour.
+  let wantedColour = $derived(pictureColour(part));
+  let madeColour = $state(null);
+  $effect(() => {
+    const wanted = wantedColour;
+    if (!wanted) {
+      madeColour = null;
+      return undefined;
+    }
+    let live = true;
+    recolourPicture(wanted).then((made) => { if (live) madeColour = made; });
+    return () => { live = false; };
+  });
+  let colouredPart = $derived(madeColour ? withRecolouredPicture(part, madeColour) : part);
+
   let layout = $derived(part?._children?.Layout ?? null);
-  let background = $derived(part?._children?.Background ?? null);
+  let background = $derived(colouredPart?._children?.Background ?? null);
   let effects = $derived(part?._children?.Effects ?? null);
   let text = $derived(part?._children?.Text ?? null);
-  let image = $derived(part?._children?.Image ?? null);
+  let image = $derived(colouredPart?._children?.Image ?? null);
   // A panel knob or slider carried by a component (utils/sliderControlPart.js): the panel's own
   // pipeline, fed the session the panel would hold for it, so it draws and animates the same way.
   let sliderControl = $derived(isSliderControlPart(part) ? part?.meta?.sliderControl ?? null : null);

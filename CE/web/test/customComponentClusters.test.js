@@ -11,7 +11,7 @@ import {
   createValueChannel,
   makeInteractive,
 } from '../src/CE_Application/utils/customComponentFactory.js';
-import { deriveInteractClusters } from '../src/CE_Application/utils/customComponentClusters.js';
+import { deriveInteractClusters, describeValueUse } from '../src/CE_Application/utils/customComponentClusters.js';
 
 function blankControl() {
   return createControl('CustomComponent');
@@ -89,6 +89,31 @@ test('orphan buckets: channel without behavior, behavior without channel, dangli
   assert.deepEqual(orphans.channels, ['lonely']);
   assert.deepEqual(orphans.behaviors, ['headless']);
   assert.deepEqual(orphans.zones, ['dangling']);
+});
+
+test('a value the component uses, or one that follows a control, is set by the panel; one nothing uses is not wired up', () => {
+  const control = withGraph({
+    channels: {
+      lamp: createValueChannel('lamp', { label: 'Lamp', type: 'bool', defaultValue: true }),
+      follower: { ...createValueChannel('follower', {}), valueSource: 'knob-1' },
+      lonely: createValueChannel('lonely', {}),
+    },
+  });
+  control._children.Bindings._children = {
+    litOn: { source: 'channel.lamp.normalized', target: 'Parts.lamp_lit.opacity' },
+    glowOn: { source: 'channel.lamp.normalized', target: 'Parts.lamp_glow.opacity' },
+  };
+  const { setByPanel, orphans } = deriveInteractClusters(control);
+  assert.deepEqual(setByPanel, ['lamp', 'follower']);
+  assert.deepEqual(orphans.channels, ['lonely']);
+  assert.deepEqual(describeValueUse(control, 'lamp'), { parts: ['lamp_lit', 'lamp_glow'], shows: true, states: [] });
+  assert.deepEqual(describeValueUse(control, 'follower'), { parts: [], shows: false, states: [] });
+  // A state that reads it, and a binding that moves rather than shows.
+  control._children.Bindings._children.slide = { source: 'channel.lamp.normalized', target: 'Parts.lamp_lit.Layout.offsetX' };
+  control._children.States._children = { ...control._children.States._children, glowing: { when: { custom: 'channel.lamp.normalized > 0.5' } } };
+  assert.deepEqual(describeValueUse(control, 'lamp'), { parts: ['lamp_lit', 'lamp_glow'], shows: false, states: ['glowing'] });
+  // A name that only begins the same is not this value.
+  assert.deepEqual(deriveInteractClusters(withGraph({ channels: { lam: createValueChannel('lam', {}) } })).setByPanel, []);
 });
 
 test('zone reaching two clusters appears in both, tagged shared', () => {

@@ -685,8 +685,20 @@ The control opens in the Component Designer, ready to use and to change:
   fill and stroke editable. Layer masks and vector masks stay masks, on or off as they were. Drop
   shadows and outer glows stay shadows you can change; a shape layer's other styles become its own
   fill, outline, inner shadows and bevel, and a picture's are drawn into it, close to Photoshop's.
-  Adjustment layers are applied to the layers under them. Change a picture layer's colour with its
-  tint. Text layers stay text where the file says their size and colour.
+  Adjustment layers are applied to the layers under them. Text layers stay text where the file says
+  their size and colour.
+
+**A picture layer's colour.** Select a picture layer and the look bar shows its **Colour**; the
+dock's **Colors** tab opens on it (**Editing: skirt › Colour**). The colour the picture was drawn in
+becomes the one you pick, and every other pixel keeps its proportion to it, so its shading, a
+highlight painted into it or a printed scale stays as drawn. A colour from the control set's roles
+links it to the set, as for a fill. Beside the picker, **Drawn** is the colour it was drawn in and
+**Now** the one it has; **Pick from the picture** shows the picture to click the colour that is to
+change (for a picture of more than one colour, which then changes as a whole), and **Back to as
+drawn** gives it its own colours again. A layer of frames changes all its frames together. Light
+(a layer that multiplies, adds or dodges, or one named shading, highlights, shadow, reflection or
+shine) has no colour of its own: the look bar and the dock say so and offer **Edit skirt's colour**
+for the layer it lights. The **Layers** list marks each layer **Picture**, **Frames** or **Light**.
 
 ### A knob modelled in Blender
 
@@ -705,18 +717,20 @@ small add-on that comes with CEditor.
    **File → New Component from Photoshop Artwork...**.
 
 Each object comes in as its colour, with its shading multiplied over it and its highlights added:
-change a part's colour with its tint and its light stays as Blender rendered it. The shadow on the
-panel is a layer. The pointer is rendered turned every 27 degrees, and so are its shadow and its
+change a part's colour (see [Importing a control you drew](#importing-a-control-you-drew)) and its
+light stays as Blender rendered it, its edge included. A metal's reflections are its colour: change a
+metal cap's colour and its highlights, and the pointer's reflection in it, change with it. The shadow
+on the panel is a layer. The pointer is rendered turned every 27 degrees, and so are its shadow and its
 reflection in the parts under it: each comes in as one layer of frames that turns with the value
 and shows the frame for the pointer's angle, the two either side mixed, so the side of the pointer
-towards the light stays lit, and a metal cap mirrors it, as it turns. Recolour such a layer with its
-**Effects › Filters**. The shadow turns about a point of its own beside the axis, so it stays on the
+towards the light stays lit, and a metal cap mirrors it, as it turns. The shadow turns about a point of its own beside the axis, so it stays on the
 side away from the light whichever way the pointer points. Blender's camera looks straight down
 (the scene's own, when it is orthographic).
 
 A lamp's glow is a layer of its own, and so is its light on the panel; in a switch or a button they
 show when the switch is on, and on a knob they light with a value of their own, **Lamp**, which the
-panel sets with a binding or a script. Light on the panel brightens whatever panel the control is
+panel sets with a binding or a script. The **Interact** card lists it under **Set by the panel**,
+with the layers it shows and whether it starts on or off. Light on the panel brightens whatever panel the control is
 put on in proportion, as light does, a little on a dark panel and a lot on a light one. And CEditor
 mixes the knob's outline with the colour under it as Blender does, so it looks right on a panel of
 any colour, or on a plate filled with one. **For this panel** in the export (on by default) lights a
@@ -1199,8 +1213,9 @@ counter window by the zone the reading is in, stepped or blended, and blended as
 them even where the part is see-through. A bar meter on a track you can see through shows its fill
 through a mask as wide as the reading. A meter
 that shows another control's value keeps showing it: the knob that came into the component with it,
-or the control that stayed on the panel. The **Interact** card says what such a value follows, and
-**Value From** in the value's **Definition** (Advanced) changes it: its own value, another value of
+or the control that stayed on the panel. The **Interact** card lists a value no grab area moves under
+**Set by the panel**, with what it changes and what it follows; **Value From** there, or in the
+value's **Definition** (Advanced), changes it: its own value, another value of
 the component, or a knob or slider on the panel. A control drawn in a classic design (**Core › Control
 design**: Flat disc, Moulded pebble, Studio needle and the rest) comes in as layers that draw that design in its
 own colours: a knob as the drawing itself, shape by shape, its pointer or cap turning with the value;

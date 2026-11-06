@@ -6,11 +6,11 @@
   import { floating } from '../utils/floatingUi.js';
   import { getSection, updateControlProperty, applyControlPatch } from '../stores/controls.js';
   import { creatorMode } from '../stores/creatorMode.js';
-  import { deriveInteractClusters } from '../utils/customComponentClusters.js';
+  import { deriveInteractClusters, describeValueUse } from '../utils/customComponentClusters.js';
   import { buildInteractivePatch } from '../utils/customComponentScaffold.js';
   import { listInteractiveArchetypes } from '../utils/customComponentFactory.js';
   import { numberOr } from '../utils/primitives.js';
-  import { describeValueSource } from '../utils/valueSources.js';
+  import { describeValueSource, valueSourceChoices } from '../utils/valueSources.js';
   import { defaultFires, isButtonBehavior } from '../utils/customButtonFiring.js';
   import { activePanel } from '../stores/panels.js';
   import { behaviorTypeWord, capitalised, carriedControlWord, channelTypeWord, isCarriedControlBehavior } from '../utils/authorWords.js';
@@ -25,6 +25,7 @@
   import CustomBehaviorsEditor from './CustomBehaviorsEditor.svelte';
   import CustomHitZonesEditor from './CustomHitZonesEditor.svelte';
   import Unplug from 'lucide-svelte/icons/unplug';
+  import SlidersHorizontal from 'lucide-svelte/icons/sliders-horizontal';
   import Waves from 'lucide-svelte/icons/waves';
   import MousePointerClick from 'lucide-svelte/icons/mouse-pointer-click';
   import SquareDashed from 'lucide-svelte/icons/square-dashed';
@@ -41,6 +42,21 @@
   let derivation = $derived(deriveInteractClusters(control));
   let clusters = $derived(derivation.clusters);
   let orphans = $derived(derivation.orphans);
+  // Values nothing here moves that the component uses, or that follow a control: the panel sets them
+  // (an imported dial's Lamp). Not a fault, so not under Not wired up.
+  let setByPanel = $derived(derivation.setByPanel ?? []);
+
+  const listed = (names) => (names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`);
+  function panelValueText(name) {
+    const channel = channels?._children?.[name] ?? {};
+    const use = describeValueUse(control, name);
+    const on = ['bool', 'boolean'].includes(String(channel.type ?? 'float'));
+    const parts = use.parts.length ? `${use.shows ? 'Shows' : 'Changes'} ${listed(use.parts)}${use.shows && on ? ' when on' : ''}.` : '';
+    const states = use.states.length ? ` Read by the state${use.states.length === 1 ? '' : 's'} ${listed(use.states)}.` : '';
+    return `${parts}${states}`.trim();
+  }
+  const isOnOff = (name) => ['bool', 'boolean'].includes(String(channels?._children?.[name]?.type ?? 'float'));
+  const isNumber = (name) => !['bool', 'boolean', 'enum', 'text', 'string', 'color', 'note'].includes(String(channels?._children?.[name]?.type ?? 'float'));
   let hasOrphans = $derived(orphans.channels.length + orphans.behaviors.length + orphans.zones.length > 0);
 
   const ARCHETYPES = listInteractiveArchetypes();
@@ -346,18 +362,54 @@
     </div>
   {/each}
 
+  {#if setByPanel.length}
+    <PropertySection title="Set by the panel" icon={SlidersHorizontal}>
+      <div class="panel-values" data-testid="set-by-panel">
+        <p class="panel-values-hint">No grab area moves these. A binding or a script on the panel sets them{#if setByPanel.some(isNumber)}, or a knob or slider they follow{/if}.</p>
+        {#each setByPanel as name (name)}
+          {@const channel = channels?._children?.[name] ?? {}}
+          <div class="panel-value" data-value={name}>
+            <span class="tag value-type">{capitalised(channelTypeWord(channel.type))}</span>
+            <strong>{String(channel.label ?? '').trim() || name}{#if String(channel.label ?? '').trim() && channel.label !== name}<span class="value-name">{name}</span>{/if}</strong>
+            {#if panelValueText(name) || describeValueSource(control, name, $activePanel?.controls ?? [])}
+              <em>{panelValueText(name)}{#if describeValueSource(control, name, $activePanel?.controls ?? [])}{' '}{capitalised(describeValueSource(control, name, $activePanel?.controls ?? []))}.{/if}</em>
+            {/if}
+            <div class="panel-value-set">
+              {#if isOnOff(name)}
+                <span class="set-label">Starts</span>
+                <span class="onoff" role="group" aria-label="How {name} starts">
+                  <button type="button" class:on={!channel.defaultValue} aria-pressed={!channel.defaultValue} onclick={() => setChannelField(name, 'defaultValue', false)}>Off</button>
+                  <button type="button" class:on={!!channel.defaultValue} aria-pressed={!!channel.defaultValue} onclick={() => setChannelField(name, 'defaultValue', true)}>On</button>
+                </span>
+              {:else if isNumber(name)}
+                <label class="value-from" title="Where this value is taken from: its own (a binding or a script sets it), another value of this component, or a knob or slider on the panel.">
+                  <span class="set-label">Value From</span>
+                  <select value={String(channel.valueSource ?? '')} onchange={(event) => setChannelField(name, 'valueSource', event.currentTarget.value)}>
+                    {#each valueSourceChoices(control, name, $activePanel?.controls ?? []) as choice (choice.value)}
+                      <option value={choice.value}>{choice.label}</option>
+                    {/each}
+                  </select>
+                </label>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    </PropertySection>
+  {/if}
+
   {#if hasOrphans}
     <PropertySection title="Not wired up" icon={Unplug}>
       <div class="orphans">
         {#each orphans.channels as name (name)}
-          <!-- A value that follows another (its Value From): what it follows, where nothing here drives it. -->
-          <div class="orphan-row"><span class="tag">channel</span><strong>{name}</strong><em>{describeValueSource(control, name, $activePanel?.controls ?? []) || 'no behavior drives it (fine for output-only values)'}</em></div>
+          <!-- Nothing moves it and nothing uses it: probably left over. -->
+          <div class="orphan-row warn"><span class="tag">value</span><strong>{name}</strong><em>Nothing sets it and nothing uses it.</em></div>
         {/each}
         {#each orphans.behaviors as name (name)}
-          <div class="orphan-row warn"><span class="tag">behavior</span><strong>{name}</strong><em>its value channel is missing</em></div>
+          <div class="orphan-row warn"><span class="tag">behaviour</span><strong>{name}</strong><em>Its value is missing.</em></div>
         {/each}
         {#each orphans.zones as name (name)}
-          <div class="orphan-row warn"><span class="tag">zone</span><strong>{name}</strong><em>targets a missing behavior/channel</em></div>
+          <div class="orphan-row warn"><span class="tag">grab area</span><strong>{name}</strong><em>Moves nothing: its behaviour and value are missing.</em></div>
         {/each}
       </div>
     </PropertySection>
@@ -671,11 +723,16 @@
     flex-direction: column;
     gap: 4px;
     width: 100%;
+    grid-column: 1 / -1;
+    min-width: 0;
   }
 
+  /* The tag, the name, then what is wrong on the rest of the width: the text was squeezed into a
+     column a word wide beside them. */
   .orphan-row {
-    display: flex;
-    align-items: center;
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr);
+    align-items: baseline;
     gap: 7px;
     font-size: 11px;
     color: #C9D5DD;
@@ -686,6 +743,37 @@
     font-style: normal;
     font-size: 10px;
   }
+
+  .panel-values {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+  .panel-values-hint { margin: 0; color: #8A97A3; font-size: 10.5px; line-height: 1.45; }
+  .panel-value {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 4px 10px;
+    align-items: baseline;
+    font-size: 11px;
+    color: #C9D5DD;
+  }
+  .panel-value .value-type { align-self: center; }
+  .panel-value strong { color: #E8EEF5; font-size: 11.5px; }
+  .value-name { margin-left: 6px; font: 500 10px/1 var(--font-mono, ui-monospace, monospace); color: #616C75; }
+  .panel-value em { grid-column: 2; font-style: normal; color: #B9C8D4; font-size: 10.5px; line-height: 1.45; }
+  .panel-value-set { grid-column: 2; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .panel-value-set:empty { display: none; }
+  .set-label { color: #616C75; font-size: 10px; }
+  .value-from { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+  .value-from select { min-width: 0; max-width: 100%; }
+  .onoff { display: inline-flex; border: 1px solid #333; border-radius: 3px; overflow: hidden; }
+  .onoff button { border: 0; background: transparent; color: #8A949C; font: 600 10px/1 inherit; padding: 4px 9px; cursor: pointer; }
+  .onoff button.on { background: #0B2320; color: #8FEDE3; }
+  .onoff button:focus-visible { outline: 2px solid #14B8A6; outline-offset: -2px; }
 
   .orphan-row.warn em {
     color: #D5A16B;

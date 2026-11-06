@@ -45,6 +45,11 @@
     openLayerGradient = () => {},
     toggleFillGradient = () => {},
     openComponentScripts = () => {},
+    // What the selected layer is, for its colour (stores/designerColourTarget.js designerLayerLook):
+    // a picture's colour is its own; light has none, and names the layer it lights.
+    selectedLook = null,
+    openPictureColour = () => {},
+    selectLayerByName = () => {},
     notice = null,
     actions = null,
   } = $props();
@@ -58,7 +63,26 @@
   <div class="surface-lookbar" aria-label="Component look bar">
     {#if activeSelectionKind === 'layer' && selectedPart}
     <div class="paint-strip" class:disabled={!canPaintLayer} aria-label="Layer paint controls">
-      {#if selectedBackground}
+      {#if selectedLook?.kind === 'picture' || selectedLook?.kind === 'frames'}
+        <!-- A picture draws no fill, gradient, stroke or corners: its colour is its own
+             (utils/pictureRecolour.js), changed with its light kept. -->
+        <span class="paint-kind">{selectedLook.kind === 'frames' ? 'Layer of frames' : 'Picture layer'}</span>
+        <label class="paint-swatch">
+          <span>Colour</span>
+          <button type="button" class="mini-swatch-btn" data-testid="picture-colour-swatch"
+            disabled={!canPaintLayer}
+            class:linked={isTokenReference(selectedLook.colour)}
+            style={swatchCss(shown(selectedLook.colour || selectedLook.drawn || 'FF808080', 'FF808080'))}
+            onclick={openPictureColour}
+            title={linkTitle('Colour', selectedLook.colour, selectedLook.colour ? 'Change its colour' : 'Change its colour (drawn as it is now)')}
+          >{#if isTokenReference(selectedLook.colour)}<span class="link-mark" aria-hidden="true">🔗</span>{/if}</button>
+        </label>
+      {:else if selectedLook?.kind === 'light'}
+        <span class="paint-kind" title="Light: what the lights do to the layers under it. It has no colour of its own.">Light layer</span>
+        {#if selectedLook.lights}
+          <button type="button" class="light-link" data-testid="light-layer-link" onclick={() => selectLayerByName(selectedLook.lights)}>Edit {selectedLook.lights}'s colour</button>
+        {/if}
+      {:else if selectedBackground}
         {#if paint.fill}
           <label class="paint-swatch">
             <span>Fill</span>
@@ -225,6 +249,10 @@
 
 <style>
   .mini-swatch-btn.linked { position: relative; }
+  .paint-kind { flex: 0 0 auto; font: 600 9px/1 var(--font-mono, ui-monospace, monospace); letter-spacing: 0.12em; text-transform: uppercase; color: #616C75; padding: 0 2px; }
+  .light-link { flex: 0 0 auto; height: 28px; padding: 0 10px; border: 1px solid #0E7C70; border-radius: 4px; background: #0B2320; color: #8FEDE3; font: 600 11px/1 inherit; cursor: pointer; }
+  .light-link:hover { background: #0F2E2A; }
+  .light-link:focus-visible { outline: 2px solid #14B8A6; outline-offset: 1px; }
   .link-mark { position: absolute; right: -6px; bottom: -6px; width: 12px; height: 12px; border-radius: 50%; background: #12324A; border: 1px solid #3A6A8E; font-size: 7px; line-height: 10px; text-align: center; pointer-events: none; }
   .surface-lookbar { grid-area: lookbar; }
 

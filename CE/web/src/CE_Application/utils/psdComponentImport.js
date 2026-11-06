@@ -41,6 +41,7 @@ import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { pngDataUrl } from './pngEncode.js';
 import { createPartNode } from './customComponentFactory.js';
 import { linearEdgeNames } from './linearEdges.js';
+import { colourOfNames, colourShareOf, drawnColour } from './pictureRecolour.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { deepClone } from './deepClone.js';
 import { buildArtworkComponent, uniqueLayerName } from './artworkComponent.js';
@@ -88,6 +89,20 @@ function crop(pixels, width, box) {
   for (let y = 0; y < box.height; y += 1) {
     const from = ((box.y + y) * width + box.x) * 4;
     out.set(pixels.subarray(from, from + box.width * 4), y * box.width * 4);
+  }
+  return out;
+}
+
+/** `pixels` cropped to `from` (RGBA), laid in a box `to` of the same picture: clear where it has none. */
+function placed(pixels, from, to) {
+  const out = new Uint8Array(to.width * to.height * 4);
+  for (let y = 0; y < to.height; y += 1) {
+    const sy = to.y + y - from.y;
+    if (sy < 0 || sy >= from.height) continue;
+    const x0 = Math.max(to.x, from.x);
+    const x1 = Math.min(to.x + to.width, from.x + from.width);
+    if (x1 <= x0) continue;
+    out.set(pixels.subarray((sy * from.width + (x0 - from.x)) * 4, (sy * from.width + (x1 - from.x)) * 4), (y * to.width + (x0 - to.x)) * 4);
   }
   return out;
 }
@@ -334,8 +349,17 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   // The records as parts. A picture the file names for it (the Blender add-on's parts that stay put)
   // has its edge mixed for the panel under it as light mixes (utils/linearEdges.js).
   const linearEdges = linearEdgeNames(psd.imageResources?.xmpMetadata);
+  // A colour layer's share (utils/pictureRecolour.js), "<name> colour share": how much of its colour
+  // shows in each pixel, which the Blender add-on writes for its colour layers. Not a part: it goes
+  // with the picture it is for.
+  const shares = new Map();
+  for (const record of records) {
+    const of = record.type === 'picture' ? colourShareOf(record.label) : '';
+    if (of) { shares.set(of, record); record.share = true; }
+  }
   const layers = [];
   for (const record of records) {
+    if (record.share) continue;
     const effects = record.shadows.length || record.css !== 'normal' ? blendEffects(record.css) : null;
     if (effects && record.shadows.length) effects._children.Shadows.items = record.shadows;
     const layout = { x: record.box.x, y: record.box.y, width: record.box.width, height: record.box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' };
@@ -360,7 +384,12 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
         role: 'image', kind: 'rectangle', opacity: round(record.alpha, 3), visible: record.visible, layout,
         sections: { Background: pictureBackground(pngDataUrl(record.box.width, record.box.height, record.pixels)), ...(effects ? { Effects: effects } : {}) },
       });
-      if (linearEdges.has(record.label)) part._children.Background._children.Fill.imageEdges = 'linear';
+      const fill = part._children.Background._children.Fill;
+      if (linearEdges.has(record.label)) fill.imageEdges = 'linear';
+      // The colour it was drawn in, which its colour is changed from.
+      fill.imageColourDrawn = drawnColour(record.pixels);
+      const share = shares.get(record.label);
+      if (share) fill.imageColourShare = pngDataUrl(record.box.width, record.box.height, placed(share.pixels, share.box, record.box));
     }
     if (record.mask) part.mask = record.mask;
     layers.push({ name: record.label, part, box: record.box, names: record.chain });
@@ -378,7 +407,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   if (report.pattern.size) warnings.push(`Pattern-filled shapes come in as their pictures: ${list(report.pattern)}.`);
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'Photoshop Artwork';
-  const built = buildArtworkComponent({ name, width, height, layers, fileName });
+  const built = buildArtworkComponent({ name, width, height, layers, fileName, colourOf: colourOfNames(psd.imageResources?.xmpMetadata) });
   return { ok: true, name, width, height, ...built, warnings, kept: [...report.kept] };
 }
 

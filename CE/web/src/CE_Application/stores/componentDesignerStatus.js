@@ -20,12 +20,19 @@ const CLOSED = Object.freeze({
   controlId: '',
   fill: '',
   layers: Object.freeze([]),
+  looks: Object.freeze([]),
   zoom: 1,
   snapEnabled: false,
   snapSize: 10,
 });
 
 export const componentDesignerStatus = writable(CLOSED);
+
+/**
+ * A layer the dock asks the open designer to select (`{ controlId, name }`): a light layer's "Edit
+ * <layer>'s colour" selects the layer it lights. The designer takes it and sets it back to null.
+ */
+export const designerLayerRequest = writable(null);
 
 /** The designer has closed: nothing to report. */
 export function resetComponentDesignerStatus() {

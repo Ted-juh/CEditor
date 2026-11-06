@@ -246,7 +246,9 @@ test('with nothing to colour in the designer, the Colors tab says how to give it
   // The picker colours nothing then (applyColor returns), and a full picker sat there doing nothing.
   const dock = src('CE_Application/panels/DisplayPanel.svelte');
   assert.match(dock, /let colorsIdle = \$derived\(designerOpen && !\$colorTarget && editingGradientStop === null && !pickingNotepadColor\);/);
-  assert.match(dock, /\{#if colorsIdle\}\s*<p class="colors-idle">Select a layer on the canvas and its fill opens here\./);
+  assert.match(dock, /\{:else if colorsIdle\}\s*<p class="colors-idle">Select a layer on the canvas and its fill opens here\./);
+  // A light layer selected alone (utils/pictureRecolour.js): it has no colour, and the tab says which layer it lights.
+  assert.match(dock, /\{#if colorsIdle && lightLook\}[\s\S]*?is light: what the lights do to the layers under it\. It has no colour of its own to change\.[\s\S]*?Edit \{lightLook\.lights\}'s colour/);
 });
 
 test("a layer's look is styled in the look bar, and the inspector beside the canvas does not copy it", () => {
