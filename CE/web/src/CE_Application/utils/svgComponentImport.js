@@ -663,5 +663,5 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'SVG Artwork';
   const built = buildArtworkComponent({ name, width: frame.width, height: frame.height, layers, fileName });
-  return { ok: true, name, width: frame.width, height: frame.height, ...built, layers: layers.length, warnings };
+  return { ok: true, name, width: frame.width, height: frame.height, ...built, warnings };
 }

@@ -379,7 +379,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'Photoshop Artwork';
   const built = buildArtworkComponent({ name, width, height, layers, fileName });
-  return { ok: true, name, width, height, ...built, layers: layers.length, warnings, kept: [...report.kept] };
+  return { ok: true, name, width, height, ...built, warnings, kept: [...report.kept] };
 }
 
 function normalizeTo(model, box) {

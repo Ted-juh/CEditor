@@ -129,7 +129,11 @@ test('a Blender knob comes in as a dial: the pointer, its shadow and its reflect
   assert.deepEqual([lamp.type, lamp.defaultValue], ['bool', true]);
   assert.deepEqual(bindings.filter((b) => b.source === 'channel.lamp.normalized').map((b) => b.target).sort(),
     ['Parts.lamp_glow.opacity', 'Parts.lamp_glow_shine.opacity', 'Parts.lamp_lit.opacity']);
-  assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of \d+ layers: pointer shadow, pointer reflection, pointer turn with the value\. .* with a value of their own, Lamp\.$/);
+  // The notice counts the component's layers as the designer lists them, not the file's 49: the 33
+  // layers of the pointer, its shadow and its reflection at their angles are three.
+  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 49);
+  assert.equal(plan.layers, Object.keys(parts).length);
+  assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of 19 layers: pointer shadow, pointer reflection, pointer turn with the value\. .* with a value of their own, Lamp\.$/);
 });
 
 test('CEditor draws the layers as the add-on composed them', () => {

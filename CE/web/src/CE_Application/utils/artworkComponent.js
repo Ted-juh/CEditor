@@ -391,6 +391,9 @@ export function buildArtworkComponent({ name = 'Artwork', width, height, layers:
   return {
     component,
     kind,
+    // The component's layers, as the Component Designer lists them: a turning part drawn at several
+    // angles is one, however many layers of the file it was made from.
+    layers: Object.keys(parts).length,
     report: {
       turns: names(roles.turns), moves: names(roles.moves), track: names(roles.track), pivot: names(roles.pivot),
       on: names(roles.on), off: names(roles.off), pressed: names(roles.pressed),
