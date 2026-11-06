@@ -171,9 +171,10 @@
       // onto a screen was to place and bind every control by hand.
       { type: 'submenu', label: 'New Panel from Device Profile', items: generateFromProfileItems },
       // Panel artwork is drawn in a vector editor; the placeholders in its "components" layer say
-      // where every control goes. utils/svgPanelImport.js has the convention.
-      { label: 'New Panel from SVG Artwork...', action: () => newPanelFromSvgArtwork() },
-      { label: 'Update Panel from SVG Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
+      // where every control goes. utils/svgPanelImport.js has the convention. Vector artwork is an SVG,
+      // a PDF, or an Illustrator file read through its PDF part (utils/pdfArtwork.js).
+      { label: 'New Panel from Vector Artwork...', action: () => newPanelFromSvgArtwork() },
+      { label: 'Update Panel from Vector Artwork...', enabled: hasPanel, action: () => updatePanelFromSvgArtwork() },
       // The same convention from a Photoshop file: a "components" layer group (utils/psdPanelImport.js).
       { label: 'New Panel from Photoshop Artwork...', action: () => newPanelFromPsdArtwork() },
       { label: 'Update Panel from Photoshop Artwork...', enabled: hasPanel, action: () => updatePanelFromPsdArtwork() },
@@ -185,7 +186,7 @@
       { label: 'Import Component...', action: () => importComponentFromFile() },
       // A drawing made the control itself: every shape or layer a layer of a new component, still
       // editable, and the layers named pointer, fader or lamp wired to move (utils/artworkComponent.js).
-      { label: 'New Component from SVG Artwork...', action: () => newComponentFromSvgArtwork() },
+      { label: 'New Component from Vector Artwork...', action: () => newComponentFromSvgArtwork() },
       { label: 'New Component from Photoshop Artwork...', action: () => newComponentFromPsdArtwork() },
       { label: 'Open Component from Library...', action: () => openSavedCustomComponent() },
       { type: 'separator' },

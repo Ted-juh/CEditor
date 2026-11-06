@@ -995,7 +995,9 @@ The owner asked about reading these directly. What each format is, and the route
 Built: SVG and Photoshop as layered components, and the Blender add-on writing a layered PSD
 (`tools/blender/ceditor_layers.py`; docs/panel-artwork-import.md says what it writes). Next: .ai
 through its PDF part if Illustrator files are wanted directly; a Figma plugin if Figma is; Level 3
-with piece E; Level 2 when somebody needs a shape only Blender can make.
+with piece E; Level 2 when somebody needs a shape only Blender can make. The owner asked for all four
+on 2026-11-06; [import-formats.md](import-formats.md) has the decisions and what is built (Illustrator
+and PDF, first).
 
 What building the add-on found, against Level 1 as written above:
 

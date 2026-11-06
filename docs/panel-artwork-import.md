@@ -3,10 +3,11 @@
 Two editor workflows for building panels quickly and keeping them consistent. Both are in the web
 editor and need nothing from the native build.
 
-## New Panel from SVG Artwork
+## New Panel from Vector Artwork
 
-**File › New Panel from SVG Artwork…** turns an SVG drawn in Inkscape, Illustrator, Affinity or any
-other vector editor into a new panel. The drawing becomes the background, and the placeholders
+**File › New Panel from Vector Artwork…** turns an SVG drawn in Inkscape, Illustrator, Affinity or any
+other vector editor into a new panel; a PDF, or an Illustrator file, comes in the same way (see
+[From a PDF or an Illustrator file](#from-a-pdf-or-an-illustrator-file)). The drawing becomes the background, and the placeholders
 you drew become real controls on exactly the spots you drew them.
 
 ### Drawing the placeholders
@@ -69,6 +70,34 @@ CSS classes, as Illustrator writes them, count.
   worked on, use **Update Panel** (below).
 - To discard an import, close its tab without saving. It is a new, unsaved panel until you save it.
 
+### From a PDF or an Illustrator file
+
+The three Vector Artwork commands (New Panel, Update Panel, New Component) open a `.pdf` or an `.ai`
+as well as an `.svg`. An Illustrator file saved with **Create PDF Compatible File** (Illustrator's
+default) carries a PDF copy of its artwork; CEditor reads that copy with pdf.js (Mozilla, Apache 2.0)
+and turns it into an SVG in memory (`utils/pdfArtwork.js`), which the SVG import then reads as it reads
+any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
+
+| In the file | In CEditor |
+|---|---|
+| Top-level layers | Groups named after them: `components` for a panel's placeholders, `pointer`, `cap`, `lamp on` for a component's parts. A layer switched off comes into a component hidden (as a hidden Photoshop layer does: a switch's lit look), and stays out of a panel's background |
+| Paths, fills, strokes | Vector layers, with their widths, caps, joins, dashes and fill rule. A closed run of four lines along the axes is a rectangle, and four curves through the ends of the axes an ellipse or a circle, so a panel's placeholders are measured |
+| Gradients | Linear and radial: the shape filled with the gradient (Illustrator writes the shape as a clip and paints the gradient inside it). A mesh or freeform gradient is drawn in its mean colour |
+| Clipping masks | The layer's mask, as for SVG |
+| Opacity, blend modes, transparency groups | Kept |
+| Placed and embedded images | Picture layers |
+| Text | Text in the font the file names, its size and colour |
+| CMYK colour | Converted as pdf.js shows it, as Acrobat does without colour management |
+| Sublayers and object names | Not read: Illustrator keeps them only in its own private data, which is undocumented. Name a moving part as a top-level layer, or export SVG |
+| Artboards, pages | One is read; with several the import asks which |
+
+So a panel's placeholders, which a PDF keeps no names for, are typed by their colour and shape (red
+circles knobs, long red rectangles sliders, and so on, as above), and the notice says so; rename the
+controls after. Opacity masks, pattern fills and image masks are not drawn, and the Console lists
+any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
+is refused with what to do: save it again with Create PDF Compatible File ticked, or use Export As ›
+SVG.
+
 ## New Panel from Photoshop Artwork
 
 **File › New Panel from Photoshop Artwork...** does the same from a `.psd`:
@@ -101,11 +130,13 @@ Photoshop before importing.
 worked on, by the same rules as the SVG update below. Controls are matched to their layers by
 **layer name**, so keep the names stable between revisions.
 
-## New Component from SVG Artwork, and from Photoshop Artwork
+## New Component from Vector Artwork, and from Photoshop Artwork
 
 Where the panel importers make a panel with the drawing as its picture, these make the drawing the
-control: a custom component, every shape (SVG) or layer (Photoshop) one of its layers, opened in the
-Component Designer to change and save (`utils/svgComponentImport.js`, `utils/psdComponentImport.js`).
+control: a custom component, every shape (SVG, PDF, Illustrator) or layer (Photoshop) one of its
+layers, opened in the Component Designer to change and save (`utils/svgComponentImport.js`,
+`utils/psdComponentImport.js`). A PDF or an `.ai` is read as an SVG first, as for a panel above; its
+parts are named by its top-level layers, and the notice lists them.
 
 - **SVG**: each `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` and `path` is a vector
   layer with its transforms applied, its fill (a colour, a linear or radial gradient, a pattern drawn
@@ -306,10 +337,10 @@ which the suite holds CEditor's own recolour (within a mean 1.4 and 1.1, the 99t
 and what each lights beside it (the panel by the skirt, the skirt by the cap: a mean 2.2 and 1.5 levels);
 `browser-checks/pictureColour.mjs` changes the skirt's colour in the editor and on a panel.
 
-## Update Panel from SVG Artwork
+## Update Panel from Vector Artwork
 
 Artwork gets revised, and by then the panel has bindings, scripts and links. **File › Update Panel
-from SVG Artwork…** brings the open panel up to date with a new version of its drawing, and keeps
+from Vector Artwork…** brings the open panel up to date with a new version of its drawing, and keeps
 that work. Before changing anything it shows what it will do and asks.
 
 What it changes:

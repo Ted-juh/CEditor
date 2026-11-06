@@ -1,9 +1,11 @@
-// svgPanelImportActions.js — File › New Panel from SVG Artwork, and File › Update Panel from SVG Artwork.
+// svgPanelImportActions.js — File › New Panel from Vector Artwork, and File › Update Panel from Vector
+// Artwork: an SVG, a PDF, or an Illustrator file saved with PDF compatibility.
 //
 // The same layers as panel sharing, for the same reasons:
 //
 //   utils/svgPanelImport.js     the convention and the geometry. No bridge, no stores. Tested in node.
 //   utils/svgPanelReimport.js   matching a revised drawing to the panel it made. Pure, tested in node.
+//   utils/pdfArtwork.js         a PDF or an .ai as the SVG the two above read. Tested in node.
 //   here                        the commands: choose a file, read it, change the panels, report.
 //
 // "New" always makes a new panel. "Update" changes the open one, and only in the ways
@@ -23,7 +25,7 @@ import { activePanel, addPanel, panels } from './panels.js';
 import { createPanel } from './panelModel.js';
 import { updatePanelInList } from './panelDocumentHelpers.js';
 import { cerror, cinfo, cwarn } from './console.js';
-import { notify } from './scriptUi.js';
+import { notify, openDialog } from './scriptUi.js';
 import { confirmDestructive } from '../utils/confirmDiscard.js';
 import { buildSvgImportControls, describeSvgImport, planSvgPanelImport, svgDataUrl } from '../utils/svgPanelImport.js';
 import { embedSvgFonts } from '../utils/svgArtworkFonts.js';
@@ -39,7 +41,7 @@ const READ_TIMEOUT_MS = 15000;
 const REQUEST_PREFIX = 'svgpanel_';
 
 let requestCounter = 0;
-let pendingBrowse = null;   // { requestId, handle(text, filePath) }
+let pendingBrowse = null;   // { requestId, handle(svgText, filePath, origin) }
 const pendingReads = new Map();
 let listenersReady = false;
 
@@ -52,7 +54,73 @@ function textFromDataUrl(dataUrl) {
 }
 
 function baseName(path) {
-  return String(path ?? '').split(/[\\/]/).pop().replace(/\.svg$/i, '') || 'SVG Panel';
+  return String(path ?? '').split(/[\\/]/).pop().replace(/\.(svg|pdf|ai)$/i, '') || 'SVG Panel';
+}
+
+const fileNameOf = (path) => String(path ?? '').split(/[\\/]/).pop();
+const VECTOR_FILE = /\.(svg|pdf|ai)$/i;
+const PDF_FILE = /\.(pdf|ai)$/i;
+
+/** Where an artwork read from a PDF came from, for a report: "the PDF part of Knob.ai, artboard 2 of 3". */
+export function pdfOriginText(origin) {
+  if (!origin) return '';
+  const where = origin.pages > 1 ? `, ${origin.illustrator ? 'artboard' : 'page'} ${origin.page} of ${origin.pages}` : '';
+  return `${origin.illustrator ? 'the PDF part of ' : ''}${origin.fileName}${where}`;
+}
+
+/** Which page of a PDF with several to read: the app's list dialog. Its number, or null to stop. */
+function askPage(fileName, pages, labels, illustrator) {
+  const word = illustrator ? 'Artboard' : 'Page';
+  const items = Array.from({ length: pages }, (_, i) => {
+    const label = String(labels?.[i] ?? '').trim();
+    return label && label !== String(i + 1) ? `${i + 1} · ${label}` : `${word} ${i + 1}`;
+  });
+  return new Promise((resolve) => {
+    const id = openDialog({
+      ask: 'list',
+      title: `Which ${word.toLowerCase()}?`,
+      message: `${fileName} has ${pages} ${word.toLowerCase()}s. One is read; choose which.`,
+      items,
+      accept: 'Import',
+      cancel: 'Cancel',
+    }, (answer) => resolve(answer ? items.indexOf(answer) + 1 : null));
+    // Another dialog is open: the first.
+    if (id == null) resolve(1);
+  });
+}
+
+/**
+ * A PDF's or an .ai's bytes as SVG text, through utils/pdfArtwork.js (pdf.js loads on first use):
+ * `{ svg, origin }`, origin `{ fileName, page, pages, layers, notes, illustrator }`; or null with the
+ * reason reported (nothing reported when the author cancelled the choice of page).
+ */
+export async function svgFromPdfBytes(bytes, filePath, { pdfjs = null } = {}) {
+  const { readPdfArtwork, describePdfNotes } = await import('../utils/pdfArtwork.js');
+  const fileName = fileNameOf(filePath) || 'Artwork.pdf';
+  const illustrator = /\.ai$/i.test(fileName);
+  const result = await readPdfArtwork(bytes, { pdfjs, choosePage: (pages, labels) => askPage(fileName, pages, labels, illustrator) });
+  if (!result.ok) {
+    if (result.reason !== 'cancelled') {
+      cerror('[pdf import]', result.error);
+      notify(result.error, { kind: 'error', duration: 0 });
+    }
+    return null;
+  }
+  return {
+    svg: result.svg,
+    origin: {
+      fileName, page: result.page, pages: result.pages, layers: result.layers,
+      // An .ai is read through its PDF part; a .pdf is one, whoever wrote it.
+      notes: describePdfNotes(result.notes), illustrator,
+    },
+  };
+}
+
+/** Hand `handle` an artwork file's SVG text: an SVG's own, or a PDF's or an .ai's read from its bytes. */
+async function deliver(handle, filePath, text, bytes) {
+  if (!PDF_FILE.test(filePath)) return handle(await text(), filePath, null);
+  const read = await svgFromPdfBytes(await bytes(), filePath);
+  return read ? handle(read.svg, filePath, read.origin) : null;
 }
 
 /**
@@ -83,8 +151,9 @@ export function embedArtworkFonts(panelId, svgText) {
  * Build and open a panel from SVG text. Split from the file picking so the part that matters is
  * reachable without a backend. Returns the new panel, or null with the reason already reported.
  */
-export function importSvgPanelText(text, fileName = '') {
+export function importSvgPanelText(text, fileName = '', origin = null) {
   const plan = planSvgPanelImport(text);
+  if (plan.ok && origin) plan.warnings = [...(plan.warnings ?? []), ...origin.notes];
   const lines = describeSvgImport(plan);
   if (!plan.ok) {
     cerror('[svg import]', lines[0]);
@@ -100,19 +169,24 @@ export function importSvgPanelText(text, fileName = '') {
   panel.bgImageFit = 'fill';
   // Names are per panel, and this one is new — nothing to collide with but its own placeholders.
   panel.controls = buildSvgImportControls(plan);
-  // What "Update Panel from SVG Artwork" matches against next time.
+  // What "Update Panel from Vector Artwork" matches against next time.
   panel.artworkImport = artworkRecord(plan, linksForNewImport(plan, panel.controls), baseName(fileName));
   addPanel(panel);
   embedArtworkFonts(panel.id, plan.background.svg);
 
-  cinfo(`[svg import] ✓ ${lines[0]} → "${panel.name}". Save it to keep it.`);
-  for (const line of lines.slice(1)) cwarn(`[svg import] ${line}`);
+  const from = origin ? `, read from ${pdfOriginText(origin)}` : '';
+  cinfo(`[svg import] ✓ ${lines[0]}${from} → "${panel.name}". Save it to keep it.`);
+  for (const line of [...lines.slice(1), ...(origin?.notes ?? [])]) cwarn(`[svg import] ${line}`);
   const unplaced = plan.skipped.length;
+  // A PDF keeps a layer's name and nothing below it, so its placeholders are typed by colour and shape.
+  const unnamed = origin && plan.placeholders.some((placeholder) => !placeholder.name)
+    ? ' The placeholders were typed by their colour and shape, since a PDF keeps no names for them; rename the controls as you need.'
+    : '';
   notify(
     unplaced
-      ? `Placed ${panel.controls.length} control(s); ${unplaced} placeholder(s) could not be placed — the Console says which and why.`
-      : `Placed ${panel.controls.length} control(s) on the artwork.`,
-    { kind: unplaced ? 'warn' : 'info', duration: unplaced ? 0 : 5000 },
+      ? `Placed ${panel.controls.length} control(s)${from}; ${unplaced} placeholder(s) could not be placed — the Console says which and why.${unnamed}`
+      : `Placed ${panel.controls.length} control(s) on the artwork${from}.${unnamed}`,
+    { kind: unplaced ? 'warn' : 'info', duration: unplaced || unnamed ? 0 : 5000 },
   );
   return panel;
 }
@@ -122,7 +196,7 @@ export function importSvgPanelText(text, fileName = '') {
  * background image is outside undo (history.js excludes panel images to keep snapshots small): undo
  * puts the controls back, but not the old artwork. Returns what was applied, or null.
  */
-export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmDestructive } = {}) {
+export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmDestructive, origin = null } = {}) {
   if (!get(activePanel)) {
     notify('Open the panel to update first.', { kind: 'warn' });
     return null;
@@ -134,7 +208,9 @@ export function updatePanelFromSvgText(text, fileName = '', { confirm = confirmD
     notify(line, { kind: 'error', duration: 0 });
     return null;
   }
-  const update = updatePanelFromArtworkPlan(plan, `${baseName(fileName)}.svg`, { confirm, tag: 'svg update' });
+  if (origin) plan.warnings = [...(plan.warnings ?? []), ...origin.notes];
+  const fileLabel = origin ? pdfOriginText(origin).replace(/^the PDF part of /, '') : `${baseName(fileName)}.svg`;
+  const update = updatePanelFromArtworkPlan(plan, fileLabel, { confirm, tag: 'svg update' });
   if (update) embedArtworkFonts(get(activePanel)?.id, plan.background.svg);
   return update;
 }
@@ -195,16 +271,24 @@ export function updatePanelFromArtworkPlan(plan, fileLabel, { confirm = confirmD
   return update;
 }
 
-function readSvgText(filePath) {
+/** A file through the bridge: its text, or with `bytes` its bytes. */
+function readFile(filePath, { bytes = false } = {}) {
   return new Promise((resolve, reject) => {
     const requestId = `${REQUEST_PREFIX}${++requestCounter}`;
     const timer = setTimeout(() => {
       pendingReads.delete(requestId);
       reject(new Error(`Timed out reading ${filePath}`));
     }, READ_TIMEOUT_MS);
-    pendingReads.set(requestId, { resolve, reject, timer });
+    pendingReads.set(requestId, { resolve, reject, timer, bytes });
     requestFileData(requestId, filePath);
   });
+}
+
+/** Decode what requestFileData returns as bytes. */
+function bytesFromDataUrl(dataUrl) {
+  const comma = String(dataUrl ?? '').indexOf(',');
+  if (comma < 0) return new Uint8Array(0);
+  return Uint8Array.from(atob(String(dataUrl).slice(comma + 1)), (c) => c.charCodeAt(0));
 }
 
 function ensureListeners() {
@@ -219,15 +303,15 @@ function ensureListeners() {
     pendingBrowse = null;
     const filePath = String(payload?.filePath ?? '').trim();
     if (!filePath) return;
-    if (!/\.svg$/i.test(filePath)) {
-      notify('Choose an .svg file — a bitmap has no placeholder layer to read.', { kind: 'warn' });
+    if (!VECTOR_FILE.test(filePath)) {
+      notify('Choose an .svg, .pdf or .ai file — a bitmap has no layers to read.', { kind: 'warn' });
       return;
     }
     try {
-      handle(await readSvgText(filePath), filePath);
+      await deliver(handle, filePath, () => readFile(filePath), () => readFile(filePath, { bytes: true }));
     } catch (error) {
       cerror('[svg import] Could not read', filePath, '—', error.message);
-      notify('Could not read the SVG file.', { kind: 'error', duration: 0 });
+      notify('Could not read the artwork file.', { kind: 'error', duration: 0 });
     }
   });
 
@@ -238,7 +322,7 @@ function ensureListeners() {
     pendingReads.delete(payload.requestId);
     clearTimeout(pending.timer);
     if (!payload?.data) pending.reject(new Error('The file was empty or could not be read'));
-    else pending.resolve(textFromDataUrl(payload.data));
+    else pending.resolve(pending.bytes ? bytesFromDataUrl(payload.data) : textFromDataUrl(payload.data));
   });
 }
 
@@ -246,35 +330,39 @@ function fallbackPicker(handle) {
   if (typeof window === 'undefined' || !window.document) return;
   const input = window.document.createElement('input');
   input.type = 'file';
-  input.accept = '.svg,image/svg+xml';
+  input.accept = '.svg,.pdf,.ai,image/svg+xml,application/pdf';
   input.onchange = async () => {
     const file = input.files?.[0];
-    if (file) handle(await file.text(), file.name);
+    if (file) await deliver(handle, file.name, () => file.text(), async () => new Uint8Array(await file.arrayBuffer()));
   };
   input.click();
 }
 
-/** Ask for an SVG file, then `handle(text, filePath)`: the app's own dialog, or the browser's. */
-export function chooseSvg(handle) {
+/**
+ * Ask for vector artwork (an SVG, a PDF, or an Illustrator file saved with PDF compatibility), then
+ * `handle(svgText, filePath, origin)`: the app's own dialog, or the browser's. `origin` is null for an
+ * SVG, and says where a PDF's artwork came from (see svgFromPdfBytes).
+ */
+export function chooseVectorArtwork(handle) {
   if (!isJuceAvailable()) {
     fallbackPicker(handle);
     return;
   }
   ensureListeners();
   pendingBrowse = { requestId: `${REQUEST_PREFIX}browse_${++requestCounter}`, handle };
-  browseImage(pendingBrowse.requestId);
+  browseImage(pendingBrowse.requestId, { patterns: '*.svg;*.pdf;*.ai', title: 'Vector artwork (SVG, PDF, Illustrator)' });
 }
 
-/** File › New Panel from SVG Artwork. */
+/** File › New Panel from Vector Artwork. */
 export function newPanelFromSvgArtwork() {
-  chooseSvg((text, filePath) => importSvgPanelText(text, filePath));
+  chooseVectorArtwork((text, filePath, origin) => importSvgPanelText(text, filePath, origin));
 }
 
-/** File › Update Panel from SVG Artwork. */
+/** File › Update Panel from Vector Artwork. */
 export function updatePanelFromSvgArtwork() {
   if (!get(activePanel)) {
     notify('Open the panel to update first.', { kind: 'warn' });
     return;
   }
-  chooseSvg((text, filePath) => updatePanelFromSvgText(text, filePath));
+  chooseVectorArtwork((text, filePath, origin) => updatePanelFromSvgText(text, filePath, { origin }));
 }

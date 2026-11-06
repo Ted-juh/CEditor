@@ -165,7 +165,7 @@ Choose **File → New Panel** (Ctrl+N). The **New Panel** dialog asks for:
 Press **Create Panel**. You can change the size later on the panel's **Core** tab.
 
 There are other ways to start. **File → New Panel from Device Profile** makes a panel with one
-control for every parameter of a synth, already bound. **New Panel from SVG Artwork...** and **New
+control for every parameter of a synth, already bound. **New Panel from Vector Artwork...** and **New
 Panel from Photoshop Artwork...** build a panel from a drawing (see
 [Importing artwork](#importing-artwork)).
 
@@ -650,12 +650,19 @@ If you design your panel in a drawing program, CEditor can build it from the dra
    ellipse wherever a control should go. Name each one after what it should become — knob, slider,
    button, toggle, led, label, display, meter or menu — or give it a colour that stands for one.
 2. Everything else in the drawing becomes the panel's background picture.
-3. Choose **File → New Panel from SVG Artwork...** (or **from Photoshop Artwork...**).
+3. Choose **File → New Panel from Vector Artwork...** (or **from Photoshop Artwork...**). Vector
+   artwork is an SVG, a PDF, or an Illustrator file saved with **Create PDF Compatible File**
+   (Illustrator's default).
 
 The Console lists what CEditor guessed and what it skipped. When the drawing changes, **Update Panel
-from SVG Artwork...** moves the controls whose placeholders moved and adds new ones; it never removes
-controls, and it shows you what will change first. Photoshop layer styles, masks and adjustment layers
-are not drawn.
+from Vector Artwork...** moves the controls whose placeholders moved and adds new ones; it never
+removes controls, and it shows you what will change first. Photoshop layer styles, masks and
+adjustment layers are not drawn.
+
+A PDF or an Illustrator file keeps the names of its top-level layers and nothing below them, so put
+the placeholders in a top-level layer called **components** and give each its colour: CEditor types
+them by colour and shape, and you rename the controls afterwards. A file with several artboards asks
+which one to read.
 
 ### Importing a control you drew
 
@@ -671,11 +678,13 @@ part of the drawing still a layer you can change.
    their angle (**pointer reflection at 27**, **at -27**), become one layer of frames: it shows the
    one for the knob's angle, mixed into the next as the knob turns. A name counts inside a group's
    name too.
-2. Choose **File → New Component from SVG Artwork...** or **New Component from Photoshop Artwork...**.
+2. Choose **File → New Component from Vector Artwork...** or **New Component from Photoshop Artwork...**.
+   From a PDF or an Illustrator file, name the moving parts as top-level layers (**pointer**,
+   **cap**, **lamp on**): those are the names the file keeps.
 
 The control opens in the Component Designer, ready to use and to change:
 
-- **From SVG** (Illustrator, Inkscape, Affinity Designer, Figma, Sketch), every shape is a vector
+- **From SVG, PDF or Illustrator** (Illustrator, Inkscape, Affinity Designer, Figma, Sketch), every shape is a vector
   layer, with its colours, gradient (on its fill and its outline), pattern, outline and opacity. Text
   stays text. A shape cut by a clip path is cut for good and stays a vector; a mask, or a clip on
   text, a picture or an outlined shape, becomes the layer's own mask. Pictures linked from the SVG
@@ -1541,14 +1550,14 @@ CEditor is a beta. Things to know before you rely on it:
 | **New Panel** | Ctrl+N | Opens the New Panel dialog: name, starting template and size. |
 | **Open Panel** | Ctrl+O | Opens a `.cepanel` file. |
 | **New Panel from Device Profile** | | Creates a panel with a control for each parameter of a loaded device profile. |
-| **New Panel from SVG Artwork...** | | Builds a panel from an SVG drawing; see [Importing artwork](#importing-artwork). |
-| **Update Panel from SVG Artwork...** | | Applies a revised SVG to the open panel, after showing what will change. |
+| **New Panel from Vector Artwork...** | | Builds a panel from an SVG, PDF or Illustrator drawing; see [Importing artwork](#importing-artwork). |
+| **Update Panel from Vector Artwork...** | | Applies a revised drawing to the open panel, after showing what will change. |
 | **New Panel from Photoshop Artwork...** | | The same from a Photoshop file. |
 | **Update Panel from Photoshop Artwork...** | | The same update from a Photoshop file. |
 | **Open Recent** | | Recently used panels, components, device profiles and script workspaces. |
 | **New Custom Component** | | Opens an empty custom component in its own tab. |
 | **Import Component...** | | Brings in a `.ceditor-component.json` (or library) file and opens a single component. Dropping the file on the window does the same. |
-| **New Component from SVG Artwork...** | | Makes a control from an SVG drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
+| **New Component from Vector Artwork...** | | Makes a control from an SVG, PDF or Illustrator drawing, every shape a layer; see [Importing a control you drew](#importing-a-control-you-drew). |
 | **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer; a knob modelled in Blender comes in this way too, see [A knob modelled in Blender](#a-knob-modelled-in-blender). |
 | **Open Component from Library...** | | Opens a component from your library in its own tab. |
 | **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |

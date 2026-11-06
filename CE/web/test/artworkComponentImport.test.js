@@ -337,7 +337,7 @@ test('a Photoshop layer\'s mask is its own; its clipped layers are in its pictur
 
 test('the commands are in the File menu and open the component in the Component Designer', () => {
   const menu = readFileSync(new URL('../src/CE_Application/layout/MenuBar.svelte', import.meta.url), 'utf8');
-  assert.match(menu, /label: 'New Component from SVG Artwork\.\.\.', action: \(\) => newComponentFromSvgArtwork\(\)/);
+  assert.match(menu, /label: 'New Component from Vector Artwork\.\.\.', action: \(\) => newComponentFromSvgArtwork\(\)/);
   assert.match(menu, /label: 'New Component from Photoshop Artwork\.\.\.', action: \(\) => newComponentFromPsdArtwork\(\)/);
   const actions = readFileSync(new URL('../src/CE_Application/stores/artworkComponentActions.js', import.meta.url), 'utf8');
   assert.match(actions, /createComponentDocument\(\{ control: plan\.component, name: plan\.name \}\)/);

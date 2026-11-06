@@ -44,11 +44,13 @@ const AI_WITHOUT_PDF = 'This Illustrator file was saved without PDF compatibilit
 
 /**
  * Reads page `page` (1-based) of a PDF or a PDF-compatible Illustrator file as SVG text.
- * `{ ok, svg, pages, page, width, height, layers: [{ name, visible }], notes: [{ kind, count }],
- * creator, illustrator }`, or `{ ok: false, reason, error }`. `pdfjs`: the library, for Node (its
- * legacy build); in a browser it is loaded when first needed.
+ * `{ ok, svg, pages, page, labels, width, height, layers: [{ name, visible }], notes: [{ kind, count }],
+ * creator, illustrator }`, or `{ ok: false, reason, error }`. `choosePage(pages, labels)`: asked
+ * which page when there are several (an Illustrator file's artboards), returning its number or null
+ * to stop (`reason: 'cancelled'`); `labels` are the pages' labels where the file has them, else
+ * null. `pdfjs`: the library, for Node (its legacy build); in a browser it is loaded when first needed.
  */
-export async function readPdfArtwork(bytes, { page = 1, pdfjs = null, password = '' } = {}) {
+export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs = null, password = '' } = {}) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
   const kind = artworkFileKind(data);
   if (kind === 'ai') return { ok: false, reason: 'ai-without-pdf', error: AI_WITHOUT_PDF };
@@ -67,7 +69,13 @@ export async function readPdfArtwork(bytes, { page = 1, pdfjs = null, password =
   }
   try {
     const pages = doc.numPages;
-    const number = Math.min(Math.max(1, Math.round(page)), pages);
+    const labels = await doc.getPageLabels().catch(() => null);
+    let wanted = page;
+    if (pages > 1 && choosePage) {
+      wanted = await choosePage(pages, labels);
+      if (wanted == null) return { ok: false, reason: 'cancelled', error: '' };
+    }
+    const number = Math.min(Math.max(1, Math.round(Number(wanted) || 1)), pages);
     const pdfPage = await doc.getPage(number);
     const ops = await pdfPage.getOperatorList();
     const config = await doc.getOptionalContentConfig();
@@ -80,7 +88,7 @@ export async function readPdfArtwork(bytes, { page = 1, pdfjs = null, password =
       objs: pdfPage.objs, commonObjs: pdfPage.commonObjs, view: pdfPage.view, layers,
     });
     if (pdfPage.rotate) out.notes.push({ kind: 'rotated', count: 1 });
-    return { ok: true, ...out, pages, page: number, creator, illustrator: /illustrator/i.test(creator) };
+    return { ok: true, ...out, pages, page: number, labels, creator, illustrator: /illustrator/i.test(creator) };
   } finally {
     doc.destroy?.();
   }
@@ -112,9 +120,11 @@ const num = (value) => {
   return Object.is(rounded, -0) ? '0' : String(rounded);
 };
 const matrixText = (m) => `matrix(${m.map(num).join(' ')})`;
+const NOT_XML = new RegExp('[\\uFFFE\\uFFFF]', 'g');
 const escapeXml = (text) => String(text).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c])
-  // Characters XML 1.0 does not allow.
-  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F￾￿]/g, '');
+  // Characters XML 1.0 does not allow; the last two through a string, which the minifier leaves
+  // escaped (a bundle holding them as they are is held at two bytes a character).
+  .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(NOT_XML, '');
 const BLEND = new Set(['multiply', 'screen', 'overlay', 'darken', 'lighten', 'color-dodge', 'color-burn', 'hard-light',
   'soft-light', 'difference', 'exclusion', 'hue', 'saturation', 'color', 'luminosity']);
 
@@ -626,6 +636,21 @@ function asEllipse(segments) {
     }
   }
   return { cx, cy, rx, ry };
+}
+
+const NOTE_TEXT = {
+  'mesh-gradient': (n) => `${n} mesh or freeform gradient${n === 1 ? '' : 's'}, drawn in ${n === 1 ? 'its' : 'their'} mean colour`,
+  'opacity-mask': (n) => `${n} opacity mask${n === 1 ? '' : 's'}, not applied`,
+  'pattern-fill': (n) => `${n} pattern fill${n === 1 ? '' : 's'}, drawn grey`,
+  'pattern-stroke': (n) => `${n} pattern stroke${n === 1 ? '' : 's'}, drawn grey`,
+  'image-mask': (n) => `${n} image mask${n === 1 ? '' : 's'}, not drawn`,
+  image: (n) => `${n} image${n === 1 ? '' : 's'} that could not be read`,
+  rotated: () => 'the page is turned in the file and comes in unturned',
+};
+
+/** What a read could not carry, as lines for the import's report. */
+export function describePdfNotes(notes = []) {
+  return notes.map(({ kind, count }) => NOTE_TEXT[kind]?.(count)).filter(Boolean).map((line) => `From the PDF: ${line}.`);
 }
 
 function patternPaint(args, base) {
