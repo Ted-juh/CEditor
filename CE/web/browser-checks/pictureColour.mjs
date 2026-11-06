@@ -65,6 +65,41 @@ try {
   assert.ok(near(onPanel[1], panelBeside, 3), `and the panel beside it as it was: ${onPanel[1]} against ${panelBeside}`);
   console.log(`  ok  on the panel: the skirt ${onPanel[0].slice(0, 3)} where it was ${panelSkirt.slice(0, 3)}, nothing beside it painted`);
 
+  // The pointer made blue: its reflection in the cap, a part of frames that follows the cap, worked out
+  // again in the pointer's colour by the browser (decoded, pictureRecolour.js rethrownPixels, encoded).
+  const thrown = await page.evaluate(async (data) => {
+    const file = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
+    const { planPsdComponentImport } = await window.__ceImport('/src/CE_Application/utils/psdComponentImport.js');
+    const { withColourFollows, pictureColourSources } = await window.__ceImport('/src/CE_Application/utils/pictureRecolour.js');
+    const parts = planPsdComponentImport(file, { fileName: 'blender-knob.psd' }).component._children.Parts._children;
+    parts.pointer._children.Image.colour = 'FF3985FF';
+    const sources = await pictureColourSources(withColourFollows(Object.entries(parts)));
+    const image = parts.pointer_reflection._children.Image;
+    const made = sources.get('pointer_reflection');
+    const pixelsOf = async (src) => {
+      const picture = new Image();
+      picture.src = src;
+      await picture.decode();
+      const canvas = document.createElement('canvas');
+      canvas.width = picture.width;
+      canvas.height = picture.height;
+      const context = canvas.getContext('2d');
+      context.drawImage(picture, 0, 0);
+      return context.getImageData(0, 0, picture.width, picture.height).data;
+    };
+    if (!made) return null;
+    const before = await pixelsOf(image.frames[image.frameIndex].source);
+    const after = await pixelsOf(made.frames[image.frameIndex]);
+    // What each adds, summed over the frame: colour times opacity.
+    const sum = (pixels) => [0, 1, 2].map((c) => { let total = 0; for (let i = 0; i < pixels.length; i += 4) total += pixels[i + c] * pixels[i + 3] / 255; return Math.round(total); });
+    return { before: sum(before), after: sum(after), frames: made.frames.filter(Boolean).length, pointer: Boolean(sources.get('pointer')) };
+  }, bytes);
+  assert.ok(thrown, 'the reflection is worked out again when the pointer changes colour');
+  assert.ok(thrown.after[0] < thrown.before[0] && thrown.after[2] > thrown.before[2] + 50,
+    `the pointer blue, its reflection in the cap less red and more blue: ${thrown.after} where it was ${thrown.before}`);
+  assert.equal(thrown.frames, 11, 'at every angle');
+  console.log(`  ok  the pointer blue: its reflection in the cap adds ${thrown.after} where it added ${thrown.before} (red, green, blue over the frame)`);
+
   await page.evaluate(async (data) => {
     const file = Uint8Array.from(atob(data), (c) => c.charCodeAt(0));
     const { planPsdComponentImport } = await window.__ceImport('/src/CE_Application/utils/psdComponentImport.js');

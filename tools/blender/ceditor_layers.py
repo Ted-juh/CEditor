@@ -28,6 +28,10 @@
 #                      dodge), shown when the lamp is on
 #   <name> shadow      a moving part's shadow on the panel and on the parts under it
 #   <name> reflection  a moving part's reflection in the shiny parts under it (linear dodge)
+#   <name> reflection from <part> at <angle>, <name> reflection base at <angle>
+#                      hidden: for a turning part, the share of that reflection (the light it throws
+#                      on the parts under it) that comes off <part>'s colour, and the look under it,
+#                      for CEditor to change with that part's colour
 #   pivot              where turning parts turn about (a dot CEditor hides)
 #   <name> shadow pivot  where a turning part's shadow turns about (a dot CEditor hides)
 #
@@ -65,7 +69,11 @@
 #     panel by it, a brass cap a warm light on the skirt under its rim). Each part is rendered again
 #     colourless, and the difference is written: on the other parts, the light and gloss off its
 #     colour; on the panel, the share of the light there off it. CEditor scales each by the part's
-#     change of colour, and works the parts and the panel it lights out again.
+#     change of colour, and works the parts and the panel it lights out again. A turning part (the
+#     pointer) throws its light on the parts under it as its reflection, at each angle: the share of
+#     it off its colour is written beside it, and CEditor works it out again in the pointer's colour,
+#     then in proportion to a metal's it falls in. The light it throws on the panel is not written:
+#     on the test knob it is under a level.
 #   - A lit lamp's outermost pixels, which Cycles shows lit out to where the lamp covers a quarter of
 #     a pixel while the panel still shows through, are lit as on the scene's panel ("For this panel",
 #     on by default; off, or without a panel object, as on black).
@@ -937,14 +945,23 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                 covered = (to8(alpha) > 0).astype(np.float32)
                 inside = (to8(depth[..., 0]) >= 255)[..., None]
                 own = np.where(inside, linear(to8(colour_rgb) / 255.0), linear(drawn))
-                gloss = np.clip(seen["bare"] - own * seen["light"], 0.0, None)
-                add(f"{name} lighting{suffix}", light_code(seen["light"]), covered, hidden=True)
+                # Its colour as Blender has it at each pixel (its diffuse colour is a little under its
+                # base colour where its gloss takes more of the light, towards its edge, and the same
+                # turned back to rest at every angle): the light is written as what CEditor's colour
+                # there (`own`) is multiplied by to give the light off it. So its gloss is only what it
+                # reflects whatever its colour, and in another colour it is lit as Blender lights it;
+                # with the colour it was drawn in alone, a few percent of the old colour stayed in the
+                # gloss (on an orange pointer made blue, 17 levels of red).
+                known = (look["alpha"] > 0.05)[..., None] & (own > 1e-4)
+                scale = np.where(known, np.clip(linear(look["colour"]) / np.maximum(own, 1e-4), 0.5, 2.0), 1.0)
+                gloss = np.clip(seen["bare"] - own * scale * seen["light"], 0.0, None)
+                add(f"{name} lighting{suffix}", light_code(seen["light"] * scale), covered, hidden=True)
                 add(f"{name} gloss{suffix}", light_code(gloss), covered, hidden=True)
                 # The light each other part throws on it by way of its colour: the light on it, and its
                 # gloss, less what they are with that part colourless.
                 for k, colourless_look in (bounce or {}).items() if not suffix else ():
-                    light_k = np.clip(seen["light"] - colourless_look["light"], 0.0, None)
-                    gloss_k = np.clip(gloss - np.clip(colourless_look["bare"] - own * colourless_look["light"], 0.0, None), 0.0, None)
+                    light_k = np.clip(seen["light"] - colourless_look["light"], 0.0, None) * scale
+                    gloss_k = np.clip(gloss - np.clip(colourless_look["bare"] - own * scale * colourless_look["light"], 0.0, None), 0.0, None)
                     add(f"{name} lighting from {colour_name_of(k)}", bounce_code(light_k), covered, hidden=True)
                     add(f"{name} gloss from {colour_name_of(k)}", bounce_code(gloss_k), covered, hidden=True)
 
@@ -1080,6 +1097,23 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                         # edge, resampled), its look at rest.
                         turned_looks.setdefault(o.name, {})[angle] = {
                             key: np.where(value[..., 3:4] > 0.5, value[..., :3], rest[key]) for key, value in kept.items()}
+            # What each turning part does to the light under it by way of its colour (the light it throws
+            # on the cap and skirt, its reflection in a metal): the same renders with that part
+            # colourless (see colourless), at each angle. CEditor scales the difference by the part's
+            # change of colour, as for the light a part that stays put throws.
+            turned_without = {}
+            if turn is not None and unseen:
+                for k in objs:
+                    restore = colourless(k)
+                    try:
+                        for angle in angles:
+                            if angle:
+                                left_there = 1.0 - turned(covered, angle, axis_px)[..., 3]
+                                turned_without.setdefault(k, {})[angle] = share(turn(angle, objs, catchers=[panel] + still), left_there)
+                            else:
+                                turned_without.setdefault(k, {})[angle] = share(render(objs, catchers=[panel] + still), left)
+                    finally:
+                        restore()
             if ratio is not None:
                 if turned_shares and shadow_pivot_px is not None:
                     # Its shadow at each angle, turned back about the point it turns about.
@@ -1180,11 +1214,35 @@ def export_layers(scene, filepath, size=512, samples=128, report=print, for_pane
                     # the light. Away from rest the layers are hidden, so the file shows the part at rest.
                     for angle in angles:
                         share_there = turned_shares[angle] if angle else ratio
-                        rgb, alpha = light(reflect(share_there), where)
+                        reflected = reflect(share_there)
+                        rgb, alpha = light(reflected, where)
+                        # The share of it that comes off each turning part's colour, as a multiple of the
+                        # light under it (the light there is lin(under) times the share, and the part's
+                        # colour adds `via` of it), and the look under it: CEditor works the reflection
+                        # out again with the part in another colour (utils/pictureRecolour.js
+                        # rethrownPixels). Over where it adds light, or would in another colour: where
+                        # the part darkens what is under it in a channel (it hides some of the sky
+                        # there) its colour still adds light, which another colour can make more than
+                        # it hides (an orange pointer's blue on the cap is under its shadow; a blue
+                        # one's is not).
+                        via = {k: np.clip(share_there - without[angle], 0.0, None) * where[..., None]
+                               for k, without in turned_without.items()}
+                        near = where & ((reflected.max(-1) >= 0.5 / 255) | np.any([v.max(-1) >= 2.0 ** -12 for v in via.values()] or [False], axis=0))
+                        base = linear(under)
                         if angle:
-                            back = turned(np.concatenate([rgb, alpha[..., None]], axis=-1), -angle, axis_px, sharp=True)
-                            rgb, alpha = back[..., :3], back[..., 3]
+                            back = lambda values, a: turned(np.concatenate([values, np.asarray(a, dtype=np.float32)[..., None]], axis=-1), -angle, axis_px, sharp=True)
+                            turned_back = back(rgb, alpha)
+                            rgb, alpha = turned_back[..., :3], turned_back[..., 3]
+                            covered_back = back(base, near)
+                            base = covered_back[..., :3]
+                            # Light up to sixteen times what is under it, turned at a sixteenth, and back.
+                            via = {k: back(v / 16.0, near)[..., :3] * 16.0 for k, v in via.items()}
+                            near = covered_back[..., 3] > 0.5
                         add(f"{reflection_name} at {angle_name(angle)}", rgb, alpha, "lddg", hidden=angle != 0)
+                        if via and near.any():
+                            add(f"{reflection_name} base at {angle_name(angle)}", light_code(base), near.astype(np.float32), hidden=True)
+                            for k, v in via.items():
+                                add(f"{reflection_name} from {colour_name_of(k)} at {angle_name(angle)}", bounce_code(v), near.astype(np.float32), hidden=True)
                 else:
                     add(reflection_name, *light(added, where), "lddg")
             for o, look, opacity, over in zip(objs, looks, opacities, above):

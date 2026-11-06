@@ -135,6 +135,7 @@ function framesFromAngles(layers) {
   });
   const replaced = new Map();
   const angles = new Map();
+  const renamed = new Map();
   const taken = new Set(layers.map((layer) => layer.part.name));
   for (const set of sets.values()) {
     const distinct = new Set(set.map((each) => each.angle));
@@ -155,6 +156,8 @@ function framesFromAngles(layers) {
         x: share(layer.box.x - box.x, box.width), y: share(layer.box.y - box.y, box.height),
         width: share(layer.box.width, box.width), height: share(layer.box.height, box.height),
         ...(fill.imageColourLighting && fill.imageColourGloss ? { lighting: fill.imageColourLighting, gloss: fill.imageColourGloss } : {}),
+        // The light another part throws in it, and the look under it (a turning part's reflection).
+        ...(fill.imageColourUnder && fill.imageColourThrown ? { under: fill.imageColourUnder, thrown: { ...fill.imageColourThrown } } : {}),
       };
     };
     // Angles a step apart (the smallest gap) over the dial's travel, the -135 to 135 degrees it turns:
@@ -194,12 +197,21 @@ function framesFromAngles(layers) {
       },
     });
     angles.set(part.name, list);
+    for (const { layer } of set) renamed.set(layer.part.name, part.name);
     const lowest = Math.min(...set.map((each) => each.index));
     replaced.set(lowest, { name: set[0].base, part, box, names: [set[0].base, ...(first.names?.slice(1) ?? [])] });
     for (const each of set) if (each.index !== lowest) replaced.set(each.index, null);
   }
   if (!replaced.size) return { layers, angles };
-  return { layers: layers.flatMap((layer, index) => (replaced.has(index) ? (replaced.get(index) ? [replaced.get(index)] : []) : [layer])), angles };
+  const out = layers.flatMap((layer, index) => (replaced.has(index) ? (replaced.get(index) ? [replaced.get(index)] : []) : [layer]));
+  // Light thrown by a part now one part of frames is keyed by that part's name.
+  const rename = (map) => (map && typeof map === 'object' ? Object.fromEntries(Object.entries(map).map(([from, value]) => [renamed.get(from) ?? from, value])) : map);
+  for (const { part } of out) {
+    const fill = part._children.Background?._children?.Fill;
+    if (fill?.imageColourThrown) fill.imageColourThrown = rename(fill.imageColourThrown);
+    for (const frame of part._children.Image?.frames ?? []) if (frame.thrown) frame.thrown = rename(frame.thrown);
+  }
+  return { layers: out, angles };
 }
 
 /**

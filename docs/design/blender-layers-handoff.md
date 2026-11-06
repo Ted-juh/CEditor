@@ -56,6 +56,9 @@ the layers, laid as CEditor lays them, to the render. In levels of 255, at 160 p
 | Turned 120°: its reflection in the cap | p99 6 | 10 |
 | Turned 120°: the cap round it, its shadow included | mean 0.9 | 1.4 |
 | Turned 120°: the shadow's place | 0.2 px off | 5.9 px turned about the axis |
+| The skirt red, the cap brass, where each covers the pixel | mean 1.4, 0.9 | 1.5, 1.1 |
+| The orange pointer made blue, on it | mean 1.4 | 18.2 |
+| Its reflection in the cap, where the colour changes it by 3 or more | mean 1.7, p99 5 | 4.6, 10 (as drawn) |
 
 In the editor itself (a 320 px knob, screenshots against Blender's renders): mean 1.0, p99 4 at rest
 and turned 118.8° with the wheel; on a plate of a dark panel's colour mean 1.1, p99 6, its outline
@@ -139,15 +142,9 @@ The pieces, and where they live:
 - The frames of a part of frames cannot be edited one by one in the UI.
 - A sliding part (a fader) is rendered at rest only: its own light, shadow and reflection do not
   change along its travel (the same frames idea would apply per position).
-- An SVG drawn at several angles ("needle at 27" as vectors) still fades separate layers, which is
-  inexact for shadows and multiplies.
 - The filmstrip baker (Assets › bake) draws a part's blend mode and its colour since the fixes, but
   not the outline mixing (a filmstrip has no panel under it).
-- A part in another colour: a turning part (the pointer) keeps its drawn colour in the light it
-  throws on the rest and in its reflection in the cap (what a part that stays put throws on what is
-  beside it, the panel's `bounce` and the skirt by a brass cap, is worked out again since the third
-  round: 1.8 and 1.5 levels at the mean just beside the test knob's skirt and cap, 4.6 and 10.4
-  before); a picture of several colours changes as a whole; a glowing part's glow at its very edge is
+- A part in another colour: a picture of several colours changes as a whole; a glowing part's glow at its very edge is
   not worked out again.
 
 ## Not verified

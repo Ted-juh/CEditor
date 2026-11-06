@@ -274,6 +274,7 @@ held out, and written as the layers its look adds up from:
 | `<lamp> glow`, `<lamp> glow shine` | colour dodge, linear dodge | a lamp's light on the panel, the same two ways, shown when the lamp is on |
 | `<name> shadow`, `<name> reflection` | normal, linear dodge | a sliding part's shadow and reflection on the panel and the parts under it, which move with it |
 | `<name> at <angle>`, `<name> shading at <angle>`, ... | as above | a part that turns whole, its shadow and its reflection, rendered with it turned that far: one each 27 degrees, those away from rest hidden |
+| `<name> reflection from <part> at <angle>`, `<name> reflection base at <angle>` | normal, hidden | the share of a turning part's reflection (the light it throws on the parts under it) that comes off that part's colour (8 bits over 1/4096 to 16), and the look under it; read with each frame of the reflection on import |
 | `pivot` | normal, hidden | where turning parts turn |
 | `<name> shadow pivot` | normal, hidden | where a turning part's shadow turns |
 
@@ -315,7 +316,11 @@ shading and highlights layers again as the add-on works them out: each pixel the
 that light plus the gloss, split as the add-on splits it, with its highlights over the whole inside
 so that light can come where there was none. The colour there is the colour layer's own where the
 part covers the pixel whole, else the colour it was drawn in, and the add-on writes the gloss past
-exactly that, so that worked out again in the colour it was drawn in, the part is as written. The
+exactly that, so that worked out again in the colour it was drawn in, the part is as written. Blender's
+own colour for a part is a little under its base colour where its gloss takes more of the light
+(towards its edge), so the light is written as what that colour must be multiplied by there: its
+gloss is then only what it reflects whatever its colour (with the colour it was drawn in alone, a few
+percent of the old colour stayed in the gloss, 17 levels of red on an orange pointer made blue). The
 file's XMP names each colour layer's shading and highlights (`<ceditor:colourOf>`,
 `skirt highlights=skirt`), and a turning part's reflection that falls mostly in a metal part, which
 changes with the metal's colour in proportion; `<ceditor:metal>` names the metal parts, whose light
@@ -333,7 +338,15 @@ part it lights is worked out again with that light added, in its own colour; on 
 there is scaled and the shadow, the bounce and its shine are worked out again for it: the shadow a
 multiply where the panel must darken (black at an opacity is a multiply by black at that opacity),
 the bounce where it must brighten. The bounce and its shine cover every pixel such light reaches,
-adding nothing where there is none. A part that turns keeps its drawn colour in the light it throws.
+adding nothing where there is none. A part that turns throws its light on the parts under it as its
+reflection, rendered at each angle: the add-on renders it again colourless at each angle and writes
+the share of the reflection off its colour and the look under it (`pointer reflection from pointer
+at 27`, `pointer reflection base at 27`), and CEditor works each frame out again in the part's new
+colour (`rethrownPixels`), then changes it with the metal it falls in. Measured on the test knob
+with the orange pointer made blue: within 1.7 levels of Blender's render on the cap where the
+pointer's colour changes it by 3 or more, 4.6 with the reflection in its drawn colour. The light it
+throws on the panel is not written: on the test knob Blender's render of the panel beside the knob
+does not change by a level with the pointer's colour.
 
 **A turning part.** The light stays put while the part turns, so what it does with the light
 changes: its own light (the side towards the sun lit, the sun's glint on it), its shadow on the

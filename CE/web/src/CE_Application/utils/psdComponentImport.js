@@ -410,7 +410,18 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
       }
       if (metal.has(record.label) || metal.has(record.label.replace(/\s+at\s+\S+\s*$/i, ''))) fill.imageColourMetal = true;
       const onIt = thrown.get(record.label);
-      if (onIt) {
+      if (onIt && record.css === 'plus-lighter') {
+        // Light a part throws (a turning part's reflection in the cap): the look under it and the share
+        // of it off each part's colour.
+        const laid = (map) => pngDataUrl(record.box.width, record.box.height, placed(map.pixels, map.box, record.box));
+        const byPart = {};
+        for (const { kind, from, record: map } of onIt) {
+          if (kind === 'base') fill.imageColourUnder = laid(map);
+          else if (kind === 'light') byPart[from] = laid(map);
+        }
+        if (fill.imageColourUnder && Object.keys(byPart).length) fill.imageColourThrown = byPart;
+        else delete fill.imageColourUnder;
+      } else if (onIt) {
         const laid = (map) => pngDataUrl(record.box.width, record.box.height, placed(map.pixels, map.box, record.box));
         const byPart = {};
         for (const { kind, from, record: map } of onIt) {
@@ -429,8 +440,17 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   // The light thrown on a part keyed by the part it comes off; the panel's shine and shadow go with its
   // bounce layer.
   const partNamed = new Map(layers.map((layer) => [layer.name, layer.part.name]));
+  // A turning part is written at angles ("pointer at 0", "pointer at 27"): the light it throws is keyed
+  // by one of them, made the name of the part of frames they become (utils/artworkComponent.js).
+  const partOf = (from) => partNamed.get(from) ?? partNamed.get(`${from} at 0`)
+    ?? [...partNamed].find(([label]) => label.toLowerCase().startsWith(`${from.toLowerCase()} at `))?.[1];
   for (const layer of layers) {
     const fill = layer.part._children.Background?._children?.Fill;
+    if (fill?.imageColourThrown) {
+      fill.imageColourThrown = Object.fromEntries(Object.entries(fill.imageColourThrown)
+        .filter(([from]) => partOf(from)).map(([from, map]) => [partOf(from), map]));
+      if (!Object.keys(fill.imageColourThrown).length) { delete fill.imageColourThrown; delete fill.imageColourUnder; }
+    }
     if (!fill?.imageColourBounce) continue;
     fill.imageColourBounce = Object.fromEntries(Object.entries(fill.imageColourBounce)
       .filter(([from]) => partNamed.has(from)).map(([from, maps]) => [partNamed.get(from), maps]));

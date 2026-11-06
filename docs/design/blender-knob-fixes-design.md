@@ -58,8 +58,14 @@ Where it differs from the design below, and what was measured.
   The import keys the maps to the parts they come from (`imageColourBounce`), and the panel's shine
   and the shadow follow the bounce (`imageColourFollows`, roles `shine` and `shadow`); a group with
   no colour of its own is worked out again when a part beside it changes colour. A part that turns
-  (the pointer) is not among them: it is rendered at each angle, and its light on the rest keeps its
-  drawn colour.
+  (the pointer) is not among them: it is rendered at each angle, and its light on the rest is its
+  reflection in the parts under it. Since the fourth round that is worked out again too: rendered
+  colourless at each angle, the share of it off the pointer's colour and the look under it are
+  written beside each frame (`pointer reflection from pointer at 27`, `... base at 27`), and CEditor
+  scales the share (`rethrownPixels`) before changing the frame with the metal it is in. In the same
+  round the light beside each colour layer took in Blender's own colour at each pixel (a little under
+  the base colour towards a glossy part's edge), which had stayed in the gloss as a few percent of
+  the old colour: an orange pointer made blue was 18 levels off, now 1.4.
   Three things on the way: a stays-part's edge mixed with one opacity for all three channels cannot
   reach a saturated colour over a grey panel, so each channel is now exact (`linearEdgeMix`,
   `edge_mix`: the opacity the coverage, raised only as far as a channel needs to stay within 0 and

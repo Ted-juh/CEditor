@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import {
   colourRgb, drawnColour, recolourPixels, pictureColour, pictureColourSettings, withRecolouredPicture,
   withColourFollows, pictureLayerKind, litLayerOf, rgbColour, recolourGroupPixels, decodeLight,
-  lightMapOf, lightRoleOf, colourOfNames, metalNames,
+  lightMapOf, lightRoleOf, colourOfNames, metalNames, bounceMapOf, rethrownPixels,
 } from '../src/CE_Application/utils/pictureRecolour.js';
 
 /** RGBA pixels from [r, g, b, a] tuples. */
@@ -211,6 +211,61 @@ test('a colour layer, its shading and its highlights go together; a reflection o
   const drawnNow = withRecolouredPicture(parts[0][1], made);
   assert.deepEqual([drawnNow._children.Background._children.Fill.imageSrc, drawnNow._colourGroup, pictureColour(drawnNow)], ['data:brass', undefined, null]);
   assert.deepEqual(pictureColourSettings(cap).lit, true);
+});
+
+test('a turning part\'s reflection is worked out again in its colour, then follows the metal it is in', () => {
+  // The add-on's maps for it, at each angle.
+  assert.deepEqual(bounceMapOf('pointer reflection from pointer at -27'), { of: 'pointer reflection at -27', kind: 'light', from: 'pointer' });
+  assert.deepEqual(bounceMapOf('pointer reflection base at 27'), { of: 'pointer reflection at 27', kind: 'base', from: '' });
+  assert.equal(bounceMapOf('pointer shadow at 27'), null, 'a frame is not a map');
+  // On pixels: the cap under it a mid grey, the reflection adding a warm streak, most of it off the
+  // pointer's orange. The code of a linear value, as the add-on writes it (light_code, bounce_code).
+  const code = (x) => (x >= 2 ** -8 ? Math.min(255, Math.max(1, Math.round((Math.log2(x) + 8) * 255 / 16))) : 0);
+  const toLinear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+  const toSrgb = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055);
+  const grey = 0.5;
+  const share = [1.6, 1.25, 1.05];
+  const via = [0.5, 0.2, 0.03];
+  const added = share.map((s) => toSrgb(toLinear(grey) * s) - grey);
+  const layer = pixels([...added.map((v) => Math.round(v * 255)), 255], [0, 0, 0, 0]);
+  const under = pixels([...[0, 1, 2].map(() => code(toLinear(grey))), 255], [0, 0, 0, 0]);
+  const light = pixels([...via.map((v) => code(v * 16)), 255], [0, 0, 0, 0]);
+  // In its own colour: as written.
+  const same = rethrownPixels({ pixels: layer, under, emitters: [{ ratio: [1, 1, 1], light }] });
+  at(same, 0).forEach((v, c) => assert.ok(Math.abs(v - at(layer, 0)[c]) <= 1, `as written: ${at(same, 0)}`));
+  // The pointer made blue (its red a tenth, its blue ten times): the streak loses its red and gains blue.
+  const blue = at(rethrownPixels({ pixels: layer, under, emitters: [{ ratio: [0.1, 1, 10], light }] }), 0);
+  const want = [0, 1, 2].map((c) => Math.round((toSrgb(toLinear(grey) * (share[c] + via[c] * ([0.1, 1, 10][c] - 1))) - grey) * 255));
+  blue.slice(0, 3).forEach((v, c) => assert.ok(Math.abs(v - want[c]) <= 2, `the streak in blue: ${blue} against ${want}`));
+  assert.ok(blue[0] < at(layer, 0)[0] && blue[2] > at(layer, 0)[2]);
+  assert.deepEqual(at(rethrownPixels({ pixels: layer, under, emitters: [{ ratio: [0.1, 1, 10], light }] }), 1), [0, 0, 0, 0], 'nothing where nothing is under it');
+
+  // As parts: the reflection follows the cap, and is thrown by the pointer.
+  const thrown = (name) => ({ under: `data:under-${name}`, thrown: { pointer: `data:via-${name}` } });
+  const reflection = framesPart('pointer_reflection', {
+    colourFollows: 'cap', frames: [{ source: 'data:a', ...thrown('a') }, { source: 'data:b', ...thrown('b') }],
+  }, 'plus-lighter');
+  const cap = picturePart('cap', { imageColourDrawn: 'FFE7E7E9', imageColourMetal: true });
+  const pointer = framesPart('pointer', { colour: 'FF1E3CC8', colourDrawn: 'FFC8501E' });
+  assert.deepEqual(pictureColourSettings(reflection).thrown, ['pointer']);
+  const [[, alone]] = withColourFollows([['pointer_reflection', reflection]], { cap, pointer, pointer_reflection: reflection });
+  const wanted = pictureColour(alone);
+  assert.equal(wanted.kind, 'frames');
+  assert.equal(wanted.colour, null, 'the cap as drawn: no change in proportion after');
+  assert.deepEqual(wanted.thrown.emitters.map((each) => each.from), ['pointer']);
+  assert.deepEqual(wanted.frames.map((frame) => [frame.under, frame.thrown.pointer]), [['data:under-a', 'data:via-a'], ['data:under-b', 'data:via-b']]);
+  // The cap brass as well: worked out in the pointer's colour, then changed with the cap's.
+  const brass = picturePart('cap', { imageColour: 'FFCDA046', imageColourDrawn: 'FFE7E7E9', imageColourMetal: true });
+  const both = pictureColour(withColourFollows([['pointer_reflection', reflection]], { cap: brass, pointer, pointer_reflection: reflection })[0][1]);
+  assert.deepEqual([both.colour, both.drawn, both.thrown.emitters.length], [[205, 160, 70], [231, 231, 233], 1]);
+  assert.notEqual(both.key, wanted.key);
+  // The pointer as drawn: the reflection only follows the cap.
+  const asDrawn = framesPart('pointer', { colourDrawn: 'FFC8501E' });
+  assert.equal(pictureColour(withColourFollows([['pointer_reflection', reflection]], { cap, pointer: asDrawn, pointer_reflection: reflection })[0][1]), null);
+  // Made for it, the transient settings go with its colour.
+  const made = { key: wanted.key, kind: 'frames', frames: ['data:x', 'data:y'] };
+  const replaced = withRecolouredPicture(alone, made);
+  assert.deepEqual([replaced._colourThrown, replaced._children.Image.frames.map((frame) => frame.source)], [undefined, ['data:x', 'data:y']]);
 });
 
 test('the designer tells a picture, a part of frames and light apart, and which layer a light lights', () => {

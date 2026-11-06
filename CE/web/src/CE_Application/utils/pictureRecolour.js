@@ -9,6 +9,12 @@
  *   Image:           { colour, colourDrawn, colourMetal, colourFollows, colourRole,
  *                      frames: [{ source, lighting, gloss }, ...] }
  *
+ * A light layer another part throws (a turning part's reflection in the parts under it, from the
+ * add-on) may carry the share of it that comes off that part's colour and the look under it
+ * (`Fill.imageColourThrown` { part: map } and `Fill.imageColourUnder`; on a part of frames each
+ * frame's `thrown` and `under`): it is worked out again with that part in its new colour first
+ * (`rethrownPixels`), then changed with any part it follows.
+ *
  * `imageColour` / `colour` is the colour chosen (AARRGGBB, or a control set's role such as
  * `{control.body}`); empty is the picture as drawn. `…Drawn` is the colour the picture was drawn in,
  * measured on import (`drawnColour`).
@@ -127,6 +133,13 @@ export function lightMapOf(label) {
  * 'gloss', 'light', 'shine' or 'base'; null for any other name.
  */
 export function bounceMapOf(label) {
+  // A turning part's, at an angle ("pointer reflection from pointer at 27", "pointer reflection base
+  // at 27"): for the layer of that angle.
+  const angled = /^(.*\S)(\s+at\s+-?\d+(?:\.\d+)?)\s*$/i.exec(String(label ?? '').trim());
+  if (angled) {
+    const map = bounceMapOf(angled[1]);
+    return map ? { ...map, of: `${map.of}${angled[2]}` } : null;
+  }
   const text = String(label ?? '').trim();
   let match = /^(.*?)\s+(lighting|gloss)\s+from\s+(.+)$/i.exec(text);
   if (match) return { of: match[1], kind: match[2].toLowerCase(), from: match[3] };
@@ -251,6 +264,38 @@ export function recolourBouncePixels({ base, bounce: dodge, shine = null, shadow
 }
 
 /**
+ * A light layer a part throws on what is under it (its reflection in a metal cap; linear dodge, its
+ * colour the light added and its opacity how much of it), worked out again with parts in new colours,
+ * as the add-on writes it (ceditor_layers.py add_group): the light there is the look under it, in
+ * linear light, times a share, and each part's colour adds part of that share. `pixels` the layer
+ * (RGBA straight), `under` the look under it (light_code) and each emitter's `light` (bounce_code,
+ * the share off its colour), all in the layer's box; `ratio` each part's change of colour, linear,
+ * per channel. Returns the layer: unchanged where `under` does not reach.
+ */
+export function rethrownPixels({ pixels, under, emitters }) {
+  const out = new Uint8ClampedArray(pixels);
+  for (let i = 0; i < pixels.length; i += 4) {
+    if (!under[i + 3]) continue;
+    const alpha = pixels[i + 3] / 255;
+    const now = [0, 0, 0];
+    for (let c = 0; c < 3; c += 1) {
+      const below = srgbOf(decodeLight(under[i + c]));
+      // The light as written, under it and added, and what each part's new colour changes of it.
+      let light = toLinear(Math.min(1, below + (pixels[i + c] / 255) * alpha));
+      for (const { ratio, light: share } of emitters) light += toLinear(below) * (ratio[c] - 1) * decodeBounce(share[i + c]);
+      now[c] = clamp01(srgbOf(Math.max(0, light)) - below);
+    }
+    const strongest = Math.max(...now);
+    // Its opacity kept where it holds the light (a frame turned back has soft edges), else as much as
+    // the light needs; nothing where it adds less than half a level.
+    const opacity = alpha > 0 && strongest <= alpha ? alpha : strongest >= 0.5 / 255 ? Math.max(strongest, alpha) : 0;
+    for (let c = 0; c < 3; c += 1) out[i + c] = opacity > 0 ? Math.round(clamp01(now[c] / opacity) * 255) : 0;
+    out[i + 3] = Math.round(opacity * 255);
+  }
+  return out;
+}
+
+/**
  * A part's colour layer and the light layers that go with it, worked out again in `colour`, as the
  * Blender add-on works them out (ceditor_layers.py add_part, part_look). Each picture `{ pixels, box }`,
  * RGBA straight, its box `{ x, y, width, height }` in the artwork's pixels; `lighting` and `gloss` are
@@ -344,6 +389,7 @@ export function pictureColourSettings(part) {
       path: 'Image.colour', drawnPath: 'Image.colourDrawn', colour: String(image.colour ?? ''), drawn: String(image.colourDrawn ?? ''),
       follows: String(image.colourFollows ?? ''), role: String(image.colourRole ?? ''), metal: image.colourMetal === true,
       lit: image.frames.some((frame) => frame?.lighting && frame?.gloss),
+      thrown: thrownFrom(image.frames.map((frame) => (frame?.under ? frame.thrown : null))),
     };
   }
   if (hasPictureFill(part)) {
@@ -356,9 +402,17 @@ export function pictureColourSettings(part) {
       // for the panel's bounce layer, the scene's panel under it.
       bounce: fill.imageColourBounce && typeof fill.imageColourBounce === 'object' ? fill.imageColourBounce : null,
       panelBase: String(fill.imageColourBase ?? ''),
+      thrown: thrownFrom([fill.imageColourUnder ? fill.imageColourThrown : null]),
     };
   }
   return null;
+}
+
+/** The parts a light layer's pictures say are thrown by (`{ part: map }` each), or [] for none. */
+function thrownFrom(maps) {
+  const parts = new Set();
+  for (const map of maps) if (map && typeof map === 'object') for (const [part, src] of Object.entries(map)) if (src) parts.add(part);
+  return [...parts];
 }
 
 const sourceKey = (src) => `${src.length}:${src.slice(64, 96)}:${src.slice(-48)}`;
@@ -374,6 +428,7 @@ function sheetOf(part) {
   if (isFramesImage(image)) {
     return image.frames.map((frame) => ({
       src: String(frame?.source ?? ''), lighting: String(frame?.lighting ?? ''), gloss: String(frame?.gloss ?? ''),
+      under: String(frame?.under ?? ''), thrown: frame?.thrown && typeof frame.thrown === 'object' ? frame.thrown : {},
       box: {
         x: Math.round(at.x + ((Number(frame?.x) || 0) / 100) * at.width), y: Math.round(at.y + ((Number(frame?.y) || 0) / 100) * at.height),
         width: Math.round(((Number(frame?.width) || 100) / 100) * at.width), height: Math.round(((Number(frame?.height) || 100) / 100) * at.height),
@@ -383,6 +438,7 @@ function sheetOf(part) {
   const fill = fillOf(part);
   return [{
     src: String(fill?.imageSrc ?? ''), lighting: String(fill?.imageColourLighting ?? ''), gloss: String(fill?.imageColourGloss ?? ''),
+    under: String(fill?.imageColourUnder ?? ''), thrown: fill?.imageColourThrown && typeof fill.imageColourThrown === 'object' ? fill.imageColourThrown : {},
     box: { x: Math.round(at.x), y: Math.round(at.y), width: Math.round(at.width), height: Math.round(at.height) },
   }];
 }
@@ -406,8 +462,19 @@ export function pictureColour(part) {
   const group = part?._colourGroup;
   // A part lit by another in a new colour is worked out again in its own colour too.
   const lit = Boolean(group?.bounce?.length);
-  const colour = colourRgb(settings.colour) ?? (lit ? drawn : null);
-  if (!colour || (drawn && !lit && colour.every((value, c) => value === drawn[c]))) return null;
+  // Light thrown by parts in new colours (a turning part's reflection), worked out again first.
+  const thrown = part?._colourThrown?.emitters?.length ? part._colourThrown : null;
+  let colour = colourRgb(settings.colour) ?? (lit ? drawn : null);
+  if (colour && drawn && !lit && colour.every((value, c) => value === drawn[c])) colour = null;
+  if (thrown && !group) {
+    const frames = sheetOf(part).map((sheet) => ({ src: sheet.src, under: sheet.under, thrown: sheet.thrown }));
+    const head = colour ? `${colour.join(',')}>${drawn ? drawn.join(',') : 'measured'}` : 'own';
+    const key = `${head}|thrown:${thrown.key}|${frames.map((f) => `${sourceKey(f.src)}/${sourceKey(f.under)}`).join('|')}`;
+    return settings.path === 'Image.colour'
+      ? { kind: 'frames', colour, drawn, frames, thrown, key }
+      : { kind: 'fill', colour, drawn, src: frames[0].src, under: frames[0].under, thrownMaps: frames[0].thrown, thrown, key };
+  }
+  if (!colour) return null;
   const head = `${colour.join(',')}>${drawn ? drawn.join(',') : 'measured'}`;
   if (group && drawn) {
     const frames = isFramesImage(imageOf(part)) ? imageOf(part).frames.length : 0;
@@ -445,7 +512,7 @@ function withImage(part, changes) {
 export function withColourFollows(entries, all = null) {
   const byName = all instanceof Map ? all : new Map(all ? Object.entries(all) : entries);
   const settingsOf = new Map([...byName].map(([name, part]) => [name, pictureColourSettings(part)]));
-  if (![...settingsOf.values()].some((own) => own?.follows || own?.lit || own?.panelBase)) return entries;
+  if (![...settingsOf.values()].some((own) => own?.follows || own?.lit || own?.panelBase || own?.thrown?.length)) return entries;
   // A part's change of colour, in linear light, per channel; null for a part as drawn.
   const ratioOf = (name) => {
     const own = settingsOf.get(name);
@@ -500,6 +567,9 @@ export function withColourFollows(entries, all = null) {
     const panelName = own.panelBase ? name : (own.follows && ['shine', 'shadow'].includes(own.role) && settingsOf.get(own.follows)?.panelBase ? own.follows : '');
     const panel = panelName ? panelOf(panelName) : null;
     if (panel) next = { ...next, _colourPanel: { ...panel, role: panelName === name ? 'bounce' : own.role } };
+    // Light it is thrown by parts in new colours (a turning part's reflection in the cap).
+    const emitters = (own.thrown ?? []).map((from) => ({ from, ratio: ratioOf(from) })).filter((each) => each.ratio);
+    if (emitters.length) next = { ...next, _colourThrown: { emitters, key: thrownKey(emitters) } };
     return [name, next];
   });
 
@@ -526,7 +596,7 @@ export function withColourFollows(entries, all = null) {
 export function withRecolouredPicture(part, made) {
   const wanted = pictureColour(part);
   if (!wanted || !made || made.key !== wanted.key) return part;
-  const { _colourGroup: _, _colourPanel: __, ...stripped } = part;
+  const { _colourGroup: _, _colourPanel: __, _colourThrown: ___, ...stripped } = part;
   // The shadow under the panel's bounce, made a multiply (black at an opacity is the same as a multiply
   // by black at that opacity, so it draws as before where nothing changed).
   const plain = made.blend ? withBlend(stripped, made.blend) : stripped;
@@ -555,6 +625,27 @@ async function recolourOne(src, colour, drawn) {
   const from = drawn ?? colourRgb(drawnColour(picture.pixels));
   if (!from) return src;
   return pngDataUrl(picture.width, picture.height, recolourPixels(picture.pixels, colour, from));
+}
+
+/**
+ * A light layer's picture thrown by parts in new colours (`thrown.emitters`), worked out again from
+ * the look under it and the share off each one's colour, then, with `colour`, changed in proportion
+ * as a follower is. The picture as it was where its maps do not fit it.
+ */
+async function rethrowOne({ src, under, thrown: maps }, thrown, colour, drawn) {
+  if (!src) return '';
+  const emitters = thrown.emitters.filter((each) => maps?.[each.from]);
+  if (!under || !emitters.length) return colour ? recolourOne(src, colour, drawn) : src;
+  const [picture, below, ...shares] = await Promise.all([picturePixels(src), picturePixels(under), ...emitters.map((each) => picturePixels(maps[each.from]))]);
+  if (!picture) return '';
+  const fits = (other) => other && other.width === picture.width && other.height === picture.height;
+  if (!fits(below) || !shares.every(fits)) return colour ? recolourOne(src, colour, drawn) : src;
+  let pixels = rethrownPixels({ pixels: picture.pixels, under: below.pixels, emitters: emitters.map((each, i) => ({ ratio: each.ratio, light: shares[i].pixels })) });
+  if (colour) {
+    const from = drawn ?? colourRgb(drawnColour(picture.pixels));
+    if (from) pixels = recolourPixels(pixels, colour, from);
+  }
+  return pngDataUrl(picture.width, picture.height, pixels);
 }
 
 /** The drawn colour of a part of frames that came in without one: its middle frame's, measured. */
@@ -650,6 +741,14 @@ export function recolourPicture(wanted) {
       const own = sheets[wanted.role] ?? [];
       const pictures = await Promise.all(Array.from({ length: count }, async (_, i) => ((await groupFrame(wanted, i))[wanted.role] || own[i]?.src || '')));
       return wanted.frames ? { key: wanted.key, kind: 'frames', frames: pictures } : { key: wanted.key, kind: 'fill', src: pictures[0] };
+    }
+    if (wanted.thrown) {
+      const drawn = wanted.colour ? wanted.drawn ?? (wanted.kind === 'frames' ? await measuredFramesColour(wanted.frames) : null) : null;
+      if (wanted.kind === 'frames') {
+        const frames = await Promise.all(wanted.frames.map((frame) => rethrowOne(frame, wanted.thrown, wanted.colour, drawn)));
+        return { key: wanted.key, kind: 'frames', frames };
+      }
+      return { key: wanted.key, kind: 'fill', src: await rethrowOne({ src: wanted.src, under: wanted.under, thrown: wanted.thrownMaps }, wanted.thrown, wanted.colour, drawn) };
     }
     if (wanted.kind === 'frames') {
       const drawn = wanted.drawn ?? await measuredFramesColour(wanted.frames);

@@ -407,36 +407,37 @@ def decoded_bounce(code):
     return decoded(code) / 16.0
 
 
-def regroup(pixels, out, name, picked, extra_light=0.0, extra_gloss=0.0):
+def regroup(pixels, out, name, picked, extra_light=0.0, extra_gloss=0.0, suffix="", drawn=None):
     """`name`'s colour, shading and highlights layers worked out again in `picked` (8-bit) as CEditor
     works them out (pictureRecolour.js recolourGroupPixels), with `extra_light` and `extra_gloss` added
     to the light on it and its gloss (light another part throws on it, changed with that part's
-    colour); into `out`."""
-    layer = pixels[name]
+    colour); into `out`. `suffix`: a frame of a part written at angles (" at 0"), and `drawn` the colour
+    CEditor measured on its frame at rest."""
+    layer = pixels[f"{name}{suffix}"]
     a = layer[..., 3]
-    drawn = drawn_of(layer)
+    drawn = drawn_of(layer) if drawn is None else drawn
     covered = a > 0
     members = {light for light, colour_name in result["colour_of"] if colour_name == name}
-    shading = pixels.get(next((n for n in members if n.endswith("shading")), ""))
-    highlights = pixels.get(next((n for n in members if n.endswith("highlights")), ""))
+    shading = pixels.get(next((f"{n}{suffix}" for n in members if n.endswith("shading")), ""))
+    highlights = pixels.get(next((f"{n}{suffix}" for n in members if n.endswith("highlights")), ""))
     s_alpha = (shading[..., 3:4] / 255.0) if shading is not None else 0.0
     h_alpha = (highlights[..., 3:4] / 255.0) if highlights is not None else np.zeros_like(a[..., None], dtype=np.float32)
     ref = addon.linear(drawn / 255.0)
     new = addon.linear(picked / 255.0)
     own = np.where(h_alpha >= 1.0, addon.linear(layer[..., :3] / 255.0), ref)
     c = np.where(ref > 1e-4, own * new / np.maximum(ref, 1e-4), new)
-    lit = c * np.maximum(decoded(pixels[f"{name} lighting"][..., :3]) + extra_light, 0.0)
-    total = lit + np.maximum(decoded(pixels[f"{name} gloss"][..., :3]) + extra_gloss, 0.0)
+    lit = c * np.maximum(decoded(pixels[f"{name} lighting{suffix}"][..., :3]) + extra_light, 0.0)
+    total = lit + np.maximum(decoded(pixels[f"{name} gloss{suffix}"][..., :3]) + extra_gloss, 0.0)
     e = addon.srgb(c)
     shade = np.where(e > 1e-4, np.clip(addon.srgb_beyond(lit) / np.maximum(e, 1e-4), 0.0, 1.0), 1.0)
     beyond = addon.srgb_beyond(total) if name in result["metal"] else addon.srgb(total)
     shine = np.clip(beyond - e * shade, 0.0, 1.0)
     colour_now = np.clip((addon.srgb(total) - h_alpha * shine) / np.maximum(1.0 - s_alpha + s_alpha * shade, 1e-4), 0.0, 1.0)
     keep = lambda new_rgb, old: np.where(covered[..., None] & (old[..., 3:4] > 0), np.concatenate([addon.to8(new_rgb), old[..., 3:4]], axis=-1), old)
-    out[name] = keep(colour_now, layer)
+    out[f"{name}{suffix}"] = keep(colour_now, layer)
     for member in members:
-        if member.endswith(("shading", "highlights")) and member in pixels:
-            out[member] = keep(shade if member.endswith("shading") else shine, pixels[member])
+        if member.endswith(("shading", "highlights")) and f"{member}{suffix}" in pixels:
+            out[f"{member}{suffix}"] = keep(shade if member.endswith("shading") else shine, pixels[f"{member}{suffix}"])
 
 
 def bounce_in(pixels, out, name, ratio):
@@ -567,6 +568,93 @@ for part, colour in (("skirt", (0.42, 0.02, 0.018)), ("cap", (0.62, 0.36, 0.06))
     check(float(d[beside].mean()) < 2 and float(d[edge].mean()) < 3,
           f"and what it lights beside it, lit in its new colour: mean {d[beside].mean():.2f} levels just beside it "
           f"({unthrown[beside].mean():.2f} with its light on them as rendered), {d[edge].mean():.2f} at its edge")
+
+# The pointer in a new colour: a part of frames with its light written at every angle, worked out
+# again at each angle as the skirt and cap are; and the light it throws on the cap and skirt under it
+# (its reflection in the metal cap, at each angle) worked out again in its colour from the share of it
+# off its colour, as CEditor does (pictureRecolour.js rethrownPixels), where before the reflection
+# kept the pointer's drawn colour. Against Blender rendering the knob with the pointer in that colour.
+def rethrown(pixels, out, name, ratios, suffix):
+    """The reflection `name` + `suffix` with the light off each part's colour scaled by its change
+    of colour (`ratios`: part name to its ratio, in linear light): the light there is lin(under) times
+    a share, and the part's colour adds `via` of it."""
+    layer, base = pixels[f"{name}{suffix}"], pixels.get(f"{name} base{suffix}")
+    if base is None:
+        return
+    here = base[..., 3] > 0
+    under = addon.srgb(decoded(base[..., :3]))
+    alpha = layer[..., 3:4] / 255.0
+    added = layer[..., :3] / 255.0 * alpha
+    light = addon.linear(np.clip(under + added, 0.0, 1.0))
+    for part, ratio in ratios.items():
+        light = light + addon.linear(under) * (ratio - 1.0) * decoded_bounce(pixels[f"{name} from {part}{suffix}"][..., :3])
+    now = np.clip(addon.srgb(np.maximum(light, 0.0)) - under, 0.0, 1.0)
+    strongest = now.max(-1, keepdims=True)
+    opacity = np.where((alpha > 0) & (strongest <= alpha), alpha, np.where(strongest >= 0.5 / 255, np.maximum(strongest, alpha), 0.0))
+    rgb = np.where(opacity > 0, np.clip(now / np.maximum(opacity, 1e-6), 0.0, 1.0), 0.0)
+    out[f"{name}{suffix}"] = np.where(here[..., None], addon.rgba8(rgb, opacity[..., 0]), layer)
+
+
+POINTER_COLOUR = (0.04, 0.22, 0.85)
+socket = material_colour("pointer")
+was = tuple(socket.default_value)
+socket.default_value = (*POINTER_COLOUR, 1)
+want = np.round(addon.srgb(reference(scene, SIZE, SAMPLES, "recoloured-pointer", catcher=False)[..., :3]) * 255)
+socket.default_value = was
+as_rendered = np.round(addon.srgb(reference(scene, SIZE, SAMPLES, "pointer-as-drawn", catcher=False)[..., :3]) * 255)
+pixels = result["pixels"]
+pointer_drawn = drawn_of(pixels["pointer at 0"])
+albedo = addon.linear(pointer_drawn / 255.0) / np.maximum(np.asarray(was[:3], dtype=np.float32), 1e-6)
+picked = np.round(addon.srgb(np.asarray(POINTER_COLOUR, dtype=np.float32) * albedo) * 255)
+ref = addon.linear(pointer_drawn / 255.0)
+pointer_ratio = np.where(ref > 1e-4, addon.linear(picked / 255.0) / np.maximum(ref, 1e-4), 1.0)
+own_only = dict(pixels)
+regroup(pixels, own_only, "pointer", picked, suffix=" at 0", drawn=pointer_drawn)
+thrown_too = dict(own_only)
+rethrown(pixels, thrown_too, "pointer reflection", {"pointer": pointer_ratio}, " at 0")
+same = dict(pixels)
+rethrown(pixels, same, "pointer reflection", {"pointer": np.ones(3, dtype=np.float32)}, " at 0")
+check(all(f"pointer reflection {kind} at {addon.angle_name(angle)}" in pixels for kind in ("base", "from pointer") for angle in (-27, 0, 27)),
+      "the pointer's reflection has the share of it off the pointer's colour, and the look under it, at each angle")
+unchanged = np.abs(same["pointer reflection at 0"].astype(int) - pixels["pointer reflection at 0"].astype(int)).max()
+check(unchanged <= 1, f"worked out again in its own colour, the reflection is as written: at most {unchanged} levels")
+on_pointer = pixels["pointer at 0"][..., 3] > 0
+reflected = (pixels["pointer reflection at 0"][..., 3] > 0) & ~grown_by(on_pointer, 1)
+pointer_inside = pixels.get("pointer highlights at 0", np.zeros_like(pixels["pointer at 0"]))[..., 3] > 0
+pointer_body = (pixels["pointer at 0"][..., 3] > 0) & pointer_inside & ~grown_by(pixels["pointer at 0"][..., 3] == 0, 1)
+got = {how: np.abs(want - np.round(stacked(result["layers"], p, bare) * 255)).max(-1) for how, p in (("thrown", thrown_too), ("own", own_only))}
+# The light the pointer throws on the panel, which the add-on does not write: Blender's own two renders,
+# the pointer orange and blue, on the panel away from the knob and its shadow.
+knob = np.zeros_like(on_pointer)
+for name in ("skirt", "cap", "lens", "pointer shadow at 0", "shadow"):
+    if name in pixels:
+        knob |= pixels[name][..., 3] > 0
+panel_by = grown_by(knob, int(round(0.2 * px))) & ~grown_by(knob, 2)
+on_panel_change = np.abs(want - as_rendered).max(-1)[panel_by]
+if os.environ.get("CEDITOR_LAYERS_DEBUG"):
+    np.savez(os.path.join(OUT, "recoloured-pointer.npz"), want=want, as_rendered=as_rendered,
+             thrown=np.round(stacked(result["layers"], thrown_too, bare) * 255), own=np.round(stacked(result["layers"], own_only, bare) * 255),
+             **{k.replace(" ", "_"): v for k, v in pixels.items() if k.startswith("pointer")})
+print(f"  pointer in a new colour: on it mean {got['thrown'][pointer_body].mean() if pointer_body.any() else float('nan'):.2f}; its reflection in the cap mean {got['thrown'][reflected].mean():.2f}, "
+      f"p99 {np.percentile(got['thrown'][reflected], 99):.1f} ({got['own'][reflected].mean():.2f}, {np.percentile(got['own'][reflected], 99):.1f} as drawn); "
+      f"its light on the panel beside the knob in Blender: p99 {np.percentile(on_panel_change, 99):.1f}, at most {on_panel_change.max():.0f}")
+# For the web suite: Blender's render with the pointer blue, and the colour picked for it.
+recoloured_references["pointer"] = {"colour": "FF" + "".join(f"{int(v):02X}" for v in picked),
+                                    "rgb": base64.b64encode(np.ascontiguousarray(want.astype(np.uint8)).tobytes()).decode("ascii")}
+# At the fixture's 96 pixels the pointer is five wide, all edge: measured above, held at 160.
+if SIZE >= 128:
+    check(float(got["thrown"][pointer_body].mean()) < 3, f"the pointer in a new colour is Blender's render of it: mean {got['thrown'][pointer_body].mean():.2f} levels")
+# Where Blender's render changes by 3 levels or more with the pointer's colour: below that the two
+# renders differ by their noise as much as by the colour.
+changed = reflected & (np.abs(want - as_rendered).max(-1) >= 3)
+print(f"  its reflection where Blender changes by 3 levels or more ({changed.sum()} pixels): mean {got['thrown'][changed].mean():.2f}, "
+      f"p99 {np.percentile(got['thrown'][changed], 99):.1f} ({got['own'][changed].mean():.2f}, {np.percentile(got['own'][changed], 99):.1f} as drawn)")
+check(SIZE < 128 or changed.sum() >= 10 and float(got["thrown"][changed].mean()) < 0.5 * float(got["own"][changed].mean())
+      and float(got["thrown"][reflected].mean()) < float(got["own"][reflected].mean()),
+      f"and its reflection in the cap takes its new colour: mean {got['thrown'][changed].mean():.2f} levels where Blender changes by 3 or more "
+      f"({got['own'][changed].mean():.2f} in its drawn colour), {got['thrown'][reflected].mean():.2f} over all of it ({got['own'][reflected].mean():.2f})")
+check(float(np.percentile(on_panel_change, 99)) <= 1.5,
+      f"the light it throws on the panel, which is not written, is under a level or two in Blender: 99th percentile {np.percentile(on_panel_change, 99):.1f}")
 
 # Drawn larger, as CEditor draws a component at any size and on a screen of two pixels to the point:
 # the browser scales each layer before it blends them, and the layers must still add up to the
@@ -711,8 +799,8 @@ if FIXTURE:
     with open(psd, "rb") as src, open(target, "wb") as dst:
         dst.write(src.read())
     print("wrote", target)
-    # Blender's renders of the knob with the skirt red and the cap brass, on its panel, and the colour
-    # each colour layer is given: what CEditor's own recolour is held to.
+    # Blender's renders of the knob with the skirt red, the cap brass and the pointer blue, on its
+    # panel, and the colour each colour layer is given: what CEditor's own recolour is held to.
     references = os.path.join(os.path.dirname(target), "blender-knob-recoloured.json")
     with open(references, "w") as out:
         json.dump({"width": SIZE, "height": SIZE, **recoloured_references}, out)

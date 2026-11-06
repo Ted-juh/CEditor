@@ -21,7 +21,7 @@ import { applyCustomBindings } from '../src/CE_Application/utils/interactionRunt
 import { deriveInteractClusters, describeValueUse } from '../src/CE_Application/utils/customComponentClusters.js';
 import { imageFrameLayers } from '../src/CE_Application/utils/imageFrames.js';
 import { hasLinearEdges, mixEdgesInLinearLight } from '../src/CE_Application/utils/linearEdges.js';
-import { colourRgb, decodeLight, litLayerOf, pictureColour, pictureLayerKind, recolourBouncePixels, recolourGroupPixels, withColourFollows } from '../src/CE_Application/utils/pictureRecolour.js';
+import { colourRgb, decodeLight, litLayerOf, pictureColour, pictureLayerKind, recolourBouncePixels, recolourGroupPixels, rethrownPixels, withColourFollows } from '../src/CE_Application/utils/pictureRecolour.js';
 import { inflateSync } from 'node:zlib';
 
 /** A PNG's pixels (8-bit RGBA, not interlaced, as CEditor's encoder writes them). */
@@ -137,10 +137,10 @@ test('a Blender knob comes in as a dial: the pointer, its shadow and its reflect
   assert.deepEqual(wiring.orphans, { channels: [], behaviors: [], zones: [] });
   const use = describeValueUse(plan.component, 'lamp');
   assert.deepEqual([use.parts.sort(), use.shows], [['lamp_glow', 'lamp_glow_shine', 'lamp_lit'], true]);
-  // The notice counts the component's layers as the designer lists them, not the file's 94: the 33
-  // layers of the pointer, its shadow and its reflection at their angles are three, and the 45 hidden
-  // ones of the light on the parts and on the panel are not layers at all.
-  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 94);
+  // The notice counts the component's layers as the designer lists them, not the file's 116: the 33
+  // layers of the pointer, its shadow and its reflection at their angles are three, and the 67 hidden
+  // ones of the light on the parts, on the panel and in the pointer's reflection are not layers at all.
+  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 116);
   assert.equal(plan.layers, Object.keys(parts).length);
   assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of 19 layers: pointer shadow, pointer reflection, pointer turn with the value\. .* with a value of their own, Lamp\.$/);
 });
@@ -379,6 +379,68 @@ test('what a part lights beside it is lit in its new colour: the panel by the re
     const { mean, n } = summary(diffs);
     assert.ok(n > 100 && mean < 2.5, `the skirt beside the brass cap: ${n} pixels, mean ${mean.toFixed(2)} levels against Blender`);
   }
+});
+
+test('a recoloured pointer\'s reflection in the cap takes its colour, as Blender renders the pointer blue', () => {
+  const references = JSON.parse(readFileSync(new URL('./fixtures/blender-knob-recoloured.json', import.meta.url), 'utf8'));
+  const plan = planPsdComponentImport(bytes, { fileName: 'blender-knob.psd' });
+  const parts = plan.component._children.Parts._children;
+  const decode = (src) => decodePng(Buffer.from(src.split(',')[1], 'base64'));
+  const toSrgb = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * Math.min(1, Math.max(0, x)) ** (1 / 2.4) - 0.055);
+  const image = parts.pointer_reflection._children.Image;
+  // Each frame carries the look under it and the share of it off the pointer's colour, keyed by the
+  // pointer's part (its layers were "pointer at <angle>").
+  assert.ok(image.frames.every((frame) => frame.under && frame.thrown?.pointer), 'every angle has its maps');
+  assert.equal(image.colourFollows, 'cap', 'and it still follows the metal it is in');
+  // Through the designer's path: the pointer in its new colour, the reflection worked out again.
+  const recoloured = { ...parts.pointer, _children: { ...parts.pointer._children, Image: { ...parts.pointer._children.Image, colour: references.pointer.colour } } };
+  const entries = withColourFollows([['pointer_reflection', parts.pointer_reflection]], { ...parts, pointer: recoloured });
+  const wanted = pictureColour(entries[0][1]);
+  assert.equal(wanted.kind, 'frames');
+  assert.deepEqual(wanted.thrown.emitters.map((each) => each.from), ['pointer']);
+  // On pixels, at rest: the cap under it, the pointer's shadow over that, the reflection added; against
+  // Blender's render where the reflection is and the pointer is not.
+  const reference = Buffer.from(references.pointer.rgb, 'base64');
+  const [ratio] = wanted.thrown.emitters.map((each) => each.ratio);
+  const frameBox = (part, frame, picture) => {
+    const { x, y, width, height } = part._children.Layout;
+    return { x: Math.round(x + (frame.x / 100) * width), y: Math.round(y + (frame.y / 100) * height), width: picture.width, height: picture.height };
+  };
+  const rest = image.frames[image.frameIndex];
+  const layer = decode(rest.source);
+  const box = frameBox(parts.pointer_reflection, rest, layer);
+  const under = decode(rest.under).pixels;
+  const light = decode(rest.thrown.pointer).pixels;
+  const shadowFrame = parts.pointer_shadow._children.Image.frames[parts.pointer_shadow._children.Image.frameIndex];
+  const shadow = decode(shadowFrame.source);
+  const shadowBox = frameBox(parts.pointer_shadow, shadowFrame, shadow);
+  const pointerFrame = parts.pointer._children.Image.frames[parts.pointer._children.Image.frameIndex];
+  const pointer = decode(pointerFrame.source);
+  const pointerBox = frameBox(parts.pointer, pointerFrame, pointer);
+  const alphaIn = (picture, b, x, y) => (x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height ? picture.pixels[((y - b.y) * b.width + (x - b.x)) * 4 + 3] : 0);
+  const near = (x, y) => [-1, 0, 1].some((dy) => [-1, 0, 1].some((dx) => alphaIn(pointer, pointerBox, x + dx, y + dy) > 0));
+  const shown = (pixels, i, x, y) => [0, 1, 2].map((c) => {
+    const below = toSrgb(decodeLight(under[i + c])) * (1 - alphaIn(shadow, shadowBox, x, y) / 255);
+    return Math.min(255, Math.round((below + (pixels[i + c] / 255) * (pixels[i + 3] / 255)) * 255));
+  });
+  const now = rethrownPixels({ pixels: layer.pixels, under, emitters: [{ ratio, light }] });
+  const errors = { now: [], drawn: [] };
+  for (let y = 0; y < box.height; y += 1) for (let x = 0; x < box.width; x += 1) {
+    const i = (y * box.width + x) * 4;
+    const [ax, ay] = [x + box.x, y + box.y];
+    if (!layer.pixels[i + 3] || !under[i + 3] || near(ax, ay)) continue;
+    const want = [0, 1, 2].map((c) => reference[(ay * SIZE + ax) * 3 + c]);
+    const worst = (pixels) => Math.max(...shown(pixels, i, ax, ay).map((v, c) => Math.abs(v - want[c])));
+    errors.now.push(worst(now));
+    errors.drawn.push(worst(layer.pixels));
+  }
+  const mean = (list) => list.reduce((a, b) => a + b, 0) / list.length;
+  assert.ok(errors.now.length >= 15, `${errors.now.length} pixels compared`);
+  // At the fixture's 96 pixels the reflection is a small streak: 1.1 levels, at most 2, measured here;
+  // 1.9 and 4 in the pointer's drawn colour.
+  assert.ok(mean(errors.now) < 1.5 && Math.max(...errors.now) <= 3 && mean(errors.now) < mean(errors.drawn),
+    `the reflection in the blue pointer's colour: mean ${mean(errors.now).toFixed(2)}, at most ${Math.max(...errors.now)} levels against Blender; `
+    + `${mean(errors.drawn).toFixed(2)} and ${Math.max(...errors.drawn)} in its drawn colour`);
 });
 
 test('CEditor draws the layers as the add-on composed them', () => {
