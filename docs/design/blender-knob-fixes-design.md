@@ -23,16 +23,26 @@ Where it differs from the design below, and what was measured.
   a picture over its fill keeps its Fill.
 - **A picture with no drawn colour** (not imported from Photoshop) has it measured when it is drawn,
   and for the dock's Drawn swatch; nothing is written until Pick from the picture.
-- **The add-on** writes `<name> colour share` (hidden, beside each colour layer whose share is not 1
-  throughout: the skirt, the cap and the pointer at each angle; the lamp's lens needs none) and
-  `<ceditor:colourOf>` in the XMP: a metal's highlights (`cap highlights=cap`) and a turning part's
-  reflection that falls mostly in a metal part (`pointer reflection=cap`), since that reflection is a
-  multiple of the light on the metal. A metal is a part whose covered pixels are mostly metal by its
-  passes.
-- **A metal's glint.** Light brighter than white was clipped before the split, so a silver cap's
-  highlights held only what filled its colour to white, and recoloured brass the glint went dark
-  (Blender keeps it near white). For a metal the highlights now hold the light past white up to a
-  whole white (`srgb_beyond`); shown, the two still add to white.
+- **The light, not a share** (second round, closing the two gaps the first left). A share per pixel
+  could not carry how a part's look changes with its colour: Blender adds the gloss in linear light
+  and a browser in sRGB, so a darker colour's weak channels came out a few levels short (the red
+  skirt a mean 6.8), and a metal's glint, many times white, more than a layer holds (the brass cap's
+  blue 52 short there). The add-on now writes beside each colour layer the light on the part without
+  its colour and its gloss (`<name> lighting`, `<name> gloss`, hidden; linear light in 8 bits over
+  1/256 to 256, `light_code`), and CEditor works the colour, shading and highlights layers out again
+  in the new colour as the add-on does (`recolourGroupPixels`): the new colour times the light plus
+  the gloss, split as the add-on splits it. Highlights now cover the whole inside (adding nothing
+  where there is no light) so light can come where there was none. The gloss is past the colour
+  CEditor takes there (the colour layer's own inside, the drawn colour elsewhere), so the part
+  worked out again in its own colour is as written (within 3 levels). Two traps on the way: Cycles'
+  light passes are per covered sample and must not be divided by coverage (at a part's edge that made
+  the light sixty times too bright), and a gloss made to absorb the light's 8-bit rounding carries it
+  onto a new colour's weak channels as noise.
+- **The XMP** names each colour layer's shading and highlights (`<ceditor:colourOf>`,
+  `skirt shading=skirt`), a turning part's reflection that falls mostly in a metal part
+  (`pointer reflection=cap`, changed in proportion by the metal's colour), and the metal parts
+  (`<ceditor:metal>`, whose highlights keep light past white). A metal is a part whose covered
+  pixels are mostly metal by its passes.
 - **The Lamp.** An on/off value had no Value From (the flat list offered it for numbers only, and a
   followed fraction read as off). It now follows too, on once its source is past half way
   (`sourcedCustomValues`), and the card and the flat list offer it; its row says what it shows, how it
@@ -46,22 +56,24 @@ Where it differs from the design below, and what was measured.
   shows **Now** from the layer's stored colour, so a colour set by a script or a role shows too.
 
 **Measured** (`tools/blender/test_ceditor_layers.py`, against Blender rendering the knob with the
-material changed, at 160 px):
+material changed, at 160 px, where the part covers the pixel; the web suite holds CEditor's own
+JavaScript to Blender's renders in `test/fixtures/blender-knob-recoloured.json` the same way, at 96 px):
 
-| Recoloured | Mean | 99th percentile | Note |
-|---|---|---|---|
-| The skirt, pale grey to red | 6.8 | 12 | its edge 6.6 by its share, 9.0 in proportion |
-| The metal cap, silver to brass | 5.5 | 11 away from the glint | 8.0 with its reflections left as rendered; at the glint's centre the blue 52 short |
+| Recoloured | Mean | 99th percentile | Changed in proportion instead | First round (share) |
+|---|---|---|---|---|
+| The skirt, pale grey to red | 1.45 | 4 | 8.1, 15 | 6.8, 12 |
+| The metal cap, silver to brass, glint included | 1.1 | 5 | 8.1, 105 | 5.5, 52 at the glint |
 
-Not to a level or two, unlike the knob as drawn: Blender adds a part's gloss to its colour in linear
-light and a browser in sRGB, and the gloss was measured on the colour as drawn, so a darker new
-colour's weak channels come out a few levels short (the red skirt's green and blue). No share can
-carry that: it depends on the new colour. And a glint more than a white beyond is more than a layer
-holds.
+What is left is the light a part throws on what is beside it, which Blender lights in the new colour
+and the layers keep as rendered: just beside the red skirt the panel is 4.6 levels off at the mean,
+just beside the brass cap the skirt 10 (its blue), and a part's edge, partly what is beside it, is
+within that (5.1 and 7.0). Closing it would mean the add-on rendering each part's bounce on the
+others separately.
 
 Checked: the web suite, `browser-checks/pictureColour.mjs` (the Interact card; the skirt selected,
 its colour changed in the designer and on a panel, nothing beside it painted, back to as drawn; a
-light layer), the add-on's test 59 of 59 at 160 px and 57 of 57 at the fixture's 96 px.
+light layer; a baked filmstrip), the add-on's test 61 of 61 at 160 px and 59 of 59 at the fixture's
+96 px.
 
 ## 1. A picture layer's colour
 

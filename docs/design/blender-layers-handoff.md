@@ -34,7 +34,7 @@ render, on any panel and at any angle, measured rather than judged by eye.
   modes), was green in all four jobs, the Windows build and its C++ tests included.
 - Everything checked locally on `aa902a74`: the web suite 7574 of 7579 (none failing, 5 skipped),
   the 40 browser checks, lint, the add-on's test 50 of 50 (160 px) and 48 of 48 (the fixture's
-  96 px), Blender 4.0.2. Since the fixes: the add-on's test 59 of 59 and 57 of 57, the browser
+  96 px), Blender 4.0.2. Since the fixes: the add-on's test 61 of 61 and 59 of 59, the browser
   checks 41 (with `pictureColour`).
 
 ## What works, and how close it is
@@ -91,12 +91,12 @@ The pieces, and where they live:
 
 ## Defects found in review
 
-1. **Fixed:** a colour per picture (`Fill.imageColour`, `Image.colour`) worked out on its pixels,
-   by the colour share the add-on now writes; a metal's highlights and the reflection in it follow
-   it; the look bar and the Colors dock edit it, light layers point to the layer they light, the
-   Layers list says Picture, Frames or Light. Against Blender with the material changed: the skirt red
-   a mean 6.8 levels, the cap brass 5.5 (see the design record for why not 1). The review's
-   description: The manual says "change a part's colour
+1. **Fixed:** a colour per picture (`Fill.imageColour`, `Image.colour`) worked out on its pixels;
+   a part's shading and highlights, and a turning part's reflection in a metal, go with it; the look bar and the Colors dock edit it, light layers point to the layer they light, the
+   Layers list says Picture, Frames or Light. The add-on writes the light on each part and its gloss,
+   and CEditor works its colour, shading and highlights out again in the new colour: against Blender
+   with the material changed, where the part covers the pixel, the skirt red a mean 1.45 levels, the
+   metal cap brass 1.1, its glint included. The review's description: The manual says "change a part's colour
    with its tint". A picture layer's tint (`Background.Fill.imageTint`) is drawn by `buildLayerStyle`
    (`utils/backgroundCSS.js`) as an inset box-shadow wash at 30 %, over the layer's whole box: set
    red on the skirt, it painted a red rectangle over the knob and the panel corners round it
@@ -140,11 +140,10 @@ The pieces, and where they live:
   inexact for shadows and multiplies.
 - The filmstrip baker (Assets › bake) draws a part's blend mode and its colour since the fixes, but
   not the outline mixing (a filmstrip has no panel under it).
-- A part in another colour: a darker colour's weak channels come out a few levels short of Blender
-  where the part is glossy (its gloss was measured on the colour as drawn, and Blender adds it in
-  linear light); the light a part throws on the panel (`bounce`) and a shiny part's reflection of it
-  keep the colour as drawn; the centre of a metal's glint keeps less of the new colour's weakest
-  channel than Blender shows; a picture of several colours changes as a whole.
+- A part in another colour: the light it throws on what is beside it (the panel's `bounce`, the
+  skirt by a brass cap) and a shiny part's reflection of it keep the colour as drawn (4.6 and 10
+  levels at the mean just beside the test knob's skirt and cap); a picture of several colours changes
+  as a whole; a glowing part's glow at its very edge is not worked out again.
 
 ## Not verified
 
@@ -198,7 +197,7 @@ menu does.
 From the design record's order: Illustrator `.ai` through its PDF part (pdf.js) if Illustrator files are wanted
 directly; a Figma plugin if Figma is; Level 3 (CEditor's own 3D parts, with piece E); Level 2 (glTF)
 when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; the
-gloss of a recoloured part in linear light (its gloss written as a layer of its own); a
+light a recoloured part throws on what is beside it (each part's bounce rendered on its own); a
 lamp edge that holds on any panel; a CI job for the Blender test.
 
 ## The owner's working rules, beyond CLAUDE.md

@@ -41,7 +41,7 @@ import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { pngDataUrl } from './pngEncode.js';
 import { createPartNode } from './customComponentFactory.js';
 import { linearEdgeNames } from './linearEdges.js';
-import { colourOfNames, colourShareOf, drawnColour } from './pictureRecolour.js';
+import { colourOfNames, drawnColour, lightMapOf, metalNames } from './pictureRecolour.js';
 import { SECTION_DEFAULTS } from '../models/sectionDefaults.js';
 import { deepClone } from './deepClone.js';
 import { buildArtworkComponent, uniqueLayerName } from './artworkComponent.js';
@@ -349,17 +349,21 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   // The records as parts. A picture the file names for it (the Blender add-on's parts that stay put)
   // has its edge mixed for the panel under it as light mixes (utils/linearEdges.js).
   const linearEdges = linearEdgeNames(psd.imageResources?.xmpMetadata);
-  // A colour layer's share (utils/pictureRecolour.js), "<name> colour share": how much of its colour
-  // shows in each pixel, which the Blender add-on writes for its colour layers. Not a part: it goes
-  // with the picture it is for.
-  const shares = new Map();
+  // The light on a colour layer and its gloss ("<name> lighting", "<name> gloss"), which the Blender
+  // add-on writes beside its colour layers, in linear light, for CEditor to work the part out again in
+  // another colour (utils/pictureRecolour.js). Not parts: they go with the picture they are for.
+  const lights = new Map();
   for (const record of records) {
-    const of = record.type === 'picture' ? colourShareOf(record.label) : '';
-    if (of) { shares.set(of, record); record.share = true; }
+    const map = record.type === 'picture' ? lightMapOf(record.label) : null;
+    if (!map) continue;
+    lights.set(map.of, { ...lights.get(map.of), [map.kind]: record });
+    record.lightMap = true;
   }
+  const xmp = psd.imageResources?.xmpMetadata;
+  const metal = metalNames(xmp);
   const layers = [];
   for (const record of records) {
-    if (record.share) continue;
+    if (record.lightMap) continue;
     const effects = record.shadows.length || record.css !== 'normal' ? blendEffects(record.css) : null;
     if (effects && record.shadows.length) effects._children.Shadows.items = record.shadows;
     const layout = { x: record.box.x, y: record.box.y, width: record.box.width, height: record.box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' };
@@ -388,8 +392,13 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
       if (linearEdges.has(record.label)) fill.imageEdges = 'linear';
       // The colour it was drawn in, which its colour is changed from.
       fill.imageColourDrawn = drawnColour(record.pixels);
-      const share = shares.get(record.label);
-      if (share) fill.imageColourShare = pngDataUrl(record.box.width, record.box.height, placed(share.pixels, share.box, record.box));
+      const light = lights.get(record.label);
+      if (light?.lighting && light?.gloss) {
+        const laid = (map) => pngDataUrl(record.box.width, record.box.height, placed(map.pixels, map.box, record.box));
+        fill.imageColourLighting = laid(light.lighting);
+        fill.imageColourGloss = laid(light.gloss);
+      }
+      if (metal.has(record.label) || metal.has(record.label.replace(/\s+at\s+\S+\s*$/i, ''))) fill.imageColourMetal = true;
     }
     if (record.mask) part.mask = record.mask;
     layers.push({ name: record.label, part, box: record.box, names: record.chain });
@@ -407,7 +416,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   if (report.pattern.size) warnings.push(`Pattern-filled shapes come in as their pictures: ${list(report.pattern)}.`);
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'Photoshop Artwork';
-  const built = buildArtworkComponent({ name, width, height, layers, fileName, colourOf: colourOfNames(psd.imageResources?.xmpMetadata) });
+  const built = buildArtworkComponent({ name, width, height, layers, fileName, colourOf: colourOfNames(xmp) });
   return { ok: true, name, width, height, ...built, warnings, kept: [...report.kept] };
 }
 

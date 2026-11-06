@@ -33,6 +33,7 @@
 import { createControl } from '../models/componentTypes.js';
 import { createPartNode, createValueChannel, makeInteractive } from './customComponentFactory.js';
 import { deepClone } from './deepClone.js';
+import { lightRoleOf } from './pictureRecolour.js';
 
 const ROLE_WORDS = [
   ['pivot', ['pivot', 'centre', 'center', 'axis']],
@@ -139,12 +140,13 @@ function framesFromAngles(layers) {
     const box = { x: x0, y: y0, width: Math.max(1, x1 - x0), height: Math.max(1, y1 - y0) };
     const share = (value, whole) => Math.round((value / whole) * 1e6) / 1e4;
     const frameOf = ({ layer }) => {
-      const colourShare = layer.part._children.Background._children.Fill.imageColourShare;
+      // The light on it and its gloss at that angle, in its box (utils/pictureRecolour.js).
+      const fill = layer.part._children.Background._children.Fill;
       return {
         source: pictureOf(layer.part),
         x: share(layer.box.x - box.x, box.width), y: share(layer.box.y - box.y, box.height),
         width: share(layer.box.width, box.width), height: share(layer.box.height, box.height),
-        ...(colourShare ? { share: colourShare } : {}),
+        ...(fill.imageColourLighting && fill.imageColourGloss ? { lighting: fill.imageColourLighting, gloss: fill.imageColourGloss } : {}),
       };
     };
     // Angles a step apart (the smallest gap) over the dial's travel, the -135 to 135 degrees it turns:
@@ -172,13 +174,14 @@ function framesFromAngles(layers) {
     // Its colour is changed from the colour of the frame at rest (utils/pictureRecolour.js).
     const atRest = [...set].sort((a, b) => Math.abs(a.angle) - Math.abs(b.angle))[0].layer;
     const colourDrawn = String(atRest.part._children.Background._children.Fill.imageColourDrawn ?? '');
+    const colourMetal = atRest.part._children.Background._children.Fill.imageColourMetal === true;
     for (const { layer } of set) taken.delete(layer.part.name);
     const effects = first.part._children.Effects;
     const part = createPartNode(uniqueLayerName(set[0].base, taken), {
       role: 'image', kind: 'rectangle', opacity: Math.max(...set.map(({ layer }) => layer.part.opacity ?? 1)), visible: true,
       layout: { x: box.x, y: box.y, width: box.width, height: box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
       sections: {
-        Image: { _type: 'Image', mode: 'frames', frames, frameIndex: Math.round(rest * 1e4) / 1e4, blendFrames: true, interpolation: 'smooth', colour: '', colourDrawn },
+        Image: { _type: 'Image', mode: 'frames', frames, frameIndex: Math.round(rest * 1e4) / 1e4, blendFrames: true, interpolation: 'smooth', colour: '', colourDrawn, ...(colourMetal ? { colourMetal } : {}) },
         ...(effects ? { Effects: deepClone(effects) } : {}),
       },
     });
@@ -201,17 +204,21 @@ function framesFromAngles(layers) {
  */
 export function buildArtworkComponent({ name = 'Artwork', width, height, layers: drawn = [], fileName = '', colourOf = null }) {
   const { layers, angles: frameAngles } = framesFromAngles(drawn);
-  // Light that takes a part's colour (a metal's highlights; the Blender add-on says which, as
-  // `colourOf`, light layer to colour layer, by name): it follows that part's colour
+  // The light layers that go with a colour layer (the Blender add-on says which, as `colourOf`, light
+  // layer to colour layer, by name): its shading and highlights, worked out again with it in another
+  // colour, and a turning part's reflection in a metal, changed with the metal's colour
   // (utils/pictureRecolour.js).
   const named = (label) => layers.find((layer) => nameWords(layer.name).join(' ') === nameWords(label).join(' '));
   for (const [light, colourLayer] of colourOf ?? []) {
     const follower = named(light);
     const leader = named(colourLayer);
     if (!follower || !leader || follower === leader) continue;
+    const role = lightRoleOf(light);
     const image = follower.part._children.Image;
-    if (image) image.colourFollows = leader.part.name;
-    else if (follower.part._children.Background) follower.part._children.Background._children.Fill.imageColourFollows = leader.part.name;
+    const target = image ?? follower.part._children.Background?._children?.Fill;
+    if (!target) continue;
+    if (image) Object.assign(image, { colourFollows: leader.part.name, ...(role ? { colourRole: role } : {}) });
+    else Object.assign(target, { imageColourFollows: leader.part.name, ...(role ? { imageColourRole: role } : {}) });
   }
   const component = createControl('CustomComponent');
   const children = component._children;

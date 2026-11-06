@@ -21,7 +21,7 @@ import { applyCustomBindings } from '../src/CE_Application/utils/interactionRunt
 import { deriveInteractClusters, describeValueUse } from '../src/CE_Application/utils/customComponentClusters.js';
 import { imageFrameLayers } from '../src/CE_Application/utils/imageFrames.js';
 import { hasLinearEdges, mixEdgesInLinearLight } from '../src/CE_Application/utils/linearEdges.js';
-import { colourRgb, litLayerOf, pictureColour, pictureLayerKind, recolourPixels, withColourFollows } from '../src/CE_Application/utils/pictureRecolour.js';
+import { colourRgb, litLayerOf, pictureColour, pictureLayerKind, recolourGroupPixels, withColourFollows } from '../src/CE_Application/utils/pictureRecolour.js';
 import { inflateSync } from 'node:zlib';
 
 /** A PNG's pixels (8-bit RGBA, not interlaced, as CEditor's encoder writes them). */
@@ -137,59 +137,115 @@ test('a Blender knob comes in as a dial: the pointer, its shadow and its reflect
   assert.deepEqual(wiring.orphans, { channels: [], behaviors: [], zones: [] });
   const use = describeValueUse(plan.component, 'lamp');
   assert.deepEqual([use.parts.sort(), use.shows], [['lamp_glow', 'lamp_glow_shine', 'lamp_lit'], true]);
-  // The notice counts the component's layers as the designer lists them, not the file's 62: the 33
-  // layers of the pointer, its shadow and its reflection at their angles are three, and the 13 colour
-  // shares are not layers at all.
-  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 62);
+  // The notice counts the component's layers as the designer lists them, not the file's 77: the 33
+  // layers of the pointer, its shadow and its reflection at their angles are three, and the 28 of the
+  // light on the parts and their gloss are not layers at all.
+  assert.equal(readPsd(bytes.buffer, { skipLayerImageData: true, skipThumbnail: true, skipCompositeImageData: true }).children.length, 77);
   assert.equal(plan.layers, Object.keys(parts).length);
   assert.match(describeArtworkComponent(plan, plan.layers), /^A dial of 19 layers: pointer shadow, pointer reflection, pointer turn with the value\. .* with a value of their own, Lamp\.$/);
 });
 
-test('a Blender part\'s colour changes with its light kept: its drawn colour, its colour share, a metal\'s reflections', () => {
+test('a Blender part comes in with the light on it, its gloss, its light layers and whether it is metal', () => {
   const plan = planPsdComponentImport(bytes, { fileName: 'blender-knob.psd' });
   const parts = plan.component._children.Parts._children;
   const fill = (name) => parts[name]._children.Background._children.Fill;
-  const decode = (src) => decodePng(Buffer.from(src.split(',')[1], 'base64'));
-  // Each colour layer the colour it was drawn in, and its share beside it; the light layers are light.
+  // Each colour layer the colour it was drawn in, and the light on it and its gloss beside it.
   assert.deepEqual(colourRgb(fill('skirt').imageColourDrawn).map((v) => Math.abs(v - 193) <= 6), [true, true, true], fill('skirt').imageColourDrawn);
-  for (const name of ['skirt', 'cap']) assert.match(fill(name).imageColourShare ?? '', /^data:image\/png;base64,/, `${name}: its share`);
+  for (const name of ['skirt', 'cap', 'lens']) {
+    assert.match(fill(name).imageColourLighting ?? '', /^data:image\/png;base64,/, `${name}: the light on it`);
+    assert.match(fill(name).imageColourGloss ?? '', /^data:image\/png;base64,/, `${name}: its gloss`);
+  }
+  assert.deepEqual(['skirt', 'cap', 'lens'].map((name) => fill(name).imageColourMetal === true), [false, true, false], 'the cap is metal');
   const pointer = parts.pointer._children.Image;
   assert.ok(colourRgb(pointer.colourDrawn)[0] > colourRgb(pointer.colourDrawn)[2] + 60, `the pointer is orange: ${pointer.colourDrawn}`);
-  assert.equal(pointer.frames.filter((frame) => frame.source && frame.share).length, pointer.frames.filter((frame) => frame.source).length, 'a share at each angle drawn');
+  assert.equal(pointer.frames.filter((frame) => frame.source && frame.lighting && frame.gloss).length, pointer.frames.filter((frame) => frame.source).length, 'its light at each angle drawn');
   const kinds = Object.fromEntries(Object.keys(parts).map((name) => [name, pictureLayerKind(parts[name], name)]));
   assert.deepEqual(Object.keys(kinds).filter((name) => kinds[name] === 'light').sort(), [
     'bounce', 'bounce_shine', 'cap_highlights', 'cap_shading', 'lamp_glow', 'lamp_glow_shine', 'lamp_lit', 'lens_highlights',
     'pointer_reflection', 'pointer_shadow', 'shadow', 'skirt_highlights', 'skirt_shading',
   ]);
   assert.deepEqual(['skirt_shading', 'cap_highlights', 'pointer_shadow', 'lens_highlights'].map((name) => litLayerOf(name, parts)), ['skirt', 'cap', 'pointer', 'lens']);
-  // The metal cap's highlights and the pointer's reflection in it take its colour.
-  assert.equal(fill('cap_highlights').imageColourFollows, 'cap');
-  assert.equal(parts.pointer_reflection._children.Image.colourFollows, 'cap');
-  assert.equal(fill('skirt_highlights').imageColourFollows, undefined, 'a plastic\'s highlights stay white');
+  // Its shading and highlights go with it; the pointer's reflection in the metal cap follows the cap.
+  const role = (name) => [fill(name).imageColourFollows, fill(name).imageColourRole];
+  assert.deepEqual([role('skirt_shading'), role('skirt_highlights'), role('cap_highlights'), role('lens_highlights')],
+    [['skirt', 'shading'], ['skirt', 'highlights'], ['cap', 'highlights'], ['lens', 'highlights']]);
+  assert.deepEqual([parts.pointer_reflection._children.Image.colourFollows, parts.pointer_reflection._children.Image.colourRole], ['cap', undefined]);
   fill('cap').imageColour = 'FFCDA046';
   const followed = Object.fromEntries(withColourFollows(Object.entries(parts)));
+  assert.deepEqual(['cap', 'cap_shading', 'cap_highlights'].map((name) => followed[name]._colourGroup?.role), ['colour', 'shading', 'highlights']);
   assert.deepEqual(pictureColour(followed.cap_highlights).colour, [205, 160, 70]);
-  assert.deepEqual(pictureColour(followed.pointer_reflection).colour, [205, 160, 70]);
-  // The skirt taken to red: inside, the red exactly; at its edge, by its share, not in proportion.
-  const skirt = decode(fill('skirt').imageSrc);
-  const share = decode(fill('skirt').imageColourShare);
-  assert.deepEqual([share.width, share.height], [skirt.width, skirt.height]);
-  const red = [178, 34, 34];
-  const drawn = colourRgb(fill('skirt').imageColourDrawn);
-  const byShare = recolourPixels(skirt.pixels, red, drawn, share.pixels);
-  const inProportion = recolourPixels(skirt.pixels, red, drawn);
-  let inside = 0;
-  let edgeDiffers = 0;
-  for (let i = 0; i < skirt.pixels.length; i += 4) {
-    const whole = share.pixels[i] === 255 && share.pixels[i + 1] === 255 && share.pixels[i + 2] === 255;
-    if (whole && skirt.pixels[i + 3] === 255 && skirt.pixels.slice(i, i + 3).every((v, c) => v === drawn[c])) {
-      inside += 1;
-      assert.deepEqual([...byShare.slice(i, i + 3)], red);
+  assert.deepEqual(pictureColour(followed.pointer_reflection).kind, 'frames', 'the reflection changed in proportion');
+});
+
+test('in another colour a Blender part is as Blender renders it, where it covers the pixel: the skirt red, the metal cap brass', () => {
+  const references = JSON.parse(readFileSync(new URL('./fixtures/blender-knob-recoloured.json', import.meta.url), 'utf8'));
+  const plan = planPsdComponentImport(bytes, { fileName: 'blender-knob.psd' });
+  const parts = plan.component._children.Parts._children;
+  const decode = (src) => decodePng(Buffer.from(src.split(',')[1], 'base64'));
+  const boxOf = (part) => { const { x, y, width, height } = part._children.Layout; return { x, y, width, height }; };
+  const fillOf = (name) => parts[name]._children.Background._children.Fill;
+  /** Where a part covers the artwork (alpha > 0), a frame of frames at rest. */
+  const covers = (name) => {
+    const part = parts[name];
+    const image = part._children.Image;
+    let picture;
+    let box = boxOf(part);
+    if (image?.mode === 'frames') {
+      const frame = image.frames[Math.round(image.frameIndex)];
+      picture = decode(frame.source);
+      box = { x: Math.round(box.x + (frame.x / 100) * box.width), y: Math.round(box.y + (frame.y / 100) * box.height), width: picture.width, height: picture.height };
+    } else picture = decode(fillOf(name).imageSrc);
+    const out = new Uint8Array(SIZE * SIZE);
+    for (let y = 0; y < picture.height; y += 1) for (let x = 0; x < picture.width; x += 1) {
+      if (picture.pixels[(y * picture.width + x) * 4 + 3] && y + box.y < SIZE && x + box.x < SIZE) out[(y + box.y) * SIZE + x + box.x] = 1;
     }
-    if (skirt.pixels[i + 3] && share.pixels[i] < 250 && Math.abs(byShare[i + 1] - inProportion[i + 1]) > 2) edgeDiffers += 1;
+    return out;
+  };
+  const grown = (mask) => mask.map((_, i) => {
+    const x = i % SIZE; const y = Math.floor(i / SIZE);
+    for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) if (mask[(y + dy) * SIZE + x + dx] && x + dx >= 0 && x + dx < SIZE) return 1;
+    return 0;
+  });
+  for (const [name, over] of [['skirt', ['cap', 'pointer', 'pointer_shadow']], ['cap', ['pointer', 'pointer_shadow']]]) {
+    const reference = Buffer.from(references[name].rgb, 'base64');
+    const colour = colourRgb(references[name].colour);
+    const sheet = (part) => ({ pixels: decode(fillOf(part).imageSrc).pixels, box: boxOf(parts[part]) });
+    const result = recolourGroupPixels({
+      colour, drawn: colourRgb(fillOf(name).imageColourDrawn), metal: fillOf(name).imageColourMetal === true,
+      layer: sheet(name), lighting: decode(fillOf(name).imageColourLighting).pixels, gloss: decode(fillOf(name).imageColourGloss).pixels,
+      shading: parts[`${name}_shading`] ? sheet(`${name}_shading`) : null, highlights: sheet(`${name}_highlights`),
+    });
+    // Where it covers the pixel (its highlights over it), the parts over it left out: what the browser
+    // shows is the colour layer, times the shading as it covers it, plus the highlights as they do.
+    const hidden = over.map(covers).reduce((a, b) => a.map((v, i) => v | b[i])).map((v) => v);
+    const hiddenGrown = grown(hidden);
+    const at = (picture, box, x, y) => ((y - box.y) * box.width + (x - box.x)) * 4;
+    const colourBox = boxOf(parts[name]);
+    const shadingBox = parts[`${name}_shading`] ? boxOf(parts[`${name}_shading`]) : null;
+    const highlightsBox = boxOf(parts[`${name}_highlights`]);
+    const inBox = (box, x, y) => box && x >= box.x && y >= box.y && x < box.x + box.width && y < box.y + box.height;
+    const diffs = [];
+    for (let y = 0; y < SIZE; y += 1) for (let x = 0; x < SIZE; x += 1) {
+      if (hiddenGrown[y * SIZE + x] || !inBox(highlightsBox, x, y) || !inBox(colourBox, x, y)) continue;
+      const h = at(result.highlights, highlightsBox, x, y);
+      const hA = result.highlights[h + 3] / 255;
+      const v = at(result.colour, colourBox, x, y);
+      if (!hA || result.colour[v + 3] < 255) continue;
+      const s = shadingBox && inBox(shadingBox, x, y) ? at(result.shading, shadingBox, x, y) : -1;
+      const sA = s >= 0 ? result.shading[s + 3] / 255 : 0;
+      let worst = 0;
+      for (let k = 0; k < 3; k += 1) {
+        const shownNow = Math.min(255, result.colour[v + k] * (1 - sA + sA * (s >= 0 ? result.shading[s + k] / 255 : 1)) + hA * result.highlights[h + k]);
+        worst = Math.max(worst, Math.abs(Math.round(shownNow) - reference[(y * SIZE + x) * 3 + k]));
+      }
+      diffs.push(worst);
+    }
+    diffs.sort((a, b) => a - b);
+    const mean = diffs.reduce((sum, d) => sum + d, 0) / diffs.length;
+    const p99 = diffs[Math.floor(diffs.length * 0.99)];
+    assert.ok(diffs.length > 300, `${name}: ${diffs.length} pixels compared`);
+    assert.ok(mean < 2 && p99 < 6, `${name} in ${references[name].colour}: mean ${mean.toFixed(2)}, 99th percentile ${p99} levels against Blender`);
   }
-  assert.ok(inside > 100, `${inside} pixels inside, the red exactly`);
-  assert.ok(edgeDiffers > 20, `${edgeDiffers} edge pixels lit as the new colour, not scaled with the old one's light`);
 });
 
 test('CEditor draws the layers as the add-on composed them', () => {

@@ -131,12 +131,15 @@ Component Designer to change and save (`utils/svgComponentImport.js`, `utils/psd
 and a part of frames (`Image.colour`) have a colour of their own: a colour or a control set's role,
 empty for the picture as drawn. Beside it the colour it was drawn in (`…Drawn`: measured on import
 as the median of the pixels the layer covers most; measured when drawn for a picture that came in
-another way). Each pixel, each channel, alpha untouched: `new = old + (colour − drawn) × share`, the
-share the pixel over the drawn colour unless the file gives it, so the drawn colour becomes the new
-one and the rest keep their proportion to it. Worked out on the pixels once per colour, before the
-outline mixing and the baking of parts that never change, so the editor, the Player, an exported
-plug-in and the filmstrip baker all draw the same picture. `…Follows` names another part whose colour
-a layer takes (a metal's highlights). The Component Designer's look bar and the Colors dock edit it;
+another way). A picture with the light on it written beside it (`…Lighting`, `…Gloss`, from the
+Blender add-on, below) is worked out again in the new colour together with its shading and
+highlights (`…Follows` it with `…Role`), as the add-on works them out, so it is lit as Blender would
+light it. Any other picture is changed in proportion, each pixel, each channel, alpha untouched:
+`new = old × colour / drawn`, so the drawn colour becomes the new one and the rest keep their
+proportion to it; so too a layer that only follows another's colour (a turning part's reflection in
+a metal). Worked out on the pixels once per colour, before the outline mixing and the baking of
+parts that never change, so the editor, the Player, an exported plug-in and the filmstrip baker all
+draw the same picture. The Component Designer's look bar and the Colors dock edit it;
 light (a picture that multiplies, adds or dodges, or is named shading, highlights, shadow,
 reflection, shine or bounce) has none, and points to the layer it lights. `Fill.imageTint` stays the
 30 % wash it is for panel backgrounds and textures.
@@ -174,7 +177,7 @@ held out, and written as the layers its look adds up from:
 | Layer | Blend | What it is |
 |---|---|---|
 | `<name>` | normal | its own colour, unlit (a metal's is what it reflects) |
-| `<name> colour share` | normal, hidden | how much of that colour shows in each pixel of it (1 inside; at its edge, its shading), read with it on import, not a layer of its own |
+| `<name> lighting`, `<name> gloss` | normal, hidden | the light on it without its colour, and the light it reflects whatever its colour, in linear light (8 bits over 1/256 to 256, a step of 4 %); read with it on import, not layers of their own |
 | `<name> shading` | multiply | what the lights and the room do to that colour |
 | `<name> highlights` | linear dodge | its reflections, and light brighter than its colour |
 | `<name> lit` | linear dodge | a lamp's glow, shown when the lamp is on |
@@ -214,16 +217,22 @@ panel is worked out for whatever panel the control is on:
   pixel while the panel still shows through, are lit as on the scene's panel (**For this panel** in
   the export, on by default; off, or without a panel object, as on black).
 
-**A part's colour.** A colour layer holds the part's colour inside and, at its edge, its whole look
-as lit (colour × shading + highlights), since a multiply there would reach what is beside the part in
-the pixel. Changed in proportion, a white glint there would be tinted; so the add-on writes beside it
-how much of the colour shows in each pixel (`shading / (1 − depth + depth × shading)`: 1 inside, the
-shading at the edge), and CEditor changes the colour by that, which at the edge is the new colour lit
-as the old one was. A metal's reflections are its colour: the add-on names its highlights, and a
-turning part's reflection that falls mostly in it, in the file's XMP (`<ceditor:colourOf>`,
-`cap highlights=cap`), and the import has them take its colour. For a metal, light brighter than
-white (a glint) is kept in its highlights up to a whole white, so a glint Blender shows white stays
-white in another colour.
+**A part's colour.** Cycles adds a part's gloss to its colour in linear light, and a browser lays
+layers on in sRGB, so layers split for one colour do not add up for another: changed in proportion,
+a darker colour's weak channels came out a few levels short of Blender where the part is glossy, and
+a metal's glint, many times white, went dark. So the add-on writes beside each colour layer the light
+on the part without its colour (Cycles' diffuse light passes, a metal's glossy ones) and its gloss,
+in linear light, past white too; and CEditor, given a new colour, works out the part's colour,
+shading and highlights layers again as the add-on works them out: each pixel the new colour times
+that light plus the gloss, split as the add-on splits it, with its highlights over the whole inside
+so that light can come where there was none. The colour there is the colour layer's own where the
+part covers the pixel whole, else the colour it was drawn in, and the add-on writes the gloss past
+exactly that, so that worked out again in the colour it was drawn in, the part is as written. The
+file's XMP names each colour layer's shading and highlights (`<ceditor:colourOf>`,
+`skirt highlights=skirt`), and a turning part's reflection that falls mostly in a metal part, which
+changes with the metal's colour in proportion; `<ceditor:metal>` names the metal parts, whose light
+past white is kept in their highlights. Cycles' light passes are per sample the part covers, unlike
+its colour passes, and are not divided by its coverage.
 
 **A turning part.** The light stays put while the part turns, so what it does with the light
 changes: its own light (the side towards the sun lit, the sun's glint on it), its shadow on the
@@ -253,13 +262,13 @@ layers against them, laid as CEditor lays them:
   percentile (made for the scene's panel and added, as the add-on wrote it before, 15 to 17); the
   outline mixed for the panel within a mean 1.5 to 4.4 (in sRGB, 5.7 to 11.1);
 - drawn twice the size, as a browser scales each layer before it blends them;
-- in another colour, against Blender rendering the knob with that material changed: the skirt red
-  within a mean 6.8 levels, the 99th percentile 12 (on the dark green and blue, Blender adds the
-  skirt's gloss in linear light and a browser in sRGB, and the gloss measured on the pale skirt lifts
-  them a few levels short); at its edge a mean 6.6 (9.0 changed in proportion, without its share);
-  the metal cap brass within a mean 5.5, the 99th percentile 11 away from its glint, and 8.0 with its
-  reflections left as rendered. At the glint's centre, light more than a white beyond what a layer
-  holds, the brass's blue is 52 levels short of Blender's;
+- in another colour, against Blender rendering the knob with that material changed, where the part
+  covers the pixel: the skirt red within a mean 1.45 levels, the 99th percentile 4, and the metal cap
+  brass within 1.1 and 5, its glint included (changed in proportion with their light as rendered,
+  8.1 and 15, and 8.1 and 105); worked out again in the colour each was drawn in, within 3 levels of
+  the file. At a part's edge, and just beside it, the light it throws on what is next to it (the panel
+  by the skirt, the skirt by the cap) is lit in the new colour by Blender and kept as rendered by the
+  layers: the edge within that, 5 and 7 levels at the mean, beside it 4.6 and 10;
 - turned 120 degrees: the pointer's shadow where Blender casts it (0.2 px off at 160 px; the shadow
   at rest turned about the axis is 6 px off, on the side towards the light); the pointer's own light
   within a mean 11 levels (its light at rest, turned, 63); its reflection in the cap beside it at
@@ -273,8 +282,11 @@ shadow for what a part leaves of a pixel, not the pixel as a whole; the shadow l
 parts, darkens just that. `--fixture` writes the small file the web suite reads
 (`test/fixtures/blender-knob.psd`), checked by `test/blenderLayersImport.test.js` for what turns,
 about where (the shadow about its own point), in which modes, which frame shows as the pointer
-turns, the parts whose outline CEditor mixes, the lamp's value, each colour layer's drawn colour and
-share and the metal's followers, and for CEditor's compositor drawing it as the add-on composed it;
+turns, the parts whose outline CEditor mixes, the lamp's value, each colour layer's drawn colour,
+light, gloss and light layers, and for CEditor's compositor drawing it as the add-on composed it.
+`--fixture` also writes Blender's renders of the knob with the skirt red and the cap brass
+(`test/fixtures/blender-knob-recoloured.json`), to which the suite holds CEditor's own recolour
+(within a mean 1.4 and 1.1, the 99th percentile 4 and 5);
 `browser-checks/pictureColour.mjs` changes the skirt's colour in the editor and on a panel.
 
 ## Update Panel from SVG Artwork

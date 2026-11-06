@@ -10,7 +10,9 @@
 # the web suite imports (test/blenderLayersImport.test.js). Needs a Blender with numpy (blender.org's
 # builds have it). Exits 1 on a failure.
 
+import base64
 import importlib.util
+import json
 import math
 import os
 import re
@@ -163,8 +165,8 @@ def drawn(layers, pixels, turn=0.0, at_rest_only=False):
     `at_rest_only`: each part of frames only as it is at rest, as before the add-on rendered them at
     every angle."""
     for name, blend, frames in parts_of(layers):
-        # A pivot is a mark and a colour share a hidden layer the import reads: neither is drawn.
-        if addon.role_of(name) == "pivot" or name.endswith("colour share"):
+        # A pivot is a mark, and a part's lighting and gloss hidden layers the import reads: none is drawn.
+        if addon.role_of(name) == "pivot" or name.endswith((" lighting", " gloss")):
             continue
         rgba = pixels[name] / 255.0 if frames is None else frame_at(frames, pixels, 0.0 if at_rest_only else turn)
         if rgba is not None:
@@ -226,11 +228,14 @@ for part in ("skirt", "cap"):
 check(blends.get("cap shading") == "mul ", "the cap's shading multiplies its colour")
 check(blends.get("cap highlights") == "lddg", "the metal cap's reflections add")
 hidden_layers = set(result["hidden"])
-check(all(f"{part} colour share" in hidden_layers and blends[f"{part} colour share"] == "norm" for part in ("skirt", "cap"))
-      and "pointer colour share at 0" in hidden_layers,
-      "each colour layer has its colour share beside it, hidden, at each angle for the pointer")
-check(sorted(result["colour_of"]) == [("cap highlights", "cap"), ("pointer reflection", "cap")],
-      f"the metal cap's highlights and the pointer's reflection in it take its colour, and nothing else's do: {result['colour_of']}")
+check(all(f"{part} {what}" in hidden_layers and blends[f"{part} {what}"] == "norm" for part in ("skirt", "cap", "lens") for what in ("lighting", "gloss"))
+      and {"pointer lighting at 0", "pointer gloss at 0"} <= hidden_layers,
+      "each colour layer has the light on it and its gloss beside it, hidden, at each angle for the pointer")
+groups = dict(result["colour_of"])
+check({"skirt highlights": "skirt", "cap highlights": "cap", "lens highlights": "lens", "pointer reflection": "cap"}.items() <= groups.items()
+      and groups.get("skirt shading", "skirt") == "skirt" and groups.get("cap shading", "cap") == "cap",
+      f"each part's shading and highlights go with its colour layer, and the pointer's reflection with the metal cap: {result['colour_of']}")
+check(result["metal"] == ["cap"], f"the cap is the metal part: {result['metal']}")
 frames = {name: list_ for name, _, list_ in parts_of(result["layers"]) if list_}
 first = lambda base: names.index(frames[base][0][1])
 check("pointer shadow" in frames and first("pointer shadow") < first("pointer"), "the pointer's shadow is under the pointer")
@@ -366,32 +371,64 @@ for tone, (d, srgb_edges) in tones.items():
           f"on a {tone} panel the knob's outline is mixed for it: mean {d[skirt_edge].mean():.1f}, 99th percentile "
           f"{np.percentile(d[skirt_edge], 99):.0f} levels, {srgb_edges[skirt_edge].mean():.1f} and {np.percentile(srgb_edges[skirt_edge], 99):.0f} mixed in sRGB")
 
-# A part's colour changed, as CEditor changes it (utils/pictureRecolour.js): the colour layer's drawn
-# colour taken to the new one, each pixel by its colour share; a metal's highlights by the same change,
-# in proportion. Against Blender rendering the knob with that part's material in the new colour.
-def recoloured(pixels, name, colour, follows=(), with_share=True):
-    """`pixels` with `name`'s colour taken to `colour` (linear, as a material's) and the layers in
-    `follows` with it."""
+# A part's colour changed, as CEditor changes it (utils/pictureRecolour.js): from the light on it and
+# its gloss, written beside its colour layer, its colour, shading and highlights layers worked out
+# again in the new colour, in linear light, as the add-on works them out; a turning part's reflection
+# in a metal changed with the metal's colour, in proportion. Against Blender rendering the knob with
+# that part's material in the new colour.
+def decoded(code):
+    code = code.astype(np.float32)
+    return np.where(code > 0, np.power(2.0, code * 16.0 / 255.0 - 8.0), 0.0)
+
+
+def in_colour(pixels, name, colour, was, with_light=True):
+    """`pixels` with `name` in the colour the material `colour` (linear) gives its colour layer, where
+    `was` gave it the colour it was drawn in (Blender's diffuse colour is a few percent under the base
+    colour), picked as an 8-bit colour; and the layers that go with it. `with_light` False: the colour
+    layer changed in proportion instead, and its light layers left as rendered (what CEditor does for
+    a picture with no light written beside it)."""
     out = dict(pixels)
     layer = pixels[name]
     a = layer[..., 3]
     inside = a >= int(a.max()) - 2
     drawn = np.array([np.sort(layer[..., c][inside])[int(inside.sum()) // 2] for c in range(3)], dtype=np.float32)
-    new = np.round(addon.srgb(np.asarray(colour, dtype=np.float32)) * 255)
+    albedo = addon.linear(drawn / 255.0) / np.maximum(np.asarray(was[:3], dtype=np.float32), 1e-6)
+    picked = np.round(addon.srgb(np.asarray(colour, dtype=np.float32) * albedo) * 255)
+    covered = a > 0
+    members = {light: colour_name for light, colour_name in result["colour_of"] if colour_name == name}
+    followers = [light for light in members if not light.endswith(("shading", "highlights"))]
 
-    def change(rgba, share):
+    def in_proportion(rgba):
         rgb = rgba[..., :3].astype(np.float32)
-        part = np.where(drawn >= 8, rgb / np.maximum(drawn, 1e-6), 1.0)
-        if share is not None:
-            part = np.where(share[..., 3:4] > 0, share[..., :3] / 255.0, part)
-        rgb = np.clip(np.round(rgb + (new - drawn) * part), 0, 255)
+        share = np.where(drawn >= 8, rgb / np.maximum(drawn, 1e-6), 1.0)
+        rgb = np.clip(np.round(rgb + (picked - drawn) * share), 0, 255)
         return np.concatenate([rgb, rgba[..., 3:4]], axis=-1).astype(np.uint8)
 
-    share = pixels.get(f"{name} colour share") if with_share else None
-    out[name] = change(layer, share)
-    for base in follows:
+    for base in followers:
         for light in [n for n in pixels if n == base or n.startswith(f"{base} at ")]:
-            out[light] = change(pixels[light], None)
+            out[light] = in_proportion(pixels[light])
+    if not with_light:
+        out[name] = in_proportion(layer)
+        return out, drawn
+    shading = pixels.get(next((n for n in members if n.endswith("shading")), ""))
+    highlights = pixels.get(next((n for n in members if n.endswith("highlights")), ""))
+    s_alpha = (shading[..., 3:4] / 255.0) if shading is not None else 0.0
+    h_alpha = (highlights[..., 3:4] / 255.0) if highlights is not None else np.zeros_like(a[..., None], dtype=np.float32)
+    ref = addon.linear(drawn / 255.0)
+    new = addon.linear(picked / 255.0)
+    own = np.where(h_alpha >= 1.0, addon.linear(layer[..., :3] / 255.0), ref)
+    c = np.where(ref > 1e-4, own * new / np.maximum(ref, 1e-4), new)
+    lit = c * decoded(pixels[f"{name} lighting"][..., :3])
+    total = lit + decoded(pixels[f"{name} gloss"][..., :3])
+    e = addon.srgb(c)
+    shade = np.where(e > 1e-4, np.clip(addon.srgb_beyond(lit) / np.maximum(e, 1e-4), 0.0, 1.0), 1.0)
+    beyond = addon.srgb_beyond(total) if name in result["metal"] else addon.srgb(total)
+    shine = np.clip(beyond - e * shade, 0.0, 1.0)
+    colour_now = np.clip((addon.srgb(total) - h_alpha * shine) / np.maximum(1.0 - s_alpha + s_alpha * shade, 1e-4), 0.0, 1.0)
+    keep = lambda new_rgb, old: np.where(covered[..., None] & (old[..., 3:4] > 0), np.concatenate([addon.to8(new_rgb), old[..., 3:4]], axis=-1), old)
+    out[name] = keep(colour_now, layer)
+    for member, picture in ((n, pixels[n]) for n in members if n.endswith(("shading", "highlights")) and n in pixels):
+        out[member] = keep(shade if member.endswith("shading") else shine, picture)
     return out, drawn
 
 
@@ -399,46 +436,54 @@ def material_colour(name):
     return scene.objects[name].data.materials[0].node_tree.nodes["Principled BSDF"].inputs["Base Color"]
 
 
-for part, colour, follows in (("skirt", (0.42, 0.02, 0.018), ()), ("cap", (0.62, 0.36, 0.06), ("cap highlights", "pointer reflection"))):
+recoloured_references = {}
+for part, colour in (("skirt", (0.42, 0.02, 0.018)), ("cap", (0.62, 0.36, 0.06))):
     socket = material_colour(part)
     was = tuple(socket.default_value)
     socket.default_value = (*colour, 1)
     want = np.round(addon.srgb(reference(scene, SIZE, SAMPLES, f"recoloured-{part}", catcher=False)[..., :3]) * 255)
     socket.default_value = was
-    pixels_now, drawn_colour = recoloured(result["pixels"], part, colour, follows)
+    pixels_now, drawn_colour = in_colour(result["pixels"], part, colour, was)
+    albedo = addon.linear(drawn_colour / 255.0) / np.maximum(np.asarray(was[:3], dtype=np.float32), 1e-6)
+    picked = np.round(addon.srgb(np.asarray(colour, dtype=np.float32) * albedo) * 255).astype(int)
+    # For the web suite (test/blenderLayersImport.test.js): Blender's render, and the colour picked.
+    recoloured_references[part] = {"colour": "FF" + "".join(f"{v:02X}" for v in picked),
+                                   "rgb": base64.b64encode(np.ascontiguousarray(want.astype(np.uint8)).tobytes()).decode("ascii")}
     as_drawn = np.round(addon.srgb(np.asarray(was[:3], dtype=np.float32)) * 255)
     check(np.abs(drawn_colour - as_drawn).max() <= 3, f"{part}: the colour it was drawn in is its material's, {drawn_colour} against {as_drawn}")
-    # On the part itself, where it shows: its edge included, the parts over it left out.
+    # Worked out again in the colour it was drawn in, it is the picture as written.
+    same = np.abs(np.round(stacked(result["layers"], in_colour(result["pixels"], part, was[:3], was)[0], bare) * 255)
+                  - np.round(stacked(result["layers"], result["pixels"], bare) * 255)).max(-1)
+    # On the part itself, where it shows, the parts over it left out: where it covers the pixel whole
+    # (its light layers over it), and at its edge.
     own = result["pixels"][part][..., 3] > 0
     for other in ("cap", "pointer at 0", "pointer shadow at 0") if part == "skirt" else ("pointer at 0", "pointer shadow at 0"):
         own &= ~grown_by(result["pixels"][other][..., 3] > 0, 1)
-    edge = own & (result["pixels"][part][..., 3] < 255)
-    d = np.abs(want - np.round(stacked(result["layers"], pixels_now, bare) * 255)).max(-1)
-    plain = np.abs(want - np.round(stacked(result["layers"], recoloured(result["pixels"], part, colour, follows, with_share=False)[0], bare) * 255)).max(-1)
-    kept = np.abs(want - np.round(stacked(result["layers"], recoloured(result["pixels"], part, colour)[0], bare) * 255)).max(-1)
+    body = own & (result["pixels"][f"{part} highlights"][..., 3] > 0)
+    edge = own & ~body
+    # Just outside it, where nothing of it is drawn: the light it throws on what is beside it (the
+    # panel by the skirt, the skirt by the cap), which Blender lights in the new colour and the layers
+    # keep as rendered.
+    beside = grown_by(result["pixels"][part][..., 3] > 0, 3) & ~(result["pixels"][part][..., 3] > 0)
+    for other in ("pointer at 0", "pointer shadow at 0"):
+        beside &= ~grown_by(result["pixels"][other][..., 3] > 0, 2)
+    if part == "cap":
+        beside &= result["pixels"]["skirt"][..., 3] == 255
+    got = np.round(stacked(result["layers"], pixels_now, bare) * 255)
+    d = np.abs(want - got).max(-1)
+    plain = np.abs(want - np.round(stacked(result["layers"], in_colour(result["pixels"], part, colour, was, with_light=False)[0], bare) * 255)).max(-1)
     if os.environ.get("CEDITOR_LAYERS_DEBUG"):
-        np.savez(os.path.join(OUT, f"recoloured-{part}.npz"), want=want, got=np.round(stacked(result["layers"], pixels_now, bare) * 255), own=own)
-    print(f"  {part} recoloured: mean {d[own].mean():.2f}, p99 {np.percentile(d[own], 99):.1f}; edge {d[edge].mean():.2f} "
-          f"({plain[edge].mean():.2f} without its share); highlights kept {kept[own].mean():.2f}")
-    # Not to a level or two: Blender adds a part's gloss to its colour in linear light, the browser in
-    # sRGB, and the gloss measured on the colour as drawn lifts a darker colour too little (the red
-    # skirt's green and blue, a few levels). And a metal's glint, brighter than white by more than its
-    # highlights can hold, keeps less of the new colour's weakest channel than Blender shows (the brass
-    # cap's blue, at the glint's centre): held apart.
-    glint = np.zeros_like(own)
-    for base in follows:
-        for light in [n for n in result["pixels"] if n == base]:
-            shine = result["pixels"][light]
-            glint |= shine[..., :3].max(-1) * (shine[..., 3] / 255.0) >= 200
-    rest = own & ~glint
-    check(float(d[own].mean()) < 8 and float(np.percentile(d[rest], 99)) < 20,
-          f"{part} in a new colour, its light kept, is Blender's render of it: mean {d[own].mean():.2f}, 99th percentile {np.percentile(d[rest], 99):.1f} levels"
-          + (f" ({int(glint.sum())} pixels of glint apart, {d[glint].mean():.0f} levels there)" if glint.any() else ""))
-    check(float(d[edge].mean()) <= float(plain[edge].mean()) + 0.05,
-          f"and at its edge, by its colour share: mean {d[edge].mean():.2f} levels, {plain[edge].mean():.2f} changed in proportion")
-    if follows:
-        check(float(d[own].mean()) < 0.8 * float(kept[own].mean()),
-              f"and a metal's reflections change with it: mean {d[own].mean():.2f} levels, {kept[own].mean():.2f} with them as rendered")
+        np.savez(os.path.join(OUT, f"recoloured-{part}.npz"), want=want, got=got, own=own)
+    print(f"  {part} in a new colour: where it covers the pixel mean {d[body].mean():.2f}, p99 {np.percentile(d[body], 99):.1f}; "
+          f"its edge {d[edge].mean():.2f}; beside it {d[beside].mean():.2f}; in proportion, its light as rendered: {plain[body].mean():.2f}, "
+          f"p99 {np.percentile(plain[body], 99):.1f}; as drawn again: at most {same.max():.0f}")
+    check(float(same.max()) <= 3, f"{part}, worked out again in its own colour, is the picture as written: at most {same.max():.0f} levels")
+    check(float(d[body].mean()) < 2 and float(np.percentile(d[body], 99)) < 6,
+          f"{part} in a new colour is Blender's render of it: mean {d[body].mean():.2f}, 99th percentile {np.percentile(d[body], 99):.1f} levels where "
+          f"it covers the pixel, glint and all (changed in proportion with its light as rendered, {plain[body].mean():.2f} and {np.percentile(plain[body], 99):.1f})")
+    # Its edge is partly what is beside it, lit by it in its old colour: no further off than that.
+    check(float(d[edge].mean()) <= float(d[beside].mean()) + 2,
+          f"and its edge within what it throws on what is beside it: mean {d[edge].mean():.2f} levels, {d[beside].mean():.2f} just beside it")
 
 # Drawn larger, as CEditor draws a component at any size and on a screen of two pixels to the point:
 # the browser scales each layer before it blends them, and the layers must still add up to the
@@ -580,6 +625,12 @@ if FIXTURE:
     with open(psd, "rb") as src, open(target, "wb") as dst:
         dst.write(src.read())
     print("wrote", target)
+    # Blender's renders of the knob with the skirt red and the cap brass, on its panel, and the colour
+    # each colour layer is given: what CEditor's own recolour is held to.
+    references = os.path.join(os.path.dirname(target), "blender-knob-recoloured.json")
+    with open(references, "w") as out:
+        json.dump({"width": SIZE, "height": SIZE, **recoloured_references}, out)
+    print("wrote", references)
 
 print(f"\n{'All passed' if not failures else f'{len(failures)} failed'} ({OUT})")
 sys.exit(1 if failures else 0)

@@ -691,7 +691,8 @@ The control opens in the Component Designer, ready to use and to change:
 **A picture layer's colour.** Select a picture layer and the look bar shows its **Colour**; the
 dock's **Colors** tab opens on it (**Editing: skirt › Colour**). The colour the picture was drawn in
 becomes the one you pick, and every other pixel keeps its proportion to it, so its shading, a
-highlight painted into it or a printed scale stays as drawn. A colour from the control set's roles
+highlight painted into it or a printed scale stays as drawn. A part made with the Blender add-on is
+worked out again in the new colour, with its shading and highlights, as Blender would light it. A colour from the control set's roles
 links it to the set, as for a fill. Beside the picker, **Drawn** is the colour it was drawn in and
 **Now** the one it has; **Pick from the picture** shows the picture to click the colour that is to
 change (for a picture of more than one colour, which then changes as a whole), and **Back to as
@@ -717,9 +718,11 @@ small add-on that comes with CEditor.
    **File → New Component from Photoshop Artwork...**.
 
 Each object comes in as its colour, with its shading multiplied over it and its highlights added:
-change a part's colour (see [Importing a control you drew](#importing-a-control-you-drew)) and its
-light stays as Blender rendered it, its edge included. A metal's reflections are its colour: change a
-metal cap's colour and its highlights, and the pointer's reflection in it, change with it. The shadow
+change a part's colour (see [Importing a control you drew](#importing-a-control-you-drew)) and it is
+lit as Blender would light it in that colour, its edge included: the add-on writes the light on each
+part beside it, and CEditor works the part's shading and highlights out again with the new colour. A
+metal's reflections are its colour: a metal cap's glint, and the pointer's reflection in it, take its
+new colour. The light a part throws on what is beside it keeps the colour it was drawn in. The shadow
 on the panel is a layer. The pointer is rendered turned every 27 degrees, and so are its shadow and its
 reflection in the parts under it: each comes in as one layer of frames that turns with the value
 and shows the frame for the pointer's angle, the two either side mixed, so the side of the pointer

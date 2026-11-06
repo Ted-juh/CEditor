@@ -4,30 +4,33 @@
  * A picture layer (a part whose Background fill is a picture) and a part of frames (utils/
  * imageFrames.js) each have a colour of their own:
  *
- *   Background.Fill: { imageColour, imageColourDrawn, imageColourShare, imageColourFollows }
- *   Image:           { colour, colourDrawn, colourFollows, frames: [{ source, share }, ...] }
+ *   Background.Fill: { imageColour, imageColourDrawn, imageColourLighting, imageColourGloss,
+ *                      imageColourMetal, imageColourFollows, imageColourRole }
+ *   Image:           { colour, colourDrawn, colourMetal, colourFollows, colourRole,
+ *                      frames: [{ source, lighting, gloss }, ...] }
  *
  * `imageColour` / `colour` is the colour chosen (AARRGGBB, or a control set's role such as
  * `{control.body}`); empty is the picture as drawn. `…Drawn` is the colour the picture was drawn in,
- * measured on import (`drawnColour`). Each pixel, each channel, alpha untouched:
+ * measured on import (`drawnColour`).
  *
- *   new = old + (colour − drawn) × share
+ * A picture with the light on it written beside it (`…Lighting`, `…Gloss`: the Blender add-on
+ * tools/blender/ceditor_layers.py writes them, in linear light) is worked out again in its new colour
+ * with the light layers that go with it (its shading and highlights, `…Follows` it with `…Role`), as
+ * the add-on works them out: the colour layer, the shading it multiplies by and the highlights added
+ * over it, each pixel from the new colour times the light, plus the gloss, in linear light. So the part
+ * is lit as Blender would light it in that colour, its edge and a metal's glint (`…Metal`: light past
+ * white kept in its highlights) included (`recolourGroupPixels`).
  *
- * `share` is, unless the file gives it, the pixel over the drawn colour (a channel of the drawn colour
- * darker than 8 levels takes 1): the drawn colour becomes the new one exactly, and every other pixel
- * keeps its proportion to it, which is right wherever the light is multiplied into the colour.
+ * Any other picture is changed in proportion, each pixel, each channel, alpha untouched:
  *
- * The Blender add-on (tools/blender/ceditor_layers.py) writes a part's colour layer as its colour
- * inside and its whole lit look at its edge, where a multiply or an add would reach what is beside it
- * in the pixel. There a pixel holds colour × shading + highlights, and the share is how much of the
- * colour shows through the light: the add-on writes it ("<name> colour share", read by the import
- * into `imageColourShare` and each frame's `share`), and with it the edge is Blender's own.
+ *   new = old × colour / drawn       (a channel of the drawn colour darker than 8 levels: + colour − drawn)
  *
- * `…Follows` names another part whose colour this one takes, with its own default share: a metal's
- * highlights, whose reflections are the metal's colour (the add-on marks metal parts, and the import
- * sets the highlights to follow).
+ * the drawn colour becoming the new one exactly and every other pixel keeping its proportion to it,
+ * which is right wherever the light is multiplied into the colour. Light that only follows a part
+ * (`…Follows` with no role: a turning part's reflection in a metal) is changed so too.
  *
  * Worked out on the pixels, once per picture and colour, as utils/linearEdges.js works out an edge:
+ * `withColourFollows` gives each part what it needs from the parts it goes with,
  * `pictureColourSources` makes the pictures and `withPictureColourSources` puts them in the parts,
  * colour cleared, before anything draws them (CanvasControl, the outline mixing, the static baking,
  * the filmstrip baker); a part not passed through that recolours itself
@@ -81,47 +84,130 @@ export function drawnColour(pixels) {
   return rgbColour(counts.map(median));
 }
 
+const xmpBag = (xmp, tag) => {
+  const block = new RegExp(`<ceditor:${tag}>([\\s\\S]*?)</ceditor:${tag}>`).exec(String(xmp ?? ''));
+  if (!block) return [];
+  const unescape = (text) => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
+  return [...block[1].matchAll(/<rdf:li>([\s\S]*?)<\/rdf:li>/g)].map((match) => unescape(match[1]));
+};
+
 /**
- * Which layers take another's colour, as a Photoshop file says in its XMP (the Blender add-on writes
- * <ceditor:colourOf>, a bag of "light layer=colour layer": a metal's highlights take its colour).
- * A Map from the light layer's name to the colour layer's.
+ * The light layers that go with a colour layer, as a Photoshop file says in its XMP (the Blender
+ * add-on writes <ceditor:colourOf>, a bag of "light layer=colour layer": a part's shading and
+ * highlights, and a turning part's reflection in a metal). A Map from the light layer's name to the
+ * colour layer's.
  */
 export function colourOfNames(xmp) {
-  const block = /<ceditor:colourOf>([\s\S]*?)<\/ceditor:colourOf>/.exec(String(xmp ?? ''));
-  if (!block) return new Map();
-  const unescape = (text) => text.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&amp;/g, '&');
-  return new Map([...block[1].matchAll(/<rdf:li>([\s\S]*?)<\/rdf:li>/g)]
-    .map((match) => unescape(match[1]).split('='))
+  return new Map(xmpBag(xmp, 'colourOf')
+    .map((entry) => entry.split('='))
     .filter((pair) => pair.length === 2 && pair[0].trim() && pair[1].trim())
     .map(([light, colour]) => [light.trim(), colour.trim()]));
 }
 
-/**
- * The colour share a file gives for a colour layer, by name: "skirt colour share" for "skirt",
- * "pointer colour share at 27" for "pointer at 27". The name of the layer it is for, or ''.
- */
-export function colourShareOf(label) {
-  const match = /^(.*?)\s+colour\s+share(\s+at\s+\S+)?\s*$/i.exec(String(label ?? ''));
-  return match ? `${match[1]}${match[2] ?? ''}` : '';
+/** The colour layers a Photoshop file says are metal (<ceditor:metal>): their glint is light past white. */
+export function metalNames(xmp) {
+  return new Set(xmpBag(xmp, 'metal').map((name) => name.trim()).filter(Boolean));
 }
 
 /**
- * `pixels` (RGBA, straight) with `drawn` taken to `colour` (each [r, g, b]): see the top of the file.
- * `share`, when given, is RGBA pixels of the same size, the share per channel in its colour (255 is
- * 1); where it is clear, or not given, the share is the pixel over the drawn colour.
+ * The light a file writes beside a colour layer, by name: "skirt lighting" and "skirt gloss" for
+ * "skirt", "pointer lighting at 27" for "pointer at 27". `{ of, kind }`, kind 'lighting' or 'gloss';
+ * null for any other layer.
  */
-export function recolourPixels(pixels, colour, drawn, share = null) {
+export function lightMapOf(label) {
+  const match = /^(.*?)\s+(lighting|gloss)(\s+at\s+\S+)?\s*$/i.exec(String(label ?? ''));
+  return match ? { of: `${match[1]}${match[3] ?? ''}`, kind: match[2].toLowerCase() } : null;
+}
+
+/** The role of a light layer that goes with a colour layer, by its name: 'shading', 'highlights' or ''. */
+export function lightRoleOf(name) {
+  const own = words(name);
+  if (own.includes('shading')) return 'shading';
+  if (own.includes('highlights')) return 'highlights';
+  return '';
+}
+
+/** `pixels` (RGBA, straight) with `drawn` taken to `colour` (each [r, g, b]), in proportion. */
+export function recolourPixels(pixels, colour, drawn) {
   const out = new Uint8ClampedArray(pixels.length);
   const delta = [0, 1, 2].map((c) => colour[c] - drawn[c]);
-  const ownShare = share && share.length === pixels.length ? share : null;
   for (let i = 0; i < pixels.length; i += 4) {
     out[i + 3] = pixels[i + 3];
-    const given = ownShare && ownShare[i + 3] > 0;
     for (let c = 0; c < 3; c += 1) {
       const old = pixels[i + c];
       if (!pixels[i + 3]) { out[i + c] = old; continue; }
-      const part = given ? ownShare[i + c] / 255 : (drawn[c] >= 8 ? old / drawn[c] : 1);
-      out[i + c] = Math.round(old + delta[c] * part);
+      out[i + c] = Math.round(old + delta[c] * (drawn[c] >= 8 ? old / drawn[c] : 1));
+    }
+  }
+  return out;
+}
+
+const toLinear = (v) => (v <= 0.04045 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+/** sRGB, carried on past white (a light many times white stays so). */
+const srgbBeyond = (x) => {
+  const v = Math.max(0, x);
+  return v <= 0.0031308 ? v * 12.92 : 1.055 * v ** (1 / 2.4) - 0.055;
+};
+const srgbOf = (x) => Math.min(1, srgbBeyond(x));
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+/** Linear light from the add-on's 8 bits (ceditor_layers.py light_code): 0, or 1/256 to 256. */
+export function decodeLight(code) {
+  return code ? 2 ** ((code * 16) / 255 - 8) : 0;
+}
+
+/**
+ * A part's colour layer and the light layers that go with it, worked out again in `colour`, as the
+ * Blender add-on works them out (ceditor_layers.py add_part, part_look). Each picture `{ pixels, box }`,
+ * RGBA straight, its box `{ x, y, width, height }` in the artwork's pixels; `lighting` and `gloss` are
+ * pixels in the colour layer's box. `colour`, `drawn`: [r, g, b] 0 to 255.
+ *
+ * Each pixel the colour layer covers, each channel: the part's colour there (the colour layer's own
+ * where its light layers cover the pixel whole, else the colour it was drawn in) taken to the new
+ * colour in proportion, in linear light; the look in it, colour × light + gloss; then as the add-on
+ * splits a look: shading = the lit colour over the colour (at most 1), highlights = what is past that
+ * (a metal's past white too), and the colour layer what, under them as they cover the pixel, gives the
+ * look. Returns `{ colour, shading, highlights }`, each RGBA in its own box (null for one not given),
+ * opacities untouched.
+ */
+export function recolourGroupPixels({ colour, drawn, metal = false, layer, lighting, gloss, shading = null, highlights = null }) {
+  const { box } = layer;
+  const out = {
+    colour: new Uint8ClampedArray(layer.pixels),
+    shading: shading ? new Uint8ClampedArray(shading.pixels) : null,
+    highlights: highlights ? new Uint8ClampedArray(highlights.pixels) : null,
+  };
+  const ref = drawn.map((v) => toLinear(v / 255));
+  const next = colour.map((v) => toLinear(v / 255));
+  const indexIn = (sheet, x, y) => {
+    if (!sheet) return -1;
+    const sx = x + box.x - sheet.box.x;
+    const sy = y + box.y - sheet.box.y;
+    if (sx < 0 || sy < 0 || sx >= sheet.box.width || sy >= sheet.box.height) return -1;
+    return (sy * sheet.box.width + sx) * 4;
+  };
+  const beyond = metal ? srgbBeyond : srgbOf;
+  for (let y = 0; y < box.height; y += 1) {
+    for (let x = 0; x < box.width; x += 1) {
+      const i = (y * box.width + x) * 4;
+      if (!layer.pixels[i + 3]) continue;
+      const hi = indexIn(highlights, x, y);
+      const si = indexIn(shading, x, y);
+      const hA = hi >= 0 ? highlights.pixels[hi + 3] / 255 : 0;
+      const sA = si >= 0 ? shading.pixels[si + 3] / 255 : 0;
+      for (let c = 0; c < 3; c += 1) {
+        const own = hA >= 1 ? toLinear(layer.pixels[i + c] / 255) : ref[c];
+        const part = ref[c] > 1e-4 ? (own * next[c]) / ref[c] : next[c];
+        const lit = part * decodeLight(lighting[i + c]);
+        const look = lit + decodeLight(gloss[i + c]);
+        const e = srgbOf(part);
+        const shade = e > 1e-4 ? clamp01(srgbBeyond(lit) / e) : 1;
+        const added = clamp01(beyond(look) - e * shade);
+        const under = 1 - sA + sA * shade;
+        out.colour[i + c] = Math.round(clamp01((srgbOf(look) - hA * added) / Math.max(under, 1e-4)) * 255);
+        if (si >= 0 && sA > 0) out.shading[si + c] = Math.round(shade * 255);
+        if (hi >= 0 && hA > 0) out.highlights[hi + c] = Math.round(added * 255);
+      }
     }
   }
   return out;
@@ -146,17 +232,26 @@ export function hasPictureColour(part) {
 }
 
 /**
- * The colour settings of a part's picture, as stored: `{ path, colour, drawn, follows }`, `path` the
- * part-relative property the colour is written at; null for a part that is not a picture.
+ * The colour settings of a part's picture, as stored: `{ path, drawnPath, colour, drawn, follows,
+ * role, metal, lit }` (`path` the part-relative property the colour is written at, `lit` whether the
+ * light on it is written beside it); null for a part that is not a picture.
  */
 export function pictureColourSettings(part) {
   const image = imageOf(part);
   if (isFramesImage(image)) {
-    return { path: 'Image.colour', drawnPath: 'Image.colourDrawn', colour: String(image.colour ?? ''), drawn: String(image.colourDrawn ?? ''), follows: String(image.colourFollows ?? '') };
+    return {
+      path: 'Image.colour', drawnPath: 'Image.colourDrawn', colour: String(image.colour ?? ''), drawn: String(image.colourDrawn ?? ''),
+      follows: String(image.colourFollows ?? ''), role: String(image.colourRole ?? ''), metal: image.colourMetal === true,
+      lit: image.frames.some((frame) => frame?.lighting && frame?.gloss),
+    };
   }
   if (hasPictureFill(part)) {
     const fill = fillOf(part);
-    return { path: 'Background.Fill.imageColour', drawnPath: 'Background.Fill.imageColourDrawn', colour: String(fill.imageColour ?? ''), drawn: String(fill.imageColourDrawn ?? ''), follows: String(fill.imageColourFollows ?? '') };
+    return {
+      path: 'Background.Fill.imageColour', drawnPath: 'Background.Fill.imageColourDrawn', colour: String(fill.imageColour ?? ''), drawn: String(fill.imageColourDrawn ?? ''),
+      follows: String(fill.imageColourFollows ?? ''), role: String(fill.imageColourRole ?? ''), metal: fill.imageColourMetal === true,
+      lit: Boolean(fill.imageColourLighting && fill.imageColourGloss),
+    };
   }
   return null;
 }
@@ -164,9 +259,35 @@ export function pictureColourSettings(part) {
 const sourceKey = (src) => `${src.length}:${src.slice(64, 96)}:${src.slice(-48)}`;
 
 /**
- * What a part's picture needs to be drawn in its colour: `{ kind: 'fill', src, share }` or
- * `{ kind: 'frames', frames: [{ src, share }] }`, with `colour`, `drawn` ([r, g, b]) and a `key`; null
- * when it is drawn as it is (no colour, no drawn colour, or the two the same).
+ * A part's pictures in the artwork's pixels: `[{ src, box, lighting, gloss }]`, one for a picture
+ * layer, one a frame for a part of frames (the import lays parts out in pixels from the top left).
+ */
+function sheetOf(part) {
+  const layout = part?._children?.Layout ?? {};
+  const at = { x: Number(layout.x) || 0, y: Number(layout.y) || 0, width: Number(layout.width) || 0, height: Number(layout.height) || 0 };
+  const image = imageOf(part);
+  if (isFramesImage(image)) {
+    return image.frames.map((frame) => ({
+      src: String(frame?.source ?? ''), lighting: String(frame?.lighting ?? ''), gloss: String(frame?.gloss ?? ''),
+      box: {
+        x: Math.round(at.x + ((Number(frame?.x) || 0) / 100) * at.width), y: Math.round(at.y + ((Number(frame?.y) || 0) / 100) * at.height),
+        width: Math.round(((Number(frame?.width) || 100) / 100) * at.width), height: Math.round(((Number(frame?.height) || 100) / 100) * at.height),
+      },
+    }));
+  }
+  const fill = fillOf(part);
+  return [{
+    src: String(fill?.imageSrc ?? ''), lighting: String(fill?.imageColourLighting ?? ''), gloss: String(fill?.imageColourGloss ?? ''),
+    box: { x: Math.round(at.x), y: Math.round(at.y), width: Math.round(at.width), height: Math.round(at.height) },
+  }];
+}
+
+/**
+ * What a part's picture needs to be drawn in its colour, with a `key` and `colour`, `drawn` ([r, g, b];
+ * `drawn` null for one to be measured): `{ kind: 'group', role, group, frames }` for a part worked out
+ * again with the light on it (withColourFollows gives it `_colourGroup`), else `{ kind: 'fill', src }`
+ * or `{ kind: 'frames', frames: [{ src }] }`, changed in proportion; null when it is drawn as it is (no
+ * colour, or its own).
  */
 export function pictureColour(part) {
   const settings = pictureColourSettings(part);
@@ -177,14 +298,17 @@ export function pictureColour(part) {
   const drawn = colourRgb(settings.drawn);
   if (!colour || (drawn && colour.every((value, c) => value === drawn[c]))) return null;
   const head = `${colour.join(',')}>${drawn ? drawn.join(',') : 'measured'}`;
-  if (settings.path === 'Image.colour') {
-    const frames = imageOf(part).frames.map((frame) => ({ src: String(frame?.source ?? ''), share: String(frame?.share ?? '') }));
-    return { kind: 'frames', colour, drawn, frames, key: `${head}|${frames.map((f) => `${sourceKey(f.src)}/${sourceKey(f.share)}`).join('|')}` };
+  const group = part?._colourGroup;
+  if (group && drawn) {
+    const frames = isFramesImage(imageOf(part)) ? imageOf(part).frames.length : 0;
+    return { kind: 'group', role: group.role, group, colour, drawn, frames, key: `${head}|${group.key}|${group.role}` };
   }
-  const fill = fillOf(part);
-  const src = String(fill.imageSrc);
-  const share = String(fill.imageColourShare ?? '');
-  return { kind: 'fill', colour, drawn, src, share, key: `${head}|${sourceKey(src)}/${sourceKey(share)}` };
+  if (settings.path === 'Image.colour') {
+    const frames = imageOf(part).frames.map((frame) => ({ src: String(frame?.source ?? '') }));
+    return { kind: 'frames', colour, drawn, frames, key: `${head}|${frames.map((f) => sourceKey(f.src)).join('|')}` };
+  }
+  const src = String(fillOf(part).imageSrc);
+  return { kind: 'fill', colour, drawn, src, key: `${head}|${sourceKey(src)}` };
 }
 
 function withFill(part, changes) {
@@ -197,20 +321,53 @@ function withImage(part, changes) {
 }
 
 /**
- * Parts (`[name, part]` entries) with the colour of each that follows another taken from it (its
- * colour and drawn colour; its own share). `all`: every part by name, when the entries are only some.
+ * Parts (`[name, part]` entries) with what each needs of the parts it goes with: the colour and drawn
+ * colour of the part a light layer follows; and, for a colour layer with the light on it written and
+ * its shading and highlights (`…Role`), a `_colourGroup` on each of the three (their pictures, the
+ * light, whether it is metal), from which recolourGroupPixels works them out together. `all`: every
+ * part by name (a Map or an object), when the entries are only some.
  */
 export function withColourFollows(entries, all = null) {
-  const byName = all ?? new Map(entries);
-  if (!entries.some(([, part]) => pictureColourSettings(part)?.follows)) return entries;
+  const byName = all instanceof Map ? all : new Map(all ? Object.entries(all) : entries);
+  const settingsOf = new Map([...byName].map(([name, part]) => [name, pictureColourSettings(part)]));
+  if (![...settingsOf.values()].some((own) => own?.follows || own?.lit)) return entries;
+  const members = new Map();
+  for (const [name, own] of settingsOf) {
+    if (!own?.follows || !own.role) continue;
+    const group = members.get(own.follows) ?? {};
+    group[own.role] = name;
+    members.set(own.follows, group);
+  }
+  const groups = new Map();
+  const groupOf = (leaderName) => {
+    if (groups.has(leaderName)) return groups.get(leaderName);
+    const lead = settingsOf.get(leaderName);
+    let group = null;
+    if (lead?.lit) {
+      const own = members.get(leaderName) ?? {};
+      const sheet = (name) => (name && byName.has(name) ? sheetOf(byName.get(name)) : null);
+      group = { leader: sheet(leaderName), shading: sheet(own.shading), highlights: sheet(own.highlights), metal: lead.metal };
+      const keyOf = (frames) => (frames ? frames.map((f) => `${sourceKey(f.src)}/${sourceKey(f.lighting)}/${sourceKey(f.gloss)}@${f.box.x},${f.box.y}`).join(';') : '-');
+      group.key = `${leaderName}:${group.metal ? 'metal' : ''}|${keyOf(group.leader)}|${keyOf(group.shading)}|${keyOf(group.highlights)}`;
+    }
+    groups.set(leaderName, group);
+    return group;
+  };
   return entries.map(([name, part]) => {
-    const own = pictureColourSettings(part);
-    if (!own?.follows) return [name, part];
-    const leader = pictureColourSettings(byName instanceof Map ? byName.get(own.follows) : byName[own.follows]);
-    if (!leader) return [name, part];
-    return [name, own.path === 'Image.colour'
-      ? withImage(part, { colour: leader.colour, colourDrawn: leader.drawn })
-      : withFill(part, { imageColour: leader.colour, imageColourDrawn: leader.drawn })];
+    const own = settingsOf.get(name) ?? pictureColourSettings(part);
+    if (!own) return [name, part];
+    let next = part;
+    if (own.follows) {
+      const lead = settingsOf.get(own.follows);
+      if (!lead) return [name, part];
+      next = own.path === 'Image.colour'
+        ? withImage(part, { colour: lead.colour, colourDrawn: lead.drawn })
+        : withFill(part, { imageColour: lead.colour, imageColourDrawn: lead.drawn });
+    }
+    const leaderName = own.follows && own.role ? own.follows : (own.lit ? name : '');
+    const group = leaderName ? groupOf(leaderName) : null;
+    if (group) next = { ...next, _colourGroup: { ...group, role: leaderName === name ? 'colour' : own.role } };
+    return [name, next];
   });
 }
 
@@ -221,25 +378,32 @@ export function withColourFollows(entries, all = null) {
 export function withRecolouredPicture(part, made) {
   const wanted = pictureColour(part);
   if (!wanted || !made || made.key !== wanted.key) return part;
+  const { _colourGroup: _, ...plain } = part;
   if (made.kind === 'frames') {
-    const frames = imageOf(part).frames.map((frame, i) => (made.frames[i] ? { ...frame, source: made.frames[i] } : frame));
-    return withImage(part, { frames, colour: '' });
+    const frames = imageOf(plain).frames.map((frame, i) => (made.frames[i] ? { ...frame, source: made.frames[i] } : frame));
+    return withImage(plain, { frames, colour: '' });
   }
-  return withFill(part, { imageSrc: made.src, imageColour: '' });
+  return withFill(plain, { imageSrc: made.src, imageColour: '' });
 }
 
 // --- In a browser ------------------------------------------------------------------------------
 
 const made = new Map();
+const madeGroups = new Map();
 
-async function recolourOne(src, share, colour, drawn) {
+const remember = (cache, key, promise) => {
+  cache.set(key, promise);
+  if (cache.size > 128) cache.delete(cache.keys().next().value);
+  return promise;
+};
+
+async function recolourOne(src, colour, drawn) {
   if (!src) return '';
-  const [picture, shares] = await Promise.all([picturePixels(src), share ? picturePixels(share) : null]);
+  const picture = await picturePixels(src);
   if (!picture) return '';
-  const sharePixels = shares && shares.width === picture.width && shares.height === picture.height ? shares.pixels : null;
   const from = drawn ?? colourRgb(drawnColour(picture.pixels));
   if (!from) return src;
-  return pngDataUrl(picture.width, picture.height, recolourPixels(picture.pixels, colour, from, sharePixels));
+  return pngDataUrl(picture.width, picture.height, recolourPixels(picture.pixels, colour, from));
 }
 
 /** The drawn colour of a part of frames that came in without one: its middle frame's, measured. */
@@ -250,23 +414,58 @@ async function measuredFramesColour(frames) {
   return picture ? colourRgb(drawnColour(picture.pixels)) : null;
 }
 
+/** One frame of a part's group worked out in its new colour: `{ colour, shading, highlights }`, data URLs. */
+function groupFrame(want, index) {
+  const { group, colour, drawn } = want;
+  const key = `${colour.join(',')}>${drawn.join(',')}|${group.key}|${index}`;
+  if (madeGroups.has(key)) return madeGroups.get(key);
+  return remember(madeGroups, key, (async () => {
+    const lead = group.leader?.[index];
+    if (!lead?.src || !lead.lighting || !lead.gloss) return {};
+    const at = (sheet) => (sheet?.[index]?.src ? sheet[index] : null);
+    const [layer, lighting, gloss, shading, highlights] = await Promise.all([
+      picturePixels(lead.src), picturePixels(lead.lighting), picturePixels(lead.gloss),
+      at(group.shading) ? picturePixels(at(group.shading).src) : null,
+      at(group.highlights) ? picturePixels(at(group.highlights).src) : null,
+    ]);
+    const fits = (picture, box) => picture && picture.width === box.width && picture.height === box.height;
+    if (!fits(layer, lead.box) || !fits(lighting, lead.box) || !fits(gloss, lead.box)) return {};
+    const sheet = (picture, frame) => (frame && fits(picture, frame.box) ? { pixels: picture.pixels, box: frame.box } : null);
+    const shadingSheet = sheet(shading, at(group.shading));
+    const highlightsSheet = sheet(highlights, at(group.highlights));
+    const result = recolourGroupPixels({
+      colour, drawn, metal: group.metal, layer: { pixels: layer.pixels, box: lead.box }, lighting: lighting.pixels, gloss: gloss.pixels,
+      shading: shadingSheet, highlights: highlightsSheet,
+    });
+    return {
+      colour: pngDataUrl(lead.box.width, lead.box.height, result.colour),
+      shading: result.shading ? pngDataUrl(shadingSheet.box.width, shadingSheet.box.height, result.shading) : '',
+      highlights: result.highlights ? pngDataUrl(highlightsSheet.box.width, highlightsSheet.box.height, result.highlights) : '',
+    };
+  })());
+}
+
 /** The pictures `pictureColour(part)` asks for, made: `{ key, kind, src }` or `{ key, kind, frames }`. */
 export function recolourPicture(wanted) {
   if (typeof document === 'undefined' || !wanted) return Promise.resolve(null);
   if (made.has(wanted.key)) return made.get(wanted.key);
-  const promise = (async () => {
+  return remember(made, wanted.key, (async () => {
+    if (wanted.kind === 'group') {
+      const count = Math.max(1, wanted.frames);
+      const sheets = { colour: wanted.group.leader, shading: wanted.group.shading, highlights: wanted.group.highlights };
+      const own = sheets[wanted.role] ?? [];
+      const pictures = await Promise.all(Array.from({ length: count }, async (_, i) => ((await groupFrame(wanted, i))[wanted.role] || own[i]?.src || '')));
+      return wanted.frames ? { key: wanted.key, kind: 'frames', frames: pictures } : { key: wanted.key, kind: 'fill', src: pictures[0] };
+    }
     if (wanted.kind === 'frames') {
       const drawn = wanted.drawn ?? await measuredFramesColour(wanted.frames);
       const frames = drawn
-        ? await Promise.all(wanted.frames.map((frame) => recolourOne(frame.src, frame.share, wanted.colour, drawn)))
+        ? await Promise.all(wanted.frames.map((frame) => recolourOne(frame.src, wanted.colour, drawn)))
         : wanted.frames.map((frame) => frame.src);
       return { key: wanted.key, kind: 'frames', frames };
     }
-    return { key: wanted.key, kind: 'fill', src: await recolourOne(wanted.src, wanted.share, wanted.colour, wanted.drawn) };
-  })();
-  made.set(wanted.key, promise);
-  if (made.size > 128) made.delete(made.keys().next().value);
-  return promise;
+    return { key: wanted.key, kind: 'fill', src: await recolourOne(wanted.src, wanted.colour, wanted.drawn) };
+  })());
 }
 
 /** For parts (`[name, part]` entries, follows resolved), their pictures in their colours: a Map from name. */
