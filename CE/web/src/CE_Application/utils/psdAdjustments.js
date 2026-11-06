@@ -9,7 +9,10 @@
 // published behaviour as closely as an import needs: Levels, Curves, Exposure, Invert, Posterize,
 // Threshold, Channel Mixer and Gradient Map are exact; Brightness/Contrast, Hue/Saturation (the
 // master range), Vibrance, Color Balance, Black & White and Photo Filter follow the documented
-// formulas and come out close. Selective Color and Color Lookup are not done, and say so.
+// formulas and come out close. Selective Color follows the per-range weighting worked out from
+// Photoshop's results (it publishes no formula) and is close too. Color Lookup applies the table the
+// layer carries (Photoshop keeps the whole .cube, .3dl or .look file in it), interpolated
+// trilinearly; a lookup through an ICC profile (Abstract or Device Link) is not done, and says so.
 
 const clamp = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
 const unit = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -120,6 +123,164 @@ function gradientColour(stops, t) {
     }
   }
   return psdRgb(list[list.length - 1].color);
+}
+
+const SELECTIVE_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks'];
+
+/**
+ * Selective Color: each range's cyan, magenta, yellow and black (-100..100 %) move the red, green
+ * and blue they are the ink of, weighted by how much of the range the colour is in. A colour is in
+ * reds as far as red leads the other two (max - mid), in yellows as far as blue trails them (mid -
+ * min), and so on round the wheel; in whites as far as its lowest channel is over half, in blacks as
+ * far as its highest is under half, in neutrals as far as it is neither. Relative scales the change
+ * by the ink already there, so it cannot tint pure white; Absolute adds it outright.
+ */
+function selectiveColour(adjustment) {
+  const relative = adjustment.mode !== 'absolute';
+  const ranges = SELECTIVE_RANGES.map((name) => [name, adjustment[name]])
+    .filter(([, cmyk]) => cmyk && (cmyk.c || cmyk.m || cmyk.y || cmyk.k));
+  return ([r, g, b]) => {
+    const rgb = [r / 255, g / 255, b / 255];
+    const max = Math.max(...rgb);
+    const min = Math.min(...rgb);
+    const mid = rgb[0] + rgb[1] + rgb[2] - max - min;
+    const weight = {
+      reds: rgb[0] === max ? max - mid : 0,
+      greens: rgb[1] === max ? max - mid : 0,
+      blues: rgb[2] === max ? max - mid : 0,
+      cyans: rgb[0] === min ? mid - min : 0,
+      magentas: rgb[1] === min ? mid - min : 0,
+      yellows: rgb[2] === min ? mid - min : 0,
+      whites: min > 0.5 ? (min - 0.5) * 2 : 0,
+      blacks: max < 0.5 ? (0.5 - max) * 2 : 0,
+      neutrals: 1 - (Math.abs(max - 0.5) + Math.abs(min - 0.5)),
+    };
+    const out = [...rgb];
+    for (const [name, cmyk] of ranges) {
+      const w = weight[name];
+      if (w <= 0) continue;
+      const k = (cmyk.k ?? 0) / 100;
+      [cmyk.c, cmyk.m, cmyk.y].forEach((ink, i) => {
+        const v = rgb[i];
+        const amount = (ink ?? 0) / 100;
+        const change = ((-1 - amount) * k - amount) * (relative ? 1 - v : 1);
+        out[i] += Math.min(1 - v, Math.max(-v, change)) * w;
+      });
+    }
+    return out.map((v) => clamp(v * 255));
+  };
+}
+
+const textOf = (bytes) => (typeof bytes === 'string' ? bytes : new TextDecoder('latin1').decode(bytes));
+
+/** A .cube file (Adobe's and Resolve's): a 3D table red fastest, or a 1D one, over its domain. */
+function readCube(text) {
+  let size3 = 0; let size1 = 0;
+  let lo = [0, 0, 0]; let hi = [1, 1, 1];
+  const values = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    if (!line) continue;
+    const [word, ...rest] = line.split(/\s+/);
+    if (word === 'LUT_3D_SIZE') size3 = Number(rest[0]);
+    else if (word === 'LUT_1D_SIZE') size1 = Number(rest[0]);
+    else if (word === 'DOMAIN_MIN') lo = rest.slice(0, 3).map(Number);
+    else if (word === 'DOMAIN_MAX') hi = rest.slice(0, 3).map(Number);
+    else if (word === 'LUT_3D_INPUT_RANGE' || word === 'LUT_1D_INPUT_RANGE') { lo = [0, 1, 2].map(() => Number(rest[0])); hi = [0, 1, 2].map(() => Number(rest[1])); }
+    else if (/^[-+.\d]/.test(word)) {
+      const triple = [word, ...rest].slice(0, 3).map(Number);
+      if (triple.length === 3 && triple.every(Number.isFinite)) values.push(...triple);
+    }
+  }
+  const size = size3 || size1;
+  const count = size3 ? size3 ** 3 : size1;
+  if (!(size >= 2) || values.length !== count * 3) return null;
+  return { size, dimensions: size3 ? 3 : 1, table: Float32Array.from(values), lo, hi };
+}
+
+/** A .3dl file (Flame's and Lustre's): integer triples blue fastest, their bit depth from the largest. */
+function read3dl(text) {
+  const values = [];
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, '').trim();
+    if (!/^\d/.test(line)) continue;
+    const numbers = line.split(/\s+/).map(Number);
+    if (numbers.length === 3 && numbers.every(Number.isFinite)) values.push(...numbers);
+  }
+  const size = Math.round(Math.cbrt(values.length / 3));
+  if (size < 2 || size ** 3 * 3 !== values.length) return null;
+  // The output depth, as the file's largest value suggests it: 10-bit for up to 2047, and so on.
+  const largest = values.reduce((a, b) => Math.max(a, b), 0);
+  let bits = 8;
+  while (bits < 16 && largest > 2 ** bits * 2 - 1) bits += 2;
+  if (bits === 14) bits = 16;
+  const scale = 2 ** bits - 1;
+  const table = new Float32Array(values.length);
+  for (let r = 0; r < size; r += 1) {
+    for (let g = 0; g < size; g += 1) {
+      for (let b = 0; b < size; b += 1) {
+        const from = ((r * size + g) * size + b) * 3;
+        const to = ((b * size + g) * size + r) * 3;
+        for (let c = 0; c < 3; c += 1) table[to + c] = values[from + c] / scale;
+      }
+    }
+  }
+  return { size, dimensions: 3, table, lo: [0, 0, 0], hi: [1, 1, 1] };
+}
+
+/** An Iridas .look (SpeedGrade's): XML, its table little-endian 32-bit floats in hex, red fastest. */
+function readLook(text) {
+  if (/<mask\b/i.test(text)) return null;
+  const size = Number((text.match(/<size>([^<]*)<\/size>/i)?.[1] ?? '').replace(/["'\s]/g, ''));
+  const hex = (text.match(/<data>([^<]*)<\/data>/i)?.[1] ?? '').replace(/["'\s]/g, '');
+  if (!(size >= 2) || hex.length !== size ** 3 * 3 * 8 || /[^0-9a-f]/i.test(hex)) return null;
+  const view = new DataView(new ArrayBuffer(4));
+  const table = new Float32Array(size ** 3 * 3);
+  for (let i = 0; i < table.length; i += 1) {
+    for (let b = 0; b < 4; b += 1) view.setUint8(b, parseInt(hex.slice(i * 8 + b * 2, i * 8 + b * 2 + 2), 16));
+    table[i] = view.getFloat32(0, true);
+  }
+  return { size, dimensions: 3, table, lo: [0, 0, 0], hi: [1, 1, 1] };
+}
+
+/**
+ * The lookup table in a Color Lookup layer's file, as `{ size, dimensions, table, lo, hi }` (the
+ * table 0..1, red fastest), or null when there is none this reads.
+ */
+export function readLookupTable(bytes, format) {
+  if (!bytes || !bytes.length) return null;
+  const text = textOf(bytes);
+  const kind = /LUT_[13]D_SIZE/.test(text) ? 'cube' : /<LUT\b/i.test(text) ? 'look' : format === '3dl' || !format ? '3dl' : format;
+  if (kind === 'cube') return readCube(text);
+  if (kind === 'look') return readLook(text);
+  if (kind === '3dl') return read3dl(text);
+  return null;
+}
+
+function colourLookup(lut) {
+  const { size, table, lo, hi } = lut;
+  const n = size - 1;
+  const at = (v, c) => unit(((v / 255) - lo[c]) / ((hi[c] - lo[c]) || 1)) * n;
+  if (lut.dimensions === 1) {
+    return (rgb) => rgb.map((v, c) => {
+      const x = at(v, c); const i = Math.min(n - 1, Math.floor(x)); const t = x - i;
+      return clamp((table[i * 3 + c] * (1 - t) + table[(i + 1) * 3 + c] * t) * 255);
+    });
+  }
+  const cell = (r, g, b, c) => table[((b * size + g) * size + r) * 3 + c];
+  return ([r, g, b]) => {
+    const x = at(r, 0); const y = at(g, 1); const z = at(b, 2);
+    const i = Math.min(n - 1, Math.floor(x)); const j = Math.min(n - 1, Math.floor(y)); const k = Math.min(n - 1, Math.floor(z));
+    const tx = x - i; const ty = y - j; const tz = z - k;
+    const out = [0, 0, 0];
+    for (let c = 0; c < 3; c += 1) {
+      const lerp = (a, b2, t) => a + (b2 - a) * t;
+      const near = lerp(lerp(cell(i, j, k, c), cell(i + 1, j, k, c), tx), lerp(cell(i, j + 1, k, c), cell(i + 1, j + 1, k, c), tx), ty);
+      const far = lerp(lerp(cell(i, j, k + 1, c), cell(i + 1, j, k + 1, c), tx), lerp(cell(i, j + 1, k + 1, c), cell(i + 1, j + 1, k + 1, c), tx), ty);
+      out[c] = clamp(lerp(near, far, tz) * 255);
+    }
+    return out;
+  };
 }
 
 /**
@@ -259,9 +420,25 @@ export function adjustmentFunction(adjustment, report = new Set()) {
         return gradientColour(stops, t).map(clamp);
       };
     }
+    case 'selective color':
+      report.add('Selective Color');
+      return selectiveColour(adjustment);
+    case 'color lookup': {
+      if (adjustment.lookupType && adjustment.lookupType !== '3dlut') return null;
+      const lut = readLookupTable(adjustment.lut3DFileData, adjustment.lutFormat);
+      return lut ? colourLookup(lut) : null;
+    }
     default:
       return null;
   }
+}
+
+/** What an adjustment `adjustmentFunction` does not do is, for the import's list of them. */
+export function unappliedAdjustment(adjustment) {
+  const type = adjustment?.type ?? 'unknown';
+  if (type !== 'color lookup') return type;
+  if (adjustment.lookupType && adjustment.lookupType !== '3dlut') return 'Color Lookup through an ICC profile';
+  return adjustment.lut3DFileData?.length ? `Color Lookup, its table (${adjustment.lut3DFileName || adjustment.lutFormat || 'file'}) not readable` : 'Color Lookup without its table';
 }
 
 /**

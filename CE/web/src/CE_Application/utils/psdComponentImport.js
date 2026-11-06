@@ -34,7 +34,7 @@ import { readPsd } from 'ag-psd';
 // ag-psd is told once, by the panel importer, to make its pixel arrays without a canvas.
 import './psdPanelImport.js';
 import { compositePsd, layerMaskSampler } from './psdComposite.js';
-import { adjustArgb, adjustPixels, adjustmentFunction, psdRgb } from './psdAdjustments.js';
+import { adjustArgb, adjustPixels, adjustmentFunction, psdRgb, unappliedAdjustment } from './psdAdjustments.js';
 import { drawLayerStyles, editableShadows, hasDrawnStyles, pxOf } from './psdLayerStyles.js';
 import { combinedPathData, psdGradient, vectorFillOf, vectorStrokeOf } from './psdVectors.js';
 import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
@@ -287,7 +287,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     for (const layer of clippedAdjustments) {
       const fn = adjustmentFunction(layer.adjustment, report.approximated);
       if (fn) adjustPixels(pixels, width, 0, 0, fn, { strength: layer.opacity ?? 1, mask: layerMaskSampler(layer) });
-      else report.unsupported.add(`${layer.name || 'unnamed'} (${layer.adjustment.type})`);
+      else report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
     }
     const box = opaqueBounds(pixels, width, height);
     if (!box) return;
@@ -302,7 +302,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   /** An adjustment layer: what it does, to every layer read so far (they are all under it). */
   const adjust = (layer, opacity) => {
     const fn = adjustmentFunction(layer.adjustment, report.approximated);
-    if (!fn) { report.unsupported.add(`${layer.name || 'unnamed'} (${layer.adjustment?.type ?? 'unknown'})`); return; }
+    if (!fn) { report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`); return; }
     const strength = opacity * (layer.opacity ?? 1);
     const mask = layerMaskSampler(layer);
     for (const record of records) {

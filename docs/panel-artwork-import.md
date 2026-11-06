@@ -154,8 +154,9 @@ parts are named by its top-level layers, and the notice lists them.
   Color and Gradient Overlay, Stroke, Inner Shadow, Inner Glow and Bevel become its own settings; on a
   picture they are drawn into it, with Satin, close to Photoshop's. Adjustment layers (Levels, Curves,
   Exposure, Invert, Posterize, Threshold, Channel Mixer, Gradient Map exactly; Brightness/Contrast,
-  Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter closely) are applied to every
-  layer under them, pictures and colours alike. Pass Through groups are unfolded; a group with its
+  Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter, Selective Color closely; Color
+  Lookup from the .cube, .3dl or .look table the layer carries) are applied to every layer under
+  them, pictures and colours alike. A Color Lookup through an ICC profile is not. Pass Through groups are unfolded; a group with its
   own mode or mask is one layer. Text layers stay text where the file says their size and colour.
 
 **A picture's colour** (`utils/pictureRecolour.js`). A picture layer (`Background.Fill.imageColour`)
@@ -192,7 +193,7 @@ layer is called button. With nothing named to move it is layers only. Not `cap`:
 would swing round with it; name a cap that should turn `rotor`.
 
 Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
-approximate adjustments), Selective Color and Color Lookup adjustments (not applied), adjustment
+approximate adjustments), Color Lookup through an ICC profile (not applied), adjustment
 layers inside groups with their own blend mode, and references to anything not in the file.
 
 ## New Component from 3D Model (glTF)
