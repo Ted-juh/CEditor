@@ -710,6 +710,33 @@ drawn** gives it its own colours again. A layer of frames changes all its frames
 shine) has no colour of its own: the look bar and the dock say so and offer **Edit skirt's colour**
 for the layer it lights. The **Layers** list marks each layer **Picture**, **Frames** or **Light**.
 
+### A 3D part
+
+A **3D part** is a knob CEditor renders itself, with no other program: a small scene of objects,
+each with a shape, a material and a motion, lit by the control set's lamp and seen from straight above.
+
+1. Choose **3D** in the tool strip under the canvas and drag a square on the canvas (a click places
+   one 64 pixels across). It starts as a knob: a skirt that stays put, a body and a knurled metal top
+   that turn, and a pointer.
+2. The **Layers** list shows the 3D part with its objects under it, each with what it does: **stays**,
+   **turns · round** (a turned body: its ridges turn and its light stays where the lamp is) or
+   **turns** (anything else, rendered every 27 degrees). Click one to edit it in the dock's **3D** tab.
+3. In the **3D** tab: its **Name**; **With the Value** (Stays, Turns or Lamp); its **Shape**: a
+   **Turned Body** (Side smooth, knurled or fluted, Ridges, Depth, Diameter, Height, where it Stands,
+   Taper, a Top flat, inset, domed or dished), a **Block** (Width, Length, Corner, Height) or a
+   **Pointer** (a line, a bar, a dot or a chicken-head); and its **Material**: Finish (spun, brushed or
+   polished metal, gloss or satin plastic, rubber), **Colour** and Roughness. **Add Object** copies the
+   one selected; **Remove** takes it away.
+
+A change of shape, finish or motion renders the part again: about a second with a graphics card,
+several without one (the status line in the 3D tab says how long, and the picture there until then
+stays). A **colour** changes at once, picked in the **Colors** dock: the part is worked out again in
+the new colour, lit as it was, as a knob modelled in Blender is. Moving the 3D part moves what it made;
+resizing it renders it again. The component's value turns it; in a new component it gets a grab area
+to turn it by. What it makes is ordinary layers, so the Player and an exported plug-in draw it with
+no 3D at all. It draws as Blender's real-time renderer does, not as its ray tracer: no light bounces
+from one part onto another.
+
 ### A control drawn in Figma
 
 The **CEditor Export** plugin saves a Figma frame as an SVG with every layer's name kept. It comes

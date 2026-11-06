@@ -579,9 +579,15 @@ function groupFrame(want, index) {
       at(group.shading) ? picturePixels(at(group.shading).src) : null,
       at(group.highlights) ? picturePixels(at(group.highlights).src) : null,
     ]);
-    const fits = (picture, box) => picture && picture.width === box.width && picture.height === box.height;
+    // The pictures are laid out by their parts' boxes, in the artwork's pixels; a picture drawn finer
+    // than its box (a 3D part's, at twice the component's pixels) is placed at its own scale, the
+    // colour layer's, which the layers that go with it share.
+    const scale = layer && lead.box.width ? layer.width / lead.box.width : 1;
+    const inPixels = (box) => ({ x: Math.round(box.x * scale), y: Math.round(box.y * scale), width: Math.round(box.width * scale), height: Math.round(box.height * scale) });
+    const fits = (picture, box) => picture && Math.abs(picture.width - box.width * scale) <= 1 && Math.abs(picture.height - box.height * scale) <= 1;
     if (!fits(layer, lead.box) || !fits(lighting, lead.box) || !fits(gloss, lead.box)) return {};
-    const sheet = (picture, frame) => (frame && fits(picture, frame.box) ? { pixels: picture.pixels, box: frame.box } : null);
+    const leadBox = { ...inPixels(lead.box), width: layer.width, height: layer.height };
+    const sheet = (picture, frame) => (frame && fits(picture, frame.box) ? { pixels: picture.pixels, box: { ...inPixels(frame.box), width: picture.width, height: picture.height } } : null);
     const shadingSheet = sheet(shading, at(group.shading));
     const highlightsSheet = sheet(highlights, at(group.highlights));
     // Light other parts throw on it, in its box (a part that stays put: one frame).
@@ -591,11 +597,11 @@ function groupFrame(want, index) {
     const bounce = thrownMaps.filter((each) => fits(each.lighting, lead.box) && fits(each.gloss, lead.box))
       .map((each) => ({ ratio: each.ratio, lighting: each.lighting.pixels, gloss: each.gloss.pixels }));
     const result = recolourGroupPixels({
-      colour, drawn, metal: group.metal, layer: { pixels: layer.pixels, box: lead.box }, lighting: lighting.pixels, gloss: gloss.pixels,
+      colour, drawn, metal: group.metal, layer: { pixels: layer.pixels, box: leadBox }, lighting: lighting.pixels, gloss: gloss.pixels,
       shading: shadingSheet, highlights: highlightsSheet, bounce,
     });
     return {
-      colour: pngDataUrl(lead.box.width, lead.box.height, result.colour),
+      colour: pngDataUrl(leadBox.width, leadBox.height, result.colour),
       shading: result.shading ? pngDataUrl(shadingSheet.box.width, shadingSheet.box.height, result.shading) : '',
       highlights: result.highlights ? pngDataUrl(highlightsSheet.box.width, highlightsSheet.box.height, result.highlights) : '',
     };

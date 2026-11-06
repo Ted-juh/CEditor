@@ -222,17 +222,29 @@ export async function linearEdgeSources(parts, backdrop) {
   if (made.has(key)) return made.get(key);
   const promise = (async () => {
     const read = await Promise.all(pictures.map((part) => picturePixels(part._children.Background._children.Fill.imageSrc)));
-    const layers = pictures.map((part, i) => {
-      const layout = part._children.Layout ?? {};
-      const blend = part._children.Effects?._children?.Blend?.mode ?? 'normal';
-      return read[i] ? {
-        ...read[i], x: Math.round(Number(layout.x) || 0), y: Math.round(Number(layout.y) || 0),
-        opacity: part.opacity ?? 1, visible: part.visible !== false, blend, linear: hasLinearEdges(part),
-      } : null;
-    });
-    const mixed = mixEdgesInLinearLight(layers.map((layer) => layer ?? { width: 0, height: 0, pixels: new Uint8ClampedArray(0), x: 0, y: 0, visible: false }), backdrop);
+    // A picture drawn finer than its box (a 3D part's, at twice the component's pixels) is mixed with
+    // the pictures at its own scale, laid where their boxes put them at that scale; one at another
+    // scale is not under it there, and the backdrop stands in for it.
+    const scaleOf = (part, picture) => {
+      const width = Number(part._children.Layout?.width) || 0;
+      return picture && width ? Math.round((picture.width / width) * 100) / 100 : 1;
+    };
+    const scales = pictures.map((part, i) => scaleOf(part, read[i]));
+    const nothing = { width: 0, height: 0, pixels: new Uint8ClampedArray(0), x: 0, y: 0, visible: false };
     const sources = new Map();
-    for (const [index, pixels] of mixed) sources.set(pictures[index].name, pngDataUrl(layers[index].width, layers[index].height, pixels));
+    for (const scale of new Set(scales)) {
+      const layers = pictures.map((part, i) => {
+        if (!read[i] || scales[i] !== scale) return null;
+        const layout = part._children.Layout ?? {};
+        const blend = part._children.Effects?._children?.Blend?.mode ?? 'normal';
+        return {
+          ...read[i], x: Math.round((Number(layout.x) || 0) * scale), y: Math.round((Number(layout.y) || 0) * scale),
+          opacity: part.opacity ?? 1, visible: part.visible !== false, blend, linear: hasLinearEdges(part),
+        };
+      });
+      const mixed = mixEdgesInLinearLight(layers.map((layer) => layer ?? nothing), backdrop);
+      for (const [index, pixels] of mixed) if (layers[index]) sources.set(pictures[index].name, pngDataUrl(layers[index].width, layers[index].height, pixels));
+    }
     return sources;
   })();
   made.set(key, promise);

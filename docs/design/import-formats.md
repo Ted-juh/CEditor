@@ -1,6 +1,6 @@
 # Four more ways in: Illustrator, Figma, 3D parts and glTF
 
-*Decided 2026-11-06; #1 and #2 built.* The routes for bringing designs in that
+*Decided 2026-11-06; #1, #2 and #3 built.* The routes for bringing designs in that
 [changeable-control-sets.md](changeable-control-sets.md) ("Native files" and "Order") lists as next:
 Illustrator files read directly, Figma, CEditor's own 3D parts (Level 3, with piece E) and glTF models
 (Level 2). The mock-ups the owner approved are [import-formats-mockups.html](import-formats-mockups.html).
@@ -100,8 +100,58 @@ the manifest, the window's rows and notes, a frame as a dial, on and off variant
 variant as a button, flattening, the messages, UTF-8), its SVG read by `planSvgComponentImport`; the
 window was driven once in Chromium (rows, notes, options, Save, the download). Not run in Figma itself.
 
-## 3 and 4. 3D parts and glTF — after
+## 3. CEditor's own 3D parts — built
 
-A 3D part in the Component Designer: objects with a shape (piece E's turned bodies, knurled or fluted,
-tops, blocks; a pointer of its own) or a mesh from a glTF file, a material, a motion; rendered by
-three.js from straight above, lit by the set's lamp, into the layers the Blender add-on writes.
+A 3D part is a marker part (`kind: 'scene3d'`) holding a recipe (`meta.scene3d`,
+`utils/scene3dModel.js`): objects, each a shape (piece E's turned bodies, smooth, knurled or fluted, a
+taper, a top flat, inset, domed or dished; a block; a pointer of its own: line, bar, dot,
+chicken-head), a material (six finishes, a colour, a roughness) and a motion (stays, turns, lamp).
+The marker draws nothing; what it makes is ordinary parts.
+
+- **Render** (`utils/scene3dRender.js`, three.js 0.186.1, in the editor only, loaded when a 3D part is
+  rendered). Each object from straight above with the others held out (a depth-only material drawn
+  first), at three times the size and averaged, so a pixel's coverage is its share of samples: unlit for
+  its colour, then lit with a base colour of white and of black. A physically based material is
+  linear in its base colour (three's multiple-scattering term only slightly not), so the difference is
+  the light on it without its colour and the black render its gloss, the add-on's two passes; a metal's
+  colour is its reflection, so its gloss is nothing. Linear output, no tone mapping, float targets. The
+  shadow on the panel: the panel lit with what stays put casting and not (an object that is not to be
+  seen but is to cast is drawn with neither colour nor depth: three's shadow pass draws it all the
+  same). A turning object that is not round at every 27 degrees, turned back to rest through a Lanczos
+  window, with its shadow on the panel and on what stays put (the render without its shadow made once).
+  Lit by the set's lamp (`lampDirection`, as piece E), a fill, and three's RoomEnvironment.
+- **Layers** (`utils/scene3dLayers.js`): the add-on's layer building ported: part_look, unover,
+  inward, carry_in, add_part, turned; colour layers with their whole look at the edge, shading and
+  highlights over the inside, the light and gloss hidden beside them in `light_code`, frames, pivots,
+  and the XMP; written as a PSD in memory (ag-psd) and read by `planPsdComponentImport`, so a 3D part's
+  parts are made exactly as a Blender knob's are. Not written: the bounce maps and a turning part's
+  reflection in a metal, which need light bouncing between parts.
+- **Merge** (`utils/scene3dMerge.js`): the import's parts renamed after the 3D part (`knob__pointer`),
+  marked `meta.scene3dOf`, placed in its box (the render is at up to twice the component's pixels, at
+  most 384 a side), kept just after it; its bindings and states renamed, onto the component's own value
+  where it has one; its value, behaviour and grab area added where the component has none, and its grab
+  area alone where the component has a value but nothing on the canvas to move it (a new component).
+  What it added is listed on the marker (`meta.scene3dWired`) and the next render takes back only that.
+- **In the designer** (`stores/scene3dActions.js`): the **3D** tool places a starter knob and renders it;
+  renders run one at a time per part, a request during one done once after it with the recipe as it is
+  then; the Layers list shows the marker with its objects under it, and what it made not at all; its
+  box is the one picked and dragged (what it made has no box of its own there); moved, what it made
+  moves (no render); resized, it renders again; the dock's **3D** tab (`components/Scene3dTab.svelte`)
+  edits an object and says the render's state and time. A colour picked in the Colors dock (a callback
+  target) is written to the recipe and to the colour layer it made, which is worked out again at once.
+- **Two things found on the way.** The colour group lined its pictures up by their parts' boxes, one
+  picture pixel a box pixel, which an import gives and a 3D part's pictures, at twice the component's
+  pixels, do not: recolouring a 3D part did nothing. The group recolour now works at the colour layer's
+  own scale, and the outline mixing mixes each scale's pictures among themselves. And the designer's
+  source is held under 5,800 lines by a test: the 3D tool's placing and the following of its box live in
+  the store.
+
+Tested: `test/scene3d.test.js` (with passes made up: the recipe, the layers, a part worked out again in
+its own colour within 3 levels, the import, the merge and its wiring); `browser-checks/scene3d.mjs`
+(three.js in Chromium: drawn with the tool, rendered, listed, recoloured at once, moved, reshaped).
+About 11 seconds a render here, in software WebGL, for a part 80 pixels across.
+
+## 4. glTF models — next
+
+The same 3D part with objects from a glTF file: meshes and their materials read by three's
+GLTFLoader, each object a part by its name's words, its material editable, its shape the file's.

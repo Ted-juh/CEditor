@@ -21,8 +21,14 @@
   import UnlinkIcon from 'lucide-svelte/icons/unlink';
   import { maskLinked } from '../utils/partMask.js';
   import { generatorNameForEntry, layerKind, layerKindClass, layerKindLabel } from '../utils/customDesignSurfaceHelpers.js';
+  import { isScene3dPart } from '../utils/scene3dMerge.js';
+  import { describeObject, normalizeScene3d } from '../utils/scene3dModel.js';
+  import { scene3dSelection } from '../stores/scene3dActions.js';
+  import { displayTabRequest } from '../stores/displayTab.js';
 
   let {
+    // The component's id: a 3D part's object row (stores/scene3dActions.js scene3dSelection) names it.
+    controlId = '',
     topLevelPartEntries = [],
     kitEntries = [],
     generatedSourceEntries = [],
@@ -191,6 +197,14 @@
     selectLayer(name, event);
   }
 
+  // A 3D part's object, from its row under the 3D part: the 3D part selected, the 3D tab on that object.
+  function selectScene3dObject(name, index, event) {
+    event?.stopPropagation?.();
+    selectLayer(name);
+    scene3dSelection.set({ controlId, part: name, index });
+    displayTabRequest.set({ tab: 'scene3d' });
+  }
+
   function commitRename() {
     const from = renamingLayer;
     const to = renameDraft.trim();
@@ -320,6 +334,17 @@
   {#each operandEntriesFor(name) as [memberName, member] (memberName)}
     {@render partRow(memberName, member, depth + 1)}
   {/each}
+  {#if isScene3dPart(part)}
+    {#each normalizeScene3d(part.meta?.scene3d ?? {}).objects as object, index (index)}
+      <button type="button" class="list-row scene3d-object" data-testid="scene3d-object"
+        class:picked={isLayerSelected(name) && $scene3dSelection?.part === name && $scene3dSelection?.index === index}
+        title={`${object.name}: ${describeObject(object)}. Edit it in the 3D tab.`}
+        onclick={(event) => selectScene3dObject(name, index, event)}>
+        <span class="row-text"><strong>{object.name}</strong></span>
+        <span class="object-motion">{describeObject(object)}</span>
+      </button>
+    {/each}
+  {/if}
 {/snippet}
 
 
@@ -1068,4 +1093,10 @@
     background: #E33;
     transform: rotate(-35deg);
   }
+  .scene3d-object { display: flex; align-items: baseline; gap: 8px; width: 100%; padding: 4px 8px 4px 34px; border: 0; background: transparent; color: #B9C8D4; font: 500 11px/1.3 inherit; text-align: left; cursor: pointer; }
+  .scene3d-object:hover { background: #1b2228; }
+  .scene3d-object.picked { background: #0B2320; color: #8FEDE3; }
+  .scene3d-object:focus-visible { outline: 2px solid #14B8A6; outline-offset: -2px; }
+  .scene3d-object .row-text strong { font-weight: 500; }
+  .scene3d-object .object-motion { margin-left: auto; font: 500 9.5px/1 ui-monospace, monospace; color: #616C75; }
 </style>

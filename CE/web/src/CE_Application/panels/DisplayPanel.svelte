@@ -15,6 +15,7 @@
   import Sparkles from 'lucide-svelte/icons/sparkles';
   import Contrast from 'lucide-svelte/icons/contrast';
   import Cylinder from 'lucide-svelte/icons/cylinder';
+  import Box from 'lucide-svelte/icons/box';
   import TypeIcon from 'lucide-svelte/icons/type';
   import Boxes from 'lucide-svelte/icons/boxes';
   import MonitorIcon from 'lucide-svelte/icons/monitor';
@@ -84,11 +85,12 @@
   // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
   // is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'mask', 'render', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'mask', 'render', 'scene3d', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
     mask: () => import('../components/MaskTab.svelte').then((module) => ({ default: module.default })),
     render: () => import('../components/RenderTab.svelte').then((module) => ({ default: module.default })),
+    scene3d: () => import('../components/Scene3dTab.svelte').then((module) => ({ default: module.default })),
     type: () => import('../components/TextDock.svelte').then((module) => ({ default: module.default })),
     assets: () => import('../components/AssetsTab.svelte').then((module) => ({ default: module.default })),
     screen: () => import('../components/ScreenTab.svelte').then((module) => ({ default: module.default })),
@@ -127,7 +129,7 @@
     // a live interactive surface and should only run on demand.
     if (normalized === 'preview') return DEFAULT_DISPLAY_TAB;
     // Mask edits a Component Designer layer, and the designer is never open at startup.
-    if (normalized === 'mask' || normalized === 'render') return DEFAULT_DISPLAY_TAB;
+    if (normalized === 'mask' || normalized === 'render' || normalized === 'scene3d') return DEFAULT_DISPLAY_TAB;
     return normalized;
   }
 
@@ -1091,6 +1093,8 @@
     { id: 'mask',     label: 'Mask',     icon: Contrast, designerOnly: true },
     // Only while the Component Designer is open: the rendered look of the layer selected there.
     { id: 'render',   label: 'Render',   icon: Cylinder, designerOnly: true },
+    // Only while the Component Designer is open: the 3D part selected there (docs/design/import-formats.md, 3).
+    { id: 'scene3d',  label: '3D',       icon: Box, designerOnly: true },
     { id: 'type',     label: 'Text',     icon: TypeIcon },
     { id: 'assets',   label: 'Assets',   icon: Boxes },
     { id: 'screen',   label: 'Screen',   icon: MonitorIcon },
@@ -1321,6 +1325,11 @@
       {@const RenderTab = activeTabComponent.default}
       <div class="tab-pane">
         <RenderTab />
+      </div>
+    {:else if activeTab === 'scene3d' && activeTabComponentId === activeTab && activeTabComponent?.default}
+      {@const Scene3dTab = activeTabComponent.default}
+      <div class="tab-pane">
+        <Scene3dTab />
       </div>
     {:else if activeTab === 'type' && activeTabComponentId === activeTab && activeTabComponent?.default}
       {@const TextDock = activeTabComponent.default}

@@ -106,6 +106,17 @@
       <strong>Hit Zone</strong>
     </button>
 
+    <button
+      type="button"
+      class:active={activeTool === 'scene3d'}
+      title="3D: draw a knob CEditor renders, its every object a shape, a material and a motion you can change"
+      data-testid="tool-scene3d"
+      onclick={() => setActiveTool('scene3d')}
+    >
+      <span class="tool-icon scene3d"></span>
+      <strong>3D</strong>
+    </button>
+
     <div class="tool-flyout-host">
       <button
         type="button"

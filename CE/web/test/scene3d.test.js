@@ -183,10 +183,19 @@ test('merged into a component: named after the 3D part, placed in its box, wired
   assert.deepEqual([Object.keys(gone._children.Bindings._children).length, Object.keys(gone._children.ValueChannels._children).length, Object.keys(gone._children.HitZones._children).length], [0, 0, 0]);
 
   // A component with a value of its own keeps it, and what the 3D part made follows it.
+  // A component with a value of its own keeps it, and what the 3D part made follows it; with nothing
+  // on the canvas to move it, the 3D part's grab area moves it.
   const own = structuredClone(control);
   own._children.ValueChannels._children.cutoff = { name: 'cutoff', type: 'float' };
+  own._children.Behaviors._children.cutoffSlider = { name: 'cutoffSlider', type: 'slider', valueChannel: 'cutoff' };
   const onOwn = mergeScene3d(own, 'knob', rendered, options);
   assert.deepEqual(Object.keys(onOwn._children.ValueChannels._children), ['cutoff']);
+  assert.deepEqual(Object.keys(onOwn._children.Behaviors._children), ['cutoffSlider']);
   assert.ok(Object.values(onOwn._children.Bindings._children).every((b) => b.source === 'channel.cutoff.normalized'));
-  assert.deepEqual(onOwn._children.Parts._children.knob.meta.scene3dWired, { channels: [], behaviors: [], hitZones: [] });
+  const zone = onOwn._children.HitZones._children.mainZone;
+  assert.deepEqual([zone.targetValueChannel, zone.targetBehavior, zone.bounds.x, zone.bounds.width], ['cutoff', 'cutoffSlider', 50, 12]);
+  assert.deepEqual(onOwn._children.Parts._children.knob.meta.scene3dWired, { channels: [], behaviors: [], hitZones: ['mainZone'] });
+  // One with a grab area of its own is left as it is.
+  own._children.HitZones._children.face = { name: 'face', bounds: {} };
+  assert.deepEqual(Object.keys(mergeScene3d(own, 'knob', rendered, options)._children.HitZones._children), ['face']);
 });

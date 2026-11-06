@@ -131,6 +131,25 @@ export function mergeScene3d(control, sceneName, rendered, { frame, scale = 1, a
       }
     }
   }
+  // A component with a value of its own but nothing on the canvas to move it (a new one: a value and
+  // a behaviour, no grab area) gets the 3D part's grab area, on its own value and behaviour.
+  const zones = ensure(next, 'HitZones', 'HitZones');
+  if (own && !Object.keys(zones).length) {
+    const behaviors = children(next, 'Behaviors');
+    const ownBehavior = Object.entries(behaviors).find(([, behavior]) => behavior?.valueChannel === main)?.[0] ?? '';
+    for (const [name, zone] of Object.entries(children(rendered, 'HitZones'))) {
+      const copy = deepClone(zone);
+      copy.targetValueChannel = main;
+      copy.targetBehavior = ownBehavior;
+      copy.bounds = {
+        ...copy.bounds, unit: 'percent',
+        x: round((frame.x / artboard.width) * 100), y: round((frame.y / artboard.height) * 100),
+        width: round((frame.width / artboard.width) * 100), height: round((frame.height / artboard.height) * 100),
+      };
+      zones[name] = copy;
+      wired.hitZones.push(name);
+    }
+  }
   if (madeChannels.lamp && !channels.lamp) {
     channels.lamp = deepClone(madeChannels.lamp);
     wired.channels.push('lamp');

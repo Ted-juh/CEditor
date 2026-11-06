@@ -80,6 +80,8 @@
   import { arcHandleStyle, arcPointerAngle, drawnCentre, followDrawn, moveSnapped, pivotPlacement, screenBounds } from '../utils/surfaceTransforms.js';
   import { partTransform } from '../utils/bezierPath.js';
   import SurfaceToolStrip from './SurfaceToolStrip.svelte';
+  import { placeScene3dPart, followScene3dBoxes } from '../stores/scene3dActions.js';
+  import { scene3dOwner } from '../utils/scene3dMerge.js';
   import SurfaceQuickbar from './SurfaceQuickbar.svelte';
   import SurfaceBottomBar from './SurfaceBottomBar.svelte';
   import SurfacePalette from './SurfacePalette.svelte';
@@ -308,15 +310,17 @@
     return [...kits.values()];
   });
   let generatedSourceEntries = $derived.by(() => buildGeneratedSourceEntries());
+  // What a 3D part made is listed under it as its objects (SurfaceDockLayers), not layer by layer.
   let topLevelPartEntries = $derived(topDownPartEntries.filter(([, part]) => {
     const source = generatedSourceForNode(part);
-    return !isBooleanOperand(part) && !kitIdFor(part) && (!source || !isGeneratedSourceCollapsed(source));
+    return !isBooleanOperand(part) && !kitIdFor(part) && !scene3dOwner(part) && (!source || !isGeneratedSourceCollapsed(source));
   }));
   let dockHitZoneEntries = $derived(hitZoneEntries.filter(([, zone]) => {
     const source = generatedSourceForNode(zone);
     return !source || !isGeneratedSourceCollapsed(source);
   }));
-  let overlayPartEntries = $derived(allPartEntries.filter(([name, part]) => part?.visible !== false && (isBooleanOperand(part)
+  // A 3D part is picked, moved and resized by its own box; what it made has no box of its own here.
+  let overlayPartEntries = $derived(allPartEntries.filter(([name, part]) => part?.visible !== false && !scene3dOwner(part) && (isBooleanOperand(part)
     ? selectedLayerSet.has(name)
     : (!kitIdFor(part) || selectedLayerSet.has(name)))));
   let selectedKitEntry = $derived(kitEntries.find((entry) => entry.id === selectedKit) ?? null);
@@ -578,6 +582,8 @@
     { id: 'arcTrack', label: 'Arc', key: 'A' },
     { id: 'capsule', label: 'Capsule', key: 'C' },
     { id: 'hitZone', label: 'Hit Zone', key: 'H' },
+    // A knob CEditor renders from objects with a shape, a material and a motion (stores/scene3dActions.js).
+    { id: 'scene3d', label: '3D', key: '' },
     { id: 'interactive', label: 'Interactive', key: 'I' },
     { id: 'text', label: 'Text', key: 'T' },
     // Lines & polygons (drawn as SVG vector shapes via shapeGeometry).
@@ -1416,6 +1422,13 @@
 
   function commitDrawnFrame(tool, rect, event = null) {
     if (!core?.id || !rect) return;
+    if (tool === 'scene3d') {
+      const name = placeScene3dPart(core.id, rect);
+      if (name) { localSelectedLayerNames = [name]; revealDisplayDock('scene3d'); pulseSelection(`layer:${name}`); }
+      activeTool = 'select';
+      lastDrawCreatedAt = Date.now();
+      return;
+    }
     if (tool === 'interactive') {
       commitInteractiveDraw(rect);
       return;
@@ -1934,6 +1947,9 @@
     displayDockHidden = false;
     displayTabRequest.set({ tab });
   }
+
+  // A 3D part's box moved or resized: what it made follows it (stores/scene3dActions.js).
+  $effect(() => followScene3dBoxes(core?.id, authoredParts?._children));
 
   function openLayerColour(relativePath, currentValue) {
     if (!core?.id || !selectedLayer) return;
@@ -4081,6 +4097,7 @@
           </div>
           {#if dockTab === 'layers'}
           <SurfaceDockLayers
+            controlId={core?.id ?? ''}
             {topLevelPartEntries} {kitEntries} {generatedSourceEntries} {hitZoneEntries} {dockHitZoneEntries}
             {activeSelectionKind} {selectedLayer} {selectedLayerSet} {selectedKit} {selectedHitZone}
             {selectionPulseTarget} {draggingLayerName}
@@ -4558,6 +4575,8 @@
     border: 2px dashed #E5A029;
     border-radius: 3px;
   }
+
+  .surface-shell :global(.tool-icon.scene3d::before) { content: '3D'; position: absolute; inset: 0; color: #8FEDE3; font-size: 9.5px; font-weight: 800; line-height: 16px; text-align: center; }
 
   .surface-shell :global(.tool-icon.hitZone::after) {
     content: '';

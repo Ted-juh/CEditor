@@ -194,6 +194,7 @@ export function layerKindLabel(part) {
   // the badge, cut to "SLIDERC…".
   if (kind === SLIDER_CONTROL_KIND) return capitalised(carriedControlWord(part));
   const labels = {
+    scene3d: '3D',
     roundedRectangle: 'Rounded',
     rectangle: 'Rect',
     circle: 'Circle',
