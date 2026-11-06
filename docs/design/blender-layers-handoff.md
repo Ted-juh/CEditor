@@ -31,7 +31,9 @@ render, on any panel and at any angle, measured rather than judged by eye.
 - CI on this branch is started by hand (Actions › CI › Run workflow on the branch). Runs 525, 526
   and 527 were green; 528, on `aa902a74`, was running when this was written. Run 529, on
   `claude/new-session-ofvsj0` at `418c630` (the fixes, on/off Value From and the baker's blend
-  modes), was green in all four jobs, the Windows build and its C++ tests included.
+  modes), was green in all four jobs, the Windows build and its C++ tests included. Run 530, at
+  `986c9ce` (the light and gloss written, a part worked out again in its new colour), and run 531,
+  at `1cdb635` (the light a part throws on what is beside it), were green in all four jobs too.
 - Everything checked locally on `aa902a74`: the web suite 7574 of 7579 (none failing, 5 skipped),
   the 40 browser checks, lint, the add-on's test 50 of 50 (160 px) and 48 of 48 (the fixture's
   96 px), Blender 4.0.2. Since the fixes: the add-on's test 61 of 61 and 59 of 59, the browser
