@@ -1,11 +1,62 @@
 # Blender knob fixes: a picture layer's colour, and a value the panel sets
 
-Status, 2026-11-06: **designed, not built; waiting for the owner's approval.** The mock-ups are
+Status, 2026-11-06: **built.** The owner approved the recommendation on each question (keep the wash
+and add the colour beside it; a metal's reflections change with it; tag the layers; colour-set roles;
+option A, "Set by the panel"). The mock-ups are
 [`blender-knob-fixes-mockups.html`](blender-knob-fixes-mockups.html) (its pictures in
 `blender-knob-fixes/`). This answers defects 1 and 3 of the review in
 [`blender-layers-handoff.md`](blender-layers-handoff.md); defect 2 (the import notice counted the
 file's layers) is fixed: `buildArtworkComponent` returns the number of parts it made, and the test
-knob reads "A dial of 19 layers" (its file holds 49).
+knob reads "A dial of 19 layers" (its file holds 62, the 13 colour shares among them).
+
+## As built
+
+Where it differs from the design below, and what was measured.
+
+- **Where it lives.** `utils/pictureRecolour.js` (the pixels, the parts, what a layer is);
+  `CanvasControl.svelte` recolours before the outline mixing and the static baking, and passes the
+  outline-mixed picture on with its colour cleared (`withEdgeSources`); `InteractivePartRenderer`
+  recolours a part that reaches it unrecoloured (the Component Designer, its state sheets); the
+  filmstrip baker recolours before it draws. `withColourFollows` gives a follower its leader's colour
+  wherever parts are drawn. The decode is `linearEdges.js`'s, shared (`picturePixels`).
+- **A picture layer** is what `partMask.js` calls one: a picture with no fill under it. A shape with
+  a picture over its fill keeps its Fill.
+- **A picture with no drawn colour** (not imported from Photoshop) has it measured when it is drawn,
+  and for the dock's Drawn swatch; nothing is written until Pick from the picture.
+- **The add-on** writes `<name> colour share` (hidden, beside each colour layer whose share is not 1
+  throughout: the skirt, the cap and the pointer at each angle; the lamp's lens needs none) and
+  `<ceditor:colourOf>` in the XMP: a metal's highlights (`cap highlights=cap`) and a turning part's
+  reflection that falls mostly in a metal part (`pointer reflection=cap`), since that reflection is a
+  multiple of the light on the metal. A metal is a part whose covered pixels are mostly metal by its
+  passes.
+- **A metal's glint.** Light brighter than white was clipped before the split, so a silver cap's
+  highlights held only what filled its colour to white, and recoloured brass the glint went dark
+  (Blender keeps it near white). For a metal the highlights now hold the light past white up to a
+  whole white (`srgb_beyond`); shown, the two still add to white.
+- **The Lamp.** An on/off value has no Value From in the model (the flat list offers it for numbers
+  only), so its row says what it shows and how it starts (Off / On, the value's default); a number set
+  by the panel has Value From inline. The card's other rows use its words (value, behaviour, grab
+  area) and the full width.
+- **The dock** names a light layer in its header ("skirt_shading › light, no colour of its own") and
+  shows **Now** from the layer's stored colour, so a colour set by a script or a role shows too.
+
+**Measured** (`tools/blender/test_ceditor_layers.py`, against Blender rendering the knob with the
+material changed, at 160 px):
+
+| Recoloured | Mean | 99th percentile | Note |
+|---|---|---|---|
+| The skirt, pale grey to red | 6.8 | 12 | its edge 6.6 by its share, 9.0 in proportion |
+| The metal cap, silver to brass | 5.5 | 11 away from the glint | 8.0 with its reflections left as rendered; at the glint's centre the blue 52 short |
+
+Not to a level or two, unlike the knob as drawn: Blender adds a part's gloss to its colour in linear
+light and a browser in sRGB, and the gloss was measured on the colour as drawn, so a darker new
+colour's weak channels come out a few levels short (the red skirt's green and blue). No share can
+carry that: it depends on the new colour. And a glint more than a white beyond is more than a layer
+holds.
+
+Checked: the web suite, `browser-checks/pictureColour.mjs` (the Interact card; the skirt selected,
+its colour changed in the designer and on a panel, nothing beside it painted, back to as drawn; a
+light layer), the add-on's test 59 of 59 at 160 px and 57 of 57 at the fixture's 96 px.
 
 ## 1. A picture layer's colour
 
@@ -167,7 +218,7 @@ one unused), and the Blender import test: the Lamp is set by the panel, nothing 
    import by name (a skirt or body to Body, a cap to Knob / fader cap, a pointer to Marker).
 5. **The Lamp:** Option A (recommended) or B; the section's name; Value From inline in Simple mode.
 
-## Order of work, once approved
+## Order of work (as planned)
 
 1. `utils/pictureRecolour.js` and its tests; the properties; the draw path and the baker.
 2. The Colors dock target, the look bar, the light layers' link; a browser check.

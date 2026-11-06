@@ -1,9 +1,8 @@
 # Blender knobs in CEditor: where it stands
 
-Status, 2026-11-06: **built and measured; of the three defects found in review, the import notice is
-fixed, and the other two are designed with mock-ups waiting for the owner's approval**
-([`blender-knob-fixes-design.md`](blender-knob-fixes-design.md),
-[`blender-knob-fixes-mockups.html`](blender-knob-fixes-mockups.html)). Read this first in a fresh
+Status, 2026-11-06: **built and measured; the three defects found in review are fixed**, the two
+interface ones as approved from their mock-ups ([`blender-knob-fixes-design.md`](blender-knob-fixes-design.md),
+its *As built* section first; [`blender-knob-fixes-mockups.html`](blender-knob-fixes-mockups.html)). Read this first in a fresh
 session, then `CLAUDE.md`. The design record is
 [`changeable-control-sets.md`](changeable-control-sets.md) (section *Bringing designs in*); the user
 documentation is [`../panel-artwork-import.md`](../panel-artwork-import.md) (section *A knob modelled
@@ -21,8 +20,8 @@ render, on any panel and at any angle, measured rather than judged by eye.
 ## Branch and state
 
 - Work continues on branch `claude/new-session-ofvsj0`, which carries all of
-  `ccr-4944badf-4smz0y` (below) and, on top, the import notice's fix and the design and mock-ups
-  for defects 1 and 3.
+  `ccr-4944badf-4smz0y` (below) and, on top, the import notice's fix, the design and mock-ups for
+  defects 1 and 3, and their build.
 - Branch `ccr-4944badf-4smz0y`. `main` is at `87d0eedc` (the merge of changeable control sets);
   the branch carries, on top of it, `20a7382b` (the add-on), `bad257ce` (ignore `__pycache__`),
   `f1380d80` (made for the scene's panel; a turning part's shadow keeps its side), `a5fcc1cc` (the
@@ -33,7 +32,8 @@ render, on any panel and at any angle, measured rather than judged by eye.
   and 527 were green; 528, on `aa902a74`, was running when this was written.
 - Everything checked locally on `aa902a74`: the web suite 7574 of 7579 (none failing, 5 skipped),
   the 40 browser checks, lint, the add-on's test 50 of 50 (160 px) and 48 of 48 (the fixture's
-  96 px), Blender 4.0.2.
+  96 px), Blender 4.0.2. Since the fixes: the add-on's test 59 of 59 and 57 of 57, the browser
+  checks 41 (with `pictureColour`).
 
 ## What works, and how close it is
 
@@ -89,10 +89,12 @@ The pieces, and where they live:
 
 ## Defects found in review
 
-1. **Recolouring an imported picture layer does not work.** *Designed, waiting for approval:* a
-   colour per picture (`Fill.imageColour`, `Image.colour`) worked out on its pixels, exact for the
-   add-on's colour layers once it writes a colour share; the Colors dock and look bar edit it. See
-   `blender-knob-fixes-design.md`. The review's description: The manual says "change a part's colour
+1. **Fixed:** a colour per picture (`Fill.imageColour`, `Image.colour`) worked out on its pixels,
+   by the colour share the add-on now writes; a metal's highlights and the reflection in it follow
+   it; the look bar and the Colors dock edit it, light layers point to the layer they light, the
+   Layers list says Picture, Frames or Light. Against Blender with the material changed: the skirt red
+   a mean 6.8 levels, the cap brass 5.5 (see the design record for why not 1). The review's
+   description: The manual says "change a part's colour
    with its tint". A picture layer's tint (`Background.Fill.imageTint`) is drawn by `buildLayerStyle`
    (`utils/backgroundCSS.js`) as an inset box-shadow wash at 30 %, over the layer's whole box: set
    red on the skirt, it painted a red rectangle over the knob and the panel corners round it
@@ -112,9 +114,8 @@ The pieces, and where they live:
    component the designer shows as 21: `planPsdComponentImport` returns `layers: layers.length`
    before `framesFromAngles` folds each angle set into one part. Count the parts. Small; fix with a
    test (`test/blenderLayersImport.test.js` matches `A dial of \d+ layers`).
-3. *Designed, waiting for approval:* a section "Set by the panel" in the Interact card for values
-   something uses and nothing on the component moves (option A), or a reworded list (option B). The
-   review's description: **The dial's Lamp value is listed under "NOT WIRED UP"** in the Interact card ("no behavior drives
+3. **Fixed:** the Interact card lists such a value under "Set by the panel", with the layers it
+   shows and how it starts (Value From for a number). The review's description: **The dial's Lamp value is listed under "NOT WIRED UP"** in the Interact card ("no behavior drives
    it (fine for output-only values)"). True, since the panel sets it, but it reads as a fault. Wording
    or presentation; UI, so a mock-up first.
 
@@ -136,7 +137,12 @@ The pieces, and where they live:
 - An SVG drawn at several angles ("needle at 27" as vectors) still fades separate layers, which is
   inexact for shadows and multiplies.
 - The filmstrip baker (Assets › bake) ignores a part's blend mode altogether (predates this), so a
-  Blender knob bakes wrongly into a filmstrip.
+  Blender knob bakes wrongly into a filmstrip. It does recolour.
+- A part in another colour: a darker colour's weak channels come out a few levels short of Blender
+  where the part is glossy (its gloss was measured on the colour as drawn, and Blender adds it in
+  linear light); the light a part throws on the panel (`bounce`) and a shiny part's reflection of it
+  keep the colour as drawn; the centre of a metal's glint keeps less of the new colour's weakest
+  channel than Blender shows; a picture of several colours changes as a whole.
 
 ## Not verified
 
@@ -159,7 +165,7 @@ NODE_OPTIONS=--max-old-space-size=6144 npm run build
 CHROMIUM_PATH=/opt/pw-browsers/chromium npm run test:browser   # 40 checks, about 10 minutes
 ```
 
-Blender (`apt-get install -y blender` gives 4.0.2 if a fresh container has none):
+Blender (`apt-get install -y blender python3-numpy` gives 4.0.2 if a fresh container has none; Ubuntu's Blender runs on the system Python and finds no numpy without the second package):
 
 ```bash
 blender -b --factory-startup --python tools/blender/test_ceditor_layers.py -- /tmp/out             # 160 px, about 1.5 minutes
@@ -187,11 +193,10 @@ menu does.
 
 ## What next
 
-Once the owner has answered the questions in `blender-knob-fixes-design.md`, build defects 1 and 3
-in the order given there. Then, from the
-design record's order: Illustrator `.ai` through its PDF part (pdf.js) if Illustrator files are wanted
+From the design record's order: Illustrator `.ai` through its PDF part (pdf.js) if Illustrator files are wanted
 directly; a Figma plugin if Figma is; Level 3 (CEditor's own 3D parts, with piece E); Level 2 (glTF)
-when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; a
+when a shape only Blender can make is needed. Smaller, if wanted: frames per position for faders; the
+gloss of a recoloured part in linear light (its gloss written as a layer of its own); a
 lamp edge that holds on any panel; a CI job for the Blender test.
 
 ## The owner's working rules, beyond CLAUDE.md
