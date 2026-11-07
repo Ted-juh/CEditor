@@ -56,7 +56,7 @@
  * Pure and canvas-free, so node tests it exactly as the editor runs it.
  */
 
-import { adjustmentFunction, cmykToRgb, gradientRamp, inkPlaneColours, psdRgb, unappliedAdjustment, useCmykProfile } from './psdAdjustments.js';
+import { adjustmentFunction, cmykToRgb, gradientRamp, inkAdjustmentFunction, inkPlaneColours, labAdjustment, labPlaneColours, labToRgb, psdRgb, unappliedAdjustment, useCmykProfile } from './psdAdjustments.js';
 import { gradientField, patternSampler, scaleOf } from './psdVectors.js';
 import { blur } from './gaussianBlur.js';
 
@@ -419,7 +419,9 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
   // Type in an 8- or 16-bit file blends at Photoshop's "Blend Text Colors Using Gamma: 1.45", on by
   // default: both colours taken to linear light and to a 1.45 gamma there, blended, and back (the
   // PhotoCraft corpus's 50 type files: edge pixels to 0.05 of a level, where plain blending was 30 off).
-  const textGamma = Boolean(layer.text) && own && !inLinear && blend === 'normal' && !inTextless;
+  // In another blend mode, the blend is worked as ever and its result mixed in at the edge's share in
+  // that same space (PhotoCraft's text-on-gradient-blend-multiply.psd: 6.3 % of pixels off to none).
+  const textGamma = Boolean(layer.text) && own && !inLinear && !inTextless;
   for (let sy = 0; sy < src.height; sy += 1) {
     const y = top + sy;
     if (y < 0 || y >= height) continue;
@@ -437,6 +439,13 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
       if (through && sa > 0) sa *= through(sr, sg, sb, dst[d], dst[d + 1], dst[d + 2]);
       if (dissolve && sa > 0) sa = dissolveNoise(y * width + x) < sa ? 1 : 0;
       if (sa <= 0) continue;
+      if (textGamma && sa < 1 && dst[d + 3] > 0 && blend !== 'normal') {
+        const before = [dst[d], dst[d + 1], dst[d + 2], dst[d + 3]];
+        blendPixel(dst, d, sr, sg, sb, 1, blend, separable, nonSeparable);
+        for (let k = 0; k < 3; k += 1) dst[d + k] = fromTextSpace(toTextSpace(before[k]) + (toTextSpace(dst[d + k]) - toTextSpace(before[k])) * sa);
+        dst[d + 3] = before[3] + (1 - before[3]) * sa;
+        continue;
+      }
       if (textGamma && sa < 1 && dst[d + 3] > 0) {
         for (let k = 0; k < 3; k += 1) dst[d + k] = toTextSpace(dst[d + k]);
         blendPixel(dst, d, toTextSpace(sr), toTextSpace(sg), toTextSpace(sb), sa, blend, separable, nonSeparable);
@@ -679,6 +688,9 @@ function withOnly(effects, keys) {
   return out;
 }
 
+// The blurred shape below which a gradient Outer Glow fades out (drawCast).
+const GLOW_GRADIENT_FADE = 0.11;
+
 // Inside a group drawn on its own, a knockout reaches only its clear start.
 const CLEAR = Object.freeze({ shallow: null, deep: null });
 
@@ -708,7 +720,7 @@ export function compositePsd(layers, width, height, options = {}) {
     const linear = Boolean(options.linear);
     inLinear = linear;
     // (A Grayscale or CMYK file's type is blended plainly: not measured there.)
-    inTextless = Boolean(options.grey || options.cmyk || options.textGamma === false);
+    inTextless = Boolean(options.grey || options.cmyk || options.lab || options.textGamma === false);
     return compositeLayers(layers, width, height, { ...options, deep: options.deep ?? hasPrecise(layers), linear });
   } finally {
     inLinear = false;
@@ -731,7 +743,7 @@ let inTextless = false;
 
 const hasPrecise = (layers) => (layers ?? []).some((layer) => Boolean(layer.imageData?.precise) || hasPrecise(layer.children));
 
-function compositeLayers(layers, width, height, { skip = () => false, styles = null, grey = false, cmyk = false, deep = false, linear = false } = {}) {
+function compositeLayers(layers, width, height, { skip = () => false, styles = null, grey = false, cmyk = false, deep = false, linear = false, lab = false } = {}) {
   const notDrawn = { effects: [], adjustment: [] };
   // The styles drawn, by name; those only close to Photoshop's carry why after it, in brackets.
   const drawnStyles = new Set();
@@ -1024,11 +1036,14 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
           if (X < 0 || Y < 0 || X >= width || Y >= height) continue;
           const d = (Y * width + X) * 4;
           if (cast.ramp) {
-            // A glow along a gradient: its colour and its opacity both from the gradient, from the edge
-            // (the left end) out to where the glow ends (layer_params.psd: a faint far end shows to the
-            // Size and stops there).
+            // A glow along a gradient: its colour from the gradient, from the edge (the left end) out to
+            // where the glow ends, at the gradient's opacity there (layer_params.psd: a faint far end
+            // shows to the Size and stops there), and faded out where the blurred shape, before its
+            // Range and Contour, falls below 0.11 (PhotoCraft's outer-glow-gradient.psd: read pixel by
+            // pixel, full to there and then in proportion; 18 % of pixels off to 1.8).
             const [gr, gg, gb, ga] = cast.ramp(1 - a).map((v, k) => (k < 3 ? (linear ? toLight(v / 255) : v / 255) : v));
-            blendStylePixel(dst, d, gr, gg, gb, ga * cast.opacity * opacity, castMode, separable, nonSeparable);
+            const fade = cast.raw ? Math.min(1, cast.raw[y * cast.width + x] / GLOW_GRADIENT_FADE) : 1;
+            blendStylePixel(dst, d, gr, gg, gb, fade * ga * cast.opacity * opacity, castMode, separable, nonSeparable);
           } else blendStylePixel(dst, d, r, g, b, a * cast.opacity * opacity, castMode, separable, nonSeparable);
         }
       }
@@ -1120,7 +1135,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
    * clipped to), by its opacity and Fill and its masks, its result blended in its own blend mode.
    */
   const adjustBelow = (dst, layer, inherited, within = null) => {
-    const fn = adjustmentFunction(layer.adjustment, closeAdjustments, { grey, cmyk, deep, linear });
+    const fn = adjustmentFunction(layer.adjustment, closeAdjustments, { grey, cmyk, deep, linear, lab });
     if (!fn) {
       notDrawn.adjustment.push(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
       return;
@@ -1285,6 +1300,49 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
   };
 }
 
+/**
+ * A Lab file flattened on its own L, a and b, as Photoshop flattens it: Normal layers mixed on the stored
+ * values (a layer's opacity, its masks' and its edges' share mixing L, a and b each), the adjustments
+ * Photoshop works there on them (psdAdjustments.js labAdjustment), then made RGB. The layers need their
+ * stored values (utils/psdRead.js keeps them as `labPlanes`). As compositePsd, or null where the file has
+ * something this does not work on L, a and b (another blend mode, a layer style, another adjustment),
+ * which the RGB flattening draws instead.
+ */
+export function compositeLab(layers, width, height, options = {}) {
+  let stored = false;
+  const fits = (list) => (list ?? []).every((layer) => {
+    if (layer.hidden || options.skip?.(layer)) return true;
+    if (layer.labPlanes) stored = true;
+    const mode = String(layer.blendMode ?? 'normal');
+    if (mode !== 'normal' && !(mode === 'pass through' && layer.children)) return false;
+    if (hasEffects(layer)) return false;
+    if (layer.adjustment) return labAdjustment(layer.adjustment);
+    if (layer.imageData && !layer.labPlanes) return false;
+    return fits(layer.children);
+  });
+  const drawn = (list) => (list ?? []).some((layer) => !layer.hidden && !options.skip?.(layer) && (layer.vectorFill || drawn(layer.children)));
+  if (!fits(layers) || !(stored || drawn(layers))) return null;
+  const tree = (list) => (list ?? []).map((layer) => {
+    const out = { ...layer };
+    if (layer.children) out.children = tree(layer.children);
+    if (layer.labPlanes && layer.imageData) out.imageData = { ...layer.imageData, data: layer.labPlanes.lab, precise: layer.labPlanes.precise };
+    return out;
+  });
+  labPlaneColours(true);
+  let flat;
+  try {
+    flat = compositePsd(tree(layers), width, height, { ...options, lab: true, linear: false });
+  } finally {
+    labPlaneColours(false);
+  }
+  const pixels = new Uint8Array(flat.pixels.length);
+  for (let i = 0; i < pixels.length; i += 4) {
+    const [r, g, b] = labToRgb((flat.pixels[i] * 100) / 255, flat.pixels[i + 1] - 128, flat.pixels[i + 2] - 128);
+    pixels[i] = Math.round(r); pixels[i + 1] = Math.round(g); pixels[i + 2] = Math.round(b); pixels[i + 3] = flat.pixels[i + 3];
+  }
+  return { ...flat, pixels };
+}
+
 // The adjustments that change each ink on its own, which is all Photoshop does with them in CMYK.
 const INK_ADJUSTMENTS = new Set(['invert', 'posterize', 'levels', 'curves', 'brightness/contrast', 'hue/saturation', 'color balance']);
 // Of those, the ones Photoshop works on cyan, magenta and yellow as an RGB colour's complement (the
@@ -1295,36 +1353,35 @@ const CMY_ONLY = new Set(['hue/saturation', 'color balance']);
 /**
  * A CMYK file flattened on its inks, as Photoshop flattens it: its cyan, magenta and yellow and its
  * black each flattened on their own, the blend modes and adjustments working on the stored inks, then
- * made RGB as a press profile shows them (cmykToRgb). The layers need their inks (utils/psdRead.js
- * keeps them as `inkPlanes`). As compositePsd, or null where the file has something that works on
- * whole colours, not ink by ink (an adjustment such as Hue/Saturation or Threshold), which
- * the RGB flattening draws instead.
+ * made RGB as a press profile shows them (cmykToRgb); an adjustment that works on the four inks
+ * together, at the top of the file, on the flattened inks under it. The layers need their inks
+ * (utils/psdRead.js keeps them as `inkPlanes`); a file of fills alone gives its colours as inks. As
+ * compositePsd, or null where the file has something with no rule on the inks (a Photo Filter, or a
+ * whole-colour adjustment inside a group), which the RGB flattening draws instead.
  */
 export function compositeInks(layers, width, height, options = {}) {
-  // A Threshold at the top level of the file: what is under it flattened on the inks first, then each
-  // pixel white or black ink alone as its inks' plain RGB (255·(1 − ink)(1 − black)) weighs, which is
-  // how Photoshop judges a CMYK pixel there (threshold_cmyk.psd: 0.09% of pixels apart, where any
-  // profile's colours put 6-8% on the wrong side); the rest drawn on over that, on the inks.
-  const at = (layers ?? []).findIndex((layer) => !layer.hidden && !options.skip?.(layer) && layer.adjustment?.type === 'threshold');
+  // An adjustment that works on a pixel's four inks together (Threshold, Channel Mixer, Gradient Map,
+  // Selective Color, Colorize: psdAdjustments.js inkAdjustmentFunction), at the top level of the file:
+  // what is under it flattened on the inks first, then each pixel's inks through it, as Photoshop works
+  // it (threshold_cmyk.psd: 0.09% of pixels apart, where any profile's colours put 6-8% on the wrong
+  // side); the rest drawn on over that, on the inks.
+  const at = (layers ?? []).findIndex((layer) => !layer.hidden && !options.skip?.(layer) && inkAdjustmentFunction(layer.adjustment));
   if (at >= 0 && String(layers[at].blendMode ?? 'normal') === 'normal' && !layers[at].clipping) {
     const below = inkPlanesOf(layers.slice(0, at), width, height, options);
     if (!below) return null;
     const { cmy, k } = below;
-    const threshold = layers[at];
-    const level = threshold.adjustment.level ?? 128;
-    const mask = layerCoverage(threshold, width, height);
-    const opacity = (threshold.opacity ?? 1) * (threshold.fillOpacity ?? 1);
+    const layer = layers[at];
+    const fn = inkAdjustmentFunction(layer.adjustment);
+    const mask = layerCoverage(layer, width, height);
+    const opacity = (layer.opacity ?? 1) * (layer.fillOpacity ?? 1);
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         const i = (y * width + x) * 4;
         const strength = opacity * (mask ? mask(x, y) : 1);
         if (!(strength > 0) || cmy[i + 3] === 0) continue;
-        const white = 1 - (255 - k[i]) / 255;
-        const plain = [0, 1, 2].map((c) => 255 * (cmy[i + c] / 255) * white);
-        const light = Math.round(0.3 * plain[0] + 0.59 * plain[1] + 0.11 * plain[2]) >= level;
-        // White is no ink at all (255 stored); black is black ink alone.
-        for (let c = 0; c < 3; c += 1) cmy[i + c] += (255 - cmy[i + c]) * strength;
-        k[i] += ((light ? 255 : 0) - k[i]) * strength;
+        const inks = fn([1 - cmy[i] / 255, 1 - cmy[i + 1] / 255, 1 - cmy[i + 2] / 255, 1 - k[i] / 255]);
+        for (let c = 0; c < 3; c += 1) cmy[i + c] += (255 * (1 - inks[c]) - cmy[i + c]) * strength;
+        k[i] += (255 * (1 - inks[3]) - k[i]) * strength;
       }
     }
     const flat = { name: 'flattened', left: 0, top: 0, right: width, bottom: height, blendMode: 'normal', opacity: 1,
@@ -1359,7 +1416,9 @@ function inkPlanesOf(layers, width, height, options = {}) {
     // take the layer's, as Photoshop's CMYK test file shows.)
     return fits(layer.children);
   });
-  if (!fits(layers) || !inks) return null;
+  // (A file of fills alone works on the inks too: its colours given as inks, its gradients mixing them.)
+  const drawn = (list) => (list ?? []).some((layer) => !layer.hidden && !options.skip?.(layer) && (layer.vectorFill || drawn(layer.children)));
+  if (!fits(layers) || !(inks || drawn(layers))) return null;
   const tree = (list, plane) => (list ?? []).map((layer) => {
     const out = { ...layer };
     if (layer.children) out.children = tree(layer.children, plane);

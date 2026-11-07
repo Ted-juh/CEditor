@@ -387,32 +387,74 @@ points the other way (text.psd, above; masks.psb). As components: 81 / 11 / 12 /
 import hangs, throws or makes bad output: psd-tools' 948 imports as before, and all 258 of the new
 corpus's files import as components. CI run 543 (commit `d201a0f`) passed in all four jobs.
 
+## The ninth pass: what the eighth left
+
+| Left | Now |
+|---|---|
+| A Lab file's adjustments (lab8 and lab16, 11 of 12 files each over 10 %) | Flattened on the stored L, a and b where every layer allows it (Normal layers, these adjustments), as Photoshop works a Lab file: Invert, Posterize, Levels and Curves each channel (Levels' and Curves' first channel record is L's); Threshold, Brightness/Contrast and Gradient Map on L (the map's stops mixed on their stored values); Photo Filter multiplying the XYZ taken from L, a and b with no RGB between, Preserve Luminosity keeping L; Hue/Saturation turning a and b round a square, the larger of \|a\| and \|b\| its chroma and each side 45°, Saturation scaling that chroma by 1 / (1 − s) up to 127, Lightness on L alone; Colorize setting a and b at its Saturation, at its Hue measured from the corner where a and b are equal, rounded down to whole levels. Read pixel by pixel from the files: the square's turn is 40° to a twentieth of a degree for every colour, its scale 1.33. A 16-bit file's own picture read at full precision (a and b over 0..65280). All 24 files under 1 %, each at 0 % off, 0 to 1.1 levels on average |
+| A CMYK file's Channel Mixer, Gradient Map, Selective Color and Colorize (8-100 %) | Worked on the four inks together at the top of the file. Channel Mixer: each ink its percentages of the four and its constant, in ink, its records read in full (ag-psd drops each one's black source and the black output). Gradient Map: along the inks' plain Rec. 601 luma (PhotoCraft's measure for CMYK Threshold), the stops' four inks mixed as stored (the binary block keeps a CMYK stop as stored, 255 no ink). Selective Color: each range weighed on the plain complement as in RGB, its four percentages moving the four inks. Colorize: on the plain complement, separated plainly again, black first, cyan, magenta and yellow held together to 2.18 × (1 − K) under heavy black, as Photoshop's do past 75 % black. All eight files to 0 % |
+| A bevel's Gloss Contour (26-31 %) | The contour remaps the light's cosine as before, but the highlight and shadow are measured from the flat face's own cosine (the sine of the altitude), not the contour's value there: a contour that peaks there lights the flat face in full, as Photoshop's picture does. Ramp-peak 31 % to 0.3, double-ring 26 to 3.9 |
+| A bevel's Contour (13-15 %) | Over the bevel's own half of the blurred edge (an Inner Bevel's from the edge up), the whole depth high, by its Range, measured down from the top (ag-psd drops the Range: read from the descriptor). Ramp-peak 15 % to 2.9, double-ring at 70 % 13 to 6.1 |
+| An Outer Glow with a gradient (18 %) | Its colour along the gradient as before, and faded where the blurred shape, before Range and Contour, falls below 0.11: full to there and then in proportion, read pixel by pixel. 18 % to 1.8 |
+| A Smooth Stroke Emboss over an outside stroke (7.7 %), a centred Chisel one (8.7 %) | The shape bevelled as the stroke sits on it, lit on the stroke alone: an Outer Bevel under an outside stroke (its light grows towards the shape, as Photoshop's does), an Emboss under a centred one, an Inner Bevel under an inside one. 7.7 % to 0.3, 8.7 to 3.2; the Chisel outside ones 4.1 to 1.4 and 1.3 to 0.7 |
+| Smart filters with a filter mask (25-41 %) | The layer's pixels are the filters' result everywhere; Photoshop's picture mixes them with the smart object's own pixels, which it keeps in the file's 'FEid' cache, through the filter mask kept there too. A hard mask 39 % to 0, a stack 25 to 0, a gradient mask 41 to 3.2 |
+| Type in Multiply (6.3 %) | Blended as ever, then mixed in at its edge at the type gamma: 6.3 % to 0 |
+| Gradient Map's Smoothness | Never past either stop of a segment: every Gradient Map file a third closer (0.42 levels to 0.29 in RGB, 1.8 to 1.1 in Lab) |
+| psd-tools' 4 by 4 files (62-94 %) | Their colours: a CMYK or Lab file of fills alone now mixes its gradient's stops as inks or in Lab, and a 32-bit Grayscale file's stops, kept as ink, are linear light like its pixels (4x4_32bit_grayscale.psd 87.5 % to 56). Their angle stays (below) |
+
+Tried and not kept: the gradient's ends taken out to whole pixels, again: it draws all six 4 by 4
+files to 0 %, and the 146 gradient layers whose pixels Photoshop kept go from 0.84 % off to 17.8 when
+redrawn so (a Reflected 30° on 34 pixels among them), so it is not Photoshop's rule. For a CMYK Photo
+Filter: the RGB filter on the stored inks (7.9 levels), any filter colour fitted freely (6), the Lab
+filter through the profile (8); a multiply of the stored values with their luminosity kept fits the
+black-free colours to 0.2 of a level and not the rest. For the Lighter Color edges in a Pass Through
+group at 47 % Fill: two regimes, read pixel by pixel. Where the layer is the lighter, it goes in at
+its coverage times the Fill, as drawn. Where the backdrop is, Photoshop still moves the pixel about
+(0.55 − 0.45 α) of that way, which no reading of the group found here gives.
+
+**Measured: the panel flattening against Photoshop's own picture of the file.**
+
+| | Before | Now |
+|---|---|---|
+| PhotoCraft's corpus (258): under 1 % | 199 | 236 |
+| over 5 % | 44 | 3 |
+| over 20 % | 31 | 0 |
+| psd-tools' corpus (281): under 1 % | 265 | 265 |
+| over 5 % | 8 | 8 |
+| over 20 % | 7 | 7 |
+
+In PhotoCraft's corpus 46 files came closer and one moved the other way (a Chisel Pillow Emboss with
+both contours, 2.5 levels to 3.2 on average, its pixels off unchanged). In psd-tools' three came
+closer and three the other way: layer_params.psd and .psb, 0.06 of a level on average (their
+gradient glow), and 4x4_16bit_lab.psd by one pixel of sixteen (its stops now mixed in Lab, its angle
+still not Photoshop's).
+
 ## Left, and why
 
 - **An SVG filter that is lighting, turbulence or displacement**, or colours in SVG's default
   linearRGB, is a picture of its element, drawn right, edited as one.
 - **A Lab file** is converted plainly, and a CMYK file with a version 4 profile (or none) through the
   fit of the default press profile. A Multichannel file's display is Photoshop's model of inks, not
-  checked against a picture of one.
-- **Parts of layer styles not measured**: Soften, a Precise glow and a Noise gradient (its average
-  colour) are drawn by the same readings and named in the Console; a style's Noise and Jitter and a
-  bevel's Texture are not drawn. A bevel far larger than its shape
-  (layer_comps.psd, Size 100 on a face 160 px across) shades a little differently from the fitted
-  one (1.5 % of pixels; most of what was put down to it was its shadow's Linear Burn, above).
-- **Dissolve's grain** is random in Photoshop; its density is matched, its pixels cannot be.
-- **A Lab file's adjustments** work on RGB colours here, where Photoshop works Invert, Posterize,
-  Threshold, Brightness/Contrast, Gradient Map, Levels and Curves on L, a and b (PhotoCraft's corpus,
-  lab8 and lab16: 11 of 12 files each over 10 % off). A CMYK file's Channel Mixer, Gradient Map,
-  Photo Filter, Selective Color and Colorize likewise run on the inks in Photoshop and in RGB here
-  (8-100 %). Both need a channel path of their own, as CMYK's inks have.
+  checked against a picture of one. A Lab file with another blend mode, a layer style or an
+  adjustment Photoshop does not work on L, a and b is flattened in RGB.
+- **Parts of layer styles not measured**: Soften, a Precise glow, a Contour on a Chisel bevel or an
+  Emboss, and a Noise gradient (its average colour) are drawn by the same readings and named in the
+  Console; a style's Noise and Jitter and a bevel's Texture are not drawn. A bevel far larger than its
+  shape (layer_comps.psd, Size 100 on a face 160 px across) shades a little differently from the
+  fitted one (1.5 % of pixels).
+- **Random in Photoshop**: Dissolve's grain (its density is matched) and a Noise gradient
+  (effect-stroke-gradient.psd, 14 %), each from Photoshop's own random numbers. PhotoCraft draws its
+  own too; neither can match Photoshop's pixels without its generator.
+- **A CMYK Photo Filter** (16.6 %): on the inks in Photoshop, black kept exactly, by a rule not
+  found (above); drawn in RGB here.
 - **The rest of the flattening's differences**, each measured and none with a file that pins a
-  rule for it: a bevel's Gloss Contour and Contour (13-31 %; PhotoCraft has not found Photoshop's
-  rule either); a Smooth Stroke Emboss over an outside stroke (7.7 %), whose light varies along each
-  side over far more than its Size; an Outer Glow with a gradient (18 %); a Noise gradient on a
-  stroke (effect-stroke-gradient.psd, 14 %), Photoshop's random one; a Lighter Color layer's
-  half-transparent edge pixels in a Pass Through group below full Fill (4 %); a Reflected gradient
-  stroke, about a ninth longer in Photoshop than the box the linear ones are measured across
-  (effect-enums.psd); a Pillow Emboss's shading (layer_params.psd, 1.7 %); a stroke along a
-  polygon's slanting edge (shape-fx2.psd, 1.7 %); smart filters with a filter mask (25-41 %); and
-  gradients on very small boxes, whose angle Photoshop moves a few degrees off what the file says
-  (psd-tools' 34-pixel swatches; at 4 by 4 pixels, 30° drawn as 45°), by a rule not found.
+  rule for it: a Lighter Color layer's half-transparent edge pixels in a Pass Through group below
+  full Fill (4 %, above); a Reflected gradient stroke (effect-enums.psd, 1.4 %), which Photoshop
+  draws black for 6 pixels each side of its middle and then near straight to its ends, which neither
+  spline here fits closer than 11 levels; a Pillow Emboss's shading (layer_params.psd, 1.7 %); a
+  stroke along a polygon's slanting edge (shape-fx2.psd, 1.7 %); a smart filter's gradient mask
+  (3.2 %), where Photoshop's cache is transparent under part of the layer; the double-ring Contour
+  (6.1 %) and Gloss Contour (3.9 %); and gradients on very small boxes, whose angle Photoshop moves
+  off what the file says (at 4 by 4 pixels, 30° drawn as 45°: psd-tools' six 16- and 32-bit 4x4
+  files, 56-94 %, which carry no pixels of their gradient), by a rule not found: taking its ends to
+  whole pixels gives those and breaks 146 others.

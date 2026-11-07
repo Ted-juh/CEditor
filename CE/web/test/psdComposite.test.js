@@ -310,8 +310,13 @@ test('a CMYK file is flattened on its inks: an Invert inverts each ink, Black ha
   const dark = { ...layer, inkPlanes: ink([255, 255, 255], 0) };
   const lighter = compositeInks([dark, { name: 'Curves', adjustment: { type: 'curves', black: [{ input: 0, output: 128 }, { input: 255, output: 255 }] } }], 1, 1);
   near([...lighter.pixels], [...rgbOf([0, 0, 0, 1 - 128 / 255]), 255], 'black lightened, nothing else');
-  // An adjustment that works on whole colours cannot be drawn on inks: the RGB flattening draws it.
-  assert.equal(compositeInks([layer, { name: 'Colorize', adjustment: { type: 'hue/saturation', master: { a: 1 << 8, b: 30, c: 50, d: 0 } } }], 1, 1), null);
+  // Colorize is worked on the inks' plain complement and separated plainly again, black first: 20%
+  // cyan is 204, 255, 255, a lightness of 0.9; at 30° and 50% that is 0.95, 0.9, 0.85, which is no
+  // cyan, 5.3% magenta, 10.5% yellow and 5% black (PhotoCraft's cmyk hue-saturation-colorize.psd).
+  const colorized = compositeInks([layer, { name: 'Colorize', adjustment: { type: 'hue/saturation', master: { a: 1 << 8, b: 30, c: 50, d: 0 } } }], 1, 1);
+  near([...colorized.pixels], [...rgbOf([0, 0.05 / 0.95, 0.1 / 0.95, 0.05]), 255], 'colorized and separated');
+  // One that works on whole colours and has no rule on inks still goes to the RGB flattening.
+  assert.equal(compositeInks([layer, { name: 'Photo Filter', adjustment: { type: 'photo filter', color: { r: 236, g: 138, b: 0 }, density: 0.25 } }], 1, 1), null);
   // Hue/Saturation works on cyan, magenta and yellow as an RGB colour's complement, black kept: black
   // ink alone does not move when the hue turns (PhotoCraft's cmyk hue-saturation.psd), while 20% cyan
   // turns to another ink.
@@ -324,4 +329,50 @@ test('a CMYK file is flattened on its inks: an Invert inverts each ink, Black ha
   const at = (level) => [...compositeInks([layer, { name: 'Threshold', adjustment: { type: 'threshold', level } }], 1, 1).pixels];
   near(at(240), [255, 255, 255, 255], 'white: no ink');
   near(at(250), [...rgbOf([0, 0, 0, 1]), 255], 'black ink alone');
+});
+
+test('a Lab file is flattened on its stored L, a and b: Normal mixes them, adjustments work on them', async () => {
+  const { compositeLab } = await import('../src/CE_Application/utils/psdComposite.js');
+  const { labToRgb } = await import('../src/CE_Application/utils/psdAdjustments.js');
+  // Stored as Photoshop stores Lab (L 0..255, a and b offset by 128); the reader keeps them beside the
+  // colours as `labPlanes`.
+  const lab = (name, l, a, b, extra = {}) => ({ name, left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([0, 0, 0, 255]) },
+    labPlanes: { lab: new Uint8ClampedArray([l, a, b, 255]) }, ...extra });
+  const rgbOf = (l, a, b) => labToRgb((l * 100) / 255, a - 128, b - 128).map(Math.round);
+  // Inverted on L, a and b: a saturated colour, which its RGB would clip, keeps its own inverse.
+  const inverted = compositeLab([lab('red', 138, 209, 198), { name: 'Invert', adjustment: { type: 'invert' } }], 1, 1);
+  near([...inverted.pixels], [...rgbOf(117, 46, 57), 255], 'inverted');
+  // Normal at half opacity mixes the stored values: half way between two greys is the grey between.
+  const mixed = compositeLab([lab('dark', 50, 128, 128), lab('light', 150, 128, 128, { opacity: 0.5 })], 1, 1);
+  near([...mixed.pixels], [...rgbOf(100, 128, 128), 255], 'mixed on L');
+  // Another blend mode, or an adjustment Photoshop works on RGB there, goes to the RGB flattening.
+  assert.equal(compositeLab([lab('dark', 50, 128, 128), lab('top', 150, 128, 128, { blendMode: 'multiply' })], 1, 1), null);
+  assert.equal(compositeLab([lab('dark', 50, 128, 128), { name: 'Mixer', adjustment: { type: 'channel mixer' } }], 1, 1), null);
+});
+
+test('a CMYK file of fills alone is flattened on its inks too: a gradient mixes its stops as inks', async () => {
+  const { compositeInks } = await import('../src/CE_Application/utils/psdComposite.js');
+  const { cmykToRgb } = await import('../src/CE_Application/utils/psdAdjustments.js');
+  // psd-tools' 4x4_16bit_cmyk.psd: a Gradient Fill with no pixels. Half way between full cyan and full
+  // magenta is half of each, as Photoshop mixes them, not the RGB half way between their colours.
+  const fill = { name: 'Gradient Fill', left: 0, top: 0, right: 0, bottom: 0, blendMode: 'normal', opacity: 1, vectorFill: { type: 'solid', style: 'linear', angle: 0, smoothness: 0,
+    colorStops: [{ location: 0, color: { c: 100, m: 0, y: 0, k: 0 } }, { location: 1, color: { c: 0, m: 100, y: 0, k: 0 } }], opacityStops: [{ location: 0, opacity: 1 }, { location: 1, opacity: 1 }] } };
+  const flat = compositeInks([fill], 2, 1);
+  assert.ok(flat, 'drawn on the inks');
+  // Fills are worked at whole pixel coordinates: the second pixel is half way across.
+  near([...flat.pixels.slice(0, 4)], [...cmykToRgb(1, 0, 0, 0).map(Math.round), 255], 'the first stop');
+  near([...flat.pixels.slice(4, 8)], [...cmykToRgb(0.5, 0.5, 0, 0).map(Math.round), 255], 'half of each ink');
+});
+
+test('type in another blend mode: the blend worked as ever, mixed in at its edge in type\'s space', () => {
+  // Grey 200 under a Multiply type pixel of grey 100 at half coverage: Multiply gives 78.4, mixed half
+  // way with 200 in linear light at a 1.45 gamma (PhotoCraft's text-on-gradient-blend-multiply.psd).
+  const toLight = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+  const fromLight = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+  const space = (v) => toLight(v / 255) ** (1 / 1.45);
+  const back = (t) => 255 * fromLight(t ** 1.45);
+  const multiplied = (200 * 100) / 255;
+  const want = back(space(200) + (space(multiplied) - space(200)) * (128 / 255));
+  const { at } = flatten([solid('under', 0, 0, 1, 1, grey(200)), solid('type', 0, 0, 1, 1, [100, 100, 100, 128], { text: { text: 'A' }, blendMode: 'multiply' })], 1, 1);
+  assert.ok(Math.abs(at(0)[0] - want) <= 1, `${at(0)} vs ${want}`);
 });

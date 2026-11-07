@@ -31,7 +31,7 @@
 import { convertedNotice, readPhotoshop } from './psdRead.js';
 import { PLACEHOLDER_LAYER_NAMES, ROLE_CONTROL_TYPES, colourRole, roleFromName } from './svgPanelImport.js';
 import { pngDataUrl } from './pngEncode.js';
-import { compositeInks, compositePsd } from './psdComposite.js';
+import { compositeInks, compositeLab, compositePsd } from './psdComposite.js';
 import { LAYER_STYLES } from './psdLayerStyles.js';
 
 function isGroup(layer) {
@@ -148,10 +148,12 @@ export function planPsdPanelImport(bytes) {
 
   // The artwork: every other visible layer, flattened as Photoshop would (ag-psd lists children
   // bottom first, which is the order they are drawn in).
-  // A CMYK file on its inks, as Photoshop flattens it, where everything in it works ink by ink.
+  // A CMYK file on its inks, as Photoshop flattens it, where everything in it works ink by ink; a Lab
+  // file likewise on its stored L, a and b.
   // (A 32-bit file put together in linear light, as Photoshop works one: utils/psdComposite.js.)
   const options = { skip: (layer) => layer === group, styles: LAYER_STYLES, grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK', cmykProfile: psd.cmykProfile, linear: psd.bitsPerChannel === 32 };
-  const onInks = read.converted === 'CMYK' ? compositeInks(psd.children, width, height, options) : null;
+  const onInks = read.converted === 'CMYK' ? compositeInks(psd.children, width, height, options)
+    : read.converted === 'Lab' ? compositeLab(psd.children, width, height, options) : null;
   const { pixels, painted, notDrawn, closeTo, dissolve } = onInks ?? compositePsd(psd.children, width, height, options);
 
   const warnings = [];

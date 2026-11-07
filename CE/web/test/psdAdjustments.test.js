@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { writePsdUint8Array } from 'ag-psd';
 import { inflateSync } from 'node:zlib';
-import { adjustmentFunction, readLookupTable, unappliedAdjustment } from '../src/CE_Application/utils/psdAdjustments.js';
+import { adjustmentFunction, gradientRamp, inkAdjustmentFunction, labAdjustment, readLookupTable, unappliedAdjustment } from '../src/CE_Application/utils/psdAdjustments.js';
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 
 const near = (actual, expected, tolerance, message) => {
@@ -228,4 +228,54 @@ test('Posterize, Levels and Curves draw as Photoshop draws them', () => {
   const curves = adjustmentFunction({ type: 'curves', rgb: [{ input: 0, output: 0 }, { input: 200, output: 255 }],
     red: [{ input: 49, output: 60 }, { input: 94, output: 218 }, { input: 102, output: 0 }, { input: 185, output: 229 }, { input: 195, output: 36 }] });
   assert.ok(Math.abs(curves([47, 0, 0])[0] - 76) <= 1, `${curves([47, 0, 0])[0]}`);
+});
+
+test('A Lab file\'s adjustments work on its stored L, a and b, as Photoshop works them there', () => {
+  // Stored as Photoshop stores Lab: L 0..255 for 0..100, a and b offset by 128. Each expected value is
+  // Photoshop's own, read from PhotoCraft's corpus (lab8: hue-saturation, -colorize, photo-filter).
+  const lab = (adjustment) => adjustmentFunction(adjustment, new Set(), { lab: true });
+  // Invert each channel; Threshold on L, to neutral; Levels' first channel record is L's.
+  assert.deepEqual(lab({ type: 'invert' })([138, 209, 198]), [117, 46, 57]);
+  assert.deepEqual(lab({ type: 'threshold', level: 128 })([143, 30, 220]), [255, 128, 128]);
+  near(lab({ type: 'levels', red: { shadowInput: 15, highlightInput: 230, shadowOutput: 10, highlightOutput: 245, midtoneInput: 1.3 } })([138, 209, 198]), [163, 209, 198], 1, 'Levels on L');
+  // Hue/Saturation turns a and b round a square (40° here) and scales the larger of |a| and |b| by
+  // 1 / (1 − 0.25), Lightness on L alone.
+  const hue = lab({ type: 'hue/saturation', master: { a: 0, b: 0, c: 25, d: 0, hue: 40, saturation: 25, lightness: -10 } });
+  near(hue([138, 209, 198]), [124, 155, 236], 1, 'turned');
+  near(hue([194, 155, 207]), [175, 72, 233], 2, 'turned');
+  near(hue([143, 128, 128]), [129, 128, 128], 1, 'a grey only darkened');
+  // Colorize sets a and b at its Saturation, at its Hue measured from the a = b corner.
+  const colorize = lab({ type: 'hue/saturation', master: { a: 256, b: -160, c: 40, d: 5 } });
+  near(colorize([138, 209, 198]), [144, 105, 88], 1, 'colorized');
+  // Photo Filter multiplies XYZ taken from L, a and b; Preserve Luminosity keeps L.
+  const filter = lab({ type: 'photo filter', color: { l: 67.19, a: 33.14, b: 72.79 }, density: 0.4, preserveLuminosity: true });
+  near(filter([143, 128, 128]), [143, 134, 135], 1, 'a grey warmed');
+  near(filter([138, 209, 198]), [138, 208, 194], 1, 'a red warmed');
+  // What Photoshop does not work on L, a and b is left to the RGB flattening.
+  assert.equal(labAdjustment({ type: 'channel mixer' }), false);
+  assert.equal(labAdjustment({ type: 'hue/saturation', master: { hue: 10 }, reds: { hue: 5 } }), false, 'colour ranges');
+});
+
+test('A CMYK file\'s Channel Mixer, Gradient Map, Selective Color and Colorize work on the four inks together', () => {
+  // Channel Mixer: each ink its percentages of the four, and its constant, in ink (inks 0..1).
+  const mixer = inkAdjustmentFunction({ type: 'channel mixer', inks: [[80, 30, -10, 0, 0], [10, 90, 0, 0, 5], [0, 20, 70, 0, 0], [0, 0, 0, 0, 0]] });
+  near(mixer([0.5, 0.2, 0.4, 0.3]), [0.42, 0.28, 0.32, 0], 1e-9, 'mixed');
+  // Gradient Map: along the inks' plain luma, the stops' four inks.
+  const map = inkAdjustmentFunction({ type: 'gradient map', colorStops: [{ location: 0, color: { c: 0, m: 0, y: 0, k: 100 } }, { location: 1, color: { c: 0, m: 0, y: 0, k: 0 } }], smoothness: 0 });
+  near(map([0, 0, 0, 0]), [0, 0, 0, 0], 1e-6, 'paper stays paper');
+  near(map([0, 0, 0, 1]), [0, 0, 0, 1], 1e-6, 'black stays black');
+  near(map([0, 0, 0, 0.5]), [0, 0, 0, 0.5], 0.01, 'half black, half way');
+  // Selective Color: a range's four percentages move the four inks, Relative by the ink there.
+  const selectiveInks = inkAdjustmentFunction(selective('relative', { reds: { c: -30, m: 10, y: 0, k: 0 } }));
+  near(selectiveInks([0, 1, 1, 0]), [0, 1, 1, 0], 1e-9, 'red: no cyan to take, magenta full');
+  near(selectiveInks([0.2, 0.8, 0.8, 0]), [0.2 - 0.06 * 0.6, 0.8 + 0.08 * 0.6, 0.8, 0], 1e-6, 'a red weighed in reds by 0.6');
+  // An adjustment without a rule on inks has none here.
+  assert.equal(inkAdjustmentFunction({ type: 'photo filter' }), null);
+});
+
+test('A gradient\'s Smoothness never takes a colour past either stop of its segment', () => {
+  // Three stops, the last two nearly alike: the spline through them would overshoot the last.
+  const ramp = gradientRamp({ smoothness: 1, colorStops: [
+    { location: 0, color: { r: 0, g: 0, b: 0 } }, { location: 0.5, color: { r: 200, g: 200, b: 200 } }, { location: 1, color: { r: 205, g: 205, b: 205 } }] });
+  for (let t = 0.5; t <= 1; t += 0.05) assert.ok(ramp(t)[0] <= 205 + 1e-9 && ramp(t)[0] >= 200 - 1e-9, `${t}: ${ramp(t)[0]}`);
 });

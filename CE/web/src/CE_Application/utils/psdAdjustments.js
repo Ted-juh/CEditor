@@ -47,6 +47,14 @@ export function inkPlaneColours(plane) {
   inkPlane = plane;
 }
 
+// While a Lab file is flattened on its own channels (utils/psdComposite.js compositeLab), colours are
+// its stored L, a and b: L 0..255 for 0..100, a and b offset by 128.
+let labPlane = false;
+/** Colours as a Lab file's stored L, a and b (true), or as RGB again (false). */
+export function labPlaneColours(on) {
+  labPlane = Boolean(on);
+}
+
 /**
  * Where a gradient's stops run to: ag-psd gives them 0..1 (the file's 0..4096 divided out); 4096 for
  * stops given as the file writes them; and a newer Photoshop's, written in another unit (0 to 2.5),
@@ -115,7 +123,8 @@ export function gradientRamp(content, { mirrored = false } = {}) {
     });
     const single = !Array.isArray(value(stops[0]));
     return (u) => {
-      if (u <= at(stops[0])) return value(stops[0]);
+      // (Each stop's value as read when the ramp was made: a CMYK file's ink planes are set only then.)
+      if (u <= at(stops[0])) return single ? values[0][0] : values[0];
       for (let i = 1; i < n; i += 1) {
         const a = stops[i - 1];
         const b = stops[i];
@@ -124,7 +133,7 @@ export function gradientRamp(content, { mirrored = false } = {}) {
         let k = (u - at(a)) / dx;
         const m = Number(b.midpoint ?? 0.5);
         k = k < m ? (0.5 * k) / Math.max(1e-9, m) : 0.5 + (0.5 * (k - m)) / Math.max(1e-9, 1 - m);
-        if (!(smooth > 0)) return mix(value(a), value(b), k);
+        if (!(smooth > 0)) return single ? mix(values[i - 1][0], values[i][0], k) : mix(values[i - 1], values[i], k);
         const va = values[i - 1]; const vb = values[i];
         const slope = (stop, c, secant) => (slopes[stop]
           ? (1 - smooth) * secant + smooth * slopes[stop][c] * dx
@@ -132,12 +141,15 @@ export function gradientRamp(content, { mirrored = false } = {}) {
         const k2 = k * k; const k3 = k2 * k;
         const out = va.map((v, c) => {
           const secant = vb[c] - v;
-          return (2 * k3 - 3 * k2 + 1) * v + (k3 - 2 * k2 + k) * slope(i - 1, c, secant)
+          const y = (2 * k3 - 3 * k2 + 1) * v + (k3 - 2 * k2 + k) * slope(i - 1, c, secant)
             + (-2 * k3 + 3 * k2) * vb[c] + (k3 - k2) * slope(i, c, secant);
+          // (Never past either stop of its segment: Photoshop's spline does not overshoot, PhotoCraft's
+          // gradient-map.psd in every mode, a third closer on average.)
+          return Math.max(Math.min(v, vb[c]), Math.min(Math.max(v, vb[c]), y));
         });
         return single ? out[0] : out;
       }
-      return value(stops[n - 1]);
+      return single ? values[n - 1][0] : values[n - 1];
     };
   };
   const lerp = (a, b, k) => a + (b - a) * k;
@@ -163,6 +175,7 @@ export function gradientRamp(content, { mirrored = false } = {}) {
 /** Photoshop's colour objects as 0..255 RGB (or, while flattening on inks, as the plane's inks). */
 export function psdRgb(color) {
   if (inkPlane) return inksOf(color, inkPlane);
+  if (labPlane) return labStoredOf(color);
   if (!color || typeof color !== 'object') return [0, 0, 0];
   if (Number.isFinite(color.r)) return [color.r, color.g, color.b];
   if (Number.isFinite(color.fr)) return [color.fr * 255, color.fg * 255, color.fb * 255];
@@ -213,6 +226,42 @@ export function labToRgb(l, a, b) {
     const v = Math.max(0, Math.min(1, c));
     return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
   });
+}
+
+/** sRGB (0..255) to Lab (L 0..100, a and b about 0), white D50, as labToRgb's inverse. */
+export function rgbToLab(r, g, b) {
+  return xyzToLab(times(SRGB_TO_XYZ_D50, [r, g, b].map((v) => toLinear(clamp(v)))));
+}
+
+const LAB_E = 216 / 24389;
+const LAB_K = 24389 / 27;
+const labF = (t) => (t > LAB_E ? Math.cbrt(t) : (LAB_K * t + 16) / 116);
+const labFInverse = (t) => (t ** 3 > LAB_E ? t ** 3 : (116 * t - 16) / LAB_K);
+function xyzToLab([x, y, z]) {
+  const fx = labF(x / WHITE_D50[0]); const fy = labF(y / WHITE_D50[1]); const fz = labF(z / WHITE_D50[2]);
+  return [116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz)];
+}
+/** A Lab file's stored L, a, b (L 0..255, a and b offset by 128) to D50 XYZ, and back. */
+function storedToXyz([l, a, b]) {
+  const fy = ((l * 100) / 255 + 16) / 116;
+  return [WHITE_D50[0] * labFInverse(fy + (a - 128) / 500), WHITE_D50[1] * labFInverse(fy), WHITE_D50[2] * labFInverse(fy - (b - 128) / 200)];
+}
+function xyzToStored(xyz) {
+  const [l, a, b] = xyzToLab(xyz);
+  return [(l * 255) / 100, a + 128, b + 128];
+}
+
+/** A colour as a Lab file stores it: given in Lab, its own; otherwise its RGB taken to Lab. */
+function labStoredOf(color) {
+  if (color && Number.isFinite(color.l) && Number.isFinite(color.a)) return [color.l * 2.55, color.a + 128, color.b + 128];
+  const previous = labPlane;
+  labPlane = false;
+  try {
+    const [l, a, b] = rgbToLab(...psdRgb(color));
+    return [l * 2.55, a + 128, b + 128];
+  } finally {
+    labPlane = previous;
+  }
 }
 
 function hsbToRgb(h, s, v) {
@@ -334,26 +383,31 @@ const SELECTIVE_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magent
  * far as its highest is under half, in neutrals as far as it is neither. Relative scales the change
  * by the ink already there, so it cannot tint pure white; Absolute adds it outright.
  */
+/** How far a colour (0..1) is in each of Selective Color's ranges. */
+function selectiveWeights(rgb) {
+  const max = Math.max(...rgb);
+  const min = Math.min(...rgb);
+  const mid = rgb[0] + rgb[1] + rgb[2] - max - min;
+  return {
+    reds: rgb[0] === max ? max - mid : 0,
+    greens: rgb[1] === max ? max - mid : 0,
+    blues: rgb[2] === max ? max - mid : 0,
+    cyans: rgb[0] === min ? mid - min : 0,
+    magentas: rgb[1] === min ? mid - min : 0,
+    yellows: rgb[2] === min ? mid - min : 0,
+    whites: min > 0.5 ? (min - 0.5) * 2 : 0,
+    blacks: max < 0.5 ? (0.5 - max) * 2 : 0,
+    neutrals: 1 - (Math.abs(max - 0.5) + Math.abs(min - 0.5)),
+  };
+}
+
 function selectiveColour(adjustment) {
   const relative = adjustment.mode !== 'absolute';
   const ranges = SELECTIVE_RANGES.map((name) => [name, adjustment[name]])
     .filter(([, cmyk]) => cmyk && (cmyk.c || cmyk.m || cmyk.y || cmyk.k));
   return ([r, g, b]) => {
     const rgb = [r / 255, g / 255, b / 255];
-    const max = Math.max(...rgb);
-    const min = Math.min(...rgb);
-    const mid = rgb[0] + rgb[1] + rgb[2] - max - min;
-    const weight = {
-      reds: rgb[0] === max ? max - mid : 0,
-      greens: rgb[1] === max ? max - mid : 0,
-      blues: rgb[2] === max ? max - mid : 0,
-      cyans: rgb[0] === min ? mid - min : 0,
-      magentas: rgb[1] === min ? mid - min : 0,
-      yellows: rgb[2] === min ? mid - min : 0,
-      whites: min > 0.5 ? (min - 0.5) * 2 : 0,
-      blacks: max < 0.5 ? (0.5 - max) * 2 : 0,
-      neutrals: 1 - (Math.abs(max - 0.5) + Math.abs(min - 0.5)),
-    };
+    const weight = selectiveWeights(rgb);
     const out = [...rgb];
     for (const [name, cmyk] of ranges) {
       const w = weight[name];
@@ -749,7 +803,196 @@ function vibranceLinear(c, v) {
  * The adjustment as `([r, g, b]) => [r, g, b]` (0..255), or null when it is one this does not do.
  * `report` (a Set) collects what was only approximated.
  */
-export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false, deep = false, linear = false } = {}) {
+const INK_UNDER_BLACK = 2.18;
+/** The Rec. 601 luma of CMYK inks' plain complement, (1 − c)(1 − k) and so on (inks 0..1), 0..1. */
+const inkLuma = ([c, m, y, k]) => (0.299 * (1 - c) + 0.587 * (1 - m) + 0.114 * (1 - y)) * (1 - k);
+
+/**
+ * An adjustment Photoshop works on a CMYK pixel's four inks together, as a function of them (each 0..1,
+ * 0 none) to the new inks; null for any other. Measured on PhotoCraft's corpus (cmyk8 and cmyk16, within
+ * a level or two):
+ * - Threshold: white (no ink) or black ink alone, split on the inks' plain luma (inkLuma).
+ * - Channel Mixer: each ink the given percentages of the four (and its constant), in ink; its records
+ *   read by utils/psdRead.js as `inks` (cyan, magenta, yellow, black outputs: C, M, Y, K, constant).
+ * - Gradient Map: along the plain luma, the stops' four inks mixed on their stored values.
+ * - Selective Color: each range weighted on the plain complement as in RGB, its four percentages moving
+ *   the four inks (Relative: by the ink already there).
+ * - Hue/Saturation's Colorize: on the plain complement, then separated plainly again, black first.
+ */
+export function inkAdjustmentFunction(adjustment) {
+  const type = adjustment?.type;
+  const plainOf = ([c, m, y, k]) => [c, m, y].map((v) => (1 - v) * (1 - k));
+  switch (type) {
+    case 'threshold': {
+      const level = adjustment.level ?? 128;
+      return (inks) => {
+        const p = plainOf(inks).map((v) => 255 * v);
+        return Math.round(0.3 * p[0] + 0.59 * p[1] + 0.11 * p[2]) >= level ? [0, 0, 0, 0] : [0, 0, 0, 1];
+      };
+    }
+    case 'channel mixer': {
+      const records = adjustment.inks;
+      if (!Array.isArray(records) || records.length < 4 || adjustment.monochrome) return null;
+      return (inks) => records.slice(0, 4).map((r) => unit(inks.reduce((sum, v, j) => sum + ((r[j] ?? 0) / 100) * v, 0) + (r[4] ?? 0) / 100));
+    }
+    case 'gradient map': {
+      const previous = inkPlane;
+      let cmy; let black;
+      try {
+        inkPlane = 'cmy'; cmy = gradientRamp(adjustment);
+        inkPlane = 'k'; black = gradientRamp(adjustment);
+      } finally {
+        inkPlane = previous;
+      }
+      return (inks) => {
+        const t = adjustment.reverse ? 1 - inkLuma(inks) : inkLuma(inks);
+        const stored = [...cmy(t).slice(0, 3), black(t)[0]];
+        return stored.map((v) => 1 - v / 255);
+      };
+    }
+    case 'selective color': {
+      const relative = adjustment.mode !== 'absolute';
+      const ranges = SELECTIVE_RANGES.map((name) => [name, adjustment[name]]).filter(([, r]) => r && (r.c || r.m || r.y || r.k));
+      return (inks) => {
+        const weight = selectiveWeights(plainOf(inks));
+        const out = [...inks];
+        for (const [name, range] of ranges) {
+          const w = weight[name];
+          if (!(w > 0)) continue;
+          [range.c, range.m, range.y, range.k].forEach((percent, i) => {
+            const change = ((percent ?? 0) / 100) * (relative ? inks[i] : 1);
+            out[i] += Math.min(1 - inks[i], Math.max(-inks[i], change)) * w;
+          });
+        }
+        return out.map(unit);
+      };
+    }
+    case 'hue/saturation': {
+      if (!adjustment.master?.a) return null;
+      const fn = adjustmentFunction(adjustment);
+      return (inks) => {
+        const [r, g, b] = fn(plainOf(inks).map((v) => 255 * v)).map((v) => unit(v / 255));
+        const k = 1 - Math.max(r, g, b);
+        if (k >= 1) return [0, 0, 0, 1];
+        // Under heavy black, cyan, magenta and yellow held together to at most 2.18 × what the black
+        // leaves (Photoshop's colours past 75 % black, to a level or two).
+        const colour = [r, g, b].map((v) => (1 - v - k) / (1 - k));
+        const most = Math.max(...colour);
+        const scale = most > 0 ? Math.min(1, (INK_UNDER_BLACK * (1 - k)) / most) : 1;
+        return [...colour.map((v) => v * scale), k];
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+// The adjustments a Lab file works on its own L, a and b (labAdjustmentFunction); any other is drawn on
+// its RGB colours instead.
+const LAB_ADJUSTMENTS = new Set(['invert', 'posterize', 'threshold', 'brightness/contrast', 'levels', 'curves', 'gradient map', 'hue/saturation', 'photo filter']);
+
+/** Whether a Lab file's flattening works `adjustment` on its stored L, a and b (compositeLab). */
+export function labAdjustment(adjustment) {
+  if (!LAB_ADJUSTMENTS.has(adjustment?.type)) return false;
+  // (Hue/Saturation's colour ranges are not measured in a Lab file.)
+  if (adjustment.type === 'hue/saturation' && !adjustment.master?.a) {
+    return HUE_RANGES.every((name) => { const r = adjustment[name]; return !r || !(r.hue || r.saturation || r.lightness); });
+  }
+  return true;
+}
+
+/**
+ * A Lab colour's chroma about neutral as Photoshop's Hue/Saturation measures it in a Lab file: the larger
+ * of |a| and |b|, and its hue as the way round that square, 0..8 from +a towards +b (each side 45°).
+ */
+function squareOf(a, b) {
+  const m = Math.max(Math.abs(a), Math.abs(b));
+  if (!(m > 0)) return [0, 0];
+  const x = a / m; const y = b / m;
+  let s;
+  if (Math.abs(a) >= Math.abs(b)) s = a > 0 ? y : 4 - y;
+  else s = b > 0 ? 2 - x : 6 + x;
+  return [m, ((s % 8) + 8) % 8];
+}
+function fromSquare(m, s) {
+  const t = ((s % 8) + 8) % 8;
+  const [x, y] = t < 1 ? [1, t] : t < 3 ? [2 - t, 1] : t < 5 ? [-1, 4 - t] : t < 7 ? [t - 6, -1] : [1, t - 8];
+  return [m * x, m * y];
+}
+
+/**
+ * An adjustment on a Lab file's stored L, a and b (L 0..255, a and b offset by 128), as Photoshop works
+ * one there (PhotoCraft's corpus, lab8 and lab16: each within a level or two of Photoshop's pictures).
+ * Invert, Posterize, Levels and Curves work each channel (Levels' and Curves' first channel record is
+ * L's, the next two a's and b's); Threshold, Brightness/Contrast and Gradient Map work on L; Photo
+ * Filter multiplies the colour's XYZ, taken from L, a and b without an RGB between; Hue/Saturation turns
+ * a and b round a square and scales them (squareOf). Null for any other (labAdjustment).
+ */
+function labAdjustmentFunction(adjustment, report, { deep = false } = {}) {
+  const type = adjustment?.type;
+  const lighten = (light) => (l) => (light >= 0 ? l + (255 - l) * light : l * (1 + light));
+  switch (type) {
+    case 'invert':
+      // A 16-bit file mirrors a and b about neutral exactly (PhotoCraft's lab16 invert.psd).
+      return deep ? ([l, a, b]) => [255 - l, 256 - a, 256 - b] : ([l, a, b]) => [255 - l, 255 - a, 255 - b];
+    case 'posterize':
+    case 'levels':
+    case 'curves':
+      // Each channel on its own, as the RGB ones work R, G and B: Levels' and Curves' records for the
+      // three channels (their first, the composite, is not used in Lab).
+      if (type === 'posterize') return adjustmentFunction(adjustment, report, { deep });
+      return adjustmentFunction({ ...adjustment, rgb: undefined }, report, { deep });
+    case 'threshold': {
+      const level = adjustment.level ?? 128;
+      return ([l]) => (Math.round(l) >= level ? [255, 128, 128] : [0, 128, 128]);
+    }
+    case 'brightness/contrast': {
+      const fn = adjustmentFunction(adjustment, report, { deep });
+      return ([l, a, b]) => [fn([l, l, l])[0], a, b];
+    }
+    case 'gradient map': {
+      // Along L, the stops mixed on their stored values (labPlaneColours).
+      const ramp = gradientRamp(adjustment);
+      return ([l]) => ramp(adjustment.reverse ? 1 - l / 255 : l / 255).slice(0, 3);
+    }
+    case 'photo filter': {
+      const raw = Number(adjustment.density ?? 0.25);
+      const d = unitClamp(raw > 1 ? raw / 100 : raw);
+      const filter = storedToXyz(labStoredOf(adjustment.color));
+      const scale = filter.map((v, i) => 1 - d + (d * v) / WHITE_D50[i]);
+      const preserve = adjustment.preserveLuminosity !== false;
+      return (lab) => {
+        const out = xyzToStored(storedToXyz(lab).map((v, i) => v * scale[i]));
+        return [preserve ? lab[0] : out[0], out[1], out[2]];
+      };
+    }
+    case 'hue/saturation': {
+      const master = adjustment.master ?? {};
+      if (master.a) {
+        // Colorize: a and b set at the Saturation, at the Hue measured from the corner where a and b are
+        // equal; L lightened or darkened.
+        const [x, y] = fromSquare(Math.max(0, Math.min(100, master.c ?? 25)), (((master.b ?? 0) % 360) / 45) + 1);
+        const light = lighten((master.d ?? 0) / 100);
+        // (Whole levels, rounded down: where the colour has next to no red, a level of a is many of red.)
+        return ([l]) => [light(l), 128 + Math.floor(x), 128 + Math.floor(y)];
+      }
+      const turn = (master.hue ?? 0) / 45;
+      const sat = Math.max(-1, Math.min(1, (master.saturation ?? 0) / 100));
+      const factor = sat > 0 ? 1 / Math.max(1e-3, 1 - sat) : 1 + sat;
+      const light = lighten(Math.max(-1, Math.min(1, (master.lightness ?? 0) / 100)));
+      return ([l, a, b]) => {
+        const [m, s] = squareOf(a - 128, b - 128);
+        const [x, y] = fromSquare(Math.min(127, m * factor), s + turn);
+        return [light(l), 128 + x, 128 + y];
+      };
+    }
+    default:
+      return null;
+  }
+}
+
+export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false, deep = false, linear = false, lab = false } = {}) {
+  if (lab) return labAdjustmentFunction(adjustment, report, { deep });
   const type = adjustment?.type;
   switch (type) {
     case 'invert':

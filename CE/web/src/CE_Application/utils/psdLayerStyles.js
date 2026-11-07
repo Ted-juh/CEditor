@@ -12,9 +12,9 @@
 // Drawn as Photoshop draws them, each measured against its own pictures of psd-tools' test files
 // (layer_effects.psd holds one style a layer): the shadows, glows, Satin and Bevel are the shape
 // blurred as Photoshop blurs it (SIZE_SIGMA below), a Stroke a band of the shape's signed distance
-// (psd-tools' reading). What was not measured (a Chisel bevel, Soften, a Gloss Contour, a Precise
-// glow, Noise) is drawn by the same readings and named after the style, in brackets, so the import
-// can say so.
+// (psd-tools' reading). What was not measured (Soften, a Contour on a Chisel bevel or an Emboss, a
+// Precise glow, Noise) is drawn by the same readings and named after the style, in brackets, so the
+// import can say so.
 //
 // Interior styles are drawn at full strength whatever the layer's Fill opacity, as Photoshop draws
 // them; a layer at Fill 0% with a Color Overlay shows the overlay.
@@ -190,8 +190,9 @@ function approximations(effect, glow = false, bevel = false) {
   if (glow && effect.technique === 'precise') notes.push('Precise');
 
   if (bevel && pxOf(effect.soften, 0) > 0) notes.push('Soften');
-  if (bevel && contourTable(effect.contour)) notes.push('its Gloss Contour');
-  if (bevel && effect.useShape && contourTable(effect.shapeContour)) notes.push('its Contour');
+  // (A Gloss Contour is measured, and a Contour on a Smooth Inner or Outer Bevel: bevelShading.)
+  const measuredContour = (effect.technique ?? 'smooth') === 'smooth' && ['inner bevel', 'outer bevel'].includes(effect.style ?? 'inner bevel');
+  if (bevel && effect.useShape && contourTable(effect.shapeContour) && !measuredContour) notes.push('its Contour');
   if (bevel && effect.useTexture) notes.push('its Texture not drawn');
 
   if (Number(effect.noise) > 0 || Number(effect.jitter) > 0) notes.push('its Noise not drawn');
@@ -249,7 +250,8 @@ function bevelShading(shape, width, height, bevel) {
   const dir = bevel.direction === 'down' ? -1 : 1;
   const soften = Math.max(0, pxOf(bevel.soften, 0));
   const technique = bevel.technique ?? 'smooth';
-  const shapeContour = bevel.useShape ? contourFunction({ contour: bevel.shapeContour }) : null;
+  // (A Linear Contour leaves the height as it is.)
+  const shapeContour = bevel.useShape && contourTable(bevel.shapeContour) ? contourFunction({ contour: bevel.shapeContour }) : null;
   const pad = Math.ceil(2 * reach + soften) + 3;
   const heightOf = padded(width, height, pad, (x, y) => (x < 0 || y < 0 || x >= width || y >= height ? 0 : shape[y * width + x]), (h, w, hh) => {
     if (technique === 'smooth') styleBlur(h, w, hh, reach, { levels: false });
@@ -280,14 +282,32 @@ function bevelShading(shape, width, height, bevel) {
     }
     // A chisel rises Depth × Size / 2 (PhotoCraft's measurement), a smooth bevel the Size × Depth.
     const scale = technique === 'smooth' ? reach * depth * dir : (Math.max(1, pxOf(bevel.size, 5)) / 2) * depth * dir;
-    for (let i = 0; i < h.length; i += 1) h[i] = scale * (shapeContour ? shapeContour(h[i]) : h[i]);
+    if (shapeContour && technique === 'smooth' && (style === 'inner bevel' || style === 'outer bevel')) {
+      // A Contour runs over the bevel's own half of the blurred edge, the whole depth high: an Inner
+      // Bevel's up from the edge (half-way up the blur) to the top, an Outer Bevel's from its foot to the
+      // edge; its Range (ag-psd drops it: utils/psdRead.js) the share of that half it takes, measured down
+      // from the top, 50 % by default (PhotoCraft's bevel-inner-contour-ramp-peak.psd and its
+      // double-ring at 70 %: 15 and 13 % of pixels off to 3 and 6).
+      const inner = style === 'inner bevel';
+      const range = Math.max(0.01, Number(bevel.range ?? 0.5));
+      for (let i = 0; i < h.length; i += 1) {
+        const u = inner ? clamp01(1 - (1 - h[i]) / range) : clamp01(1 - (0.5 - h[i]) / range);
+        h[i] = scale * (shapeContour(u) + (inner ? 1 : 0));
+      }
+    } else {
+      for (let i = 0; i < h.length; i += 1) h[i] = scale * (shapeContour ? shapeContour(h[i]) : h[i]);
+    }
     if (soften > 0) blur(h, w, hh, SIZE_SIGMA * soften);
   });
   const theta = ((bevel.angle ?? 120) * Math.PI) / 180;
   const alt = ((bevel.altitude ?? 30) * Math.PI) / 180;
   const lx = Math.cos(alt) * Math.cos(theta); const ly = -Math.cos(alt) * Math.sin(theta); const lz = Math.sin(alt);
+  // The Gloss Contour remaps how the light falls on each pixel, its cosine; the highlight and shadow
+  // are then measured from the flat face's own cosine, not from the contour's value there, so a contour
+  // that peaks there lights the flat face in full (PhotoCraft's bevel-inner-gloss-ramp-peak.psd: 31 % of
+  // pixels off to 0.3, its double-ring 26 % to 4).
   const gloss = contourFunction(bevel);
-  const flat = gloss(lz);
+  const flat = lz;
   const n = width * height;
   const hi = new Float32Array(n); const lo = new Float32Array(n); const hiFlip = new Float32Array(n); const loFlip = new Float32Array(n);
   const H = (x, y) => heightOf[Math.max(0, Math.min(height - 1, y)) * width + Math.max(0, Math.min(width - 1, x))];
@@ -373,6 +393,7 @@ export function castShadows(shape, width, height, effects) {
     }
     if (spread > 0 && size > 0) grow(alpha, w, h, spread * size);
     const contour = contourFunction(effect);
+    let raw = null;
     if (glow && effect.technique === 'precise') {
       // Precise: straight out from the edge to the Size, not blurred.
       const from = distanceTo((i) => alpha[i] >= 0.5, w, h);
@@ -380,6 +401,7 @@ export function castShadows(shape, width, height, effects) {
       for (let i = 0; i < alpha.length; i += 1) alpha[i] = contour(glowAmount(clamp01(1 - from[i] / reach) / 2, effect.range));
     } else {
       styleBlur(alpha, w, h, (1 - spread) * size);
+      if (glow) raw = Float32Array.from(alpha);
       for (let i = 0; i < alpha.length; i += 1) alpha[i] = contour(glow ? glowAmount(alpha[i], effect.range) : alpha[i]);
     }
     if (conceal) {
@@ -389,7 +411,7 @@ export function castShadows(shape, width, height, effects) {
     }
     // A glow with a gradient takes its colour along it, from the edge (its left end) outward.
     const ramp = glow && !effect.color && effect.gradient ? gradientRamp(effect.gradient) : null;
-    casts.push({ x: left, y: top, width: w, height: h, alpha, rgb, ramp, mode, opacity: effect.opacity ?? 0.75, name: name + approximations(effect, glow) });
+    casts.push({ x: left, y: top, width: w, height: h, alpha, raw: ramp ? raw : null, rgb, ramp, mode, opacity: effect.opacity ?? 0.75, name: name + approximations(effect, glow) });
   };
   for (const shadow of effects.dropShadow ?? []) {
     if (!enabled(shadow)) continue;
@@ -681,14 +703,14 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     const hi = position === 'outside' ? size : position === 'center' ? size / 2 : 0;
     const band = (d, a, b) => clamp01(b - d + 0.5) * clamp01(d - a + 0.5);
     const under = beside ? { x: left, y: top, width, height, alpha: new Float32Array(shape.length), rgb: new Uint8ClampedArray(shape.length * 3), mode: modeOf(stroke, 'normal'), opacity: stroke.opacity ?? 1, name: 'Stroke' } : null;
-    // Stroke Emboss: an inner bevel of the stroke's outline (the shape and the band beside it), its
-    // light and shade laid on the stroke's own colour, so on the stroke alone (PhotoCraft's corpus's
-    // bevel-stroke-smooth.psd: lit along its outer edge, the layer's colour untouched).
+    // Stroke Emboss: the layer's shape bevelled as the stroke sits on it, an Outer Bevel under an
+    // outside stroke, an Emboss under a centred one, an Inner Bevel under an inside one, its light and
+    // shade laid on the stroke's own colour, so on the stroke alone (PhotoCraft's corpus: its
+    // bevel-stroke files, the smooth one 7.7 % of pixels off to 0.3, the centred chisel 8.7 to 3.2).
     let embossed = null;
     if (strokeEmboss) {
-      const outline = new Float32Array(shape.length);
-      for (let i = 0; i < shape.length; i += 1) outline[i] = clamp01(hi - edgeDistance[i] + 0.5);
-      const { hi: light, lo: shade } = bevelShading(outline, width, height, { ...strokeEmboss, style: 'inner bevel' });
+      const style = position === 'outside' ? 'outer bevel' : position === 'center' ? 'emboss' : 'inner bevel';
+      const { hi: light, lo: shade } = bevelShading(shape, width, height, { ...strokeEmboss, style });
       const hiRgb = (strokeEmboss.highlightColor ? psdRgb(strokeEmboss.highlightColor) : [255, 255, 255]).map((v) => v / 255);
       const loRgb = (strokeEmboss.shadowColor ? psdRgb(strokeEmboss.shadowColor) : [0, 0, 0]).map((v) => v / 255);
       const over = (c, s0, k, mode) => {

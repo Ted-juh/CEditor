@@ -19,6 +19,7 @@
  * `knockout` says only whether it does.
  */
 import { initializeCanvas, readPsd } from 'ag-psd';
+import { unzlibSync } from 'fflate';
 import { cmykToRgb, labToRgb } from './psdAdjustments.js';
 import { readEffectsBlock } from './psdEffects.js';
 import { iccCmykToRgb } from './iccProfile.js';
@@ -78,6 +79,11 @@ function linearColours(layers) {
     if (Array.isArray(value)) { for (const item of value) fix(item, depth + 1); return; }
     if (typeof value.r === 'number' && typeof value.g === 'number' && typeof value.b === 'number' && Object.keys(value).length <= 4) {
       for (const k of ['r', 'g', 'b']) value[k] = 255 * srgb(clamp01(value[k] / 255));
+      return;
+    }
+    // A grey, given as its ink, likewise (4x4_32bit_grayscale.psd: its gradient's stops).
+    if (typeof value.k === 'number' && typeof value.c !== 'number' && Object.keys(value).length === 1) {
+      value.k = 100 * (1 - srgb(clamp01(1 - value.k / 100)));
       return;
     }
     for (const [key, item] of Object.entries(value)) if (key !== 'imageData' && key !== 'picture') fix(item, depth + 1);
@@ -165,6 +171,8 @@ function layerRecords(view) {
         inner += (((view[inner] + 1) + 3) & ~3); // name, a Pascal string padded to 4
         let knockout = 0;
         let black = null;
+        let mixer = null;
+        let bevelRange = null;
         let effectsAt = null;
         let effectsKey = '';
         let restricted = null;
@@ -175,8 +183,32 @@ function layerRecords(view) {
           const body = inner + 8 + (long ? 8 : 4);
           if (key === 'knko') knockout = view[body];
           if (key === 'curv' || key === 'levl') black = blackChannel(data, key, body);
+          // Channel Mixer's records in full (ag-psd drops each one's fourth source, black in a CMYK file,
+          // and the black output): five numbers each, the four sources and the constant.
+          if (key === 'mixr') {
+            mixer = [];
+            const size = length(inner + 8, long);
+            for (let k = 4; k + 10 <= size; k += 10) mixer.push([0, 2, 4, 6, 8].map((o) => data.getInt16(body + k + o)));
+          }
           // The layer's styles: 'lmfx' (several of one style) over 'lfx2', and that over 'lfxs', which a
           // group may keep instead (group-stroke-off-canvas.psd: its strokes only there).
+          // A bevel's Contour Range ('Inpr' in its descriptor, before its 'useTexture'), which ag-psd
+          // does not pass on.
+          if ((key === 'lfx2' || key === 'lmfx') && bevelRange == null) {
+            const stop = Math.min(end, body + length(inner + 8, long));
+            const find = (text, from) => {
+              for (let p = from; p + text.length <= stop; p += 1) {
+                let k = 0;
+                while (k < text.length && view[p + k] === text.charCodeAt(k)) k += 1;
+                if (k === text.length) return p;
+              }
+              return -1;
+            };
+            const bevelAt = find('ebbl', body);
+            const textureAt = bevelAt >= 0 ? find('useTexture', bevelAt) : -1;
+            const rangeAt = bevelAt >= 0 ? find('InprUntF#Prc', bevelAt) : -1;
+            if (rangeAt >= 0 && textureAt >= 0 && rangeAt < textureAt) bevelRange = data.getFloat64(rangeAt + 12) / 100;
+          }
           if (key === 'lmfx') { effectsAt = body; effectsKey = key; }
           if (key === 'lfx2' && effectsKey !== 'lmfx') { effectsAt = body; effectsKey = key; }
           if (key === 'lfxs' && effectsAt == null) { effectsAt = body; effectsKey = key; }
@@ -189,7 +221,7 @@ function layerRecords(view) {
           }
           inner = body + length(inner + 8, long);
         }
-        out.push({ knockout, channels, black, realApplied, effectsAt, effectsKey, restricted, maskParameters });
+        out.push({ knockout, channels, black, mixer, bevelRange, realApplied, effectsAt, effectsKey, restricted, maskParameters });
         at = end;
       }
       return out;
@@ -289,9 +321,14 @@ function compositeChannels(view, count) {
     } else {
       return null;
     }
-    // 16 bits: the high byte.
+    // 16 bits: the high byte (and each value whole, as `wide`, for a reader that wants it).
     const eight = bytes === 1 ? planes : planes.map((plane) => plane.filter((_, i) => i % 2 === 0));
-    return { width, height, planes: eight };
+    const wide = bytes === 1 ? null : planes.map((plane) => {
+      const out = new Uint16Array(plane.length / 2);
+      for (let i = 0; i < out.length; i += 1) out[i] = (plane[2 * i] << 8) | plane[2 * i + 1];
+      return out;
+    });
+    return { width, height, planes: eight, wide };
   } catch {
     return null;
   }
@@ -306,6 +343,9 @@ export function convertedNotice(mode, { inks = false, profile = false } = {}) {
       ? 'its colours are made RGB through the colour profile it carries, as Photoshop shows them'
       : 'its colours are made RGB as a standard press profile shows them (U.S. Web Coated SWOP), the file carrying none CEditor can read, so they can differ a little from Photoshop\'s';
     return `This Photoshop file is in CMYK colour: ${how}; ${inks ? 'it is flattened on its inks, as Photoshop flattens it' : 'its adjustment layers act on the RGB colours'}.`;
+  }
+  if (mode === 'Lab') {
+    return `This Photoshop file is in Lab colour: its colours are made RGB plainly, as Photoshop shows them; ${inks ? 'it is flattened on its L, a and b, as Photoshop flattens it' : 'its adjustment layers act on the RGB colours'}.`;
   }
   return `This Photoshop file is in ${mode} colour: its colours are made RGB plainly, without the file's colour profile, so they can differ a little from Photoshop's own conversion; adjustment layers act on the RGB colours.`;
 }
@@ -450,9 +490,30 @@ function readConverted(view, mode, composite) {
     return finishConverted(psd, view, composite, 1, (p) => [p[0], p[0], p[0]]);
   }
   if (mode === 9) {
-    const psd = parse((id) => id, 3);
-    walkPictures(psd.children, (data) => { for (let i = 0; i < data.length; i += 4) data.set(lab8(data[i], data[i + 1], data[i + 2]).map(Math.round), i); });
-    return finishConverted(psd, view, composite, 3, (p) => lab8(p[0], p[1], p[2]));
+    const psd = parse((id) => id, 3, true);
+    const deep = psd.bitsPerChannel === 16;
+    walkPictures(psd.children, (data, layer) => {
+      // The stored L, a and b kept beside the colours, for the panel flattening to work on them as
+      // Photoshop does (utils/psdComposite.js compositeLab). A 16-bit file keeps a and b over 0..65280
+      // (neutral 32768), its L over 0..65535: a and b taken to the same scale as L here.
+      const { precise, ...picture } = layer.imageData;
+      let fine;
+      if (deep && precise) {
+        fine = new Uint16Array(precise.length);
+        for (let i = 0; i < precise.length; i += 4) {
+          fine[i] = precise[i]; fine[i + 3] = precise[i + 3];
+          for (let c = 1; c < 3; c += 1) {
+            fine[i + c] = Math.min(65535, Math.round((precise[i + c] * 65535) / 65280));
+            data[i + c] = Math.min(255, Math.round(precise[i + c] / 256));
+          }
+        }
+      }
+      layer.labPlanes = { lab: Uint8ClampedArray.from(data), ...(fine ? { precise: fine } : {}) };
+      layer.imageData = picture;
+      for (let i = 0; i < data.length; i += 4) data.set(lab8(data[i], data[i + 1], data[i + 2]).map(Math.round), i);
+    });
+    // (A 16-bit file's picture of itself at its full precision: L over 0..65535, a and b over 0..65280.)
+    return finishConverted(psd, view, composite, 3, (p) => lab8(p[0], p[1], p[2]), (p) => lab8(p[0] / 257, p[1] / 256, p[2] / 256));
   }
   if (mode === 4) {
     // Through the file's own profile where it carries one this reads (as Photoshop shows it).
@@ -549,15 +610,17 @@ export function unmatteLinear(data) {
 }
 
 /** A converted file's picture of itself, read here, where it is wanted. */
-function finishConverted(psd, view, composite, channels, toRgb) {
+function finishConverted(psd, view, composite, channels, toRgb, wideToRgb = null) {
   if (composite) {
     const read = compositeChannels(view, channels);
     if (read && read.planes.length === channels) {
       const data = new Uint8ClampedArray(read.width * read.height * 4);
       const pixel = new Array(channels);
+      const planes = wideToRgb && read.wide ? read.wide : read.planes;
+      const convert = wideToRgb && read.wide ? wideToRgb : toRgb;
       for (let i = 0; i < read.width * read.height; i += 1) {
-        for (let c = 0; c < channels; c += 1) pixel[c] = read.planes[c][i];
-        const rgb = toRgb(pixel);
+        for (let c = 0; c < channels; c += 1) pixel[c] = planes[c][i];
+        const rgb = convert(pixel);
         data[i * 4] = rgb[0]; data[i * 4 + 1] = rgb[1]; data[i * 4 + 2] = rgb[2]; data[i * 4 + 3] = 255;
       }
       psd.imageData = { width: read.width, height: read.height, data };
@@ -619,6 +682,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
     order.forEach((layer, i) => {
       if (layer && records[i].knockout) layer.knockoutLevel = records[i].knockout;
       if (layer?.adjustment && records[i].black && converted === 'CMYK') layer.adjustment.black = records[i].black;
+      if (layer?.adjustment?.type === 'channel mixer' && records[i].mixer && converted === 'CMYK') layer.adjustment.inks = records[i].mixer;
       if (layer?.mask && records[i].realApplied && layer.realMask?.imageData) layer.mask.real = layer.realMask;
       if (layer && records[i].restricted) layer.channelBlendingRestrictions = records[i].restricted;
       if (layer?.mask && records[i].maskParameters) {
@@ -629,6 +693,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
         const effects = readEffectsBlock(new DataView(view.buffer, view.byteOffset, view.byteLength), records[i].effectsAt);
         if (effects) layer.effects = effects;
       }
+      if (layer?.effects?.bevel && records[i].bevelRange != null && layer.effects.bevel.range == null) layer.effects.bevel.range = records[i].bevelRange;
     });
   }
   if (psd.bitsPerChannel && psd.bitsPerChannel !== 8 && !converted) {
@@ -637,6 +702,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
     if (psd.imageData) psd.imageData = eightBit(psd.imageData);
     if (psd.bitsPerChannel === 32) linearColours(psd.children);
   }
+  if (!converted) smartFilterMasks(psd);
   globalLight(psd);
   binaryColours(psd.children);
   // (A converted file's patterns are in its own colours, not RGB.)
@@ -664,14 +730,119 @@ function binaryColours(layers) {
     // A Gradient Map's stops come from its binary block too, where a grey's ink is read over 0..255
     // rather than as the percentage descriptors give (a Grayscale file's gradient-map.psd in
     // PhotoCraft's corpus: 238.5 is 93.5 % ink).
+    // A Lab stop's L, a and b come in fractions there, as a Photo Filter's colour does (PhotoCraft's
+    // lab8 gradient-map.psd).
     if (adjustment?.type === 'gradient map') {
       for (const stop of adjustment.colorStops ?? []) {
         const c = stop.color;
         if (c && Number.isFinite(c.k) && !Number.isFinite(c.c)) stop.color = { k: (c.k * 100) / 255 };
+        // A CMYK stop's inks as stored there, 255 none (PhotoCraft's cmyk8 gradient-map.psd), as percent.
+        else if (c && [c.c, c.m, c.y, c.k].every(Number.isFinite)) stop.color = { c: 100 - c.c / 2.55, m: 100 - c.m / 2.55, y: 100 - c.y / 2.55, k: 100 - c.k / 2.55 };
+        else if (c && Number.isFinite(c.l) && Math.abs(c.l) <= 1 && Math.abs(c.a) <= 1.01 && Math.abs(c.b) <= 1.01) {
+          stop.color = { l: c.l * 100, a: c.a * (c.a < 0 ? 128 : 127), b: c.b * (c.b < 0 ? 128 : 127) };
+        }
       }
     }
     binaryColours(layer.children);
   }
+}
+
+/**
+ * One plane of a smart filter's cache ('FEid', which ag-psd reads as `filterEffectsMasks`), `w` × `h`
+ * samples of `depth` bits, to 8 bits: raw, RLE (four-byte row counts in every file), or zip with or
+ * without prediction. Null where it cannot be read.
+ */
+function filterPlane({ compressionMode, data }, w, h, depth) {
+  if (!(w > 0 && h > 0) || !data || (depth !== 8 && depth !== 16)) return null;
+  const bytes = depth / 8;
+  const rowBytes = w * bytes;
+  let raw;
+  try {
+    if (compressionMode === 0) raw = data;
+    else if (compressionMode === 1) {
+      raw = new Uint8Array(rowBytes * h);
+      const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+      let p = 4 * h;
+      for (let r = 0; r < h; r += 1) {
+        const end = p + view.getUint32(4 * r);
+        let o = r * rowBytes;
+        while (p < end && o < (r + 1) * rowBytes) {
+          const n = data[p] > 127 ? data[p] - 256 : data[p];
+          p += 1;
+          if (n >= 0) { raw.set(data.subarray(p, p + n + 1), o); o += n + 1; p += n + 1; } else if (n !== -128) { raw.fill(data[p], o, o + 1 - n); o += 1 - n; p += 1; }
+        }
+        p = end;
+      }
+    } else if (compressionMode === 2 || compressionMode === 3) {
+      raw = unzlibSync(data);
+      if (compressionMode === 3) {
+        for (let r = 0; r < h; r += 1) {
+          if (bytes === 1) for (let x = 1; x < w; x += 1) raw[r * rowBytes + x] = (raw[r * rowBytes + x] + raw[r * rowBytes + x - 1]) & 255;
+          else {
+            for (let x = 1; x < w; x += 1) {
+              const at = r * rowBytes + 2 * x;
+              const v = (((raw[at] << 8) | raw[at + 1]) + ((raw[at - 2] << 8) | raw[at - 1])) & 0xffff;
+              raw[at] = v >> 8; raw[at + 1] = v & 255;
+            }
+          }
+        }
+      }
+    } else return null;
+  } catch {
+    return null;
+  }
+  if (raw.length < rowBytes * h) return null;
+  if (bytes === 1) return raw.subarray(0, w * h);
+  const out = new Uint8Array(w * h);
+  for (let i = 0; i < w * h; i += 1) out[i] = Math.round(((raw[2 * i] << 8) | raw[2 * i + 1]) / 257);
+  return out;
+}
+
+/**
+ * A smart object's filters with a filter mask: the layer's pixels in the file are its filters' result
+ * everywhere, the mask not applied. Photoshop's picture shows the result only where the mask is white,
+ * the smart object's own pixels (the cache Photoshop keeps beside it) where it is black, and a mix
+ * between (PhotoCraft's sf-filter-mask-hard.psd, -gradient.psd, sf-stack-blend-and-mask.psd).
+ */
+function smartFilterMasks(psd) {
+  const items = psd.filterEffectsMasks;
+  if (!Array.isArray(items) || !items.length) return;
+  const byId = new Map(items.filter((item) => item?.extra).map((item) => [item.id, item]));
+  const visit = (layers) => {
+    for (const layer of layers ?? []) {
+      visit(layer.children);
+      const item = byId.get(layer.placedLayer?.placed);
+      const image = layer.imageData;
+      if (!item || !image?.data || layer.placedLayer?.filter?.maskEnabled === false) continue;
+      const w = item.right - item.left; const h = item.bottom - item.top;
+      const colour = [0, 1, 2].map((c) => (item.channels?.[c] ? filterPlane(item.channels[c], w, h, item.depth) : null));
+      if (colour.some((plane) => !plane)) continue;
+      const alphaSlot = item.channels?.at(-1);
+      const alpha = alphaSlot ? filterPlane(alphaSlot, w, h, item.depth) : null;
+      const m = item.extra;
+      const mw = m.right - m.left; const mh = m.bottom - m.top;
+      const mask = filterPlane(m, mw, mh, item.depth);
+      if (!mask) continue;
+      const outside = layer.placedLayer?.filter?.maskExtendWithWhite === false ? 0 : 255;
+      const left = layer.left ?? 0; const top = layer.top ?? 0;
+      for (let y = 0; y < image.height; y += 1) {
+        for (let x = 0; x < image.width; x += 1) {
+          const X = left + x; const Y = top + y;
+          const mx = X - m.left; const my = Y - m.top;
+          const k = (mx >= 0 && my >= 0 && mx < mw && my < mh ? mask[my * mw + mx] : outside) / 255;
+          if (k >= 1) continue;
+          const ux = X - item.left; const uy = Y - item.top;
+          const inside = ux >= 0 && uy >= 0 && ux < w && uy < h;
+          const u = uy * w + ux;
+          const d = (y * image.width + x) * 4;
+          const own = inside ? [colour[0][u], colour[1][u], colour[2][u], alpha ? alpha[u] : 255] : [0, 0, 0, 0];
+          for (let c = 0; c < 4; c += 1) image.data[d + c] = Math.round(own[c] + (image.data[d + c] - own[c]) * k);
+        }
+      }
+      if (image.precise) delete image.precise;
+    }
+  };
+  visit(psd.children);
 }
 
 /**

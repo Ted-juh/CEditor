@@ -391,6 +391,45 @@ test('Stroke Emboss lights the stroke alone; a Chisel bevel is straight facets',
   assert.ok(g(15, 8) > 120 && Math.abs(g(15, 8) - g(15, 9)) <= 2, `${g(15, 8)} ${g(15, 9)}`);
 });
 
+test('a bevel\'s Gloss Contour and Contour; a Stroke Emboss bevels the shape as the stroke sits on it; a gradient glow fades out', () => {
+  const w = 40; const h = 40; const S = 24; const off = 8;
+  const data = new Uint8ClampedArray(S * S * 4);
+  for (let i = 0; i < S * S; i += 1) data.set([90, 120, 170, 255], i * 4);
+  const layer = (effects) => ({ name: 'tile', left: off, top: off, right: off + S, bottom: off + S, blendMode: 'normal', opacity: 1, imageData: { width: S, height: S, data }, effects });
+  const bevel = (more) => ({ enabled: true, style: 'inner bevel', technique: 'smooth', size: px(8), strength: 1, angle: 120, altitude: 30, direction: 'up',
+    highlightBlendMode: 'screen', highlightColor: { r: 255, g: 255, b: 255 }, highlightOpacity: 0.75, shadowBlendMode: 'multiply', shadowColor: { r: 0, g: 0, b: 0 }, shadowOpacity: 0.75, ...more });
+  const peak = { curve: [{ x: 0, y: 0 }, { x: 128, y: 255 }, { x: 255, y: 0 }] };
+  const draw = (effects, below = []) => {
+    const out = compositePsd([...below, layer(effects)], w, h, { styles: LAYER_STYLES }).pixels;
+    return (x, y) => [...out.slice((y * w + x) * 4, (y * w + x) * 4 + 3)];
+  };
+  // A Gloss Contour that peaks where the light falls on the flat face lights the flat face in full: the
+  // highlight is measured from the flat face's own light, not from the contour's value there
+  // (PhotoCraft's bevel-inner-gloss-ramp-peak.psd).
+  assert.deepEqual(draw({ bevel: bevel({ contour: peak }) })(20, 20), [214, 221, 234]);
+  assert.deepEqual(draw({ bevel: bevel({}) })(20, 20), [90, 120, 170], 'no light on the flat face without it');
+  // A Contour runs over the bevel's own half of the edge: a ramp-peak one rises to its top a few pixels
+  // in and falls again, so the top edge is lit and the band inside it in shadow (where a Linear one
+  // is lit all the way, less and less).
+  const contoured = draw({ bevel: bevel({ useShape: true, shapeContour: peak, range: 0.5 }) });
+  const linear = draw({ bevel: bevel({}) });
+  assert.ok(contoured(20, 8)[2] > 200 && contoured(20, 12)[2] < 80, `${contoured(20, 8)} ${contoured(20, 12)}`);
+  for (let y = 9; y < 15; y += 1) assert.ok(linear(20, y)[2] <= linear(20, y - 1)[2], `linear at ${y}`);
+  // Stroke Emboss over an outside stroke is an Outer Bevel of the shape, lit on the stroke alone: along
+  // the lit top side the stroke grows lighter towards the shape (PhotoCraft's bevel-stroke-smooth.psd).
+  const stroke = { enabled: true, position: 'outside', fillType: 'color', size: px(5), opacity: 1, blendMode: 'normal', color: { r: 200, g: 60, b: 40 } };
+  const embossed = draw({ stroke: [stroke], bevel: bevel({ style: 'stroke emboss' }) });
+  for (let y = 4; y < 8; y += 1) assert.ok(embossed(20, y)[1] > embossed(20, y - 1)[1], `${y}: ${embossed(20, y)} after ${embossed(20, y - 1)}`);
+  assert.deepEqual(embossed(20, 20), [90, 120, 170], 'the layer itself untouched');
+  // An Outer Glow along a gradient fades out where its blurred shape falls below 0.11: its far end shows
+  // the white under it (PhotoCraft's outer-glow-gradient.psd).
+  const white = { name: 'white', left: 0, top: 0, right: w, bottom: h, blendMode: 'normal', opacity: 1, imageData: { width: w, height: h, data: new Uint8ClampedArray(w * h * 4).fill(255) } };
+  const glow = { enabled: true, blendMode: 'normal', opacity: 1, technique: 'softer', size: px(12), choke: px(0), range: 0.5,
+    gradient: { colorStops: [{ location: 0, color: { r: 255, g: 0, b: 0 } }, { location: 1, color: { r: 0, g: 0, b: 255 } }], opacityStops: [{ location: 0, opacity: 1 }, { location: 1, opacity: 1 }], smoothness: 1 } };
+  const glowing = draw({ outerGlow: glow }, [white]);
+  assert.ok(glowing(0, 20)[1] > 60 && glowing(2, 20)[1] < 10, `${glowing(0, 20)} ${glowing(2, 20)}`);
+});
+
 /** A tiny ICC version 2 CMYK profile: A2B1 (mft2) from inks to Lab, B2A0 (mft1) from Lab to inks. */
 function cmykProfile({ darkest = 0 } = {}) {
   const writer = () => {

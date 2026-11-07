@@ -131,8 +131,9 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
 - **Fill layers** saved without pixels (a shape, a Color, Gradient or Pattern Fill) are drawn from
   their fill and their vector mask: a pattern tiled from the document's corner, from the patterns
   the file keeps, and smoothed where it is scaled; a gradient across its shape's box, or its layer
-  mask's where it has no path, bent by its Smoothness through its stops as Photoshop bends it (in a
-  32-bit file, mixed in linear light). A path left open is filled as if closed by a straight line.
+  mask's where it has no path, bent by its Smoothness through its stops as Photoshop bends it, never
+  past either stop of a segment (in a 32-bit file, mixed in linear light). A path left open is filled
+  as if closed by a straight line.
   A shape whose vector mask is below full Density, or feathered, shows its fill faintly past its
   path, over the whole canvas, as Photoshop shows it; a layer mask kept beside the vector mask cuts
   the shape too. A shape's own Stroke (its stroke setting, not a layer style) stays over the layers
@@ -144,6 +145,8 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   against its pictures; raised Vibrance and Selective Color closely; Color Lookup from the table the
   layer carries (one with nothing chosen leaves colours alone). In a 32-bit file they work on its
   linear values, as Photoshop works them there.
+- **Smart filters with a filter mask** show the filters' result through the mask and the smart
+  object's own pixels (the copy Photoshop keeps beside it) where the mask hides it.
 - **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures:
   Drop Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights
   around it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part
@@ -157,26 +160,34 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   stroke on a layer the size of the canvas borders the picture, and on a shape that runs on past the
   canvas is not seen there. A stroke rounds a square's corner from the corner itself, and an Outer
   Bevel, an Emboss or a Pillow Emboss shades the part of a Stroke outside the layer. A Chisel bevel
-  is straight facets, Hard or Soft; a Stroke Emboss bevels the stroke and lights it alone. Drawn only
-  close, and named in the Console: Soften, a bevel's Gloss Contour and Contour, a Precise glow, and
-  a Noise gradient (its average colour); a style's Noise and a bevel's Texture are not drawn.
+  is straight facets, Hard or Soft; a Stroke Emboss bevels the shape as the stroke sits on it (an
+  Outer Bevel under an outside stroke, an Emboss under a centred one) and lights the stroke alone. A
+  bevel's Gloss Contour remaps its light, and its Contour its height over the bevel's own half of the
+  edge, by its Range; an Outer Glow along a gradient fades out at its far end. Drawn only close, and
+  named in the Console: Soften, a Contour on a Chisel bevel or an Emboss, a Precise glow, and a Noise
+  gradient (its average colour); a style's Noise and a bevel's Texture are not drawn.
 - **Type** blends with what is under it as Photoshop blends type by default ("Blend Text Colors
   Using Gamma", 1.45, in its Color Settings), so its antialiased edges come out as light as
-  Photoshop's. A file made with that setting changed blends a little differently there.
+  Photoshop's; type in another blend mode is blended as ever and mixed in at its edges the same way.
+  A file made with that setting changed blends a little differently there.
 - **Dissolve** is drawn with a grain of its own, as dense as Photoshop's. Photoshop's is random, so
   the pixels differ.
 - **A 16- or 32-bit file** is put together at the precision its pixels keep (a Posterize cuts its
   16-bit values where Photoshop does), and a 32-bit one in linear light, as Photoshop works it, so an
   antialiased edge blends as it does there. A 32-bit file's own picture of itself, where it is partly
   transparent, is read back from the white Photoshop matted it against.
-- **A CMYK file** is flattened on its inks, as Photoshop flattens it, where every adjustment in it
-  works on the inks (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast,
-  and Hue/Saturation and Color Balance on cyan, magenta and yellow, black left alone); with one that
-  works on whole colours (Channel Mixer, Gradient Map, Photo Filter, Selective Color, a Colorize) it
-  is flattened in RGB, and differs from Photoshop's, which works those on the inks too. A Threshold
-  over the whole file is judged on the inks, as Photoshop judges it there, each pixel white or the
-  black ink alone. Its colours are made RGB through the colour profile
-  the file carries, as Photoshop shows them (Relative Colorimetric, Black Point Compensation).
+- **A CMYK file** is flattened on its inks, as Photoshop flattens it: Levels, Curves with their Black
+  channel, Invert, Posterize and Brightness/Contrast on each ink; Hue/Saturation and Color Balance on
+  cyan, magenta and yellow, black left alone; and at the top of the file, Threshold, Channel Mixer
+  (its black source and black output too), Gradient Map (its stops' inks), Selective Color (its four
+  inks) and a Colorize (separated again, black first) on the four inks together. A Photo Filter, whose
+  rule on the inks is not known, flattens the file in RGB, and differs from Photoshop's there. Its
+  colours are made RGB through the colour profile the file carries, as Photoshop shows them (Relative
+  Colorimetric, Black Point Compensation); its gradients mix their stops as inks.
+- **A Lab file** is flattened on its stored L, a and b, as Photoshop flattens it: Normal layers mix
+  them; Invert, Posterize, Levels and Curves work each channel, Threshold, Brightness/Contrast and
+  Gradient Map work on L, Photo Filter on the colour's XYZ, and Hue/Saturation turns and scales a and
+  b. Another blend mode, a layer style or another adjustment flattens it in RGB.
 
 What is only close, and what is not applied (a Color Lookup through an ICC profile), is named in the
 Console. The fix for exact pixels is Photoshop's own: rasterize or merge that layer before importing.
@@ -282,8 +293,8 @@ colours made RGB through the colour profile it carries, as Photoshop shows them 
 profile, as Photoshop's own are; without one it can read, as U.S. Web Coated SWOP, Photoshop's
 default, shows them); a panel's background is flattened on its inks (above), a component's
 adjustment layers act on the RGB colours. A Lab file is read the same way, its colours made RGB
-plainly, and its adjustments act on those, where Photoshop works most of them on L, a and b: they
-differ from Photoshop's there. The notice says so; a Duotone file comes in grey, an Indexed Color one through its palette,
+plainly; a panel's background is flattened on L, a and b (above), a component's adjustment layers act
+on the RGB colours. The notice says so; a Duotone file comes in grey, an Indexed Color one through its palette,
 and a Multichannel one, which has no layers, as its channels printed one over another in their inks'
 colours (a spot channel's own, any other cyan, magenta, yellow or black by its place).
 
