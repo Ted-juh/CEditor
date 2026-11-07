@@ -22,13 +22,39 @@ export function psdRgb(color) {
   if (!color || typeof color !== 'object') return [0, 0, 0];
   if (Number.isFinite(color.r)) return [color.r, color.g, color.b];
   if (Number.isFinite(color.fr)) return [color.fr * 255, color.fg * 255, color.fb * 255];
-  if (Number.isFinite(color.k)) {
+  if (Number.isFinite(color.k) && Number.isFinite(color.c)) {
     const k = color.k / 100;
     return [255 * (1 - color.c / 100) * (1 - k), 255 * (1 - color.m / 100) * (1 - k), 255 * (1 - color.y / 100) * (1 - k)];
   }
+  // A grey given as its ink (0 white, 100 black).
+  if (Number.isFinite(color.k)) return [0, 1, 2].map(() => 255 * (1 - color.k / 100));
   if (Number.isFinite(color.h)) return hsbToRgb(color.h, color.s / 100, color.b / 100);
+  if (Number.isFinite(color.l) && Number.isFinite(color.a)) return labToRgb(color.l, color.a, color.b);
   if (Number.isFinite(color.l)) return [color.l * 2.55, color.l * 2.55, color.l * 2.55];
   return [0, 0, 0];
+}
+
+/**
+ * CIE Lab (Photoshop's: L 0..100, a and b about -128..127, against D50) as sRGB 0..255, through XYZ
+ * and Bradford's adaptation to sRGB's D65 white.
+ */
+export function labToRgb(l, a, b) {
+  const fy = (l + 16) / 116;
+  const fx = fy + a / 500;
+  const fz = fy - b / 200;
+  const f = (t) => (t ** 3 > 0.008856 ? t ** 3 : (t - 16 / 116) / 7.787);
+  const x = 0.96422 * f(fx);
+  const y = l > 8 ? f(fy) : l / 903.3;
+  const z = 0.82521 * f(fz);
+  const linear = [
+    3.1338561 * x - 1.6168667 * y - 0.4906146 * z,
+    -0.9787684 * x + 1.9161415 * y + 0.0334540 * z,
+    0.0719453 * x - 0.2289914 * y + 1.4052427 * z,
+  ];
+  return linear.map((c) => {
+    const v = Math.max(0, Math.min(1, c));
+    return 255 * (v <= 0.0031308 ? 12.92 * v : 1.055 * v ** (1 / 2.4) - 0.055);
+  });
 }
 
 function hsbToRgb(h, s, v) {
@@ -131,11 +157,12 @@ function curveTable(points) {
 function gradientColour(stops, t) {
   const list = [...(stops ?? [])].sort((a, b) => a.location - b.location);
   if (!list.length) return [t * 255, t * 255, t * 255];
-  const at = t * 4096;
+  // Stops 0..1 as ag-psd gives them (0..4096 as the file writes them, if given so).
+  const at = t * (list.some((stop) => stop.location > 1) ? 4096 : 1);
   if (at <= list[0].location) return psdRgb(list[0].color);
   for (let i = 1; i < list.length; i += 1) {
     if (at <= list[i].location) {
-      const k = (at - list[i - 1].location) / Math.max(1, list[i].location - list[i - 1].location);
+      const k = (at - list[i - 1].location) / Math.max(1e-9, list[i].location - list[i - 1].location);
       const a = psdRgb(list[i - 1].color);
       const b = psdRgb(list[i].color);
       return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];

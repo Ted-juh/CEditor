@@ -130,19 +130,55 @@ Of the Illustrator files, `S2.ai` (JPEG 2000 pictures) went from 45 % to 2 %, th
 `issue13520.ai` from 91 % to 15 % (its mesh shading is close, not exact), `personwithdog.ai` from 11 %
 to under 1 %.
 
+## The third pass: what was left, done
+
+| Left after the second pass | Now |
+|---|---|
+| An SVG element with a filter is a picture, not shapes to edit | A filter that is a blur or a drop shadow (Inkscape's, Illustrator's, `feDropShadow`) on a shape is the layer's own blur or shadows, which the Component Designer edits; only one its effects cannot be (lighting, turbulence, a colour matrix), or one whose region cuts the effect off, is a picture. A layer's shadows, blur and bevel now scale with a component set to *Scale internals*, as a picture would: they kept their pixel sizes. A group of one shape with a blend mode is that shape with it |
+| A Photoshop knockout through layers outside a group, said | Cut: each layer it reaches (to its group's start, or deep to the Background) gets a hole of its shape, as deep as its opacity, in its pixels or its mask. psd-tools' deep knockout files, wholly off as components, match. A Normal group whose layers blend is one picture, as Photoshop blends them within it (it was unfolded, its Multiply layers darkening what was under the group) |
+| CMYK and Lab Photoshop files refused | Read, through ag-psd: a copy of the file said to be RGB (or Grayscale), so everything else is read as ever, its colours made RGB here; CMYK's black read in a second pass, its channel given the first colour's id. Duotone comes in grey, Indexed Color (where ag-psd fails on it) through its palette; the composite is decoded here. Lab colours in shapes and styles were grey: Lab to sRGB through D50 |
+| A PDF mesh used as a fill's pattern in one colour; a pattern stroke not in a component | The mesh's picture cut to the shape (and nothing at all for a mesh with no area, as pdf.js draws it, where it was its mean colour over the page); a stencil painted with a pattern or a gradient, that paint through it; a stroke painted with an SVG pattern, a picture of the stroke over the shape |
+| LibreOffice's small pictures blocky against smooth | Not a difference after all: poppler draws them smooth at full resolution; the harness had drawn its reference at 288 dpi and scaled it up. References are drawn at 1,024 pixels now |
+| The production build out of heap here | `npm run build` asks node for 4 GB: the build peaks at 3.7 GB resident, past the 2.2 GB some machines give node by default |
+| Found on the way | Every Photoshop gradient read with its stops at 0: ag-psd gives stop locations 0..1, three places read them as 0..4096 (shape fills, Gradient Map, gradient overlays), so each drew its last colour. A fill layer saved without pixels (shape layers, Color and Gradient Fills; 51 layers in 30 test files) is drawn from its fill and vector mask in a panel's flattening, with Photoshop's gradient styles and angle, and whole-document fills come into a component. A shape or text layer's Fill opacity was ignored |
+
+Hue/Saturation's colour ranges were tried further (saturation toward luma or the mid grey, a smooth
+fade at a range's edges, the strongest range alone): none came closer over the three test files than
+the order kept, so it stays.
+
+**Measured.** The files this pass touches, drawn by the commit before it and by this one, in the same
+browser, PDF references now drawn at 1,024 pixels (under 1 % / 1-5 % / 5-20 % / over 20 % of pixels
+visibly off):
+
+| Corpus | Before | After |
+|---|---|---|
+| Photoshop, as a component on a white panel (139) | 60 / 8 / 16 / 55 | 68 / 9 / 18 / 44 |
+| pdf.js's tests (96) | 37 / 29 / 25 / 5 | 37 / 30 / 25 / 4 |
+| Illustrator (9) | 5 / 0 / 3 / 1 | 5 / 1 / 3 / 0 |
+| LibreOffice drawings (40) | 6 / 25 / 9 / 0 | 6 / 25 / 9 / 0 |
+| resvg's filter and blend tests (84) | 0 / 75 / 4 / 5 | 0 / 75 / 4 / 5 |
+| Desktop icons with filters (7) | 1 / 5 / 1 / 0 | 1 / 5 / 1 / 0 |
+
+Eighteen Photoshop files came closer. Two moved the other way, and both are files whose own picture
+of themselves is blank (saved without Maximize Compatibility): their shapes, saved without pixels,
+are drawn now, and the blank reference counts them as off. The filter tests hold where they were
+with seven of their shapes now editable shapes with effects, two desktop icons' shadows among them.
+With its reference drawn sharp, LibreOffice's set has no file a fifth off, and none worse than
+before.
+
+No import hangs, throws or makes bad output: the SVG and Photoshop files' 7,161 imports, the PDFs'
+1,128 (the two stress files apart, as before). Photoshop components that import went from 260 to
+290 of 316: the rest are files with nothing to draw (an adjustment layer alone) and one Multichannel
+file. PDFs note only the 4 pictures pdf.js cannot decode.
+
 ## Left, and why
 
-- **An SVG element with a filter, or a group with a blend mode, is a picture**, not shapes to edit:
-  drawn right, edited as one. A drop shadow could become the layer's own shadow instead; it does not
-  scale with a component the way a picture does, so it is not.
-- **A Photoshop knockout through layers outside a group** cannot cut layers that come in as layers of
-  their own; said. A panel's flattened background draws it.
+- **An SVG filter that is neither a blur nor a drop shadow** is a picture of its element, drawn
+  right, edited as one.
+- **CMYK and Lab colours** are made RGB without the file's profile; adjustment layers in a CMYK file
+  act on the RGB colours where Photoshop's act on its inks, so those files differ most (psd-tools'
+  CMYK adjustment tests). A Multichannel file is not read.
 - **Hue/Saturation's colour ranges** are close, not exact (above).
-- **A PDF mesh used as a fill's pattern**, as against painted on its own, is one colour; a pattern
-  used as a stroke's paint is drawn on a panel and not in a component.
-- **LibreOffice's PDFs** keep the shaded parts of a drawing as small pictures at 96 pixels an inch,
-  marked not to be smoothed: poppler draws them blocky, a browser smooth. Neither is wrong.
-- **CMYK and Lab Photoshop files** are not read (ag-psd does not); the notice says how to convert.
-- **Building here**: the production build needs more than this container's default 2.2 GB of
-  JavaScript heap (`NODE_OPTIONS=--max-old-space-size=4096`), the commit before this pass as much as
-  this one. CI's runners have more memory, and their default is larger.
+- **A pattern fill layer saved without pixels** is not drawn in a panel's flattening (a component
+  draws its picture); a vector mask on a layer of pixels is not applied there either.
+- **The two pdf.js stress files** exhaust memory inside pdf.js.

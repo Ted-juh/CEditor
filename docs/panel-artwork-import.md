@@ -95,8 +95,9 @@ any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
 
 So a panel's placeholders, which a PDF keeps no names for, are typed by their colour and shape (red
 circles knobs, long red rectangles sliders, and so on, as above), and the notice says so; rename the
-controls after. A mesh used as a fill's pattern (rather than painted on its own) is drawn in its mean
-colour, and patterns nested more than three deep in grey; the Console lists any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
+controls after. A mesh used as a fill's pattern is the mesh's picture cut to the shape, and a stencil
+painted with a pattern or a gradient is that paint through the stencil. Patterns nested more than
+three deep are grey; the Console lists any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
 is refused with what to do: save it again with Create PDF Compatible File ticked, or use Export As ›
 SVG.
 
@@ -120,10 +121,13 @@ together first and then blended in as one layer. A knockout layer or group (Blen
 Knockout) cuts through what is under it to where its group began (Shallow) or to the Background
 layer (Deep, through Pass Through groups), and is drawn there at its Fill: a Fill of 0 cuts a hole.
 
+A fill layer saved without pixels (a shape, a Color or Gradient Fill) is drawn from its fill and its
+vector mask, the mask's paths joined by their operations; a pattern fill is not.
+
 It cannot draw four things:
 
 - layer styles (effects), such as shadows, glows and strokes;
-- vector masks;
+- a vector mask on a layer of pixels;
 - adjustment layers;
 - Dissolve's noise. A Dissolve layer is drawn as Normal.
 
@@ -155,9 +159,12 @@ parts are named by its top-level layers, and the notice lists them.
   stroke gains no closing edge). Colours are CSS's: every named colour, `#rgb`, `#rgba`, `#rrggbb`,
   `#rrggbbaa`, `rgb()`, `rgba()`, `hsl()`, `hsla()` and `currentColor`, an alpha in the colour
   joining the opacity; gradient stops are placed as SVG places them. A shape's own `mix-blend-mode`
-  is its layer's. An element with a filter (a blur, a drop shadow, lighting) and a group with a blend
-  mode are each a picture of themselves, as SVG draws them, so the filter shows and the group blends
-  as one; such a layer is a picture, not shapes to edit. An `<image>` is placed in its box as its
+  is its layer's, and so is a group's that holds one shape. A filter that is a blur or a drop shadow
+  (as Inkscape, Illustrator and `feDropShadow` write them) on a shape is the layer's own blur or
+  shadow, which the Component Designer edits; any other filter (lighting, turbulence, a colour
+  matrix), one whose region cuts its effect off, and a group of several shapes with a blend mode make
+  that element a picture of itself, as SVG draws it, so the filter shows and the group blends as one.
+  A stroke painted with a pattern is a picture of the stroke over the shape. An `<image>` is placed in its box as its
   `preserveAspectRatio` says. A `<use>` of what holds it (a loop) is not drawn, as SVG does not draw
   it. An SVG written with its namespace as a prefix (`<svg:svg>`) is read as plain SVG.
 - **More than 2,000 shapes**, a page of a document's text and rules more than a control, is more than a
@@ -174,9 +181,11 @@ parts are named by its top-level layers, and the notice lists them.
   Hue/Saturation with its colour ranges, Vibrance, Color Balance, Black & White, Photo Filter, Selective Color closely; Color
   Lookup from the .cube, .3dl or .look table the layer carries) are applied to every layer under
   them, pictures and colours alike. A Color Lookup through an ICC profile is not. Pass Through groups are unfolded; a group with its
-  own mode or mask, or with a knockout layer inside, is one layer. A layer that knocks out through
-  layers outside a group cannot cut them as layers of their own, and is said. Text layers stay text
-  where the file says their size and colour.
+  own mode or mask, a Normal group whose layers blend (Photoshop blends them with each other only), and
+  one with a knockout that stops at it, is one layer. A layer or group that knocks out through layers
+  that come in as layers of their own cuts them: a hole of its shape, as deep as its opacity, in their
+  pictures or their masks. A shape or text layer's Fill opacity is on its fill and stroke, not its
+  styles. Text layers stay text where the file says their size and colour.
 
 **A picture's colour** (`utils/pictureRecolour.js`). A picture layer (`Background.Fill.imageColour`)
 and a part of frames (`Image.colour`) have a colour of their own: a colour or a control set's role,
@@ -214,14 +223,17 @@ would swing round with it; name a cap that should turn `rotor`.
 
 A Photoshop file saved in 16 or 32 bits a channel is read as 8 (a 32-bit file's colour from the
 linear light Photoshop works it in); one of a single Background layer, which has no layers, only the
-picture of the whole file, comes in as that one picture layer. A file in CMYK, Lab, Duotone,
-Multichannel or Indexed Color is not read, and the notice says which and to convert it to RGB
-(Image › Mode › RGB Color).
+picture of the whole file, comes in as that one picture layer. A file in CMYK or Lab colour is read,
+its colours made RGB plainly (without the file's colour profile, so a little apart from Photoshop's
+own conversion; adjustment layers act on the RGB colours), and the notice says so; a Duotone file
+comes in grey, and an Indexed Color one through its palette. A Multichannel file is not read, and the
+notice says to convert it to RGB (Image › Mode › RGB Color).
 
 Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
 approximate adjustments), Color Lookup through an ICC profile (not applied), adjustment
-layers inside groups with their own blend mode, references to anything not in the file, and the
-SVG elements drawn as pictures of themselves (for a filter or a group's blend mode).
+layers inside groups with their own blend mode, references to anything not in the file, the SVG
+filters read as a layer's own blur or shadow, and the SVG elements drawn as pictures of themselves
+(for any other filter, or a group's blend mode).
 
 ## New Component from 3D Model (glTF)
 

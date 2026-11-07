@@ -41,7 +41,8 @@ a sheet with one row per state (Base first) and one column per size:
 scaled from the size it was drawn at. Parts sized in percent follow the box; parts sized in pixels
 keep their size. So a component that looks right on the artboard can break when somebody places
 it smaller, or stretches it. (A component whose *Transform › Resize* is set to *Scale internals*
-scales its pixel sizes too, and the sheet draws it that way.)
+scales its pixel sizes too, its layers' shadows, blurs and bevels included, and the sheet draws it
+that way.)
 
 Each cell is drawn by the renderer the panel uses, with that state's changes applied, at the
 preview's test value. The dashed line is the component's edge. Anything drawn past it is shown,

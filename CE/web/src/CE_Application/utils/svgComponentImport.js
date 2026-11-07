@@ -415,6 +415,157 @@ function enclosedArea(model) {
   return total;
 }
 
+/**
+ * A filter that is a layer effect, read as one: `{ blur }` (a Gaussian blur of the element, its
+ * deviation in the element's units), `{ shadows: [{ dx, dy, deviation, colour, opacity }] }` (drop
+ * shadows under it, as Inkscape, Illustrator and feDropShadow write them), `{}` (no effect), or null
+ * for anything else, which is drawn as SVG draws it. `classes`: the style rules, for flood colours.
+ */
+export function filterEffect(filter, classes = [], byId = new Map()) {
+  if (!filter || String(filter.attributes?.primitiveUnits ?? '') === 'objectBoundingBox') return null;
+  // A filter with no primitives of its own takes those of the one it refers to (href), as SVG does.
+  let source = filter;
+  for (let depth = 0; depth < 8 && !(source.children ?? []).some((child) => String(child.name ?? '').startsWith('fe')); depth += 1) {
+    const href = String(source.attributes?.href ?? source.attributes?.['xlink:href'] ?? '').replace(/^#/, '');
+    if (!href || !byId.get(href)) break;
+    source = byId.get(href);
+  }
+  const SOURCE = { kind: 'source', blur: 0 };
+  const ALPHA = { kind: 'shape', colour: '000000', opacity: 1, blur: 0, dx: 0, dy: 0 };
+  const results = new Map();
+  let last = SOURCE;
+  const input = (name) => {
+    const key = String(name ?? '').trim();
+    if (!key) return last;
+    if (key === 'SourceGraphic') return SOURCE;
+    if (key === 'SourceAlpha') return ALPHA;
+    return results.get(key) ?? null;
+  };
+  const attr = (node, name) => node.attributes?.[name] ?? ownStyle(node, classes)[name];
+  const deviation = (node) => {
+    const values = String(attr(node, 'stdDeviation') ?? '0').trim().split(/[\s,]+/).map(Number);
+    if (values.some((v) => !Number.isFinite(v) || v < 0)) return null;
+    return values.length > 1 && Math.abs(values[0] - values[1]) > 1e-6 ? null : values[0];
+  };
+  const blurred = (a, b) => Math.sqrt(a * a + b * b);
+  const floodOf = (node) => ({
+    kind: 'flood',
+    colour: parseColour(String(attr(node, 'flood-color') ?? 'black'), 'black') ?? '000000',
+    opacity: opacityOf(attr(node, 'flood-opacity')) * colourAlpha(String(attr(node, 'flood-color') ?? 'black'), 'black'),
+  });
+  const over = (bottom, top) => ({ kind: 'over', layers: [...(bottom.kind === 'over' ? bottom.layers : [bottom]), ...(top.kind === 'over' ? top.layers : [top])] });
+  // dx and dy are numbers, not lengths: '10%' is not one, and the effect is left to SVG.
+  const number = (value, fallback) => (value == null ? fallback : /^\s*[-+]?(\d+\.?\d*|\.\d+)([eE][-+]?\d+)?\s*$/.test(String(value)) ? Number(value) : NaN);
+  for (const node of source.children ?? []) {
+    if (!String(node.name ?? '').startsWith('fe')) continue;
+    const a = input(node.attributes?.in);
+    let out = null;
+    switch (node.name) {
+      case 'feGaussianBlur': {
+        const sigma = deviation(node);
+        if (sigma == null || !a) break;
+        if (a.kind === 'source') out = { ...a, blur: blurred(a.blur, sigma) };
+        else if (a.kind === 'shape') out = { ...a, blur: blurred(a.blur, sigma) };
+        break;
+      }
+      case 'feOffset': {
+        const dx = number(node.attributes?.dx, 0);
+        const dy = number(node.attributes?.dy, 0);
+        if (!Number.isFinite(dx) || !Number.isFinite(dy)) break;
+        if (a?.kind === 'shape') out = { ...a, dx: a.dx + dx, dy: a.dy + dy };
+        else if (a?.kind === 'source' && !dx && !dy) out = a;
+        break;
+      }
+      case 'feFlood': out = floodOf(node); break;
+      case 'feDropShadow': {
+        const sigma = deviation(node) ?? null;
+        const flood = floodOf(node);
+        const dx = number(node.attributes?.dx, 2);
+        const dy = number(node.attributes?.dy, 2);
+        if (sigma == null || a?.kind !== 'source' || a.blur || !Number.isFinite(dx) || !Number.isFinite(dy)) break;
+        out = over({ kind: 'shape', colour: flood.colour, opacity: flood.opacity, blur: sigma, dx, dy }, a);
+        break;
+      }
+      case 'feComposite': {
+        const b = input(node.attributes?.in2);
+        const operator = String(node.attributes?.operator ?? 'over');
+        if (!a || !b) break;
+        if (operator === 'in' && a.kind === 'flood' && (b.kind === 'shape' || (b.kind === 'source' && !b.blur))) {
+          // A colour cut to the shape: the silhouette in that colour.
+          out = { kind: 'shape', colour: a.colour, opacity: a.opacity * (b.kind === 'shape' ? b.opacity : 1), blur: b.kind === 'shape' ? b.blur : 0, dx: b.kind === 'shape' ? b.dx : 0, dy: b.kind === 'shape' ? b.dy : 0 };
+        } else if (operator === 'in' && a.kind === 'shape' && b.kind === 'flood') {
+          out = { ...a, opacity: a.opacity * b.opacity };
+        } else if (operator === 'over') {
+          out = over(b, a);
+        }
+        break;
+      }
+      case 'feBlend': {
+        const b = input(node.attributes?.in2);
+        if (a && b && String(node.attributes?.mode ?? 'normal') === 'normal') out = over(b, a);
+        break;
+      }
+      case 'feMerge': {
+        const layers = (node.children ?? []).filter((child) => child.name === 'feMergeNode').map((child) => input(child.attributes?.in));
+        if (layers.length && layers.every(Boolean)) out = layers.reduce((acc, layer) => (acc ? over(acc, layer) : layer), null);
+        break;
+      }
+      case 'feColorMatrix': {
+        // A shadow's colour set by a matrix: every channel a constant, the alpha scaled.
+        const values = String(node.attributes?.values ?? '').trim().split(/[\s,]+/).map(Number);
+        if (a?.kind === 'shape' && String(node.attributes?.type ?? 'matrix') === 'matrix' && values.length === 20 && values.every(Number.isFinite)
+          && [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 19].every((i) => Math.abs(values[i]) < 1e-6)) {
+          const hex = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
+          out = { ...a, colour: `${hex(values[4])}${hex(values[9])}${hex(values[14])}`, opacity: a.opacity * Math.max(0, Math.min(1, values[18])) };
+        }
+        break;
+      }
+      case 'feComponentTransfer': {
+        // A shadow's opacity scaled: feFuncA linear (slope) or table (0 to a).
+        const funcs = (node.children ?? []).filter((child) => /^feFunc[RGBA]$/.test(child.name));
+        const alpha = funcs.find((child) => child.name === 'feFuncA');
+        if (a?.kind !== 'shape' || !alpha || funcs.some((child) => child !== alpha && String(child.attributes?.type ?? 'identity') !== 'identity')) break;
+        const type = String(alpha.attributes?.type ?? 'identity');
+        const table = String(alpha.attributes?.tableValues ?? '').trim().split(/[\s,]+/).map(Number);
+        if (type === 'linear' && !num(alpha.attributes?.intercept)) out = { ...a, opacity: a.opacity * Math.max(0, Math.min(1, num(alpha.attributes?.slope, 1))) };
+        else if (type === 'table' && table.length === 2 && table[0] === 0 && Number.isFinite(table[1])) out = { ...a, opacity: a.opacity * Math.max(0, Math.min(1, table[1])) };
+        else if (type === 'identity') out = a;
+        break;
+      }
+      default: break;
+    }
+    if (!out) return null;
+    const name = String(node.attributes?.result ?? '').trim();
+    if (name) results.set(name, out);
+    last = out;
+  }
+  if (last.kind === 'source') return last.blur ? { blur: last.blur } : {};
+  if (last.kind !== 'over') return null;
+  const top = last.layers[last.layers.length - 1];
+  const below = last.layers.slice(0, -1);
+  if (top.kind !== 'source' || top.blur || !below.length || below.some((layer) => layer.kind !== 'shape')) return null;
+  return { shadows: below.map((layer) => ({ dx: layer.dx, dy: layer.dy, deviation: layer.blur, colour: layer.colour, opacity: layer.opacity })) };
+}
+
+/** A filter's effect (filterEffect) as the layer's own: its blur, or its drop shadows. */
+function applyEffect(part, effect, m) {
+  if (!part._children.Effects) part._children.Effects = deepClone(SECTION_DEFAULTS.Effects);
+  const effects = part._children.Effects._children;
+  const k = scaleOf(m);
+  if (effect.blur) effects.Filters.blur = round(effect.blur * k, 3);
+  if (effect.shadows) {
+    // CSS's blur is twice the deviation (utils/outlineShadows.js); the offset turned with the shape.
+    effects.Shadows.items = effect.shadows.map((shadow) => {
+      const origin = apply(m, 0, 0);
+      const to = apply(m, shadow.dx, shadow.dy);
+      return {
+        enabled: true, type: 'drop', offsetX: round(to.x - origin.x, 3), offsetY: round(to.y - origin.y, 3),
+        blur: round(shadow.deviation * 2 * k, 3), spread: 0, colour: argb(shadow.colour, shadow.opacity),
+      };
+    });
+  }
+}
+
 function blendEffects(mode) {
   const effects = deepClone(SECTION_DEFAULTS.Effects);
   effects._children.Blend.mode = mode;
@@ -694,8 +845,24 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     if (filterId && !filtered && !measuring) note('missing', label);
     const blend = String(own['mix-blend-mode'] ?? node.attributes?.['mix-blend-mode'] ?? '').trim();
     const group = node.name === 'g' || node.name === 'svg' || node.name === 'a' || node.name === 'switch' || node.name === 'use';
-    const groupBlend = group && CSS_BLEND_MODES.has(blend) && blend !== 'normal';
-    if (!measuring && sliced && (filtered || groupBlend)) {
+    let groupBlend = group && CSS_BLEND_MODES.has(blend) && blend !== 'normal';
+    // A group of one shape blends as that shape does: the blend mode is the shape's, and it stays a
+    // shape. (A group of several blends them as one, which only a picture of it draws.)
+    if (groupBlend && node.name !== 'use') {
+      const drawn = (node.children ?? []).filter((child) => child.name && !SKIPPED.has(child.name));
+      const [only] = drawn;
+      const ownBlend = only ? String(ownStyle(only, classes)['mix-blend-mode'] ?? only.attributes?.['mix-blend-mode'] ?? '').trim() : '';
+      if (drawn.length === 1 && SHAPES.has(only.name) && (!ownBlend || ownBlend === 'normal') && !refOf(only.attributes?.filter ?? ownStyle(only, classes).filter)) {
+        node = { ...node, children: node.children.map((child) => (child === only ? { ...child, attributes: { ...child.attributes, style: `${child.attributes?.style ?? ''};mix-blend-mode:${blend}` } } : child)) };
+        groupBlend = false;
+      }
+    }
+    // A filter that is a layer effect (a blur, a drop shadow) on a shape: the shape stays a shape, the
+    // effect its layer's own, which the Component Designer edits.
+    const filterValue = String(node.attributes?.filter ?? own.filter ?? '').trim();
+    const lone = /^url\(\s*["']?#[^)"'\s]+["']?\s*\)$/.test(filterValue);
+    const effect = filtered && lone && !measuring && SHAPES.has(node.name) ? fitsRegion(filterEffect(defs.filter.get(filterId), classes, defs.filter), defs.filter.get(filterId), node) : null;
+    if (!measuring && sliced && ((filtered && !effect) || groupBlend)) {
       note(filtered ? 'filter' : 'blend', label);
       pictureLayer(node, pictureOf);
       return;
@@ -740,7 +907,27 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     else if (node.name === 'text') textLayer(node, m, style, alpha, label, chain, here);
     else if (node.name === 'image') imageLayer(node, m, alpha, label, chain, here);
     else note('unknown', `<${node.name}>`);
+    if (effect && (effect.blur || effect.shadows)) {
+      note('effect', label);
+      for (let i = before; i < layers.length; i += 1) applyEffect(layers[i].part, effect, m);
+    }
     if (style.switchedOff) for (let i = before; i < layers.length; i += 1) layers[i].part.visible = false;
+  };
+
+  /**
+   * `effect` where the filter's region holds all of it (the shape, its shadows, three deviations of
+   * blur round each), else null: a region that cuts a shadow off is drawn by SVG, as a picture.
+   */
+  const fitsRegion = (effect, filter, node) => {
+    if (!effect || (!effect.blur && !effect.shadows)) return effect;
+    const box = ownBox(node);
+    if (!box) return null;
+    const grow = (b, by, dx = 0, dy = 0) => ({ x0: b.x + dx - by, y0: b.y + dy - by, x1: b.x + b.width + dx + by, y1: b.y + b.height + dy + by });
+    const parts = effect.blur ? [grow(box, effect.blur * 3)] : [grow(box, 0), ...effect.shadows.map((shadow) => grow(box, shadow.deviation * 3, shadow.dx, shadow.dy))];
+    const reach = { x0: Math.min(...parts.map((p) => p.x0)), y0: Math.min(...parts.map((p) => p.y0)), x1: Math.max(...parts.map((p) => p.x1)), y1: Math.max(...parts.map((p) => p.y1)) };
+    const region = filterRegion(filter, [box], IDENTITY);
+    const slack = 0.5;
+    return region.x <= reach.x0 + slack && region.y <= reach.y0 + slack && region.x + region.width >= reach.x1 - slack && region.y + region.height >= reach.y1 - slack ? effect : null;
   };
 
   // The elements whose filter region is being measured (a picture's box holds it).
@@ -755,7 +942,12 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const y0 = Math.min(...boxes.map((b) => b.y));
     const w = Math.max(...boxes.map((b) => b.x + b.width)) - x0;
     const h = Math.max(...boxes.map((b) => b.y + b.height)) - y0;
-    const a = filter?.attributes ?? {};
+    // Its region's attributes, each from the filter or, where it has none, the one it refers to (href).
+    const a = {};
+    for (let at = filter, depth = 0; at && depth < 8; depth += 1) {
+      for (const key of ['x', 'y', 'width', 'height', 'filterUnits']) if (a[key] == null && at.attributes?.[key] != null) a[key] = at.attributes[key];
+      at = defs.filter.get(String(at.attributes?.href ?? at.attributes?.['xlink:href'] ?? '').replace(/^#/, ''));
+    }
     const length = (value, fallback, whole) => {
       const text = String(value ?? '').trim();
       if (!text) return fallback;
@@ -927,7 +1119,11 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     }
     if (open && !strokeColour) return;
     let stroke = null;
-    if (strokeColour === 'gradient') {
+    // A stroke painted with a pattern: a picture of the stroke, over the shape (below).
+    let patternStroke = null;
+    if (strokeColour === 'gradient' && defs.paint.get(strokeRef)?.name === 'pattern') {
+      patternStroke = defs.paint.get(strokeRef);
+    } else if (strokeColour === 'gradient') {
       const target = defs.paint.get(strokeRef);
       const paint = target?.name === 'linearGradient' || target?.name === 'radialGradient' ? gradientPaint(target, opacityOf(style['stroke-opacity'])) : null;
       if (paint?.colour) stroke = { colour: paint.colour, width: round(Math.max(0.5, strokeWidth)) };
@@ -937,7 +1133,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
       stroke = { colour: argb(strokeColour, opacityOf(style['stroke-opacity']) * colourAlpha(strokeValue, style.color)), width: round(Math.max(0.5, strokeWidth)) };
     }
     const filled = fill.colour !== '00000000' || fill.gradient || fill.picture;
-    if (!stroke && !filled) return;
+    if (!stroke && !filled && !patternStroke) return;
 
     const emit = (paint, line, closed) => {
       const reach = line ? strokeWidth / 2 : 0;
@@ -964,7 +1160,34 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
       emit({ colour: '00000000', gradient: null, picture: '' }, stroke, false);
       return;
     }
-    emit(fill, stroke, !open);
+    if (stroke || filled) emit(fill, stroke, !open);
+    if (patternStroke) {
+      // As SVG strokes it: the outline in its own space, the pattern, the stroke's width, caps, joins
+      // and dashes, over the box the stroke can reach (a mitred corner past half its width).
+      const own = ownStyle(node, classes);
+      const extra = ['stroke-linecap', 'stroke-linejoin', 'stroke-miterlimit', 'stroke-dasharray', 'stroke-dashoffset']
+        .map((key) => [key, node.attributes?.[key] ?? own[key]]).filter(([, value]) => value != null)
+        .map(([key, value]) => ` ${key}="${String(value).replace(/"/g, '&quot;')}"`).join('');
+      const opacity = opacityOf(style['stroke-opacity']);
+      const reach = strokeWidth * 2;
+      const box = { x: round(bounds.x - reach, 3), y: round(bounds.y - reach, 3), width: round(bounds.width + reach * 2, 3), height: round(bounds.height + reach * 2, 3) };
+      const section = deepClone(SECTION_DEFAULTS.Background);
+      Object.assign(section._children.Fill, {
+        solidEnabled: false, imageEnabled: true, imageFit: 'stretch', imageOpacity: 100,
+        imageSrc: picture(box, `<g transform="${matrixText(m)}"><path d="${data}" fill="none" stroke="url(#${strokeRef})" stroke-width="${num(style['stroke-width'], 1)}"${opacity < 1 ? ` stroke-opacity="${opacity}"` : ''}${extra}/></g>`),
+      });
+      section._children.Border.enabled = false;
+      section._children.Corners.radius = 0;
+      const part = createPartNode(uniqueLayerName(`${label} outline`, taken), {
+        role: 'image',
+        kind: 'rectangle',
+        opacity: round(alpha, 3),
+        layout: { x: box.x, y: box.y, width: box.width, height: box.height, xUnit: 'px', yUnit: 'px', widthUnit: 'px', heightUnit: 'px', anchorX: 'left', anchorY: 'top' },
+        sections: { Background: section, ...(blend ? { Effects: blendEffects(blend) } : {}) },
+      });
+      applyMasks(part, box, masks);
+      layers.push({ name: label, part, box, names: chain });
+    }
   };
 
   const textLayer = (node, m, style, alpha, label, chain, stack) => {
@@ -1071,6 +1294,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   if (noted.has('link')) warnings.push(`Linked pictures that could not be read: ${list('link')}. Keep them beside the SVG, or embed them before exporting.`);
   if (noted.has('use')) warnings.push(`References to nothing in the file: ${list('use')}.`);
   if (noted.has('loop')) warnings.push(`References that loop back to what holds them, not drawn (as SVG does not draw them): ${list('loop')}.`);
+  if (noted.has('effect')) warnings.push(`SVG filters read as the layer's own blur or drop shadow, which the Component Designer edits: ${list('effect')}.`);
   if (noted.has('filter')) warnings.push(`Drawn as pictures of themselves, with their SVG filters (blur, drop shadow, lighting) as SVG draws them: ${list('filter')}. They are pictures, not shapes to edit.`);
   if (noted.has('blend')) warnings.push(`Groups with a blend mode, each drawn as a picture of itself so it blends as one: ${list('blend')}.`);
   if (noted.has('unknown')) warnings.push(`Not read: ${list('unknown')}.`);

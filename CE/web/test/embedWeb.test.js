@@ -137,7 +137,9 @@ test('a build of dist/ writes dist-embed/ to match it, and a failed one leaves n
 
 test('what is built is what is embedded: the build writes it, CMake takes it, the C++ inflates it', () => {
   const pkg = JSON.parse(read('CE/web/package.json'));
-  assert.equal(pkg.scripts.build, 'vite build', 'a step after the build can be left behind; the build writes dist-embed/');
+  // One vite build and nothing after it (given room: the build's two bundles pass 2 GB of heap, past
+  // what some machines give node by default).
+  assert.match(pkg.scripts.build, /^(node --max-old-space-size=\d+ node_modules\/vite\/bin\/vite\.js|vite) build$/, 'a step after the build can be left behind; the build writes dist-embed/');
   assert.match(read('CE/web/vite.config.js'), /plugins: \[[^\]]*embedPlayerBundle\(\)\]/);
   assert.match(read('CE/web/vite.config.js'), /manifest: true,/);
   const cmake = read('CMakeLists.txt');

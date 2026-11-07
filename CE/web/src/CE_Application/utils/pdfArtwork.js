@@ -360,6 +360,21 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
 
   const drawPath = (segments, { fill = false, stroke = false, evenOdd = false } = {}) => {
     if (!segments?.length || (!fill && !stroke)) return;
+    // A mesh as the fill's pattern: the path filled with its background colour, if it has one, and
+    // the mesh's picture cut to the path; then the stroke on its own.
+    const mesh = fill && state.fill.kind === 'shading' ? get(state.fill.id) : null;
+    if (mesh?.[0] === 'Mesh') {
+      const id = nextId('c');
+      defs.push(`<clipPath id="${id}" clipPathUnits="userSpaceOnUse"><path d="${segmentsText(segments)}"${evenOdd ? ' clip-rule="evenodd"' : ''}/></clipPath>`);
+      const matrix = multiply(flip, multiply(state.fill.base, state.fill.matrix ?? IDENTITY));
+      const background = mesh[7];
+      if (background && (Array.isArray(background) || ArrayBuffer.isView(background))) {
+        emit(`${shapeElement(segments)} fill="${hexOf(background)}"${state.fillAlpha < 1 ? ` fill-opacity="${num(state.fillAlpha)}"` : ''}${evenOdd ? ' fill-rule="evenodd"' : ''}${blendStyle()}/>`);
+      }
+      meshImage(mesh, matrix, [...state.clips, { id, segments, evenOdd }]);
+      if (stroke) drawPath(segments, { stroke: true });
+      return;
+    }
     let attributes = '';
     if (fill) {
       const f = paint(state.fill, state.fillAlpha, 'fill');
@@ -405,19 +420,22 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     drawPath(segments, how);
   };
 
+  /** A mesh drawn as a picture of itself, inside `clips`; false where it cannot be. */
+  const meshImage = (ir, matrix, clips) => {
+    const picture = meshPicture(ir, matrix);
+    if (!picture) return false;
+    const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
+    emit(`<image width="${picture.width}" height="${picture.height}" preserveAspectRatio="none" transform="${matrixText(picture.transform)}" href="${picture.href}"${opacity}${blendStyle()}/>`, clips);
+    return true;
+  };
+
   const shadingFill = (id) => {
     const ir = get(id);
     const matrix = multiply(flip, state.ctm);
     // A mesh (Illustrator's gradient mesh, a free-form or a patch shading): a picture of it, drawn
     // inside whatever clips it, where it was one mean colour.
-    if (ir?.[0] === 'Mesh') {
-      const picture = meshPicture(ir, matrix);
-      if (picture) {
-        const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
-        emit(`<image width="${picture.width}" height="${picture.height}" preserveAspectRatio="none" transform="${matrixText(picture.transform)}" href="${picture.href}"${opacity}${blendStyle()}/>`);
-        return;
-      }
-    }
+    // (One with no area, or no triangles, draws nothing, as in pdf.js.)
+    if (ir?.[0] === 'Mesh') { meshImage(ir, matrix, state.clips); return; }
     const value = gradient(ir, matrix) ?? '#808080';
     const alpha = state.fillAlpha < 1 ? ` fill-opacity="${num(state.fillAlpha)}"` : '';
     // Painted inside the innermost clip: the clip's shape, filled with it (Illustrator's gradient fill);
@@ -435,14 +453,17 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
   // drawn at (4,096 pixels at most): a page drew one of 34,862 by 4,332 pixels forty times, and
   // copying and encoding it each time never finished.
   const encoded = new Map();
+  // A picture's size to encode at, for one `drawn` pixels across: its own at most, else no finer than
+  // twice drawn (4,096 at most). One drawn larger than it is is left to the browser to smooth, as
+  // Acrobat and poppler draw it (pdf.js alone draws one not marked /Interpolate in blocks).
+  const fitPicture = (size, drawn) => Math.max(1, Math.min(size, Math.ceil(Math.min(4096, Math.max(drawn * 2, 64)))));
   const image = (picture) => {
     if (!picture) { note('image'); return; }
     const page = multiply(flip, state.ctm);
     const drawnW = Math.hypot(page[0], page[1]);
     const drawnH = Math.hypot(page[2], page[3]);
-    const fit = (size, drawn) => Math.max(1, Math.min(size, Math.ceil(Math.min(4096, Math.max(drawn * 2, 64)))));
-    const w = fit(picture.width, drawnW);
-    const h = fit(picture.height, drawnH);
+    const w = fitPicture(picture.width, drawnW);
+    const h = fitPicture(picture.height, drawnH);
     const key = `${w}x${h}`;
     let made = encoded.get(picture)?.get(key);
     if (made === undefined) {
@@ -465,12 +486,13 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     const picture = typeof mask?.data === 'string' ? get(mask.data) : mask;
     const { width: sw, height: sh, data } = picture ?? {};
     if (!sw || !sh || !data?.length) { note('image-mask'); return; }
-    const colour = state.fill.kind === 'colour' && /^#[0-9a-f]{6}$/i.test(state.fill.value) ? state.fill.value : null;
-    if (!colour) { if (state.fill.kind !== 'colour') note('pattern-fill'); return; }
+    const plain = state.fill.kind === 'colour' && /^#[0-9a-f]{6}$/i.test(state.fill.value) ? state.fill.value : null;
+    if (!plain && state.fill.kind === 'colour') return;
+    // Painted with a pattern or a gradient: the stencil is the mask of that paint over its square.
+    const colour = plain ?? '#ffffff';
     const page = multiply(multiply(flip, state.ctm), at);
-    const fit = (size, drawn) => Math.max(1, Math.min(size, Math.ceil(Math.min(4096, Math.max(drawn * 2, 64)))));
-    const w = fit(sw, Math.hypot(page[0], page[1]));
-    const h = fit(sh, Math.hypot(page[2], page[3]));
+    const w = fitPicture(sw, Math.hypot(page[0], page[1]));
+    const h = fitPicture(sh, Math.hypot(page[2], page[3]));
     const key = `${w}x${h}${colour}`;
     let made = encoded.get(data)?.get(key);
     if (made === undefined) {
@@ -480,7 +502,16 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     }
     const m = multiply(page, [1 / w, 0, 0, -1 / h, 0, 1]);
     const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
-    emit(`<image width="${w}" height="${h}" preserveAspectRatio="none" transform="${matrixText(m)}" href="${made}"${opacity}${blendStyle()}/>`);
+    const stencil = `<image width="${w}" height="${h}" preserveAspectRatio="none" transform="${matrixText(m)}" href="${made}"`;
+    if (plain) {
+      emit(`${stencil}${opacity}${blendStyle()}/>`);
+      return;
+    }
+    const id = nextId('m');
+    defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" x="${num(-width)}" y="${num(-height)}" width="${num(width * 3)}" height="${num(height * 3)}" style="mask-type:alpha">${stencil}/></mask>`);
+    const f = paint(state.fill, state.fillAlpha, 'fill');
+    const corners = [[0, 0], [1, 0], [1, 1], [0, 1]].map(([x, y]) => apply(page, x, y));
+    emit(`<path d="M${corners.map((p) => p.map(num).join(' ')).join('L')}Z" fill="${f.value}"${f.alpha < 1 ? ` fill-opacity="${num(f.alpha)}"` : ''} mask="url(#${id})"${blendStyle()}/>`);
   };
 
   // --- Text ---

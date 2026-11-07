@@ -22,9 +22,13 @@
  *   - Groups: Pass Through paints its layers straight onto what is below; any other mode, Normal
  *     included, composites the group on its own first and then blends the result, as Photoshop does.
  *
+ *   - A fill layer saved without pixels (a shape, a Color or Gradient Fill): its colour or gradient
+ *     (Photoshop's styles and angle, across the layer's box) inside its vector mask, the mask's paths
+ *     filled and joined by their operations.
+ *
  * What it does not, and says so by layer name (`notDrawn`): layer effects (shadows, glows, strokes —
- * Photoshop does not store them as pixels), vector masks (paths, not pixels), adjustment layers (they
- * have no pixels; they change the ones below), and Dissolve's noise.
+ * Photoshop does not store them as pixels), a vector mask on a layer of pixels, adjustment layers
+ * (they have no pixels; they change the ones below), and Dissolve's noise.
  *
  * Compositing is the W3C model, which is Photoshop's: the colour is blended with the backdrop first,
  * in proportion to the backdrop's coverage, and the result composited source-over:
@@ -36,6 +40,9 @@
  * Buffers are straight (not premultiplied) RGBA as Float32 0..1; the result is 8-bit RGBA.
  * Pure and canvas-free, so node tests it exactly as the editor runs it.
  */
+
+import { psdRgb } from './psdAdjustments.js';
+import { psdGradient } from './psdVectors.js';
 
 const clamp = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -178,13 +185,16 @@ function maskSampler(layer) {
 
 /** Paint a raster layer's pixels into `dst` (document-sized) with `mode` at `alpha`. */
 function paintLayer(dst, width, height, layer, mode, alpha) {
-  const src = layer.imageData;
+  // A fill layer saved without its pixels (a shape, a Color or Gradient Fill): drawn from its fill and
+  // its vector mask, over the whole document.
+  const own = layer.imageData?.data?.length ? layer.imageData : null;
+  const src = own ?? fillPicture(layer, width, height);
   if (!src?.data?.length || alpha <= 0) return false;
   const mask = maskSampler(layer);
   const separable = SEPARABLE[mode];
   const nonSeparable = separable ? null : NON_SEPARABLE[mode] ?? SEPARABLE.normal;
-  const left = Math.round(layer.left ?? 0);
-  const top = Math.round(layer.top ?? 0);
+  const left = own ? Math.round(layer.left ?? 0) : 0;
+  const top = own ? Math.round(layer.top ?? 0) : 0;
   for (let sy = 0; sy < src.height; sy += 1) {
     const y = top + sy;
     if (y < 0 || y >= height) continue;
@@ -203,6 +213,178 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
 }
 
 const isGroup = (layer) => Array.isArray(layer?.children);
+
+// --- Fill layers without pixels ------------------------------------------------------------------
+
+const drawnFills = new WeakMap();
+/** A fill layer with no pixels of its own, drawn: `{ width, height, data }` over the document, or null. */
+function fillPicture(layer, width, height) {
+  if (!layer?.vectorFill || layer.imageData?.width > 0) return null;
+  const key = `${width}x${height}`;
+  if (drawnFills.get(layer)?.key === key) return drawnFills.get(layer).picture;
+  let picture = null;
+  const coverage = vectorCoverage(layer.vectorMask, width, height);
+  const box = coverage ? coverageBounds(coverage, width, height) : { x: 0, y: 0, width, height };
+  const paint = box ? fillPaint(layer.vectorFill, box) : null;
+  if (paint) {
+    const data = new Uint8ClampedArray(width * height * 4);
+    for (let y = box.y; y < box.y + box.height; y += 1) {
+      for (let x = box.x; x < box.x + box.width; x += 1) {
+        const c = coverage ? coverage[y * width + x] : 1;
+        if (c <= 0) continue;
+        const [r, g, b, a] = paint(x + 0.5, y + 0.5);
+        const i = (y * width + x) * 4;
+        data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = Math.round(255 * a * Math.min(1, c));
+      }
+    }
+    picture = { width, height, data };
+  }
+  drawnFills.set(layer, { key, picture });
+  return picture;
+}
+
+/** What a fill paints at a point: a colour, or a gradient across `box` as CEditor draws one. */
+function fillPaint(fill, box) {
+  if (fill.type === 'color') {
+    const [r, g, b] = psdRgb(fill.color);
+    return () => [r, g, b, 1];
+  }
+  const gradient = fill.type === 'pattern' ? null : psdGradient(fill);
+  if (!gradient) return null;
+  const stops = gradient.stops.map((stop) => ({
+    t: stop.position / 100,
+    a: parseInt(stop.color.slice(0, 2), 16) / 255,
+    rgb: [2, 4, 6].map((i) => parseInt(stop.color.slice(i, i + 2), 16)),
+  }));
+  const at = (t) => {
+    if (t <= stops[0].t) return [...stops[0].rgb, stops[0].a];
+    for (let i = 1; i < stops.length; i += 1) {
+      if (t <= stops[i].t) {
+        const k = (t - stops[i - 1].t) / Math.max(1e-6, stops[i].t - stops[i - 1].t);
+        return [...stops[i - 1].rgb.map((v, c) => v + (stops[i].rgb[c] - v) * k), stops[i - 1].a + (stops[i].a - stops[i - 1].a) * k];
+      }
+    }
+    const last = stops[stops.length - 1];
+    return [...last.rgb, last.a];
+  };
+  // Photoshop's geometry, aligned with the layer: the line through the box's centre at the angle
+  // (counter-clockwise from the right), as long as the box is across it, times the scale.
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  const theta = ((Number(fill.angle) || 0) * Math.PI) / 180;
+  const ux = Math.cos(theta);
+  const uy = -Math.sin(theta);
+  const length = ((Math.abs(box.width * ux) + Math.abs(box.height * uy)) || 1) * ((Number(fill.scale) || 100) / 100);
+  const half = length / 2;
+  const style = String(fill.style ?? 'linear');
+  return (x, y) => {
+    const px = x - cx;
+    const py = y - cy;
+    const along = px * ux + py * uy;
+    const across = -px * uy + py * ux;
+    let t;
+    if (style === 'reflected') t = Math.abs(along) / half;
+    else if (style === 'radial') t = Math.hypot(px, py) / half;
+    else if (style === 'diamond') t = (Math.abs(along) + Math.abs(across)) / half;
+    else if (style === 'angle') t = (((Math.atan2(-py, px) - theta) / (2 * Math.PI)) % 1 + 1) % 1;
+    else t = along / length + 0.5;
+    const [r, g, b, a] = at(Math.max(0, Math.min(1, t)));
+    return [r, g, b, a];
+  };
+}
+
+/**
+ * A vector mask as coverage of the document's pixels (0 to 1), or null where it shows everything: each
+ * path filled (non-zero), joined to those before by its operation, as Photoshop combines them.
+ */
+function vectorCoverage(vectorMask, width, height) {
+  const paths = (vectorMask?.paths ?? []).filter((path) => (path.knots ?? []).length >= 2);
+  if (!paths.length) {
+    if (vectorMask?.invert) return new Float32Array(width * height);
+    return null;
+  }
+  let result = vectorMask.fillStartsWithAllPixels ? new Float32Array(width * height).fill(1) : null;
+  for (const path of paths) {
+    const p = pathCoverage(path, width, height);
+    if (!result) { result = path.operation === 'subtract' ? new Float32Array(width * height) : p; continue; }
+    for (let i = 0; i < result.length; i += 1) {
+      const a = result[i];
+      const b = p[i];
+      switch (path.operation) {
+        case 'subtract': result[i] = a * (1 - b); break;
+        case 'intersect': result[i] = a * b; break;
+        case 'exclude': result[i] = a + b - 2 * a * b; break;
+        default: result[i] = a + b - a * b;
+      }
+    }
+  }
+  if (vectorMask.invert) for (let i = 0; i < result.length; i += 1) result[i] = 1 - result[i];
+  return result;
+}
+
+/** One path of a vector mask as coverage: its Béziers flattened, filled non-zero, four rows a pixel. */
+function pathCoverage(path, width, height) {
+  const knots = path.knots;
+  const points = [];
+  const segment = (a, b) => {
+    // From a's anchor through a's outgoing and b's incoming handles to b's anchor.
+    const p0 = [a.points[2], a.points[3]];
+    const p1 = [a.points[4], a.points[5]];
+    const p2 = [b.points[0], b.points[1]];
+    const p3 = [b.points[2], b.points[3]];
+    const reach = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) + Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) + Math.hypot(p3[0] - p2[0], p3[1] - p2[1]);
+    const steps = Math.max(1, Math.min(64, Math.ceil(reach / 2)));
+    for (let k = points.length ? 1 : 0; k <= steps; k += 1) {
+      const t = k / steps;
+      const u = 1 - t;
+      points.push([
+        u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+        u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+      ]);
+    }
+  };
+  for (let i = 1; i < knots.length; i += 1) segment(knots[i - 1], knots[i]);
+  segment(knots[knots.length - 1], knots[0]);
+  const out = new Float32Array(width * height);
+  const ys = points.map((p) => p[1]);
+  const top = Math.max(0, Math.floor(Math.min(...ys)));
+  const bottom = Math.min(height - 1, Math.ceil(Math.max(...ys)));
+  const ROWS = 4;
+  for (let y = top; y <= bottom; y += 1) {
+    for (let k = 0; k < ROWS; k += 1) {
+      const sy = y + (k + 0.5) / ROWS;
+      const crossings = [];
+      for (let i = 0; i < points.length; i += 1) {
+        const [x0, y0] = points[i];
+        const [x1, y1] = points[(i + 1) % points.length];
+        if ((y0 <= sy && y1 > sy) || (y1 <= sy && y0 > sy)) crossings.push({ x: x0 + ((sy - y0) / (y1 - y0)) * (x1 - x0), w: y1 > y0 ? 1 : -1 });
+      }
+      crossings.sort((a, b) => a.x - b.x);
+      let winding = 0;
+      for (let i = 0; i < crossings.length - 1; i += 1) {
+        winding += crossings[i].w;
+        if (!winding) continue;
+        const xa = Math.max(0, crossings[i].x);
+        const xb = Math.min(width, crossings[i + 1].x);
+        for (let x = Math.floor(xa); x < Math.ceil(xb); x += 1) {
+          out[y * width + x] += (Math.min(xb, x + 1) - Math.max(xa, x)) / ROWS;
+        }
+      }
+    }
+  }
+  return out;
+}
+
+function coverageBounds(coverage, width, height) {
+  let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (coverage[y * width + x] <= 0) continue;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+  }
+  return x1 < 0 ? null : { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
+}
 // Inside a group drawn on its own, a knockout reaches only its clear start.
 const CLEAR = Object.freeze({ shallow: null, deep: null });
 
@@ -232,7 +414,9 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
   const note = (layer) => {
     const name = layer.name || 'unnamed';
     if (hasEffects(layer)) notDrawn.effects.push(name);
-    if (layer.vectorMask && !(layer.mask?.imageData && !layer.mask.fromVectorData)) notDrawn.vectorMask.push(name);
+    // (A fill layer with no pixels is drawn from its vector mask: fillPicture.)
+    const drawnFromVectors = layer.vectorFill && !(layer.imageData?.width > 0) && layer.vectorFill.type !== 'pattern';
+    if (layer.vectorMask && !drawnFromVectors && !(layer.mask?.imageData && !layer.mask.fromVectorData)) notDrawn.vectorMask.push(name);
     if (layer.adjustment) notDrawn.adjustment.push(name);
   };
 

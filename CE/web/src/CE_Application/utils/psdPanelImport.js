@@ -26,7 +26,7 @@
  * Pure: bytes in, plan out, in the shape buildSvgImportControls takes, so both importers build and
  * name controls identically. The menu command is stores/psdPanelImportActions.js.
  */
-import { readPhotoshop } from './psdRead.js';
+import { convertedNotice, readPhotoshop } from './psdRead.js';
 import { PLACEHOLDER_LAYER_NAMES, ROLE_CONTROL_TYPES, colourRole, roleFromName } from './svgPanelImport.js';
 import { pngDataUrl } from './pngEncode.js';
 import { compositePsd } from './psdComposite.js';
@@ -148,6 +148,7 @@ export function planPsdPanelImport(bytes) {
   const { pixels, painted, notDrawn } = compositePsd(psd.children, width, height, { skip: (layer) => layer === group });
 
   const warnings = [];
+  if (read.converted) warnings.push(convertedNotice(read.converted));
   if (!placeholders.length) warnings.push(`The "${group.name}" group has no layers to place.`);
   const outside = placeholders.filter((p) => p.x + p.width <= 0 || p.y + p.height <= 0 || p.x >= width || p.y >= height);
   if (outside.length) warnings.push(`${outside.length} placeholder(s) sit outside the canvas and will be off the panel.`);

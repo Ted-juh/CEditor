@@ -30,7 +30,7 @@
  *
  * Pure: bytes in, `{ ok, component, kind, layers, warnings }` out.
  */
-import { readPhotoshop } from './psdRead.js';
+import { convertedNotice, readPhotoshop } from './psdRead.js';
 // ag-psd is told once, by the panel importer, to make its pixel arrays without a canvas.
 import './psdPanelImport.js';
 import { compositePsd, layerMaskSampler } from './psdComposite.js';
@@ -62,8 +62,20 @@ const NEAREST_BLEND = {
 const isGroup = (layer) => Array.isArray(layer?.children);
 // A layer's knockout: 0 none, 1 shallow, 2 deep (utils/psdRead.js reads the level).
 const knockoutOf = (layer) => Number(layer?.knockoutLevel ?? (layer?.knockout ? 1 : 0));
+// Whether a group holds a layer that knocks out (any, or to the group's start: shallow).
 const knocksInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
   && (knockoutOf(layer) > 0 || (isGroup(layer) && knocksInside(layer))));
+// Whether a group holds a layer that blends in a mode of its own (Multiply, Screen, ...).
+const blendsInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
+  && (!['normal', 'pass through'].includes(String(layer.blendMode ?? 'normal')) || (isGroup(layer) && blendsInside(layer))));
+const knocksShallowInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
+  && (knockoutOf(layer) === 1 || (isGroup(layer) && knocksShallowInside(layer))));
+/** An AARRGGBB colour at `k` of its opacity. */
+const fadeArgb = (colour, k) => {
+  const hex = String(colour ?? '');
+  if (k >= 1 || !/^[0-9a-f]{8}$/i.test(hex)) return colour;
+  return `${Math.round(parseInt(hex.slice(0, 2), 16) * Math.max(0, k)).toString(16).padStart(2, '0')}${hex.slice(2)}`.toUpperCase();
+};
 const round = (value, places = 2) => Math.round(value * 10 ** places) / 10 ** places;
 
 function svgPicture(svg) {
@@ -185,7 +197,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   const taken = new Set();
   const report = {
     kept: new Set(), drawn: new Set(), approximated: new Set(), unsupported: new Set(), nearest: new Set(),
-    flattened: new Set(), adjustedInGroup: new Set(), pattern: new Set(), knockout: new Set(),
+    flattened: new Set(), adjustedInGroup: new Set(), pattern: new Set(),
   };
 
   const blendOf = (layer, label) => {
@@ -249,15 +261,21 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     // Text the file says plainly is set as text, editable; with styles it is its picture, styles drawn.
     const section = !isGroup(unit) && !clipped.length && !hasDrawnStyles(unit.effects) ? textSection(unit) : null;
     if (section) {
+      // Its Fill opacity on its type, not on its styles.
+      if ((unit.fillOpacity ?? 1) < 1) section._children.Fill.colour = fadeArgb(section._children.Fill.colour, unit.fillOpacity);
       const box = { x: unit.left ?? 0, y: unit.top ?? 0, width: Math.max(1, (unit.right ?? 0) - (unit.left ?? 0)), height: Math.max(1, (unit.bottom ?? 0) - (unit.top ?? 0)) };
       records.push({ type: 'text', label, chain, visible, alpha, css, box, section, shadows: shadowsOf(unit), mask: maskOver(unit, box) });
       return;
     }
 
     // A shape layer: its paths, filled and stroked, as a vector layer you can still reshape.
-    const fill = !isGroup(unit) && unit.vectorFill && unit.vectorMask?.paths?.length && !clippedPixels.length ? vectorFillOf(unit.vectorFill) : null;
+    // A fill layer with no vector mask fills the whole document (Layer › New Fill Layer).
+    const wholeFill = !isGroup(unit) && unit.vectorFill && !unit.vectorMask?.paths?.length && !(unit.imageData?.width > 0);
+    const fill = !isGroup(unit) && unit.vectorFill && (unit.vectorMask?.paths?.length || wholeFill) && !clippedPixels.length ? vectorFillOf(unit.vectorFill) : null;
     if (fill) {
-      const outline = combinedPathData(unit.vectorMask, { geometry, everything });
+      const outline = wholeFill
+        ? { d: `M0 0L${width} 0L${width} ${height}L0 ${height}Z`, fillRule: 'nonzero' }
+        : combinedPathData(unit.vectorMask, { geometry, everything });
       const model = outline ? parsePathData(outline.d) : [];
       const bounds = model.length ? modelBounds(model) : null;
       if (bounds && bounds.width > 0 && bounds.height > 0) {
@@ -265,10 +283,17 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
         const strokeWidth = stroke?.width ?? 0;
         const box = { x: bounds.x - strokeWidth / 2, y: bounds.y - strokeWidth / 2, width: bounds.width + strokeWidth, height: bounds.height + strokeWidth };
         const noFill = unit.vectorStroke?.fillEnabled === false;
+        // Its Fill opacity on its fill and its stroke, not on its styles.
+        const content = unit.fillOpacity ?? 1;
+        const faded = (paint) => (paint && content < 1 ? {
+          ...paint,
+          colour: fadeArgb(paint.colour, content),
+          ...(paint.gradient ? { gradient: { ...paint.gradient, stops: paint.gradient.stops.map((stop) => ({ ...stop, color: fadeArgb(stop.color, content) })) } } : {}),
+        } : paint);
         records.push({
           type: 'vector', label, chain, visible, alpha, css, box,
-          fill: noFill ? { colour: '00000000', gradient: null } : fill,
-          stroke,
+          fill: noFill ? { colour: '00000000', gradient: null } : faded(fill),
+          stroke: faded(stroke),
           pathData: serializePathData(normalizeTo(model, bounds), 5),
           fillRule: outline.fillRule,
           shadows: shadowsOf(unit),
@@ -328,8 +353,54 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     }
   };
 
-  /** A layer list, bottom first, as Photoshop stacks it: each base with the layers clipped to it. */
-  const walk = (list, opacity, names, hidden) => {
+  /**
+   * A knockout through layers that are layers of their own (Blending Options › Knockout): each layer
+   * read since `from` that it reaches (not the Background) gets a hole its shape, as deep as its
+   * opacity. A picture's own pixels are cut; a shape's or text's mask takes the hole.
+   */
+  const cutBelow = (unit, strength, from) => {
+    const alone = { ...unit, hidden: false, opacity: 1, fillOpacity: 1, blendMode: 'normal', clipping: false, knockoutLevel: 0, knockout: false };
+    const { pixels: shape } = compositePsd([alone], width, height);
+    const cover = (x, y) => (x >= 0 && y >= 0 && x < width && y < height ? (shape[(y * width + x) * 4 + 3] / 255) * strength : 0);
+    for (let r = from; r < records.length; r += 1) {
+      const record = records[r];
+      if (record.background) continue;
+      if (record.type === 'picture') {
+        const { x: bx, y: by, width: bw, height: bh } = record.box;
+        for (let y = 0; y < bh; y += 1) {
+          for (let x = 0; x < bw; x += 1) {
+            const c = cover(bx + x, by + y);
+            if (c > 0) record.pixels[(y * bw + x) * 4 + 3] = Math.round(record.pixels[(y * bw + x) * 4 + 3] * (1 - c));
+          }
+        }
+        continue;
+      }
+      const w = Math.max(1, Math.ceil(record.box.width));
+      const h = Math.max(1, Math.ceil(record.box.height));
+      const hole = new Uint8Array(w * h * 4);
+      let cut = false;
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) {
+          const c = cover(Math.floor(record.box.x + ((x + 0.5) * record.box.width) / w), Math.floor(record.box.y + ((y + 0.5) * record.box.height) / h));
+          const p = (y * w + x) * 4;
+          hole[p] = 255; hole[p + 1] = 255; hole[p + 2] = 255; hole[p + 3] = Math.round(255 * (1 - c));
+          if (c > 0) cut = true;
+        }
+      }
+      if (!cut) continue;
+      const src = pngDataUrl(w, h, hole);
+      const own = record.mask?.enabled ? record.mask : null;
+      record.mask = own
+        ? { ...own, src: svgPicture(`<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none"><defs><mask id="k" style="mask-type:alpha"><image href="${src}" width="${w}" height="${h}" preserveAspectRatio="none"/></mask></defs><image href="${own.src}" width="${w}" height="${h}" preserveAspectRatio="none" mask="url(#k)"/></svg>`) }
+        : { enabled: true, src, x: 0, y: 0, width: 100, height: 100, invert: false };
+    }
+  };
+
+  /**
+   * A layer list, bottom first, as Photoshop stacks it: each base with the layers clipped to it.
+   * `start`: the first record of the group being read, where a shallow knockout in it stops.
+   */
+  const walk = (list, opacity, names, hidden, start = 0, top = true) => {
     const all = list ?? [];
     for (let i = 0; i < all.length; i += 1) {
       const base = all[i];
@@ -341,25 +412,33 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
         continue;
       }
       const unit = hidden ? { ...base, hidden: true } : base;
+      // A knockout cuts what is under it first: to its group's start (shallow), or to the Background
+      // (deep, and either at the top of the file).
+      const knock = knockoutOf(base);
+      if (knock > 0 && !base.hidden && !hidden) cutBelow(base, opacity * (base.opacity ?? 1), knock >= 2 || top ? 0 : start);
       if (isGroup(base)) {
         const mode = String(base.blendMode ?? 'pass through');
-        // A knockout cuts through the layers under it, which as layers of their own it cannot: a group
-        // holding a layer that knocks out is one picture, drawn as Photoshop draws it. One that knocks
-        // out itself cuts through layers outside it, and is said.
+        // A group holding a knockout that stops at it is one picture, drawn as Photoshop draws it: one
+        // that knocks out to the group's start (shallow), or any in a group of its own mode, Normal
+        // included, which Photoshop puts together on its own. A deep one in a Pass Through group
+        // reaches past it to the Background, and cuts the layers on its way (cutBelow).
+        // A Normal group whose layers blend (Multiply, Screen) blends them with each other only, not with
+        // what is under the group: one picture too.
         const isolated = (mode !== 'pass through' && mode !== 'normal') || clipped.length || (base.mask && !base.mask.disabled)
-          || knocksInside(base);
-        if (knockoutOf(base) > 0 && !base.hidden && !hidden) report.knockout.add(base.name || 'a group');
+          || knocksShallowInside(base) || (mode !== 'pass through' && (knocksInside(base) || blendsInside(base)));
         if (isolated) {
           report.flattened.add(base.name || 'a group');
           if ((base.children ?? []).some((child) => child.adjustment)) report.adjustedInGroup.add(base.name || 'a group');
           unitRecord(unit, clipped, opacity, names);
         } else {
-          walk(base.children, opacity * (base.opacity ?? 1) * (base.fillOpacity ?? 1), base.name ? [base.name, ...names] : names, hidden || base.hidden);
+          walk(base.children, opacity * (base.opacity ?? 1) * (base.fillOpacity ?? 1), base.name ? [base.name, ...names] : names, hidden || base.hidden, records.length, false);
         }
         continue;
       }
-      if (knockoutOf(base) > 0 && !base.hidden && !hidden) report.knockout.add(base.name || 'a layer');
+      const before = records.length;
       unitRecord(unit, clipped, opacity, names);
+      // The Background layer (the bottom one, its transparency locked), which a knockout stops at.
+      if (top && i === 0 && base.transparencyProtected && records.length > before) records[before].background = true;
     }
   };
   walk(psd.children, 1, [], false);
@@ -481,13 +560,13 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   }
   const warnings = [];
   const list = (set) => [...set].slice(0, 5).join(', ') + (set.size > 5 ? ` and ${set.size - 5} more` : '');
+  if (read.converted) warnings.push(convertedNotice(read.converted));
   if (report.drawn.size) warnings.push(`Layer styles drawn into the pictures, close to Photoshop's: ${list(report.drawn)}.`);
   if (report.approximated.size) warnings.push(`Adjustments applied close to Photoshop's: ${list(report.approximated)}.`);
   if (report.unsupported.size) warnings.push(`Adjustments not applied: ${list(report.unsupported)}. Merge them into the layers below in Photoshop first.`);
   if (report.adjustedInGroup.size) warnings.push(`Adjustment layers inside groups with their own blend mode are not applied: ${list(report.adjustedInGroup)}.`);
   if (report.nearest.size) warnings.push(`Blend modes drawn as the nearest one the editor has: ${list(report.nearest)}.`);
-  if (report.flattened.size) warnings.push(`Groups with their own blend mode, mask or knockout are one layer each: ${list(report.flattened)}.`);
-  if (report.knockout.size) warnings.push(`Knockout through the layers under it is not drawn for a layer outside a group: ${list(report.knockout)}. Put it in a group with what it cuts through.`);
+  if (report.flattened.size) warnings.push(`Groups drawn as one layer each, as Photoshop puts them together on their own (their own blend mode or mask, a knockout inside, or a Normal group whose layers blend): ${list(report.flattened)}.`);
   if (report.pattern.size) warnings.push(`Pattern-filled shapes come in as their pictures: ${list(report.pattern)}.`);
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'Photoshop Artwork';

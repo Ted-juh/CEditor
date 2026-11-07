@@ -111,3 +111,26 @@ test('resolveInteractiveControl applies the policy on the resolved tree', () => 
   const stretch = resolveInteractiveControl(makeControl({ mode: 'stretch', parts: { knob: pxPart() } }), {});
   assert.equal(stretch.control._children.Parts._children.knob._children.Layout.width, 40);
 });
+
+test('scaleInternals scales a layer\'s shadows, blur and bevel with it, as a picture of it would show them', () => {
+  const control = makeControl({
+    parts: {
+      p: pxPart({
+        Effects: {
+          _type: 'Effects',
+          _children: {
+            Shadows: { _type: 'Shadows', items: [{ enabled: true, type: 'drop', offsetX: 2, offsetY: 3, blur: 4, spread: 1, colour: '66000000' }] },
+            Filters: { _type: 'Filters', blur: 1.5 },
+            Bevel: { _type: 'Bevel', enabled: true, size: 5 },
+          },
+        },
+      }),
+    },
+  });
+  assert.equal(applyCustomInternalScale(control), true);
+  const effects = control._children.Parts._children.p._children.Effects._children;
+  // Twice the design size across and down.
+  assert.deepEqual(effects.Shadows.items[0], { enabled: true, type: 'drop', offsetX: 4, offsetY: 6, blur: 8, spread: 2, colour: '66000000' });
+  assert.equal(effects.Filters.blur, 3);
+  assert.equal(effects.Bevel.size, 10);
+});

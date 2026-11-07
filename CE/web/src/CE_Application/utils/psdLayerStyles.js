@@ -108,13 +108,14 @@ export function hasDrawnStyles(effects) {
 function gradientAt(gradient, t) {
   const colours = [...(gradient?.colorStops ?? [])].sort((a, b) => a.location - b.location);
   const opacities = [...(gradient?.opacityStops ?? [])].sort((a, b) => a.location - b.location);
-  const at = clamp01(t) * 4096;
+  // Stops 0..1 as ag-psd gives them (0..4096 as the file writes them, if given so).
+  const at = clamp01(t) * ([...colours, ...opacities].some((stop) => stop.location > 1) ? 4096 : 1);
   const lerpStops = (stops, get, fallback) => {
     if (!stops.length) return fallback;
     if (at <= stops[0].location) return get(stops[0]);
     for (let i = 1; i < stops.length; i += 1) {
       if (at <= stops[i].location) {
-        const k = (at - stops[i - 1].location) / Math.max(1, stops[i].location - stops[i - 1].location);
+        const k = (at - stops[i - 1].location) / Math.max(1e-9, stops[i].location - stops[i - 1].location);
         const a = get(stops[i - 1]); const b = get(stops[i]);
         return Array.isArray(a) ? a.map((v, j) => v + (b[j] - v) * k) : a + (b - a) * k;
       }

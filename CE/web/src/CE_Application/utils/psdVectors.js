@@ -54,23 +54,32 @@ export function combinedPathData(vectorMask, { geometry = null, everything = nul
 const hex2 = (v) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
 const argb = (rgb, alpha = 1) => `${hex2(alpha * 255)}${rgb.map(hex2).join('')}`.toUpperCase();
 
-/** Photoshop's gradient (colour and opacity stops, 0..4096) as the fill's gradient. */
+/**
+ * Where a gradient's stops run to: ag-psd gives them 0..1 (the file's 0..4096 divided out); 4096 for
+ * stops given as the file writes them.
+ */
+export function stopScale(...lists) {
+  return lists.flat().some((stop) => Number(stop?.location) > 1) ? 4096 : 1;
+}
+
+/** Photoshop's gradient (colour and opacity stops) as the fill's gradient. */
 export function psdGradient(content) {
   const colours = [...(content?.colorStops ?? [])].sort((a, b) => a.location - b.location);
   if (colours.length < 2) return null;
   const opacities = [...(content?.opacityStops ?? [])].sort((a, b) => a.location - b.location);
+  const scale = stopScale(colours, opacities);
   const opacityAt = (location) => {
     if (!opacities.length) return 1;
     if (location <= opacities[0].location) return opacities[0].opacity ?? 1;
     for (let i = 1; i < opacities.length; i += 1) {
       if (location <= opacities[i].location) {
-        const k = (location - opacities[i - 1].location) / Math.max(1, opacities[i].location - opacities[i - 1].location);
+        const k = (location - opacities[i - 1].location) / Math.max(1e-9, opacities[i].location - opacities[i - 1].location);
         return (opacities[i - 1].opacity ?? 1) + ((opacities[i].opacity ?? 1) - (opacities[i - 1].opacity ?? 1)) * k;
       }
     }
     return opacities[opacities.length - 1].opacity ?? 1;
   };
-  let stops = colours.map((stop) => ({ color: argb(psdRgb(stop.color), opacityAt(stop.location)), position: Math.round((stop.location / 4096) * 1000) / 10 }));
+  let stops = colours.map((stop) => ({ color: argb(psdRgb(stop.color), opacityAt(stop.location)), position: Math.round((stop.location / scale) * 1000) / 10 }));
   if (content.reverse) stops = stops.map((stop) => ({ ...stop, position: Math.round((100 - stop.position) * 10) / 10 })).reverse();
   const style = String(content.style ?? content.type ?? 'linear');
   if (style === 'radial') {
