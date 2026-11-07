@@ -85,7 +85,7 @@ any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
 | Gradients | Linear and radial: the shape filled with the gradient (Illustrator writes the shape as a clip and paints the gradient inside it). A mesh or freeform gradient is drawn in its mean colour |
 | Clipping masks | The layer's mask, as for SVG |
 | Opacity, blend modes, transparency groups | Kept |
-| Placed and embedded images | Picture layers, no finer than twice the size they are drawn at (4,096 pixels at most). JBIG2 (black-and-white scans) and JPEG 2000 pictures are not read: their decoders are not carried, and the Console lists them |
+| Placed and embedded images | Picture layers, no finer than twice the size they are drawn at (4,096 pixels at most). JBIG2 (black-and-white scans) and JPEG 2000 pictures are read too: pdf.js's decoders for them come with the editor and are fetched only for a file that needs one |
 | Text | Text in the font the file names, its size and colour |
 | CMYK colour | Converted as pdf.js shows it, as Acrobat does without colour management |
 | Sublayers and object names | Not read: Illustrator keeps them only in its own private data, which is undocumented. Name a moving part as a top-level layer, or export SVG |
@@ -232,9 +232,9 @@ app reads from there; the browser cannot, and asks for a `.glb`). It makes a com
   the panel the control is placed on stands in for it, its shadow and all.
 - The model is turned from glTF's y up to look down on it, and fitted to the 3D part's square about the
   knob's axis. Its camera, lights and textures are not used, and the notice says so.
-- Meshes compressed with meshoptimizer (gltfpack's) are read. Draco-compressed meshes and KTX2
-  (Basis Universal) textures are not: the notice says so, and how to export the model again (in
-  Blender, glTF 2.0 with Data › Compression off).
+- Meshes compressed with meshoptimizer (gltfpack's) or Draco are read; three.js's Draco decoder comes
+  with the editor and is fetched only for a model that needs it. A model whose textures are KTX2
+  (Basis Universal) is read with its textures left out, as every model's are.
 
 The model is kept in the component (as the file's bytes), so it renders again when a setting changes.
 It draws as a real-time renderer does: soft shadows and a studio's reflections, but no light bouncing

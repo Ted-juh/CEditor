@@ -174,11 +174,13 @@
     return `${toHex(r)}${toHex(g)}${toHex(b)}`;
   }
 
-  function sampleGradientColor(stops, position) {
-    if (!stops.length) return 'FFFFFF';
+  /** The colour and its opacity a gradient's stops give at `position` (0–100), as SVG blends them. */
+  function sampleGradient(stops, position) {
+    const at = (s) => ({ color: s.color, opacity: s.opacity ?? 1 });
+    if (!stops.length) return { color: 'FFFFFF', opacity: 1 };
     const p = Math.max(0, Math.min(100, position));
-    if (p <= stops[0].position) return stops[0].color;
-    if (p >= stops[stops.length - 1].position) return stops[stops.length - 1].color;
+    if (p <= stops[0].position) return at(stops[0]);
+    if (p >= stops[stops.length - 1].position) return at(stops[stops.length - 1]);
 
     for (let i = 0; i < stops.length - 1; i++) {
       const a = stops[i];
@@ -188,10 +190,10 @@
         const t = (p - a.position) / span;
         const [ar, ag, ab] = hexToRgb(a.color);
         const [br, bg, bb] = hexToRgb(b.color);
-        return rgbToHex([lerp(ar, br, t), lerp(ag, bg, t), lerp(ab, bb, t)]);
+        return { color: rgbToHex([lerp(ar, br, t), lerp(ag, bg, t), lerp(ab, bb, t)]), opacity: lerp(a.opacity ?? 1, b.opacity ?? 1, t) };
       }
     }
-    return stops[stops.length - 1].color;
+    return at(stops[stops.length - 1]);
   }
 
   function buildFlowStops(gradient, range) {
@@ -204,17 +206,18 @@
     if (span <= 0.0001) return stops;
 
     const out = [];
-    out.push({ color: sampleGradientColor(stops, start), position: 0 });
+    out.push({ ...sampleGradient(stops, start), position: 0 });
 
     for (const s of stops) {
       if (s.position <= start || s.position >= end) continue;
       out.push({
         color: s.color,
+        opacity: s.opacity,
         position: ((s.position - start) / span) * 100,
       });
     }
 
-    out.push({ color: sampleGradientColor(stops, end), position: 100 });
+    out.push({ ...sampleGradient(stops, end), position: 100 });
     return out;
   }
 
@@ -413,7 +416,7 @@
             <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={coords.x1} y1={coords.y1} x2={coords.x2} y2={coords.y2}>
               {#each stops as stop}
-                <stop offset="{stop.position}%" stop-color="#{stop.color}" />
+                <stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />
               {/each}
             </linearGradient>
           {/if}
@@ -423,19 +426,19 @@
           {#if stops.length >= 2}
             {#if def.sideKey === 'top'}
               <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1="0" y1={t} x2="0" y2="0">
-                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
+                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />{/each}
               </linearGradient>
             {:else if def.sideKey === 'right'}
               <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1={width - t} y1="0" x2={width} y2="0">
-                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
+                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />{/each}
               </linearGradient>
             {:else if def.sideKey === 'bottom'}
               <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1="0" y1={height - t} x2="0" y2={height}>
-                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
+                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />{/each}
               </linearGradient>
             {:else if def.sideKey === 'left'}
               <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse" x1={t} y1="0" x2="0" y2="0">
-                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
+                {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />{/each}
               </linearGradient>
             {/if}
           {/if}
@@ -445,7 +448,7 @@
             <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={def.axis.x1} y1={def.axis.y1} x2={def.axis.x2} y2={def.axis.y2}>
               {#each stops as stop}
-                <stop offset="{stop.position}%" stop-color="#{stop.color}" />
+                <stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />
               {/each}
             </linearGradient>
           {/if}
@@ -466,7 +469,7 @@
               fr={innerR} r={outerR}>
               {#each stops as stop}
                 {@const pos = def.flip ? (100 - stop.position) : stop.position}
-                <stop offset="{pos}%" stop-color="#{stop.color}" />
+                <stop offset="{pos}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />
               {/each}
             </radialGradient>
           {/if}
@@ -478,7 +481,7 @@
             <linearGradient id={svgDefId(def.id)} gradientUnits="userSpaceOnUse"
               x1={start.x} y1={start.y} x2={end.x} y2={end.y}>
               {#each stops as stop}
-                <stop offset="{stop.position}%" stop-color="#{stop.color}" />
+                <stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />
               {/each}
             </linearGradient>
           {/if}
@@ -490,7 +493,7 @@
               x1={ax.x1} y1={ax.y1} x2={ax.x2} y2={ax.y2}>
               {#each stops as stop}
                 {@const pos = def.flip ? (100 - stop.position) : stop.position}
-                <stop offset="{pos}%" stop-color="#{stop.color}" />
+                <stop offset="{pos}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />
               {/each}
             </linearGradient>
           {/if}

@@ -60,6 +60,22 @@ function stubNodeModuleBuiltin() {
   };
 }
 
+// three.js's DRACOLoader names its own full Draco decoder by default (`new URL('../libs/draco/...',
+// import.meta.url)`: 286 kB of WebAssembly, its wrapper and a 719 kB JavaScript fallback), and Vite
+// carries whatever a module names so. The 3D model import always hands it the smaller glTF decoder
+// itself (utils/scene3dGltf.js), so the defaults would be a megabyte in the build that nothing reads:
+// they are left out, in that one module.
+function dracoDefaultsLeftOut() {
+  return {
+    name: 'ce-draco-defaults-left-out',
+    enforce: 'pre',
+    transform(code, id) {
+      if (!id.replace(/\\/g, '/').includes('three/examples/jsm/loaders/DRACOLoader.js')) return null;
+      return { code: code.replace(/new URL\(\s*'\.\.\/libs\/draco\/[^']+',\s*import\.meta\.url\s*\)\.toString\(\)/g, "''"), map: null };
+    },
+  };
+}
+
 // V8 holds a script's source for as long as the page lives, at one byte per character only while
 // every character fits in Latin-1: one character past U+00FF and the whole script is stored at two.
 // Most chunks had some — dashes, arrows, ♯ and ♭, in strings and labels: 541 in the 2.9 MB chunk
@@ -130,7 +146,7 @@ export function embedPlayerBundle({ web = fileURLToPath(new URL('.', import.meta
 }
 
 export default defineConfig(({ command }) => ({
-  plugins: [stubNodeModuleBuiltin(), svelte(), oneByteChunks(), embedPlayerBundle()],
+  plugins: [stubNodeModuleBuiltin(), dracoDefaultsLeftOut(), svelte(), oneByteChunks(), embedPlayerBundle()],
   define: {
     __APP_BUILD__: JSON.stringify(buildStamp()),
   },

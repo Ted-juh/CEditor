@@ -26,6 +26,40 @@ function loadThree() {
   return modules;
 }
 
+// Draco-compressed meshes: three.js's decoder for glTF (the smaller of its two builds, 192 kB of
+// WebAssembly and its wrapper), bundled with the editor and fetched only for a model that needs it.
+// In a page only: it decodes in Web Workers.
+let draco = null;
+function dracoLoader(manager) {
+  if (typeof Worker === 'undefined' || typeof document === 'undefined') return null;
+  draco ??= Promise.all([
+    import('three/examples/jsm/loaders/DRACOLoader.js'),
+    import('three/examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js?url'),
+    import('three/examples/jsm/libs/draco/gltf/draco_decoder.wasm?url'),
+  ]).then(([{ DRACOLoader }, { default: js }, { default: wasm }]) => {
+    const loader = new DRACOLoader(manager);
+    loader.setDecoderPath({ js, wasm });
+    return loader;
+  });
+  return draco;
+}
+
+/**
+ * KTX2 (Basis Universal) textures, not decoded: CEditor draws each object in its material's colour and
+ * no texture, so a model that requires them is read with them left empty, rather than refused or a
+ * transcoder carried only to decode pictures that are thrown away.
+ */
+function skipBasisTextures(THREE) {
+  return (parser) => ({
+    name: 'KHR_texture_basisu',
+    loadTexture(textureIndex) {
+      const def = parser.json.textures?.[textureIndex];
+      if (!def?.extensions?.KHR_texture_basisu) return null;
+      return Promise.resolve(new THREE.Texture());
+    },
+  });
+}
+
 const toBuffer = (bytes) => (bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength));
 const dataUrlBytes = (url) => {
   const comma = String(url ?? '').indexOf(',');
@@ -61,39 +95,32 @@ export async function readGltf(source) {
   const loader = new GLTFLoader(manager);
   // Meshes compressed with meshoptimizer (gltfpack's), read: its decoder comes with three.js.
   loader.setMeshoptDecoder(MeshoptDecoder);
+  loader.register(skipBasisTextures(THREE));
   const bytes = toBuffer(dataUrlBytes(source.asset));
-  const unread = compressionNotRead(bytes);
-  if (unread) throw new Error(unread);
+  if (usesExtension(bytes, 'KHR_draco_mesh_compression')) {
+    const decoder = await dracoLoader(manager);
+    if (!decoder) throw new Error(DRACO_NOT_HERE);
+    loader.setDRACOLoader(decoder);
+  }
   const gltf = await loader.parseAsync(bytes, '');
   return gltf.scene;
 }
 
-/**
- * What a model uses that CEditor does not read, said plainly with how to export it so it can: Draco
- * mesh compression and KTX2 textures need decoders it does not carry. '' when there is nothing.
- */
-function compressionNotRead(buffer) {
-  let json = null;
+const DRACO_NOT_HERE = 'its meshes are compressed with Draco, which is decoded in the editor, not here.';
+
+/** Whether a model's JSON (a .gltf, or a .glb's first chunk) names `name` among its extensions. */
+function usesExtension(buffer, name) {
   try {
     const view = new Uint8Array(buffer);
     const binary = view[0] === 0x67 && view[1] === 0x6c && view[2] === 0x54 && view[3] === 0x46;
     const text = binary
       ? new TextDecoder().decode(view.subarray(20, 20 + new DataView(view.buffer, view.byteOffset).getUint32(12, true)))
       : new TextDecoder().decode(view);
-    json = JSON.parse(text);
+    const json = JSON.parse(text);
+    return [...(json?.extensionsRequired ?? []), ...(json?.extensionsUsed ?? [])].includes(name);
   } catch {
-    return '';
+    return false;
   }
-  const used = new Set([...(json?.extensionsRequired ?? []), ...(json?.extensionsUsed ?? [])]);
-  if (used.has('KHR_draco_mesh_compression')) {
-    return 'its meshes are compressed with Draco, which CEditor does not read. Export it again without mesh compression '
-      + '(in Blender: File › Export › glTF 2.0, Data › Compression off).';
-  }
-  if (used.has('KHR_texture_basisu') && (json?.extensionsRequired ?? []).includes('KHR_texture_basisu')) {
-    return 'its textures are KTX2 (Basis Universal), which CEditor does not read. CEditor draws each object in its material\'s colour, '
-      + 'so export it again with PNG or JPEG textures, or none.';
-  }
-  return '';
 }
 
 /** The objects a scene's top level holds, by kind: { objects, pivot, panel, unnamed }. */

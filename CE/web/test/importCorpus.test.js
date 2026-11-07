@@ -14,6 +14,9 @@ import { readPdfArtwork } from '../src/CE_Application/utils/pdfArtwork.js';
 import { readGltf } from '../src/CE_Application/utils/scene3dGltf.js';
 import * as pdfjsLegacy from 'pdfjs-dist/legacy/build/pdf.mjs';
 import { illustratorPdf } from './support/pdfFixture.js';
+import { render } from 'svelte/server';
+import OutlineBorder from '../src/CE_Panel/components/OutlineBorder.svelte';
+import { svgGradientStops } from '../src/CE_Application/utils/gradientStops.js';
 
 const svg = (body, attrs = 'viewBox="0 0 100 100"') => `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" ${attrs}>${body}</svg>`;
 const parts = (plan) => plan.component._children.Parts._children;
@@ -179,10 +182,47 @@ test('PDF: a picture is waited for, encoded once however often it is drawn, and 
   assert.ok(!(read.notes ?? []).some((note) => note.kind === 'image'), 'none dropped');
 });
 
-test('glTF: Draco meshes and required KTX2 textures are named with how to export the model so it is read', async () => {
-  const asset = (json) => `data:model/gltf+json;base64,${Buffer.from(JSON.stringify({ asset: { version: '2.0' }, ...json })).toString('base64')}`;
-  await assert.rejects(() => readGltf({ asset: asset({ extensionsUsed: ['KHR_draco_mesh_compression'], extensionsRequired: ['KHR_draco_mesh_compression'] }) }),
-    /compressed with Draco.*Compression off/);
-  await assert.rejects(() => readGltf({ asset: asset({ extensionsUsed: ['KHR_texture_basisu'], extensionsRequired: ['KHR_texture_basisu'] }) }),
-    /KTX2.*PNG or JPEG/);
+test('PDF: a JPEG 2000 picture is decoded (pdf.js\'s decoder, carried with the editor), where it was dropped', async () => {
+  // An 8 by 8 picture, red on the left and blue on the right, saved as JPEG 2000 (lossless).
+  const jpx = Buffer.from('AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAACAAAAAgAAwcHAAAAAAAPY29scgEAAAAAABAAAADRanAyY/9P/1EALwAAAAAACAAAAAgAAAAAAAAAAAAAAAgAAAAIAAAAAAAAAAAAAwcBAQcBAQcBAf9SAAwAAAABAAMEBAAB/1wADUBASEhQSEhQSEhQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAUAAB/5PH1AQEf8+0CAXJx9QECJ/PwAgFc4DPwAgC58faCgACiElbv4DH2goACUBdW7/H2gwAF9iXpf9/gMfaDAAXLJWl/3//2Q==', 'base64');
+  const bytes = illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: 'q 80 0 0 80 10 10 cm /Im0 Do Q' }],
+    resources: { XObject: { Im0: { dict: '/Type /XObject /Subtype /Image /Width 8 /Height 8 /Filter /JPXDecode', content: jpx.toString('latin1') } } },
+  });
+  const wasmUrl = `${new URL('../node_modules/pdfjs-dist/wasm/', import.meta.url).pathname}`;
+  const read = await readPdfArtwork(bytes, { pdfjs: pdfjsLegacy, wasmUrl });
+  assert.equal(read.ok, true, read.error);
+  assert.match(read.svg, /<image width="8" height="8"[^>]* href="data:image\/png/);
+  assert.ok(!(read.notes ?? []).some((note) => note.kind === 'image'), 'not dropped');
 });
+
+test('glTF: required KTX2 textures are read as none (objects draw in their material\'s colour); Draco is decoded in a page', async () => {
+  const asset = (json) => `data:model/gltf+json;base64,${Buffer.from(JSON.stringify({ asset: { version: '2.0' }, ...json })).toString('base64')}`;
+  // A model that requires KTX2: its textures left empty, the model read, where it was refused.
+  const basis = await readGltf({ asset: asset({
+    extensionsUsed: ['KHR_texture_basisu'], extensionsRequired: ['KHR_texture_basisu'],
+    scenes: [{ nodes: [0] }], scene: 0, nodes: [{ name: 'Cap' }],
+    images: [{ uri: 'data:image/ktx2;base64,AAAA' }], textures: [{ extensions: { KHR_texture_basisu: { source: 0 } } }],
+    materials: [{ pbrMetallicRoughness: { baseColorTexture: { index: 0 } } }],
+  }) });
+  assert.equal(basis.children[0].name, 'Cap');
+  // Draco decodes in Web Workers, which a page has and node does not: said, not attempted.
+  await assert.rejects(() => readGltf({ asset: asset({ extensionsUsed: ['KHR_draco_mesh_compression'], extensionsRequired: ['KHR_draco_mesh_compression'] }) }),
+    /compressed with Draco, which is decoded in the editor/);
+});
+
+test('a radial gradient on an outline is drawn radial, its stops\' opacity kept (Inkscape\'s highlights)', () => {
+  // An icon's highlight, a white-to-clear radial gradient stroke, was drawn as a straight light band.
+  const plan = planSvgComponentImport(svg('<defs><radialGradient id="r" cx="0.3" cy="0.3" r="0.7"><stop offset="0" stop-color="#fff"/>'
+    + '<stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient></defs>'
+    + '<path id="shine" d="M20 20 H80 V80 H20 Z" fill="none" stroke="url(#r)" stroke-width="8"/>'));
+  const border = borderOf(parts(plan).shine);
+  assert.equal(border.gradient.type, 'radial');
+  assert.deepEqual(svgGradientStops(border.gradient).map((stop) => stop.opacity), [1, 0]);
+  const drawn = render(OutlineBorder, { props: { border, outline: { d: 'M4 4 H64 V64 H4 Z' }, width: 68, height: 68 } }).body;
+  assert.match(drawn, /<radialGradient[^>]*gradientUnits="userSpaceOnUse"/);
+  assert.doesNotMatch(drawn, /<linearGradient/);
+  assert.match(drawn, /stop-opacity="0"/);
+});
+

@@ -50,18 +50,21 @@ const AI_WITHOUT_PDF = 'This Illustrator file was saved without PDF compatibilit
  * to stop (`reason: 'cancelled'`); `labels` are the pages' labels where the file has them, else
  * null. `pdfjs`: the library, for Node (its legacy build); in a browser it is loaded when first needed.
  */
-export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs = null, password = '' } = {}) {
+export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs = null, password = '', wasmUrl = '' } = {}) {
   const data = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
   const kind = artworkFileKind(data);
   if (kind === 'ai') return { ok: false, reason: 'ai-without-pdf', error: AI_WITHOUT_PDF };
   if (kind !== 'pdf') return { ok: false, reason: 'not-pdf', error: 'This file is not a PDF or an Illustrator file.' };
   const lib = pdfjs ?? await loadPdfjs();
+  // The decoders pdf.js loads for a picture that needs one: in the editor the ones it carries
+  // (BundledDecoders), elsewhere a folder of them when given (`wasmUrl`, node's tests and tools).
+  const decoders = pdfjs ? (wasmUrl ? { wasmUrl } : {}) : { BinaryDataFactory: BundledDecoders, useWorkerFetch: false };
   let doc;
   try {
     // A copy: pdf.js takes the buffer over.
     doc = await lib.getDocument({
       data: data.slice(), password, isEvalSupported: false, isOffscreenCanvasSupported: false,
-      fontExtraProperties: true, disableFontFace: true, verbosity: 0,
+      fontExtraProperties: true, disableFontFace: true, verbosity: 0, ...decoders,
     }).promise;
   } catch (error) {
     if (error?.name === 'PasswordException') return { ok: false, reason: 'password', error: 'This PDF is protected by a password.' };
@@ -113,6 +116,26 @@ export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs
     return { ok: false, reason: 'unreadable', error: `This PDF could not be read: ${error?.message || 'its page is damaged'}` };
   } finally {
     doc.destroy?.();
+  }
+}
+
+// pdf.js's picture decoders, bundled with the editor and fetched only when a page needs one: JBIG2
+// (black and white scans) and JPEG 2000. Vite gives each file a URL of its own; pdf.js asks for them by
+// name. (Its ICC colour module, qcms, is not among them: pdf.js uses it only when its worker fetches
+// files itself, which it does not here, and draws a profile's colours through its alternate space.)
+const DECODERS = {
+  'jbig2.wasm': () => import('pdfjs-dist/wasm/jbig2.wasm?url'),
+  'openjpeg.wasm': () => import('pdfjs-dist/wasm/openjpeg.wasm?url'),
+};
+
+class BundledDecoders {
+  async fetch({ kind, filename }) {
+    const load = kind === 'wasmUrl' ? DECODERS[filename] : null;
+    if (!load) throw new Error(`${filename} is not carried`);
+    const { default: url } = await load();
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`${filename}: ${response.status}`);
+    return new Uint8Array(await response.arrayBuffer());
   }
 }
 

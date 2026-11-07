@@ -20,6 +20,17 @@
   let outlineBands = $derived(outlineBorderBands(border));
   let outlinePaints = $derived(outlineBands.length ? outlineBorderPaints(border) : null);
   let outlineGradientCoords = $derived(outlinePaints?.gradient ? gradientCoords(outlinePaints.gradient.angle, width, height) : null);
+  // A radial gradient on the outline, placed as a radial fill is (its centre and radii in % of the
+  // box), where it was drawn as a straight ramp across the shape.
+  let outlineRadial = $derived.by(() => {
+    const gradient = outlinePaints?.gradient;
+    if (!gradient || gradient.type !== 'radial') return null;
+    const cx = ((Number(gradient.centerX) || 50) / 100) * width;
+    const cy = ((Number(gradient.centerY) || 50) / 100) * height;
+    const rx = Math.max(1e-3, ((Number(gradient.radiusX) || 50) / 100) * width);
+    const ry = Math.max(1e-3, ((Number(gradient.radiusY ?? gradient.radiusX) || 50) / 100) * height);
+    return { cx, cy, r: rx, transform: `translate(${cx} ${cy}) scale(1 ${ry / rx}) translate(${-cx} ${-cy})` };
+  });
   // Paints for a band, in the box border's order: its own (shaded) colour, then gradient, image, overlay.
   // A gradient that follows the outline: the path sampled by the browser's own geometry, cut into
   // short pieces each stroked in the colour of where it falls (utils/outlineBorder.js).
@@ -82,12 +93,21 @@
           </mask>
         {/if}
       {/each}
-      {#if outlinePaints?.gradient && outlineGradientCoords}
+      {#if outlinePaints?.gradient && outlineRadial}
+        <!-- A radial gradient, as the fill draws one (CSS's ellipse rx% ry% at cx% cy% of the box). -->
+        {@const stops = svgGradientStops(outlinePaints.gradient)}
+        {#if stops.length >= 2}
+          <radialGradient id={svgDefId('ol-grad')} gradientUnits="userSpaceOnUse"
+            cx={outlineRadial.cx} cy={outlineRadial.cy} r={outlineRadial.r} gradientTransform={outlineRadial.transform}>
+            {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />{/each}
+          </radialGradient>
+        {/if}
+      {:else if outlinePaints?.gradient && outlineGradientCoords}
         {@const stops = svgGradientStops(outlinePaints.gradient)}
         {#if stops.length >= 2}
           <linearGradient id={svgDefId('ol-grad')} gradientUnits="userSpaceOnUse"
             x1={outlineGradientCoords.x1} y1={outlineGradientCoords.y1} x2={outlineGradientCoords.x2} y2={outlineGradientCoords.y2}>
-            {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" />{/each}
+            {#each stops as stop}<stop offset="{stop.position}%" stop-color="#{stop.color}" stop-opacity={stop.opacity ?? 1} />{/each}
           </linearGradient>
         {/if}
       {/if}
