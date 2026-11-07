@@ -127,7 +127,7 @@
         {#if band.dots}
           <!-- Dots take the gradient across the shape: a dot is too small to show where along it falls. -->
           <path d={outline.insets?.[outlineInsetKey(band.dots.depth)] ?? ''} fill="none" stroke={paint === 'flow' ? `url(#${svgDefId('ol-grad')})` : paint} stroke-width={band.dots.radius * 2}
-            stroke-dasharray={band.dasharray} stroke-linecap="round" />
+            stroke-opacity={paint === band.colour ? band.opacity ?? 1 : 1} stroke-dasharray={band.dasharray} stroke-linecap="round" />
         {:else if paint === 'flow'}
           <g mask="url(#{svgDefId(`ol-band-${i}`)})" data-outline-flow>
             {#each outlineFlow as piece, k (k)}
@@ -135,7 +135,9 @@
             {/each}
           </g>
         {:else}
-          <rect x={-pad} y={-pad} width={width + 2 * pad} height={height + 2 * pad} fill={paint} mask="url(#{svgDefId(`ol-band-${i}`)})" />
+          <!-- The border colour at its own opacity (a stroke-opacity, an AARRGGBB colour). -->
+          <rect x={-pad} y={-pad} width={width + 2 * pad} height={height + 2 * pad} fill={paint} fill-opacity={paint === band.colour ? band.opacity ?? 1 : 1}
+            mask="url(#{svgDefId(`ol-band-${i}`)})" />
         {/if}
       {/each}
     {/each}

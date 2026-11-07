@@ -60,6 +60,10 @@ const NEAREST_BLEND = {
 };
 
 const isGroup = (layer) => Array.isArray(layer?.children);
+// A layer's knockout: 0 none, 1 shallow, 2 deep (utils/psdRead.js reads the level).
+const knockoutOf = (layer) => Number(layer?.knockoutLevel ?? (layer?.knockout ? 1 : 0));
+const knocksInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
+  && (knockoutOf(layer) > 0 || (isGroup(layer) && knocksInside(layer))));
 const round = (value, places = 2) => Math.round(value * 10 ** places) / 10 ** places;
 
 function svgPicture(svg) {
@@ -181,7 +185,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   const taken = new Set();
   const report = {
     kept: new Set(), drawn: new Set(), approximated: new Set(), unsupported: new Set(), nearest: new Set(),
-    flattened: new Set(), adjustedInGroup: new Set(), pattern: new Set(),
+    flattened: new Set(), adjustedInGroup: new Set(), pattern: new Set(), knockout: new Set(),
   };
 
   const blendOf = (layer, label) => {
@@ -339,16 +343,22 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
       const unit = hidden ? { ...base, hidden: true } : base;
       if (isGroup(base)) {
         const mode = String(base.blendMode ?? 'pass through');
-        const isolated = (mode !== 'pass through' && mode !== 'normal') || clipped.length || (base.mask && !base.mask.disabled);
+        // A knockout cuts through the layers under it, which as layers of their own it cannot: a group
+        // holding a layer that knocks out is one picture, drawn as Photoshop draws it. One that knocks
+        // out itself cuts through layers outside it, and is said.
+        const isolated = (mode !== 'pass through' && mode !== 'normal') || clipped.length || (base.mask && !base.mask.disabled)
+          || knocksInside(base);
+        if (knockoutOf(base) > 0 && !base.hidden && !hidden) report.knockout.add(base.name || 'a group');
         if (isolated) {
           report.flattened.add(base.name || 'a group');
           if ((base.children ?? []).some((child) => child.adjustment)) report.adjustedInGroup.add(base.name || 'a group');
           unitRecord(unit, clipped, opacity, names);
         } else {
-          walk(base.children, opacity * (base.opacity ?? 1), base.name ? [base.name, ...names] : names, hidden || base.hidden);
+          walk(base.children, opacity * (base.opacity ?? 1) * (base.fillOpacity ?? 1), base.name ? [base.name, ...names] : names, hidden || base.hidden);
         }
         continue;
       }
+      if (knockoutOf(base) > 0 && !base.hidden && !hidden) report.knockout.add(base.name || 'a layer');
       unitRecord(unit, clipped, opacity, names);
     }
   };
@@ -476,7 +486,8 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   if (report.unsupported.size) warnings.push(`Adjustments not applied: ${list(report.unsupported)}. Merge them into the layers below in Photoshop first.`);
   if (report.adjustedInGroup.size) warnings.push(`Adjustment layers inside groups with their own blend mode are not applied: ${list(report.adjustedInGroup)}.`);
   if (report.nearest.size) warnings.push(`Blend modes drawn as the nearest one the editor has: ${list(report.nearest)}.`);
-  if (report.flattened.size) warnings.push(`Groups with their own blend mode or mask are one layer each: ${list(report.flattened)}.`);
+  if (report.flattened.size) warnings.push(`Groups with their own blend mode, mask or knockout are one layer each: ${list(report.flattened)}.`);
+  if (report.knockout.size) warnings.push(`Knockout through the layers under it is not drawn for a layer outside a group: ${list(report.knockout)}. Put it in a group with what it cuts through.`);
   if (report.pattern.size) warnings.push(`Pattern-filled shapes come in as their pictures: ${list(report.pattern)}.`);
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'Photoshop Artwork';

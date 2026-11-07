@@ -177,7 +177,7 @@ function initialState() {
   return {
     ctm: IDENTITY, base: IDENTITY,
     fill: { kind: 'colour', value: '#000000' }, stroke: { kind: 'colour', value: '#000000' },
-    fillAlpha: 1, strokeAlpha: 1, blend: 'normal', softMask: false,
+    fillAlpha: 1, strokeAlpha: 1, blend: 'normal',
     lineWidth: 1, cap: 0, join: 0, miter: 10, dash: null,
     clips: [],
     font: null, fontSize: 0, charSpacing: 0, wordSpacing: 0, hScale: 1, leading: 0, rise: 0, renderMode: 0,
@@ -198,7 +198,7 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
   const flip = [1, 0, 0, -1, -x0, y1];
   const op = Object.fromEntries(Object.entries(OPS).map(([name, code]) => [code, name]));
   const defs = [];
-  const body = [];
+  let body = [];
   const noted = new Map();
   const note = (kind) => noted.set(kind, (noted.get(kind) ?? 0) + 1);
   const seenLayers = [];
@@ -225,7 +225,7 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     for (let i = same; i < openClips.length; i += 1) body.push('</g>');
     openClips = openClips.slice(0, same);
     for (let i = same; i < clips.length; i += 1) {
-      body.push(`<g clip-path="url(#${clips[i].id})">`);
+      body.push(clips[i].mask ? `<g mask="url(#${clips[i].id})">` : `<g clip-path="url(#${clips[i].id})">`);
       openClips.push(clips[i]);
     }
     body.push(element);
@@ -314,7 +314,6 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
 
   const drawPath = (segments, { fill = false, stroke = false, evenOdd = false } = {}) => {
     if (!segments?.length || (!fill && !stroke)) return;
-    if (state.softMask) note('opacity-mask');
     let attributes = '';
     if (fill) {
       const f = paint(state.fill, state.fillAlpha, 'fill');
@@ -363,12 +362,24 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
   const shadingFill = (id) => {
     const ir = get(id);
     const matrix = multiply(flip, state.ctm);
+    // A mesh (Illustrator's gradient mesh, a free-form or a patch shading): a picture of it, drawn
+    // inside whatever clips it, where it was one mean colour.
+    if (ir?.[0] === 'Mesh') {
+      const picture = meshPicture(ir, matrix);
+      if (picture) {
+        const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
+        emit(`<image width="${picture.width}" height="${picture.height}" preserveAspectRatio="none" transform="${matrixText(picture.transform)}" href="${picture.href}"${opacity}${blendStyle()}/>`);
+        return;
+      }
+    }
     const value = gradient(ir, matrix) ?? '#808080';
     const alpha = state.fillAlpha < 1 ? ` fill-opacity="${num(state.fillAlpha)}"` : '';
-    // Painted inside the innermost clip: the clip's shape, filled with it (Illustrator's gradient fill).
-    const inner = state.clips[state.clips.length - 1];
+    // Painted inside the innermost clip: the clip's shape, filled with it (Illustrator's gradient fill);
+    // a soft mask inside it still masks it.
+    const at = state.clips.findLastIndex((clip) => !clip.mask);
+    const inner = state.clips[at];
     if (inner) {
-      emit(`${shapeElement(inner.segments)} fill="${value}"${inner.evenOdd ? ' fill-rule="evenodd"' : ''}${alpha}${blendStyle()}/>`, state.clips.slice(0, -1));
+      emit(`${shapeElement(inner.segments)} fill="${value}"${inner.evenOdd ? ' fill-rule="evenodd"' : ''}${alpha}${blendStyle()}/>`, state.clips.filter((_, i) => i !== at));
     } else {
       emit(`<rect x="0" y="0" width="${num(width)}" height="${num(height)}" fill="${value}"${alpha}${blendStyle()}/>`);
     }
@@ -465,11 +476,61 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
         case 'ca': state.fillAlpha = value; break;
         case 'CA': state.strokeAlpha = value; break;
         case 'BM': state.blend = String(value ?? 'normal'); break;
-        case 'SMask': state.softMask = !!value; break;
+        // A soft mask (an opacity mask): the one just drawn (beginGroup, below), over what follows until
+        // the state is restored or the mask set to none. It masks as a clip clips, so it is kept with them.
+        case 'SMask':
+          state.clips = state.clips.filter((clip) => !clip.mask);
+          if (value && pendingMask) state.clips.push({ id: pendingMask, mask: true });
+          else if (value) note('opacity-mask');
+          pendingMask = null;
+          break;
         case 'Font': state.font = get(value?.[0]); state.fontSize = value?.[1] ?? state.fontSize; break;
         default: break;
       }
     }
+  };
+
+  // A soft mask's drawing, made into an SVG mask: what the page draws while it is set is drawn
+  // through it. Luminosity: the drawing over its backdrop colour, by its brightness; Alpha: by its
+  // coverage; a transfer function, through a filter that maps the one to the other.
+  let pendingMask = null;
+  const masking = [];
+  const beginMask = (options) => {
+    closeClips();
+    masking.push({ body, openClips, options });
+    body = [];
+    openClips = [];
+    structure.push('mask');
+    stack.push({ ...state, clips: [...state.clips] });
+    // The mask is drawn as it is, unclipped, at full opacity, blended normally.
+    state.clips = [];
+    state.fillAlpha = 1;
+    state.strokeAlpha = 1;
+    state.blend = 'normal';
+  };
+  const endMask = () => {
+    closeClips();
+    structure.pop();
+    const { body: outer, openClips: outerClips, options } = masking.pop();
+    const content = body.join('');
+    body = outer;
+    openClips = outerClips;
+    if (stack.length) state = stack.pop();
+    const region = `x="${num(-width)}" y="${num(-height)}" width="${num(width * 3)}" height="${num(height * 3)}"`;
+    const luminosity = options?.subtype !== 'Alpha';
+    const backdrop = luminosity ? `<rect ${region} fill="${/^#[0-9a-f]{6}$/i.test(options?.backdrop ?? '') ? options.backdrop : '#000000'}"/>` : '';
+    const id = nextId('m');
+    const table = options?.transferMap?.length === 256 ? Array.from(options.transferMap, (v) => num(v / 255)).join(' ') : '';
+    if (table) {
+      const filterId = nextId('f');
+      defs.push(`<filter id="${filterId}" filterUnits="userSpaceOnUse" ${region} color-interpolation-filters="sRGB">`
+        + (luminosity ? '<feColorMatrix type="luminanceToAlpha"/>' : '')
+        + `<feComponentTransfer><feFuncA type="table" tableValues="${table}"/></feComponentTransfer></filter>`);
+      defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" ${region} style="mask-type:alpha"><g filter="url(#${filterId})">${backdrop}${content}</g></mask>`);
+    } else {
+      defs.push(`<mask id="${id}" maskUnits="userSpaceOnUse" ${region}${luminosity ? '' : ' style="mask-type:alpha"'}>${backdrop}${content}</mask>`);
+    }
+    pendingMask = id;
   };
 
   const openStructure = (element, kind) => {
@@ -483,7 +544,7 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     closeClips();
     while (structure.length > at) {
       const closing = structure.pop();
-      if (closing === 'layer' || closing === 'group') body.push('</g>');
+      if (closing === 'layer' || closing === 'group' || closing === 'wrap') body.push('</g>');
     }
   };
 
@@ -534,19 +595,28 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
       case 'paintFormXObjectEnd': if (stack.length) state = stack.pop(); break;
       case 'beginGroup': {
         const group = args?.[0] ?? {};
-        if (group.smask || group.hasSoftMask) note('opacity-mask');
+        if (group.smask) { beginMask(group.smask); break; }
         const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
         const mode = BLEND.has(state.blend) ? ` style="mix-blend-mode:${state.blend}"` : '';
+        // A soft mask set on a group masks the group as a whole, with its opacity, before it blends
+        // (inside it the mask starts over as none, as PDF has it).
+        const masks = state.clips.filter((clip) => clip.mask);
+        const masked = masks.length ? ` mask="url(#${masks[0].id})"` : '';
         stack.push({ ...state, clips: [...state.clips] });
-        openStructure(`<g${opacity}${mode}>`, 'group');
+        openStructure(`<g${opacity}${mode}${masked}>`, 'group');
+        for (const extra of masks.slice(1)) {
+          body.push(`<g mask="url(#${extra.id})">`);
+          structure.push('wrap');
+        }
+        state.clips = state.clips.filter((clip) => !clip.mask);
         // Inside a transparency group the alpha and blend mode start over (they apply to it whole).
         state.fillAlpha = 1;
         state.strokeAlpha = 1;
         state.blend = 'normal';
-        state.softMask = false;
         break;
       }
       case 'endGroup':
+        if (structure[structure.length - 1] === 'mask') { endMask(); break; }
         closeStructure('group');
         if (stack.length) state = stack.pop();
         break;
@@ -591,6 +661,14 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
         break;
       default: break;
     }
+  }
+  // A mask whose group never ended (a damaged page): what it drew is kept as its mask.
+  while (masking.length) {
+    while (structure.length && structure[structure.length - 1] !== 'mask') {
+      const closing = structure.pop();
+      if (closing === 'layer' || closing === 'group' || closing === 'wrap') body.push('</g>');
+    }
+    endMask();
   }
   closeClips();
   while (structure.length) {
@@ -731,12 +809,63 @@ function hexOf(value) {
 }
 
 /** A mesh gradient's mean colour, which is what can be drawn of it without a mesh. */
+/** A mesh's mean colour, for a mesh used as a pattern's paint. pdf.js gives four bytes a vertex. */
 function meanMeshColour(ir) {
   const colours = ir?.[3];
   if (!colours?.length) return '#808080';
   let r = 0; let g = 0; let b = 0; let n = 0;
-  for (let i = 0; i + 2 < colours.length; i += 3) { r += colours[i]; g += colours[i + 1]; b += colours[i + 2]; n += 1; }
+  for (let i = 0; i + 3 < colours.length; i += 4) { r += colours[i]; g += colours[i + 1]; b += colours[i + 2]; n += 1; }
   return n ? hexOf([r / n, g / n, b / n]) : '#808080';
+}
+
+/**
+ * A mesh shading as a picture: pdf.js's IR, `['Mesh', type, positions (x, y a vertex, in the
+ * shading's space), colours (RGB and a spare byte a vertex), vertex count, bounds [x0, y0, x1, y1]]`,
+ * every three vertices a triangle whose colour is blended across it (Gouraud shading, as PDF draws a
+ * mesh). Drawn over its bounds at twice the size `matrix` (shading space to the SVG's) draws them,
+ * 2,048 pixels at most; clear where no triangle is. `{ href, width, height, transform }` or null.
+ */
+function meshPicture(ir, matrix) {
+  const [, , positions, colours, count, bounds] = ir;
+  if (!positions?.length || !colours?.length || !(count >= 3) || !bounds || bounds.length < 4) return null;
+  const [bx0, by0, bx1, by1] = bounds;
+  const bw = bx1 - bx0;
+  const bh = by1 - by0;
+  if (!(bw > 0) || !(bh > 0)) return null;
+  const size = (extent, scale) => Math.max(8, Math.min(2048, Math.ceil(extent * scale * 2)));
+  const width = size(bw, Math.hypot(matrix[0], matrix[1]));
+  const height = size(bh, Math.hypot(matrix[2], matrix[3]));
+  const sx = width / bw;
+  const sy = height / bh;
+  const rgba = new Uint8ClampedArray(width * height * 4);
+  for (let v = 0; v + 2 < count; v += 3) {
+    const xs = [0, 1, 2].map((k) => (positions[(v + k) * 2] - bx0) * sx);
+    const ys = [0, 1, 2].map((k) => (positions[(v + k) * 2 + 1] - by0) * sy);
+    const area = (xs[1] - xs[0]) * (ys[2] - ys[0]) - (xs[2] - xs[0]) * (ys[1] - ys[0]);
+    if (!area) continue;
+    const c = [0, 1, 2].map((k) => (v + k) * 4);
+    const left = Math.max(0, Math.floor(Math.min(...xs)));
+    const right = Math.min(width - 1, Math.ceil(Math.max(...xs)));
+    const top = Math.max(0, Math.floor(Math.min(...ys)));
+    const bottom = Math.min(height - 1, Math.ceil(Math.max(...ys)));
+    // Each pixel whose centre is in the triangle (or within a hair of its edge, so that neighbours
+    // meet without a seam), its colour weighted by how near it is to each corner.
+    const edge = -0.5 / Math.sqrt(Math.abs(area));
+    for (let y = top; y <= bottom; y += 1) {
+      const py = y + 0.5;
+      for (let x = left; x <= right; x += 1) {
+        const px = x + 0.5;
+        const w0 = ((xs[1] - px) * (ys[2] - py) - (xs[2] - px) * (ys[1] - py)) / area;
+        const w1 = ((xs[2] - px) * (ys[0] - py) - (xs[0] - px) * (ys[2] - py)) / area;
+        const w2 = 1 - w0 - w1;
+        if (w0 < edge || w1 < edge || w2 < edge) continue;
+        const i = (y * width + x) * 4;
+        for (let k = 0; k < 3; k += 1) rgba[i + k] = w0 * colours[c[0] + k] + w1 * colours[c[1] + k] + w2 * colours[c[2] + k];
+        rgba[i + 3] = 255;
+      }
+    }
+  }
+  return { href: pngDataUrl(width, height, rgba), width, height, transform: multiply(matrix, [bw / width, 0, 0, bh / height, bx0, by0]) };
 }
 
 /** An image object from pdf.js as straight RGBA, or null. Kinds: 1 one bit grey, 2 RGB, 3 RGBA. */

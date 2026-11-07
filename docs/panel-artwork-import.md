@@ -82,9 +82,10 @@ any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
 |---|---|
 | Top-level layers | Groups named after them: `components` for a panel's placeholders, `pointer`, `cap`, `lamp on` for a component's parts. A layer switched off comes into a component hidden (as a hidden Photoshop layer does: a switch's lit look), and stays out of a panel's background |
 | Paths, fills, strokes | Vector layers, with their widths, caps, joins, dashes and fill rule. A closed run of four lines along the axes is a rectangle, and four curves through the ends of the axes an ellipse or a circle, so a panel's placeholders are measured |
-| Gradients | Linear and radial: the shape filled with the gradient (Illustrator writes the shape as a clip and paints the gradient inside it). A mesh or freeform gradient is drawn in its mean colour |
+| Gradients | Linear and radial: the shape filled with the gradient (Illustrator writes the shape as a clip and paints the gradient inside it). A mesh or freeform gradient (a gradient mesh) is a picture of itself, its colours blended across each patch as Acrobat draws them |
 | Clipping masks | The layer's mask, as for SVG |
 | Opacity, blend modes, transparency groups | Kept |
+| Opacity masks (soft masks) | Applied: luminosity or alpha, over the mask's backdrop colour, through its transfer function; on a group, to the group as a whole |
 | Placed and embedded images | Picture layers, no finer than twice the size they are drawn at (4,096 pixels at most). JBIG2 (black-and-white scans) and JPEG 2000 pictures are read too: pdf.js's decoders for them come with the editor and are fetched only for a file that needs one |
 | Text | Text in the font the file names, its size and colour |
 | CMYK colour | Converted as pdf.js shows it, as Acrobat does without colour management |
@@ -93,8 +94,7 @@ any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
 
 So a panel's placeholders, which a PDF keeps no names for, are typed by their colour and shape (red
 circles knobs, long red rectangles sliders, and so on, as above), and the notice says so; rename the
-controls after. Opacity masks, pattern fills and image masks are not drawn, and the Console lists
-any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
+controls after. Pattern fills and image masks are not drawn, and the Console lists any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
 is refused with what to do: save it again with Create PDF Compatible File ticked, or use Export As ›
 SVG.
 
@@ -111,10 +111,12 @@ SVG.
 - Every other visible layer is flattened into the background, with each layer's opacity and its
   group's.
 
-The flattening follows Photoshop's own rules. It draws every blend mode, Opacity and Fill,
-layer masks, clipping masks, and groups the way Photoshop does: a Pass Through group paints its
-layers straight onto what is below, and a group in any other mode is put together first and then
-blended in as one layer.
+The flattening follows Photoshop's own rules. It draws every blend mode, Opacity and Fill (a
+group's too), layer masks, clipping masks, knockout, and groups the way Photoshop does: a Pass
+Through group paints its layers straight onto what is below, and a group in any other mode is put
+together first and then blended in as one layer. A knockout layer or group (Blending Options ›
+Knockout) cuts through what is under it to where its group began (Shallow) or to the Background
+layer (Deep, through Pass Through groups), and is drawn there at its Fill: a Fill of 0 cuts a hole.
 
 It cannot draw four things:
 
@@ -141,7 +143,8 @@ parts are named by its top-level layers, and the notice lists them.
 - **SVG**: each `rect`, `circle`, `ellipse`, `line`, `polyline`, `polygon` and `path` is a vector
   layer with its transforms applied, its fill (a colour, a linear or radial gradient, a pattern drawn
   as its picture), its stroke as the layer's outline (a gradient stroke as the outline's gradient),
-  and its opacity; Illustrator's class rules are read. `<text>` is a text layer, an `<image>` a
+  and its opacity (a gradient of one stop is that stop's colour); style rules are read, by class,
+  element and id (Illustrator's `.cls-1`), as CSS ranks them. `<text>` is a text layer, an `<image>` a
   picture layer (a linked one read from beside the SVG, in the desktop app), `<use>` the shape it
   uses. A plain filled shape under a clip path is cut to it and stays one vector; a `<mask>`, or a
   clip on text, a picture, an outlined shape or several clips, becomes the layer's mask: an SVG
@@ -150,8 +153,11 @@ parts are named by its top-level layers, and the notice lists them.
   stroke gains no closing edge). Colours are CSS's: every named colour, `#rgb`, `#rgba`, `#rrggbb`,
   `#rrggbbaa`, `rgb()`, `rgba()`, `hsl()`, `hsla()` and `currentColor`, an alpha in the colour
   joining the opacity; gradient stops are placed as SVG places them. A shape's own `mix-blend-mode`
-  is its layer's. A `<use>` of what holds it (a loop) is not drawn, as SVG does not draw it. An SVG
-  written with its namespace as a prefix (`<svg:svg>`) is read as plain SVG.
+  is its layer's. An element with a filter (a blur, a drop shadow, lighting) and a group with a blend
+  mode are each a picture of themselves, as SVG draws them, so the filter shows and the group blends
+  as one; such a layer is a picture, not shapes to edit. An `<image>` is placed in its box as its
+  `preserveAspectRatio` says. A `<use>` of what holds it (a loop) is not drawn, as SVG does not draw
+  it. An SVG written with its namespace as a prefix (`<svg:svg>`) is read as plain SVG.
 - **More than 2,000 shapes**, a page of a document's text and rules more than a control, is more than a
   component stays quick to edit with: the import stops and says to use it as a panel's artwork
   (New Panel from Vector Artwork) or simplify it.
@@ -163,10 +169,12 @@ parts are named by its top-level layers, and the notice lists them.
   Color and Gradient Overlay, Stroke, Inner Shadow, Inner Glow and Bevel become its own settings; on a
   picture they are drawn into it, with Satin, close to Photoshop's. Adjustment layers (Levels, Curves,
   Exposure, Invert, Posterize, Threshold, Channel Mixer, Gradient Map exactly; Brightness/Contrast,
-  Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter, Selective Color closely; Color
+  Hue/Saturation with its colour ranges, Vibrance, Color Balance, Black & White, Photo Filter, Selective Color closely; Color
   Lookup from the .cube, .3dl or .look table the layer carries) are applied to every layer under
   them, pictures and colours alike. A Color Lookup through an ICC profile is not. Pass Through groups are unfolded; a group with its
-  own mode or mask is one layer. Text layers stay text where the file says their size and colour.
+  own mode or mask, or with a knockout layer inside, is one layer. A layer that knocks out through
+  layers outside a group cannot cut them as layers of their own, and is said. Text layers stay text
+  where the file says their size and colour.
 
 **A picture's colour** (`utils/pictureRecolour.js`). A picture layer (`Background.Fill.imageColour`)
 and a part of frames (`Image.colour`) have a colour of their own: a colour or a control set's role,
@@ -210,9 +218,8 @@ Multichannel or Indexed Color is not read, and the notice says which and to conv
 
 Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
 approximate adjustments), Color Lookup through an ICC profile (not applied), adjustment
-layers inside groups with their own blend mode, references to anything not in the file, SVG filters
-(a blur, a drop shadow: not drawn; give the layer a shadow in the Component Designer) and a group's
-blend mode (not kept).
+layers inside groups with their own blend mode, references to anything not in the file, and the
+SVG elements drawn as pictures of themselves (for a filter or a group's blend mode).
 
 ## New Component from 3D Model (glTF)
 
@@ -261,8 +268,8 @@ Blender:
   that say a state of their own (a `lamp` in the off look, the variant's own `State=Off`) are dropped,
   so the group's state is the one that counts. Variants that differ in anything else (`Size=Large`)
   are left out; the default's are used.
-- **Flatten effects into pictures** (off by default): the importer does not draw SVG filters, so a
-  drop shadow, an inner shadow or a blur would be lost. With this on, each layer is saved on its own,
+- **Flatten effects into pictures** (off by default): Figma's effects export as SVG filters, which
+  the importer draws by making each filtered element a picture of itself. With this on, each layer is saved on its own,
   and one with an effect as a picture of how Figma renders it, effect and all, where Figma draws it. A
   frame with a mask layer is saved whole, since a mask between layers would be lost.
 - **Keep text as text** (on by default): text as SVG text, else as outlines.

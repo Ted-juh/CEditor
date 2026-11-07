@@ -7,8 +7,8 @@
 //
 // Each adjustment becomes a function from one 8-bit [r, g, b] to another. These follow Photoshop's
 // published behaviour as closely as an import needs: Levels, Curves, Exposure, Invert, Posterize,
-// Threshold, Channel Mixer and Gradient Map are exact; Brightness/Contrast, Hue/Saturation (the
-// master range, and Colorize), Vibrance, Color Balance, Black & White and Photo Filter follow the documented
+// Threshold, Channel Mixer and Gradient Map are exact; Brightness/Contrast, Hue/Saturation (its colour
+// ranges and Colorize too), Vibrance, Color Balance, Black & White and Photo Filter follow the documented
 // formulas and come out close. Selective Color follows the per-range weighting worked out from
 // Photoshop's results (it publishes no formula) and is close too. Color Lookup applies the table the
 // layer carries (Photoshop keeps the whole .cube, .3dl or .look file in it), interpolated
@@ -60,6 +60,25 @@ function hslToRgb(h, s, l) {
     return l - a * Math.max(-1, Math.min(k - 3, 9 - k, 1));
   };
   return [f(0) * 255, f(8) * 255, f(4) * 255];
+}
+
+const HUE_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas'];
+// Photoshop's own bounds for each range (start of the fade in, start, end, end of the fade out), for a
+// file that leaves them unset.
+const HUE_RANGE_DEFAULTS = {
+  reds: [315, 345, 15, 45], yellows: [15, 45, 75, 105], greens: [75, 105, 135, 165],
+  cyans: [135, 165, 195, 225], blues: [195, 225, 255, 285], magentas: [255, 285, 315, 345],
+};
+
+/** How far hue `h` (degrees) is in a Hue/Saturation range [a, b, c, d], round the colour wheel: 0 to 1. */
+export function hueRangeWeight(h, [a, b, c, d]) {
+  const turn = (v) => ((v % 360) + 360) % 360;
+  if (turn(h - b) <= turn(c - b)) return 1;
+  const fadeIn = turn(b - a);
+  const before = turn(b - h);
+  const fadeOut = turn(d - c);
+  const after = turn(h - c);
+  return Math.max(fadeIn > 0 && before < fadeIn ? 1 - before / fadeIn : 0, fadeOut > 0 && after < fadeOut ? 1 - after / fadeOut : 0);
 }
 
 /** A Levels channel as a table: input black and white, gamma, output black and white. */
@@ -346,18 +365,47 @@ export function adjustmentFunction(adjustment, report = new Set()) {
           return hslToRgb(hue, sat, unit(l));
         };
       }
-      if (['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas'].some((name) => adjustment[name] && (adjustment[name].hue || adjustment[name].saturation || adjustment[name].lightness))) {
-        report.add('Hue/Saturation colour ranges (the master range is applied)');
-      }
+      // The colour ranges (Reds, Yellows, ...): each its own hue, saturation and lightness, as far as a
+      // colour's hue is in the range, fully between its two inner bounds and fading to nothing at its
+      // outer ones; a grey has no hue and is in none. Photoshop publishes no formula; this order is the
+      // one that matches its own pictures of psd-tools' test files (8 %, 1 % and 12 % of pixels visibly
+      // off, from 24 %, 11 % and 18 % with the master range alone): a range's lightness first, as far as
+      // the colour is colourful; then the hue turned and the saturation moved by the master's and the
+      // ranges' together; then the master's lightness. Lightness moves toward white or black.
+      const ranges = HUE_RANGES.map((name) => {
+        const range = adjustment[name];
+        if (!range || !(range.hue || range.saturation || range.lightness)) return null;
+        const bounds = [range.a, range.b, range.c, range.d].map((v) => Number(v) || 0);
+        return {
+          bounds: bounds.every((v) => v === 0) ? HUE_RANGE_DEFAULTS[name] : bounds,
+          hue: range.hue ?? 0, sat: (range.saturation ?? 0) / 100, light: (range.lightness ?? 0) / 100,
+        };
+      }).filter(Boolean);
+      if (ranges.length) report.add('Hue/Saturation colour ranges');
       const hue = master.hue ?? 0;
       const sat = (master.saturation ?? 0) / 100;
       const light = (master.lightness ?? 0) / 100;
-      return ([r, g, b]) => {
-        let [h, s, l] = rgbToHsl(r, g, b);
-        h = (h + hue + 360) % 360;
-        s = sat >= 0 ? s + (1 - s) * sat * s : s * (1 + sat);
-        l = light >= 0 ? l + (1 - l) * light : l * (1 + light);
-        return hslToRgb(h, unit(s), unit(l));
+      const lighten = (rgb, amount) => (amount >= 0 ? rgb.map((v) => v + (255 - v) * amount) : rgb.map((v) => v * (1 + amount)));
+      return (rgb) => {
+        const [h0, s0] = rgbToHsl(...rgb);
+        let out = rgb;
+        let dh = hue;
+        let ds = sat;
+        if (s0 > 0 && ranges.length) {
+          const chroma = (Math.max(...rgb) - Math.min(...rgb)) / 255;
+          for (const range of ranges) {
+            const w = hueRangeWeight(h0, range.bounds);
+            if (!w) continue;
+            if (range.light) out = lighten(out, w * chroma * range.light);
+            dh += w * range.hue;
+            ds += w * range.sat;
+          }
+        }
+        ds = Math.max(-1, Math.min(1, ds));
+        let [h, s, l] = rgbToHsl(...out);
+        h = (((h + dh) % 360) + 360) % 360;
+        s = ds >= 0 ? s + (1 - s) * ds : s * (1 + ds);
+        return lighten(hslToRgb(h, unit(s), l), light);
       };
     }
     case 'vibrance': {

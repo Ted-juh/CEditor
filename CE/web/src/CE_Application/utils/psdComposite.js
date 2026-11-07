@@ -8,7 +8,12 @@
  *     reported). The separable modes use Photoshop's own formulas, which match the W3C compositing
  *     spec except for Soft Light, where Photoshop's curve differs and is the one used. Hue, Saturation,
  *     Color and Luminosity use the spec's SetLum/SetSat, which is how Photoshop describes them.
- *   - Opacity and Fill opacity, and a group's opacity on everything inside it.
+ *   - Opacity and Fill opacity, a group's on everything inside it.
+ *   - Knockout (Blending Options): where a knockout layer or group covers, what is under it gives way,
+ *     by its opacity, to the backdrop its group began with (Shallow: clear in a group drawn on its own,
+ *     what was under a Pass Through group) or to the Background layer (Deep: through Pass Through groups
+ *     only, a group drawn on its own stopping it as Shallow; clear without a Background), and it is
+ *     drawn there with its Fill opacity. A Fill of 0 cuts a hole.
  *   - Layer masks, from their own pixels, with the mask's default colour outside its rectangle and its
  *     density. A disabled mask is ignored, as Photoshop ignores it.
  *   - Clipping masks: a clipped layer is drawn only where the layer it clips to has pixels, and
@@ -198,6 +203,8 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
 }
 
 const isGroup = (layer) => Array.isArray(layer?.children);
+// Inside a group drawn on its own, a knockout reaches only its clear start.
+const CLEAR = Object.freeze({ shallow: null, deep: null });
 
 function hasEffects(layer) {
   return Boolean(layer.effects && !layer.effects.disabled && Object.values(layer.effects).some((effect) =>
@@ -229,22 +236,34 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
     if (layer.adjustment) notDrawn.adjustment.push(name);
   };
 
-  /** One layer (or group) and the clipped layers riding on it, into `dst`, scaled by `inherited`. */
-  const drawUnit = (dst, base, clipped, inherited) => {
+  /**
+   * One layer (or group) and the clipped layers riding on it, into `dst`, scaled by `inherited`.
+   * `reach`: what a knockout gives way to, `{ shallow, deep }` (null: clear).
+   */
+  const drawUnit = (dst, base, clipped, inherited, reach) => {
     const opacity = inherited * (base.opacity ?? 1);
+    const fill = base.fillOpacity ?? 1;
     const mode = modeOf(base);
+    const level = Number(base.knockoutLevel ?? (base.knockout ? 1 : 0));
+    if (level > 0) {
+      // Where it covers (its pixels and masks, at full fill), what is under it gives way.
+      const shape = new Float32Array(dst.length);
+      drawUnit(shape, { ...base, opacity: 1, fillOpacity: 1, blendMode: 'normal', knockoutLevel: 0, knockout: false }, [], 1, CLEAR);
+      knock(dst, shape, opacity, level >= 2 ? reach.deep : reach.shallow);
+    }
 
     if (isGroup(base)) {
       if (mode === 'pass through' && !clipped.length && !maskSampler(base)) {
-        drawList(dst, base.children, opacity);   // straight onto what is below
+        // Straight onto what is below; a shallow knockout inside gives way to what was there.
+        drawList(dst, base.children, opacity * fill, { shallow: knocksInside(base) ? Float32Array.from(dst) : null, deep: reach.deep });
         return;
       }
       // Isolated: the group on its own, then blended in as one layer would be.
       const buffer = new Float32Array(dst.length);
-      drawList(buffer, base.children, 1);
+      drawList(buffer, base.children, 1, CLEAR);
       applyMask(buffer, base);
       for (const layer of clipped) drawClipped(buffer, layer);
-      compositeBuffer(dst, buffer, mode === 'pass through' ? 'normal' : mode, opacity);
+      compositeBuffer(dst, buffer, mode === 'pass through' ? 'normal' : mode, opacity * fill);
       return;
     }
 
@@ -270,7 +289,7 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
     const opacity = (layer.opacity ?? 1);
     if (isGroup(layer)) {
       const inner = new Float32Array(buffer.length);
-      drawList(inner, layer.children, 1);
+      drawList(inner, layer.children, 1, CLEAR);
       applyMask(inner, layer);
       compositeBuffer(buffer, inner, mode === 'pass through' ? 'normal' : mode, opacity);
     } else if (paintLayer(buffer, width, height, layer, mode, opacity * (layer.fillOpacity ?? 1))) {
@@ -281,7 +300,7 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
   };
 
   /** A layer stack, bottom first, gathering each base with the clipped layers above it. */
-  const drawList = (dst, list, inherited) => {
+  const drawList = (dst, list, inherited, reach) => {
     // Bases and their clipped layers are matched on the whole list, hidden layers included: a
     // layer clipped to a hidden one is hidden with it, not re-attached to the next one down.
     const all = list ?? [];
@@ -292,7 +311,24 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
       // A clipped layer with nothing under it to clip to is drawn as Photoshop does: not at all.
       if (base.hidden || skip(base) || base.clipping) continue;
       note(base);
-      drawUnit(dst, base, clipped, inherited);
+      drawUnit(dst, base, clipped, inherited, reach);
+    }
+  };
+
+  /** Whether anything in a group knocks out (a pass-through group keeps what it began on, for them). */
+  const knocksInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
+    && (Number(layer.knockoutLevel ?? (layer.knockout ? 1 : 0)) > 0 || (isGroup(layer) && knocksInside(layer))));
+
+  /** `dst` giving way to `to` (null: clear) where `shape` covers, by `strength`. Straight colour. */
+  const knock = (dst, shape, strength, to) => {
+    for (let i = 0; i < dst.length; i += 4) {
+      const t = shape[i + 3] * strength;
+      if (!(t > 0)) continue;
+      const ad = dst[i + 3] * (1 - t);
+      const ak = to ? to[i + 3] * t : 0;
+      const a = ad + ak;
+      for (let k = 0; k < 3; k += 1) dst[i + k] = a > 0 ? (dst[i + k] * ad + (to ? to[i + k] * ak : 0)) / a : 0;
+      dst[i + 3] = a;
     }
   };
 
@@ -304,8 +340,16 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
     }
   };
 
+  // The Background layer (the bottom one, its transparency locked), for a deep knockout to reach.
+  const bottom = (layers ?? [])[0];
+  let background = null;
+  if (bottom && !isGroup(bottom) && bottom.transparencyProtected && !bottom.hidden && !skip(bottom)) {
+    background = new Float32Array(width * height * 4);
+    paintLayer(background, width, height, bottom, 'normal', 1);
+  }
   const canvas = new Float32Array(width * height * 4);
-  drawList(canvas, layers, 1);
+  // At the top, a shallow knockout reaches the Background too.
+  drawList(canvas, layers, 1, { shallow: background, deep: background });
 
   const pixels = new Uint8Array(canvas.length);
   for (let i = 0; i < canvas.length; i += 1) pixels[i] = Math.round(clamp(canvas[i]) * 255);

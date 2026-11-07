@@ -4,12 +4,15 @@
 // it, fixed.
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { inflateSync } from 'node:zlib';
 import { writePsdUint8Array } from 'ag-psd';
 import { planSvgComponentImport } from '../src/CE_Application/utils/svgComponentImport.js';
 import { planSvgPanelImport, withoutSvgPrefix } from '../src/CE_Application/utils/svgPanelImport.js';
 import { planPsdComponentImport } from '../src/CE_Application/utils/psdComponentImport.js';
 import { planPsdPanelImport } from '../src/CE_Application/utils/psdPanelImport.js';
 import { eightBit, readPhotoshop } from '../src/CE_Application/utils/psdRead.js';
+import { adjustmentFunction, hueRangeWeight } from '../src/CE_Application/utils/psdAdjustments.js';
+import { compositePsd } from '../src/CE_Application/utils/psdComposite.js';
 import { readPdfArtwork } from '../src/CE_Application/utils/pdfArtwork.js';
 import { readGltf } from '../src/CE_Application/utils/scene3dGltf.js';
 import * as pdfjsLegacy from 'pdfjs-dist/legacy/build/pdf.mjs';
@@ -104,13 +107,36 @@ test('an SVG written with its namespace as a prefix is read as plain SVG, by bot
   assert.equal(withoutSvgPrefix(svg('<rect/>')), svg('<rect/>'), 'any other SVG as it is');
 });
 
-test('filters and a group\'s blend mode are said, not dropped silently; a shape\'s own blend mode is its layer\'s', () => {
-  const plan = planSvgComponentImport(svg('<defs><filter id="blur"><feGaussianBlur stdDeviation="3"/></filter></defs>'
-    + '<rect id="soft" width="40" height="40" filter="url(#blur)"/><g id="tinted" style="mix-blend-mode:screen"><rect width="10" height="10"/></g>'
-    + '<rect id="shade" x="50" width="40" height="40" style="mix-blend-mode:multiply"/>'));
-  assert.ok(plan.warnings.some((line) => /filters .* not drawn: soft/.test(line)), plan.warnings.join(' | '));
-  assert.ok(plan.warnings.some((line) => /group's blend mode is not kept.*tinted/.test(line)));
+test('an element with a filter, or a group with a blend mode, is a picture of itself, as SVG draws it', () => {
+  const plan = planSvgComponentImport(svg('<defs><filter id="blur"><feGaussianBlur stdDeviation="3"/></filter>'
+    + '<filter id="wide" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="8"/></filter>'
+    + '<path id="dot" d="M0 0 H6 V6 H0 Z" fill="#c00"/></defs>'
+    + '<rect id="soft" x="10" y="10" width="40" height="40" filter="url(#blur)"/>'
+    + '<g id="tinted" style="mix-blend-mode:screen"><rect width="10" height="10" fill="red"/><rect x="5" width="10" height="10"/></g>'
+    + '<rect id="shade" x="50" width="40" height="40" style="mix-blend-mode:multiply"/>'
+    + '<circle id="glow" cx="70" cy="70" r="10" filter="url(#wide)"/>'
+    + '<use id="spot" href="#dot" x="80" y="10" filter="url(#blur)"/>'));
+  assert.equal(plan.ok, true, plan.error);
+  const layout = (name) => { const l = parts(plan)[name]._children.Layout; return [l.x, l.y, l.width, l.height]; };
+  const pictureOf = (name) => atob(fillOf(parts(plan)[name]).imageSrc.split(',')[1]);
+  // Its box holds the filter's region: by default a tenth of the shape past each side (and a pixel).
+  assert.equal(fillOf(parts(plan).soft).imageEnabled, true);
+  assert.deepEqual(layout('soft'), [5, 5, 50, 50]);
+  assert.match(pictureOf('soft'), /<filter id="blur">.*filter="url\(#blur\)"/);
+  assert.deepEqual(layout('glow'), [49, 49, 42, 42], 'a region of its own, half the shape past each side');
+  // The group blends as one, its layer's blend mode; a shape's own blend mode stays the shape's.
+  assert.equal(fillOf(parts(plan).tinted).imageEnabled, true);
+  assert.equal(parts(plan).tinted._children.Effects._children.Blend.mode, 'screen');
   assert.equal(parts(plan).shade._children.Effects._children.Blend.mode, 'multiply');
+  assert.notEqual(fillOf(parts(plan).shade).imageEnabled, true);
+  // A <use> carries what it draws into its picture.
+  assert.match(pictureOf('spot'), /<path id="dot"/);
+  assert.ok(plan.warnings.some((line) => /pictures of themselves.*filters.*soft, glow, spot/.test(line)), plan.warnings.join(' | '));
+  assert.ok(plan.warnings.some((line) => /blend mode.*picture of itself.*tinted/.test(line)));
+  // A filter not in the file is no filter, as in a browser: the shape is drawn as it is.
+  const missing = planSvgComponentImport(svg('<rect id="plain" width="5" height="5" filter="url(#gone)"/>'));
+  assert.notEqual(fillOf(parts(missing).plain).imageEnabled, true);
+  assert.ok(missing.warnings.some((line) => /filter that is not in the file: plain/.test(line)));
 });
 
 const solid = (name, w, h, rgba) => ({ name, left: 0, top: 0, right: w, bottom: h, imageData: { width: w, height: h, data: new Uint8ClampedArray(w * h * 4).map((_, i) => rgba[i % 4]) } });
@@ -124,6 +150,61 @@ test('Photoshop: 16- and 32-bit pixels are made 8-bit, a 32-bit file\'s colour f
   assert.deepEqual([...eightBit({ width: 1, height: 1, data: Float32Array.from([0.5, 0.5, 0.5, 1]) }, false).data], [128, 128, 128, 255]);
   const plain = { width: 1, height: 1, data: new Uint8ClampedArray(4) };
   assert.equal(eightBit(plain), plain, 'an 8-bit picture as it is');
+});
+
+test('Photoshop: Hue/Saturation\'s colour ranges (Reds, Yellows, ...) are applied, round the colour wheel', () => {
+  // A range is whole between its inner bounds and fades to nothing at its outer ones, across 0°.
+  assert.equal(hueRangeWeight(0, [315, 345, 15, 45]), 1);
+  assert.equal(hueRangeWeight(330, [315, 345, 15, 45]), 0.5);
+  assert.equal(hueRangeWeight(30, [315, 345, 15, 45]), 0.5);
+  assert.equal(hueRangeWeight(120, [315, 345, 15, 45]), 0);
+  const plain = { a: 0, b: 0, c: 0, d: 0, hue: 0, saturation: 0, lightness: 0 };
+  const fn = adjustmentFunction({
+    type: 'hue/saturation', master: { ...plain, c: 25 },
+    reds: { ...plain, a: 315, b: 345, c: 15, d: 45, lightness: 100 },
+    blues: { ...plain, a: 195, b: 225, c: 255, d: 285, hue: 180 },
+  });
+  const round = (rgb) => rgb.map((v) => Math.round(v));
+  assert.deepEqual(round(fn([255, 0, 0])), [255, 255, 255], 'red lightened to white');
+  assert.deepEqual(round(fn([0, 0, 255])), [255, 255, 0], 'blue turned half round, to yellow');
+  assert.deepEqual(round(fn([0, 255, 0])), [0, 255, 0], 'green in neither');
+  assert.deepEqual(round(fn([128, 128, 128])), [128, 128, 128], 'a grey in none');
+});
+
+test('Photoshop: a group\'s Fill opacity, and knockout, shallow and deep, drawn as Photoshop draws them', () => {
+  // psd-tools' knockout files, as layers: a white Background, a red layer, and blue in a group at 50 %
+  // Fill. The expected pixels are Photoshop's own pictures of those files.
+  const background = { ...solid('Background', 4, 4, [255, 255, 255, 255]), transparencyProtected: true };
+  const red = solid('BG', 4, 4, [255, 0, 0, 255]);
+  const blue = () => solid('BLUE', 4, 4, [0, 0, 255, 255]);
+  const draw = (layers) => [...compositePsd(layers, 4, 4).pixels.slice(0, 4)];
+  const group = (props, children) => ({ name: 'Group', blendMode: 'normal', opacity: 1, ...props, children });
+  // No knockout: the Fill on the group, blue at half over red.
+  assert.deepEqual(draw([background, red, group({ fillOpacity: 128 / 255 }, [blue()])]), [127, 0, 128, 255]);
+  // Deep: through to the Background, blue at half over white; the same through a Pass Through group.
+  assert.deepEqual(draw([background, red, group({ fillOpacity: 128 / 255, knockoutLevel: 2 }, [blue()])]), [127, 127, 255, 255]);
+  assert.deepEqual(draw([background, red, group({ blendMode: 'pass through', fillOpacity: 128 / 255, knockoutLevel: 2 }, [blue()])]), [127, 127, 255, 255]);
+  // Without a Background, through to nothing.
+  assert.deepEqual(draw([{ ...background, transparencyProtected: false }, red, group({ fillOpacity: 128 / 255, knockoutLevel: 2 }, [blue()])]), [0, 0, 255, 128]);
+  // Inside a group drawn on its own (Normal), shallow and deep both stop at it: green gives way to its
+  // clear start, and the group lies on red. Inside a Pass Through group, deep goes on to the Background.
+  const nested = (outer, level) => [background, red, group({ blendMode: outer, name: 'Outer' }, [solid('GREEN', 4, 4, [0, 255, 0, 255]), group({ fillOpacity: 128 / 255, knockoutLevel: level }, [blue()])])];
+  assert.deepEqual(draw(nested('normal', 1)), [127, 0, 128, 255]);
+  assert.deepEqual(draw(nested('normal', 2)), [127, 0, 128, 255]);
+  assert.deepEqual(draw(nested('pass through', 2)), [127, 127, 255, 255]);
+});
+
+test('Photoshop, as a component: a group with a knockout inside is one picture; a knockout across layers is said', () => {
+  const layer = (name, rgba, extra = {}) => ({ ...solid(name, 8, 8, rgba), ...extra });
+  const file = (children) => writePsdUint8Array({ width: 8, height: 8, children });
+  const inside = planPsdComponentImport(file([
+    layer('panel', [255, 0, 0, 255]),
+    { name: 'cap', opacity: 1, children: [layer('ring', [0, 255, 0, 255]), layer('hole', [0, 0, 255, 255], { knockout: true, fillOpacity: 0 })] },
+  ]), { fileName: 'knob.psd' });
+  assert.equal(inside.ok, true, inside.error);
+  assert.ok(inside.warnings.some((line) => /one layer each: cap/.test(line)), inside.warnings.join(' | '));
+  const across = planPsdComponentImport(file([layer('panel', [255, 0, 0, 255]), layer('hole', [0, 0, 255, 255], { knockout: true, fillOpacity: 0 })]), { fileName: 'knob.psd' });
+  assert.ok(across.warnings.some((line) => /Knockout .* not drawn .*: hole/.test(line)), across.warnings.join(' | '));
 });
 
 test('Photoshop: a colour mode CEditor cannot read is named, with how to convert it', () => {
@@ -197,6 +278,92 @@ test('PDF: a JPEG 2000 picture is decoded (pdf.js\'s decoder, carried with the e
   assert.ok(!(read.notes ?? []).some((note) => note.kind === 'image'), 'not dropped');
 });
 
+test('PDF: a soft mask (an opacity mask) masks what is drawn under it, where it showed unmasked', async () => {
+  // Illustrator's opacity masks: what they hid came in as black boxes.
+  const page = (smask) => illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: '/GS0 gs 1 0 0 rg 0 0 100 100 re f' }],
+    resources: {
+      XObject: { Fm0: { dict: '/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Group << /S /Transparency /CS /DeviceRGB >>', content: '1 1 1 rg 0 0 50 100 re f' } },
+      ExtGState: { GS0: `<< /Type /ExtGState /SMask << /Type /Mask ${smask} /G 4 0 R >> >>` },
+    },
+  });
+  const luminosity = await readPdfArtwork(page('/S /Luminosity'), { pdfjs: pdfjsLegacy });
+  assert.equal(luminosity.ok, true, luminosity.error);
+  // The mask: black where the group draws nothing (its backdrop), white where it draws white.
+  assert.match(luminosity.svg, /<mask id="(m\d+)" maskUnits="userSpaceOnUse"[^>]*><rect [^>]*fill="#000000"\/><rect x="0" y="0" width="50" height="100" fill="#ffffff"\/><\/mask>/);
+  const id = luminosity.svg.match(/<mask id="(m\d+)"/)[1];
+  assert.match(luminosity.svg, new RegExp(`<g mask="url\\(#${id}\\)"><rect x="0" y="0" width="100" height="100" fill="#ff0000"/>`));
+  assert.ok(!(luminosity.notes ?? []).some((note) => note.kind === 'opacity-mask'), 'not noted as dropped');
+  // Alpha: by coverage, no backdrop.
+  const alpha = await readPdfArtwork(page('/S /Alpha'), { pdfjs: pdfjsLegacy });
+  assert.match(alpha.svg, /<mask id="m\d+" [^>]*style="mask-type:alpha"><rect x="0" y="0" width="50"/);
+  // And through to a component: the red layer masked.
+  const plan = planSvgComponentImport(luminosity.svg);
+  assert.equal(plan.ok, true, plan.error);
+  const masked = Object.values(parts(plan)).find((part) => fillOf(part).colour === 'FFFF0000');
+  assert.equal(masked?.mask?.enabled, true);
+  assert.match(atob(masked.mask.src.split(",")[1]), /<mask id="m\d+"/, "the mask carried into its picture");
+});
+
+/** A PNG data URL from utils/pngEncode.js (8-bit RGBA, filter 0 on every row) as { width, height, at(x, y) }. */
+function decodePng(url) {
+  const bytes = Buffer.from(url.split(',')[1], 'base64');
+  const width = bytes.readUInt32BE(16);
+  const height = bytes.readUInt32BE(20);
+  const chunks = [];
+  for (let at = 8; at < bytes.length;) {
+    const length = bytes.readUInt32BE(at);
+    if (bytes.toString('latin1', at + 4, at + 8) === 'IDAT') chunks.push(bytes.subarray(at + 8, at + 8 + length));
+    at += length + 12;
+  }
+  const raw = inflateSync(Buffer.concat(chunks));
+  return { width, height, at: (x, y) => [...raw.subarray(y * (width * 4 + 1) + 1 + x * 4, y * (width * 4 + 1) + 5 + x * 4)] };
+}
+
+test('PDF: a mesh shading (a gradient mesh) is drawn as a picture of itself, blended across each triangle', async () => {
+  // One triangle: red at the bottom left, green at the bottom right, blue at the top left (PDF space).
+  const vertex = (x, y, rgb) => Buffer.from([0, x >> 8, x & 255, y >> 8, y & 255, ...rgb]);
+  const data = Buffer.concat([vertex(0, 0, [255, 0, 0]), vertex(65535, 0, [0, 255, 0]), vertex(0, 65535, [0, 0, 255])]);
+  const bytes = illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: '/Sh0 sh' }],
+    resources: { Shading: { Sh0: { dict: '/ShadingType 4 /ColorSpace /DeviceRGB /BitsPerCoordinate 16 /BitsPerComponent 8 /BitsPerFlag 8 /Decode [0 100 0 100 0 1 0 1 0 1]', content: data.toString('latin1') } } },
+  });
+  const read = await readPdfArtwork(bytes, { pdfjs: pdfjsLegacy });
+  assert.equal(read.ok, true, read.error);
+  assert.ok(!(read.notes ?? []).some((note) => note.kind === 'mesh-gradient'), 'not one mean colour');
+  const [, w, h, transform, href] = read.svg.match(/<image width="(\d+)" height="(\d+)" preserveAspectRatio="none" transform="matrix\(([^)]+)\)" href="([^"]+)"/);
+  const picture = decodePng(href);
+  assert.deepEqual([picture.width, picture.height], [Number(w), Number(h)]);
+  // Its rows run up the page (PDF's y), the transform turning them over.
+  assert.equal(Number(transform.split(' ')[3]) < 0, true);
+  const near = (rgba, rgb) => rgb.every((v, k) => Math.abs(rgba[k] - v) < 12) && rgba[3] === 255;
+  assert.ok(near(picture.at(1, 1), [255, 0, 0]), `red corner: ${picture.at(1, 1)}`);
+  assert.ok(near(picture.at(picture.width - 2, 1), [0, 255, 0]), `green corner: ${picture.at(picture.width - 2, 1)}`);
+  assert.ok(near(picture.at(1, picture.height - 2), [0, 0, 255]), `blue corner: ${picture.at(1, picture.height - 2)}`);
+  assert.equal(picture.at(picture.width - 2, picture.height - 2)[3], 0, 'clear where no triangle is');
+});
+
+test('PDF: a soft mask set on a transparency group masks the group whole, with its opacity and blend mode', async () => {
+  // Illustrator draws a masked object as a group that resets the mask inside: the mask was lost.
+  const bytes = illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: '/GS0 gs /Fm1 Do' }],
+    resources: {
+      XObject: {
+        Fm0: { dict: '/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Group << /S /Transparency /CS /DeviceRGB >>', content: '1 1 1 rg 0 0 50 100 re f' },
+        Fm1: { dict: '/Type /XObject /Subtype /Form /BBox [0 0 100 100] /Group << /S /Transparency >> /Resources << /ExtGState << /GS1 << /SMask /None >> >> >>', content: '/GS1 gs 1 0 0 rg 0 0 100 100 re f' },
+      },
+      ExtGState: { GS0: '<< /Type /ExtGState /SMask << /Type /Mask /S /Luminosity /G 4 0 R >> /ca 0.5 /BM /Screen >>' },
+    },
+  });
+  const read = await readPdfArtwork(bytes, { pdfjs: pdfjsLegacy });
+  assert.equal(read.ok, true, read.error);
+  const id = read.svg.match(/<mask id="(m\d+)"/)[1];
+  assert.match(read.svg, new RegExp(`<g opacity="0.5" style="mix-blend-mode:screen" mask="url\\(#${id}\\)"><rect x="0" y="0" width="100" height="100" fill="#ff0000"/>`));
+});
+
 test('glTF: required KTX2 textures are read as none (objects draw in their material\'s colour); Draco is decoded in a page', async () => {
   const asset = (json) => `data:model/gltf+json;base64,${Buffer.from(JSON.stringify({ asset: { version: '2.0' }, ...json })).toString('base64')}`;
   // A model that requires KTX2: its textures left empty, the model read, where it was refused.
@@ -226,3 +393,58 @@ test('a radial gradient on an outline is drawn radial, its stops\' opacity kept 
   assert.match(drawn, /stop-opacity="0"/);
 });
 
+
+test('an outline\'s colour keeps its own opacity (a stroke-opacity, here handed down by a group)', () => {
+  const plan = planSvgComponentImport(svg('<g stroke-opacity="0.5"><rect id="box" x="40" y="40" width="20" height="20" fill="gray" stroke="green" stroke-width="4"/></g>'));
+  const border = borderOf(parts(plan).box);
+  assert.equal(border.colour, '80008000');
+  const drawn = render(OutlineBorder, { props: { border, outline: { d: 'M2 2 H22 V22 H2 Z' }, width: 24, height: 24 } }).body;
+  assert.match(drawn, /fill="#008000" fill-opacity="0.502"/, 'drawn at half, where it was drawn solid');
+});
+
+test('gradients as SVG paints them: one stop is its colour; the paint\'s opacity fades every stop', () => {
+  const plan = planSvgComponentImport(svg('<defs><linearGradient id="one"><stop offset="0.5" stop-color="green" stop-opacity="0.5"/></linearGradient>'
+    + '<linearGradient id="two"><stop offset="0" stop-color="#f00"/><stop offset="1" stop-color="#00f"/></linearGradient></defs>'
+    + '<rect id="solid" x="10" y="10" width="30" height="30" fill="url(#one)" stroke="url(#one)" stroke-width="4"/>'
+    + '<rect id="faded" x="50" y="10" width="30" height="30" fill="url(#two)" fill-opacity="0.5"/>'));
+  assert.deepEqual(plan.warnings, []);
+  assert.equal(fillOf(parts(plan).solid).colour, '80008000', 'one stop: its colour, where it was no paint');
+  assert.equal(borderOf(parts(plan).solid).colour, '80008000');
+  assert.deepEqual(fillOf(parts(plan).faded).gradient.stops.map((stop) => stop.color), ['80FF0000', '800000FF']);
+});
+
+test('an embedded picture: its wrapped base64 joined, placed as preserveAspectRatio says', () => {
+  const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGP4z8DwHwAFAAH/iZk9HQAAAABJRU5ErkJggg==';
+  const wrapped = `data:image/png;base64,\n${png.slice(0, 40)}\n  ${png.slice(40)}`;
+  const plan = planSvgComponentImport(svg(`<image id="meet" x="0" y="0" width="80" height="40" xlink:href="${wrapped}"/>`
+    + `<image id="slice" x="0" y="50" width="80" height="40" preserveAspectRatio="xMinYMax slice" href="data:image/png;base64,${png}"/>`
+    + `<image id="none" x="0" y="0" width="10" height="90" preserveAspectRatio="none" href="data:image/png;base64,${png}"/>`));
+  const meet = fillOf(parts(plan).meet);
+  assert.equal(meet.imageSrc, `data:image/png;base64,${png}`, 'no line breaks, which CSS does not take');
+  assert.deepEqual([meet.imageFit, meet.imageAlign], ['contain', 'center']);
+  assert.deepEqual([fillOf(parts(plan).slice).imageFit, fillOf(parts(plan).slice).imageAlign], ['cover', 'bottom-left']);
+  assert.equal(fillOf(parts(plan).none).imageFit, 'stretch');
+});
+
+test('a clip in objectBoundingBox units on a turned shape clips it in the shape\'s own box', async () => {
+  const file = svg('<clipPath id="c" clipPathUnits="objectBoundingBox"><rect x="0.2" y="0.2" width="0.6" height="0.6"/></clipPath>'
+    + '<rect id="turned" width="100" height="100" fill="green" clip-path="url(#c)" transform="translate(50 -20) rotate(45)"/>', 'viewBox="0 0 100 100"');
+  // As a mask: the clip, in the shape's own units, turned with it.
+  const masked = planSvgComponentImport(file);
+  const mask = atob(parts(masked).turned.mask.src.split(',')[1]);
+  assert.match(mask, /<clipPath id="c-box-1" clipPathUnits="userSpaceOnUse" transform="matrix\(100 0 0 100 0 0\)">/);
+  assert.match(mask, /<g transform="matrix\(0\.707107 0\.707107 -0\.707107 0\.707107 50 -20\)" clip-path="url\(#c-box-1\)">/);
+  // Cut to it, with the geometry to cut with: the inner square, turned.
+  const { loadGeometry } = await import('../src/CE_Application/utils/partOutlines.js');
+  const cut = planSvgComponentImport(file, { geometry: await loadGeometry() });
+  const layout = parts(cut).turned._children.Layout;
+  assert.equal(parts(cut).turned.mask, undefined);
+  // The 60 by 60 inner square turned 45°: 85 across, about its centre (50, 51).
+  assert.deepEqual([layout.x, layout.y, layout.width, layout.height].map((v) => Math.round(v)), [8, 8, 85, 85]);
+});
+
+test('style rules by type, id and class, as CSS ranks them; !important read past', () => {
+  const plan = planSvgComponentImport(svg('<style>/* rules */ rect { fill: red } .a, .b { fill: #00f } #x { fill: green !important } path.e { fill: #ff0 } g > rect { fill: black }</style>'
+    + '<rect id="r" width="20" height="20"/><rect class="a" id="q" x="30" width="20" height="20"/><rect class="b" id="x" x="60" width="20" height="20"/><path class="e" id="p" d="M0 50h30v30h-30z"/>'));
+  assert.deepEqual(['r', 'q', 'x', 'p'].map((name) => fillOf(parts(plan)[name]).colour), ['FFFF0000', 'FF0000FF', 'FF008000', 'FFFFFF00']);
+});

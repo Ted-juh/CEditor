@@ -91,31 +91,42 @@ const num = (value, fallback = 0) => {
 const round = (value, places = 2) => Math.round(value * 10 ** places) / 10 ** places;
 
 /** Every class rule's declarations, as class → { property: value }. Plain class selectors only. */
+/**
+ * The document's style rules, in the order CSS applies them (by specificity, then as written): each
+ * `{ type, id, classes, declarations }` for a selector of one element (\`.cls-1\`, \`rect\`, \`#cap\`,
+ * \`path.edge\`, \`*\`). A selector that looks past the element (\`g > rect\`, \`g rect\`) is not read.
+ */
 function classRules(root) {
-  const rules = new Map();
+  const rules = [];
   const visit = (node) => {
     if (node.name === 'style') {
       const pattern = /([^{}]+)\{([^}]*)\}/g;
       let match;
-      while ((match = pattern.exec(node.text ?? ''))) {
+      while ((match = pattern.exec(String(node.text ?? '').replace(/\/\*[\s\S]*?\*\//g, '')))) {
         const declarations = declarationsOf(match[2]);
         for (const selector of match[1].split(',')) {
-          const name = selector.trim().match(/^\.([A-Za-z0-9_-]+)$/);
-          if (name) rules.set(name[1], { ...(rules.get(name[1]) ?? {}), ...declarations });
+          const text = selector.trim();
+          const parts = /^(\*|[A-Za-z][\w:-]*)?((?:[.#][A-Za-z0-9_-]+)*)$/.exec(text);
+          if (!text || !parts) continue;
+          const type = parts[1] && parts[1] !== '*' ? parts[1] : '';
+          const classes = [...parts[2].matchAll(/\.([A-Za-z0-9_-]+)/g)].map((m) => m[1]);
+          const ids = [...parts[2].matchAll(/#([A-Za-z0-9_-]+)/g)].map((m) => m[1]);
+          if (ids.length > 1) continue;
+          rules.push({ type, id: ids[0] ?? '', classes, declarations, specificity: ids.length * 10000 + classes.length * 100 + (type ? 1 : 0), order: rules.length });
         }
       }
     }
     for (const child of node.children ?? []) visit(child);
   };
   visit(root);
-  return rules;
+  return rules.sort((a, b) => a.specificity - b.specificity || a.order - b.order);
 }
 
 function declarationsOf(text) {
   const out = {};
   for (const piece of String(text ?? '').split(';')) {
     const at = piece.indexOf(':');
-    if (at > 0) out[piece.slice(0, at).trim().toLowerCase()] = piece.slice(at + 1).trim();
+    if (at > 0) out[piece.slice(0, at).trim().toLowerCase()] = piece.slice(at + 1).replace(/!important\s*$/i, '').trim();
   }
   return out;
 }
@@ -127,7 +138,13 @@ function ownStyle(node, classes) {
   for (const property of [...INHERITED, 'opacity', 'stop-color', 'stop-opacity']) {
     if (attributes[property] != null) style[property] = String(attributes[property]).trim();
   }
-  for (const name of String(attributes.class ?? '').split(/\s+/).filter(Boolean)) Object.assign(style, classes.get(name) ?? {});
+  if (classes.length) {
+    const own = new Set(String(attributes.class ?? '').split(/\s+/).filter(Boolean));
+    for (const rule of classes) {
+      if ((rule.type && rule.type !== node.name) || (rule.id && rule.id !== attributes.id) || rule.classes.some((name) => !own.has(name))) continue;
+      Object.assign(style, rule.declarations);
+    }
+  }
   Object.assign(style, declarationsOf(attributes.style));
   return style;
 }
@@ -178,6 +195,8 @@ function parseColour(value, current = '') {
 const colourAlpha = (value, current = '') => readColour(value, current)?.alpha ?? 1;
 
 const argb = (rgb, alpha = 1) => `${Math.round(Math.max(0, Math.min(1, alpha)) * 255).toString(16).padStart(2, '0')}${rgb}`.toUpperCase();
+/** An AARRGGBB colour at `k` of its opacity. */
+const fadeArgb = (colour, k) => (k >= 1 ? colour : argb(String(colour).slice(-6), (parseInt(String(colour).slice(0, 2), 16) / 255) * k));
 const opacityOf = (value, fallback = 1) => {
   const text = String(value ?? '').trim();
   if (!text) return fallback;
@@ -441,13 +460,14 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   // Ids by kind: a file may give a gradient and a shape the same id ("cap"), and a fill means the
   // gradient, a <use> the shape.
   const ids = new Map();
-  const defs = { paint: new Map(), clipPath: new Map(), mask: new Map() };
+  const defs = { paint: new Map(), clipPath: new Map(), mask: new Map(), filter: new Map() };
   const indexIds = (node) => {
     const id = node.attributes?.id;
     if (id) {
       if (node.name === 'linearGradient' || node.name === 'radialGradient' || node.name === 'pattern') defs.paint.set(id, node);
       else if (node.name === 'clipPath') defs.clipPath.set(id, node);
       else if (node.name === 'mask') defs.mask.set(id, node);
+      else if (node.name === 'filter') defs.filter.set(id, node);
       else if (!ids.has(id)) ids.set(id, node);
     }
     for (const child of node.children ?? []) indexIds(child);
@@ -473,19 +493,29 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   };
   gatherDefinitions(root);
   const REFERENCE = /url\(\s*["']?#([^)"'\s]+)["']?\s*\)|href\s*=\s*["']#([^"']+)["']/g;
-  /** The definitions `content` refers to, and those they refer to, as markup. */
+  /**
+   * The definitions `content` refers to, and those they refer to, as markup; and the elements its
+   * <use>s draw, which in <defs> are drawn only where they are used, as there.
+   */
+  const referredText = (id) => {
+    if (definitionText.has(id)) return definitionText.get(id);
+    const node = ids.get(id);
+    return node && Number.isFinite(node.start) && Number.isFinite(node.end) ? source.slice(node.start, node.end) : '';
+  };
   const definitionsFor = (content) => {
-    const wanted = new Set();
+    const wanted = new Map();
     const queue = [content];
     while (queue.length) {
       for (const match of queue.pop().matchAll(REFERENCE)) {
         const id = match[1] ?? match[2];
-        if (wanted.has(id) || !definitionText.has(id)) continue;
-        wanted.add(id);
-        queue.push(definitionText.get(id));
+        if (wanted.has(id)) continue;
+        const text = referredText(id);
+        if (!text) continue;
+        wanted.set(id, text);
+        queue.push(text);
       }
     }
-    return styleTexts.join('') + [...wanted].map((id) => definitionText.get(id)).join('');
+    return styleTexts.join('') + [...wanted.values()].join('');
   };
   /** A picture of `content` (in document pixels) over `box`, for a mask or a fill. */
   const picture = (box, content) => svgPicture(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"`
@@ -537,9 +567,49 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     // so what it masks stays where it is in the document.
     for (const entry of [...stack].reverse()) {
       const attribute = entry.kind === 'clip' ? 'clip-path' : 'mask';
-      content = `<g transform="${matrixText(entry.matrix)}" ${attribute}="url(#${entry.id})"><g transform="${matrixText(invert(entry.matrix))}">${content}</g></g>`;
+      const id = entry.kind === 'clip' ? clipInUserSpace(entry) : entry.id;
+      content = `<g transform="${matrixText(entry.matrix)}" ${attribute}="url(#${id})"><g transform="${matrixText(invert(entry.matrix))}">${content}</g></g>`;
     }
     return content;
+  };
+
+  /**
+   * The box a clip in objectBoundingBox units measures against: the element's own, in its own space
+   * (a shape's outline, a picture's rectangle), or null where it is not measured here (a group's).
+   */
+  const ownBox = (node) => {
+    if (node.name === 'image') {
+      const width = num(node.attributes?.width);
+      const height = num(node.attributes?.height);
+      return width > 0 && height > 0 ? { x: num(node.attributes?.x), y: num(node.attributes?.y), width, height } : null;
+    }
+    if (!SHAPES.has(node.name)) return null;
+    try {
+      const data = shapePathData(node);
+      return data ? modelBounds(parsePathData(data)) : null;
+    } catch {
+      return null;
+    }
+  };
+  // A clip in objectBoundingBox units, as one in the user space of the element it clips: the same
+  // shapes, scaled to that element's box. The layer's mask is a picture of the clip round a box of its
+  // own, which in the clip's units was the wrong box (a turned shape's clip came out unturned).
+  const boxClips = new Map();
+  const clipInUserSpace = (entry) => {
+    const clip = defs.clipPath.get(entry.id);
+    const box = entry.box;
+    if (!box || !(box.width > 0 && box.height > 0) || String(clip?.attributes?.clipPathUnits ?? '') !== 'objectBoundingBox') return entry.id;
+    const key = `${entry.id} ${box.x} ${box.y} ${box.width} ${box.height}`;
+    if (!boxClips.has(key)) {
+      const text = definitionText.get(entry.id) ?? '';
+      const open = text.match(/^<clipPath\b[^>]*>/)?.[0];
+      if (!open || open.endsWith('/>')) return entry.id;
+      const id = `${entry.id}-box-${boxClips.size + 1}`;
+      const transform = `${matrixText([box.width, 0, 0, box.height, box.x, box.y])} ${clip.attributes?.transform ?? ''}`.trim();
+      definitionText.set(id, `<clipPath id="${id}" clipPathUnits="userSpaceOnUse" transform="${transform}">${text.slice(open.length)}`);
+      boxClips.set(key, id);
+    }
+    return boxClips.get(key);
   };
   const applyMasks = (part, box, stack) => {
     if (!stack.length) return;
@@ -549,8 +619,14 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   /** A clip path's region in the document, as path data, or '' (for Paper.js to cut a shape to). */
   const clipRegion = (entry) => {
     const clip = defs.clipPath.get(entry.id);
-    if (!clip || String(clip.attributes?.clipPathUnits ?? '') === 'objectBoundingBox') return '';
-    const own = multiply(entry.matrix, parseTransform(clip.attributes?.transform));
+    if (!clip) return '';
+    let own = multiply(entry.matrix, parseTransform(clip.attributes?.transform));
+    if (String(clip.attributes?.clipPathUnits ?? '') === 'objectBoundingBox') {
+      // Its shapes in the units of the clipped element's own box.
+      const box = entry.box;
+      if (!box || !(box.width > 0 && box.height > 0)) return '';
+      own = multiply(entry.matrix, multiply([box.width, 0, 0, box.height, box.x, box.y], parseTransform(clip.attributes?.transform)));
+    }
     const pieces = [];
     for (const child of clip.children ?? []) {
       if (!SHAPES.has(child.name)) return '';
@@ -589,7 +665,10 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const maskId = refOf(node.attributes?.mask ?? own.mask);
     const here = [...stack];
     if (clipId) {
-      if (defs.clipPath.has(clipId)) here.push({ kind: 'clip', id: clipId, matrix: m });
+      if (defs.clipPath.has(clipId)) {
+        const boxed = String(defs.clipPath.get(clipId).attributes?.clipPathUnits ?? '') === 'objectBoundingBox';
+        here.push({ kind: 'clip', id: clipId, matrix: m, ...(boxed ? { box: ownBox(node) } : {}) });
+      }
       else note('missing', label);
     }
     if (maskId) {
@@ -597,17 +676,41 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
       else note('missing', label);
     }
 
-    if (!measuring && name && drawnAsFrame(name, chain) && Number.isFinite(node.start) && Number.isFinite(node.end)
-      && !/<use\b/.test(source.slice(node.start, node.end))) {
-      angleLayer(node, { matrix, inherited, opacity, names, stack, depth, own, label, chain, switchedOff, hidden: !!style.switchedOff });
+    const sliced = Number.isFinite(node.start) && Number.isFinite(node.end);
+    const pictureOf = { matrix, inherited, opacity, names, stack, depth, own, label, chain, switchedOff, hidden: !!style.switchedOff };
+    if (!measuring && name && sliced && drawnAsFrame(name, chain)) {
+      pictureLayer(node, pictureOf);
       return;
     }
-    // Not drawn here: a filter (a blur, a drop shadow), and a group's blend mode (a shape's own is
-    // its layer's); said so.
-    if (!measuring && refOf(node.attributes?.filter ?? own.filter)) note('filter', label);
+    // A filter (a blur, a drop shadow, lighting) draws what it holds as one picture, and a group's
+    // blend mode blends the group as one: each such element is a picture of itself, as SVG draws it.
+    // (A shape's own blend mode is its layer's, below, and it stays a shape.) A filter that is not in
+    // the file is no filter, as in a browser.
+    const filterId = refOf(node.attributes?.filter ?? own.filter);
+    const filtered = !!filterId && defs.filter.has(filterId);
+    if (filterId && !filtered && !measuring) note('missing', label);
     const blend = String(own['mix-blend-mode'] ?? node.attributes?.['mix-blend-mode'] ?? '').trim();
+    const group = node.name === 'g' || node.name === 'svg' || node.name === 'a' || node.name === 'switch' || node.name === 'use';
+    const groupBlend = group && CSS_BLEND_MODES.has(blend) && blend !== 'normal';
+    if (!measuring && sliced && (filtered || groupBlend)) {
+      note(filtered ? 'filter' : 'blend', label);
+      pictureLayer(node, pictureOf);
+      return;
+    }
+    // Measured for a picture: a filter draws over its region, past the shapes it holds.
+    if (measuring && filtered && !regionOf.has(node)) {
+      const mark = layers.length;
+      regionOf.add(node);
+      try {
+        visit(node, matrix, inherited, opacity, names, stack, depth);
+      } finally {
+        regionOf.delete(node);
+      }
+      const held = layers.slice(mark);
+      if (held.length) layers.push({ box: filterRegion(defs.filter.get(filterId), held.map((layer) => layer.box), m), part: {}, names: [] });
+      return;
+    }
     if (node.name === 'g' || node.name === 'svg' || node.name === 'a' || node.name === 'switch') {
-      if (!measuring && blend && blend !== 'normal') note('blend', label);
       drawing.add(node);
       try {
         for (const child of node.children ?? []) visit(child, m, style, alpha, chain, here, depth + 1);
@@ -637,12 +740,59 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     if (style.switchedOff) for (let i = before; i < layers.length; i += 1) layers[i].part.visible = false;
   };
 
+  // The elements whose filter region is being measured (a picture's box holds it).
+  const regionOf = new Set();
   /**
-   * A turning layer drawn at one of several angles, as a picture: the element as the file has it,
-   * under its groups' transform and the paint they hand down, over the box its shapes cover (and
-   * the room a filter takes round them). Its groups' clips and masks are its mask; its own are in it.
+   * Where a filter draws, in the document: its region (x, y, width, height on the <filter>; by default
+   * a tenth of the box it filters past each side), over `boxes`, the document boxes of what it holds,
+   * or in the user space of the element it is on (`m`).
    */
-  const angleLayer = (node, { matrix, inherited, opacity, names, stack, depth, own, label, chain, switchedOff, hidden }) => {
+  const filterRegion = (filter, boxes, m) => {
+    const x0 = Math.min(...boxes.map((b) => b.x));
+    const y0 = Math.min(...boxes.map((b) => b.y));
+    const w = Math.max(...boxes.map((b) => b.x + b.width)) - x0;
+    const h = Math.max(...boxes.map((b) => b.y + b.height)) - y0;
+    const a = filter?.attributes ?? {};
+    const length = (value, fallback, whole) => {
+      const text = String(value ?? '').trim();
+      if (!text) return fallback;
+      const n = parseFloat(text);
+      if (!Number.isFinite(n)) return fallback;
+      return text.endsWith('%') ? (n / 100) * whole : n;
+    };
+    if (String(a.filterUnits ?? '') === 'userSpaceOnUse') {
+      const rx = length(a.x, NaN, frame.width);
+      const ry = length(a.y, NaN, frame.height);
+      const rw = length(a.width, NaN, frame.width);
+      const rh = length(a.height, NaN, frame.height);
+      if ([rx, ry, rw, rh].every(Number.isFinite) && rw > 0 && rh > 0) {
+        const corners = [apply(m, rx, ry), apply(m, rx + rw, ry), apply(m, rx, ry + rh), apply(m, rx + rw, ry + rh)];
+        const xs = corners.map((p) => p.x);
+        const ys = corners.map((p) => p.y);
+        return { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
+      }
+    }
+    // Fractions of the box (objectBoundingBox, the default): '-10%' or -0.1.
+    const fraction = (value, fallback) => {
+      const text = String(value ?? '').trim();
+      const n = parseFloat(text);
+      if (!text || !Number.isFinite(n)) return fallback;
+      return text.endsWith('%') ? n / 100 : n;
+    };
+    const fx = fraction(a.x, -0.1);
+    const fy = fraction(a.y, -0.1);
+    const fw = Math.max(0, fraction(a.width, 1.2));
+    const fh = Math.max(0, fraction(a.height, 1.2));
+    return { x: x0 + fx * w, y: y0 + fy * h, width: fw * w, height: fh * h };
+  };
+
+  /**
+   * An element drawn as a picture of itself: a turning layer drawn at one of several angles, an
+   * element with a filter, a group with a blend mode. The element as the file has it, under its
+   * groups' transform and the paint they hand down, over the box its shapes cover and its filters'
+   * regions. Its groups' clips and masks are its mask; its own are in it.
+   */
+  const pictureLayer = (node, { matrix, inherited, opacity, names, stack, depth, own, label, chain, switchedOff, hidden }) => {
     // Where it draws: the layers it would have made, measured and taken back.
     const mark = layers.length;
     measuring += 1;
@@ -652,7 +802,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
       measuring -= 1;
     }
     const made = layers.splice(mark);
-    for (const layer of made) taken.delete(layer.part.name);
+    for (const layer of made) if (layer.part.name) taken.delete(layer.part.name);
     if (!made.length) return;
     let markup = source.slice(node.start, node.end);
     // A layer switched off in the file comes in hidden (below), not blank.
@@ -661,12 +811,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const y0 = Math.min(...made.map((layer) => layer.box.y));
     const x1 = Math.max(...made.map((layer) => layer.box.x + layer.box.width));
     const y1 = Math.max(...made.map((layer) => layer.box.y + layer.box.height));
-    // A filter (a blurred shadow) draws past the shapes, by up to a tenth of them each way as SVG
-    // gives it room by default.
-    const filtered = /\bfilter\s*[=:]/.test(markup);
-    const padX = filtered ? (x1 - x0) * 0.1 + 2 : 1;
-    const padY = filtered ? (y1 - y0) * 0.1 + 2 : 1;
-    const box = { x: round(x0 - padX, 3), y: round(y0 - padY, 3), width: round(x1 - x0 + padX * 2, 3), height: round(y1 - y0 + padY * 2, 3) };
+    const box = { x: round(x0 - 1, 3), y: round(y0 - 1, 3), width: round(x1 - x0 + 2, 3), height: round(y1 - y0 + 2, 3) };
     const handed = INHERITED.filter((property) => property !== 'display' && property !== 'visibility' && inherited[property] != null)
       .map((property) => ` ${property}="${String(inherited[property]).replace(/&/g, '&amp;').replace(/"/g, '&quot;')}"`).join('');
     const section = deepClone(SECTION_DEFAULTS.Background);
@@ -747,11 +892,25 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const inner = { x: bounds.x, y: bounds.y, width: Math.max(1e-6, bounds.width), height: Math.max(1e-6, bounds.height) };
     const local = modelBounds(model) ?? inner;
 
+    // A gradient as a paint, at the paint's own opacity: one stop is that stop's colour, as SVG paints
+    // it, and none is nothing. { colour } or { gradient }, or null.
+    const gradientPaint = (target, opacity) => {
+      const stops = gradientStops(target, gradients, classes);
+      if (stops.length === 1) return { colour: fadeArgb(stops[0].color, opacity) };
+      const gradient = gradientFill(target, gradients, classes, local, inner, m);
+      if (!gradient) return null;
+      if (opacity < 1) gradient.stops = gradient.stops.map((stop) => ({ ...stop, color: fadeArgb(stop.color, opacity) }));
+      return { gradient };
+    };
+
     let fill = { colour: '00000000', gradient: null, picture: '' };
     if (!lineOnly) {
       const target = fillRef ? defs.paint.get(fillRef) : null;
       if (target?.name === 'linearGradient' || target?.name === 'radialGradient') {
-        fill = { colour: '00000000', gradient: gradientFill(target, gradients, classes, local, inner, m), picture: '' };
+        const paint = gradientPaint(target, opacityOf(style['fill-opacity']));
+        if (paint?.colour) fill = { colour: paint.colour, gradient: null, picture: '' };
+        else if (paint?.gradient) fill = { colour: '00000000', gradient: paint.gradient, picture: '' };
+        else if (gradientStops(target, gradients, classes).length) note('paint', label);
       } else if (target?.name === 'pattern') {
         // The pattern drawn over the shape's own box, as SVG draws it there, and the shape clips it.
         fill = { colour: '00000000', gradient: null, picture: picture(inner, `<g transform="${matrixText(m)}"><rect x="${round(local.x, 3)}" y="${round(local.y, 3)}" width="${round(local.width, 3)}" height="${round(local.height, 3)}" fill="url(#${fillRef})"/></g>`) };
@@ -767,9 +926,10 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     let stroke = null;
     if (strokeColour === 'gradient') {
       const target = defs.paint.get(strokeRef);
-      const gradient = target?.name === 'linearGradient' || target?.name === 'radialGradient' ? gradientFill(target, gradients, classes, local, inner, m) : null;
-      if (!gradient) note('paint', label);
-      stroke = { colour: gradient?.stops?.[0]?.color ?? 'FF000000', width: round(Math.max(0.5, strokeWidth)), gradient };
+      const paint = target?.name === 'linearGradient' || target?.name === 'radialGradient' ? gradientPaint(target, opacityOf(style['stroke-opacity'])) : null;
+      if (paint?.colour) stroke = { colour: paint.colour, width: round(Math.max(0.5, strokeWidth)) };
+      else if (paint?.gradient) stroke = { colour: paint.gradient.stops?.[0]?.color ?? 'FF000000', width: round(Math.max(0.5, strokeWidth)), gradient: paint.gradient };
+      else if (!target || gradientStops(target, gradients, classes).length) note('paint', label);
     } else if (strokeColour) {
       stroke = { colour: argb(strokeColour, opacityOf(style['stroke-opacity']) * colourAlpha(strokeValue, style.color)), width: round(Math.max(0.5, strokeWidth)) };
     }
@@ -849,9 +1009,12 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   };
 
   const imageLayer = (node, m, alpha, label, chain, stack) => {
-    const linked = String(node.attributes?.href ?? node.attributes?.['xlink:href'] ?? '');
-    // A linked picture is read from beside the file, where the command could (files).
-    const href = linked.startsWith('data:image/') ? linked : String(files?.[linked] ?? '');
+    const linked = String(node.attributes?.href ?? node.attributes?.['xlink:href'] ?? '').trim();
+    // A linked picture is read from beside the file, where the command could (files). An embedded one
+    // as the file has it, less the line breaks its base64 is often wrapped with, which a browser takes
+    // in an SVG and not in the CSS a layer's picture is drawn with.
+    const embedded = /^data:image\//i.test(linked) ? (/;base64,/i.test(linked) ? linked.replace(/\s+/g, '') : linked) : '';
+    const href = embedded || String(files?.[linked] ?? '');
     if (!href.startsWith('data:image/')) { note('link', label || linked); return; }
     const w = num(node.attributes?.width);
     const h = num(node.attributes?.height);
@@ -863,7 +1026,15 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const ys = corners.map((p) => p.y);
     const box = { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
     const section = deepClone(SECTION_DEFAULTS.Background);
-    Object.assign(section._children.Fill, { solidEnabled: false, imageEnabled: true, imageSrc: href, imageFit: 'stretch', imageOpacity: 100 });
+    // Placed in its box as preserveAspectRatio says: by default whole and centred (meet), or filling
+    // it and cut (slice), or stretched to it (none).
+    const [align = 'xMidYMid', meetOrSlice = 'meet'] = String(node.attributes?.preserveAspectRatio ?? '').trim().split(/\s+/).filter(Boolean);
+    const fit = align === 'none' ? 'stretch' : meetOrSlice === 'slice' ? 'cover' : 'contain';
+    const placed = /^x(Min|Mid|Max)Y(Min|Mid|Max)$/.exec(align);
+    const column = { Min: 'left', Mid: '', Max: 'right' }[placed?.[1] ?? 'Mid'];
+    const row = { Min: 'top', Mid: '', Max: 'bottom' }[placed?.[2] ?? 'Mid'];
+    const imageAlign = [row, column].filter(Boolean).join('-') || 'center';
+    Object.assign(section._children.Fill, { solidEnabled: false, imageEnabled: true, imageSrc: href, imageFit: fit, imageAlign, imageOpacity: 100 });
     section._children.Border.enabled = false;
     section._children.Corners.radius = 0;
     const part = createPartNode(uniqueLayerName(label, taken), {
@@ -892,12 +1063,12 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   if (!layers.length) return { ok: false, error: 'The drawing has no shapes, text or embedded pictures to make layers of.' };
   const list = (key) => [...(noted.get(key) ?? [])].slice(0, 5).join(', ');
   if (noted.has('paint')) warnings.push(`Paints that are not a colour, gradient or pattern are not read: ${list('paint')}.`);
-  if (noted.has('missing')) warnings.push(`References to a gradient, pattern, clip path or mask that is not in the file: ${list('missing')}.`);
+  if (noted.has('missing')) warnings.push(`References to a gradient, pattern, clip path, mask or filter that is not in the file: ${list('missing')}.`);
   if (noted.has('link')) warnings.push(`Linked pictures that could not be read: ${list('link')}. Keep them beside the SVG, or embed them before exporting.`);
   if (noted.has('use')) warnings.push(`References to nothing in the file: ${list('use')}.`);
   if (noted.has('loop')) warnings.push(`References that loop back to what holds them, not drawn (as SVG does not draw them): ${list('loop')}.`);
-  if (noted.has('filter')) warnings.push(`SVG filters (blur, drop shadow, lighting) are not drawn: ${list('filter')}. Give the layer a shadow in the Component Designer instead.`);
-  if (noted.has('blend')) warnings.push(`A group's blend mode is not kept, only a shape's own: ${list('blend')}.`);
+  if (noted.has('filter')) warnings.push(`Drawn as pictures of themselves, with their SVG filters (blur, drop shadow, lighting) as SVG draws them: ${list('filter')}. They are pictures, not shapes to edit.`);
+  if (noted.has('blend')) warnings.push(`Groups with a blend mode, each drawn as a picture of itself so it blends as one: ${list('blend')}.`);
   if (noted.has('unknown')) warnings.push(`Not read: ${list('unknown')}.`);
   if (noted.has('path')) warnings.push(`Paths that could not be read: ${list('path')}.`);
 

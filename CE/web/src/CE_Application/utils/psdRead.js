@@ -16,6 +16,22 @@
  * one Background layer has no layers at all, only that.
  */
 import { initializeCanvas, readPsd } from 'ag-psd';
+import { infoHandlersMap } from 'ag-psd/dist/additionalInfo.js';
+
+// A layer's knockout (Blending Options › Knockout) is a level, 0 none, 1 shallow, 2 deep; ag-psd keeps
+// only whether it is set. Read again here as `knockoutLevel`, for utils/psdComposite.js to draw.
+const knockout = infoHandlersMap.knko;
+if (knockout && !knockout.ceditorLevel) {
+  infoHandlersMap.knko = {
+    ...knockout,
+    ceditorLevel: true,
+    read: (reader, target, ...rest) => {
+      const at = reader.offset;
+      knockout.read(reader, target, ...rest);
+      target.knockoutLevel = reader.view.getUint8(at);
+    },
+  };
+}
 
 // ag-psd makes its pixel arrays through a canvas unless told otherwise — a canvas it borrows from the
 // page in a browser, and has none of in node. A plain array is all `useImageData` needs, is the same
