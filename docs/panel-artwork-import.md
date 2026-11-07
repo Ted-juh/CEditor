@@ -123,7 +123,8 @@ clipping masks, knockout, Advanced Blending's Channels (a channel left unticked 
 and Blend If, and groups the way Photoshop does: a Pass Through group paints its layers straight
 onto what is below (its opacity and mask saying how far what is below goes toward that), and a group
 in any other mode, or a Pass Through one below 100% Fill, is put together first and then blended in
-as one layer. A knockout layer or group (Blending Options › Knockout) cuts through what is under it
+as one layer (where its layers are all in a mode such as Lighter Color, its partly covered pixels
+taken between that and the group drawn on nothing, as Photoshop takes them). A knockout layer or group (Blending Options › Knockout) cuts through what is under it
 to where its group began (Shallow) or to the Background layer (Deep, through Pass Through groups),
 and is drawn there at its Fill: a Fill of 0 cuts a hole. A clipped layer clips to its base's shape,
 not its Fill: over a base at Fill 0% it shows in full. An artboard draws its background colour.
@@ -146,7 +147,8 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   layer carries (one with nothing chosen leaves colours alone). In a 32-bit file they work on its
   linear values, as Photoshop works them there.
 - **Smart filters with a filter mask** show the filters' result through the mask and the smart
-  object's own pixels (the copy Photoshop keeps beside it) where the mask hides it.
+  object's own pixels (the copy Photoshop keeps beside it) where the mask hides it, mixed with their
+  coverage between.
 - **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures:
   Drop Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights
   around it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part

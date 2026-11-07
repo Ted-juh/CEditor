@@ -836,7 +836,14 @@ function smartFilterMasks(psd) {
           const u = uy * w + ux;
           const d = (y * image.width + x) * 4;
           const own = inside ? [colour[0][u], colour[1][u], colour[2][u], alpha ? alpha[u] : 255] : [0, 0, 0, 0];
-          for (let c = 0; c < 4; c += 1) image.data[d + c] = Math.round(own[c] + (image.data[d + c] - own[c]) * k);
+          // Mixed as colours with their coverage (premultiplied), so a hole in the smart object's own
+          // pixels lets the filters' colour through rather than darkening it.
+          const a = own[3] + (image.data[d + 3] - own[3]) * k;
+          for (let c = 0; c < 3; c += 1) {
+            const mixed = own[c] * own[3] + (image.data[d + c] * image.data[d + 3] - own[c] * own[3]) * k;
+            image.data[d + c] = a > 0 ? Math.round(mixed / a) : 0;
+          }
+          image.data[d + 3] = Math.round(a);
         }
       }
       if (image.precise) delete image.precise;

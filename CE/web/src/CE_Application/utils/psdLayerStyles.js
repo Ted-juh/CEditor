@@ -178,7 +178,14 @@ function styleBlur(a, w, h, size, { levels = true } = {}) {
 /** The style's contour as a function on 0..1 (its spline, as utils/psdAdjustments.js contourTable). */
 function contourFunction(effect) {
   const table = contourTable(effect?.contour);
-  return table ? (a) => table[Math.round(clamp01(a) * 255)] / 255 : clamp01;
+  if (!table) return clamp01;
+  // Read between its entries, not at the nearest (the contour files of PhotoCraft's corpus, a few
+  // tenths of a level closer, a Chisel Pillow Emboss with both contours 3.2 levels to 2.5).
+  return (a) => {
+    const x = clamp01(a) * 255;
+    const i = Math.floor(x); const j = Math.min(255, i + 1);
+    return (table[i] + (table[j] - table[i]) * (x - i)) / 255;
+  };
 }
 
 /**

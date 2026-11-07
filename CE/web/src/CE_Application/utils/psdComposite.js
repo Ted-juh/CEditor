@@ -812,7 +812,11 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
       // a layer of its own, at its opacity and Fill, the layers clipped to it on it (psd-tools' reading,
       // which Photoshop's pictures of its test files bear out).
       if (mode === 'pass through') {
-        const own = passThroughAlone(dst, base);
+        // (Below 100% Fill, a group of layers in non-separable modes alone mixes its partly covered
+        // pixels between the two readings: passThroughAlone.)
+        const between = fill < 1 && !clipped.length && (base.children ?? []).every((child) => child.hidden || skip(child)
+          || (!child.adjustment && !child.children && !child.clipping && Boolean(NON_SEPARABLE[String(child.blendMode ?? 'normal')])));
+        const own = passThroughAlone(dst, base, between);
         applyMask(own, base);
         clipInto(own, alphaOf(own), clipped);
         compositeBuffer(dst, own, 'normal', opacity * fill);
@@ -847,7 +851,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
    * kept to the group's own pixels so far, and the group then taken back off what is below: its own
    * colour and coverage, as a buffer to lay down as one layer.
    */
-  const passThroughAlone = (dst, group) => {
+  const passThroughAlone = (dst, group, between = false) => {
     const work = Float32Array.from(dst);
     const solo = new Float32Array(dst.length);
     const within = (x, y) => solo[(y * width + x) * 4 + 3];
@@ -873,6 +877,13 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
       const ab = dst[i + 3] * (1 - ag);
       const aw = work[i + 3];
       for (let k = 0; k < 3; k += 1) own[i + k] = clamp((work[i + k] * aw - dst[i + k] * ab) / ag);
+      if (between && ag < 1) {
+        // Where it only partly covers, Photoshop's colour is between that and the group's own colour
+        // drawn on nothing, the second weighted by what the group leaves uncovered: (1 − α) / (2 − α)
+        // of the way (passthrough_fill_blendmode.psd, a Lighter Color layer at 47 % Fill: every edge
+        // pixel within its rounding, 4 % of pixels off to none).
+        for (let k = 0; k < 3; k += 1) own[i + k] = (own[i + k] + (1 - ag) * solo[i + k]) / (2 - ag);
+      }
       own[i + 3] = ag;
     }
     return own;

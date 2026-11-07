@@ -376,3 +376,16 @@ test('type in another blend mode: the blend worked as ever, mixed in at its edge
   const { at } = flatten([solid('under', 0, 0, 1, 1, grey(200)), solid('type', 0, 0, 1, 1, [100, 100, 100, 128], { text: { text: 'A' }, blendMode: 'multiply' })], 1, 1);
   assert.ok(Math.abs(at(0)[0] - want) <= 1, `${at(0)} vs ${want}`);
 });
+
+test('a Pass Through group below full Fill of layers in a non-separable mode mixes its edge pixels between the two readings', () => {
+  // Grey 200 under a Lighter Color layer of cyan at 40 % coverage, in a Pass Through group at 47 %
+  // Fill. The grey is the lighter, so laid on what is below the layer changes nothing; drawn on its own
+  // it is cyan. Photoshop's colour for the group there is between the two, the second weighted by what
+  // it leaves uncovered: (1 − α) / (2 − α) of the way (passthrough_fill_blendmode.psd, every edge pixel).
+  const alpha = 102 / 255; const fill = 0.47;
+  const group = { name: 'Group', blendMode: 'pass through', opacity: 1, fillOpacity: fill,
+    children: [solid('cyan', 0, 0, 1, 1, [0, 254, 255, 102], { blendMode: 'lighter color' })] };
+  const { at } = flatten([solid('under', 0, 0, 1, 1, grey(200)), group], 1, 1);
+  const share = alpha * fill * ((1 - alpha) / (2 - alpha));
+  near(at(0), [200 - 200 * share, 200 + 54 * share, 200 + 55 * share, 255], 'between the readings');
+});
