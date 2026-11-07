@@ -96,6 +96,8 @@ Each is a case in `CE/web/test/importCorpus.test.js`.
 | Photoshop panel, component | 948 | 0 | 0 | 0 | as before |
 | glTF | 174 | 0 | 0 | 0 | none: the 20 Draco and KTX2 models read too, in the editor in Chromium |
 
+CI run 537 (commit `bc703ce`) passed in all four jobs.
+
 What PDFs still say they leave out: a mesh used as a fill's pattern rather than painted on its own,
 in its mean colour (7 files); patterns nested past three deep or failing (3); a picture pdf.js could
 not decode (3). The two pdf.js stress files exhaust memory in pdf.js on its own, as before: in this
