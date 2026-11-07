@@ -20,6 +20,9 @@ public:
 
     void resized() override;
 
+    /** Quit once the page agrees (ValueTreeBridge::requestQuit). */
+    void requestQuit (std::function<void()> quitNow) { bridge.requestQuit (std::move (quitNow)); }
+
 private:
     void showStatusMessage (const juce::String& title, const juce::String& message);
 

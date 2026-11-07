@@ -217,16 +217,19 @@ juce::var DeviceProfileService::validateProfileSource (const juce::var& payload)
     return juce::var (response);
 }
 
+juce::File DeviceProfileService::defaultUserProfilesFolder()
+{
+    return juce::File::getSpecialLocation (juce::File::userApplicationDataDirectory)
+        .getChildFile ("CEditor")
+        .getChildFile ("profiles");
+}
+
 juce::var DeviceProfileService::saveProfileSource (const juce::var& payload)
 {
     auto* obj = payload.getDynamicObject();
     auto requestId = objectString (obj, "requestId");
     auto profileId = objectString (obj, "profileId");
     auto source = objectString (obj, "source");
-
-    auto profile = profiles.find (profileId);
-    if (profile == profiles.end())
-        return errorResponse (requestId, "Unknown profileId: " + profileId);
 
     juce::String error;
     DeviceProfileEngine probe;
@@ -238,7 +241,28 @@ juce::var DeviceProfileService::saveProfileSource (const juce::var& payload)
         return response;
     }
 
-    auto file = profile->second.file;
+    juce::File file;
+    auto profile = profiles.find (profileId);
+    if (profile != profiles.end())
+    {
+        file = profile->second.file;
+    }
+    else
+    {
+        // A profile made in the editor: its first save gives it a file in the user's own folder,
+        // named by its id. Never over a file already there — that is somebody's profile, loaded or
+        // not — and never under an id another profile already has.
+        const auto newId = probe.getProfileId();
+        if (newId.isEmpty())
+            return errorResponse (requestId, "The profile has no id, so it cannot be given a file");
+        if (newId != profileId && profiles.find (newId) != profiles.end())
+            return errorResponse (requestId, "Another profile already has the id " + newId);
+        file = userProfilesFolder.getChildFile (juce::File::createLegalFileName (newId) + ".ceditor-device.json");
+        if (file.exists())
+            return errorResponse (requestId, "A profile file is already there: " + file.getFullPathName());
+        if (! userProfilesFolder.createDirectory())
+            return errorResponse (requestId, "Could not make the profiles folder: " + userProfilesFolder.getFullPathName());
+    }
     if (! ceditor::writeTextAtomically (file, source))
         return errorResponse (requestId, "Could not save profile: " + file.getFullPathName());
 
@@ -709,15 +733,16 @@ void DeviceProfileService::loadInternalTestProfiles (bool force)
         return;
     lastProfileScanMs = now;
 
-    auto directory = sourceRoot()
+    const auto bundled = sourceRoot()
         .getChildFile ("CE")
         .getChildFile ("profiles")
         .getChildFile ("test");
 
-    if (! directory.isDirectory())
-        return;
+    juce::Array<juce::File> files;
+    for (const auto& directory : { bundled, userProfilesFolder })
+        if (directory.isDirectory())
+            files.addArray (directory.findChildFiles (juce::File::findFiles, false, "*.ceditor-device.json"));
 
-    auto files = directory.findChildFiles (juce::File::findFiles, false, "*.ceditor-device.json");
     for (const auto& file : files)
     {
         if (isLoadedProfileCurrent (file))

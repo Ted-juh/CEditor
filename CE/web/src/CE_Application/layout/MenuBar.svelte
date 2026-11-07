@@ -43,6 +43,7 @@
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
   import { openPictureExport } from '../stores/pictureExport.js';
+  import { createScreenDocument, openScreenDocumentFromFile } from '../stores/screenBuilder.js';
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
@@ -60,7 +61,7 @@
   const hasPanel = () => !!get(activePanel);
   const hasSelection = () => get(selectedComponentIds).size > 0;
   // A component open on its own is saved by exporting it (stores/componentExport.js): Save opens Export.
-  const canSave = () => ['script', 'component'].includes(get(activeEditorTab)?.type) || hasPanel();
+  const canSave = () => ['script', 'component', 'screen'].includes(get(activeEditorTab)?.type) || hasPanel();
   const saveFromMenu = (options = {}) => {
     if (get(activeEditorTab)?.type === 'component') openComponentExport();
     else saveActiveEditorDocument(options);
@@ -99,6 +100,16 @@
     picker = 'component';
   }
 
+  function newCtrl49Screen() {
+    const document = createScreenDocument();
+    if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
+  }
+
+  async function openCtrl49Screen() {
+    const document = await openScreenDocumentFromFile();
+    if (document?.id) setActiveEditorTab({ type: 'screen', id: document.id });
+  }
+
   function newDeviceProfile() {
     const profile = createDeviceProfileDraft();
     openStandaloneDeviceProfileTab(profile);
@@ -107,7 +118,7 @@
   // Open a fresh device-profile draft; with no model yet, the Designer shows its Detect screen for
   // MIDI-CI discovery (scan -> pick a device -> its drafted profile seeds the editor).
   function discoverDeviceProfile() {
-    const profile = createDeviceProfileDraft({ name: 'MIDI-CI Device' });
+    const profile = createDeviceProfileDraft({ name: 'MIDI-CI Device', discover: true });
     openStandaloneDeviceProfileTab(profile);
   }
 
@@ -201,6 +212,11 @@
       { type: 'separator' },
       { label: 'New Script Workspace', action: () => newScriptWorkspace() },
       { label: 'Open Script Workspace', action: () => openScriptWorkspaceFromFile() },
+      // The CTRL49 keyboard's screens: pages of encoder assignments, saved as the .assignment.json
+      // the native bridge loads (stores/screenBuilder.js). Reachable only from the start screen
+      // before, and only while no document was open.
+      { label: 'New CTRL49 Screen', action: () => newCtrl49Screen() },
+      { label: 'Open CTRL49 Screen...', action: () => openCtrl49Screen() },
       { type: 'separator' },
       { label: 'Save',       shortcut: 'Ctrl+S', enabled: canSave, action: () => saveFromMenu() },
       { label: 'Save As...', shortcut: 'Ctrl+Shift+S', enabled: canSave, action: () => saveFromMenu({ saveAs: true }) },

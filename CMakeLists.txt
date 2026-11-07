@@ -1015,6 +1015,25 @@ target_link_libraries(CEditorUpdateCheckTests PRIVATE
 add_test(NAME UpdateCheck COMMAND CEditorUpdateCheckTests)
 ce_configure_test(CEditorUpdateCheckTests)
 
+# --- Asking the page before quitting ---
+# Closing the window used to quit at once, unsaved work and all. QuitGate.h asks the page and waits
+# for its answer — but never forever, or a hung page would make the window impossible to close.
+# Both halves of that are logic over two injected functions, so they are tested here.
+add_executable(CEditorQuitGateTests
+    "${CE_ROOT}/tests/QuitGateTests.cpp"
+)
+
+target_include_directories(CEditorQuitGateTests PRIVATE
+    "${CE_ROOT}/src"
+)
+
+target_link_libraries(CEditorQuitGateTests PRIVATE
+    juce::juce_core
+)
+
+add_test(NAME QuitGate COMMAND CEditorQuitGateTests)
+ce_configure_test(CEditorQuitGateTests)
+
 # --- An exported plug-in's unused keys, handed to the DAW ---
 # The key message is a pure function of the key and runs anywhere; posting it is the Windows half,
 # driven there with real windows in the shape a DAW gives a plug-in (HostKeyForwarding.h). It is

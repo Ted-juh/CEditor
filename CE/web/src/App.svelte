@@ -4,6 +4,8 @@
   import ApplyToSetDialog from './CE_Application/layout/ApplyToSetDialog.svelte';
   import ComponentFromSelectionDialog from './CE_Application/layout/ComponentFromSelectionDialog.svelte';
   import PictureExportDialog from './CE_Application/layout/PictureExportDialog.svelte';
+  import QuitDialog from './CE_Application/layout/QuitDialog.svelte';
+  import { initQuitGuard } from './CE_Application/stores/quitGuard.js';
   import { onMount, untrack } from 'svelte';
 
   let menuBarHeight = $state(28);
@@ -105,6 +107,7 @@
   if (!isCutoutDebug && !isBehaviorDebug) {
     initPanelBridge();
     initScriptWorkspaceBridge();
+    initQuitGuard();   // the program asks before it quits (QuitGate.h): unsaved work is listed
     initConsoleBridge();
     initScriptConsoleBridge();
     initScriptModules();   // installed ce.ext.* modules, before any script can reach for one
@@ -562,6 +565,7 @@
   <ApplyToSetDialog />
   <ComponentFromSelectionDialog />
   <PictureExportDialog />
+  <QuitDialog />
   <HistoryWindow />
 
   {#if showShortcuts}

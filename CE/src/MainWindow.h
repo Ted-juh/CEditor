@@ -64,6 +64,15 @@ public:
         settings.setWindowBounds (getBounds());
     }
 
+    /** Quit once the page has asked about unsaved work (QuitGate.h); at once when there is no page. */
+    void requestQuit (std::function<void()> quitNow)
+    {
+        if (auto* host = dynamic_cast<WebViewHost*> (getContentComponent()))
+            host->requestQuit (std::move (quitNow));
+        else
+            quitNow();
+    }
+
 private:
     AppSettings& settings;
 };

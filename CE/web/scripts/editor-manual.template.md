@@ -123,8 +123,10 @@ With nothing open, the canvas offers buttons to start: **New Panel**, **Open Pan
 Component**, **New Device Profile**, **New Script Workspace**, **New Screen (CTRL49)** and **Import
 Device Profile**.
 
-**New Screen (CTRL49)** opens the Screen Builder, an early prototype for putting knob pages for a
-hardware synth on the screen of an M-Audio CTRL49 keyboard. It cannot save, and it cannot send pages to
+**New Screen (CTRL49)** (also **File → New CTRL49 Screen**) opens the Screen Builder, an early
+prototype for putting knob pages for a hardware synth on the screen of an M-Audio CTRL49 keyboard.
+**Save** (Ctrl+S) and **Save As…** write the screen as a `.assignment.json` file, which is also the file
+CEditor's CTRL49 bridge loads; **File → Open CTRL49 Screen...** opens one again. It cannot send pages to
 the keyboard itself. To put your own pages on a CTRL49, use the control pages in HoSTage
 ([chapter 13](#13-hostage-the-instrument-host)).
 
@@ -980,14 +982,22 @@ Device Profile**. Its screens are listed on the left:
   library, which can be exported as JSON or a `.syx` file.
 - **Detect devices** — finds synths that can describe themselves over MIDI 2.0 (MIDI-CI).
 
-**Save to engine** saves your changes to the profile; **Export portable profile** saves a copy.
+**Save to engine** saves your changes to the profile; **Export portable profile** saves a copy. Closing
+the profile's tab with unsaved changes asks first, as every tab does.
 
-> **Not finished yet:** the Device Profile Designer can only show and edit the three profiles it was
-> built with — Generic MIDI CC, Roland GAIA SH-01 and Yamaha AN1x — and profiles found over MIDI-CI. A
-> new profile (**File → New Device Profile**) opens on **Detect devices** only, and saving a new profile
-> does not work yet. Apart from lists of choices, a parameter can only be edited as text on the
-> **Advanced** screen. The **Capture** screen, meant to learn a parameter by moving it on the synth,
-> does not work yet. The preset library is kept on this computer only.
+A new profile (**File → New Device Profile**) starts as a copy of **Generic MIDI CC**: the standard
+controllers every synth answers (modulation, volume, pan, expression, filter and envelope CCs). It is a
+working profile from the start: rename it, delete what your synth does not have and add its own
+parameters. The first **Save to engine** gives it a file of its own, in a `profiles` folder in your
+CEditor settings folder, and from then on it is loaded with the others every time CEditor starts.
+**File → Discover Device (MIDI-CI)...** opens a new profile on **Detect devices** instead, to start from
+what the device says about itself.
+
+> **Not finished yet:** the Device Profile Designer can show and edit the three profiles it was built
+> with — Generic MIDI CC, Roland GAIA SH-01 and Yamaha AN1x — profiles found over MIDI-CI and new ones,
+> but not other profiles you import. Apart from lists of choices, a parameter can only be edited as text
+> on the **Advanced** screen. The **Capture** screen, meant to learn a parameter by moving it on the
+> synth, does not work yet. The preset library is kept on this computer only.
 
 ## 7. Testing your panel
 
@@ -1478,9 +1488,22 @@ changes, every 20 seconds by default, so that after a crash CEditor can offer to
 Save to a file when you want your work kept. The options are in **Settings → General**: **Enable
 Autosave**, **Autosave Delay**, **Restore Unsaved Work** and **Reopen Last Session**.
 
-> **Not finished yet:** closing a single tab asks about unsaved changes, but **File → Close Program**
-> (Alt+F4) quits without asking. Only the recovery copy is kept. Device profile tabs also close without
-> asking.
+### Quitting
+
+When you quit CEditor — **File → Close Program**, Alt+F4 or the window's close button — and something
+has unsaved changes, CEditor lists it and asks: panels, script workspaces, components, CTRL49 screens
+and device profiles in the Designer. Choose:
+
+- **Save and quit** saves everything that already has a file, waits until each is written, and then
+  quits. Something that was never saved, or a component (saved with **Export**), cannot be saved
+  without a dialog, so the window stays open and lists what is left: **Cancel**, save those yourself,
+  and quit again.
+- **Quit without saving** keeps the recovery copy of your open panels first, so **Restore Unsaved Work**
+  can offer it next time, and quits.
+- **Cancel** goes back to CEditor.
+
+With nothing unsaved CEditor quits at once. If the window is not answering at all, CEditor still quits
+after a few seconds, so it can always be closed.
 
 ## 12. Exporting a plugin
 
@@ -1613,15 +1636,14 @@ CEditor is a beta. Things to know before you rely on it:
 - **Licence.** CEditor is AGPL-3.0, and exported plugins include JUCE, so they carry the AGPL too: if
   you give an exported plugin to others, you must offer its source. Your `.cepanel` designs are your
   own.
-- **Quitting does not ask.** **Close Program** (Alt+F4) does not ask about unsaved work. Save first.
-- **The Device Profile Designer is partly built.** It edits only the profiles it was built with, new
-  profiles cannot be saved yet, and Capture does not work. See [chapter 6](#6-describing-a-synth-device-profiles).
+- **The Device Profile Designer is partly built.** It edits the profiles it was built with, new ones
+  and ones found over MIDI-CI, not other imported profiles, and Capture does not work. See
+  [chapter 6](#6-describing-a-synth-device-profiles).
 - **One device for some tools.** The Device tool, Detect devices and Presets work only with the device
   called **mainSynth**.
 - **Some tools are partly built.** The dock's **Designer** draws the contents of the Step Sequencer,
-  the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot save: closing its tab
-  asks first, then its pages are gone. It can only be opened from the start screen, with no documents
-  open.
+  the Envelope and the Turing Modulator only. The CTRL49 Screen Builder cannot send its pages to the
+  keyboard itself.
 
 [Known issues](known-issues.md) lists the open problems in detail, and the
 [release notes](../RELEASE-NOTES.md) say what this version is.
@@ -1650,13 +1672,15 @@ CEditor is a beta. Things to know before you rely on it:
 | **New Component from Photoshop Artwork...** | | The same from a Photoshop file, every layer a layer; a knob modelled in Blender comes in this way too, see [A knob modelled in Blender](#a-knob-modelled-in-blender). |
 | **New Component from 3D Model...** | | Makes a control of a glTF model's objects, rendered by CEditor; see [A 3D part](#a-3d-part). |
 | **Open Component from Library...** | | Opens a component from your library in its own tab. |
-| **New Device Profile** | | Starts a new device profile in the Device Profile Designer. |
+| **New Device Profile** | | Starts a new device profile in the Device Profile Designer, from the standard MIDI controllers. |
 | **Open Device Profile** | | Opens a loaded device profile in the designer. |
 | **Import Device Profile...** | | Loads a device profile from a file. |
 | **Discover Device (MIDI-CI)...** | | Starts a new profile by asking a connected MIDI 2.0 device to describe itself. |
 | **New Script Workspace** | | Opens the scripts of the active panel in the Behavior Designer. |
 | **Open Script Workspace** | | Opens a saved script workspace file. |
-| **Save** | Ctrl+S | Saves the panel (or the script workspace in front); with a component's own tab in front, opens **Export**. |
+| **New CTRL49 Screen** | | Opens a new screen in the Screen Builder. |
+| **Open CTRL49 Screen...** | | Opens a saved screen (a `.assignment.json` file). |
+| **Save** | Ctrl+S | Saves the panel (or the script workspace or CTRL49 screen in front); with a component's own tab in front, opens **Export**. |
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
 | **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts, icons and library components inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |
@@ -1664,7 +1688,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Close Tab** | Ctrl+W | Closes the tab in front, asking first if it has unsaved changes. |
 | **Hostage...** | | Opens HoSTage, the instrument host. |
 | **Settings...** | Ctrl+, | Opens the Settings page. |
-| **Close Program** | Alt+F4 | Quits CEditor — without asking about unsaved work. |
+| **Close Program** | Alt+F4 | Quits CEditor, asking first when something has unsaved changes; see [Quitting](#quitting). |
 
 ### Edit
 

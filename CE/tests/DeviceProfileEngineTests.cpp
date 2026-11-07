@@ -45,6 +45,7 @@ struct DeviceProfileServiceTestAccess
     static juce::File publishedFile (const DeviceProfileService& service)  { return service.publishedRequestsFile; }
     static juce::File directory()  { return DeviceProfileService::pendingRequestsDirectory(); }
     static const void* engineFor (DeviceProfileService& service, const juce::String& profileId)  { return service.resolveEngine (profileId, {}); }
+    static void setUserProfilesFolder (DeviceProfileService& service, const juce::File& folder)  { service.userProfilesFolder = folder; }
 
     /** A request already past its timeout, holding what it sent and how many tries it has left. */
     static void awaitExpired (DeviceProfileService& service, const juce::String& role, const juce::String& dumpId, int retries)
@@ -3955,6 +3956,91 @@ int runProfileMiddleCTests (const juce::File& file)
     return failures;
 }
 
+/**
+ * A profile made in the editor has no file until it is first saved (File → New Device Profile, then
+ * Save to engine in the Designer). That save used to be refused as "Unknown profileId", so a new
+ * profile could not be kept at all. Its first save now makes its file in the user's profiles folder,
+ * named by its id; later saves go to the same file; a new service reads it back; and nothing already
+ * in that folder is ever written over.
+ */
+int runNewProfileSaveTests (const juce::File& template_)
+{
+    using Access = ceditor::device::DeviceProfileServiceTestAccess;
+    auto failures = 0;
+    auto check = [&failures] (bool ok, const char* what)
+    {
+        std::cout << (ok ? "[PASS] " : "[FAIL] ") << "New profile :: " << what << '\n';
+        if (! ok) ++failures;
+    };
+
+    const auto folder = juce::File::getSpecialLocation (juce::File::tempDirectory)
+        .getChildFile ("CEditorNewProfileTest_" + juce::String::toHexString (juce::Random::getSystemRandom().nextInt64()));
+    folder.deleteRecursively();
+
+    auto sourceFor = [&template_] (const juce::String& id, const juce::String& name)
+    {
+        auto json = juce::JSON::parse (template_.loadFileAsString());
+        if (auto* root = json.getDynamicObject())
+        {
+            root->setProperty ("id", id);
+            root->setProperty ("name", name);
+        }
+        return juce::JSON::toString (json);
+    };
+    auto save = [] (ceditor::device::DeviceProfileService& service, const juce::String& id, const juce::String& source)
+    {
+        auto* payload = new juce::DynamicObject();
+        payload->setProperty ("requestId", "save_" + id);
+        payload->setProperty ("profileId", id);
+        payload->setProperty ("source", source);
+        return service.saveProfileSource (juce::var (payload));
+    };
+    auto listed = [] (ceditor::device::DeviceProfileService& service, const juce::String& id)
+    {
+        const auto list = service.listProfiles();   // kept: the array lives in it
+        if (auto* entries = list.getArray())
+            for (const auto& entry : *entries)
+                if (entry.getProperty ("id", "").toString() == id)
+                    return true;
+        return false;
+    };
+
+    const auto expected = folder.getChildFile ("my-new-synth.ceditor-device.json");
+    {
+        ceditor::device::DeviceProfileService service;
+        Access::setUserProfilesFolder (service, folder);
+
+        auto first = save (service, "my-new-synth", sourceFor ("my-new-synth", "My New Synth"));
+        check ((bool) first.getProperty ("ok", false), "its first save is accepted");
+        check (first.getProperty ("filePath", "").toString() == expected.getFullPathName(), "and makes its file in the user's folder, named by its id");
+        check (expected.existsAsFile(), "the file is there");
+        check (listed (service, "my-new-synth"), "and the profile is listed");
+
+        auto second = save (service, "my-new-synth", sourceFor ("my-new-synth", "My New Synth II"));
+        check ((bool) second.getProperty ("ok", false) && second.getProperty ("filePath", "").toString() == expected.getFullPathName(),
+               "a second save goes to the same file");
+        check (expected.loadFileAsString().contains ("My New Synth II"), "with the new text");
+
+        const auto stray = folder.getChildFile ("somebody-else.ceditor-device.json");
+        stray.replaceWithText ("not a profile");
+        auto refused = save (service, "somebody-else", sourceFor ("somebody-else", "Somebody Else"));
+        check (! (bool) refused.getProperty ("ok", true), "a new profile is never saved over a file already there");
+        check (stray.loadFileAsString() == "not a profile", "and that file is untouched");
+
+        auto invalid = save (service, "broken-one", "{ \"id\": \"broken-one\" }");
+        check (! (bool) invalid.getProperty ("ok", true) && ! folder.getChildFile ("broken-one.ceditor-device.json").exists(),
+               "a profile the engine refuses gets no file");
+    }
+    {
+        ceditor::device::DeviceProfileService service;
+        Access::setUserProfilesFolder (service, folder);
+        check (listed (service, "my-new-synth"), "a new session reads it back from the folder");
+    }
+
+    folder.deleteRecursively();
+    return failures;
+}
+
 int main (int argc, char** argv)
 {
     if (argc == 4 && juce::String (argv[1]) == "--hold-request")
@@ -3971,6 +4057,9 @@ int main (int argc, char** argv)
             for (const auto& entry : *entries)
             {
                 const juce::File source (entry.getProperty ("filePath", "").toString());
+                // Profiles the person made are theirs, in their own folder, wherever CEditor is.
+                if (source.isAChildOf (ceditor::device::DeviceProfileService::defaultUserProfilesFolder()))
+                    continue;
                 if (! source.isAChildOf (installRoot))
                 {
                     std::cerr << "[FAIL] profile escaped installed tree: " << source.getFullPathName() << '\n';
@@ -4004,6 +4093,7 @@ int main (int argc, char** argv)
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
+    failures += runNewProfileSaveTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();
     failures += runRequestRetryTests();

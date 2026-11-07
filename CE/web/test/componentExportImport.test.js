@@ -163,7 +163,7 @@ test('the way in and the way out are where an author looks', () => {
   const menu = src('CE_Application/layout/MenuBar.svelte');
   assert.match(menu, /label: 'Import Component\.\.\.', action: \(\) => importComponentFromFile\(\)/);
   assert.match(menu, /label: 'Open Component from Library\.\.\.', action: \(\) => openSavedCustomComponent\(\)/);
-  assert.match(menu, /const canSave = \(\) => \['script', 'component'\]\.includes\(get\(activeEditorTab\)\?\.type\) \|\| hasPanel\(\);/);
+  assert.match(menu, /const canSave = \(\) => \['script', 'component', 'screen'\]\.includes\(get\(activeEditorTab\)\?\.type\) \|\| hasPanel\(\);/);
   assert.match(menu, /if \(get\(activeEditorTab\)\?\.type === 'component'\) openComponentExport\(\);/);
   const app = src('App.svelte');
   assert.match(app, /if \(get\(activeEditorTab\)\?\.type === 'component'\) \{ openComponentExport\(\); return; \}/, 'Ctrl+S exports one');
