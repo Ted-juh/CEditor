@@ -431,8 +431,8 @@ In PhotoCraft's corpus 64 files came closer and two moved the other way by about
 (a double-ring Outer Glow contour, 1.43 % of pixels off to 1.51, read between its table's entries; a
 Chisel Pillow Emboss with both contours, 4.06 to 4.16, its average closer). In psd-tools' nine came
 closer and one the other way: 4x4_16bit_lab.psd by one pixel of sixteen (its stops now mixed in Lab,
-its angle still not Photoshop's). CI runs 544 (commit `c7b3b49`) and 545 (commit `35f6f22`) passed in
-all four jobs.
+its angle still not Photoshop's). CI runs 544 (commit `c7b3b49`), 545 (commit `35f6f22`) and 546
+(commit `a14cd73`) passed in all four jobs.
 
 ## Left, and why
 
@@ -449,7 +449,11 @@ all four jobs.
   fitted one (1.5 % of pixels).
 - **Random in Photoshop**: Dissolve's grain (its density is matched) and a Noise gradient
   (effect-stroke-gradient.psd, 14 %), each from Photoshop's own random numbers. PhotoCraft draws its
-  own too; neither can match Photoshop's pixels without its generator.
+  own too; neither can match Photoshop's pixels without its generator. Dissolve's is at least a fixed
+  function of the pixel's place, the same for every layer, as the one here is: where dissolve.psd's
+  three ellipses at 50 % overlap, only the top one or the background shows, never the two under it.
+  Its 2,500 pixels there at one threshold show no period (no shift within 40 pixels matches better
+  than 59 %, where chance is 50), so they do not pin down the generator.
 - **A CMYK Photo Filter** (16.6 %): on the inks in Photoshop, black kept exactly, by a rule not
   found (above); drawn in RGB here.
 - **The rest of the flattening's differences**, each measured and none with a file that pins a
