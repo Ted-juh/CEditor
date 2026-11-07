@@ -78,6 +78,24 @@ export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs
     const number = Math.min(Math.max(1, Math.round(Number(wanted) || 1)), pages);
     const pdfPage = await doc.getPage(number);
     const ops = await pdfPage.getOperatorList();
+    // The pictures the page draws arrive from pdf.js after its list of operations; read before they
+    // did, a picture was missing and dropped (78 PDFs of a test corpus of 1,130 lost one so). Each it
+    // paints is waited for, 8 seconds at most in all; not its fonts, of which only the name is used
+    // and whose conversion can take pdf.js a minute.
+    const pictures = new Set();
+    ops.fnArray.forEach((fn, i) => { if (fn === lib.OPS.paintImageXObject) pictures.add(ops.argsArray[i]?.[0]); });
+    await Promise.race([
+      Promise.all([...pictures].filter(Boolean).map((id) => new Promise((resolve) => {
+        const store = String(id).startsWith('g_') ? pdfPage.commonObjs : pdfPage.objs;
+        try {
+          if (store?.has?.(id) || !store?.get) resolve();
+          else store.get(id, () => resolve());
+        } catch {
+          resolve();
+        }
+      }))),
+      new Promise((resolve) => { setTimeout(resolve, 8000); }),
+    ]);
     const config = await doc.getOptionalContentConfig();
     const layers = new Map();
     for (const [id, group] of config) layers.set(id, { name: String(group?.name ?? '').trim(), visible: group?.visible !== false });
@@ -89,6 +107,10 @@ export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs
     });
     if (pdfPage.rotate) out.notes.push({ kind: 'rotated', count: 1 });
     return { ok: true, ...out, pages, page: number, labels, creator, illustrator: /illustrator/i.test(creator) };
+  } catch (error) {
+    // A damaged file can open and still fail on its page (pdf.js's own errors): said so, as one that
+    // does not open is, where it reached whoever imported it as an exception.
+    return { ok: false, reason: 'unreadable', error: `This PDF could not be read: ${error?.message || 'its page is damaged'}` };
   } finally {
     doc.destroy?.();
   }
@@ -329,15 +351,32 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     }
   };
 
+  // Each picture encoded once however often the page draws it, and no finer than twice the size it is
+  // drawn at (4,096 pixels at most): a page drew one of 34,862 by 4,332 pixels forty times, and
+  // copying and encoding it each time never finished.
+  const encoded = new Map();
   const image = (picture) => {
     if (!picture) { note('image'); return; }
-    const rgba = imageRgba(picture);
-    if (!rgba) { note('image'); return; }
-    const href = pngDataUrl(picture.width, picture.height, rgba);
+    const page = multiply(flip, state.ctm);
+    const drawnW = Math.hypot(page[0], page[1]);
+    const drawnH = Math.hypot(page[2], page[3]);
+    const fit = (size, drawn) => Math.max(1, Math.min(size, Math.ceil(Math.min(4096, Math.max(drawn * 2, 64)))));
+    const w = fit(picture.width, drawnW);
+    const h = fit(picture.height, drawnH);
+    const key = `${w}x${h}`;
+    let made = encoded.get(picture)?.get(key);
+    if (made === undefined) {
+      const rgba = imageRgba(picture, w, h);
+      made = rgba ? pngDataUrl(w, h, rgba) : null;
+      if (!encoded.has(picture)) encoded.set(picture, new Map());
+      encoded.get(picture).set(key, made);
+    }
+    if (!made) { note('image'); return; }
+    const href = made;
     // An image fills the unit square, its first row at the top.
-    const m = multiply(multiply(flip, state.ctm), [1 / picture.width, 0, 0, -1 / picture.height, 0, 1]);
+    const m = multiply(page, [1 / w, 0, 0, -1 / h, 0, 1]);
     const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
-    emit(`<image width="${picture.width}" height="${picture.height}" preserveAspectRatio="none" transform="${matrixText(m)}" href="${href}"${opacity}${blendStyle()}/>`);
+    emit(`<image width="${w}" height="${h}" preserveAspectRatio="none" transform="${matrixText(m)}" href="${href}"${opacity}${blendStyle()}/>`);
   };
 
   // --- Text ---
@@ -678,32 +717,53 @@ function meanMeshColour(ir) {
 }
 
 /** An image object from pdf.js as straight RGBA, or null. Kinds: 1 one bit grey, 2 RGB, 3 RGBA. */
-function imageRgba(picture) {
-  const { width, height, data, kind } = picture ?? {};
-  if (!width || !height || !data) return null;
-  const pixels = width * height;
-  const out = new Uint8ClampedArray(pixels * 4);
-  if (kind === 3 || data.length === pixels * 4) {
-    out.set(data.subarray ? data.subarray(0, pixels * 4) : data.slice(0, pixels * 4));
+/**
+ * A pdf.js picture's pixels as RGBA, at `width` by `height` (its own size unless smaller: each pixel
+ * then the average of those it covers, read straight from pdf.js's pixels, which are not copied).
+ */
+function imageRgba(picture, width = picture?.width, height = picture?.height) {
+  const { width: sw, height: sh, data, kind } = picture ?? {};
+  if (!sw || !sh || !data || !(width > 0) || !(height > 0)) return null;
+  const pixels = sw * sh;
+  let read;
+  if (kind === 3 || data.length === pixels * 4) read = (i, c) => data[i * 4 + c];
+  else if (kind === 2 || data.length === pixels * 3) read = (i, c) => (c === 3 ? 255 : data[i * 3 + c]);
+  else if (kind === 1) {
+    const rowBytes = Math.ceil(sw / 8);
+    read = (i, c) => {
+      if (c === 3) return 255;
+      const x = i % sw;
+      const y = (i - x) / sw;
+      return ((data[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1) ? 255 : 0;
+    };
+  } else return null;
+  const out = new Uint8ClampedArray(width * height * 4);
+  if (width === sw && height === sh) {
+    if (kind === 3 || data.length === pixels * 4) { out.set(data.subarray ? data.subarray(0, pixels * 4) : data.slice(0, pixels * 4)); return out; }
+    for (let i = 0; i < pixels; i += 1) for (let c = 0; c < 4; c += 1) out[i * 4 + c] = read(i, c);
     return out;
   }
-  if (kind === 2 || data.length === pixels * 3) {
-    for (let i = 0; i < pixels; i += 1) {
-      out[i * 4] = data[i * 3]; out[i * 4 + 1] = data[i * 3 + 1]; out[i * 4 + 2] = data[i * 3 + 2]; out[i * 4 + 3] = 255;
+  // Each output pixel the average of the block of source pixels it covers (colour weighted by opacity).
+  for (let y = 0; y < height; y += 1) {
+    const y0 = Math.floor((y * sh) / height);
+    const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * sh) / height));
+    for (let x = 0; x < width; x += 1) {
+      const x0 = Math.floor((x * sw) / width);
+      const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * sw) / width));
+      let r = 0; let g = 0; let b = 0; let a = 0; let n = 0;
+      for (let yy = y0; yy < y1; yy += 1) {
+        for (let xx = x0; xx < x1; xx += 1) {
+          const i = yy * sw + xx;
+          const alpha = read(i, 3);
+          r += read(i, 0) * alpha; g += read(i, 1) * alpha; b += read(i, 2) * alpha; a += alpha; n += 1;
+        }
+      }
+      const o = (y * width + x) * 4;
+      if (a > 0) { out[o] = r / a; out[o + 1] = g / a; out[o + 2] = b / a; }
+      out[o + 3] = a / n;
     }
-    return out;
   }
-  if (kind === 1) {
-    const rowBytes = Math.ceil(width / 8);
-    for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
-      const bit = (data[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1;
-      const v = bit ? 255 : 0;
-      const i = (y * width + x) * 4;
-      out[i] = v; out[i + 1] = v; out[i + 2] = v; out[i + 3] = 255;
-    }
-    return out;
-  }
-  return null;
+  return out;
 }
 
 /** The family a font's PostScript name gives: "ABCDEF+MyriadPro-Bold" → "Myriad Pro", then a generic fallback. */

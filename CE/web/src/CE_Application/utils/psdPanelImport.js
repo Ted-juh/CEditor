@@ -26,21 +26,10 @@
  * Pure: bytes in, plan out, in the shape buildSvgImportControls takes, so both importers build and
  * name controls identically. The menu command is stores/psdPanelImportActions.js.
  */
-import { initializeCanvas, readPsd } from 'ag-psd';
+import { readPhotoshop } from './psdRead.js';
 import { PLACEHOLDER_LAYER_NAMES, ROLE_CONTROL_TYPES, colourRole, roleFromName } from './svgPanelImport.js';
 import { pngDataUrl } from './pngEncode.js';
 import { compositePsd } from './psdComposite.js';
-
-// ag-psd makes its pixel arrays through a canvas unless told otherwise — a canvas it borrows from the
-// page in a browser, and has none of in node. A plain array is all `useImageData` needs, is the same
-// everywhere, and never passes through a canvas's premultiplied alpha. Only this importer uses ag-psd.
-initializeCanvas(
-  (width, height) => {
-    if (typeof document === 'undefined') throw new Error('a canvas is not available here');
-    return Object.assign(document.createElement('canvas'), { width, height });
-  },
-  (width, height) => ({ width, height, data: new Uint8ClampedArray(width * height * 4) }),
-);
 
 function isGroup(layer) {
   return Array.isArray(layer?.children);
@@ -95,13 +84,9 @@ function roleFor(layer, box) {
  * returns, so buildSvgImportControls and describeSvgImport take either.
  */
 export function planPsdPanelImport(bytes) {
-  let psd;
-  try {
-    const buffer = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    psd = readPsd(buffer, { useImageData: true, skipThumbnail: true, skipCompositeImageData: true, skipLinkedFilesData: true });
-  } catch (error) {
-    return { ok: false, error: `This is not a Photoshop file CEditor can read (${error?.message ?? error}).` };
-  }
+  const read = readPhotoshop(bytes);
+  if (!read.ok) return read;
+  const { psd } = read;
   const width = Math.round(psd.width ?? 0);
   const height = Math.round(psd.height ?? 0);
   if (!(width > 0 && height > 0)) return { ok: false, error: 'The Photoshop file has no size.' };

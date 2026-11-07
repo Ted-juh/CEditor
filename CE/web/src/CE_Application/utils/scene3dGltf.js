@@ -20,8 +20,9 @@ const PANEL_WORDS = ['panel', 'ground', 'floor', 'backdrop'];
 
 let modules = null;
 function loadThree() {
-  modules ??= Promise.all([import('three'), import('three/examples/jsm/loaders/GLTFLoader.js')])
-    .then(([THREE, { GLTFLoader }]) => ({ THREE, GLTFLoader }));
+  modules ??= Promise.all([
+    import('three'), import('three/examples/jsm/loaders/GLTFLoader.js'), import('three/examples/jsm/libs/meshopt_decoder.module.js'),
+  ]).then(([THREE, { GLTFLoader }, { MeshoptDecoder }]) => ({ THREE, GLTFLoader, MeshoptDecoder }));
   return modules;
 }
 
@@ -53,13 +54,46 @@ export async function gltfSiblings(bytes, readSibling = null) {
 
 /** A glTF's scene: `source` { asset (the file as a data URL), siblings ({ uri: dataUrl }) }. */
 export async function readGltf(source) {
-  const { THREE, GLTFLoader } = await loadThree();
+  const { THREE, GLTFLoader, MeshoptDecoder } = await loadThree();
   const manager = new THREE.LoadingManager();
   const siblings = source.siblings ?? {};
   manager.setURLModifier((url) => siblings[url] ?? siblings[decodeURIComponent(url)] ?? url);
   const loader = new GLTFLoader(manager);
-  const gltf = await loader.parseAsync(toBuffer(dataUrlBytes(source.asset)), '');
+  // Meshes compressed with meshoptimizer (gltfpack's), read: its decoder comes with three.js.
+  loader.setMeshoptDecoder(MeshoptDecoder);
+  const bytes = toBuffer(dataUrlBytes(source.asset));
+  const unread = compressionNotRead(bytes);
+  if (unread) throw new Error(unread);
+  const gltf = await loader.parseAsync(bytes, '');
   return gltf.scene;
+}
+
+/**
+ * What a model uses that CEditor does not read, said plainly with how to export it so it can: Draco
+ * mesh compression and KTX2 textures need decoders it does not carry. '' when there is nothing.
+ */
+function compressionNotRead(buffer) {
+  let json = null;
+  try {
+    const view = new Uint8Array(buffer);
+    const binary = view[0] === 0x67 && view[1] === 0x6c && view[2] === 0x54 && view[3] === 0x46;
+    const text = binary
+      ? new TextDecoder().decode(view.subarray(20, 20 + new DataView(view.buffer, view.byteOffset).getUint32(12, true)))
+      : new TextDecoder().decode(view);
+    json = JSON.parse(text);
+  } catch {
+    return '';
+  }
+  const used = new Set([...(json?.extensionsRequired ?? []), ...(json?.extensionsUsed ?? [])]);
+  if (used.has('KHR_draco_mesh_compression')) {
+    return 'its meshes are compressed with Draco, which CEditor does not read. Export it again without mesh compression '
+      + '(in Blender: File › Export › glTF 2.0, Data › Compression off).';
+  }
+  if (used.has('KHR_texture_basisu') && (json?.extensionsRequired ?? []).includes('KHR_texture_basisu')) {
+    return 'its textures are KTX2 (Basis Universal), which CEditor does not read. CEditor draws each object in its material\'s colour, '
+      + 'so export it again with PNG or JPEG textures, or none.';
+  }
+  return '';
 }
 
 /** The objects a scene's top level holds, by kind: { objects, pivot, panel, unnamed }. */

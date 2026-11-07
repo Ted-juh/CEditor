@@ -356,11 +356,25 @@ function tagDescription(node) {
  * `{ ok, width, height, background, placeholders, skipped, warnings }` — placeholders are
  * `{ role, type, name, text, x, y, width, height, orientation, reason, source }` in panel pixels.
  */
+/**
+ * An SVG written with its namespace as a prefix (`<svg:svg xmlns:svg="http://www.w3.org/2000/svg">`,
+ * as some exporters write it) as plain SVG, which is what the importers and a browser read: the
+ * prefix taken off its elements, and the namespace declared as the default. Any other text as it is.
+ */
+export function withoutSvgPrefix(text) {
+  const found = /<([A-Za-z_][\w.-]*):svg\b[^>]*?\sxmlns:\1\s*=\s*["']http:\/\/www\.w3\.org\/2000\/svg["']/.exec(text);
+  if (!found) return text;
+  const prefix = found[1].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  let out = text.replace(new RegExp(`<(/?)${prefix}:`, 'g'), '<$1');
+  if (!/<svg\b[^>]*?\sxmlns\s*=/.test(out)) out = out.replace(/<svg\b/, '<svg xmlns="http://www.w3.org/2000/svg"');
+  return out;
+}
+
 export function planSvgPanelImport(text) {
   let root;
   let source;
   try {
-    source = String(text ?? '').replace(/^\uFEFF/, '');
+    source = withoutSvgPrefix(String(text ?? '').replace(/^\uFEFF/, ''));
     root = parseXml(source, { offsets: true, doctypeSubset: 'skip' });
   } catch (error) {
     return { ok: false, error: `This is not a readable SVG file: ${error.message}` };

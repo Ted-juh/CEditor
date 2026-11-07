@@ -8,7 +8,7 @@
 // Each adjustment becomes a function from one 8-bit [r, g, b] to another. These follow Photoshop's
 // published behaviour as closely as an import needs: Levels, Curves, Exposure, Invert, Posterize,
 // Threshold, Channel Mixer and Gradient Map are exact; Brightness/Contrast, Hue/Saturation (the
-// master range), Vibrance, Color Balance, Black & White and Photo Filter follow the documented
+// master range, and Colorize), Vibrance, Color Balance, Black & White and Photo Filter follow the documented
 // formulas and come out close. Selective Color follows the per-range weighting worked out from
 // Photoshop's results (it publishes no formula) and is close too. Color Lookup applies the table the
 // layer carries (Photoshop keeps the whole .cube, .3dl or .look file in it), interpolated
@@ -332,6 +332,20 @@ export function adjustmentFunction(adjustment, report = new Set()) {
     }
     case 'hue/saturation': {
       const master = adjustment.master ?? {};
+      // Colorize: every colour given one hue and saturation, its lightness kept (then lightened or
+      // darkened). The file keeps the switch and those three ahead of the master range, which ag-psd
+      // reads as the master's first four values: a (the switch, in its high byte), b, c and d.
+      if (master.a) {
+        report.add('Hue/Saturation Colorize');
+        const hue = (((master.b ?? 0) % 360) + 360) % 360;
+        const sat = unit((master.c ?? 25) / 100);
+        const light = (master.d ?? 0) / 100;
+        return ([r, g, b]) => {
+          let l = (Math.max(r, g, b) + Math.min(r, g, b)) / 510;
+          l = light >= 0 ? l + (1 - l) * light : l * (1 + light);
+          return hslToRgb(hue, sat, unit(l));
+        };
+      }
       if (['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas'].some((name) => adjustment[name] && (adjustment[name].hue || adjustment[name].saturation || adjustment[name].lightness))) {
         report.add('Hue/Saturation colour ranges (the master range is applied)');
       }

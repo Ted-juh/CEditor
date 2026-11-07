@@ -85,7 +85,7 @@ any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
 | Gradients | Linear and radial: the shape filled with the gradient (Illustrator writes the shape as a clip and paints the gradient inside it). A mesh or freeform gradient is drawn in its mean colour |
 | Clipping masks | The layer's mask, as for SVG |
 | Opacity, blend modes, transparency groups | Kept |
-| Placed and embedded images | Picture layers |
+| Placed and embedded images | Picture layers, no finer than twice the size they are drawn at (4,096 pixels at most). JBIG2 (black-and-white scans) and JPEG 2000 pictures are not read: their decoders are not carried, and the Console lists them |
 | Text | Text in the font the file names, its size and colour |
 | CMYK colour | Converted as pdf.js shows it, as Acrobat does without colour management |
 | Sublayers and object names | Not read: Illustrator keeps them only in its own private data, which is undocumented. Name a moving part as a top-level layer, or export SVG |
@@ -145,7 +145,16 @@ parts are named by its top-level layers, and the notice lists them.
   picture layer (a linked one read from beside the SVG, in the desktop app), `<use>` the shape it
   uses. A plain filled shape under a clip path is cut to it and stays one vector; a `<mask>`, or a
   clip on text, a picture, an outlined shape or several clips, becomes the layer's mask: an SVG
-  picture of the mask, made from the file's own definitions, drawn with CSS masking.
+  picture of the mask, made from the definitions it uses, drawn with CSS masking. A path filled but
+  not closed with a `Z` is filled as SVG and PDF fill it (filled and stroked: two layers, so the
+  stroke gains no closing edge). Colours are CSS's: every named colour, `#rgb`, `#rgba`, `#rrggbb`,
+  `#rrggbbaa`, `rgb()`, `rgba()`, `hsl()`, `hsla()` and `currentColor`, an alpha in the colour
+  joining the opacity; gradient stops are placed as SVG places them. A shape's own `mix-blend-mode`
+  is its layer's. A `<use>` of what holds it (a loop) is not drawn, as SVG does not draw it. An SVG
+  written with its namespace as a prefix (`<svg:svg>`) is read as plain SVG.
+- **More than 2,000 shapes**, a page of a document's text and rules more than a control, is more than a
+  component stays quick to edit with: the import stops and says to use it as a panel's artwork
+  (New Panel from Vector Artwork) or simplify it.
 - **Photoshop**: each pixel layer is a picture layer cropped to its pixels, the layers clipped to it
   blended in, its opacity, blend mode and visibility as the layer's. Each shape layer is a vector
   layer: its paths combined by their operations, its fill colour or gradient, its stroke. A layer
@@ -193,9 +202,17 @@ The control is wired from what was found: a dial, a fader, a switch, or a button
 layer is called button. With nothing named to move it is layers only. Not `cap`: a cap's highlight
 would swing round with it; name a cap that should turn `rotor`.
 
+A Photoshop file saved in 16 or 32 bits a channel is read as 8 (a 32-bit file's colour from the
+linear light Photoshop works it in); one of a single Background layer, which has no layers, only the
+picture of the whole file, comes in as that one picture layer. A file in CMYK, Lab, Duotone,
+Multichannel or Indexed Color is not read, and the notice says which and to convert it to RGB
+(Image › Mode › RGB Color).
+
 Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
 approximate adjustments), Color Lookup through an ICC profile (not applied), adjustment
-layers inside groups with their own blend mode, and references to anything not in the file.
+layers inside groups with their own blend mode, references to anything not in the file, SVG filters
+(a blur, a drop shadow: not drawn; give the layer a shadow in the Component Designer) and a group's
+blend mode (not kept).
 
 ## New Component from 3D Model (glTF)
 
@@ -215,6 +232,9 @@ app reads from there; the browser cannot, and asks for a `.glb`). It makes a com
   the panel the control is placed on stands in for it, its shadow and all.
 - The model is turned from glTF's y up to look down on it, and fitted to the 3D part's square about the
   knob's axis. Its camera, lights and textures are not used, and the notice says so.
+- Meshes compressed with meshoptimizer (gltfpack's) are read. Draco-compressed meshes and KTX2
+  (Basis Universal) textures are not: the notice says so, and how to export the model again (in
+  Blender, glTF 2.0 with Data › Compression off).
 
 The model is kept in the component (as the file's bytes), so it renders again when a setting changes.
 It draws as a real-time renderer does: soft shadows and a studio's reflections, but no light bouncing

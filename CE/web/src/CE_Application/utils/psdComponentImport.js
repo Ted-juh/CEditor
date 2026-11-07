@@ -30,7 +30,7 @@
  *
  * Pure: bytes in, `{ ok, component, kind, layers, warnings }` out.
  */
-import { readPsd } from 'ag-psd';
+import { readPhotoshop } from './psdRead.js';
 // ag-psd is told once, by the panel importer, to make its pixel arrays without a canvas.
 import './psdPanelImport.js';
 import { compositePsd, layerMaskSampler } from './psdComposite.js';
@@ -156,13 +156,21 @@ function textSection(layer) {
  * without it they are one even-odd outline.
  */
 export function planPsdComponentImport(bytes, { fileName = '', geometry = null } = {}) {
-  let psd;
-  try {
-    const buffer = bytes instanceof ArrayBuffer ? bytes : bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-    psd = readPsd(buffer, { useImageData: true, skipThumbnail: true, skipCompositeImageData: true, skipLinkedFilesData: true });
-  } catch (error) {
-    return { ok: false, error: `This is not a Photoshop file CEditor can read (${error?.message ?? error}).` };
+  let read = readPhotoshop(bytes);
+  if (!read.ok) return read;
+  // A file of one Background layer has no layers at all (or only empty ones), only the picture of the
+  // whole file Photoshop keeps beside them: that picture is its one layer.
+  const draws = (layer) => (layer.imageData?.width > 0 && layer.imageData?.height > 0) || layer.adjustment || layer.vectorFill
+    || layer.vectorMask || layer.text || layer.children?.some(draws);
+  if (!read.psd.children?.some(draws)) {
+    const flat = readPhotoshop(bytes, { composite: true });
+    if (flat.ok && flat.psd.imageData?.data) {
+      const { psd: whole } = flat;
+      whole.children = [{ name: 'Background', left: 0, top: 0, right: whole.width, bottom: whole.height, imageData: whole.imageData }];
+      read = flat;
+    }
   }
+  const { psd } = read;
   const width = Math.round(psd.width ?? 0);
   const height = Math.round(psd.height ?? 0);
   if (!(width > 0 && height > 0)) return { ok: false, error: 'The Photoshop file has no size.' };
