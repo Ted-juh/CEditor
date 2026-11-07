@@ -385,7 +385,7 @@ In PhotoCraft's corpus 110 files came closer and none moved the other way; every
 adjustment file at 8, 16 and 32 bits is under 1 %. In psd-tools' 17 came closer, and two by 0.1-0.3
 points the other way (text.psd, above; masks.psb). As components: 81 / 11 / 12 / 35, as before. No
 import hangs, throws or makes bad output: psd-tools' 948 imports as before, and all 258 of the new
-corpus's files import as components.
+corpus's files import as components. CI run 543 (commit `d201a0f`) passed in all four jobs.
 
 ## Left, and why
 
