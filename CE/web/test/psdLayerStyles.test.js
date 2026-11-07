@@ -430,6 +430,44 @@ test('a bevel\'s Gloss Contour and Contour; a Stroke Emboss bevels the shape as 
   assert.ok(glowing(0, 20)[1] > 60 && glowing(2, 20)[1] < 10, `${glowing(0, 20)} ${glowing(2, 20)}`);
 });
 
+test('a Chisel facet is flat along a slanting edge; a bevel\'s light in a mode on whole colours blends as one', () => {
+  // A half-plane edge at 25°, antialiased: the pixels 2.5 to 3.5 in from it lie on one facet of an Inner
+  // Chisel Hard and take one light, the edge placed by each edge pixel's coverage (chiselDistances).
+  const W = 64; const H = 64; const slope = Math.tan((25 * Math.PI) / 180);
+  const data = new Uint8ClampedArray(W * H * 4);
+  for (let y = 0; y < H; y += 1) for (let x = 0; x < W; x += 1) {
+    let c = 0;
+    for (let sy = 0; sy < 8; sy += 1) for (let sx = 0; sx < 8; sx += 1) if (y + (sy + 0.5) / 8 > 16 + (x + (sx + 0.5) / 8) * slope) c += 1;
+    data.set([90, 120, 170, Math.round((255 * c) / 64)], (y * W + x) * 4);
+  }
+  const bevel = { enabled: true, style: 'inner bevel', technique: 'chisel hard', size: px(8), strength: 1, angle: 120, altitude: 30, direction: 'up',
+    highlightBlendMode: 'screen', highlightColor: { r: 255, g: 255, b: 255 }, highlightOpacity: 0.75, shadowBlendMode: 'multiply', shadowColor: { r: 0, g: 0, b: 0 }, shadowOpacity: 0.75 };
+  const layer = { name: 'edge', left: 0, top: 0, right: W, bottom: H, blendMode: 'normal', opacity: 1, imageData: { width: W, height: H, data }, effects: { bevel } };
+  const out = compositePsd([layer], W, H, { styles: LAYER_STYLES }).pixels;
+  const facet = [];
+  const cos = Math.cos(Math.atan(slope));
+  for (let x = 12; x < 52; x += 1) for (let y = 0; y < H; y += 1) {
+    const d = (y + 0.5 - (16 + (x + 0.5) * slope)) * cos;
+    if (d > 2.5 && d < 3.5) facet.push(out[(y * W + x) * 4 + 1]);
+  }
+  assert.ok(facet.length > 30 && Math.max(...facet) - Math.min(...facet) <= 3, `${Math.min(...facet)}..${Math.max(...facet)}`);
+  // A shadow in Color mode keeps the colour's luminosity, as the Color mode does, where it was drawn as
+  // Normal (PhotoCraft's bevel-emboss-smooth-colored-normal.psd: 4 % of pixels off to 0.2).
+  const square = new Uint8ClampedArray(24 * 24 * 4);
+  for (let i = 0; i < 576; i += 1) square.set([90, 120, 170, 255], i * 4);
+  const coloured = { name: 'tile', left: 8, top: 8, right: 32, bottom: 32, blendMode: 'normal', opacity: 1, imageData: { width: 24, height: 24, data: square },
+    effects: { bevel: { ...bevel, technique: 'smooth', highlightOpacity: 0, shadowBlendMode: 'color', shadowColor: { r: 60, g: 0, b: 120 }, shadowOpacity: 1 } } };
+  const shaded = compositePsd([coloured], 40, 40, { styles: LAYER_STYLES }).pixels;
+  const lum = (i) => 0.3 * shaded[i] + 0.59 * shaded[i + 1] + 0.11 * shaded[i + 2];
+  let changed = 0;
+  for (let i = 0; i < shaded.length; i += 4) {
+    if (shaded[i + 3] < 255) continue;
+    assert.ok(Math.abs(lum(i) - (0.3 * 90 + 0.59 * 120 + 0.11 * 170)) < 1, `luminosity at ${i / 4}`);
+    if (shaded[i] !== 90) changed += 1;
+  }
+  assert.ok(changed > 100, 'the shadow side recoloured');
+});
+
 /** A tiny ICC version 2 CMYK profile: A2B1 (mft2) from inks to Lab, B2A0 (mft1) from Lab to inks. */
 function cmykProfile({ darkest = 0 } = {}) {
   const writer = () => {

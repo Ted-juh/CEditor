@@ -1480,3 +1480,9 @@ export function neutralOf(mode) {
 export function blendChannel(mode, backdrop, source) {
   return SEPARABLE[mode]?.(backdrop, source);
 }
+
+/** A whole colour through `mode` (0..1 each), separable or not; undefined for a mode this has not. */
+export function blendColour(mode, backdrop, source) {
+  if (SEPARABLE[mode]) return backdrop.map((b, c) => SEPARABLE[mode](b, source[c]));
+  return NON_SEPARABLE[mode]?.(backdrop, source);
+}

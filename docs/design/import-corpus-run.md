@@ -393,8 +393,12 @@ corpus's files import as components. CI run 543 (commit `d201a0f`) passed in all
 |---|---|
 | A Lab file's adjustments (lab8 and lab16, 11 of 12 files each over 10 %) | Flattened on the stored L, a and b where every layer allows it (Normal layers, these adjustments), as Photoshop works a Lab file: Invert, Posterize, Levels and Curves each channel (Levels' and Curves' first channel record is L's); Threshold, Brightness/Contrast and Gradient Map on L (the map's stops mixed on their stored values); Photo Filter multiplying the XYZ taken from L, a and b with no RGB between, Preserve Luminosity keeping L; Hue/Saturation turning a and b round a square, the larger of \|a\| and \|b\| its chroma and each side 45°, Saturation scaling that chroma by 1 / (1 − s) up to 127, Lightness on L alone; Colorize setting a and b at its Saturation, at its Hue measured from the corner where a and b are equal, rounded down to whole levels. Read pixel by pixel from the files: the square's turn is 40° to a twentieth of a degree for every colour, its scale 1.33. A 16-bit file's own picture read at full precision (a and b over 0..65280). All 24 files under 1 %, each at 0 % off, 0 to 1.1 levels on average |
 | A CMYK file's Channel Mixer, Gradient Map, Selective Color and Colorize (8-100 %) | Worked on the four inks together at the top of the file. Channel Mixer: each ink its percentages of the four and its constant, in ink, its records read in full (ag-psd drops each one's black source and the black output). Gradient Map: along the inks' plain Rec. 601 luma (PhotoCraft's measure for CMYK Threshold), the stops' four inks mixed as stored (the binary block keeps a CMYK stop as stored, 255 no ink). Selective Color: each range weighed on the plain complement as in RGB, its four percentages moving the four inks. Colorize: on the plain complement, separated plainly again, black first, cyan, magenta and yellow held together to 2.18 × (1 − K) under heavy black, as Photoshop's do past 75 % black. All eight files to 0 % |
-| A bevel's Gloss Contour (26-31 %) | The contour remaps the light's cosine as before, but the highlight and shadow are measured from the flat face's own cosine (the sine of the altitude), not the contour's value there: a contour that peaks there lights the flat face in full, as Photoshop's picture does. Ramp-peak 31 % to 0.3, double-ring 26 to 3.9 |
-| A bevel's Contour (13-15 %) | Over the bevel's own half of the blurred edge (an Inner Bevel's from the edge up), the whole depth high, by its Range, measured down from the top (ag-psd drops the Range: read from the descriptor). Every contour read between its table's entries rather than at the nearest. Ramp-peak 15 % to 2.8, double-ring at 70 % 13 to 5.6; a Chisel Pillow Emboss with both contours 2.5 levels on average as before |
+| A bevel's Gloss Contour (26-31 %) | The contour remaps the light's cosine as before, but the highlight and shadow are measured from the flat face's own cosine (the sine of the altitude), not the contour's value there: a contour that peaks there lights the flat face in full, as Photoshop's picture does. Ramp-peak 31 % to 0 (with the height below), double-ring 26 to 3.8 |
+| A Smooth bevel's height | The shape through two box blurs of the bevel's width, a tent (PhotoCraft's measurement), not the shadows' Gaussian at 0.42 of the Size: the two agree in slope, which is all a Linear contour sees, and part where a steep contour reads the height itself. 17 bevel files closer and none further (psd-tools' layer_effects.psd and layer_comps.psd among them) |
+| A Chisel bevel along a curve (1-4 %) | PhotoCraft's distances: a sharp antialiased edge pixel places the edge by its coverage along the line through the edge points about it, and the pixels near it measure to that line, so a facet stays flat along a slanting or curved edge; a Soft Emboss rounded by a tent of a quarter of the Size. 10 of the 12 Chisel files closer (Inner Soft 1.2 % to 0.6, Emboss Hard 3 to 2.6, Pillow Soft 4.2 to 3.7), two a tenth of a point the other way |
+| An inside stroke along a slanting edge (shape-fx2.psd, 1.7 %) | Measured in by the 5 × 5 chamfer Photoshop's own follows, its seeds the partly covered edge pixels each starting at its coverage (PhotoCraft's measurement), not the exact distance: 1.7 % to 0, and four other stroke files closer (stroke-effects.psd 1.4 to 1.05). The same for an outside stroke put three files to 0 and two others to 4 and 11 %, so outside strokes keep their measure |
+| A bevel's light in Color, Hue, Saturation, Luminosity or Lighter or Darker Color (4 %) | The interior styles blended channel by channel, so a mode on whole colours fell back to Normal: a Color shadow darkened the layer where Photoshop keeps its luminosity. Blended as one colour: bevel-emboss-smooth-colored-normal.psd 4 % to 0.2 |
+| A bevel's Contour (13-15 %) | Over the bevel's own half of the blurred edge (an Inner Bevel's from the edge up), the whole depth high, by its Range, measured down from the top (ag-psd drops the Range: read from the descriptor). Every contour read between its table's entries rather than at the nearest. Ramp-peak 15 % to 1.7, double-ring at 70 % 13 to 5.2 (with the height above) |
 | An Outer Glow with a gradient (18 %) | Its colour along the gradient as before, and faded where the blurred shape, before Range and Contour, falls below 0.11: full to there and then in proportion, read pixel by pixel. 18 % to 1.8 |
 | A Smooth Stroke Emboss over an outside stroke (7.7 %), a centred Chisel one (8.7 %) | The shape bevelled as the stroke sits on it, lit on the stroke alone: an Outer Bevel under an outside stroke (its light grows towards the shape, as Photoshop's does), an Emboss under a centred one, an Inner Bevel under an inside one. 7.7 % to 0.3, 8.7 to 3.2; the Chisel outside ones 4.1 to 1.4 and 1.3 to 0.7 |
 | Smart filters with a filter mask (25-41 %) | The layer's pixels are the filters' result everywhere; Photoshop's picture mixes them with the smart object's own pixels, which it keeps in the file's 'FEid' cache, through the filter mask kept there too, as colours with their coverage (where the smart object has a hole, the filters' colour comes through rather than going dark). A hard mask 39 % to 0, a stack 25 to 0, a gradient mask 41 to 0 |
@@ -416,18 +420,19 @@ table for their Anti-aliased setting (worse at every width).
 
 | | Before | Now |
 |---|---|---|
-| PhotoCraft's corpus (258): under 1 % | 199 | 237 |
+| PhotoCraft's corpus (258): under 1 % | 199 | 240 |
 | over 5 % | 44 | 3 |
 | over 20 % | 31 | 0 |
-| psd-tools' corpus (281): under 1 % | 265 | 266 |
+| psd-tools' corpus (281): under 1 % | 265 | 267 |
 | over 5 % | 8 | 8 |
 | over 20 % | 7 | 7 |
 
-In PhotoCraft's corpus 46 files came closer and one moved the other way (a double-ring Outer Glow
-contour, 1.43 % of pixels off to 1.51, read between its table's entries). In psd-tools' four came
-closer and three the other way: layer_params.psd and .psb, 0.06 of a level on average (their
-gradient glow), and 4x4_16bit_lab.psd by one pixel of sixteen (its stops now mixed in Lab, its angle
-still not Photoshop's).
+In PhotoCraft's corpus 64 files came closer and two moved the other way by about a tenth of a point
+(a double-ring Outer Glow contour, 1.43 % of pixels off to 1.51, read between its table's entries; a
+Chisel Pillow Emboss with both contours, 4.06 to 4.16, its average closer). In psd-tools' nine came
+closer and one the other way: 4x4_16bit_lab.psd by one pixel of sixteen (its stops now mixed in Lab,
+its angle still not Photoshop's). CI runs 544 (commit `c7b3b49`) and 545 (commit `35f6f22`) passed in
+all four jobs.
 
 ## Left, and why
 
@@ -450,10 +455,9 @@ still not Photoshop's).
 - **The rest of the flattening's differences**, each measured and none with a file that pins a
   rule for it: a Reflected gradient stroke (effect-enums.psd, 1.4 %), which follows the spline here
   over a half-length of about 59 pixels where the box gives 53, by no rule found; a Pillow Emboss of
-  5 pixels on small type, under a gradient stroke (layer_params.psd, 1.7 %); a stroke along a
-  polygon's slanting edges (shape-fx2.psd, 17 pixels), whose inner boundary Photoshop antialiases
-  over about 1.4 pixels of the path's true distance, where this one measures pixels; the double-ring
-  Contour and Gloss Contour (5.6 % and 4 %), within a pixel where the contour is steep; and
+  5 pixels on small type, under a gradient stroke (layer_params.psd, 1.7 %); the double-ring
+  Contour and Gloss Contour (5.2 % and 3.8 %), within a pixel where the contour is steep; the Chisel
+  Emboss and Pillow Emboss styles (2.6-4.2 %), on the curves of the test shape's ring; and
   gradients on very small boxes, whose angle Photoshop moves off what the file says (at 4 by 4
   pixels, 30° drawn as 45°: psd-tools' six 16- and 32-bit 4x4 files, 56-94 %, which carry no pixels
   of their gradient), by a rule not found: taking its ends to whole pixels gives those and breaks 146

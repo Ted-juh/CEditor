@@ -23,7 +23,7 @@
 // under the layer (castShadows), the rest into its pixels (drawLayerStyles). It takes both as
 // LAYER_STYLES, since this module draws with its blend modes.
 
-import { blendChannel, neutralOf } from './psdComposite.js';
+import { blendChannel, blendColour, neutralOf } from './psdComposite.js';
 import { contourTable, gradientRamp, psdRgb } from './psdAdjustments.js';
 import { blur } from './gaussianBlur.js';
 import { gradientField, patternSampler, scaleOf } from './psdVectors.js';
@@ -72,6 +72,224 @@ function distanceTo(seed, width, height) {
     for (let x = 0; x < width; x += 1) out[y * width + x] = Math.sqrt(d[x]);
   }
   return out;
+}
+
+/**
+ * Felzenszwalb's exact distance transform, with each pixel's nearest seed (where `seed(i)` holds):
+ * `{ d, near }`, `near` -1 where there is none.
+ */
+function distanceNearest(seed, width, height) {
+  const n = width * height;
+  const col = new Float64Array(n); const rowOf = new Int32Array(n).fill(-1);
+  const m = Math.max(width, height);
+  const f = new Float64Array(m); const v = new Int32Array(m); const z = new Float64Array(m + 1);
+  const pass = (count, read, write) => {
+    let k = 0; let any = false;
+    for (let q = 0; q < count; q += 1) { f[q] = read(q); if (f[q] < INF) any = true; }
+    if (!any) { for (let q = 0; q < count; q += 1) write(q, INF, -1); return; }
+    let first = 0; while (f[first] >= INF) first += 1;
+    v[0] = first; z[0] = -INF; z[1] = INF;
+    for (let q = first + 1; q < count; q += 1) {
+      if (f[q] >= INF) continue;
+      let s0 = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+      while (s0 <= z[k]) { k -= 1; s0 = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+      k += 1; v[k] = q; z[k] = s0; z[k + 1] = INF;
+    }
+    k = 0;
+    for (let q = 0; q < count; q += 1) { while (z[k + 1] < q) k += 1; write(q, (q - v[k]) ** 2 + f[v[k]], v[k]); }
+  };
+  for (let x = 0; x < width; x += 1) {
+    pass(height, (y) => (seed(y * width + x) ? 0 : INF), (y, d, at) => { col[y * width + x] = d; rowOf[y * width + x] = at; });
+  }
+  const d = new Float32Array(n); const near = new Int32Array(n).fill(-1);
+  for (let y = 0; y < height; y += 1) {
+    pass(width, (x) => col[y * width + x], (x, dd, at) => {
+      d[y * width + x] = Math.sqrt(dd);
+      near[y * width + x] = at >= 0 && dd < INF ? rowOf[y * width + at] * width + at : -1;
+    });
+  }
+  return { d, near };
+}
+
+// A Chisel bevel's distances, as PhotoCraft measured Photoshop's (MIT OR Apache-2.0, effects/
+// distance.rs): a sharp antialiased edge pixel puts the edge where its coverage says, at any angle,
+// along the line through the edge points about it, and the pixels near it measure to that line, so a
+// facet stays flat along an oblique or curved edge instead of following the pixel staircase.
+const EDGE_EPS = 0.5 / 255;
+const EDGE_REACH = 0.75;
+/** Signed distance from the centre of a pixel of coverage `a` to the straight edge crossing it along `n`. */
+function edgeOffset(n, a) {
+  if (!Number.isFinite(a)) return 0;
+  const u = Math.max(Math.abs(n[0]), Math.abs(n[1])); const v = Math.min(Math.abs(n[0]), Math.abs(n[1]));
+  const inside = a > 0.5; const c = Math.max(0, Math.min(0.5, inside ? 1 - a : a));
+  const corner = u > 0 ? v / (2 * u) : 0;
+  const r = c >= corner ? (0.5 - c) * u : 0.5 * (u + v) - Math.sqrt(2 * u * v * c);
+  return inside ? r : -r;
+}
+function sharpEdges(s, w, h) {
+  const get = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : s[y * w + x]);
+  const covAt = (x, y) => {
+    const a = s[y * w + x]; if (a <= EDGE_EPS) return a;
+    let mx = a; for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) mx = Math.max(mx, get(x + dx, y + dy));
+    return Math.min(1, a / mx);
+  };
+  const covClamped = (x, y) => covAt(Math.max(0, Math.min(w - 1, x)), Math.max(0, Math.min(h - 1, y)));
+  const solid = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? true : s[y * w + x] > EDGE_EPS);
+  const pixels = []; const slot = new Int32Array(w * h);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      if (!solid(x, y)) continue;
+      let open = false; for (let dy = -1; dy <= 1 && !open; dy += 1) for (let dx = -1; dx <= 1; dx += 1) if (!solid(x + dx, y + dy)) { open = true; break; }
+      if (!open) continue;
+      const c = covAt(x, y);
+      if (c >= 1 - EDGE_EPS) continue;
+      let empty = false; let full = false;
+      for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+        const nx = x + dx; const ny = y + dy;
+        if ((dx === 0 && dy === 0) || nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+        if (s[ny * w + nx] <= EDGE_EPS) empty = true;
+        if (covAt(nx, ny) >= 1 - EDGE_EPS) full = true;
+      }
+      if (!(empty && full)) continue;
+      const a = covClamped;
+      const gx = (a(x + 1, y - 1) + 2 * a(x + 1, y) + a(x + 1, y + 1)) - (a(x - 1, y - 1) + 2 * a(x - 1, y) + a(x - 1, y + 1));
+      const gy = (a(x - 1, y + 1) + 2 * a(x, y + 1) + a(x + 1, y + 1)) - (a(x - 1, y - 1) + 2 * a(x, y - 1) + a(x + 1, y - 1));
+      const len = Math.hypot(gx, gy);
+      const normal = len > 1e-6 ? [gx / len, gy / len] : [0, 0];
+      pixels.push({ at: y * w + x, cov: c, offset: edgeOffset(len > 1e-6 ? normal : [1, 0], c), normal });
+      slot[y * w + x] = pixels.length;
+    }
+  }
+  // The line through the edge points about each one gives its direction to a fraction of a degree.
+  const points = pixels.map((p) => [(p.at % w) - p.offset * p.normal[0], Math.floor(p.at / w) - p.offset * p.normal[1]]);
+  const before = pixels.map((p) => ({ normal: p.normal }));
+  const R = 3;
+  pixels.forEach((pixel, k) => {
+    const x = pixel.at % w; const y = Math.floor(pixel.at / w); const e = before[k];
+    const near = []; let sx = 0; let sy = 0;
+    for (let dy = -R; dy <= R; dy += 1) for (let dx = -R; dx <= R; dx += 1) {
+      const nx = x + dx; const ny = y + dy;
+      if (dx * dx + dy * dy > R * R || nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const j = slot[ny * w + nx] - 1; if (j < 0) continue;
+      const o = before[j];
+      if (o.normal[0] * e.normal[0] + o.normal[1] * e.normal[1] > 0.9) { near.push(points[j]); sx += points[j][0]; sy += points[j][1]; }
+    }
+    if (near.length < 3) return;
+    const mx = sx / near.length; const my = sy / near.length;
+    let sxx = 0; let sxy = 0; let syy = 0;
+    for (const [px, py] of near) { const dx = px - mx; const dy = py - my; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; }
+    const half = 0.5 * (sxx + syy); const root = Math.sqrt(0.25 * (sxx - syy) ** 2 + sxy * sxy);
+    const along = Math.sqrt(Math.max(0, (half + root) / near.length)); const across = Math.sqrt(Math.max(0, (half - root) / near.length));
+    if (!(along > 0.7 && across < 0.1)) return;
+    const angle = 0.5 * Math.atan2(2 * sxy, sxx - syy);
+    let normal = [-Math.sin(angle), Math.cos(angle)];
+    if (normal[0] * e.normal[0] + normal[1] * e.normal[1] < 0) normal = [-normal[0], -normal[1]];
+    pixel.normal = normal; pixel.offset = edgeOffset(normal, pixel.cov);
+  });
+  const at = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? null : (slot[y * w + x] ? pixels[slot[y * w + x] - 1] : null));
+  return { at, get: (i) => (slot[i] ? pixels[slot[i] - 1] : null), empty: pixels.length === 0 };
+}
+/** Distance to a sharp edge pixel's edge from the pixel (dx, dy) away, on the shape's side or the other; null if none. */
+function sharpDistance(e, dx, dy, inside) {
+  const [nx, ny] = e.normal;
+  if (nx === 0 && ny === 0) return null;
+  const signed = e.offset + dx * nx + dy * ny;
+  const across = inside ? signed : -signed;
+  const along = Math.abs(dx * -ny + dy * nx);
+  return across > 0 ? Math.hypot(across, Math.max(0, along - EDGE_REACH)) : null;
+}
+function edgeDistanceTo(sharp, px, py, qx, qy, inside) {
+  const e = sharp.at(qx, qy); if (!e) return null;
+  let best = sharpDistance(e, px - qx, py - qy, inside);
+  if (best == null) return null;
+  const signed = e.offset + (px - qx) * e.normal[0] + (py - qy) * e.normal[1];
+  const fx = Math.round(px - signed * e.normal[0]); const fy = Math.round(py - signed * e.normal[1]);
+  for (let sy = fy - 2; sy <= fy + 2; sy += 1) for (let sx = fx - 2; sx <= fx + 2; sx += 1) {
+    const near = sharp.at(sx, sy); if (!near) continue;
+    const d = sharpDistance(near, px - sx, py - sy, inside);
+    if (d != null) best = Math.min(best, d);
+  }
+  return best;
+}
+/**
+ * The distance into a shape as Photoshop measures an inside stroke (PhotoCraft's measurement, MIT OR
+ * Apache-2.0): a 5 × 5 chamfer, its seeds the partly covered edge pixels, each starting at its own
+ * coverage, and the clear pixels; as the signed distance here (negative inside, +0.5 outside).
+ */
+function chamferInside(s, w, h) {
+  const S2 = Math.SQRT2; const S5 = Math.sqrt(5);
+  const FWD = [[-1, 0, 1], [-1, -1, S2], [0, -1, 1], [1, -1, S2], [-1, -2, S5], [1, -2, S5], [-2, -1, S5], [2, -1, S5]];
+  const get = (x, y) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : s[y * w + x]);
+  const d = new Float32Array(w * h);
+  for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) {
+    const a = s[y * w + x];
+    if (a <= EDGE_EPS) { d[y * w + x] = 0; continue; }
+    let mx = a; for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) mx = Math.max(mx, get(x + dx, y + dy));
+    const c = Math.min(1, a / mx);
+    d[y * w + x] = c < 1 - EDGE_EPS ? c : INF;
+  }
+  const relax = (x, y, sign) => {
+    const i = y * w + x; let best = d[i];
+    for (const [ox, oy, wt] of FWD) {
+      const nx = x + ox * sign; const ny = y + oy * sign;
+      if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue;
+      const c = d[ny * w + nx] + wt; if (c < best) best = c;
+    }
+    d[i] = best;
+  };
+  for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) relax(x, y, 1);
+  for (let y = h - 1; y >= 0; y -= 1) for (let x = w - 1; x >= 0; x -= 1) relax(x, y, -1);
+  const out = new Float32Array(w * h);
+  for (let i = 0; i < out.length; i += 1) out[i] = s[i] <= EDGE_EPS ? 0.5 : -(d[i] - 0.5);
+  return out;
+}
+
+/** A Chisel bevel's distances into the shape and out of it (each −0.5 on the other side). */
+function chiselDistances(s, w, h, reach) {
+  const sharp = sharpEdges(s, w, h);
+  const empty = distanceNearest((i) => s[i] <= EDGE_EPS, w, h);
+  const filled = distanceNearest((i) => s[i] > EDGE_EPS, w, h);
+  const din = new Float32Array(w * h); const dout = new Float32Array(w * h);
+  for (let y = 0; y < h; y += 1) {
+    for (let x = 0; x < w; x += 1) {
+      const i = y * w + x;
+      const e = sharp.get(i);
+      // Inside.
+      if (s[i] <= EDGE_EPS) din[i] = -0.5;
+      else if (e) din[i] = e.offset;
+      else {
+        const plain = empty.d[i] - 0.5;
+        din[i] = plain;
+        if (!(empty.d[i] > reach + 2) && !sharp.empty && empty.near[i] >= 0) {
+          const ox = empty.near[i] % w; const oy = Math.floor(empty.near[i] / w);
+          let q = null; let qd = Infinity;
+          for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+            const qx = ox + dx; const qy = oy + dy;
+            if (!sharp.at(qx, qy)) continue;
+            const dd = (qx - x) ** 2 + (qy - y) ** 2;
+            if (dd < qd) { qd = dd; q = [qx, qy]; }
+          }
+          const refined = q ? edgeDistanceTo(sharp, x, y, q[0], q[1], true) : null;
+          if (refined != null) din[i] = Math.min(refined, plain);
+        }
+      }
+      // Outside.
+      if (e) dout[i] = -e.offset;
+      else if (s[i] > EDGE_EPS) dout[i] = -0.5;
+      else {
+        const q = filled.near[i];
+        const eq = q >= 0 ? sharp.get(q) : null;
+        if (q < 0) dout[i] = INF;
+        else if (!eq) dout[i] = filled.d[i] - (Math.min(1, s[q]) - 0.5);
+        else {
+          const qx = q % w; const qy = Math.floor(q / w);
+          const measured = filled.d[i] <= reach + 2 ? edgeDistanceTo(sharp, x, y, qx, qy, false) : sharpDistance(eq, x - qx, y - qy, false);
+          dout[i] = measured ?? filled.d[i] - eq.offset;
+        }
+      }
+    }
+  }
+  return { din, dout };
 }
 
 /**
@@ -175,6 +393,23 @@ function styleBlur(a, w, h, size, { levels = true } = {}) {
   }
 }
 
+/**
+ * Two box blurs of width `width` across and down, a tent: each box takes a whole pixel for each one
+ * it covers and the share of the two at its ends that it reaches (PhotoCraft's tent_kernel).
+ */
+function tentBlur(a, w, h, width) {
+  const bw = Math.max(1, width); const half = bw / 2;
+  const r = Math.max(0, Math.ceil(half - 0.5));
+  const box = []; for (let i = -r; i <= r; i += 1) box.push(Math.max(0, Math.min(i + 0.5, half) - Math.max(i - 0.5, -half)));
+  const sum = box.reduce((x, y) => x + y, 0); for (let i = 0; i < box.length; i += 1) box[i] /= sum;
+  const k = new Array(box.length * 2 - 1).fill(0);
+  for (let i = 0; i < box.length; i += 1) for (let j = 0; j < box.length; j += 1) k[i + j] += box[i] * box[j];
+  const R = (k.length - 1) / 2;
+  const tmp = new Float32Array(a.length);
+  for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) { let acc = 0; for (let t = 0; t < k.length; t += 1) { const xx = x + t - R; if (xx >= 0 && xx < w) acc += a[y * w + xx] * k[t]; } tmp[y * w + x] = acc; }
+  for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) { let acc = 0; for (let t = 0; t < k.length; t += 1) { const yy = y + t - R; if (yy >= 0 && yy < h) acc += tmp[yy * w + x] * k[t]; } a[y * w + x] = acc; }
+}
+
 /** The style's contour as a function on 0..1 (its spline, as utils/psdAdjustments.js contourTable). */
 function contourFunction(effect) {
   const table = contourTable(effect?.contour);
@@ -238,7 +473,7 @@ const HALF_SIZE_BEVELS = new Set(['emboss', 'pillow emboss', 'stroke emboss']);
 
 /**
  * Bevel & Emboss as Photoshop shades it, measured on psd-tools' layer_effects.psd: the shape blurred
- * by the same Gaussian as the shadows (0.42 of the Size) is a height, the Size times the Depth high,
+ * (a tent, two box blurs of the Size: tentBlur) is a height, the Size times the Depth high,
  * lit from the style's angle and altitude; where the light falls on it more steeply than on the flat,
  * the highlight shows, (n·l − sin altitude) / (1 − sin altitude), and where less, the shadow,
  * (sin altitude − n·l) / sin altitude. An Emboss is the same at half the Size, on both sides of the
@@ -261,20 +496,26 @@ function bevelShading(shape, width, height, bevel) {
   const shapeContour = bevel.useShape && contourTable(bevel.shapeContour) ? contourFunction({ contour: bevel.shapeContour }) : null;
   const pad = Math.ceil(2 * reach + soften) + 3;
   const heightOf = padded(width, height, pad, (x, y) => (x < 0 || y < 0 || x >= width || y >= height ? 0 : shape[y * width + x]), (h, w, hh) => {
-    if (technique === 'smooth') styleBlur(h, w, hh, reach, { levels: false });
+    // Smooth: the shape through two box blurs of the bevel's width, a tent (PhotoCraft's measurement,
+    // MIT OR Apache-2.0: an emboss's half width rounded up to whole pixels). Where the Gaussian the
+    // shadows take was fitted before, the bevel files come out closer, most of all under a steep
+    // contour (PhotoCraft's corpus: 17 files closer, the ramp-peak contours to 0 and 1.7 %).
+    if (technique === 'smooth') tentBlur(h, w, hh, HALF_SIZE_BEVELS.has(style) ? Math.ceil(Math.max(1, pxOf(bevel.size, 5)) / 2) : reach);
     else {
       // Chisel, as PhotoCraft measured it in Photoshop (MIT OR Apache-2.0, effects/bevel.rs): straight
       // ramps of the distance to the edge, one step of 1 / (Size + 1) a pixel. Inner Hard rises from
       // half a pixel inside the edge to Size + ½, Inner Soft a pixel further out (a steeper edge
       // pixel); Outer Hard falls to nothing at Size + 1½ out, Outer Soft a pixel sooner; the emboss
-      // styles straddle the edge, half the Size each way, a Soft one rounded by a quarter of it.
-      const d = signedDistance(h, w, hh);
+      // styles straddle the edge, half the Size each way, a Soft one rounded by a tent a quarter of it.
+      // Measured to the edge each sharp edge pixel's coverage places, along its line (chiselDistances),
+      // so a facet is flat along a curve: 10 of the corpus's 12 Chisel files closer.
       const size = Math.max(1, pxOf(bevel.size, 5));
+      const { din: inward, dout: outward } = chiselDistances(h, w, hh, size + 2);
       const ramp = size + 1;
       const soft = technique === 'chisel soft';
       const paint = style === 'outer bevel' ? 'outer' : style === 'emboss' || style === 'pillow emboss' ? 'both' : 'inner';
       for (let i = 0; i < h.length; i += 1) {
-        const din = -d[i]; const dout = d[i];
+        const din = inward[i]; const dout = outward[i];
         if (paint === 'outer') {
           const top = (size + 2) / ramp;
           h[i] = dout > 0 ? (soft ? 1 - clamp01((dout + 0.5) / ramp) : Math.max(0, Math.min(top, (size + 1.5 - dout) / ramp))) : top;
@@ -285,7 +526,7 @@ function bevelShading(shape, width, height, bevel) {
           h[i] = din > 0 ? (soft ? Math.max(0, Math.min((size + 2) / ramp, (din + 1.5) / ramp)) : clamp01((din + 0.5) / ramp)) : 0;
         }
       }
-      if (soft && paint === 'both') blur(h, w, hh, Math.max(1, size / 4) / Math.sqrt(6));
+      if (soft && paint === 'both') tentBlur(h, w, hh, Math.max(1, size / 4));
     }
     // A chisel rises Depth × Size / 2 (PhotoCraft's measurement), a smooth bevel the Size × Depth.
     const scale = technique === 'smooth' ? reach * depth * dir : (Math.max(1, pxOf(bevel.size, 5)) / 2) * depth * dir;
@@ -519,6 +760,8 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     // Where the mode has a neutral colour, the strength moves the colour toward it before the blend,
     // as Photoshop draws a style (utils/psdComposite.js blendStylePixel).
     const neutral = neutralOf(mode);
+    // (A mode on whole colours, Color or Luminosity say, blended as one: blendColour.)
+    const whole = neutral === undefined && ba > 0 ? blendColour(mode, [0, 1, 2].map((c) => pixels[p + c] / 255), rgb.map((v) => v / 255)) : null;
     for (let c = 0; c < 3; c += 1) {
       const b = pixels[p + c] / 255;
       const s = rgb[c] / 255;
@@ -528,7 +771,7 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
         const moved = neutral + k * (s - neutral);
         out = (k * (1 - ba) * s + ba * (blendChannel(mode, b, moved) ?? moved)) / (k + ba * (1 - k));
       } else {
-        const blended = ba > 0 ? (blendChannel(mode, b, s) ?? s) : s;
+        const blended = ba > 0 ? (whole ? whole[c] : s) : s;
         const mixed = (1 - ba) * s + ba * blended;
         out = ba + amount * (1 - ba) > 0 ? (amount * mixed + ba * b * (1 - amount)) / (amount + ba * (1 - amount)) : 0;
       }
@@ -674,6 +917,9 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     drawn.push(`Bevel & Emboss${approximations(bevel, false, true)}`);
   }
   const edgeDistance = (effects.stroke ?? []).some(enabled) ? signedDistance(shape, width, height) : null;
+  // An inside stroke measures in by the chamfer Photoshop's own does (chamferInside: shape-fx2.psd's
+  // slanting edges 1.7 % of pixels off to none, five stroke files closer).
+  const insideDistance = (effects.stroke ?? []).some((st) => enabled(st) && (st.position ?? 'outside') === 'inside') ? chamferInside(shape, width, height) : null;
   for (const stroke of (effects.stroke ?? []).filter(enabled)) {
     const size = Math.max(0.5, pxOf(stroke.size, 3));
     const position = stroke.position ?? 'outside';
@@ -722,9 +968,10 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
       const loRgb = (strokeEmboss.shadowColor ? psdRgb(strokeEmboss.shadowColor) : [0, 0, 0]).map((v) => v / 255);
       const over = (c, s0, k, mode) => {
         const n = neutralOf(mode);
+        const whole = n === undefined ? blendColour(mode, c, s0) : null;
         return c.map((v, ch) => {
           if (n !== undefined) { const moved = n + k * (s0[ch] - n); return blendChannel(mode, v, moved) ?? moved; }
-          const blended = blendChannel(mode, v, s0[ch]) ?? s0[ch];
+          const blended = whole ? whole[ch] : s0[ch];
           return v + (blended - v) * k;
         });
       };
@@ -736,7 +983,7 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
       };
     }
     for (let i = 0; i < shape.length; i += 1) {
-      const d = edgeDistance[i];
+      const d = insideDistance && position === 'inside' ? insideDistance[i] : edgeDistance[i];
       const amount = band(d, lo, hi);
       if (amount <= 0) continue;
       let inner = 0;

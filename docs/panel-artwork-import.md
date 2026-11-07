@@ -149,25 +149,27 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
 - **Smart filters with a filter mask** show the filters' result through the mask and the smart
   object's own pixels (the copy Photoshop keeps beside it) where the mask hides it, mixed with their
   coverage between.
-- **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures:
-  Drop Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights
-  around it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part
-  inside the layer over it, and its part outside under it, in its own blend mode. A shadow or glow
-  is the shape blurred over its Size and no further; a bevel is that blur lit from its angle and
-  altitude; their Spread, Choke, Range and contours, Use Global Light and "Blend Interior Effects as
-  Group" are honoured. A style in a blend mode with a neutral colour (Multiply's white, Overlay's
-  grey) fades toward that colour below full opacity, as Photoshop fades it. A gradient stroke lies
-  across the box the stroke reaches; a pattern one, linked with the layer, starts where its layer
-  does. Styles see a layer's pixels past the canvas, and a group's styles its layers': an inside
-  stroke on a layer the size of the canvas borders the picture, and on a shape that runs on past the
-  canvas is not seen there. A stroke rounds a square's corner from the corner itself, and an Outer
-  Bevel, an Emboss or a Pillow Emboss shades the part of a Stroke outside the layer. A Chisel bevel
-  is straight facets, Hard or Soft; a Stroke Emboss bevels the shape as the stroke sits on it (an
-  Outer Bevel under an outside stroke, an Emboss under a centred one) and lights the stroke alone. A
-  bevel's Gloss Contour remaps its light, and its Contour its height over the bevel's own half of the
-  edge, by its Range; an Outer Glow along a gradient fades out at its far end. Drawn only close, and
-  named in the Console: Soften, a Contour on a Chisel bevel or an Emboss, a Precise glow, and a Noise
-  gradient (its average colour); a style's Noise and a bevel's Texture are not drawn.
+- **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures: Drop
+  Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights around
+  it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part inside the
+  layer over it, and its part outside under it, in its own blend mode. A shadow or glow is the shape
+  blurred over its Size and no further; a bevel is that blur lit from its angle and altitude; their
+  Spread, Choke, Range and contours, Use Global Light and "Blend Interior Effects as Group" are
+  honoured. A style in a blend mode with a neutral colour (Multiply's white, Overlay's grey) fades
+  toward that colour below full opacity, as Photoshop fades it. A gradient stroke lies across the
+  box the stroke reaches; a pattern one, linked with the layer, starts where its layer does. Styles
+  see a layer's pixels past the canvas, and a group's styles its layers': an inside stroke on a
+  layer the size of the canvas borders the picture, and on a shape that runs on past the canvas is
+  not seen there. A stroke rounds a square's corner from the corner itself, and an Outer Bevel, an
+  Emboss or a Pillow Emboss shades the part of a Stroke outside the layer. A Chisel bevel is
+  straight facets, Hard or Soft, flat along a slanting or curved edge too; a bevel's light and shade
+  blend in any mode, Color or Luminosity as well; a Stroke Emboss bevels the shape as the stroke
+  sits on it (an Outer Bevel under an outside stroke, an Emboss under a centred one) and lights the
+  stroke alone. A bevel's Gloss Contour remaps its light, and its Contour its height over the
+  bevel's own half of the edge, by its Range; an Outer Glow along a gradient fades out at its far
+  end. Drawn only close, and named in the Console: Soften, a Contour on a Chisel bevel or an Emboss,
+  a Precise glow, and a Noise gradient (its average colour); a style's Noise and a bevel's Texture
+  are not drawn.
 - **Type** blends with what is under it as Photoshop blends type by default ("Blend Text Colors
   Using Gamma", 1.45, in its Color Settings), so its antialiased edges come out as light as
   Photoshop's; type in another blend mode is blended as ever and mixed in at its edges the same way.
