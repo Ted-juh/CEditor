@@ -20,6 +20,8 @@
  */
 import { initializeCanvas, readPsd } from 'ag-psd';
 import { cmykToRgb, labToRgb } from './psdAdjustments.js';
+import { readEffectsBlock } from './psdEffects.js';
+import { iccCmykToRgb } from './iccProfile.js';
 
 // ag-psd makes its pixel arrays through a canvas unless told otherwise — a canvas it borrows from the
 // page in a browser, and has none of in node. A plain array is all `useImageData` needs, is the same
@@ -34,7 +36,7 @@ initializeCanvas(
 
 const MODES = { 0: 'Bitmap', 1: 'Grayscale', 2: 'Indexed Color', 3: 'RGB', 4: 'CMYK', 7: 'Multichannel', 8: 'Duotone', 9: 'Lab' };
 // The colour modes ag-psd does not read that are read here through it (readConverted).
-const CONVERTED = new Set([4, 8, 9]);
+const CONVERTED = new Set([4, 7, 8, 9]);
 
 const clamp01 = (v) => (v > 0 ? (v < 1 ? v : 1) : 0);
 const srgb = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055);
@@ -53,6 +55,29 @@ export function eightBit(image, colour = true) {
     }
   }
   return { ...image, data: out };
+}
+
+/**
+ * A 32-bit document works in linear light, and so do the colours its settings keep (a shape's fill,
+ * a gradient's stops, a style's colour): put through the same curve as its pixels (vector-mask.psd,
+ * whose shapes otherwise come out darker than Photoshop's picture of them).
+ */
+function linearColours(layers) {
+  const fix = (value, depth = 0) => {
+    if (!value || typeof value !== 'object' || depth > 6 || ArrayBuffer.isView(value)) return;
+    if (Array.isArray(value)) { for (const item of value) fix(item, depth + 1); return; }
+    if (typeof value.r === 'number' && typeof value.g === 'number' && typeof value.b === 'number' && Object.keys(value).length <= 4) {
+      for (const k of ['r', 'g', 'b']) value[k] = 255 * srgb(clamp01(value[k] / 255));
+      return;
+    }
+    for (const [key, item] of Object.entries(value)) if (key !== 'imageData' && key !== 'picture') fix(item, depth + 1);
+  };
+  for (const layer of layers ?? []) {
+    fix(layer.vectorFill);
+    fix(layer.effects);
+    fix(layer.vectorStroke);
+    linearColours(layer.children);
+  }
 }
 
 function eightBitLayers(layers, colour = true) {
@@ -102,11 +127,26 @@ function layerRecords(view) {
         // flags say parameters were applied to it, as psd-tools reads it.
         const maskLength = data.getUint32(inner);
         const realApplied = maskLength >= 36 && (view[inner + 4 + 18] & 16) !== 0;
+        // The mask's parameters (Properties › Density and Feather), where its flags say it has them:
+        // ag-psd does not always pass them on (mask-parameters-no-real-channel.psd).
+        let maskParameters = null;
+        if (maskLength >= 20 && (view[inner + 4 + 17] & 16) !== 0) {
+          const which = view[inner + 4 + 18];
+          let p = inner + 4 + 19;
+          maskParameters = {};
+          if (which & 1) { maskParameters.userMaskDensity = view[p] / 255; p += 1; }
+          if (which & 2) { maskParameters.userMaskFeather = data.getFloat64(p); p += 8; }
+          if (which & 4) { maskParameters.vectorMaskDensity = view[p] / 255; p += 1; }
+          if (which & 8) { maskParameters.vectorMaskFeather = data.getFloat64(p); p += 8; }
+          if (p > inner + 4 + maskLength) maskParameters = null;
+        }
         inner += 4 + maskLength;
         inner += 4 + data.getUint32(inner); // blending ranges
         inner += (((view[inner] + 1) + 3) & ~3); // name, a Pascal string padded to 4
         let knockout = 0;
         let black = null;
+        let effectsAt = null;
+        let restricted = null;
         while (inner + 12 <= end) {
           if (tag(inner) !== '8BIM' && tag(inner) !== '8B64') { inner += 1; continue; }
           const key = tag(inner + 4);
@@ -114,9 +154,18 @@ function layerRecords(view) {
           const body = inner + 8 + (long ? 8 : 4);
           if (key === 'knko') knockout = view[body];
           if (key === 'curv' || key === 'levl') black = blackChannel(data, key, body);
+          // The layer's styles: 'lmfx' (several of one style) over 'lfx2'.
+          if (key === 'lmfx' || (key === 'lfx2' && effectsAt == null)) effectsAt = body;
+          // Advanced Blending's Channels: the channels the layer leaves alone, four bytes each (ag-psd
+          // drops the last of them, so one channel is none).
+          if (key === 'brst') {
+            restricted = [];
+            const size = length(inner + 8, long);
+            for (let k = 0; k + 4 <= size; k += 4) restricted.push(data.getInt32(body + k));
+          }
           inner = body + length(inner + 8, long);
         }
-        out.push({ knockout, channels, black, realApplied });
+        out.push({ knockout, channels, black, realApplied, effectsAt, restricted, maskParameters });
         at = end;
       }
       return out;
@@ -225,16 +274,111 @@ function compositeChannels(view, count) {
 }
 
 /** What the notice says of a file read from a colour mode other than RGB (readConverted). */
-export function convertedNotice(mode, { inks = false } = {}) {
+export function convertedNotice(mode, { inks = false, profile = false } = {}) {
   if (mode === 'Duotone') return 'This Photoshop file is in Duotone colour: it comes in grey, without its inks\' colours.';
+  if (mode === 'Multichannel') return 'This Photoshop file is in Multichannel colour: it has no layers, and its channels come as inks in the colours their Channel Options give them, printed one over another, as Photoshop shows them.';
   if (mode === 'CMYK') {
-    return `This Photoshop file is in CMYK colour: its colours are made RGB as a standard press profile shows them (U.S. Web Coated SWOP), not through the file's own, so they can differ a little from Photoshop's; ${inks ? 'it is flattened on its inks, as Photoshop flattens it' : 'its adjustment layers act on the RGB colours'}.`;
+    const how = profile
+      ? 'its colours are made RGB through the colour profile it carries, as Photoshop shows them'
+      : 'its colours are made RGB as a standard press profile shows them (U.S. Web Coated SWOP), the file carrying none CEditor can read, so they can differ a little from Photoshop\'s';
+    return `This Photoshop file is in CMYK colour: ${how}; ${inks ? 'it is flattened on its inks, as Photoshop flattens it' : 'its adjustment layers act on the RGB colours'}.`;
   }
   return `This Photoshop file is in ${mode} colour: its colours are made RGB plainly, without the file's colour profile, so they can differ a little from Photoshop's own conversion; adjustment layers act on the RGB colours.`;
 }
 
-/** Photoshop's CMYK as stored (255 no ink) to RGB, as a press's colours look (cmykToRgb). */
-const cmyk8 = (c, m, y, k) => cmykToRgb(1 - c / 255, 1 - m / 255, 1 - y / 255, 1 - k / 255);
+/** Stored CMYK (255 no ink) as sRGB, through `convert` (inks 0..1) or the polynomial. */
+const cmyk8 = (c, m, y, k, convert = cmykToRgb) => convert(1 - c / 255, 1 - m / 255, 1 - y / 255, 1 - k / 255);
+
+/** An image resource's bytes (`id`), or null. */
+function imageResource(view, wanted) {
+  try {
+    const data = new DataView(view.buffer, view.byteOffset, view.byteLength);
+    let at = 26;
+    at += 4 + data.getUint32(at);
+    const end = at + 4 + data.getUint32(at);
+    at += 4;
+    while (at + 12 <= end) {
+      if (String.fromCharCode(view[at], view[at + 1], view[at + 2], view[at + 3]) !== '8BIM') return null;
+      const id = data.getUint16(at + 4);
+      const nameLength = view[at + 6];
+      at += 6 + ((nameLength + 2) & ~1);
+      const size = data.getUint32(at);
+      at += 4;
+      if (id === wanted) return view.subarray(at, at + size);
+      at += (size + 1) & ~1;
+    }
+  } catch {
+    // none to read
+  }
+  return null;
+}
+
+/**
+ * A Multichannel file, as Photoshop shows one: no layers (it keeps none), each channel an ink in the
+ * colour its Channel Options give a spot channel (image resource 1077, DisplayInfo), at its solidity,
+ * printed over white one on another; any other channel cyan, magenta, yellow or black by its place.
+ */
+function readMultichannel(view) {
+  const data = new DataView(view.buffer, view.byteOffset, view.byteLength);
+  const count = data.getUint16(12);
+  const read = compositeChannels(view, count);
+  if (!read || !read.planes.length) return null;
+  const inks = [];
+  const info = imageResource(view, 1077);
+  if (info && info.byteLength >= 4) {
+    const d = new DataView(info.buffer, info.byteOffset, info.byteLength);
+    for (let at = 4; at + 13 <= info.byteLength; at += 13) {
+      const space = d.getUint16(at);
+      const c = [0, 1, 2, 3].map((k) => d.getUint16(at + 2 + 2 * k));
+      const solidity = Math.min(100, d.getUint16(at + 10)) / 100;
+      let rgb = null;
+      if (space === 0) rgb = c.slice(0, 3).map((v) => v / 257);
+      else if (space === 2) rgb = cmykToRgb(...c.map((v) => 1 - v / 65535));
+      else if (space === 8) rgb = [0, 1, 2].map(() => 255 * (1 - c[0] / 10000));
+      else if (space === 7) rgb = labToRgb(c[0] / 100, (c[1] > 32767 ? c[1] - 65536 : c[1]) / 100, (c[2] > 32767 ? c[2] - 65536 : c[2]) / 100);
+      // Only a spot channel's colour is an ink's (kind 2); an alpha channel's is the overlay it is shown
+      // with as a selection, so it takes the default ink for its place.
+      inks.push(d.getUint8(at + 12) === 2 && rgb ? { rgb, solidity: solidity || 1 } : null);
+    }
+  }
+  const fallback = [[0, 174, 239], [236, 0, 140], [255, 242, 0], [35, 31, 32]];
+  const n = read.width * read.height;
+  const out = new Uint8ClampedArray(n * 4);
+  for (let i = 0; i < n; i += 1) {
+    const colour = [1, 1, 1];
+    read.planes.forEach((plane, c) => {
+      const ink = inks[c] ?? { rgb: fallback[c % 4], solidity: 1 };
+      const amount = (1 - plane[i] / 255) * ink.solidity;
+      for (let k = 0; k < 3; k += 1) colour[k] *= 1 - amount * (1 - ink.rgb[k] / 255);
+    });
+    out.set([colour[0] * 255, colour[1] * 255, colour[2] * 255, 255], i * 4);
+  }
+  return { width: read.width, height: read.height, channels: count, bitsPerChannel: data.getUint16(22), colorMode: 7, children: [], imageResources: {}, imageData: { width: read.width, height: read.height, data: out } };
+}
+
+/** The ICC profile the file carries (image resource 1039), as bytes, or null. */
+function embeddedProfile(view) {
+  try {
+    const data = new DataView(view.buffer, view.byteOffset, view.byteLength);
+    let at = 26;
+    at += 4 + data.getUint32(at);
+    const end = at + 4 + data.getUint32(at);
+    at += 4;
+    while (at + 12 <= end) {
+      if (String.fromCharCode(view[at], view[at + 1], view[at + 2], view[at + 3]) !== '8BIM') return null;
+      const id = data.getUint16(at + 4);
+      const nameLength = view[at + 6];
+      at += 6 + ((nameLength + 2) & ~1);
+      const size = data.getUint32(at);
+      at += 4;
+      if (id === 1039) return view.subarray(at, at + size);
+      at += (size + 1) & ~1;
+    }
+  } catch {
+    // none to read
+  }
+  return null;
+}
 /** Photoshop's 8-bit Lab (L 0..255 for 0..100, a and b offset by 128) to sRGB. */
 const lab8 = (l, a, b) => labToRgb((l * 100) / 255, a - 128, b - 128);
 
@@ -245,6 +389,7 @@ const lab8 = (l, a, b) => labToRgb((l * 100) / 255, a - 128, b - 128);
  * its id given to the first colour, the others' set aside. `{ psd, mode }` or null.
  */
 function readConverted(view, mode, composite) {
+  if (mode === 7) return readMultichannel(view);
   const records = layerRecords(view);
   if (!records) return null;
   const parse = (relabel, as) => {
@@ -286,7 +431,11 @@ function readConverted(view, mode, composite) {
     return finishConverted(psd, view, composite, 3, (p) => lab8(p[0], p[1], p[2]));
   }
   if (mode === 4) {
+    // Through the file's own profile where it carries one this reads (as Photoshop shows it).
+    const profile = iccCmykToRgb(embeddedProfile(view));
+    const convert = profile ?? cmykToRgb;
     const psd = parse((id) => (id === 3 ? aside(3) : id), 3);
+    if (profile) psd.cmykProfile = profile;
     const black = parse((id) => (id === 3 ? 0 : id >= 0 && id <= 2 ? aside(id) : id), 3);
     const inks = [];
     walkPictures(black.children, (data) => inks.push(data));
@@ -296,9 +445,9 @@ function readConverted(view, mode, composite) {
       // The inks as stored (255 no ink) kept beside the colours: cyan, magenta and yellow in one
       // picture, black in another, for the panel flattening to work on the inks as Photoshop does.
       layer.inkPlanes = { cmy: Uint8ClampedArray.from(data), k: k ? Uint8ClampedArray.from(k) : null };
-      for (let i = 0; i < data.length; i += 4) data.set(cmyk8(data[i], data[i + 1], data[i + 2], k ? k[i] : 255).map(Math.round), i);
+      for (let i = 0; i < data.length; i += 4) data.set(cmyk8(data[i], data[i + 1], data[i + 2], k ? k[i] : 255, convert).map(Math.round), i);
     });
-    return finishConverted(psd, view, composite, 4, (p) => cmyk8(p[0], p[1], p[2], p[3]));
+    return finishConverted(psd, view, composite, 4, (p) => cmyk8(p[0], p[1], p[2], p[3], convert));
   }
   return null;
 }
@@ -309,6 +458,52 @@ function walkPictures(layers, visit) {
     if (layer.imageData?.data instanceof Uint8ClampedArray || layer.imageData?.data instanceof Uint8Array) visit(layer.imageData.data, layer);
     walkPictures(layer.children, visit);
   }
+}
+
+/**
+ * The file's picture of itself, where it keeps more channels than its colours: the first is its
+ * transparency (matted against white) where Photoshop says so, by a negative layer count or by naming
+ * it Transparency, or where the file names no channels at all (other programs' files); one Photoshop
+ * names otherwise is an alpha channel (a saved selection, colormodes/4x4_8bit_rgba.psd's "Alpha 1"),
+ * not part of the picture. ag-psd takes the first as transparency either way, and puts any after it
+ * into the next pixel's colour, so the picture is read again here.
+ */
+function extraChannels(psd, view, colours) {
+  const channels = Number(psd.channels ?? colours);
+  if (!(channels > colours) || !psd.imageData) return;
+  const read = compositeChannels(view, channels);
+  if (!read || read.planes.length < colours) return;
+  const names = psd.imageResources?.alphaChannelNames;
+  const ids = psd.imageResources?.alphaIdentifiers;
+  let merged = !Array.isArray(names) || !names.length || /^transparency$/i.test(String(names[0]).trim()) || ids?.[0] === 0;
+  try {
+    const data = new DataView(view.buffer, view.byteOffset, view.byteLength);
+    const large = data.getUint16(4) === 2;
+    let at = 26;
+    at += 4 + data.getUint32(at);
+    at += 4 + data.getUint32(at);
+    const sectionLength = large ? Number(data.getBigUint64(at)) : data.getUint32(at);
+    at += large ? 8 : 4;
+    const infoLength = sectionLength > 0 ? (large ? Number(data.getBigUint64(at)) : data.getUint32(at)) : 0;
+    at += large ? 8 : 4;
+    if (infoLength > 0 && data.getInt16(at) < 0) merged = true;
+  } catch {
+    // (the names decide)
+  }
+  const n = read.width * read.height;
+  const out = new Uint8ClampedArray(n * 4);
+  const alpha = merged ? read.planes[colours] : null;
+  for (let i = 0; i < n; i += 1) {
+    const a = alpha ? alpha[i] : 255;
+    for (let c = 0; c < 3; c += 1) {
+      let v = read.planes[colours === 1 ? 0 : c][i];
+      // Matted against white where partly transparent.
+      if (a > 0 && a < 255) v = (v - 255 * (1 - a / 255)) / (a / 255);
+      out[i * 4 + c] = v;
+    }
+    out[i * 4 + 3] = a;
+  }
+  psd.imageData = { width: read.width, height: read.height, data: out };
 }
 
 /** A converted file's picture of itself, read here, where it is wanted. */
@@ -374,6 +569,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
     }
     return { ok: false, error: `This is not a Photoshop file CEditor can read (${error?.message ?? error}).` };
   }
+  if (composite && !converted && (fileMode === 3 || fileMode === 1)) extraChannels(psd, view, fileMode === 3 ? 3 : 1);
   // Each knockout's level, where the records and ag-psd's layers line up one for one.
   const records = layerRecords(view);
   const order = recordOrder(psd.children);
@@ -382,17 +578,51 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
       if (layer && records[i].knockout) layer.knockoutLevel = records[i].knockout;
       if (layer?.adjustment && records[i].black && converted === 'CMYK') layer.adjustment.black = records[i].black;
       if (layer?.mask && records[i].realApplied && layer.realMask?.imageData) layer.mask.real = layer.realMask;
+      if (layer && records[i].restricted) layer.channelBlendingRestrictions = records[i].restricted;
+      if (layer?.mask && records[i].maskParameters) {
+        for (const [key, value] of Object.entries(records[i].maskParameters)) if (layer.mask[key] == null && Number.isFinite(value)) layer.mask[key] = value;
+      }
+      // Styles ag-psd could not read from the descriptor (it keeps the legacy block, without `scale`).
+      if (layer && records[i].effectsAt != null && !(layer.effects && 'scale' in layer.effects)) {
+        const effects = readEffectsBlock(new DataView(view.buffer, view.byteOffset, view.byteLength), records[i].effectsAt);
+        if (effects) layer.effects = effects;
+      }
     });
   }
   if (psd.bitsPerChannel && psd.bitsPerChannel !== 8 && !converted) {
     eightBitLayers(psd.children);
     if (psd.imageData) psd.imageData = eightBit(psd.imageData);
+    if (psd.bitsPerChannel === 32) linearColours(psd.children);
   }
+  globalLight(psd);
   // (A converted file's patterns are in its own colours, not RGB.)
   if (!converted) attachPatterns(psd);
   // The file's own colour mode: a Grayscale or Duotone file's adjustments work on its one channel.
   psd.grey = fileMode === 1 || fileMode === 8;
   return { ok: true, psd, ...(converted ? { converted } : {}) };
+}
+
+/**
+ * A style set to Use Global Light takes the document's light, whatever angle it kept from when it was
+ * made: Photoshop draws it so.
+ */
+function globalLight(psd) {
+  const angle = psd.imageResources?.globalAngle;
+  const altitude = psd.imageResources?.globalAltitude;
+  if (angle == null && altitude == null) return;
+  const walk = (layers) => {
+    for (const layer of layers ?? []) {
+      for (const value of Object.values(layer.effects ?? {})) {
+        for (const effect of Array.isArray(value) ? value : [value]) {
+          if (!effect || typeof effect !== 'object' || !effect.useGlobalLight) continue;
+          if (angle != null && 'angle' in effect) effect.angle = angle;
+          if (altitude != null && 'altitude' in effect) effect.altitude = altitude;
+        }
+      }
+      walk(layer.children);
+    }
+  };
+  walk(psd.children);
 }
 
 /**

@@ -17,8 +17,8 @@ function solid(name, left, top, w, h, rgba, extra = {}) {
 }
 
 function flatten(layers, width = 4, height = 1, options) {
-  const { pixels, painted, notDrawn, closeTo, dissolve } = compositePsd(layers, width, height, options);
-  return { at: (x, y = 0) => [...pixels.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)], pixels, painted, notDrawn, closeTo, dissolve };
+  const { pixels, painted, notDrawn, closeTo, styles, dissolve } = compositePsd(layers, width, height, options);
+  return { at: (x, y = 0) => [...pixels.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)], pixels, painted, notDrawn, closeTo, styles, dissolve };
 }
 
 const grey = (v) => [v, v, v, 255];
@@ -239,7 +239,8 @@ test('given the styles, a drop shadow is cast under the layer and a stroke drawn
   near(out.at(10, 10), grey(0), 'the shadow beside it');
   near(out.at(1, 1), grey(255), 'nothing where it does not fall');
   assert.deepEqual(out.notDrawn.effects, []);
-  assert.ok(out.closeTo.styles.includes('Drop Shadow'));
+  assert.ok(out.styles.includes('Drop Shadow'));
+  assert.deepEqual(out.closeTo.styles, [], 'drawn as Photoshop draws it, so not reported');
   // At Fill 0 the layer is gone and its shadow is still hidden under it (Layer Knocks Out Drop Shadow).
   const empty = flatten([solid('bg', 0, 0, 16, 16, grey(255)), { ...square, fillOpacity: 0 }], 16, 16, { styles: LAYER_STYLES });
   near(empty.at(5, 5), grey(255), 'knocked out under the layer');

@@ -214,16 +214,62 @@ No import hangs, throws or makes bad output: the SVG and Photoshop files' 7,161 
 import went from 290 to 293 of 316 (pattern fills drawn). CI run 539 (commit `3d5c837`) passed in all
 four jobs.
 
+## The fifth pass: the "close" made exact where Photoshop's pictures say how
+
+Each item was fitted to, or checked against, Photoshop's own picture of psd-tools' test files (the
+composite a file carries), one setting at a time where a file isolates it; psd-tools (MIT) supplied
+the readings it has already pinned against Photoshop, credited where they are used.
+
+| Left after the fourth pass | Now |
+|---|---|
+| Hue/Saturation's colour ranges and the current Brightness/Contrast, fitted | psd-tools' models: Hue/Saturation through its measured saturation table, ranges weighted and lightness worked as Photoshop does; Brightness/Contrast as an S through Curves' spline with a fitted bend. Their files from 3-17 % off to under 1 % |
+| Layer styles' contours close | Measured on layer_effects.psd, one style a layer on a flat ground: a Drop Shadow, an Inner Shadow and both Glows are the shape blurred by a Gaussian whose deviation is 0.42 of the Size, cut off at the Size (a glow's faint far end stops there, layer_params.psd), at 8 bits; a glow's Range divides it, so at 50 % it is full on the edge; Satin is two copies moved the Distance each way, blurred alike, their difference; Bevel and Emboss are that blur as a height, the Size times the Depth high, lit Lambert-fashion, highlight and shadow measured from the flat's light (an Emboss at half the Size, both sides). Contours through Curves' spline, Spread and Choke, Use Global Light, a gradient glow's opacity from its gradient. A Stroke as psd-tools splits it: its part inside the layer over it, its part outside under it in its own mode. Styles see a layer's pixels past the canvas. layer_effects.psd from 11 % off to 0.2 %, every style under 2 % |
+| Hard Mix and Vivid Light at the edges | psd-tools' readings of Photoshop's extremes and ties: both exact |
+| Mask feather; mask parameters ag-psd reads in part | A Feather is a Gaussian of that deviation (layer_mask_data.psd). Density and Feather read from the layer record where ag-psd leaves them out (mask-parameters-no-real-channel.psd, 84 % off to 0); a shape's vector mask below full Density or feathered shows its fill faintly over the whole canvas; a user mask kept apart from the vector mask multiplies the path, each at its own Density (mask-density-layervectormask.psd, 17 % to 0) |
+| Blend If not read | Drawn from Photoshop's description (no file in the corpora uses it, so it is pinned by a test, not a picture); Advanced Blending's Channels read and drawn (ag-psd drops a lone restricted channel) |
+| CMYK through a fit of the default profile; Multichannel not read | Through the file's own ICC profile (version 2 lookup tables, as Photoshop's CMYK profiles are), Relative Colorimetric with Black Point Compensation as LittleCMS finds a CMYK profile's black point: against the pictures Photoshop exported beside psd-tools' CMYK files, 0.1-0.15 of a level off on average, where the fit was 4-5. A Threshold's black in CMYK is the black ink alone (threshold_cmyk.psd, 64 % to 6). A Multichannel file is read as its channels' inks overprinted, which no picture in the corpora checks |
+| Found on the way | ag-psd drops a style block it cannot read (string enums in lfx2), so those files had no styles at all: read here. A Bevel's style (Outer, Emboss, Pillow) and technique were not read, and its Depth was a hundredth (also in components). Gradient offsets were a hundredth of their size. A Divide or Color Dodge over a backdrop left at 1e-6 by float arithmetic dodged to white. A 32-bit file's setting colours are in linear light (vector-mask.psd, 29 % to 0.8). A flattened file's extra channel is its transparency only where Photoshop says so (an "Alpha 1" selection made a file wholly transparent). Artboards that are Pass Through drew no background (45 % to 0). A pattern linked with its layer starts at the layer's reference point (Pattern Overlay 23 % to 0.1). Interior styles took a layer's edge coverage twice |
+
+**Measured: the panel flattening against Photoshop's own picture of the file**, as before (281 files):
+
+| | Fourth pass | Fifth pass |
+|---|---|---|
+| Under 1 % | 212 | 245 |
+| Over 5 % | 60 | 17 |
+| Over 20 % | 34 | 9 |
+
+Fifty-five files came closer and three moved the other way: the 4 by 4 pixel 16-bit files whose
+Reflected gradient, with no pixels saved, Photoshop snaps to the pixel grid at that size.
+
+**Measured: as components in the editor**, the fourth pass's commit and this one in the same browser
+at the same size (under 1 % / 1-5 % / 5-20 % / over 20 % of pixels visibly off):
+
+| Corpus | Fourth pass | Fifth pass |
+|---|---|---|
+| Photoshop, as a component on a white panel (139) | 75 / 8 / 16 / 40 | 81 / 11 / 12 / 35 |
+
+None worse by more than 2 points. The largest moves: a grayscale Curves file and a file of gradient
+styles from wholly off to exact, strokes from 15-23 % to under 1 %, a vector mask from 22 % to 3 %.
+(A component's own vector layers draw gradients and strokes with the editor's renderer, so the
+flattening's styles reach a component only where they are drawn into a picture.)
+
+No import hangs, throws or makes bad output: the Photoshop files' 948 imports, the Multichannel file
+now among those that import.
+
 ## Left, and why
 
 - **An SVG filter that is lighting, turbulence or displacement**, or colours in SVG's default
   linearRGB, is a picture of its element, drawn right, edited as one.
-- **CMYK through the file's own profile**: colours go through a fit of the default press profile,
-  so a file made for another press differs a little. A Lab file is converted plainly; a Multichannel
-  file is not read.
-- **Hue/Saturation's colour ranges** and the current Brightness/Contrast are close, not exact: Photoshop
-  publishes neither formula, and both were fitted to its pictures.
-- **Layer styles' exact contours** (a shadow's or bevel's), and Dissolve's random grain, are close.
-- **Photoshop's other remaining differences** against its own pictures are in blend modes it draws
-  its own way at the edges (Hard Mix, Vivid Light), masks whose parameters ag-psd reads in part
-  (feather), and blending options CEditor does not read (Blend If).
+- **A Lab file** is converted plainly, and a CMYK file with a version 4 profile (or none) through the
+  fit of the default press profile. A Multichannel file's display is Photoshop's model of inks, not
+  checked against a picture of one.
+- **Parts of layer styles not measured**: a Chisel bevel, Soften, a Gloss Contour, a Precise glow, a
+  Noise gradient (its average colour) are drawn by the same readings and named in the Console; a
+  style's Noise and Jitter and a bevel's Texture are not drawn. A bevel far larger than its shape
+  (layer_comps.psd, Size 100 on a face 160 px across) shades differently from the fitted one.
+- **Dissolve's grain** is random in Photoshop; its density is matched, its pixels cannot be.
+- **The rest of the flattening's differences**: a Color Lookup without its table in the file
+  (fill_adjustments.psd), a Lighter Color layer's half-transparent edge pixels in a Pass Through
+  group below full Fill (4 %), a group's stroke reaching past the canvas (its layers are drawn on the
+  canvas only), type layers whose gradient stroke Photoshop lays over a box of its own, and the
+  tiny files above.

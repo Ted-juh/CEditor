@@ -118,8 +118,9 @@ pdf.js reads it, where it took the editor's page down with it: no program writes
   group's.
 
 The flattening follows Photoshop's own rules. It draws every blend mode, Opacity and Fill (a
-group's too), layer masks and vector masks (with their density; Reveal All and Hide All), clipping
-masks, knockout, and groups the way Photoshop does: a Pass Through group paints its layers straight
+group's too), layer masks and vector masks (with their Density and Feather; Reveal All and Hide All),
+clipping masks, knockout, Advanced Blending's Channels (a channel left unticked keeps what was below)
+and Blend If, and groups the way Photoshop does: a Pass Through group paints its layers straight
 onto what is below (its opacity and mask saying how far what is below goes toward that), and a group
 in any other mode, or a Pass Through one below 100% Fill, is put together first and then blended in
 as one layer. A knockout layer or group (Blending Options › Knockout) cuts through what is under it
@@ -129,20 +130,29 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
 
 - **Fill layers** saved without pixels (a shape, a Color, Gradient or Pattern Fill) are drawn from
   their fill and their vector mask: a pattern tiled from the document's corner, from the patterns
-  the file keeps.
+  the file keeps. A shape whose vector mask is below full Density, or feathered, shows its fill
+  faintly past its path, over the whole canvas, as Photoshop shows it.
 - **Adjustment layers** change everything under them in their group (or the layer they are clipped
   to), by their opacity, masks and blend mode: Levels, Curves, Exposure, Invert, Posterize,
   Threshold, Channel Mixer, Gradient Map and legacy Brightness/Contrast exactly; Brightness/Contrast,
   Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter and Selective Color closely;
   Color Lookup from the table the layer carries.
-- **Layer styles** are drawn: Drop Shadow and Outer Glow cast under the layer, the overlays, Satin,
-  Inner Glow, Inner Shadow, Bevel and Stroke into it, "Blend Interior Effects as Group" honoured.
-  Close to Photoshop's, not its exact contours.
+- **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures:
+  Drop Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights
+  around it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part
+  inside the layer over it, and its part outside under it, in its own blend mode. A shadow or glow
+  is the shape blurred over its Size and no further; a bevel is that blur lit from its angle and
+  altitude; their Spread, Choke, Range and contours, Use Global Light and "Blend Interior Effects as
+  Group" are honoured. Drawn only close, and named in the Console: a Chisel bevel, Soften, a
+  bevel's Gloss Contour, a Precise glow, and a Noise gradient (its average colour); a style's Noise
+  and a bevel's Texture are not drawn.
 - **Dissolve** is drawn with a grain of its own, as dense as Photoshop's. Photoshop's is random, so
   the pixels differ.
 - **A CMYK file** is flattened on its inks, as Photoshop flattens it, where every adjustment in it
   works ink by ink (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast);
-  with one that works on whole colours (Hue/Saturation, Threshold, ...) it is flattened in RGB.
+  with one that works on whole colours (Hue/Saturation, Threshold, ...) it is flattened in RGB, a
+  Threshold's black then the black ink alone. Its colours are made RGB through the colour profile
+  the file carries, as Photoshop shows them (Relative Colorimetric, Black Point Compensation).
 
 What is only close, and what is not applied (a Color Lookup through an ICC profile), is named in the
 Console. The fix for exact pixels is Photoshop's own: rasterize or merge that layer before importing.
@@ -194,7 +204,7 @@ parts are named by its top-level layers, and the notice lists them.
   mask and a vector mask are the layer's own mask, kept off if Photoshop had them off. Drop Shadow
   and Outer Glow are the layer's shadows (a picture casts them from its pixels); on a shape layer,
   Color and Gradient Overlay, Stroke, Inner Shadow, Inner Glow and Bevel become its own settings; on a
-  picture they are drawn into it, with Satin, close to Photoshop's. Adjustment layers (Levels, Curves,
+  picture they are drawn into it, with Satin, as the panel flattening draws them (above). Adjustment layers (Levels, Curves,
   Exposure, Invert, Posterize, Threshold, Channel Mixer, Gradient Map exactly; Brightness/Contrast,
   Hue/Saturation with its colour ranges, Vibrance, Color Balance, Black & White, Photo Filter, Selective Color closely; Color
   Lookup from the .cube, .3dl or .look table the layer carries) are applied to every layer under
@@ -240,18 +250,20 @@ The control is wired from what was found: a dial, a fader, a switch, or a button
 layer is called button. With nothing named to move it is layers only. Not `cap`: a cap's highlight
 would swing round with it; name a cap that should turn `rotor`.
 
-A Photoshop file saved in 16 or 32 bits a channel is read as 8 (a 32-bit file's colour from the
-linear light Photoshop works it in); one of a single Background layer, which has no layers, only the
-picture of the whole file, comes in as that one picture layer. A file in CMYK colour is read, its
-colours made RGB as a standard press profile shows them (U.S. Web Coated SWOP, Photoshop's default;
-not the file's own profile, so a little apart from Photoshop's conversion of a file with another);
-a panel's background is flattened on its inks (above), a component's adjustment layers act on the
-RGB colours. A Lab file is read the same way, its colours made RGB plainly. The notice says so; a Duotone file
-comes in grey, and an Indexed Color one through its palette. A Multichannel file is not read, and the
-notice says to convert it to RGB (Image › Mode › RGB Color).
+A Photoshop file saved in 16 or 32 bits a channel is read as 8 (a 32-bit file's colours, its
+pixels' and its settings', from the linear light Photoshop works it in); one of a single Background
+layer, which has no layers, only the picture of the whole file, comes in as that one picture layer,
+an alpha channel saved beside it (a selection) left out of it. A file in CMYK colour is read, its
+colours made RGB through the colour profile it carries, as Photoshop shows them (a version 2
+profile, as Photoshop's own are; without one it can read, as U.S. Web Coated SWOP, Photoshop's
+default, shows them); a panel's background is flattened on its inks (above), a component's
+adjustment layers act on the RGB colours. A Lab file is read the same way, its colours made RGB
+plainly. The notice says so; a Duotone file comes in grey, an Indexed Color one through its palette,
+and a Multichannel one, which has no layers, as its channels printed one over another in their inks'
+colours (a spot channel's own, any other cyan, magenta, yellow or black by its place).
 
-Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
-approximate adjustments, a Dissolve grain), Color Lookup through an ICC profile (not applied),
+Listed in the Console: what was drawn close to rather than exactly (the parts of a style named
+above, the approximate adjustments, a Dissolve grain), Color Lookup through an ICC profile (not applied),
 references to anything not in the file, the SVG filters read as a layer's own blur, shadows or
 colour filters, and the SVG elements drawn as pictures of themselves (for any other filter, or a
 group's blend mode).

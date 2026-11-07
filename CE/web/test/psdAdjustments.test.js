@@ -136,15 +136,15 @@ test('Brightness/Contrast: Legacy exactly as Photoshop draws it; the current one
   for (const [v, want] of [[4, 13], [124, 102], [184, 146]]) assert.ok(Math.abs(at(legacyDown, v) - want) <= 1, `legacy, contrast down: ${v} → ${at(legacyDown, v)}, not ${want}`);
   const legacyUp = { brightness: 20, contrast: 57, useLegacy: true };
   for (const [v, want] of [[72, 46], [108, 129], [144, 213]]) assert.ok(Math.abs(at(legacyUp, v) - want) <= 1.5, `legacy, contrast up: ${v} → ${at(legacyUp, v)}, not ${want}`);
-  // The current one (brightnesscontrast_rgb.psd): a fitted curve, 7 levels off on average over the
-  // whole range and never more than 25 at these points (the old guess was 30 off on average).
+  // The current one (brightnesscontrast_rgb.psd): psd-tools' model, 3.5 levels off on average over
+  // the whole range (the first guess was 30 off, the curve fitted here after it 7).
   const current = [
     [{ brightness: -31, contrast: 47 }, [[64, 42], [128, 99], [192, 171]]],
     [{ brightness: 23, contrast: 70 }, [[64, 57], [128, 157], [192, 229]]],
     [{ brightness: 150, contrast: -21 }, [[64, 158], [128, 236], [224, 254]]],
   ];
   for (const [adjustment, points] of current) {
-    for (const [v, want] of points) assert.ok(Math.abs(at(adjustment, v) - want) <= 25, `${JSON.stringify(adjustment)}: ${v} → ${at(adjustment, v)}, not ${want}`);
+    for (const [v, want] of points) assert.ok(Math.abs(at(adjustment, v) - want) <= 12, `${JSON.stringify(adjustment)}: ${v} → ${at(adjustment, v)}, not ${want}`);
   }
   // Black and white stay put, as in Photoshop.
   assert.equal(at({ brightness: 40, contrast: 30 }, 0), 0);

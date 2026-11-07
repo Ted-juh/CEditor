@@ -219,18 +219,29 @@ test('Photoshop, as a component: a knockout inside a group makes it one picture;
   assert.equal(panel.at(6, 1)[3], 255, 'whole beside it');
 });
 
-test('Photoshop: a colour mode CEditor cannot read is named, with how to convert it', () => {
-  const bytes = writePsdUint8Array({ width: 4, height: 4, children: [solid('a', 4, 4, [10, 20, 30, 255])] }, { generateThumbnail: false });
-  // Multichannel: separate inks with no colour of their own (CMYK, Lab and Duotone are read: below).
-  for (const [mode, name] of [[7, 'Multichannel']]) {
-    const copy = bytes.slice();
-    copy[24] = 0; copy[25] = mode;
-    const read = readPhotoshop(copy);
-    assert.equal(read.ok, false);
-    assert.match(read.error, new RegExp(`in ${name} colour.*Image › Mode › RGB Color`));
-    assert.equal(planPsdComponentImport(copy).error, read.error);
-    assert.equal(planPsdPanelImport(copy).error, read.error);
-  }
+test('Photoshop: a Multichannel file comes in as its inks overprinted; a mode no Photoshop writes is refused', () => {
+  // Its picture of itself, one channel at full ink (0) and two with none: without spot colours of its
+  // own, the channels are cyan, magenta and yellow in turn, so it is cyan.
+  const data = new Uint8ClampedArray(4 * 4 * 4).map((_, i) => [0, 255, 255, 255][i % 4]);
+  const bytes = writePsdUint8Array({ width: 4, height: 4, imageData: { width: 4, height: 4, data } }, { generateThumbnail: false });
+  const copy = bytes.slice();
+  copy[24] = 0; copy[25] = 7;
+  const read = readPhotoshop(copy, { composite: true });
+  assert.equal(read.ok, true, read.error);
+  assert.equal(read.converted, 'Multichannel');
+  assert.deepEqual(read.psd.children, []);
+  assert.deepEqual([...read.psd.imageData.data.slice(0, 4)], [0, 174, 239, 255]);
+  const plan = planPsdComponentImport(copy, { fileName: 'inks.psd' });
+  assert.equal(plan.ok, true, plan.error);
+  assert.ok(plan.warnings.some((line) => /Multichannel colour: it has no layers.*inks/.test(line)), plan.warnings.join(' | '));
+  assert.deepEqual(decodePng(fillOf(parts(plan).Background).imageSrc).at(0, 0), [0, 174, 239, 255]);
+
+  const odd = bytes.slice();
+  odd[24] = 0; odd[25] = 6;
+  const refused = readPhotoshop(odd);
+  assert.equal(refused.ok, false);
+  assert.match(refused.error, /not a Photoshop file CEditor can read/);
+  assert.equal(planPsdPanelImport(odd).error, refused.error);
 });
 
 test('Photoshop: a file of one Background layer (no layers, only its picture) comes in as that one layer', () => {
@@ -802,4 +813,22 @@ test('SVG colour filters and CSS filter functions become the layer\'s own Filter
   assert.equal(filters('css').sepia, 50);
   assert.equal(fillOf(parts(plan).faded).imageEnabled, true, 'a CSS filter the layer has not: a picture, as the browser draws it');
   assert.ok(plan.warnings.some((line) => /colour filters.*dull, css/.test(line)), plan.warnings.join(' | '));
+});
+
+test('Photoshop: a style set to Use Global Light takes the document\'s light; one restricted channel is kept', () => {
+  const data = new Uint8ClampedArray(2 * 2 * 4).fill(255);
+  const bytes = writePsdUint8Array({
+    width: 2, height: 2, imageResources: { globalAngle: 30, globalAltitude: 45 },
+    children: [{ name: 'lit', left: 0, top: 0, right: 2, bottom: 2, imageData: { width: 2, height: 2, data }, channelBlendingRestrictions: [2],
+      effects: { dropShadow: [{ enabled: true, useGlobalLight: true, angle: 120, distance: { units: 'Pixels', value: 3 }, size: { units: 'Pixels', value: 3 } }],
+        bevel: { enabled: true, useGlobalLight: true, angle: 120, altitude: 30, size: { units: 'Pixels', value: 3 } } } }],
+  }, { generateThumbnail: false });
+  const read = readPhotoshop(bytes);
+  assert.equal(read.ok, true, read.error);
+  const [layer] = read.psd.children;
+  assert.equal(layer.effects.dropShadow[0].angle, 30);
+  assert.equal(layer.effects.bevel.angle, 30);
+  assert.equal(layer.effects.bevel.altitude, 45);
+  // ag-psd's own reading drops the last restricted channel, so one is none.
+  assert.deepEqual(layer.channelBlendingRestrictions, [2]);
 });

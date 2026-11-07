@@ -30,6 +30,15 @@ export function cmykToRgb(c, m, y, k) {
   ].map(clamp);
 }
 
+// A CMYK file's own profile, while its colours are worked (utils/iccProfile.js), else the polynomial.
+let cmykProfile = null;
+/** Use `convert` ((c, m, y, k) inks 0..1 → sRGB) for CMYK colours until set back; returns the previous. */
+export function useCmykProfile(convert) {
+  const previous = cmykProfile;
+  cmykProfile = convert ?? null;
+  return previous;
+}
+
 // While a CMYK file is flattened on its inks (utils/psdComposite.js compositeInks), colours are its
 // stored inks (255 no ink): cyan, magenta and yellow for 'cmy', black for 'k'.
 let inkPlane = null;
@@ -73,6 +82,14 @@ const fromOklab = ([L, A, B]) => {
  * Perceptual in Oklab. `[r, g, b, a]`, colours 0..255, a 0..1.
  */
 export function gradientRamp(content) {
+  if (content?.type === 'noise') {
+    // A Noise gradient is Photoshop's random one, from its seed: not drawn as Photoshop draws it, but
+    // in the middle of the ranges it was allowed (its average colour), and reported so.
+    const mid = (k) => ((Number(content.min?.[k] ?? 0) + Number(content.max?.[k] ?? 1)) / 2) * 255;
+    const rgb = content.colorModel === 'rgb' || !content.colorModel ? [mid(0), mid(1), mid(2)] : [128, 128, 128];
+    const alpha = content.addTransparency ? 0.5 : 1;
+    return () => [...rgb, alpha];
+  }
   const colourStops = [...(content?.colorStops ?? [])].sort((a, b) => a.location - b.location);
   const opacityStops = [...(content?.opacityStops ?? [])].sort((a, b) => a.location - b.location);
   const scale = stopScale(colourStops, opacityStops);
@@ -115,7 +132,7 @@ export function psdRgb(color) {
   if (!color || typeof color !== 'object') return [0, 0, 0];
   if (Number.isFinite(color.r)) return [color.r, color.g, color.b];
   if (Number.isFinite(color.fr)) return [color.fr * 255, color.fg * 255, color.fb * 255];
-  if (Number.isFinite(color.k) && Number.isFinite(color.c)) return cmykToRgb(color.c / 100, color.m / 100, color.y / 100, color.k / 100);
+  if (Number.isFinite(color.k) && Number.isFinite(color.c)) return (cmykProfile ?? cmykToRgb)(color.c / 100, color.m / 100, color.y / 100, color.k / 100);
   // A grey given as its ink (0 white, 100 black).
   if (Number.isFinite(color.k)) return [0, 1, 2].map(() => 255 * (1 - color.k / 100));
   if (Number.isFinite(color.h)) return hsbToRgb(color.h, color.s / 100, color.b / 100);
@@ -259,6 +276,18 @@ function curveTable(points) {
     table[v] = clamp(y);
   }
   return table;
+}
+
+/**
+ * A layer style's contour ({ curve: [{ x, y }] } on 0..255, as ag-psd gives one) as a table from 0..255
+ * to 0..255, through the spline Curves uses; null for Linear, which leaves the style as it is.
+ */
+export function contourTable(contour) {
+  const curve = contour?.curve;
+  if (!Array.isArray(curve) || curve.length < 2) return null;
+  const linear = curve.length === 2 && curve.every((p) => Math.abs(Number(p.x) - Number(p.y)) < 0.5);
+  if (linear) return null;
+  return curveTable(curve.map((p) => ({ input: Number(p.x) || 0, output: Number(p.y) || 0 })));
 }
 
 const SELECTIVE_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks'];
@@ -419,11 +448,131 @@ function colourLookup(lut) {
   };
 }
 
+
+// How two colour ranges' saturations add up in Photoshop's Hue/Saturation: a table psd-tools measured
+// on a grid of -100..100 in tens (MIT, psd_tools/composite/adjustments.py), read here reversed on both
+// axes as it reads it, and between its points by straight lines.
+const SATURATION_GRID = [
+  [100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100,100],
+  [100, 94, 92, 91, 91, 90, 90, 90, 90, 90, 90, 89, 89, 89, 89, 89, 89, 89, 88, 88, 88],
+  [100, 92, 89, 86, 84, 83, 82, 81, 81, 80, 80, 79, 79, 78, 78, 77, 77, 76, 76, 75, 74],
+  [100, 91, 86, 82, 79, 77, 74, 73, 71, 70, 70, 68, 67, 66, 65, 64, 62, 61, 59, 58, 56],
+  [100, 91, 84, 79, 75, 71, 68, 65, 63, 61, 60, 58, 56, 54, 52, 49, 47, 44, 41, 36, 32],
+  [100, 90, 83, 77, 71, 66, 62, 59, 55, 52, 50, 47, 44, 41, 37, 33, 28, 22, 17,  9, -1],
+  [100, 90, 82, 74, 68, 62, 57, 52, 47, 43, 40, 36, 31, 26, 21, 13,  5, -5,-15,-25,-35],
+  [100, 90, 81, 73, 65, 59, 52, 46, 39, 35, 30, 24, 19, 11,  2, -8,-18,-28,-38,-48,-58],
+  [100, 90, 81, 71, 63, 55, 47, 39, 33, 26, 20, 13,  4, -6,-16,-26,-36,-46,-56,-66,-76],
+  [100, 90, 80, 70, 61, 52, 43, 35, 26, 17, 10,  1, -9,-19,-29,-39,-49,-59,-69,-79,-89],
+  [100, 90, 80, 70, 60, 50, 40, 30, 20, 10,  0,-10,-20,-30,-40,-49,-60,-70,-80,-90,-100],
+  [100, 89, 79, 68, 58, 47, 36, 24, 13,  1,-10,-19,-30,-40,-50,-60,-70,-79,-89,-99,-100],
+  [100, 89, 79, 67, 56, 44, 31, 19,  4, -9,-20,-30,-40,-50,-60,-70,-79,-90,-99,-100,-100],
+  [100, 89, 78, 66, 54, 41, 26, 11, -6,-19,-30,-40,-50,-59,-70,-79,-89,-99,-100,-100,-100],
+  [100, 89, 78, 65, 52, 37, 21,  2,-16,-29,-40,-50,-60,-70,-79,-90,-99,-100,-100,-100,-100],
+  [100, 89, 77, 64, 49, 33, 13, -8,-26,-39,-49,-60,-70,-79,-90,-99,-100,-100,-100,-100,-100],
+  [100, 89, 77, 62, 47, 28,  5,-18,-36,-49,-60,-70,-79,-89,-99,-100,-100,-100,-100,-100,-100],
+  [100, 89, 76, 61, 44, 22, -5,-28,-46,-59,-70,-79,-90,-99,-100,-100,-100,-100,-100,-100,-100],
+  [100, 88, 76, 59, 41, 17,-15,-38,-56,-69,-80,-89,-99,-100,-100,-100,-100,-100,-100,-100,-100],
+  [100, 88, 75, 58, 36,  9,-25,-48,-66,-79,-90,-99,-100,-100,-100,-100,-100,-100,-100,-100,-100],
+  [100, 88, 74, 56, 32, -1,-35,-58,-76,-89,-100,-100,-100,-100,-100,-100,-100,-100,-100,-100,-100],
+].reverse().map((row) => row.slice().reverse().map((v) => v / 100));
+function addSaturations(x, y) {
+  const at = (v) => Math.max(0, Math.min(19.999, (Math.max(-1, Math.min(1, v)) + 1) * 10));
+  const fx = at(x); const fy = at(y);
+  const i = Math.floor(fx); const j = Math.floor(fy);
+  const u = fx - i; const v = fy - j;
+  const g = SATURATION_GRID;
+  return (g[i][j] * (1 - u) + g[i + 1][j] * u) * (1 - v) + (g[i][j + 1] * (1 - u) + g[i + 1][j + 1] * u) * v;
+}
+const rgbToHslUnit = (r, g, b) => {
+  const max = Math.max(r, g, b); const min = Math.min(r, g, b); const d = max - min; const l = (max + min) / 2;
+  if (d <= 1e-9) return [0, 0, l];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  let h;
+  if (max === r) h = (((g - b) / d) % 6 + 6) % 6; else if (max === g) h = (b - r) / d + 2; else h = (r - g) / d + 4;
+  return [h / 6, s, l];
+};
+const hslUnitToRgb = (h, s, l) => {
+  const c = (1 - Math.abs(2 * l - 1)) * s; const hh = (((h % 1) + 1) % 1) * 6; const x = c * (1 - Math.abs((hh % 2) - 1));
+  const [r, g, b] = hh < 1 ? [c, x, 0] : hh < 2 ? [x, c, 0] : hh < 3 ? [0, c, x] : hh < 4 ? [0, x, c] : hh < 5 ? [x, 0, c] : [c, 0, x];
+  const m = l - c / 2;
+  return [r + m, g + m, b + m];
+};
+/**
+ * Hue/Saturation's colour ranges as psd-tools models them from Photoshop's pictures (MIT,
+ * psd_tools/composite/adjustments.py): the master lightness first; each range's hue, lightness and
+ * saturation weighed by its trapezoid; the ranges' lightness in HSV, their saturations joined through
+ * the measured table; hue and saturation then in HSL, the master's before the ranges'.
+ */
+function hueSaturationRanges(adjustment, ranges) {
+  const master = adjustment.master ?? {};
+  const mh = (master.hue ?? 0) / 360; const ms = (master.saturation ?? 0) / 100; const ml = (master.lightness ?? 0) / 100;
+  const lighten = (v, l) => (l > 0 ? v * (1 - l) + l : l < 0 ? v * (1 + l) : v);
+  const saturate = (v, s) => Math.max(0, Math.min(1, s > 0 ? v / (1 - s + 0.01) : v * (1 + s)));
+  return (rgb) => {
+    const [r, g, b] = rgb.map((v) => lighten(v / 255, ml));
+    const [h0, s0, l0] = rgbToHslUnit(r, g, b);
+    let ch = 0; let cs = 0; let cl = 0;
+    for (const range of ranges) {
+      const w = hueRangeWeight(h0 * 360, range.bounds);
+      ch += (range.hue / 360) * w;
+      cl = Math.max(-1, Math.min(1, cl + range.light * w));
+      const contribution = range.sat > 0 ? range.sat * (1 - (1 - w) ** (1.5 / (1 - range.sat ** 4 + 0.05))) : range.sat * w;
+      cs = addSaturations(cs, contribution);
+    }
+    // Into HSV for the ranges' lightness.
+    const v = l0 + s0 * Math.min(l0, 1 - l0);
+    let sv = v > 1e-9 ? 2 * (1 - l0 / v) : 0;
+    let vv = cl >= 0 ? v : Math.max(0, Math.min(1, v * (1 + cl * sv)));
+    const div = 1 / (sv + 1e-3);
+    sv = Math.max(0, Math.min(1, cl >= 0 ? sv * (1 - cl) : 1 + (div - 1) / (Math.abs(cl) - div + 1e-3)));
+    // Back to HSL.
+    const l = vv * (1 - sv / 2);
+    const denom = Math.min(l, 1 - l);
+    let s = denom > 1e-9 ? (vv - l) / denom : 0;
+    const h = (((h0 + ch + mh) % 1) + 1) % 1;
+    s = saturate(saturate(s, ms), cs);
+    return hslUnitToRgb(h, s, l).map((x) => clamp(x * 255));
+  };
+}
+
+
+/**
+ * The current Brightness/Contrast as psd-tools models it (MIT, psd_tools/composite/adjustments.py):
+ * Contrast an S through Curves' spline about 63 and 191, moved 25 levels for each 100%; Brightness a
+ * polynomial bend psd-tools fitted to Photoshop's pictures, put on as a shear along the diagonal.
+ */
+function brightnessContrastCurve(brightness, contrast) {
+  const b = brightness / 150;
+  const s = contrast * 25;
+  const curve = curveTable([{ input: 0, output: 0 }, { input: 63, output: 63 - s }, { input: 191, output: 191 + s }, { input: 255, output: 255 }]);
+  const pol = (a, x, r) => a * x ** r;
+  const xs = new Float64Array(256);
+  const ys = new Float64Array(256);
+  for (let i = 0; i < 256; i += 1) {
+    const t = i / 255;
+    const h = 0.5 * (Math.abs(b) * (pol(1.65, t, 0.35) + pol(-1, t, 10)) + (1 - Math.abs(b)) * (pol(1.96, t, 0.4) + pol(1, t, 4)) + pol(1, t, 1.25));
+    const bend = b * t * (1 - t) * h;
+    xs[i] = t - bend;
+    ys[i] = curve[i] / 255 + bend;
+  }
+  const table = new Float32Array(256);
+  let k = 0;
+  for (let i = 0; i < 256; i += 1) {
+    const t = i / 255;
+    while (k < 254 && xs[k + 1] < t) k += 1;
+    const span = xs[k + 1] - xs[k];
+    const f = span > 1e-12 ? Math.max(0, Math.min(1, (t - xs[k]) / span)) : 0;
+    const y = t <= xs[0] ? ys[0] : t >= xs[255] ? ys[255] : ys[k] + (ys[k + 1] - ys[k]) * f;
+    table[i] = clamp(y * 255);
+  }
+  return (rgb) => rgb.map((v) => table[Math.round(clamp(v))]);
+}
+
 /**
  * The adjustment as `([r, g, b]) => [r, g, b]` (0..255), or null when it is one this does not do.
  * `report` (a Set) collects what was only approximated.
  */
-export function adjustmentFunction(adjustment, report = new Set(), { grey = false } = {}) {
+export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false } = {}) {
   const type = adjustment?.type;
   switch (type) {
     case 'invert':
@@ -438,8 +587,10 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
     case 'threshold': {
       // White where the luminance, as Photoshop weighs it and rounds it to a level, reaches the
       // threshold (the grey itself in a Grayscale file).
+      // In a CMYK file its black is the black ink alone, as a press shows it (threshold_cmyk.psd).
       const level = adjustment.level ?? 128;
-      return ([r, g, b]) => { const v = Math.round(grey ? r : 0.3 * r + 0.59 * g + 0.11 * b) >= level ? 255 : 0; return [v, v, v]; };
+      const black = cmyk ? (cmykProfile ?? cmykToRgb)(0, 0, 0, 1) : [0, 0, 0];
+      return ([r, g, b]) => (Math.round(grey ? r : 0.3 * r + 0.59 * g + 0.11 * b) >= level ? [255, 255, 255] : [...black]);
     }
     case 'levels': {
       // Each channel's own levels first, then the RGB ones over all three, as Photoshop draws them.
@@ -475,18 +626,11 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
         const k = contrast >= 0 ? 1 / Math.max(0.01, 1 - contrast) : 1 + contrast;
         return (rgb) => rgb.map((v) => clamp(contrast >= 0 ? (v + brightness - 127.5) * k + 127.5 : (v - 127.5) * k + 127.5 + brightness));
       }
-      // The current one, which Photoshop took from Camera Raw and publishes no formula for: a curve
-      // fitted to its pictures of psd-tools' test files (four settings, in RGB and Grayscale), within
-      // 7 levels in 255 on average where the old guess was 30 off. Contrast as an S through Curves'
-      // own spline about the quarter tones, then Brightness bending the tones up or down.
+      // The current one, which Photoshop took from Camera Raw and publishes no formula for: psd-tools'
+      // model (brightnessContrastCurve), within 3 levels of Photoshop's pictures of its four test
+      // settings on average and nowhere 16 off, where the curve fitted here before was 7 off.
       report.add('Brightness/Contrast');
-      const bend = (brightness * (brightness >= 0 ? 1.124 : 0.809)) / 100;
-      const s = contrast * 100 * (contrast >= 0 ? 0.248 : 0.512);
-      const curve = curveTable([{ input: 0, output: 0 }, { input: 64, output: 64 - s }, { input: 192, output: 192 + s }, { input: 255, output: 255 }]);
-      return (rgb) => rgb.map((v) => {
-        const u = curve[Math.round(clamp(v))] / 255;
-        return clamp(255 * (u + bend * u * (1 - u)));
-      });
+      return brightnessContrastCurve(brightness, contrast);
     }
     case 'hue/saturation': {
       const master = adjustment.master ?? {};
@@ -504,13 +648,9 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
           return hslToRgb(hue, sat, unit(l));
         };
       }
-      // The colour ranges (Reds, Yellows, ...): each its own hue, saturation and lightness, as far as a
-      // colour's hue is in the range, fully between its two inner bounds and fading to nothing at its
-      // outer ones; a grey has no hue and is in none. Photoshop publishes no formula; this order is the
-      // one that matches its own pictures of psd-tools' test files (8 %, 1 % and 12 % of pixels visibly
-      // off, from 24 %, 11 % and 18 % with the master range alone): a range's lightness first, as far as
-      // the colour is colourful; then the hue turned and the saturation moved by the master's and the
-      // ranges' together; then the master's lightness. Lightness moves toward white or black.
+      // The master and the colour ranges (Reds, Yellows, ...), each range weighed by how far a colour's
+      // hue is in it, as psd-tools models Photoshop (hueSaturationRanges): within a level of Photoshop's
+      // own pictures of psd-tools' three test files, where the model this replaced was 2 to 8 off.
       const ranges = HUE_RANGES.map((name) => {
         const range = adjustment[name];
         if (!range || !(range.hue || range.saturation || range.lightness)) return null;
@@ -521,31 +661,7 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
         };
       }).filter(Boolean);
       if (ranges.length) report.add('Hue/Saturation colour ranges');
-      const hue = master.hue ?? 0;
-      const sat = (master.saturation ?? 0) / 100;
-      const light = (master.lightness ?? 0) / 100;
-      const lighten = (rgb, amount) => (amount >= 0 ? rgb.map((v) => v + (255 - v) * amount) : rgb.map((v) => v * (1 + amount)));
-      return (rgb) => {
-        const [h0, s0] = rgbToHsl(...rgb);
-        let out = rgb;
-        let dh = hue;
-        let ds = sat;
-        if (s0 > 0 && ranges.length) {
-          const chroma = (Math.max(...rgb) - Math.min(...rgb)) / 255;
-          for (const range of ranges) {
-            const w = hueRangeWeight(h0, range.bounds);
-            if (!w) continue;
-            if (range.light) out = lighten(out, w * chroma * range.light);
-            dh += w * range.hue;
-            ds += w * range.sat;
-          }
-        }
-        ds = Math.max(-1, Math.min(1, ds));
-        let [h, s, l] = rgbToHsl(...out);
-        h = (((h + dh) % 360) + 360) % 360;
-        s = ds >= 0 ? s + (1 - s) * ds : s * (1 + ds);
-        return lighten(hslToRgb(h, unit(s), l), light);
-      };
+      return hueSaturationRanges(adjustment, ranges);
     }
     case 'vibrance': {
       report.add('Vibrance');

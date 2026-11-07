@@ -149,12 +149,12 @@ export function planPsdPanelImport(bytes) {
   // The artwork: every other visible layer, flattened as Photoshop would (ag-psd lists children
   // bottom first, which is the order they are drawn in).
   // A CMYK file on its inks, as Photoshop flattens it, where everything in it works ink by ink.
-  const options = { skip: (layer) => layer === group, styles: LAYER_STYLES, grey: Boolean(psd.grey) };
+  const options = { skip: (layer) => layer === group, styles: LAYER_STYLES, grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK', cmykProfile: psd.cmykProfile };
   const onInks = read.converted === 'CMYK' ? compositeInks(psd.children, width, height, options) : null;
   const { pixels, painted, notDrawn, closeTo, dissolve } = onInks ?? compositePsd(psd.children, width, height, options);
 
   const warnings = [];
-  if (read.converted) warnings.push(convertedNotice(read.converted, { inks: Boolean(onInks) }));
+  if (read.converted) warnings.push(convertedNotice(read.converted, { inks: Boolean(onInks), profile: Boolean(psd.cmykProfile) }));
   if (!placeholders.length) warnings.push(`The "${group.name}" group has no layers to place.`);
   const outside = placeholders.filter((p) => p.x + p.width <= 0 || p.y + p.height <= 0 || p.x >= width || p.y >= height);
   if (outside.length) warnings.push(`${outside.length} placeholder(s) sit outside the canvas and will be off the panel.`);

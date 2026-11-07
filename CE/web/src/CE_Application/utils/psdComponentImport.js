@@ -326,8 +326,8 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     const stack = (fillOpacity) => [{ ...alone, fillOpacity }, ...clippedPixels.map((layer) => ({ ...layer, clipping: true }))];
     const fillOpacity = unit.fillOpacity ?? 1;
     const flatten = (fill) => {
-      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES, grey: Boolean(psd.grey) });
-      for (const name of out.closeTo.styles) report.drawn.add(name);
+      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES, grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK', cmykProfile: psd.cmykProfile });
+      for (const name of out.styles ?? out.closeTo.styles) report.drawn.add(name);
       for (const name of out.closeTo.adjustments) report.approximated.add(name);
       for (const name of out.notDrawn.adjustment) report.unsupported.add(name);
       for (const name of out.dissolve) report.dissolve.add(name);
@@ -342,7 +342,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     }
     // Clipped adjustments change this unit alone.
     for (const layer of clippedAdjustments) {
-      const fn = adjustmentFunction(layer.adjustment, report.approximated, { grey: Boolean(psd.grey) });
+      const fn = adjustmentFunction(layer.adjustment, report.approximated, { grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK' });
       if (fn) adjustPixels(pixels, width, 0, 0, fn, { strength: layer.opacity ?? 1, mask: layerMaskSampler(layer, { width, height }) });
       else report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
     }
@@ -358,7 +358,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
 
   /** An adjustment layer: what it does, to every layer read so far (they are all under it). */
   const adjust = (layer, opacity) => {
-    const fn = adjustmentFunction(layer.adjustment, report.approximated, { grey: Boolean(psd.grey) });
+    const fn = adjustmentFunction(layer.adjustment, report.approximated, { grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK' });
     if (!fn) { report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`); return; }
     const strength = opacity * (layer.opacity ?? 1);
     const mask = layerMaskSampler(layer, { width, height });
@@ -583,8 +583,8 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   }
   const warnings = [];
   const list = (set) => [...set].slice(0, 5).join(', ') + (set.size > 5 ? ` and ${set.size - 5} more` : '');
-  if (read.converted) warnings.push(convertedNotice(read.converted));
-  if (report.drawn.size) warnings.push(`Layer styles drawn into the pictures, close to Photoshop's: ${list(report.drawn)}.`);
+  if (read.converted) warnings.push(convertedNotice(read.converted, { profile: Boolean(psd.cmykProfile) }));
+  if (report.drawn.size) warnings.push(`Layer styles drawn into the pictures, as Photoshop draws them (what only close to it says why): ${list(report.drawn)}.`);
   if (report.approximated.size) warnings.push(`Adjustments applied close to Photoshop's: ${list(report.approximated)}.`);
   if (report.unsupported.size) warnings.push(`Adjustments not applied: ${list(report.unsupported)}. Merge them into the layers below in Photoshop first.`);
   if (report.dissolve.size) warnings.push(`Dissolve drawn with a grain of its own in pictures: ${list(report.dissolve)}. Photoshop's is random; merge the layer in Photoshop for its exact pixels.`);
@@ -662,7 +662,7 @@ function styleVector(styles, background, effects, box) {
     const bevel = styles.bevel;
     const style = { 'inner bevel': 'inner-bevel', 'outer bevel': 'outer-bevel', emboss: 'emboss', 'pillow emboss': 'pillow-emboss' }[bevel.style] ?? 'inner-bevel';
     Object.assign(effects._children.Bevel, {
-      enabled: true, style, size: pxOf(bevel.size, 5), softness: pxOf(bevel.soften, 0), depth: bevel.strength ?? 100, angle: bevel.angle ?? 120,
+      enabled: true, style, size: pxOf(bevel.size, 5), softness: pxOf(bevel.soften, 0), depth: Math.round((bevel.strength ?? 1) * 100), angle: bevel.angle ?? 120,
       highlightOpacity: Math.round((bevel.highlightOpacity ?? 0.75) * 100), shadowOpacity: Math.round((bevel.shadowOpacity ?? 0.75) * 100),
     });
     kept.push('Bevel & Emboss');

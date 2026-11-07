@@ -69,7 +69,7 @@ export function scaleOf(value) {
 /**
  * Where on a gradient each document pixel is (0..1), as Photoshop lays it over `box` ({ x, y, width,
  * height }: the layer's, or the document's where the gradient is not aligned with the layer): from the
- * box's centre (moved by its offset, in percent of the box), at its angle; a Linear one from one edge
+ * box's centre (moved by its offset, a fraction of the box, as ag-psd reads it), at its angle; a Linear one from one edge
  * of the box to the other along that angle, the others reaching half that, all times the scale.
  * Photoshop works it at whole pixel coordinates. Measured on psd-tools' files, Linear, Radial and Angle
  * within its dither; Reflected and Diamond a degree or so off where it snaps the line to pixels.
@@ -81,8 +81,8 @@ export function gradientField(content, box) {
   const uy = -Math.sin(theta);
   const width = Math.max(1, box.width);
   const height = Math.max(1, box.height);
-  const cx = box.x + width / 2 + ((Number(content?.offset?.x) || 0) * width) / 100;
-  const cy = box.y + height / 2 + ((Number(content?.offset?.y) || 0) * height) / 100;
+  const cx = box.x + width / 2 + (Number(content?.offset?.x) || 0) * width;
+  const cy = box.y + height / 2 + (Number(content?.offset?.y) || 0) * height;
   const edge = Math.min(Math.abs(ux) > 1e-9 ? width / Math.abs(ux) : Infinity, Math.abs(uy) > 1e-9 ? height / Math.abs(uy) : Infinity);
   const length = Math.max(1e-6, edge * scaleOf(content?.scale));
   const style = String(content?.style ?? content?.type ?? 'linear');
