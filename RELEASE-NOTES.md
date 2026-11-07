@@ -525,15 +525,16 @@ should.
 
 ## Bringing a Ctrlr panel across
 
-`node tools/scripts/ctrlr-import.mjs <your.panel>` reads a Ctrlr `.panel` or `.bpanelz` and tells
-you what is in it. Add `--profile out.json` to harvest a device profile from its modulators, and
-`--panel out.cepanel` to rebuild the interface on top of that profile. It needs a source checkout —
-there is no in-app importer yet.
+**File → New Panel from Ctrlr Panel...** opens a Ctrlr `.panel` or `.bpanelz` as a new panel: its
+modulators become a new device profile, saved with your others, and its controls are placed where
+they were and bound to it. The same is on the command line for a checkout, report only by default:
+`node tools/scripts/ctrlr-import.mjs <your.panel>`, with `--profile out.json` and `--panel
+out.cepanel`, or `--corpus <folder>`.
 
 It converts a file you already have and fetches nothing. Two things it will not do: guess at a MIDI
 message it cannot express (those modulators are flagged with the reason instead), and translate
-Lua (methods are imported as reference text with a note saying which of them could be ported and
-which drew the panel and cannot be). **No real community panel has been through it yet** — if you
+Lua (the methods go into the new panel's notes as text, each marked by whether it could be ported or
+drew the panel and cannot be; what did not convert is listed in a note of its own). **No real community panel has been through it yet** — if you
 have one, the report alone is useful and worth sending.
 
 ## Reporting something

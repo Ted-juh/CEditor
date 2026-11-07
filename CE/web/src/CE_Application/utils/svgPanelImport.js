@@ -33,7 +33,7 @@
  * Pure: text in, plan out. `buildSvgImportControls` turns a plan into real controls, and the menu
  * command in stores/svgPanelImportActions.js puts them in a new panel.
  */
-import { parseXml } from '../../../../../tools/ctrlr-import/xml.mjs';
+import { parseXml } from '../ctrlrImport/xml.js';
 import { createControl } from '../models/componentTypes.js';
 import { sanitizeControlName } from './controlNames.js';
 

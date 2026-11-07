@@ -15,7 +15,7 @@
 // quietly contains a wrong address is worse than one that is missing a parameter, because the first
 // sends bytes to a synth and the second does not.
 
-import { attr, attrBool, attrNumber } from './xml.mjs';
+import { attr, attrBool, attrNumber } from './xml.js';
 
 /** Ctrlr's `midiMessageType` vocabulary, and what the DPD calls the same thing. */
 const MESSAGE_KIND = {

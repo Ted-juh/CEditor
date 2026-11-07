@@ -17,7 +17,7 @@
   </modulator>
 
   <modulator modulatorName="Resonance" modulatorMin="0" modulatorMax="127" modulatorValue="0">
-    <component uiType="uiSlider" uiSliderStyle="LinearVertical" componentRectangle="90,20,24,80" />
+    <component uiType="uiSlider" uiSliderStyle="LinearVertical" componentRectangle="90,20,24,80" componentAlpha="128" />
     <midi midiMessageType="cc" midiMessageCtrlrNumber="71" midiMessageChannel="1" />
   </modulator>
 

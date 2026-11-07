@@ -3,7 +3,8 @@
 //   node tools/scripts/ctrlr-import.mjs <file.panel|file.bpanelz> [--profile out.json] [--panel out.cepanel]
 //   node tools/scripts/ctrlr-import.mjs --corpus <directory>
 //
-// The stages are `tools/ctrlr-import/` and each is useful alone — the plan says stop after any of
+// The stages are `CE/web/src/CE_Application/ctrlrImport/` (the editor's File menu runs the same
+// ones) and each is useful alone — the plan says stop after any of
 // them, and this exposes them that way. With no output flags it does S1 only: read the file and
 // report what is in it, converting nothing. That is the cheapest possible way to be wrong early,
 // and running it over a corpus answers questions about the corpus that no amount of reasoning here
@@ -20,9 +21,9 @@ import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'n
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { formatReport, readCtrlrPanel } from '../ctrlr-import/read.mjs';
-import { harvestProfile } from '../ctrlr-import/harvest.mjs';
-import { planReconstruction } from '../ctrlr-import/reconstruct.mjs';
+import { formatReport, readCtrlrPanel } from '../../CE/web/src/CE_Application/ctrlrImport/read.js';
+import { harvestProfile } from '../../CE/web/src/CE_Application/ctrlrImport/harvest.js';
+import { planReconstruction } from '../../CE/web/src/CE_Application/ctrlrImport/reconstruct.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -42,60 +43,16 @@ function parseArgs(argv) {
 }
 
 /**
- * Build a `.cepanel` from a reconstruction plan.
- *
- * The component factory is imported HERE rather than in `reconstruct.mjs`, so that module stays a
- * pure translation of the source document and can be tested without standing the editor's model up.
+ * Build a `.cepanel` from a reconstruction plan, with the builder the editor's File menu uses
+ * (ctrlrImport/buildPanel.js), so the command line and the app make the same panel from one file.
  */
-async function buildPanel(plan, { name, width, height, profileId }) {
+async function buildPanel(plan, options) {
   // pathToFileURL, not a bare path: `await import('C:\\...')` is not a valid specifier on Windows,
   // and this is a tool that has to run wherever the packaging does.
   const load = (rel) => import(pathToFileURL(path.join(APP, rel)).href);
-  const { createControl } = await load('models/componentTypes.js');
-  const { createPanel, serializePanel } = await load('stores/panelModel.js');
-
-  const panel = createPanel(name);
-  panel.width = Math.max(320, width || 0);
-  panel.height = Math.max(240, height || 0);
-  panel.requiredProfiles = profileId ? [{ role: 'primary', profileId, version: '*' }] : [];
-
-  panel.controls = plan.placed.map((entry, index) => {
-    const id = `ctrlr_${index}_${(entry.name || entry.type).replace(/\W+/g, '_').toLowerCase()}`;
-    const overrides = {
-      Core: { id, name: id, description: `${entry.name} — imported (${entry.reason})` },
-      Transform: {
-        x: entry.rect.x, y: entry.rect.y, width: entry.rect.width, height: entry.rect.height,
-        opacity: Number.isFinite(entry.alpha) ? entry.alpha : 1,
-      },
-    };
-    if (entry.colours.background) {
-      overrides.Background = { _children: { Fill: { colour: entry.colours.background } } };
-    }
-    if (entry.parameterId && entry.profileId) {
-      overrides.DeviceBindings = {
-        bindings: [{
-          kind: 'deviceParameter',
-          port: entry.type === 'ToggleButton' ? 'state' : (entry.type === 'Combobox' ? 'selectedChoice' : 'value'),
-          deviceRole: entry.deviceRole,
-          parameterId: entry.parameterId,
-          adoptMetadata: true,
-          dryRun: false,
-          feedback: { receiveUpdates: true, ignoreOwnEchoes: true, echoWindowMs: 250 },
-        }],
-      };
-    }
-    const control = createControl(entry.type, overrides);
-    if (entry.items.length && control._children.Value) {
-      control._children.Value.rows = entry.items.map((label, row) => ({
-        id: `row_${row}`, displayText: label, internalValue: label,
-        sendValue: row, receiveValue: row, selectedByDefault: row === 0, enabled: true, visualOverrides: {},
-      }));
-    }
-    if (entry.type === 'Label' && control._children.Text) control._children.Text.content = entry.name;
-    return control;
-  });
-
-  return serializePanel(panel);
+  const { buildCtrlrPanel } = await load('ctrlrImport/buildPanel.js');
+  const { serializePanel } = await load('stores/panelModel.js');
+  return serializePanel(buildCtrlrPanel(plan, options));
 }
 
 function reportCorpus(directory) {

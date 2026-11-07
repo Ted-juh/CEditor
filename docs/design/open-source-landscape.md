@@ -31,7 +31,7 @@ panel is somebody's authored work whatever its file format is.
 `CE/dpd/library/` holds five profiles. The engine behind them — seven codecs, checksum families,
 dump parsing, byte-diff inference — is the most complete part of the program, and the library that
 feeds it is the least. Everything below is a place to get profiles from without a hardware session.
-Three importers already exist (`import-ins.mjs`, `import-midici.mjs`, `tools/ctrlr-import/`); the
+Three importers already exist (`import-ins.mjs`, `import-midici.mjs`, `CE/web/src/CE_Application/ctrlrImport/`, in the File menu); the
 first two entries here would be the fourth and fifth.
 
 ### 1.1 Parameter maps with the SysEx encoding written down

@@ -230,8 +230,16 @@ export function findFirst(node, name) {
 
 export const attr = (node, name, fallback = '') => node?.attributes?.[name] ?? fallback;
 
+/**
+ * A numeric attribute, or `fallback` when it is absent, empty or not a number. Absent has to be
+ * tested before Number(): Number('') is 0, a finite number, so an attribute the file does not have
+ * used to come back as 0 instead of the fallback — which made every control imported without a
+ * componentAlpha fully transparent.
+ */
 export function attrNumber(node, name, fallback = 0) {
-  const value = Number(attr(node, name, ''));
+  const text = String(attr(node, name, '')).trim();
+  if (text === '') return fallback;
+  const value = Number(text);
   return Number.isFinite(value) ? value : fallback;
 }
 

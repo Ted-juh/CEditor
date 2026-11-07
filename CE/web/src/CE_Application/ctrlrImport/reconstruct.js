@@ -18,7 +18,7 @@
 // that immediate-mode JUCE drawing has no mapping into a declarative section model, and pretending
 // otherwise is the one place the original objection to this whole feature is correct.
 
-import { attr, attrNumber } from './xml.mjs';
+import { attr, attrNumber } from './xml.js';
 
 /**
  * Ctrlr `uiType` -> a CEditor component.
@@ -157,7 +157,9 @@ export function planReconstruction(read, { profileId = '', deviceRole = 'primary
             // The one place the original objection to this whole feature is correct. Placed as an
             // ordinary box and reported, rather than approximated.
             customPaint: paints,
-            alpha: attrNumber(child, 'componentAlpha', 1),
+            // 0-255 in Ctrlr (CtrlrIDs.xml: componentAlpha, min 0, max 255), 255 when the file says
+            // nothing; an opacity from 0 to 1 here.
+            alpha: Math.min(1, Math.max(0, attrNumber(child, 'componentAlpha', 255) / 255)),
             visible: attr(child, 'componentVisibility', '') !== '0',
           });
         }

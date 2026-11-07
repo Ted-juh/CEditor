@@ -32,7 +32,7 @@
  * Pure: text in, `{ ok, component, kind, layers, warnings }` out. The menu command is
  * stores/artworkComponentActions.js.
  */
-import { parseXml } from '../../../../../tools/ctrlr-import/xml.mjs';
+import { parseXml } from '../ctrlrImport/xml.js';
 import { documentFrame, objectName, parseTransform, withoutSvgPrefix } from './svgPanelImport.js';
 import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { createPartNode } from './customComponentFactory.js';

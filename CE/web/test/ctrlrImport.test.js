@@ -20,12 +20,12 @@ import { gzipSync, deflateSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-import { attr, findAll, parseXml } from '../../../tools/ctrlr-import/xml.mjs';
-import { classifyLuaMethod, decodePanelBytes, readCtrlrPanel } from '../../../tools/ctrlr-import/read.mjs';
-import { harvestProfile, isIdentityExpression, readSysexTemplate } from '../../../tools/ctrlr-import/harvest.mjs';
+import { attr, attrNumber as attrNumberFn, findAll, parseXml } from '../src/CE_Application/ctrlrImport/xml.js';
+import { classifyLuaMethod, decodePanelBytes, readCtrlrPanel } from '../src/CE_Application/ctrlrImport/read.js';
+import { harvestProfile, isIdentityExpression, readSysexTemplate } from '../src/CE_Application/ctrlrImport/harvest.js';
 import {
   componentForCtrlr, planReconstruction, readColour, readItemList, readRectangle,
-} from '../../../tools/ctrlr-import/reconstruct.mjs';
+} from '../src/CE_Application/ctrlrImport/reconstruct.js';
 import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
 const FIXTURE = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'fixtures/ctrlr-minimal.panel'));
@@ -278,3 +278,68 @@ test('the notes say what will differ, rather than leaving it to be discovered', 
   assert.match(notes, /paint callback/, 'a custom-paint component must be called out');
   assert.match(notes, /filmstrip/i, 'and the idiom CEditor can actually match near-exactly');
 });
+
+// --- From the File menu (stores/ctrlrImportActions.js) ---------------------------------------------
+//
+// The stages above were reachable only from a command line. File → New Panel from Ctrlr Panel... runs
+// the same ones in the editor: the profile goes to the engine as a new profile, the panel opens in a
+// tab, unsaved, and what did not convert — and the Lua, which never runs — is in the panel's notes.
+
+test('the File menu import: a profile for the engine, a panel bound to it, and the rest in its notes', async () => {
+  const { importCtrlrPanelBytes, unusedProfileId } = await import('../src/CE_Application/stores/ctrlrImportActions.js');
+  const { panels, activePanel } = await import('../src/CE_Application/stores/panels.js');
+  const { deviceProfiles } = await import('../src/CE_Application/stores/deviceProfiles.js');
+  const { get } = await import('svelte/store');
+
+  const saved = [];
+  const result = await importCtrlrPanelBytes(new Uint8Array(FIXTURE), 'C:/Panels/ts1.panel', {
+    saveProfile: (id, source) => saved.push({ id, profile: JSON.parse(source) }),
+  });
+  assert.ok(result, 'the import went through');
+  assert.equal(saved.length, 1, 'one profile, saved into the engine');
+  assert.equal(saved[0].id, result.profileId);
+  assert.equal(saved[0].profile.parameters.length, 5, 'the five modulators that convert');
+
+  const panel = get(activePanel);
+  assert.equal(panel, result.panel, 'the new panel is the tab in front');
+  assert.equal(panel.name, 'Test Synth Editor (Ctrlr)');
+  assert.equal(panel.modified, true, 'never saved: closing it or quitting asks');
+  assert.equal(panel.controls.length, 11);
+  const bound = panel.controls.filter((control) => control._children.DeviceBindings?.bindings?.length);
+  assert.ok(bound.every((control) => saved[0].profile.parameters.some((p) => p.id === control._children.DeviceBindings.bindings[0].parameterId)),
+    'every binding names a parameter the saved profile has');
+
+  const [report, lua] = panel.notepad.notes;
+  assert.equal(report.name, 'Ctrlr import');
+  assert.match(report.content, /5 of 8 modulators became parameters/);
+  assert.match(report.content, /left out: Broken Rect — componentRectangle is not four numbers/);
+  assert.match(report.content, /not converted: Scaled Thing — value expression is not the identity/);
+  assert.equal(lua.name, 'Ctrlr Lua');
+  assert.match(lua.content, /3 Lua method\(s\)/);
+  assert.match(lua.content, /-- paintBg \[paint\] hooks: luaPanelPaintBackground/);
+
+  // Imported again: a profile of its own, never written over the first (which may have been edited).
+  deviceProfiles.update((list) => [...list, { id: result.profileId, name: 'first import' }]);
+  const again = await importCtrlrPanelBytes(new Uint8Array(FIXTURE), 'ts1.panel', { saveProfile: (id) => saved.push({ id }) });
+  assert.equal(again.profileId, `${result.profileId}-2`);
+  assert.equal(unusedProfileId('a', ['a', 'a-2']), 'a-3');
+
+  const refused = await importCtrlrPanelBytes(new TextEncoder().encode('not a panel'), 'junk.panel', { saveProfile: () => saved.push('no') });
+  assert.equal(refused, null, 'a file that is not a panel is refused, by name');
+  assert.equal(saved.at(-1).id, again.profileId, 'and nothing is saved for it');
+  panels.set([]);
+});
+
+test('opacity: Ctrlr\'s componentAlpha is 0-255, and a control without one is fully opaque', () => {
+  const plan = planReconstruction(read(), { profileId: 'p', parameterIds: new Set() });
+  const byName = Object.fromEntries(plan.placed.map((entry) => [entry.name, entry]));
+  assert.equal(byName.Cutoff.alpha, 1, 'no componentAlpha: opaque (it used to come in at 0, invisible)');
+  assert.equal(byName.Resonance.alpha, 128 / 255);
+  assert.equal(attrNumberOf('<m a=""/>', 'a', 7), 7, 'an empty attribute is the fallback, not 0');
+  assert.equal(attrNumberOf('<m/>', 'a', 7), 7);
+  assert.equal(attrNumberOf('<m a="0"/>', 'a', 7), 0, 'and a real 0 is 0');
+});
+
+function attrNumberOf(xml, name, fallback) {
+  return attrNumberFn(parseXml(xml), name, fallback);
+}

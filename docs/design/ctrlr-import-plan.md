@@ -1,7 +1,9 @@
 # Ctrlr import — design record
 
-> Status: **built, 2026-08-23** — all four stages, in `tools/ctrlr-import/` behind
-> `node tools/scripts/ctrlr-import.mjs`. **Never run on a real community panel:** nobody here has a
+> Status: **built, 2026-08-23** — all four stages, now in `CE/web/src/CE_Application/ctrlrImport/`;
+> **in the editor's File menu since 2026-11-07** (New Panel from Ctrlr Panel..., see
+> [In the File menu](#in-the-file-menu)), and still behind `node tools/scripts/ctrlr-import.mjs` for
+> files and corpora. **Never run on a real community panel:** nobody here has a
 > `.panel` or a `.bpanelz`, so every open question below is answered by refusing-and-reporting
 > rather than by a guess, and the first real file is what turns those refusals into knowledge. See
 > [What was built](#what-was-built) at the end.
@@ -224,12 +226,16 @@ expensive to guess at now:
 ## What was built
 
 ```
-tools/ctrlr-import/xml.mjs          a small XML reader — no dependency, and a DOCTYPE is refused
-tools/ctrlr-import/read.mjs         S1: decode, parse, report. Converts nothing.
-tools/ctrlr-import/harvest.mjs      S2: modulators -> a .ceditor-device profile
-tools/ctrlr-import/reconstruct.mjs  S3: components -> a placement plan
-tools/scripts/ctrlr-import.mjs      the CLI, and S4's Lua triage report
+CE/web/src/CE_Application/ctrlrImport/xml.js          a small XML reader — no dependency, and a DOCTYPE is refused
+CE/web/src/CE_Application/ctrlrImport/read.js         S1: decode, parse, report. Converts nothing.
+CE/web/src/CE_Application/ctrlrImport/harvest.js      S2: modulators -> a .ceditor-device profile
+CE/web/src/CE_Application/ctrlrImport/reconstruct.js  S3: components -> a placement plan
+CE/web/src/CE_Application/ctrlrImport/buildPanel.js   the plan as a panel (the CLI and the editor share it)
+tools/scripts/ctrlr-import.mjs                        the CLI, and S4's Lua triage report
 ```
+
+(Moved from `tools/ctrlr-import/` when the File menu took them on: the editor bundles what it runs,
+and `read` now decompresses with fflate rather than node:zlib so it runs in the page as well.)
 
 ```
 node tools/scripts/ctrlr-import.mjs panel.bpanelz                       # S1 only: report
@@ -279,3 +285,22 @@ unbound, with a note saying how many and why.
   translated. The `ctrlr` compatibility shim stays unbuilt until a corpus histogram says it pays.
 - **No resource extraction yet**, so filmstrips are recognised and named but not unpacked.
 - **Nothing is bundled and nothing is fetched.** It converts a file the user already has.
+
+## In the File menu
+
+**File → New Panel from Ctrlr Panel...** (`stores/ctrlrImportActions.js`) runs S1–S4 on a file the
+author chooses, in the editor:
+
+- S1's report goes to the Console, line for line as the CLI prints it.
+- S2's profile is saved into the engine as a **new** profile, which since the same week gets a file of
+  its own in the user's profiles folder on its first save (DeviceProfileService). A re-import takes the
+  next free id (`ctrlr.ts-1`, `ctrlr.ts-1-2`…) instead of writing over a profile the author may have
+  edited since.
+- S3's panel opens in a tab, unsaved, every binding naming a parameter that profile has.
+- S4 is still reported rather than run, and the report no longer ends in the Console: each Lua
+  method's text goes into the panel's notes (**Ctrlr Lua**), with its classification, and everything
+  flagged, skipped or left unbound into a **Ctrlr import** note. The notes travel with the panel, so
+  what did not convert is still written down when somebody opens it next month.
+
+It is still true that no real community panel has been through it.
+

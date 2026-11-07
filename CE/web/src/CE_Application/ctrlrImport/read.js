@@ -15,9 +15,12 @@
 // Ctrlr panel is refused by name, because a converter that half-reads a file is worse than one that
 // says it cannot read it.
 
-import { gunzipSync, inflateSync, inflateRawSync } from 'node:zlib';
+// fflate (MIT), not node:zlib: this runs in the editor (File → New Panel from Ctrlr Panel...) as well
+// as in node (tools/scripts/ctrlr-import.mjs and the tests). Its unzlibSync is node's inflateSync,
+// its inflateSync node's inflateRawSync.
+import { gunzipSync, inflateSync, unzlibSync } from 'fflate';
 
-import { attr, attrNumber, findAll, parseXml } from './xml.mjs';
+import { attr, attrNumber, findAll, parseXml } from './xml.js';
 
 /** The Lua hooks a panel can define, from Ctrlr's own vocabulary. */
 export const LUA_HOOKS = [
@@ -64,21 +67,22 @@ export function classifyLuaMethod({ name = '', hooks = [], body = '' } = {}) {
  * compressed file that happened to start with whitespace.
  */
 export function decodePanelBytes(bytes) {
-  const buffer = Buffer.isBuffer(bytes) ? bytes : Buffer.from(bytes ?? []);
+  const buffer = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes ?? []);
   if (buffer.length === 0) return { ok: false, error: 'The file is empty.' };
 
   const attempts = [
     ['gzip', () => gunzipSync(buffer)],
-    ['zlib', () => inflateSync(buffer)],
-    ['deflate', () => inflateRawSync(buffer)],
+    ['zlib', () => unzlibSync(buffer)],
+    ['deflate', () => inflateSync(buffer)],
     ['plain', () => buffer],
   ];
 
+  const utf8 = new TextDecoder('utf-8');
   const tried = [];
   for (const [encoding, decode] of attempts) {
     let text;
     try {
-      text = decode().toString('utf8');
+      text = utf8.decode(decode());
     } catch (error) {
       tried.push(`${encoding}: ${error.message}`);
       continue;
@@ -143,7 +147,9 @@ export function readCtrlrPanel(bytes) {
     // A plain substring search rather than a regexp: the name comes out of the file, and building
     // a pattern from it would let a method called `.*` claim every hook there is.
     const hooks = name ? LUA_HOOKS.filter((hook) => decoded.text.includes(`${hook}="${name}"`)) : [];
-    return { name, hooks, bytes: body.length, classification: classifyLuaMethod({ name, hooks, body }) };
+    // The text is kept: no Lua runs after an import, so it goes into the new panel's notes for the
+    // author to port by hand (stores/ctrlrImportActions.js) rather than being lost.
+    return { name, hooks, bytes: body.length, source: body, classification: classifyLuaMethod({ name, hooks, body }) };
   });
 
   const resources = findAll(root, 'resource').map((node) => ({
