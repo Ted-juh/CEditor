@@ -5,6 +5,7 @@
    */
   import { onDestroy, untrack } from 'svelte';
   import AlignCenter from 'lucide-svelte/icons/align-center';
+  import AccessibilityIcon from 'lucide-svelte/icons/accessibility';
   import Cable from 'lucide-svelte/icons/cable';
   import Share2 from 'lucide-svelte/icons/share-2';
   import Image from 'lucide-svelte/icons/image';
@@ -85,7 +86,7 @@
   // sets. If it is ever reduced to a pointer at the properties panel again, delete it again.
   // ('layers' was missing here while shipping as a tab — same sanitiser, same consequence, so it
   // is listed now.)
-  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'mask', 'render', 'scene3d', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'console']);
+  const DISPLAY_TAB_IDS = new Set(['colors', 'gradient', 'effects', 'mask', 'render', 'scene3d', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'notepad', 'viewer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'preview', 'access', 'console']);
   const LAZY_TAB_LOADERS = {
     effects: () => import('../components/EffectsTab.svelte').then((module) => ({ default: module.default })),
     mask: () => import('../components/MaskTab.svelte').then((module) => ({ default: module.default })),
@@ -108,6 +109,7 @@
     routes: () => import('../components/RoutesTab.svelte').then((module) => ({ default: module.default })),
     snapshots: () => import('../components/SnapshotsTab.svelte').then((module) => ({ default: module.default })),
     preview: () => import('../components/InteractionPreviewTab.svelte').then((module) => ({ default: module.default })),
+    access: () => import('../components/AccessibilityTab.svelte').then((module) => ({ default: module.default })),
     console: async () => {
       const [debugModule, consoleModule] = await Promise.all([
         import('../components/DebugPanel.svelte'),
@@ -140,7 +142,7 @@
   // beside Ports. Only tools that stand on their own may go beside: Colors, Gradient, Notepad and
   // Viewer share this dock's one colour pick, and Preview mounts a live surface. A tool is never in
   // both panes; choosing the one beside in the rail swaps the two.
-  const BESIDE_TAB_IDS = new Set(['effects', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'console']);
+  const BESIDE_TAB_IDS = new Set(['effects', 'type', 'assets', 'screen', 'api', 'library', 'animation', 'designer', 'layers', 'align', 'device', 'midi', 'ports', 'routes', 'snapshots', 'access', 'console']);
   const BESIDE_TAB_STORAGE_KEY = 'ce.displayPanel.besideTab';
   const BESIDE_WIDTH_STORAGE_KEY = 'ce.displayPanel.besideWidth';
   const BESIDE_MIN_WIDTH = 240;
@@ -1112,6 +1114,8 @@
     { id: 'routes',   label: 'Routes',   icon: Share2 },
     { id: 'snapshots', label: 'Snapshots', icon: Camera },
     { id: 'preview',  label: 'Preview',  icon: Play },
+    // Can the panel be read: the names screen readers will use, and text contrast (components/AccessibilityTab.svelte).
+    { id: 'access',   label: 'Access',   icon: AccessibilityIcon },
     { id: 'console',  label: 'Console',  icon: Terminal },
   ];
   // The rail shows a designer-only tab while the designer is open; leaving the designer on one

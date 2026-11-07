@@ -35,8 +35,8 @@ export const pictureSurface = writable(null);
 export const PICTURE_MAX_SIDE = 16384;
 export const PICTURE_MAX_PIXELS = 120_000_000;
 
-/** Elements only the editor draws on the canvas: left out of every picture. */
-const EDITOR_ONLY = [
+/** Elements only the editor draws on the canvas: left out of every picture (and the Access check). */
+export const EDITOR_ONLY = [
   // The surface's own: grid, guides, the group selection and the marquee (PanelSurface).
   '.grid-overlay', '.guide-wrapper', '.selection-bounds', '.group-angle', '.marquee',
   // A control's: its handles, measurements and snap lines (CanvasControlSelectionOverlay), hit
@@ -49,11 +49,14 @@ const EDITOR_ONLY = [
 ].join(',');
 
 /** Classes that mark a control's editor state, not its look: taken off the copy. */
-const EDITOR_STATE_CLASSES = [
+export const EDITOR_STATE_CLASSES = [
   'selected', 'key-object', 'custom-component-hint', 'locked', 'lock-click-through', 'editor-draggable',
   'dragging', 'drop-target', 'device-drop-compatible', 'device-drop-warning', 'device-drop-incompatible',
   'preview-keyboard-focus', 'preview-highlighted', 'mouse-focus-outline', 'device-drop-background',
 ];
+
+/** What the editor puts on the surface itself — its zoom, its frame and its shadow — taken off the copy. */
+export const SURFACE_ROOT_STYLE = 'transform:none;border:0;box-shadow:none;border-radius:0;overflow:hidden;margin:0;left:0;top:0';
 
 const controlIdOf = (control) => String(control?._children?.Core?.id ?? '');
 
@@ -145,7 +148,7 @@ function reportGaps(picture) {
 const nextFrame = () => new Promise((resolve) => requestAnimationFrame(() => resolve()));
 
 /** Waits for a large panel's surface to finish mounting (utils/progressiveMount.js). */
-async function surfaceReady(element, timeoutMs = 20000) {
+export async function surfaceReady(element, timeoutMs = 20000) {
   const started = Date.now();
   while (element.hasAttribute('data-mount-pending') && Date.now() - started < timeoutMs) {
     await new Promise((resolve) => setTimeout(resolve, 50));
@@ -154,7 +157,7 @@ async function surfaceReady(element, timeoutMs = 20000) {
   await nextFrame();
 }
 
-function liveSurface(panelId) {
+export function liveSurface(panelId) {
   const surface = get(pictureSurface);
   if (!surface?.element?.isConnected) return null;
   if (panelId && surface.panelId !== panelId) return null;
@@ -246,8 +249,7 @@ export async function renderPanelPicture({ panelId, what = 'panel', ids = [], sc
     scale,
     skip,
     adjust: (copy) => { for (const name of EDITOR_STATE_CLASSES) copy.classList?.remove(name); },
-    // What the editor puts on the surface itself: its zoom, its frame and its shadow.
-    rootStyle: 'transform:none;border:0;box-shadow:none;border-radius:0;overflow:hidden;margin:0;left:0;top:0',
+    rootStyle: SURFACE_ROOT_STYLE,
   });
   reportGaps(picture);
   return { ok: true, ...picture };

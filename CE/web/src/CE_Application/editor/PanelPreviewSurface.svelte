@@ -17,6 +17,7 @@
   import GuideLines from './GuideLines.svelte';
   import { isDisplayOnly } from '../utils/displayMode.js';
   import { needsImageRole, resolveAriaLabel, resolveTooltip } from '../utils/coreAccessibility.js';
+  import { captionsByOwner, spokenName } from '../utils/accessibilityCheck.js';
   import { isMeterFamily, isRibbonFamily } from '../models/componentFamilies.js';
   import {
     RETURN_MODE, normalizeReturnBehavior, restValueFor, returnStep, returnStep2DAxes,
@@ -424,6 +425,9 @@
 
   // The plan, with each ground's held controls drawn immediately after it — above the rest of that
   // ground and below every live control on the layer, which is where the fold guarantees they fit.
+  // Each control's caption (a Label attached to it, printing its own words): what a screen reader
+  // calls the control when its author wrote no Screen-reader text (utils/accessibilityCheck.js).
+  let spokenCaptions = $derived(captionsByOwner(panel?.controls ?? []));
   let allRenderItems = $derived.by(() => {
     if (groundHolds.size === 0) return previewPlan.items;
     const out = [];
@@ -9440,7 +9444,11 @@
     const resolvedPreview = resolvedPreviewFor(control);
     const behavior = getBehavior(control);
     const session = sessionFor(control);
-    const coreName = control?._children?.Core?.name ?? control?._children?.Core?.controlType ?? 'Control';
+    // What a screen reader calls it when the author wrote nothing: the caption attached to it, a
+    // button's own text, or its name made readable (utils/accessibilityCheck.js — the dock's Access
+    // tool reports the same names). It used to be "<name> preview": in the exported plug-in, "Knob_3
+    // preview".
+    const spoken = spokenName(control, spokenCaptions).name;
     return {
       resolvedControlOverride: resolvedPreview?.control ?? control,
       interactionRuntimeOverride: resolvedPreview?.runtime ?? null,
@@ -9454,7 +9462,7 @@
       // The author's screen-reader text wins over the generated "<name> preview". That generated
       // string was being written over the top of whatever they had typed, which is the same defect
       // as a field nothing reads and takes longer to find.
-      previewAriaLabel: resolveAriaLabel(control, `${coreName} preview`),
+      previewAriaLabel: resolveAriaLabel(control, spoken),
       previewAriaDisabled: isDisabled(control),
       previewAriaChecked: previewAriaCheckedFor(control),
       previewAriaExpanded: isComboboxControl(control) ? openComboboxControlId === getControlId(control) : undefined,
@@ -9471,7 +9479,7 @@
         disabled: isDisabled(control),
         readOnly: isReadOnly(control) || behavior?.keyboardEnabled === false,
         inputMode: String(behavior?.valueType ?? '') === 'int' ? 'numeric' : 'decimal',
-        ariaLabel: resolveAriaLabel(control, `${coreName} value`),
+        ariaLabel: resolveAriaLabel(control, `${spoken} value`),
         tabIndex: -1,
       } : null,
       previewEditableFields: { ...spinnerEditableFields(control), ...numericEditableFields(control) },

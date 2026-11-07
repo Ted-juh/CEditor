@@ -1062,6 +1062,27 @@ saved in the panel file. Capture them in Preview.
 The dock's **Preview** tool tests one selected control on its own — its look in every state and its
 value — without sending MIDI.
 
+### Can everyone use it?
+
+The dock's **Access** tool checks two things about the panel in front.
+
+**Names.** In Preview, the player and the exported plug-in, a screen reader announces each control
+somebody operates by a name and what it is: "Cutoff, slider, 64". That name is the control's
+**Screen-reader text** (on its **Core** tab) when you wrote one; else the caption attached to it (a
+Label beside it that prints its own words); else a button's own text; else its name in the tree,
+read out as words ("tone1_lfo_shape" is read "tone1 lfo shape"). The tool lists the controls whose name
+is only an id or a type ("Knob 9", a button still called "Button") — type what the control does into
+the field beside each, which becomes its Screen-reader text — and the names several controls share,
+grouped ("FADER" on nine buttons), which a listener cannot tell apart. Click a name to select it on the
+canvas.
+
+**Text contrast.** Press **Check** and every text on the panel is measured against what is drawn behind
+it — the control's plate, a gradient, the panel's picture — as the canvas draws it. Text that reaches
+less than the WCAG AA standard is listed with its contrast and what it needs: 4.5:1, or 3:1 for large
+text (24 pixels, or 19 pixels and bold). Where most of the text's background is fine and a small part
+is not, the text passes; where a gradient runs into the text's own colour, it does not. Text painted
+with a gradient or a picture has no single colour, so it is listed to check by eye.
+
 ## 8. States and animations
 
 ### States
@@ -1797,6 +1818,7 @@ an open panel the items are greyed out.
 | **Routes** | Links between controls, as a list or as patch cords. |
 | **Snapshots** | Saves the values of the whole panel, and recalls, compares, blends and randomises them. |
 | **Preview** | Tries out one selected control on its own. |
+| **Access** | What screen readers will call each control, and whether every text can be read against what is behind it; see [Can everyone use it?](#can-everyone-use-it). |
 | **Console** | Messages from the program: build output, update checks, MIDI errors. |
 
 ## Components
