@@ -13,6 +13,7 @@ import { contourTable, gradientRamp } from '../src/CE_Application/utils/psdAdjus
 import { patternSampler } from '../src/CE_Application/utils/psdVectors.js';
 import { effectsFromDescriptor } from '../src/CE_Application/utils/psdEffects.js';
 import { iccCmykToRgb } from '../src/CE_Application/utils/iccProfile.js';
+import { eightBit, unmatteLinear } from '../src/CE_Application/utils/psdRead.js';
 
 /** A w × h shape: 1 inside the box [x0, x1) × [y0, y1), 0 elsewhere. */
 function square(w, h, x0, y0, x1, y1) {
@@ -290,6 +291,69 @@ test('a gradient fill with no path lies across its layer mask\'s rectangle; an o
   const alpha = (open) => [...compositePsd([shape(open)], 4, 4).pixels].filter((_, i) => i % 4 === 3).reduce((sum, v) => sum + v, 0) / 255;
   assert.ok(Math.abs(alpha(true) - 8) < 0.5, `${alpha(true)}`);
   assert.ok(alpha(false) > alpha(true) + 0.5, `${alpha(false)}`);
+});
+
+test('a stroke outside a square\'s corner is measured from the corner pixel, as Photoshop measures it', () => {
+  const w = 12; const h = 12;
+  const data = new Uint8ClampedArray(4 * 4 * 4);
+  for (let i = 0; i < 16; i += 1) data.set([0, 0, 255, 255], i * 4);
+  const layer = { name: 'square', left: 4, top: 4, right: 8, bottom: 8, blendMode: 'normal', opacity: 1, imageData: { width: 4, height: 4, data },
+    effects: { stroke: [{ enabled: true, position: 'outside', fillType: 'color', size: px(3), opacity: 1, blendMode: 'normal', color: { r: 255, g: 0, b: 0 } }] } };
+  const { pixels } = compositePsd([layer], w, h, { styles: LAYER_STYLES });
+  // Diagonally off the corner, its centre 2.1 px from the corner pixel's edge: all stroke (outside-stroke.psd).
+  const at = (x, y) => [...pixels.slice((y * w + x) * 4, (y * w + x) * 4 + 4)];
+  assert.deepEqual(at(2, 2), [255, 0, 0, 255]);
+  assert.deepEqual(at(5, 1), [255, 0, 0, 255]);
+});
+
+test('a bevel\'s light outside the shape shades the stroke there; a shape\'s own stroke stays over what is clipped to it', () => {
+  const w = 20; const h = 20;
+  const data = new Uint8ClampedArray(8 * 8 * 4);
+  for (let i = 0; i < 64; i += 1) data.set([128, 128, 128, 255], i * 4);
+  const stroke = { enabled: true, position: 'outside', fillType: 'color', size: px(3), opacity: 1, blendMode: 'normal', color: { r: 200, g: 0, b: 0 } };
+  const bevel = { enabled: true, style: 'outer bevel', technique: 'smooth', size: px(4), strength: 1, angle: 135, altitude: 30, direction: 'up',
+    highlightBlendMode: 'screen', highlightColor: { r: 255, g: 255, b: 255 }, highlightOpacity: 1, shadowBlendMode: 'multiply', shadowColor: { r: 0, g: 0, b: 0 }, shadowOpacity: 1 };
+  const layer = (effects) => ({ name: 'tile', left: 6, top: 6, right: 14, bottom: 14, blendMode: 'normal', opacity: 1, imageData: { width: 8, height: 8, data }, effects });
+  const plain = compositePsd([layer({ stroke: [stroke] })], w, h, { styles: LAYER_STYLES }).pixels;
+  const lit = compositePsd([layer({ stroke: [stroke], bevel })], w, h, { styles: LAYER_STYLES }).pixels;
+  const red = (pixels, x, y) => pixels[(y * w + x) * 4];
+  // In the stroke's band on the lit side (up and left) and on the other: lighter, and darker (layer_params.psd).
+  assert.equal(red(plain, 4, 10), 200);
+  assert.ok(red(lit, 4, 10) > 200, `${red(lit, 4, 10)}`);
+  assert.ok(red(lit, 15, 10) < 200, `${red(lit, 15, 10)}`);
+  // A grey shape with its own red stroke, a pixel wide inside, and a blue layer clipped to it: blue
+  // within, the stroke still red over it (stroke-composite.psd).
+  const box = new Uint8ClampedArray(6 * 6 * 4);
+  for (let y = 0; y < 6; y += 1) for (let x = 0; x < 6; x += 1) box.set(x === 0 || y === 0 || x === 5 || y === 5 ? [255, 0, 0, 255] : [204, 204, 204, 255], (y * 6 + x) * 4);
+  const shape = { name: 'frame', left: 0, top: 0, right: 6, bottom: 6, blendMode: 'normal', opacity: 1, imageData: { width: 6, height: 6, data: box },
+    vectorFill: { type: 'color', color: { r: 204, g: 204, b: 204 } }, vectorStroke: { strokeEnabled: true, lineAlignment: 'inside', content: { type: 'color', color: { r: 255, g: 0, b: 0 } } } };
+  const blue = { name: 'picture', clipping: true, left: 0, top: 0, right: 6, bottom: 6, blendMode: 'normal', opacity: 1, imageData: { width: 6, height: 6, data: new Uint8ClampedArray(144).map((_, i) => [0, 0, 255, 255][i % 4]) } };
+  const framed = compositePsd([shape, blue], 6, 6).pixels;
+  assert.deepEqual([...framed.slice(0, 4)], [255, 0, 0, 255]);
+  assert.deepEqual([...framed.slice((2 * 6 + 2) * 4, (2 * 6 + 2) * 4 + 4)], [0, 0, 255, 255]);
+});
+
+test('deep files: Posterize on the colours\' full precision; a 32-bit file put together in linear light', () => {
+  // A 16-bit file's picture keeps its own values beside the 8 bits, a 32-bit one's through sRGB's curve.
+  const sixteen = eightBit({ width: 1, height: 1, data: new Uint16Array([49164, 0, 65535, 65535]) });
+  assert.deepEqual([...sixteen.data], [191, 0, 255, 255]);
+  assert.equal(sixteen.precise[0], 49164);
+  const thirtyTwo = eightBit({ width: 1, height: 1, data: new Float32Array([0.5, 0, 1, 1]) });
+  assert.deepEqual([...thirtyTwo.data], [188, 0, 255, 255]);
+  assert.equal(Math.round((thirtyTwo.precise[0] / 65535) * 255), 188);
+  // 191 of 255 is band 2 of 4 to the 8-bit rule; its 16-bit value, 0.7502, is band 3 (posterize_16bits_rgb.psd).
+  const posterize = { name: 'Posterize', adjustment: { type: 'posterize', levels: 4 } };
+  assert.equal(compositePsd([{ name: 'p', left: 0, top: 0, imageData: sixteen }, posterize], 1, 1).pixels[0], 255);
+  assert.equal(compositePsd([{ name: 'p', left: 0, top: 0, imageData: { ...sixteen, precise: undefined } }, posterize], 1, 1).pixels[0], 170);
+  // Black at half over white: 187 in linear light (a 32-bit file), 127 in sRGB (gradient-fill.psd's edges).
+  const white = { name: 'w', left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255]) } };
+  const half = { name: 'k', left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([0, 0, 0, 128]) } };
+  assert.equal(compositePsd([white, half], 1, 1, { linear: true }).pixels[0], 187);
+  assert.equal(compositePsd([white, half], 1, 1).pixels[0], 127);
+  // A 32-bit file's own picture, matted against white in linear light, taken back (transparentbg.psd).
+  const matted = new Float32Array([0.694, 0.694, 0.694, 0.306]);
+  unmatteLinear(matted);
+  assert.ok(matted[0] < 0.01, `${matted[0]}`);
 });
 
 /** A tiny ICC version 2 CMYK profile: A2B1 (mft2) from inks to Lab, B2A0 (mft1) from Lab to inks. */

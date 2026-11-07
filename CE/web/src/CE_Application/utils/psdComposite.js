@@ -38,6 +38,9 @@
  *     Glow cast under the layer, the rest drawn into it from its shape, a Stroke's outside part under
  *     it in its own mode; as Photoshop's pictures of them measure (what was not measured reported).
  *   - Masks with their Density and Feather; Advanced Blending's Channels and Blend If.
+ *   - A 16- or 32-bit file at the precision its pixels keep (psdRead.js eightBit's `precise`), and a
+ *     32-bit one (`linear`) put together in linear light, as Photoshop works one: an antialiased edge
+ *     blends there (gradient-fill.psd, pen-text.psd, vector-mask.psd: 2 % of pixels off to none).
  *
  * What it does not, and says so by layer name (`notDrawn`): an adjustment it has no formula for
  * (utils/psdAdjustments.js unappliedAdjustment says which), and layer styles when not given `styles`.
@@ -411,6 +414,8 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
   const left = own ? Math.round(layer.left ?? 0) : 0;
   const top = own ? Math.round(layer.top ?? 0) : 0;
   const through = blendIf(layer);
+  // A 16- or 32-bit file's pixels at their full precision, where the reader kept it (psdRead.js eightBit).
+  const fine = src.precise?.length === src.data.length ? src.precise : null;
   for (let sy = 0; sy < src.height; sy += 1) {
     const y = top + sy;
     if (y < 0 || y >= height) continue;
@@ -418,14 +423,17 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
       const x = left + sx;
       if (x < 0 || x >= width) continue;
       const s = (sy * src.width + sx) * 4;
-      let sa = (src.data[s + 3] / 255) * alpha;
+      let sr = fine ? fine[s] / 65535 : src.data[s] / 255;
+      let sg = fine ? fine[s + 1] / 65535 : src.data[s + 1] / 255;
+      let sb = fine ? fine[s + 2] / 65535 : src.data[s + 2] / 255;
+      if (inLinear) { sr = toLight(sr); sg = toLight(sg); sb = toLight(sb); }
+      let sa = (fine ? fine[s + 3] / 65535 : src.data[s + 3] / 255) * alpha;
       if (mask) sa *= mask(x, y);
       const d = (y * width + x) * 4;
-      if (through && sa > 0) sa *= through(src.data[s] / 255, src.data[s + 1] / 255, src.data[s + 2] / 255, dst[d], dst[d + 1], dst[d + 2]);
+      if (through && sa > 0) sa *= through(sr, sg, sb, dst[d], dst[d + 1], dst[d + 2]);
       if (dissolve && sa > 0) sa = dissolveNoise(y * width + x) < sa ? 1 : 0;
       if (sa <= 0) continue;
-      blendPixel(dst, d, src.data[s] / 255, src.data[s + 1] / 255, src.data[s + 2] / 255,
-        sa, blend, separable, nonSeparable);
+      blendPixel(dst, d, sr, sg, sb, sa, blend, separable, nonSeparable);
     }
   }
   return true;
@@ -685,13 +693,26 @@ export function compositePsd(layers, width, height, options = {}) {
   // A CMYK file's colours through its own profile while it is drawn (utils/iccProfile.js).
   const previous = options.cmykProfile ? useCmykProfile(options.cmykProfile) : undefined;
   try {
-    return compositeLayers(layers, width, height, options);
+    // A 16- or 32-bit file's layers carry their colours at full precision (psdRead.js eightBit): it is
+    // worked as a deep file unless the caller says.
+    const linear = Boolean(options.linear);
+    inLinear = linear;
+    return compositeLayers(layers, width, height, { ...options, deep: options.deep ?? hasPrecise(layers), linear });
   } finally {
+    inLinear = false;
     if (options.cmykProfile) useCmykProfile(previous);
   }
 }
 
-function compositeLayers(layers, width, height, { skip = () => false, styles = null, grey = false, cmyk = false } = {}) {
+// A 32-bit file is put together in linear light, as Photoshop works one: its pixels taken there as they
+// are drawn in, its styles' and adjustments' sRGB colours with them, and the whole taken back at the end.
+let inLinear = false;
+const toLight = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
+const fromLight = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+
+const hasPrecise = (layers) => (layers ?? []).some((layer) => Boolean(layer.imageData?.precise) || hasPrecise(layer.children));
+
+function compositeLayers(layers, width, height, { skip = () => false, styles = null, grey = false, cmyk = false, deep = false, linear = false } = {}) {
   const notDrawn = { effects: [], adjustment: [] };
   // The styles drawn, by name; those only close to Photoshop's carry why after it, in brackets.
   const drawnStyles = new Set();
@@ -786,7 +807,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
     if (paintLayer(buffer, width, height, base, 'normal', 1)) painted += 1;
     const shape = alphaOf(buffer);
     scaleAlpha(buffer, fill);
-    clipInto(buffer, shape, clipped);
+    clipInto(buffer, shape, clipped, base);
     compositeBuffer(dst, buffer, mode, opacity, blendIf(base));
   };
 
@@ -832,11 +853,48 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
    * at all, and the whole is then cut to its shape: a clipped layer shows in full over a base at Fill
    * 0% (Fill is the base's own pixels, not its shape), and blends with the base as far as its Fill.
    */
-  const clipInto = (buffer, shape, clipped) => {
+  const clipInto = (buffer, shape, clipped, base = null) => {
     if (!clipped.length) return;
     for (let i = 0; i < shape.length; i += 1) buffer[i * 4 + 3] = shape[i] > 0 ? Math.min(1, buffer[i * 4 + 3] / shape[i]) : 0;
     for (const layer of clipped) drawClipped(buffer, layer);
+    if (base) strokeOverClipped(buffer, base);
     for (let i = 0; i < shape.length; i += 1) buffer[i * 4 + 3] *= shape[i];
+  };
+
+  /**
+   * A shape's own Stroke (not a layer style: the shape's stroke setting) stays over the layers clipped
+   * to it, as a frame does round a picture clipped into it, and over its interior styles (overlays,
+   * Satin, Inner Glow) (stroke-composite.psd). Its pixels hold the
+   * stroke drawn over the fill; where both are one colour, each pixel's share of the stroke is how far
+   * its colour has gone from the fill's toward the stroke's, Photoshop's own antialiasing, and the
+   * stroke is laid back over what was clipped by that share.
+   */
+  const strokeOverClipped = (buffer, base) => {
+    const stroke = base.vectorStroke;
+    const data = base.imageData;
+    if (!stroke || stroke.strokeEnabled === false || stroke.content?.type !== 'color' || base.vectorFill?.type !== 'color' || !data?.data?.length) return;
+    const ink = psdRgb(stroke.content.color);
+    const paint = psdRgb(base.vectorFill.color);
+    const span = ink.map((v, k) => v - paint[k]);
+    const across = span.reduce((sum, v) => sum + v * v, 0);
+    if (across < 3 * 16 * 16) return; // too alike to tell apart
+    const strength = Number(stroke.opacity ?? 1);
+    const colour = ink.map((v) => (linear ? toLight(v / 255) : v / 255));
+    const left = Math.round(base.left ?? 0); const top = Math.round(base.top ?? 0);
+    for (let sy = 0; sy < data.height; sy += 1) {
+      const y = top + sy;
+      if (y < 0 || y >= height) continue;
+      for (let sx = 0; sx < data.width; sx += 1) {
+        const x = left + sx;
+        if (x < 0 || x >= width) continue;
+        const s = (sy * data.width + sx) * 4;
+        if (!(data.data[s + 3] > 0)) continue;
+        const share = clamp(((data.data[s] - paint[0]) * span[0] + (data.data[s + 1] - paint[1]) * span[1] + (data.data[s + 2] - paint[2]) * span[2]) / across) * strength;
+        if (!(share > 0)) continue;
+        const d = (y * width + x) * 4;
+        for (let k = 0; k < 3; k += 1) buffer[d + k] += (colour[k] - buffer[d + k]) * share;
+      }
+    }
   };
 
   /** An artboard's own background colour, over its rectangle (white, black, or its colour). */
@@ -934,10 +992,11 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
     }
 
     // Shadows and glows under it, each in its own blend mode, at the layer's opacity.
-    for (const cast of styles.cast(frame, frameWidth, frameHeight, effects)) {
+    const castsOver = [];
+    const drawCast = (cast) => {
       const castMode = SEPARABLE[cast.mode] || NON_SEPARABLE[cast.mode] ? cast.mode : 'normal';
       const { separable, nonSeparable } = modeFunctions(castMode);
-      const [r, g, b] = cast.rgb.map((v) => v / 255);
+      const [r, g, b] = cast.rgb.map((v) => (linear ? toLight(v / 255) : v / 255));
       for (let y = 0; y < cast.height; y += 1) {
         for (let x = 0; x < cast.width; x += 1) {
           const a = cast.alpha[y * cast.width + x];
@@ -949,12 +1008,16 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
             // A glow along a gradient: its colour and its opacity both from the gradient, from the edge
             // (the left end) out to where the glow ends (layer_params.psd: a faint far end shows to the
             // Size and stops there).
-            const [gr, gg, gb, ga] = cast.ramp(1 - a);
-            blendStylePixel(dst, d, gr / 255, gg / 255, gb / 255, ga * cast.opacity * opacity, castMode, separable, nonSeparable);
+            const [gr, gg, gb, ga] = cast.ramp(1 - a).map((v, k) => (k < 3 ? (linear ? toLight(v / 255) : v / 255) : v));
+            blendStylePixel(dst, d, gr, gg, gb, ga * cast.opacity * opacity, castMode, separable, nonSeparable);
           } else blendStylePixel(dst, d, r, g, b, a * cast.opacity * opacity, castMode, separable, nonSeparable);
         }
       }
       drawnStyles.add(cast.name);
+    };
+    for (const cast of styles.cast(frame, frameWidth, frameHeight, effects)) {
+      // (A bevel's light outside the shape goes over the stroke's part beside it, below.)
+      if (cast.overStroke) castsOver.push(cast); else drawCast(cast);
     }
 
     // The other styles into it, over its box and as far out as a stroke reaches.
@@ -974,7 +1037,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
           const X = box.x + x + ox; const Y = box.y + y + oy;
           const p = y * box.width + x;
           part[p] = frame[(box.y + y) * frameWidth + box.x + x];
-          for (let k = 0; k < 4; k += 1) pixels[p * 4 + k] = Math.round(clamp(onCanvas(X, Y) ? own[(Y * width + X) * 4 + k] : stored(X, Y, k)) * 255);
+          for (let k = 0; k < 4; k += 1) pixels[p * 4 + k] = Math.round(clamp(onCanvas(X, Y) ? (linear && k < 3 ? fromLight(clamp(own[(Y * width + X) * 4 + k])) : own[(Y * width + X) * 4 + k]) : stored(X, Y, k)) * 255);
         }
       }
       const drawn = styles.draw(pixels, part, box.width, box.height, some, { left: box.x + ox, top: box.y + oy, anchor, bounds, document: { width, height }, beside });
@@ -984,7 +1047,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
           const X = box.x + x + ox; const Y = box.y + y + oy;
           if (!onCanvas(X, Y)) continue;
           const p = y * box.width + x;
-          for (let k = 0; k < 4; k += 1) own[(Y * width + X) * 4 + k] = pixels[p * 4 + k] / 255;
+          for (let k = 0; k < 4; k += 1) own[(Y * width + X) * 4 + k] = linear && k < 3 ? toLight(pixels[p * 4 + k] / 255) : pixels[p * 4 + k] / 255;
         }
       }
       for (const name of drawn) drawnStyles.add(name);
@@ -1003,6 +1066,9 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
       clipInto(own, shape, clipped);
       drawInto(interior);
     }
+    // A shape's own Stroke over those, under the edge styles (stroke-composite.psd: its red stroke over
+    // a Gradient Overlay, under a Stroke style).
+    strokeOverClipped(own, base);
     drawInto(withOnly(effects, EDGE_STYLES));
     // A stroke's part beside the layer, before the layer goes on and in its own mode: at t / (1 −
     // covered), so that with the layer over it the two add up (psd-tools' reading; covered is the
@@ -1021,10 +1087,12 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
           if (covered >= 1) continue;
           const j = (y * band.width + x) * 3;
           const a = Math.min(1, t / (1 - covered)) * band.opacity * opacity;
-          blendStylePixel(dst, d, band.rgb[j] / 255, band.rgb[j + 1] / 255, band.rgb[j + 2] / 255, a, bandMode, separable, nonSeparable);
+          const lit = (v) => (linear ? toLight(v / 255) : v / 255);
+          blendStylePixel(dst, d, lit(band.rgb[j]), lit(band.rgb[j + 1]), lit(band.rgb[j + 2]), a, bandMode, separable, nonSeparable);
         }
       }
     }
+    for (const cast of castsOver) drawCast(cast);
     compositeBuffer(dst, own, mode === 'pass through' ? 'normal' : mode, opacity, blendIf(base));
   };
 
@@ -1033,7 +1101,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
    * clipped to), by its opacity and Fill and its masks, its result blended in its own blend mode.
    */
   const adjustBelow = (dst, layer, inherited, within = null) => {
-    const fn = adjustmentFunction(layer.adjustment, closeAdjustments, { grey, cmyk });
+    const fn = adjustmentFunction(layer.adjustment, closeAdjustments, { grey, cmyk, deep });
     if (!fn) {
       notDrawn.adjustment.push(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
       return;
@@ -1052,14 +1120,18 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
         if (!(dst[d + 3] > 0)) continue;
         const k = strength * (mask ? mask(x, y) : 1);
         if (!(k > 0)) continue;
-        const r0 = Math.round(clamp(dst[d]) * 255);
-        const g0 = Math.round(clamp(dst[d + 1]) * 255);
-        const b0 = Math.round(clamp(dst[d + 2]) * 255);
+        const at = (v) => (linear ? fromLight(clamp(v)) : clamp(v));
+        const r0 = Math.round(at(dst[d]) * 255);
+        const g0 = Math.round(at(dst[d + 1]) * 255);
+        const b0 = Math.round(at(dst[d + 2]) * 255);
         const key = (r0 << 16) | (g0 << 8) | b0;
-        let out = known.get(key);
-        if (!out) {
+        let out = fn.fine ? null : known.get(key);
+        if (fn.fine) {
+          const [r, g, b] = fn([at(dst[d]) * 255, at(dst[d + 1]) * 255, at(dst[d + 2]) * 255]);
+          out = [clamp(r / 255), clamp(g / 255), clamp(b / 255)].map((v) => (linear ? toLight(v) : v));
+        } else if (!out) {
           const [r, g, b] = fn([r0, g0, b0]);
-          out = [clamp(r / 255), clamp(g / 255), clamp(b / 255)];
+          out = [clamp(r / 255), clamp(g / 255), clamp(b / 255)].map((v) => (linear ? toLight(v) : v));
           if (known.size < 1 << 18) known.set(key, out);
         }
         let [r, g, b] = out;
@@ -1178,7 +1250,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
   drawList(canvas, layers, 1, { shallow: background, deep: background });
 
   const pixels = new Uint8Array(canvas.length);
-  for (let i = 0; i < canvas.length; i += 1) pixels[i] = Math.round(clamp(canvas[i]) * 255);
+  for (let i = 0; i < canvas.length; i += 1) pixels[i] = Math.round(clamp(linear && i % 4 !== 3 ? fromLight(clamp(canvas[i])) : canvas[i]) * 255);
   for (const key of Object.keys(notDrawn)) notDrawn[key] = [...new Set(notDrawn[key])];
   return {
     pixels,
@@ -1265,15 +1337,20 @@ function inkPlanesOf(layers, width, height, options = {}) {
     if (layer.children) out.children = tree(layer.children, plane);
     if (layer.inkPlanes && layer.imageData) {
       let data = layer.inkPlanes.cmy;
+      // (A 16-bit file's inks at their full precision too, where the reader kept them.)
+      let precise = layer.inkPlanes.cmyPrecise ?? null;
       if (plane === 'k') {
         data = new Uint8ClampedArray(data.length);
         const k = layer.inkPlanes.k;
+        const fine = layer.inkPlanes.kPrecise;
+        precise = precise && fine ? new Uint16Array(data.length) : null;
         for (let i = 0; i < data.length; i += 4) {
           const v = k ? k[i] : 255;
           data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = layer.inkPlanes.cmy[i + 3];
+          if (precise) { precise[i] = fine[i]; precise[i + 1] = fine[i]; precise[i + 2] = fine[i]; precise[i + 3] = layer.inkPlanes.cmyPrecise[i + 3]; }
         }
       }
-      out.imageData = { ...layer.imageData, data };
+      out.imageData = { ...layer.imageData, data, precise: precise ?? undefined };
     }
     // Curves and Levels: cyan, magenta and yellow as red, green and blue; black on its own.
     const adjustment = layer.adjustment;

@@ -303,6 +303,45 @@ gradients and strokes with the editor's own renderer, and only its pictures take
 how they were found.)
 
 No import hangs, throws or makes bad output: the Photoshop files' 948 imports, as in the fifth pass.
+CI run 541 (commit `53d6bb2`) passed in all four jobs.
+
+## The seventh pass: what the sixth left
+
+| Left after the sixth pass, or found on the way | Now |
+|---|---|
+| A 16-bit file's Posterize (1-3.4 %) | A 16- or 32-bit file's pixels keep their full precision beside the 8 bits they are read as (16 bits a value: a 16-bit file's own array kept, so nothing new is allocated for one), and the flattening works from them. Posterize, in such a file, cuts the value at k / levels and draws each band on Photoshop's 15-bit scale: posterize_16bits_rgb.psd, grayscale.psd and cmyk.psd (its inks kept the same way) all three from 1-3.4 % to none. The rest of the adjustments keep the 8-bit colours they were fitted on |
+| A 32-bit file's antialiased edges (gradient-fill.psd, 2.1 %) | A 32-bit file is put together in linear light, as Photoshop works one: its pixels taken there as they are drawn in, its styles' and adjustments' colours with them, the whole taken back to sRGB at the end. gradient-fill.psd 2.1 % to 0, vector-mask.psd 0.8 to 0.03, and pen-text.psd 2 % to 0.06: what the sixth pass put down to "Blend Text Colors Using Gamma" was this |
+| Found on the way: a 32-bit file's own picture | Where it is partly transparent it is matted against white, as an 8-bit file's is, but in linear light; it was read without taking the white back off (transparentbg.psd, a black shape's edge read as grey; 1.15 % to 0.1). It is the picture an import uses where a file has no layers |
+| Strokes at a square's corner (outside-stroke.psd, 1.2 %) | A pixel outside the shape is measured from the nearest edge pixel that is not itself outside, one inside from the nearest that is not inside; at a corner, from the corner pixel itself, where the nearest edge pixel of either side had been one outside it, a pixel further off. Read off Photoshop's picture of a 3 px stroke round a 16 px square, and then: outside-stroke.psd 1.2 % to 0.8, center-stroke-sizes.psd 0.5 to 0.2, double-stroke-effects.psd 0.4 to 0, feathered-stroke.psd 0.5 to 0.2, group-clips-child-stroke.psd 1.2 to 0.5, stroke-effects.psd 1.6 to 1.4; none worse |
+| Found on the way: a shape's own Stroke | A shape's stroke setting (not a layer style) stays over the layers clipped to it, as a frame round a clipped picture, and over its overlays, under a Stroke style: stroke-composite.psd 1.9 % to 0.07. Its pixels hold the stroke drawn over the fill; where both are one colour, each pixel's share of it is how far its colour has gone from the fill's toward the stroke's, Photoshop's own antialiasing, and that much of the stroke is laid back on top |
+| A Pillow Emboss over a stroke (layer_params.psd, 2.2 %) | An Outer Bevel's, an Emboss's or a Pillow Emboss's light outside the shape goes over the part of a Stroke beside the layer, which it shades in Photoshop's picture: the file's caption from 19 % of its pixels off to 14, the file 2.2 % to 1.7. What is left is the Pillow Emboss's own shape, which no file isolates |
+
+Tried and not kept: fitting Photo Filter, Vibrance and Color Balance to fill_adjustments.psd. Its eight
+adjustments are stacked over the whole canvas (Brightness/Contrast, Levels, Curves, Exposure, Vibrance,
+Hue/Saturation, Color Balance, Photo Filter), and each of its 11,693 colours maps to one in Photoshop's
+picture, so the chain is a clean function; but no candidate for the three unpublished formulas (GIMP's
+two Color Balances, Photo Filter as Multiply, Soft Light or Overlay, kept by Rec. 601, Rec. 709, Lab
+or HSL lightness, in sRGB or in linear light) fits it closer than 8.5 levels RMS. The Photo Filter's
+colour alone, fitted freely, comes out with red above 255 and the density halved: the earlier stages
+are part of it (Brightness/Contrast's model is within 3 levels, and Levels' gamma of 0.72 steepens
+that), so a fit to this one picture would be a fit to its errors. Nor was a rule found for the
+Lighter Color edges of passthrough_fill_blendmode.psd: Photoshop moves those pixels about 7 % toward
+the layer's colour where, by luminance or by sum, the backdrop is the lighter.
+
+**Measured: the panel flattening against Photoshop's own picture of the file** (281 files):
+
+| | Sixth pass | Seventh pass |
+|---|---|---|
+| Under 1 % | 253 | 264 |
+| Over 5 % | 9 | 9 |
+| Over 20 % | 8 | 8 |
+
+Twenty-two files came closer and none moved the other way by 0.05 points or more. The eight over
+20 % are six 4 by 4 pixel 16- and 32-bit files, Dissolve's grain, and fill_adjustments.psd.
+
+**As components in the editor**, against the sixth pass in the same browser: 81 / 11 / 12 / 35, as
+before; group-clips-child-stroke.psd from 0.8 % to 0, nothing else moved. No import hangs, throws or
+makes bad output (the 948 imports, as before).
 
 ## Left, and why
 
@@ -318,13 +357,13 @@ No import hangs, throws or makes bad output: the Photoshop files' 948 imports, a
   one (1.5 % of pixels; most of what was put down to it was its shadow's Linear Burn, above).
 - **Dissolve's grain** is random in Photoshop; its density is matched, its pixels cannot be.
 - **The rest of the flattening's differences**, each measured and none with a file that pins a
-  rule for it: Photo Filter, Vibrance and Color Balance stacked (fill_adjustments.psd, 41 %); a
-  Noise gradient on a stroke (effect-stroke-gradient.psd, 14 %), Photoshop's random one; a Lighter
+  rule for it: Photo Filter, Vibrance and Color Balance stacked (fill_adjustments.psd, 41 %: above);
+  a Noise gradient on a stroke (effect-stroke-gradient.psd, 14 %), Photoshop's random one; a Lighter
   Color layer's half-transparent edge pixels in a Pass Through group below full Fill (4 %); a
   Reflected gradient stroke, which Photoshop draws about a ninth longer than the box the linear
   ones are measured across (effect-enums.psd, 3 %: the one file with one, and psd-tools no closer);
-  a 16-bit
-  file's Posterize, which Photoshop works at 16 bits and this at the 8 it reads (1-3.4 %); a 32-bit
-  file's antialiased edges, which Photoshop composites in linear light (gradient-fill.psd, 2.1 %);
-  type that Photoshop blends with "Blend Text Colors Using Gamma", a setting of the application and
-  not of the file (pen-text.psd, 2 %); and the 4 by 4 pixel files above.
+  a Pillow Emboss's shading (layer_params.psd, 1.7 %); a stroke along a polygon's slanting edge
+  (shape-fx2.psd, 1.7 %), measured on the pixel grid and not from the path; and the 4 by 4 pixel 16-
+  and 32-bit files, which keep no pixels for their gradient fill and whose Reflected gradient
+  Photoshop draws at 45° where the file says 30°, at that size only (its 8-bit twin's own pixels show
+  the same).

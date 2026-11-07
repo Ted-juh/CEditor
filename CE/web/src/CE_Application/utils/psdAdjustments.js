@@ -606,7 +606,7 @@ function brightnessContrastCurve(brightness, contrast) {
  * The adjustment as `([r, g, b]) => [r, g, b]` (0..255), or null when it is one this does not do.
  * `report` (a Set) collects what was only approximated.
  */
-export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false } = {}) {
+export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false, deep = false } = {}) {
   const type = adjustment?.type;
   switch (type) {
     case 'invert':
@@ -615,8 +615,16 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
       const levels = Math.max(2, Math.min(255, Math.round(adjustment.levels ?? 4)));
       // Photoshop's: the range cut into `levels` equal bands, each drawn at its share of 255, rounded
       // down (exactly as on psd-tools' test files).
-      const step = (v) => Math.floor(Math.min(levels - 1, Math.floor((clamp(v) * levels) / 256)) * (255 / (levels - 1)));
-      return ([r, g, b]) => [step(r), step(g), step(b)];
+      // In a 16- or 32-bit file, on the value at its full precision (0..1): cut at k / levels, each band
+      // drawn at its share of Photoshop's 15-bit scale (posterize_16bits_rgb.psd, 3.4 % of pixels off
+      // to none, where the 8-bit rule cuts a little lower and misses the pixels at each edge).
+      const step = deep
+        ? (v) => (Math.round(Math.min(levels - 1, Math.floor((clamp(v) / 255) * levels)) * (32768 / (levels - 1))) / 32768) * 255
+        : (v) => Math.floor(Math.min(levels - 1, Math.floor((clamp(v) * levels) / 256)) * (255 / (levels - 1)));
+      const fn = ([r, g, b]) => [step(r), step(g), step(b)];
+      // (Its edges fall between 8-bit levels: given the colour unrounded where the file has it.)
+      if (deep) fn.fine = true;
+      return fn;
     }
     case 'threshold': {
       // White where the luminance, as Photoshop weighs it and rounds it to a level, reaches the

@@ -78,8 +78,9 @@ function distanceTo(seed, width, height) {
  * The signed distance from each pixel to a shape's edge (negative inside), the edge read off the
  * shape's coverage as Photoshop reads it (psd-tools' finding, #799): a partly covered pixel says the
  * edge runs 0.5 − coverage from its centre, and a hard step from clear to covered puts it half a pixel
- * from each side. Every other pixel measures to the nearest of those, found by a two-pass sweep that
- * carries the nearest edge pixel along (Danielsson's), in time linear in the pixels.
+ * from each side. Every other pixel measures to the nearest of those across the edge from it (below),
+ * found by a two-pass sweep that carries the nearest edge pixel along (Danielsson's), in time linear
+ * in the pixels.
  */
 function signedDistance(shape, width, height) {
   const n = width * height;
@@ -102,33 +103,43 @@ function signedDistance(shape, width, height) {
     }
   }
   const dist2 = (i, j) => { const dx = (i % width) - (j % width); const dy = Math.floor(i / width) - Math.floor(j / width); return dx * dx + dy * dy; };
-  const pass = (ys, xs, offsets) => {
-    for (const y of ys) {
-      for (const x of xs) {
-        const i = y * width + x;
-        for (const [dx, dy] of offsets) {
-          const nx = x + dx; const ny = y + dy;
-          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-          const o = owner[ny * width + nx];
-          if (o < 0) continue;
-          if (owner[i] < 0 || dist2(i, o) < dist2(i, owner[i])) owner[i] = o;
-        }
-      }
-    }
-  };
   const range = (a, b, step) => { const out = []; for (let v = a; step > 0 ? v < b : v > b; v += step) out.push(v); return out; };
   const forwardY = range(0, height, 1); const backwardY = range(height - 1, -1, -1);
   const forwardX = range(0, width, 1); const backwardX = range(width - 1, -1, -1);
-  pass(forwardY, forwardX, [[-1, 0], [0, -1], [-1, -1], [1, -1]]);
-  pass(forwardY, backwardX, [[1, 0]]);
-  pass(backwardY, backwardX, [[1, 0], [0, 1], [1, 1], [-1, 1]]);
-  pass(backwardY, forwardX, [[-1, 0]]);
-  // An edge pixel is where it says; a pixel inside is that far in from its nearest, one outside out.
+  /** The nearest of the seeds `owner` starts with, propagated over the whole picture. */
+  const spread = (owner) => {
+    const pass = (ys, xs, offsets) => {
+      for (const y of ys) {
+        for (const x of xs) {
+          const i = y * width + x;
+          for (const [dx, dy] of offsets) {
+            const nx = x + dx; const ny = y + dy;
+            if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+            const o = owner[ny * width + nx];
+            if (o < 0) continue;
+            if (owner[i] < 0 || dist2(i, o) < dist2(i, owner[i])) owner[i] = o;
+          }
+        }
+      }
+    };
+    pass(forwardY, forwardX, [[-1, 0], [0, -1], [-1, -1], [1, -1]]);
+    pass(forwardY, backwardX, [[1, 0]]);
+    pass(backwardY, backwardX, [[1, 0], [0, 1], [1, 1], [-1, 1]]);
+    pass(backwardY, forwardX, [[-1, 0]]);
+    return owner;
+  };
+  // An edge pixel is where it says. One outside is measured from the nearest edge pixel that is not
+  // itself outside (one inside, or partly covered), one inside from the nearest that is not inside:
+  // at a square's corner, from the corner pixel itself, as Photoshop measures it (outside-stroke.psd
+  // 1.2 % of pixels off to 0.8, center-stroke-sizes.psd 0.5 to 0.2), where the nearest edge pixel of
+  // either side was one outside it, a pixel further off.
+  const fromInside = spread(owner.map((o, i) => (o >= 0 && shape[i] > 0 ? o : -1)));
+  const fromOutside = spread(owner.map((o, i) => (o >= 0 && shape[i] < 1 ? o : -1)));
   const out = new Float32Array(n);
   for (let i = 0; i < n; i += 1) {
-    const o = owner[i];
+    if (owner[i] === i) { out[i] = seedNear[i]; continue; }
+    const o = covered(i) ? fromOutside[i] : fromInside[i];
     if (o < 0) out[i] = covered(i) ? -INF : INF;
-    else if (o === i) out[i] = seedNear[i];
     else out[i] = seedNear[o] + (covered(i) ? -1 : 1) * Math.sqrt(dist2(i, o));
   }
   return out;
@@ -371,7 +382,9 @@ export function castShadows(shape, width, height, effects) {
     cast(glow, { x: 0, y: 0 }, rgb, String(glow.blendMode ?? 'screen'), 'Outer Glow', false, true);
   }
   // An Outer Bevel, an Emboss and a Pillow Emboss light what is around the shape too: cast onto it in
-  // their own modes, over the shadows and glows (a Pillow Emboss's outside is its height turned over).
+  // their own modes, over the shadows and glows (a Pillow Emboss's outside is its height turned over),
+  // and over the part of a Stroke outside the layer, which they shade (`overStroke`: layer_params.psd,
+  // its caption's red stroke lit and shaded by its Pillow Emboss, 19 % of pixels off to 14).
   const bevel = effects.bevel;
   if (enabled(bevel) && (bevel.style ?? 'inner bevel') !== 'inner bevel') {
     const reach = Math.max(1, pxOf(bevel.size, 5));
@@ -386,8 +399,8 @@ export function castShadows(shape, width, height, effects) {
     const lo = flip ? shading.loFlip : shading.lo;
     for (let i = 0; i < part.length; i += 1) { hi[i] *= 1 - part[i]; lo[i] *= 1 - part[i]; }
     const name = `Bevel & Emboss${approximations(bevel, false, true)}`;
-    casts.push({ x: left, y: top, width: w, height: h, alpha: lo, rgb: bevel.shadowColor ? psdRgb(bevel.shadowColor) : [0, 0, 0], mode: String(bevel.shadowBlendMode ?? 'multiply'), opacity: bevel.shadowOpacity ?? 0.75, name });
-    casts.push({ x: left, y: top, width: w, height: h, alpha: hi, rgb: bevel.highlightColor ? psdRgb(bevel.highlightColor) : [255, 255, 255], mode: String(bevel.highlightBlendMode ?? 'screen'), opacity: bevel.highlightOpacity ?? 0.75, name });
+    casts.push({ x: left, y: top, width: w, height: h, alpha: lo, rgb: bevel.shadowColor ? psdRgb(bevel.shadowColor) : [0, 0, 0], mode: String(bevel.shadowBlendMode ?? 'multiply'), opacity: bevel.shadowOpacity ?? 0.75, name, overStroke: true });
+    casts.push({ x: left, y: top, width: w, height: h, alpha: hi, rgb: bevel.highlightColor ? psdRgb(bevel.highlightColor) : [255, 255, 255], mode: String(bevel.highlightBlendMode ?? 'screen'), opacity: bevel.highlightOpacity ?? 0.75, name, overStroke: true });
   }
   return casts;
 }

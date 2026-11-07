@@ -135,7 +135,8 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   32-bit file, mixed in linear light). A path left open is filled as if closed by a straight line.
   A shape whose vector mask is below full Density, or feathered, shows its fill faintly past its
   path, over the whole canvas, as Photoshop shows it; a layer mask kept beside the vector mask cuts
-  the shape too.
+  the shape too. A shape's own Stroke (its stroke setting, not a layer style) stays over the layers
+  clipped to it and over its overlays, as a frame round a picture clipped into it.
 - **Adjustment layers** change everything under them in their group (or the layer they are clipped
   to), by their opacity, masks and blend mode: Levels, Curves, Exposure, Invert, Posterize,
   Threshold, Channel Mixer, Gradient Map and legacy Brightness/Contrast exactly; Brightness/Contrast,
@@ -152,11 +153,17 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   across the box the stroke reaches; a pattern one, linked with the layer, starts where its layer
   does. Styles see a layer's pixels past the canvas, and a group's styles its layers': an inside
   stroke on a layer the size of the canvas borders the picture, and on a shape that runs on past the
-  canvas is not seen there. Drawn only close, and named in the Console: a Chisel bevel, Soften, a
+  canvas is not seen there. A stroke rounds a square's corner from the corner itself, and an Outer
+  Bevel, an Emboss or a Pillow Emboss shades the part of a Stroke outside the layer. Drawn only
+  close, and named in the Console: a Chisel bevel, Soften, a
   bevel's Gloss Contour, a Precise glow, and a Noise gradient (its average colour); a style's Noise
   and a bevel's Texture are not drawn.
 - **Dissolve** is drawn with a grain of its own, as dense as Photoshop's. Photoshop's is random, so
   the pixels differ.
+- **A 16- or 32-bit file** is put together at the precision its pixels keep (a Posterize cuts its
+  16-bit values where Photoshop does), and a 32-bit one in linear light, as Photoshop works it, so an
+  antialiased edge blends as it does there. A 32-bit file's own picture of itself, where it is partly
+  transparent, is read back from the white Photoshop matted it against.
 - **A CMYK file** is flattened on its inks, as Photoshop flattens it, where every adjustment in it
   works ink by ink (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast);
   with one that works on whole colours (Hue/Saturation, ...) it is flattened in RGB. A Threshold

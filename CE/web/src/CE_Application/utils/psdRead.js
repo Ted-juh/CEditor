@@ -41,20 +41,30 @@ const CONVERTED = new Set([4, 7, 8, 9]);
 const clamp01 = (v) => (v > 0 ? (v < 1 ? v : 1) : 0);
 const srgb = (x) => (x <= 0.0031308 ? x * 12.92 : 1.055 * x ** (1 / 2.4) - 0.055);
 
-/** A picture's pixels as 8 bits a channel; `colour` false for a mask (coverage, kept linear). */
-export function eightBit(image, colour = true) {
+/**
+ * A picture's pixels as 8 bits a channel; `colour` false for a mask (coverage, kept linear) or for a
+ * picture whose channels are not RGB. `keep`: its values at their full precision kept beside, as
+ * `precise` (16 bits, 0..65535), which the flattening works from as Photoshop works a deep file.
+ */
+export function eightBit(image, colour = true, keep = colour) {
   const data = image?.data;
   if (!data || data instanceof Uint8ClampedArray || data instanceof Uint8Array) return image;
   const out = new Uint8ClampedArray(data.length);
+  // (16 bits a value, 0..65535: a 16-bit file's own array, a 32-bit file's colours through sRGB's curve.)
+  let precise = null;
   if (data instanceof Uint16Array) {
     for (let i = 0; i < data.length; i += 1) out[i] = Math.round(data[i] / 257);
+    if (keep) precise = data;
   } else {
+    if (keep) precise = new Uint16Array(data.length);
     for (let i = 0; i < data.length; i += 1) {
       const v = clamp01(data[i]);
-      out[i] = Math.round(255 * (colour && i % 4 !== 3 ? srgb(v) : v));
+      const c = colour && i % 4 !== 3 ? srgb(v) : v;
+      out[i] = Math.round(255 * c);
+      if (precise) precise[i] = Math.round(65535 * c);
     }
   }
-  return { ...image, data: out };
+  return precise ? { ...image, data: out, precise } : { ...image, data: out };
 }
 
 /**
@@ -90,12 +100,12 @@ function linearColours(layers) {
   }
 }
 
-function eightBitLayers(layers, colour = true) {
+function eightBitLayers(layers, colour = true, keep = colour) {
   for (const layer of layers ?? []) {
-    if (layer.imageData) layer.imageData = eightBit(layer.imageData, colour);
+    if (layer.imageData) layer.imageData = eightBit(layer.imageData, colour, keep);
     if (layer.mask?.imageData) layer.mask.imageData = eightBit(layer.mask.imageData, false);
     if (layer.realMask?.imageData) layer.realMask.imageData = eightBit(layer.realMask.imageData, false);
-    if (layer.children) eightBitLayers(layer.children, colour);
+    if (layer.children) eightBitLayers(layer.children, colour, keep);
   }
 }
 
@@ -406,7 +416,7 @@ function readConverted(view, mode, composite) {
   if (mode === 7) return readMultichannel(view);
   const records = layerRecords(view);
   if (!records) return null;
-  const parse = (relabel, as) => {
+  const parse = (relabel, as, keep = false) => {
     const copy = new Uint8Array(view);
     copy[24] = 0;
     copy[25] = as;
@@ -418,7 +428,7 @@ function readConverted(view, mode, composite) {
     }
     const read = readPsd(copy.buffer, { useImageData: true, skipThumbnail: true, skipCompositeImageData: true, skipLinkedFilesData: true });
     // 16 bits a channel made 8 first (as stored, not through a colour curve: these are not RGB).
-    if (read.bitsPerChannel && read.bitsPerChannel !== 8) eightBitLayers(read.children, false);
+    if (read.bitsPerChannel && read.bitsPerChannel !== 8) eightBitLayers(read.children, false, keep);
     return read;
   };
   // An id ag-psd sets aside: below -3 (its masks), any other it reads.
@@ -448,17 +458,21 @@ function readConverted(view, mode, composite) {
     // Through the file's own profile where it carries one this reads (as Photoshop shows it).
     const profile = iccCmykToRgb(embeddedProfile(view));
     const convert = profile ?? cmykToRgb;
-    const psd = parse((id) => (id === 3 ? aside(3) : id), 3);
+    // (A 16-bit file's inks kept at their full precision too, for the flattening.)
+    const psd = parse((id) => (id === 3 ? aside(3) : id), 3, true);
     if (profile) psd.cmykProfile = profile;
-    const black = parse((id) => (id === 3 ? 0 : id >= 0 && id <= 2 ? aside(id) : id), 3);
+    const black = parse((id) => (id === 3 ? 0 : id >= 0 && id <= 2 ? aside(id) : id), 3, true);
     const inks = [];
-    walkPictures(black.children, (data) => inks.push(data));
+    walkPictures(black.children, (data, layer) => inks.push([data, layer.imageData.precise]));
     let n = 0;
     walkPictures(psd.children, (data, layer) => {
-      const k = inks[n++];
+      const [k, kPrecise] = inks[n++] ?? [];
       // The inks as stored (255 no ink) kept beside the colours: cyan, magenta and yellow in one
       // picture, black in another, for the panel flattening to work on the inks as Photoshop does.
-      layer.inkPlanes = { cmy: Uint8ClampedArray.from(data), k: k ? Uint8ClampedArray.from(k) : null };
+      const { precise: cmyPrecise, ...picture } = layer.imageData;
+      layer.inkPlanes = { cmy: Uint8ClampedArray.from(data), k: k ? Uint8ClampedArray.from(k) : null,
+        ...(cmyPrecise && kPrecise ? { cmyPrecise, kPrecise } : {}) };
+      layer.imageData = picture;
       for (let i = 0; i < data.length; i += 4) data.set(cmyk8(data[i], data[i + 1], data[i + 2], k ? k[i] : 255, convert).map(Math.round), i);
     });
     return finishConverted(psd, view, composite, 4, (p) => cmyk8(p[0], p[1], p[2], p[3], convert));
@@ -518,6 +532,20 @@ function extraChannels(psd, view, colours) {
     out[i * 4 + 3] = a;
   }
   psd.imageData = { width: read.width, height: read.height, data: out };
+}
+
+/**
+ * A 32-bit file's picture of itself, where it is partly transparent, is matted against white as the
+ * file's own picture of an 8-bit one is (extraChannels), but in the linear light it is kept in: taken
+ * back to its own colour there, before it goes to sRGB (transparentbg.psd: a black shape's edge, kept
+ * as grey 217 at alpha 78, is black).
+ */
+export function unmatteLinear(data) {
+  for (let i = 0; i < data.length; i += 4) {
+    const a = data[i + 3];
+    if (!(a > 0 && a < 1)) continue;
+    for (let c = 0; c < 3; c += 1) data[i + c] = Math.max(0, Math.min(1, (data[i + c] - (1 - a)) / a));
+  }
 }
 
 /** A converted file's picture of itself, read here, where it is wanted. */
@@ -605,6 +633,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
   }
   if (psd.bitsPerChannel && psd.bitsPerChannel !== 8 && !converted) {
     eightBitLayers(psd.children);
+    if (psd.imageData?.data instanceof Float32Array) unmatteLinear(psd.imageData.data);
     if (psd.imageData) psd.imageData = eightBit(psd.imageData);
     if (psd.bitsPerChannel === 32) linearColours(psd.children);
   }

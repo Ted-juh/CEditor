@@ -326,7 +326,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     const stack = (fillOpacity) => [{ ...alone, fillOpacity }, ...clippedPixels.map((layer) => ({ ...layer, clipping: true }))];
     const fillOpacity = unit.fillOpacity ?? 1;
     const flatten = (fill) => {
-      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES, grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK', cmykProfile: psd.cmykProfile });
+      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES, grey: Boolean(psd.grey), cmyk: read.converted === 'CMYK', cmykProfile: psd.cmykProfile, linear: psd.bitsPerChannel === 32 });
       for (const name of out.styles ?? out.closeTo.styles) report.drawn.add(name);
       for (const name of out.closeTo.adjustments) report.approximated.add(name);
       for (const name of out.notDrawn.adjustment) report.unsupported.add(name);
