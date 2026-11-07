@@ -211,7 +211,8 @@ resvg's `hue-rotate()` and colour-function tests from 16-67 % to 4 % (now the la
 
 No import hangs, throws or makes bad output: the SVG and Photoshop files' 7,161 imports, and the PDFs'
 1,130, the two stress files now among them and refused with what is wrong. Photoshop components that
-import went from 290 to 293 of 316 (pattern fills drawn).
+import went from 290 to 293 of 316 (pattern fills drawn). CI run 539 (commit `3d5c837`) passed in all
+four jobs.
 
 ## Left, and why
 

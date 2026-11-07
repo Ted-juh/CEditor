@@ -21,8 +21,9 @@
 // LAYER_STYLES, since this module draws with its blend modes.
 
 import { blendChannel } from './psdComposite.js';
-import { psdRgb } from './psdAdjustments.js';
-import { scaleOf } from './psdVectors.js';
+import { gradientRamp, psdRgb } from './psdAdjustments.js';
+import { blur } from './gaussianBlur.js';
+import { gradientField, scaleOf } from './psdVectors.js';
 
 const INF = 1e20;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -68,36 +69,6 @@ function distanceTo(seed, width, height) {
     for (let x = 0; x < width; x += 1) out[y * width + x] = Math.sqrt(d[x]);
   }
   return out;
-}
-
-/**
- * A Gaussian blur of `a` (`w` × `h`, one value a pixel) in place, as three box blurs (Wells), nothing
- * outside it.
- */
-function blur(a, w, h, sigma) {
-  if (!(sigma > 0.25)) return;
-  const ideal = Math.sqrt(4 * sigma * sigma + 1);
-  let lower = Math.floor(ideal);
-  if (lower % 2 === 0) lower -= 1;
-  const m = Math.round((12 * sigma * sigma - 3 * lower * lower - 12 * lower - 9) / (-4 * lower - 4));
-  const line = new Float32Array(Math.max(w, h));
-  const pass = (start, step, n, r) => {
-    let sum = 0;
-    for (let k = 0; k <= Math.min(r, n - 1); k += 1) sum += a[start + k * step];
-    const scale = 1 / (2 * r + 1);
-    for (let i = 0; i < n; i += 1) {
-      line[i] = sum * scale;
-      if (i + r + 1 < n) sum += a[start + (i + r + 1) * step];
-      if (i - r >= 0) sum -= a[start + (i - r) * step];
-    }
-    for (let i = 0; i < n; i += 1) a[start + i * step] = line[i];
-  };
-  for (let k = 0; k < 3; k += 1) {
-    const r = ((k < m ? lower : lower + 2) - 1) / 2;
-    if (r < 1) continue;
-    for (let y = 0; y < h; y += 1) pass(y * w, 1, w, r);
-    for (let x = 0; x < w; x += 1) pass(x, w, h, r);
-  }
 }
 
 const argb = (rgb, alpha = 1) => `${Math.round(clamp01(alpha) * 255).toString(16).padStart(2, '0')}${rgb.map((c) => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
@@ -191,7 +162,7 @@ export function castShadows(shape, width, height, effects) {
   }
   if (enabled(effects.outerGlow)) {
     const glow = effects.outerGlow;
-    const rgb = glow.color ? psdRgb(glow.color) : glow.gradient ? gradientAt(glow.gradient, 0).rgb : [255, 255, 190];
+    const rgb = glow.color ? psdRgb(glow.color) : glow.gradient ? gradientRamp(glow.gradient)(0).slice(0, 3) : [255, 255, 190];
     cast(glow, { x: 0, y: 0 }, rgb, String(glow.blendMode ?? 'screen'), 'Outer Glow', false);
   }
   return casts;
@@ -217,25 +188,6 @@ export function hasDrawnStyles(effects) {
     || enabled(effects.bevel) || enabled(effects.patternOverlay);
 }
 
-function gradientAt(gradient, t) {
-  const colours = [...(gradient?.colorStops ?? [])].sort((a, b) => a.location - b.location);
-  const opacities = [...(gradient?.opacityStops ?? [])].sort((a, b) => a.location - b.location);
-  // Stops 0..1 as ag-psd gives them (0..4096 as the file writes them, if given so).
-  const at = clamp01(t) * ([...colours, ...opacities].some((stop) => stop.location > 1) ? 4096 : 1);
-  const lerpStops = (stops, get, fallback) => {
-    if (!stops.length) return fallback;
-    if (at <= stops[0].location) return get(stops[0]);
-    for (let i = 1; i < stops.length; i += 1) {
-      if (at <= stops[i].location) {
-        const k = (at - stops[i - 1].location) / Math.max(1e-9, stops[i].location - stops[i - 1].location);
-        const a = get(stops[i - 1]); const b = get(stops[i]);
-        return Array.isArray(a) ? a.map((v, j) => v + (b[j] - v) * k) : a + (b - a) * k;
-      }
-    }
-    return get(stops[stops.length - 1]);
-  };
-  return { rgb: lerpStops(colours, (s) => psdRgb(s.color), [0, 0, 0]), alpha: lerpStops(opacities, (s) => s.opacity ?? 1, 1) };
-}
 
 /**
  * Draw the layer's interior and stroke styles into `pixels` (RGBA 8-bit, document-sized), from
@@ -245,7 +197,7 @@ function gradientAt(gradient, t) {
  * Given a part of the document instead, `left` and `top` say where it is, and `anchor` (the layer's
  * top left) is where a Pattern Overlay linked with the layer starts.
  */
-export function drawLayerStyles(pixels, shape, width, height, effects, { left = 0, top = 0, anchor = null } = {}) {
+export function drawLayerStyles(pixels, shape, width, height, effects, { left = 0, top = 0, anchor = null, document = null, bounds = null } = {}) {
   const drawn = [];
   if (!effects || effects.disabled || !hasDrawnStyles(effects)) return drawn;
   const inside = (i) => shape[i] >= 0.5;
@@ -297,30 +249,22 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     }
     drawn.push('Pattern Overlay');
   }
+  // The layer's box (what its pixels cover), in the document, which an aligned gradient lies across.
+  let minX = width; let minY = height; let maxX = -1; let maxY = -1;
+  for (let i = 0; i < shape.length; i += 1) if (shape[i] > 0) { const x = i % width; const y = (i - x) / width; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
+  // (The layer's own bounds where the caller knows them: past the canvas, they reach past this part.)
+  const layerBox = maxX < 0 ? null : bounds ?? { x: left + minX, y: top + minY, width: maxX - minX + 1, height: maxY - minY + 1 };
+  const page = { x: 0, y: 0, width: document?.width ?? left + width, height: document?.height ?? top + height };
   for (const overlay of (effects.gradientOverlay ?? []).filter(enabled)) {
-    let minX = width; let minY = height; let maxX = -1; let maxY = -1;
-    for (let i = 0; i < shape.length; i += 1) if (shape[i] > 0) { const x = i % width; const y = (i - x) / width; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
-    if (maxX < 0) continue;
-    const a = ((overlay.angle ?? 90) * Math.PI) / 180;
-    const dir = { x: Math.cos(a), y: -Math.sin(a) };
-    const cx = (minX + maxX) / 2; const cy = (minY + maxY) / 2;
-    const half = (Math.abs((maxX - minX) * dir.x) + Math.abs((maxY - minY) * dir.y)) / 2 * scaleOf(overlay.scale) || 1;
-    const radius = Math.max(maxX - minX, maxY - minY) / 2 * scaleOf(overlay.scale) || 1;
+    if (!layerBox) continue;
+    // As Photoshop lays a gradient (utils/psdVectors.js gradientField), at whole pixel coordinates.
+    const field = gradientField({ style: overlay.type, angle: overlay.angle, scale: overlay.scale, reverse: overlay.reverse, offset: overlay.offset }, overlay.align === false ? page : layerBox);
+    const ramp = gradientRamp(overlay.gradient);
     for (let i = 0; i < shape.length; i += 1) {
       if (shape[i] <= 0) continue;
       const x = i % width; const y = (i - x) / width;
-      const along = ((x - cx) * dir.x + (y - cy) * dir.y) / half;
-      let t;
-      switch (overlay.type) {
-        case 'radial': t = Math.hypot(x - cx, y - cy) / radius; break;
-        case 'reflected': t = Math.abs(along); break;
-        case 'angle': t = ((Math.atan2(-(y - cy), x - cx) - a) / (2 * Math.PI) + 2) % 1; break;
-        case 'diamond': t = (Math.abs(x - cx) + Math.abs(y - cy)) / radius; break;
-        default: t = (along + 1) / 2;
-      }
-      if (overlay.reverse) t = 1 - t;
-      const { rgb, alpha } = gradientAt(overlay.gradient, t);
-      paintInside(i, rgb, alpha * (overlay.opacity ?? 1), modeOf(overlay, 'normal'));
+      const [r, g, b, alpha] = ramp(field(left + x, top + y));
+      paintInside(i, [r, g, b], alpha * (overlay.opacity ?? 1), modeOf(overlay, 'normal'));
     }
     drawn.push('Gradient Overlay');
   }
@@ -401,16 +345,32 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
   for (const stroke of (effects.stroke ?? []).filter(enabled)) {
     const size = Math.max(0.5, pxOf(stroke.size, 3));
     const position = stroke.position ?? 'outside';
-    const rgb = stroke.fillType === 'gradient' ? gradientAt(stroke.gradient, 0.5).rgb : psdRgb(stroke.color);
+    // Its paint at each pixel: a colour; a gradient laid as Photoshop lays one, over the layer's box
+    // (or the document); or a pattern tiled from the document's corner.
+    const colour = psdRgb(stroke.color);
+    let paintAt = () => [...colour, 1];
+    if (stroke.fillType === 'gradient' && stroke.gradient && layerBox) {
+      const g = stroke.gradient;
+      const field = gradientField({ style: g.style, angle: g.angle, scale: g.scale, reverse: g.reverse, offset: g.offset }, g.align === false ? page : layerBox);
+      const ramp = gradientRamp(g);
+      paintAt = (x, y) => ramp(field(x, y));
+    } else if (stroke.fillType === 'pattern' && stroke.pattern?.picture) {
+      const { width: pw, height: ph, data } = stroke.pattern.picture;
+      const wrap = (v, n) => ((v % n) + n) % n;
+      paintAt = (x, y) => { const j = (wrap(y, ph) * pw + wrap(x, pw)) * 4; return [data[j], data[j + 1], data[j + 2], data[j + 3] / 255]; };
+    }
     for (let i = 0; i < shape.length; i += 1) {
       const outerReach = position === 'outside' ? size : position === 'center' ? size / 2 : 0;
       const innerReach = position === 'inside' ? size : position === 'center' ? size / 2 : 0;
       let amount = 0;
       if (shape[i] < 0.5) amount = clamp01(outerReach + 0.5 - fromEdgeOutside[i]);
       else amount = clamp01(innerReach + 0.5 - fromEdgeInside[i]);
-      if (amount > 0) paint(i, rgb, amount * (stroke.opacity ?? 1), modeOf(stroke, 'normal'));
+      if (amount <= 0) continue;
+      const x = i % width; const y = (i - x) / width;
+      const [r, g, b, a] = paintAt(left + x, top + y);
+      paint(i, [r, g, b], amount * a * (stroke.opacity ?? 1), modeOf(stroke, 'normal'));
     }
-    drawn.push(stroke.fillType === 'gradient' ? 'Stroke (its gradient as one colour)' : 'Stroke');
+    drawn.push(stroke.fillType === 'pattern' && !stroke.pattern?.picture ? 'Stroke (its pattern not in the file: its colour)' : 'Stroke');
   }
   if (enabled(pattern) && !pattern.picture) drawn.push('Pattern Overlay (not drawn: the file does not keep its pattern)');
   return drawn;

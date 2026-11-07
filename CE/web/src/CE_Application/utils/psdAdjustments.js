@@ -38,6 +38,77 @@ export function inkPlaneColours(plane) {
   inkPlane = plane;
 }
 
+/**
+ * Where a gradient's stops run to: ag-psd gives them 0..1 (the file's 0..4096 divided out); 4096 for
+ * stops given as the file writes them; and a newer Photoshop's, written in another unit (0 to 2.5),
+ * by their largest.
+ */
+export function stopScale(...lists) {
+  const largest = Math.max(0, ...lists.flat().map((stop) => Number(stop?.location) || 0));
+  return largest > 64 ? 4096 : largest > 1 ? largest : 1;
+}
+
+const toLinear = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+const toSrgb = (c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * Math.max(0, c) ** (1 / 2.4) - 0.055);
+// Oklab, for Photoshop's Perceptual interpolation.
+const toOklab = ([r, g, b]) => {
+  const [lr, lg, lb] = [r, g, b].map(toLinear);
+  const l = Math.cbrt(0.4122214708 * lr + 0.5363325363 * lg + 0.0514459929 * lb);
+  const m = Math.cbrt(0.2119034982 * lr + 0.6806995451 * lg + 0.1073969566 * lb);
+  const s = Math.cbrt(0.0883024619 * lr + 0.2817188376 * lg + 0.6299787005 * lb);
+  return [0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s, 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s, 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s];
+};
+const fromOklab = ([L, A, B]) => {
+  const l = (L + 0.3963377774 * A + 0.2158037573 * B) ** 3;
+  const m = (L - 0.1055613458 * A - 0.0638541728 * B) ** 3;
+  const s = (L - 0.0894841775 * A - 1.291485548 * B) ** 3;
+  return [4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s, -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s, -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s].map(toSrgb);
+};
+
+/**
+ * A gradient's colour and opacity at `u` (0..1), as Photoshop draws it, measured on its own pictures
+ * of psd-tools' files: between two stops, the later stop's midpoint is where the two meet half way;
+ * Classic interpolation is in the file's colours, bent by Smoothness (at 100% an S, u − 0.583·u(1−u)
+ * (1−2u), which its two-stop fills follow to within half a level), Linear in linear light, and
+ * Perceptual in Oklab. `[r, g, b, a]`, colours 0..255, a 0..1.
+ */
+export function gradientRamp(content) {
+  const colourStops = [...(content?.colorStops ?? [])].sort((a, b) => a.location - b.location);
+  const opacityStops = [...(content?.opacityStops ?? [])].sort((a, b) => a.location - b.location);
+  const scale = stopScale(colourStops, opacityStops);
+  const smooth = content?.interpolationMethod && content.interpolationMethod !== 'classic' ? 0 : Number(content?.smoothness ?? 1);
+  const method = content?.interpolationMethod ?? 'classic';
+  const across = (stops, value, mix) => (u) => {
+    if (!stops.length) return null;
+    const at = (stop) => stop.location / scale;
+    if (u <= at(stops[0])) return value(stops[0]);
+    for (let i = 1; i < stops.length; i += 1) {
+      const a = stops[i - 1];
+      const b = stops[i];
+      if (u > at(b)) continue;
+      let k = (u - at(a)) / Math.max(1e-9, at(b) - at(a));
+      const m = Number(b.midpoint ?? 0.5);
+      k = k < m ? (0.5 * k) / Math.max(1e-9, m) : 0.5 + (0.5 * (k - m)) / Math.max(1e-9, 1 - m);
+      k -= 0.583 * smooth * k * (1 - k) * (1 - 2 * k);
+      return mix(value(a), value(b), k);
+    }
+    return value(stops[stops.length - 1]);
+  };
+  const lerp = (a, b, k) => a + (b - a) * k;
+  const colourMix = method === 'linear'
+    ? (a, b, k) => a.map((v, i) => toSrgb(lerp(toLinear(v), toLinear(b[i]), k)))
+    : method === 'perceptual'
+      ? (a, b, k) => { const oa = toOklab(a); const ob = toOklab(b); return fromOklab(oa.map((v, i) => lerp(v, ob[i], k))); }
+      : (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
+  const colourAt = across(colourStops, (stop) => psdRgb(stop.color), colourMix);
+  const alphaAt = across(opacityStops, (stop) => stop.opacity ?? 1, lerp);
+  return (u) => {
+    const t = Math.max(0, Math.min(1, u));
+    const rgb = colourAt(t) ?? [0, 0, 0];
+    return [...rgb.map((v) => Math.max(0, Math.min(255, v))), alphaAt(t) ?? 1];
+  };
+}
+
 /** Photoshop's colour objects as 0..255 RGB (or, while flattening on inks, as the plane's inks). */
 export function psdRgb(color) {
   if (inkPlane) return inksOf(color, inkPlane);
@@ -188,23 +259,6 @@ function curveTable(points) {
     table[v] = clamp(y);
   }
   return table;
-}
-
-function gradientColour(stops, t) {
-  const list = [...(stops ?? [])].sort((a, b) => a.location - b.location);
-  if (!list.length) return [t * 255, t * 255, t * 255];
-  // Stops 0..1 as ag-psd gives them (0..4096 as the file writes them, if given so).
-  const at = t * (list.some((stop) => stop.location > 1) ? 4096 : 1);
-  if (at <= list[0].location) return psdRgb(list[0].color);
-  for (let i = 1; i < list.length; i += 1) {
-    if (at <= list[i].location) {
-      const k = (at - list[i - 1].location) / Math.max(1e-9, list[i].location - list[i - 1].location);
-      const a = psdRgb(list[i - 1].color);
-      const b = psdRgb(list[i].color);
-      return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, a[2] + (b[2] - a[2]) * k];
-    }
-  }
-  return psdRgb(list[list.length - 1].color);
 }
 
 const SELECTIVE_RANGES = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas', 'whites', 'neutrals', 'blacks'];
@@ -369,7 +423,7 @@ function colourLookup(lut) {
  * The adjustment as `([r, g, b]) => [r, g, b]` (0..255), or null when it is one this does not do.
  * `report` (a Set) collects what was only approximated.
  */
-export function adjustmentFunction(adjustment, report = new Set()) {
+export function adjustmentFunction(adjustment, report = new Set(), { grey = false } = {}) {
   const type = adjustment?.type;
   switch (type) {
     case 'invert':
@@ -382,28 +436,33 @@ export function adjustmentFunction(adjustment, report = new Set()) {
       return ([r, g, b]) => [step(r), step(g), step(b)];
     }
     case 'threshold': {
+      // White where the luminance, as Photoshop weighs it and rounds it to a level, reaches the
+      // threshold (the grey itself in a Grayscale file).
       const level = adjustment.level ?? 128;
-      return ([r, g, b]) => { const v = luma(r, g, b) >= level ? 255 : 0; return [v, v, v]; };
+      return ([r, g, b]) => { const v = Math.round(grey ? r : 0.3 * r + 0.59 * g + 0.11 * b) >= level ? 255 : 0; return [v, v, v]; };
     }
     case 'levels': {
       // Each channel's own levels first, then the RGB ones over all three, as Photoshop draws them.
-      const all = levelsTable(adjustment.rgb);
-      const per = ['red', 'green', 'blue'].map((name) => levelsTable(adjustment[name]));
+      // A Grayscale file has one channel, its levels the first after the master, which it ignores.
+      const all = levelsTable(grey ? null : adjustment.rgb);
+      const per = (grey ? ['red', 'red', 'red'] : ['red', 'green', 'blue']).map((name) => levelsTable(adjustment[name]));
       return (rgb) => rgb.map((v, i) => all[Math.round(clamp(per[i][Math.round(clamp(v))]))]);
     }
     case 'curves': {
       // Each channel's own curve first, then the RGB one over all three, as Photoshop draws them.
-      const all = curveTable(adjustment.rgb);
-      const per = ['red', 'green', 'blue'].map((name) => curveTable(adjustment[name]));
+      // A Grayscale file has one channel, its curve the first after the master, which it ignores.
+      const all = curveTable(grey ? null : adjustment.rgb);
+      const per = (grey ? ['red', 'red', 'red'] : ['red', 'green', 'blue']).map((name) => curveTable(adjustment[name]));
       return (rgb) => rgb.map((v, i) => all[Math.round(clamp(per[i][Math.round(clamp(v))]))]);
     }
     case 'exposure': {
       const gain = Math.pow(2, adjustment.exposure ?? 0);
       const offset = adjustment.offset ?? 0;
       const gamma = adjustment.gamma ?? 1;
-      // In linear light, as Photoshop works exposure.
-      const toLinear = (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-      const toSrgb = (c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+      // In linear light, as Photoshop works exposure: through sRGB's curve, or in a Grayscale file
+      // through Dot Gain 20%'s, a power of 1.75 (psd-tools' finding, which its test files bear out).
+      const toLinear = grey ? (v) => (v / 255) ** 1.75 : (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+      const toSrgb = grey ? (c) => 255 * Math.max(0, c) ** (1 / 1.75) : (c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
       return (rgb) => rgb.map((v) => clamp(toSrgb(unit(Math.pow(unit(toLinear(v) * gain + offset), 1 / (gamma || 1))))));
     }
     case 'brightness/contrast': {
@@ -555,11 +614,12 @@ export function adjustmentFunction(adjustment, report = new Set()) {
       return (rgb) => [mix(adjustment.red ?? { red: 100 }, rgb), mix(adjustment.green ?? { green: 100 }, rgb), mix(adjustment.blue ?? { blue: 100 }, rgb)];
     }
     case 'gradient map': {
-      const stops = adjustment.colorStops ?? [];
+      // Through the gradient as Photoshop draws one (midpoints, Smoothness, interpolation).
+      const ramp = gradientRamp(adjustment);
       return ([r, g, b]) => {
         let t = luma(r, g, b) / 255;
         if (adjustment.reverse) t = 1 - t;
-        return gradientColour(stops, t).map(clamp);
+        return ramp(t).slice(0, 3).map(clamp);
       };
     }
     case 'selective color':

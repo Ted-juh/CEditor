@@ -149,7 +149,7 @@ export function planPsdPanelImport(bytes) {
   // The artwork: every other visible layer, flattened as Photoshop would (ag-psd lists children
   // bottom first, which is the order they are drawn in).
   // A CMYK file on its inks, as Photoshop flattens it, where everything in it works ink by ink.
-  const options = { skip: (layer) => layer === group, styles: LAYER_STYLES };
+  const options = { skip: (layer) => layer === group, styles: LAYER_STYLES, grey: Boolean(psd.grey) };
   const onInks = read.converted === 'CMYK' ? compositeInks(psd.children, width, height, options) : null;
   const { pixels, painted, notDrawn, closeTo, dissolve } = onInks ?? compositePsd(psd.children, width, height, options);
 

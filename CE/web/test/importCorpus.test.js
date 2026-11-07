@@ -687,7 +687,10 @@ test('Photoshop: a fill layer saved without pixels is drawn from its fill and ve
   const { psdGradient } = await import('../src/CE_Application/utils/psdVectors.js');
   // ag-psd gives a gradient's stops 0..1: they were read as 0..4096, every stop at 0.
   const gradient = psdGradient({ colorStops: [{ color: { r: 255, g: 0, b: 0 }, location: 0 }, { color: { r: 0, g: 0, b: 255 }, location: 1 }], angle: 0 });
-  assert.deepEqual(gradient.stops.map((stop) => stop.position), [0, 100]);
+  assert.equal(gradient.stops[0].position, 0);
+  assert.equal(gradient.stops.at(-1).position, 100);
+  assert.equal(gradient.stops[0].color, 'FFFF0000');
+  assert.equal(gradient.stops.at(-1).color, 'FF0000FF');
   // A red square, 2..6 of an 8 by 8 document, as a shape with no pixels: its vector mask's path.
   const corner = (x, y) => ({ points: [x, y, x, y, x, y] });
   const shape = { name: 'square', blendMode: 'normal', opacity: 1, vectorFill: { type: 'color', color: { r: 255, g: 0, b: 0 } },

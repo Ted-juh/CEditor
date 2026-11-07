@@ -281,8 +281,11 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
         : combinedPathData(unit.vectorMask, { geometry, everything });
       const model = outline ? parsePathData(outline.d) : [];
       const bounds = model.length ? modelBounds(model) : null;
-      if (bounds && bounds.width > 0 && bounds.height > 0) {
-        const stroke = vectorStrokeOf(unit.vectorStroke);
+      // The gradient laid over the shape's own box, as Photoshop lays it.
+      const shaped = bounds && vectorFillOf(unit.vectorFill, bounds);
+      if (bounds && bounds.width > 0 && bounds.height > 0 && shaped) {
+        Object.assign(fill, shaped);
+        const stroke = vectorStrokeOf(unit.vectorStroke, bounds);
         const strokeWidth = stroke?.width ?? 0;
         const box = { x: bounds.x - strokeWidth / 2, y: bounds.y - strokeWidth / 2, width: bounds.width + strokeWidth, height: bounds.height + strokeWidth };
         const noFill = unit.vectorStroke?.fillEnabled === false;
@@ -323,7 +326,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     const stack = (fillOpacity) => [{ ...alone, fillOpacity }, ...clippedPixels.map((layer) => ({ ...layer, clipping: true }))];
     const fillOpacity = unit.fillOpacity ?? 1;
     const flatten = (fill) => {
-      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES });
+      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES, grey: Boolean(psd.grey) });
       for (const name of out.closeTo.styles) report.drawn.add(name);
       for (const name of out.closeTo.adjustments) report.approximated.add(name);
       for (const name of out.notDrawn.adjustment) report.unsupported.add(name);
@@ -339,7 +342,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     }
     // Clipped adjustments change this unit alone.
     for (const layer of clippedAdjustments) {
-      const fn = adjustmentFunction(layer.adjustment, report.approximated);
+      const fn = adjustmentFunction(layer.adjustment, report.approximated, { grey: Boolean(psd.grey) });
       if (fn) adjustPixels(pixels, width, 0, 0, fn, { strength: layer.opacity ?? 1, mask: layerMaskSampler(layer, { width, height }) });
       else report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
     }
@@ -355,7 +358,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
 
   /** An adjustment layer: what it does, to every layer read so far (they are all under it). */
   const adjust = (layer, opacity) => {
-    const fn = adjustmentFunction(layer.adjustment, report.approximated);
+    const fn = adjustmentFunction(layer.adjustment, report.approximated, { grey: Boolean(psd.grey) });
     if (!fn) { report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`); return; }
     const strength = opacity * (layer.opacity ?? 1);
     const mask = layerMaskSampler(layer, { width, height });
@@ -503,7 +506,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     } else if (record.type === 'vector') {
       const section = vectorBackground(record.fill, record.stroke);
       const vectorEffects = effects ?? blendEffects('normal');
-      for (const name of styleVector(record.styles, section, vectorEffects)) report.kept.add(name);
+      for (const name of styleVector(record.styles, section, vectorEffects, record.box)) report.kept.add(name);
       part = createPartNode(uniqueLayerName(record.label, taken), {
         role: 'custom', kind: 'path', opacity: round(record.alpha, 3), visible: record.visible,
         layout: { ...layout, x: round(record.box.x), y: round(record.box.y), width: round(record.box.width), height: round(record.box.height) },
@@ -620,13 +623,13 @@ function vectorBackground(fill, stroke) {
  * become its fill, a stroke its outline, inner shadows and glows its inner shadows, a bevel its
  * bevel. Returns the names kept.
  */
-function styleVector(styles, background, effects) {
+function styleVector(styles, background, effects, box) {
   const kept = [];
   if (!styles || styles.disabled) return kept;
   const on = (effect) => effect && effect.enabled !== false;
   const fill = background._children.Fill;
   for (const overlay of (styles.gradientOverlay ?? []).filter(on)) {
-    const gradient = psdGradient({ ...overlay.gradient, style: overlay.type, angle: overlay.angle, reverse: overlay.reverse, scale: overlay.scale });
+    const gradient = overlay.align === false ? null : psdGradient({ ...overlay.gradient, style: overlay.type, angle: overlay.angle, reverse: overlay.reverse, scale: overlay.scale, offset: overlay.offset }, box);
     if (gradient) { Object.assign(fill, { gradientEnabled: true, gradient, gradientOpacity: Math.round((overlay.opacity ?? 1) * 100), solidEnabled: false }); kept.push('Gradient Overlay'); }
   }
   for (const overlay of (styles.solidFill ?? []).filter(on)) {

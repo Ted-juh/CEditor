@@ -98,7 +98,11 @@ function layerRecords(view) {
         at += 4;
         const end = at + extra;
         let inner = at;
-        inner += 4 + data.getUint32(inner); // layer mask data
+        // Layer mask data: the "real" mask (the user and vector masks together) counts only where its
+        // flags say parameters were applied to it, as psd-tools reads it.
+        const maskLength = data.getUint32(inner);
+        const realApplied = maskLength >= 36 && (view[inner + 4 + 18] & 16) !== 0;
+        inner += 4 + maskLength;
         inner += 4 + data.getUint32(inner); // blending ranges
         inner += (((view[inner] + 1) + 3) & ~3); // name, a Pascal string padded to 4
         let knockout = 0;
@@ -112,7 +116,7 @@ function layerRecords(view) {
           if (key === 'curv' || key === 'levl') black = blackChannel(data, key, body);
           inner = body + length(inner + 8, long);
         }
-        out.push({ knockout, channels, black });
+        out.push({ knockout, channels, black, realApplied });
         at = end;
       }
       return out;
@@ -377,6 +381,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
     order.forEach((layer, i) => {
       if (layer && records[i].knockout) layer.knockoutLevel = records[i].knockout;
       if (layer?.adjustment && records[i].black && converted === 'CMYK') layer.adjustment.black = records[i].black;
+      if (layer?.mask && records[i].realApplied && layer.realMask?.imageData) layer.mask.real = layer.realMask;
     });
   }
   if (psd.bitsPerChannel && psd.bitsPerChannel !== 8 && !converted) {
@@ -385,6 +390,8 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
   }
   // (A converted file's patterns are in its own colours, not RGB.)
   if (!converted) attachPatterns(psd);
+  // The file's own colour mode: a Grayscale or Duotone file's adjustments work on its one channel.
+  psd.grey = fileMode === 1 || fileMode === 8;
   return { ok: true, psd, ...(converted ? { converted } : {}) };
 }
 
@@ -406,6 +413,9 @@ function attachPatterns(psd) {
       if (layer.vectorFill?.type === 'pattern' && pictures.has(layer.vectorFill.id)) layer.vectorFill.picture = pictures.get(layer.vectorFill.id);
       const overlay = layer.effects?.patternOverlay;
       if (overlay?.pattern && pictures.has(overlay.pattern.id)) overlay.picture = pictures.get(overlay.pattern.id);
+      for (const stroke of layer.effects?.stroke ?? []) {
+        if (stroke?.pattern && pictures.has(stroke.pattern.id)) stroke.pattern.picture = pictures.get(stroke.pattern.id);
+      }
       walk(layer.children);
     }
   };
