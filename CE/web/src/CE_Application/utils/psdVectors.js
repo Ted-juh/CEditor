@@ -67,6 +67,32 @@ export function scaleOf(value) {
 }
 
 /**
+ * A pattern's colour at document pixel (x, y): `[r, g, b, a]` (a 0..1), its picture (`{ width, height,
+ * data }` RGBA) tiled from (ox, oy) at `scale`. Scaled, Photoshop interpolates it (bilinear, texel k
+ * at (x − ox) / scale = k: patterns.psd's 200% lines blur over three rows centred on the texel), and
+ * at 100% each pixel is its texel.
+ */
+export function patternSampler(picture, { scale = 1, ox = 0, oy = 0 } = {}) {
+  const { width: pw, height: ph, data } = picture;
+  const wrap = (v, n) => ((v % n) + n) % n;
+  const texel = (tx, ty) => (wrap(ty, ph) * pw + wrap(tx, pw)) * 4;
+  if (Math.abs(scale - 1) < 1e-6) {
+    return (x, y) => { const j = texel(Math.floor(x - ox), Math.floor(y - oy)); return [data[j], data[j + 1], data[j + 2], data[j + 3] / 255]; };
+  }
+  return (x, y) => {
+    const u = (x - ox) / scale; const v = (y - oy) / scale;
+    const x0 = Math.floor(u); const y0 = Math.floor(v); const fx = u - x0; const fy = v - y0;
+    const a = texel(x0, y0); const b = texel(x0 + 1, y0); const c = texel(x0, y0 + 1); const d = texel(x0 + 1, y0 + 1);
+    const out = [0, 0, 0, 0];
+    for (let k = 0; k < 4; k += 1) {
+      out[k] = (data[a + k] * (1 - fx) + data[b + k] * fx) * (1 - fy) + (data[c + k] * (1 - fx) + data[d + k] * fx) * fy;
+    }
+    out[3] /= 255;
+    return out;
+  };
+}
+
+/**
  * Where on a gradient each document pixel is (0..1), as Photoshop lays it over `box` ({ x, y, width,
  * height }: the layer's, or the document's where the gradient is not aligned with the layer): from the
  * box's centre (moved by its offset, a fraction of the box, as ag-psd reads it), at its angle; a Linear one from one edge
@@ -114,7 +140,7 @@ export function psdGradient(content, box = { width: 100, height: 100 }) {
   if (colours.length < 1) return null;
   const style = String(content.style ?? content.type ?? 'linear');
   if (style === 'diamond') return null;
-  const ramp = gradientRamp(content);
+  const ramp = gradientRamp(content, { mirrored: style === 'reflected' });
   const reverse = Boolean(content.reverse);
   const width = Math.max(1, box.width ?? 100);
   const height = Math.max(1, box.height ?? 100);

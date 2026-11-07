@@ -81,7 +81,7 @@ const fromOklab = ([L, A, B]) => {
  * (1−2u), which its two-stop fills follow to within half a level), Linear in linear light, and
  * Perceptual in Oklab. `[r, g, b, a]`, colours 0..255, a 0..1.
  */
-export function gradientRamp(content) {
+export function gradientRamp(content, { mirrored = false } = {}) {
   if (content?.type === 'noise') {
     // A Noise gradient is Photoshop's random one, from its seed: not drawn as Photoshop draws it, but
     // in the middle of the ranges it was allowed (its average colour), and reported so.
@@ -95,21 +95,50 @@ export function gradientRamp(content) {
   const scale = stopScale(colourStops, opacityStops);
   const smooth = content?.interpolationMethod && content.interpolationMethod !== 'classic' ? 0 : Number(content?.smoothness ?? 1);
   const method = content?.interpolationMethod ?? 'classic';
-  const across = (stops, value, mix) => (u) => {
-    if (!stops.length) return null;
+  // Smoothness, in the classic interpolation: a cubic Hermite spline through the stops, each channel on
+  // its own. An end stop's slope is 1 − 0.583 of its segment's (at 100%; the two-stop fills' S, to half
+  // a level); an inner stop's is its neighbours' (Catmull-Rom), so between two of one colour it is
+  // flat: a Blue, Yellow, Blue stroke read back from Photoshop's colours row by row (stroke-effects.psd)
+  // follows it to a hundredth. Below 100% each slope goes that far back toward its segment's own.
+  const across = (stops, value, mix) => {
+    if (!stops.length) return () => null;
     const at = (stop) => stop.location / scale;
-    if (u <= at(stops[0])) return value(stops[0]);
-    for (let i = 1; i < stops.length; i += 1) {
-      const a = stops[i - 1];
-      const b = stops[i];
-      if (u > at(b)) continue;
-      let k = (u - at(a)) / Math.max(1e-9, at(b) - at(a));
-      const m = Number(b.midpoint ?? 0.5);
-      k = k < m ? (0.5 * k) / Math.max(1e-9, m) : 0.5 + (0.5 * (k - m)) / Math.max(1e-9, 1 - m);
-      k -= 0.583 * smooth * k * (1 - k) * (1 - 2 * k);
-      return mix(value(a), value(b), k);
-    }
-    return value(stops[stops.length - 1]);
+    const values = stops.map((stop) => [].concat(value(stop)));
+    const n = stops.length;
+    // Each inner stop's Catmull-Rom slope, per unit of the gradient. A Reflected gradient mirrors about
+    // its start, so a stop there is between its neighbour and that neighbour's mirror image: flat
+    // (effect-enums.psd's reflected stroke is flat at its middle).
+    const slopes = values.map((v, i) => {
+      if (i === 0 && mirrored && at(stops[0]) <= 1e-6 && n > 1) return v.map(() => 0);
+      if (i === 0 || i === n - 1) return null;
+      return v.map((_, c) => (values[i + 1][c] - values[i - 1][c]) / Math.max(1e-9, at(stops[i + 1]) - at(stops[i - 1])));
+    });
+    const single = !Array.isArray(value(stops[0]));
+    return (u) => {
+      if (u <= at(stops[0])) return value(stops[0]);
+      for (let i = 1; i < n; i += 1) {
+        const a = stops[i - 1];
+        const b = stops[i];
+        if (u > at(b)) continue;
+        const dx = Math.max(1e-9, at(b) - at(a));
+        let k = (u - at(a)) / dx;
+        const m = Number(b.midpoint ?? 0.5);
+        k = k < m ? (0.5 * k) / Math.max(1e-9, m) : 0.5 + (0.5 * (k - m)) / Math.max(1e-9, 1 - m);
+        if (!(smooth > 0)) return mix(value(a), value(b), k);
+        const va = values[i - 1]; const vb = values[i];
+        const slope = (stop, c, secant) => (slopes[stop]
+          ? (1 - smooth) * secant + smooth * slopes[stop][c] * dx
+          : (1 - 0.583 * smooth) * secant);
+        const k2 = k * k; const k3 = k2 * k;
+        const out = va.map((v, c) => {
+          const secant = vb[c] - v;
+          return (2 * k3 - 3 * k2 + 1) * v + (k3 - 2 * k2 + k) * slope(i - 1, c, secant)
+            + (-2 * k3 + 3 * k2) * vb[c] + (k3 - k2) * slope(i, c, secant);
+        });
+        return single ? out[0] : out;
+      }
+      return value(stops[n - 1]);
+    };
   };
   const lerp = (a, b, k) => a + (b - a) * k;
   const colourMix = method === 'linear'
@@ -117,7 +146,12 @@ export function gradientRamp(content) {
     : method === 'perceptual'
       ? (a, b, k) => { const oa = toOklab(a); const ob = toOklab(b); return fromOklab(oa.map((v, i) => lerp(v, ob[i], k))); }
       : (a, b, k) => a.map((v, i) => lerp(v, b[i], k));
-  const colourAt = across(colourStops, (stop) => psdRgb(stop.color), colourMix);
+  // A 32-bit document's gradient mixes its stops in linear light, Smoothness and all (psdRead.js marks
+  // it): the stops taken back to linear, the result to sRGB.
+  const light = Boolean(content?.linearLight) && method === 'classic';
+  const colourAt = light
+    ? ((at) => (u) => { const v = at(u); return v && v.map((c) => toSrgb(c)); })(across(colourStops, (stop) => psdRgb(stop.color).map(toLinear), (a, b, k) => a.map((v, i) => lerp(v, b[i], k))))
+    : across(colourStops, (stop) => psdRgb(stop.color), colourMix);
   const alphaAt = across(opacityStops, (stop) => stop.opacity ?? 1, lerp);
   return (u) => {
     const t = Math.max(0, Math.min(1, u));
@@ -590,6 +624,7 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
       // In a CMYK file its black is the black ink alone, as a press shows it (threshold_cmyk.psd).
       const level = adjustment.level ?? 128;
       const black = cmyk ? (cmykProfile ?? cmykToRgb)(0, 0, 0, 1) : [0, 0, 0];
+      // (A CMYK file's Threshold is drawn on its inks where it can be: utils/psdComposite.js compositeInks.)
       return ([r, g, b]) => (Math.round(grey ? r : 0.3 * r + 0.59 * g + 0.11 * b) >= level ? [255, 255, 255] : [...black]);
     }
     case 'levels': {
@@ -714,7 +749,9 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
     case 'photo filter': {
       report.add('Photo Filter');
       const colour = psdRgb(adjustment.color);
-      const density = (adjustment.density ?? 25) / 100;
+      // ag-psd gives the Density as a fraction; a percent, where a reader gave one, still reads.
+      const raw = Number(adjustment.density ?? 0.25);
+      const density = raw > 1 ? raw / 100 : raw;
       return ([r, g, b]) => {
         let out = [r * (1 - density) + (r * colour[0] / 255) * density, g * (1 - density) + (g * colour[1] / 255) * density, b * (1 - density) + (b * colour[2] / 255) * density];
         if (adjustment.preserveLuminosity !== false) {
@@ -742,6 +779,9 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
       report.add('Selective Color');
       return selectiveColour(adjustment);
     case 'color lookup': {
+      // One with nothing chosen in it (no table, no profile, no name) leaves colours as they are, as a
+      // freshly added Color Lookup does in Photoshop (fill_adjustments.psd).
+      if (!adjustment.lookupType && !adjustment.lut3DFileData?.length && !adjustment.lut3DFileName && !adjustment.profile && !adjustment.name) return (rgb) => rgb;
       if (adjustment.lookupType && adjustment.lookupType !== '3dlut') return null;
       const lut = readLookupTable(adjustment.lut3DFileData, adjustment.lutFormat);
       return lut ? colourLookup(lut) : null;

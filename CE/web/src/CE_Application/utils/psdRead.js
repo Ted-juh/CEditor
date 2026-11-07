@@ -72,10 +72,20 @@ function linearColours(layers) {
     }
     for (const [key, item] of Object.entries(value)) if (key !== 'imageData' && key !== 'picture') fix(item, depth + 1);
   };
+  // Its gradients mix their stops in that linear light too (gradient-fill.psd): marked for the ramp.
+  const mark = (value, depth = 0) => {
+    if (!value || typeof value !== 'object' || depth > 6 || ArrayBuffer.isView(value)) return;
+    if (Array.isArray(value)) { for (const item of value) mark(item, depth + 1); return; }
+    if (Array.isArray(value.colorStops)) value.linearLight = true;
+    for (const [key, item] of Object.entries(value)) if (key !== 'imageData' && key !== 'picture') mark(item, depth + 1);
+  };
   for (const layer of layers ?? []) {
     fix(layer.vectorFill);
     fix(layer.effects);
     fix(layer.vectorStroke);
+    mark(layer.vectorFill);
+    mark(layer.effects);
+    mark(layer.adjustment);
     linearColours(layer.children);
   }
 }
@@ -146,6 +156,7 @@ function layerRecords(view) {
         let knockout = 0;
         let black = null;
         let effectsAt = null;
+        let effectsKey = '';
         let restricted = null;
         while (inner + 12 <= end) {
           if (tag(inner) !== '8BIM' && tag(inner) !== '8B64') { inner += 1; continue; }
@@ -154,8 +165,11 @@ function layerRecords(view) {
           const body = inner + 8 + (long ? 8 : 4);
           if (key === 'knko') knockout = view[body];
           if (key === 'curv' || key === 'levl') black = blackChannel(data, key, body);
-          // The layer's styles: 'lmfx' (several of one style) over 'lfx2'.
-          if (key === 'lmfx' || (key === 'lfx2' && effectsAt == null)) effectsAt = body;
+          // The layer's styles: 'lmfx' (several of one style) over 'lfx2', and that over 'lfxs', which a
+          // group may keep instead (group-stroke-off-canvas.psd: its strokes only there).
+          if (key === 'lmfx') { effectsAt = body; effectsKey = key; }
+          if (key === 'lfx2' && effectsKey !== 'lmfx') { effectsAt = body; effectsKey = key; }
+          if (key === 'lfxs' && effectsAt == null) { effectsAt = body; effectsKey = key; }
           // Advanced Blending's Channels: the channels the layer leaves alone, four bytes each (ag-psd
           // drops the last of them, so one channel is none).
           if (key === 'brst') {
@@ -165,7 +179,7 @@ function layerRecords(view) {
           }
           inner = body + length(inner + 8, long);
         }
-        out.push({ knockout, channels, black, realApplied, effectsAt, restricted, maskParameters });
+        out.push({ knockout, channels, black, realApplied, effectsAt, effectsKey, restricted, maskParameters });
         at = end;
       }
       return out;
@@ -583,7 +597,7 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
         for (const [key, value] of Object.entries(records[i].maskParameters)) if (layer.mask[key] == null && Number.isFinite(value)) layer.mask[key] = value;
       }
       // Styles ag-psd could not read from the descriptor (it keeps the legacy block, without `scale`).
-      if (layer && records[i].effectsAt != null && !(layer.effects && 'scale' in layer.effects)) {
+      if (layer && records[i].effectsAt != null && (!(layer.effects && 'scale' in layer.effects) || records[i].effectsKey === 'lfxs')) {
         const effects = readEffectsBlock(new DataView(view.buffer, view.byteOffset, view.byteLength), records[i].effectsAt);
         if (effects) layer.effects = effects;
       }
@@ -595,11 +609,30 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
     if (psd.bitsPerChannel === 32) linearColours(psd.children);
   }
   globalLight(psd);
+  binaryColours(psd.children);
   // (A converted file's patterns are in its own colours, not RGB.)
   if (!converted) attachPatterns(psd);
   // The file's own colour mode: a Grayscale or Duotone file's adjustments work on its one channel.
   psd.grey = fileMode === 1 || fileMode === 8;
   return { ok: true, psd, ...(converted ? { converted } : {}) };
+}
+
+/**
+ * A Photo Filter's colour, which ag-psd reads from the binary colour structure in fractions (Lab's L
+ * over 100, a and b over 128; HSB over 1), into the units its colours have everywhere else (L 0..100,
+ * a and b ±128; degrees and percent): read as they were, a warming filter's orange was black.
+ */
+function binaryColours(layers) {
+  for (const layer of layers ?? []) {
+    const adjustment = layer.adjustment;
+    const colour = adjustment?.type === 'photo filter' ? adjustment.color : null;
+    if (colour && Number.isFinite(colour.l) && Math.abs(colour.l) <= 1 && Math.abs(colour.a) <= 1.01 && Math.abs(colour.b) <= 1.01) {
+      adjustment.color = { l: colour.l * 100, a: colour.a * (colour.a < 0 ? 128 : 127), b: colour.b * (colour.b < 0 ? 128 : 127) };
+    } else if (colour && Number.isFinite(colour.h) && colour.h <= 1 && colour.s <= 1) {
+      adjustment.color = { h: colour.h * 360, s: colour.s * 100, b: colour.b * 100 };
+    }
+    binaryColours(layer.children);
+  }
 }
 
 /**

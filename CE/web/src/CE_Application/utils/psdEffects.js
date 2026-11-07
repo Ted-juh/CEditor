@@ -138,7 +138,8 @@ const READERS = {
   patternFill: ['patternOverlay', false, (d) => ({ ...common(d), pattern: d.Ptrn ? { name: d.Ptrn.Nm ?? '', id: d.Ptrn.Idnt ?? '' } : undefined, scale: percent(d['Scl'], 1), align: d.Algn, phase: d.phase ? { x: num(d.phase.Hrzn, 0), y: num(d.phase.Vrtc, 0) } : undefined })],
   FrFX: ['stroke', true, (d) => {
     const g = d.Grad ? { ...gradientOf(d.Grad), style: enumOf(d.Type, GRADIENT_STYLE) ?? 'linear', angle: num(d.Angl), reverse: d.Rvrs, align: d.Algn, scale: percent(d['Scl'], 1), offset: d.Ofst ? { x: percent(d.Ofst.Hrzn, 0), y: percent(d.Ofst.Vrtc, 0) } : undefined } : undefined;
-    return { ...common(d), position: enumOf(d.Styl, STROKE_POSITION) ?? 'outside', fillType: enumOf(d.PntT, STROKE_FILL) ?? 'color', size: px(d['Sz']), color: colourOf(d.Clr), gradient: g, pattern: d.Ptrn ? { name: d.Ptrn.Nm ?? '', id: d.Ptrn.Idnt ?? '' } : undefined };
+    const pattern = d.Ptrn ? { name: d.Ptrn.Nm ?? '', id: d.Ptrn.Idnt ?? '', linked: d.Lnkd, phase: d.phase ? { x: num(d.phase.Hrzn, 0), y: num(d.phase.Vrtc, 0) } : undefined } : undefined;
+    return { ...common(d), position: enumOf(d.Styl, STROKE_POSITION) ?? 'outside', fillType: enumOf(d.PntT, STROKE_FILL) ?? 'color', size: px(d['Sz']), color: colourOf(d.Clr), gradient: g, pattern, scale: d['Scl'] ? percent(d['Scl'], 1) : undefined };
   }],
   ebbl: ['bevel', false, (d) => ({
     enabled: d.enab !== false, present: d.present !== false,

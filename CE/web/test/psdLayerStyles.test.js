@@ -7,9 +7,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { castShadows, drawLayerStyles, stylesExtent } from '../src/CE_Application/utils/psdLayerStyles.js';
-import { blendChannel, blendIf, compositePsd } from '../src/CE_Application/utils/psdComposite.js';
-import { contourTable } from '../src/CE_Application/utils/psdAdjustments.js';
+import { castShadows, drawLayerStyles, LAYER_STYLES, stylesExtent } from '../src/CE_Application/utils/psdLayerStyles.js';
+import { blendChannel, blendIf, blendStylePixel, compositePsd, neutralOf, styleGeometry } from '../src/CE_Application/utils/psdComposite.js';
+import { contourTable, gradientRamp } from '../src/CE_Application/utils/psdAdjustments.js';
+import { patternSampler } from '../src/CE_Application/utils/psdVectors.js';
 import { effectsFromDescriptor } from '../src/CE_Application/utils/psdEffects.js';
 import { iccCmykToRgb } from '../src/CE_Application/utils/iccProfile.js';
 
@@ -114,6 +115,13 @@ test('a stroke outside a see-through edge goes under the layer: the layer\'s own
   // 0.4 of red over the band, which fills the 0.6 left beside it: 102 red, 153 green.
   const [r, g, b, a] = at(6, 3);
   assert.ok(Math.abs(r - 102) <= 2 && Math.abs(g - 153) <= 2 && b === 0 && a === 255, `${[r, g, b, a]}`);
+  // Drawn into the layer's own pixels (a component's picture), the same once it is laid on the white.
+  const own = compositePsd([{ ...layer, effects: undefined }], w, h).pixels;
+  const shape = Float32Array.from({ length: w * h }, (_, i) => own[i * 4 + 3] / 255);
+  drawLayerStyles(own, shape, w, h, layer.effects);
+  const p = (3 * w + 6) * 4;
+  const onWhite = [0, 1, 2].map((k) => (own[p + k] * own[p + 3]) / 255 + 255 - own[p + 3]);
+  assert.ok(Math.abs(onWhite[0] - 102) <= 2 && Math.abs(onWhite[1] - 153) <= 2 && onWhite[2] <= 2, `${onWhite}`);
 });
 
 test('a contour is drawn through the spline Curves uses; Linear leaves the style alone', () => {
@@ -185,6 +193,103 @@ test('masks: a shape\'s vector mask below full Density shows its fill past the p
   const masked = compositePsd([both], 4, 1).pixels;
   assert.equal(masked[3], 64);
   assert.equal(masked[15], 128);
+  // A shape layer keeps its user mask apart the same way (layer_mask_data.psb): the shape over all four
+  // pixels, the user mask hiding the right two; turned off, it hides nothing.
+  const all = { paths: [{ open: false, operation: 'combine', knots: [corner(0, 0), corner(4, 0), corner(4, 1), corner(0, 1)] }] };
+  const user = { defaultColor: 0, left: 0, top: 0, imageData: { width: 4, height: 1, data: new Uint8ClampedArray([255, 0, 0, 255, 255, 0, 0, 255, 0, 0, 0, 255, 0, 0, 0, 255]) } };
+  const shaped = (realMask) => ({ name: 'shape', blendMode: 'normal', opacity: 1, vectorFill: { type: 'color', color: { r: 255, g: 0, b: 0 } }, vectorMask: all,
+    mask: { fromVectorData: true, defaultColor: 0, left: 0, top: 0, imageData: { width: 4, height: 1, data: new Uint8ClampedArray(16).fill(255) } }, realMask,
+    left: 0, top: 0, imageData: solid });
+  const cut = compositePsd([shaped(user)], 4, 1).pixels;
+  assert.deepEqual([cut[3], cut[7], cut[11], cut[15]], [255, 255, 0, 0]);
+  const off = compositePsd([shaped({ ...user, disabled: true })], 4, 1).pixels;
+  assert.deepEqual([off[3], off[15]], [255, 255]);
+});
+
+test('a style in a mode with a neutral colour moves toward it by its strength, then blends', () => {
+  // A black Linear Burn at 70% over mid grey: the black moved 70% of the way from white (0.3), burnt in:
+  // 0.5 + 0.3 − 1, below black. Mixing the full blend by 70% would leave 0.15 (layer_comps.psd's bevel).
+  const dst = new Float32Array([0.5, 0.5, 0.5, 1]);
+  blendStylePixel(dst, 0, 0, 0, 0, 0.7, 'linear burn', (b, s) => blendChannel('linear burn', b, s));
+  assert.deepEqual([...dst].map((v) => Math.round(v * 1000) / 1000), [0, 0, 0, 1]);
+  // Multiply is the same either way: b·(1 − k + k·s).
+  const twice = new Float32Array([0.5, 0.5, 0.5, 1]);
+  blendStylePixel(twice, 0, 0.2, 0.2, 0.2, 0.5, 'multiply', (b, s) => blendChannel('multiply', b, s));
+  assert.ok(Math.abs(twice[0] - (0.5 * 0.5 + 0.5 * 0.5 * 0.2)) < 1e-6);
+  assert.equal(neutralOf('normal'), undefined);
+  assert.equal(neutralOf('overlay'), 0.5);
+  // As a Color Overlay draws it on the layer's own pixels.
+  const pixels = new Uint8ClampedArray([128, 128, 128, 255]);
+  drawLayerStyles(pixels, new Float32Array([1]), 1, 1, { solidFill: [{ enabled: true, opacity: 0.7, blendMode: 'linear burn', color: { r: 0, g: 0, b: 0 } }] });
+  assert.deepEqual([...pixels], [0, 0, 0, 255]);
+});
+
+test('a layer\'s styles see its pixels past the canvas: an edge where they stop, none where they run on', () => {
+  const red = (left, width) => {
+    const data = new Uint8ClampedArray(width * 4 * 4);
+    for (let i = 0; i < width * 4; i += 1) data.set([255, 0, 0, 255], i * 4);
+    return { name: 'red', left, top: 0, right: left + width, bottom: 4, blendMode: 'normal', opacity: 1, imageData: { width, height: 4, data } };
+  };
+  const stroke = { stroke: [{ enabled: true, position: 'inside', fillType: 'color', size: px(1), opacity: 1, blendMode: 'normal', color: { r: 0, g: 255, b: 0 } }] };
+  const styles = LAYER_STYLES;
+  const green = (pixels, x, y) => pixels[(y * 4 + x) * 4 + 1] === 255 && pixels[(y * 4 + x) * 4] === 0;
+  // The size of the canvas: the stroke borders it.
+  const framed = compositePsd([{ ...red(0, 4), effects: stroke }], 4, 4, { styles }).pixels;
+  assert.ok([0, 1, 2, 3].every((x) => green(framed, x, 0) && green(framed, x, 3)) && green(framed, 0, 1) && !green(framed, 1, 1));
+  // Two pixels of it off the left: no edge on that side. A group sees its layers' pixels the same way.
+  const shifted = compositePsd([{ ...red(-2, 4), effects: stroke }], 4, 4, { styles }).pixels;
+  assert.ok(!green(shifted, 0, 1) && green(shifted, 1, 1));
+  const grouped = compositePsd([{ name: 'g', blendMode: 'normal', opacity: 1, children: [red(-2, 4)], effects: stroke }], 4, 4, { styles }).pixels;
+  assert.ok(!green(grouped, 0, 1) && green(grouped, 1, 1));
+});
+
+test('gradients: Smoothness is a spline through the stops, flat at an inner stop between two of one colour', () => {
+  const stops = (...list) => list.map(([location, r, g, b]) => ({ location, color: { r, g, b }, midpoint: 0.5 }));
+  const opaque = [{ location: 0, opacity: 1, midpoint: 0.5 }, { location: 1, opacity: 1, midpoint: 0.5 }];
+  // Two stops: the S Photoshop's two-stop fills follow, u − 0.583·u(1 − u)(1 − 2u).
+  const two = gradientRamp({ smoothness: 1, colorStops: stops([0, 0, 0, 0], [1, 255, 255, 255]), opacityStops: opaque });
+  const s = (u) => 255 * (u - 0.583 * u * (1 - u) * (1 - 2 * u));
+  for (const u of [0.1, 0.25, 0.5, 0.8]) assert.ok(Math.abs(two(u)[0] - s(u)) < 1e-6, `${u}`);
+  // Blue, Yellow, Blue: level at the yellow, where straight lines would turn sharply.
+  const byb = gradientRamp({ smoothness: 1, colorStops: stops([0, 0, 0, 255], [0.5, 255, 255, 0], [1, 0, 0, 255]), opacityStops: opaque });
+  assert.ok(255 - byb(0.49)[0] < 0.5, `${byb(0.49)[0]}`);
+  // Reflected, mirrored about its start: level there too.
+  const reflected = gradientRamp({ smoothness: 1, colorStops: stops([0, 0, 0, 0], [1, 255, 255, 255]), opacityStops: opaque }, { mirrored: true });
+  assert.ok(reflected(0.02)[0] < 0.5 && two(0.02)[0] > 2, `${reflected(0.02)[0]} ${two(0.02)[0]}`);
+  // In a 32-bit file the stops mix in linear light: half way between black and white is 188, not 128.
+  const light = gradientRamp({ smoothness: 0, linearLight: true, colorStops: stops([0, 0, 0, 0], [1, 255, 255, 255]), opacityStops: opaque });
+  assert.equal(Math.round(light(0.5)[0]), 188);
+});
+
+test('a pattern is tiled from its origin: each texel a pixel at 100%, interpolated when scaled', () => {
+  const picture = { width: 2, height: 1, data: new Uint8ClampedArray([0, 0, 0, 255, 255, 255, 255, 255]) };
+  const plain = patternSampler(picture, { ox: 1 });
+  assert.deepEqual([plain(1, 0)[0], plain(2, 0)[0], plain(3, 0)[0], plain(0, 0)[0]], [0, 255, 0, 255]);
+  const doubled = patternSampler(picture, { scale: 2 });
+  assert.deepEqual([0, 1, 2, 3].map((x) => doubled(x, 0)[0]), [0, 127.5, 255, 127.5]);
+  assert.equal(doubled(1, 0)[3], 1);
+  // Where a layer's styles are laid (the flattening and a component alike): a linked pattern from its
+  // reference point, an aligned gradient across its record's box; a group's across its pixels.
+  assert.deepEqual(styleGeometry({ left: 3, top: 4, right: 9, bottom: 6, referencePoint: { x: 5.4, y: 2 } }),
+    { anchor: { x: 5, y: 2 }, bounds: { x: 3, y: 4, width: 6, height: 2 } });
+  assert.deepEqual(styleGeometry({ left: 3, top: 4, children: [] }), { anchor: { x: 3, y: 4 }, bounds: null });
+});
+
+test('a gradient fill with no path lies across its layer mask\'s rectangle; an open path closes straight', () => {
+  const opaque = [{ location: 0, opacity: 1, midpoint: 0.5 }, { location: 1, opacity: 1, midpoint: 0.5 }];
+  const fill = { type: 'solid', style: 'linear', angle: 0, smoothness: 0, colorStops: [{ location: 0, color: { r: 0, g: 0, b: 0 }, midpoint: 0.5 }, { location: 1, color: { r: 255, g: 255, b: 255 }, midpoint: 0.5 }], opacityStops: opaque };
+  const masked = { name: 'gradient', blendMode: 'normal', opacity: 1, vectorFill: fill, left: 0, top: 0, right: 4, bottom: 1,
+    mask: { left: 0, top: 0, right: 2, bottom: 1, defaultColor: 0, imageData: { width: 2, height: 1, data: new Uint8ClampedArray(8).fill(255) } } };
+  const { pixels } = compositePsd([masked], 4, 1);
+  // Across the mask's two pixels, the second half way; across the document it would be a quarter.
+  assert.deepEqual([pixels[0], pixels[4], pixels[11]], [0, 128, 0]);
+  // An open path whose last knot leaves on a long handle: filled as if closed by a straight line.
+  const knot = (x, y, out = [x, y]) => ({ points: [x, y, x, y, ...out] });
+  const shape = (open) => ({ name: 'pen', blendMode: 'normal', opacity: 1, vectorFill: { type: 'color', color: { r: 0, g: 0, b: 0 } },
+    vectorMask: { paths: [{ open, operation: 'combine', knots: [knot(0, 0), knot(4, 0), knot(4, 4, [0, 12])] }] } });
+  const alpha = (open) => [...compositePsd([shape(open)], 4, 4).pixels].filter((_, i) => i % 4 === 3).reduce((sum, v) => sum + v, 0) / 255;
+  assert.ok(Math.abs(alpha(true) - 8) < 0.5, `${alpha(true)}`);
+  assert.ok(alpha(false) > alpha(true) + 0.5, `${alpha(false)}`);
 });
 
 /** A tiny ICC version 2 CMYK profile: A2B1 (mft2) from inks to Lab, B2A0 (mft1) from Lab to inks. */

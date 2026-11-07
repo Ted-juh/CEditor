@@ -254,7 +254,55 @@ styles from wholly off to exact, strokes from 15-23 % to under 1 %, a vector mas
 flattening's styles reach a component only where they are drawn into a picture.)
 
 No import hangs, throws or makes bad output: the Photoshop files' 948 imports, the Multichannel file
-now among those that import.
+now among those that import. CI run 540 (commit `25acb94`) passed in all four jobs.
+
+## The sixth pass: what the fifth left, where a picture pins it
+
+As before, each item fitted to, or checked against, Photoshop's own picture of the file that shows
+it.
+
+| Left after the fifth pass, or found on the way | Now |
+|---|---|
+| A group's stroke reaching past the canvas | A group may keep its styles in an older block ('lfxs') that ag-psd does not read: read here. A group's styles see the union of its layers' pixels past the canvas (group-stroke-off-canvas.psd, 15 % to 0.2). And a layer's styles are now always worked on a frame reaching past the canvas, so a layer whose pixels stop at the canvas has an edge there: an inside stroke on a layer the size of the canvas borders the picture, as Photoshop draws it (no file in the corpora has one; pinned by a test) |
+| Type layers' gradient stroke laid over a box of its own | An outside stroke's gradient lies across the layer's box grown by the Size less a pixel, read back row by row from Photoshop's colours (stroke-effects.psd: 4 px on 24 spans 30; effect-stroke-gradient.psd: 3 px on 36 spans 40). Smoothness is a cubic spline through the stops: an end stop's slope 1 − 0.583 of its segment's (the two-stop S unchanged), an inner one's Catmull-Rom, so a Blue, Yellow, Blue stroke is level at its yellow, to a hundredth; a Reflected gradient is level at its middle. stroke-effects.psd 3.3 % to 1.6; effect-stroke-gradient.psd 17 % to 14, what is left there a Noise gradient |
+| A Color Lookup without its table (fill_adjustments.psd) | One with nothing chosen leaves colours alone, as a freshly added one does. A Photo Filter's colour, which ag-psd reads in fractions (Lab, HSB), is put in its units: a warming filter's orange had read as black, and its Density as a fraction is read as one. The file 41.6 % to 41.0, its mean difference 8.8 to 8.1 levels; the rest is Photo Filter, Vibrance and Color Balance stacked, which no file isolates |
+| Styles in a mode with a neutral colour | A style below full opacity in such a mode (Multiply's white, Screen's black, Overlay's grey) moves its colour that far toward the neutral one, then blends: B(b, n + k(s − n)), not the full blend mixed in by k. The two agree for Multiply and Screen and part for the rest: layer_comps.psd, a bevel's Linear Burn shadow, 19 % to 1.5; effects/blend-modes.psd, a shadow and a Color Overlay in every mode, 3.3 % to 0.1 |
+| Masks | A layer mask kept beside the vector mask cuts a shape layer's fill too, and one turned off does not (layer_mask_data.psb 75 % to 0, masks2.psd 3.9 to 0.5) |
+| Gradients and patterns | A 32-bit file's gradients mix their stops in linear light (gradient-fill.psd 9.4 % to 2.1). A gradient fill with no path lies across its layer mask's rectangle. A scaled pattern is interpolated, texel k at (x − origin) / scale (patterns.psd's 200 % lines, 6 % to 0); a pattern stroke linked with its layer starts at the layer's reference point, at its own scale and phase |
+| A CMYK file's Threshold | A Threshold over the whole file is judged on the inks: what is under it flattened on the inks, each pixel then white, or the black ink alone, by its inks' plain RGB, 255·(1 − ink)(1 − black), weighed 0.3, 0.59, 0.11 (threshold_cmyk.psd, 7.2 % to 0.08, where any profile's colours put 6-8 % of its pixels on the wrong side) |
+| Open paths | Filled as if closed by a straight line, with no curve of their own back to the start (pen-text.psd 2.9 % to 2.0) |
+| A component's pictures | Found by the fidelity pass. A picture's styles were drawn without the layer's box or reference point, which the flattening has: its aligned gradients lay across its pixels' box and its linked patterns started at the document's corner. And the part of a stroke outside a half-covered edge pixel, drawn into the picture, was laid at its share of the whole pixel rather than of what the layer leaves uncovered, as the flattening lays it beside the layer: effect-stroke-gradient.psd's Transparent Rainbow stroke, as a component's picture, 23 % off to 2 |
+
+Tried and not kept: measuring a stroke from the side of a pixel on its edge rather than its centre, so
+that a square's corner rounds from the corner itself. Seven stroke files came out worse
+(outside-stroke.psd 1.2 % to 1.6, center-stroke-sizes.psd 0.5 to 0.7) and two a little better
+(feathered-stroke.psd 0.54 to 0.45); put back.
+
+**Measured: the panel flattening against Photoshop's own picture of the file** (281 files):
+
+| | Fifth pass | Sixth pass |
+|---|---|---|
+| Under 1 % | 245 | 253 |
+| Over 5 % | 17 | 9 |
+| Over 20 % | 9 | 8 |
+
+Nineteen files came closer, and none moved the other way by more than 0.04 points (layer_params.psd,
+2.16 % to 2.20).
+
+**Measured: as components in the editor**, the fifth pass's commit and this one in the same browser
+at the same size (under 1 % / 1-5 % / 5-20 % / over 20 % of pixels visibly off):
+
+| Corpus | Fifth pass | Sixth pass |
+|---|---|---|
+| Photoshop, as a component on a white panel (139) | 81 / 11 / 12 / 35 | 81 / 11 / 12 / 35 |
+
+Two files moved, both closer: effect-stroke-gradient.psd 13.5 % to 11.3 and fill_adjustments.psd
+51.5 % to 50.5. Most of this pass is in the panel flattening: a component draws its shapes,
+gradients and strokes with the editor's own renderer, and only its pictures take the styles' fixes.
+(Before the component fixes above, effect-stroke-gradient.psd went the other way, to 16.9 %: that is
+how they were found.)
+
+No import hangs, throws or makes bad output: the Photoshop files' 948 imports, as in the fifth pass.
 
 ## Left, and why
 
@@ -266,10 +314,17 @@ now among those that import.
 - **Parts of layer styles not measured**: a Chisel bevel, Soften, a Gloss Contour, a Precise glow, a
   Noise gradient (its average colour) are drawn by the same readings and named in the Console; a
   style's Noise and Jitter and a bevel's Texture are not drawn. A bevel far larger than its shape
-  (layer_comps.psd, Size 100 on a face 160 px across) shades differently from the fitted one.
+  (layer_comps.psd, Size 100 on a face 160 px across) shades a little differently from the fitted
+  one (1.5 % of pixels; most of what was put down to it was its shadow's Linear Burn, above).
 - **Dissolve's grain** is random in Photoshop; its density is matched, its pixels cannot be.
-- **The rest of the flattening's differences**: a Color Lookup without its table in the file
-  (fill_adjustments.psd), a Lighter Color layer's half-transparent edge pixels in a Pass Through
-  group below full Fill (4 %), a group's stroke reaching past the canvas (its layers are drawn on the
-  canvas only), type layers whose gradient stroke Photoshop lays over a box of its own, and the
-  tiny files above.
+- **The rest of the flattening's differences**, each measured and none with a file that pins a
+  rule for it: Photo Filter, Vibrance and Color Balance stacked (fill_adjustments.psd, 41 %); a
+  Noise gradient on a stroke (effect-stroke-gradient.psd, 14 %), Photoshop's random one; a Lighter
+  Color layer's half-transparent edge pixels in a Pass Through group below full Fill (4 %); a
+  Reflected gradient stroke, which Photoshop draws about a ninth longer than the box the linear
+  ones are measured across (effect-enums.psd, 3 %: the one file with one, and psd-tools no closer);
+  a 16-bit
+  file's Posterize, which Photoshop works at 16 bits and this at the 8 it reads (1-3.4 %); a 32-bit
+  file's antialiased edges, which Photoshop composites in linear light (gradient-fill.psd, 2.1 %);
+  type that Photoshop blends with "Blend Text Colors Using Gamma", a setting of the application and
+  not of the file (pen-text.psd, 2 %); and the 4 by 4 pixel files above.

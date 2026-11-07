@@ -130,28 +130,38 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
 
 - **Fill layers** saved without pixels (a shape, a Color, Gradient or Pattern Fill) are drawn from
   their fill and their vector mask: a pattern tiled from the document's corner, from the patterns
-  the file keeps. A shape whose vector mask is below full Density, or feathered, shows its fill
-  faintly past its path, over the whole canvas, as Photoshop shows it.
+  the file keeps, and smoothed where it is scaled; a gradient across its shape's box, or its layer
+  mask's where it has no path, bent by its Smoothness through its stops as Photoshop bends it (in a
+  32-bit file, mixed in linear light). A path left open is filled as if closed by a straight line.
+  A shape whose vector mask is below full Density, or feathered, shows its fill faintly past its
+  path, over the whole canvas, as Photoshop shows it; a layer mask kept beside the vector mask cuts
+  the shape too.
 - **Adjustment layers** change everything under them in their group (or the layer they are clipped
   to), by their opacity, masks and blend mode: Levels, Curves, Exposure, Invert, Posterize,
   Threshold, Channel Mixer, Gradient Map and legacy Brightness/Contrast exactly; Brightness/Contrast,
   Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter and Selective Color closely;
-  Color Lookup from the table the layer carries.
+  Color Lookup from the table the layer carries (one with nothing chosen leaves colours alone).
 - **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures:
   Drop Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights
   around it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part
   inside the layer over it, and its part outside under it, in its own blend mode. A shadow or glow
   is the shape blurred over its Size and no further; a bevel is that blur lit from its angle and
   altitude; their Spread, Choke, Range and contours, Use Global Light and "Blend Interior Effects as
-  Group" are honoured. Drawn only close, and named in the Console: a Chisel bevel, Soften, a
+  Group" are honoured. A style in a blend mode with a neutral colour (Multiply's white, Overlay's
+  grey) fades toward that colour below full opacity, as Photoshop fades it. A gradient stroke lies
+  across the box the stroke reaches; a pattern one, linked with the layer, starts where its layer
+  does. Styles see a layer's pixels past the canvas, and a group's styles its layers': an inside
+  stroke on a layer the size of the canvas borders the picture, and on a shape that runs on past the
+  canvas is not seen there. Drawn only close, and named in the Console: a Chisel bevel, Soften, a
   bevel's Gloss Contour, a Precise glow, and a Noise gradient (its average colour); a style's Noise
   and a bevel's Texture are not drawn.
 - **Dissolve** is drawn with a grain of its own, as dense as Photoshop's. Photoshop's is random, so
   the pixels differ.
 - **A CMYK file** is flattened on its inks, as Photoshop flattens it, where every adjustment in it
   works ink by ink (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast);
-  with one that works on whole colours (Hue/Saturation, Threshold, ...) it is flattened in RGB, a
-  Threshold's black then the black ink alone. Its colours are made RGB through the colour profile
+  with one that works on whole colours (Hue/Saturation, ...) it is flattened in RGB. A Threshold
+  over the whole file is judged on the inks, as Photoshop judges it there, each pixel white or the
+  black ink alone. Its colours are made RGB through the colour profile
   the file carries, as Photoshop shows them (Relative Colorimetric, Black Point Compensation).
 
 What is only close, and what is not applied (a Color Lookup through an ICC profile), is named in the

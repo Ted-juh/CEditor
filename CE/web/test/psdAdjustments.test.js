@@ -87,6 +87,13 @@ test('Color Lookup through an ICC profile, or with a table it cannot read, is no
   assert.equal(unappliedAdjustment({ type: 'curves' }), 'curves');
 });
 
+test('a Color Lookup with nothing chosen leaves colours alone; a Photo Filter\'s Density reads as a fraction or a percent', () => {
+  assert.deepEqual(adjustmentFunction({ type: 'color lookup' })([10, 20, 30]), [10, 20, 30]);
+  const filter = (density) => adjustmentFunction({ type: 'photo filter', color: { r: 255, g: 0, b: 0 }, density, preserveLuminosity: false });
+  near(filter(0.25)([200, 200, 200]), [200, 150, 150], 0.01, 'a quarter of the way to the filtered colour');
+  near(filter(25)([200, 200, 200]), [200, 150, 150], 0.01, 'the same Density as a percent');
+});
+
 function solid(name, left, top, w, h, rgba) {
   const data = new Uint8ClampedArray(w * h * 4);
   for (let i = 0; i < w * h; i += 1) data.set(rgba, i * 4);

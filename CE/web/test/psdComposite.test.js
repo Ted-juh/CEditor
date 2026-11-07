@@ -311,5 +311,10 @@ test('a CMYK file is flattened on its inks: an Invert inverts each ink, Black ha
   const lighter = compositeInks([dark, { name: 'Curves', adjustment: { type: 'curves', black: [{ input: 0, output: 128 }, { input: 255, output: 255 }] } }], 1, 1);
   near([...lighter.pixels], [...rgbOf([0, 0, 0, 1 - 128 / 255]), 255], 'black lightened, nothing else');
   // An adjustment that works on whole colours cannot be drawn on inks: the RGB flattening draws it.
-  assert.equal(compositeInks([layer, { name: 'Threshold', adjustment: { type: 'threshold' } }], 1, 1), null);
+  assert.equal(compositeInks([layer, { name: 'Hue/Saturation', adjustment: { type: 'hue/saturation', hue: 30 } }], 1, 1), null);
+  // A Threshold judges each pixel by its inks' plain RGB, 255·(1 − ink)(1 − black): 20% cyan is
+  // 204, 255, 255, a luminance of 245; white (no ink) at 240, black ink alone at 250.
+  const at = (level) => [...compositeInks([layer, { name: 'Threshold', adjustment: { type: 'threshold', level } }], 1, 1).pixels];
+  near(at(240), [255, 255, 255, 255], 'white: no ink');
+  near(at(250), [...rgbOf([0, 0, 0, 1]), 255], 'black ink alone');
 });

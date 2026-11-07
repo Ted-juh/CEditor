@@ -23,10 +23,10 @@
 // under the layer (castShadows), the rest into its pixels (drawLayerStyles). It takes both as
 // LAYER_STYLES, since this module draws with its blend modes.
 
-import { blendChannel } from './psdComposite.js';
+import { blendChannel, neutralOf } from './psdComposite.js';
 import { contourTable, gradientRamp, psdRgb } from './psdAdjustments.js';
 import { blur } from './gaussianBlur.js';
-import { gradientField, scaleOf } from './psdVectors.js';
+import { gradientField, patternSampler, scaleOf } from './psdVectors.js';
 
 const INF = 1e20;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -454,12 +454,22 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     if (amount <= 0) return;
     const p = i * 4;
     const ba = Math.min(1, pixels[p + 3] / 255 / within);
+    // Where the mode has a neutral colour, the strength moves the colour toward it before the blend,
+    // as Photoshop draws a style (utils/psdComposite.js blendStylePixel).
+    const neutral = neutralOf(mode);
     for (let c = 0; c < 3; c += 1) {
       const b = pixels[p + c] / 255;
       const s = rgb[c] / 255;
-      const blended = ba > 0 ? (blendChannel(mode, b, s) ?? s) : s;
-      const mixed = (1 - ba) * s + ba * blended;
-      const out = ba + amount * (1 - ba) > 0 ? (amount * mixed + ba * b * (1 - amount)) / (amount + ba * (1 - amount)) : 0;
+      let out;
+      if (neutral !== undefined && ba > 0) {
+        const k = Math.min(1, amount);
+        const moved = neutral + k * (s - neutral);
+        out = (k * (1 - ba) * s + ba * (blendChannel(mode, b, moved) ?? moved)) / (k + ba * (1 - k));
+      } else {
+        const blended = ba > 0 ? (blendChannel(mode, b, s) ?? s) : s;
+        const mixed = (1 - ba) * s + ba * blended;
+        out = ba + amount * (1 - ba) > 0 ? (amount * mixed + ba * b * (1 - amount)) / (amount + ba * (1 - amount)) : 0;
+      }
       pixels[p + c] = Math.round(clamp01(out) * 255);
     }
     pixels[p + 3] = Math.round(clamp01(amount + ba * (1 - amount)) * within * 255);
@@ -477,18 +487,16 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
   // Overlays first (bottom of the interior styles), as Photoshop stacks them: pattern, gradient, colour.
   const pattern = effects.patternOverlay;
   if (enabled(pattern) && pattern.picture) {
-    const { width: pw, height: ph, data } = pattern.picture;
-    const scale = scaleOf(pattern.scale);
-    // Linked with the layer, it starts at the layer's corner; otherwise at the document's.
-    const ox = (pattern.align !== false && anchor ? anchor.x : 0) + (Number(pattern.phase?.x) || 0);
-    const oy = (pattern.align !== false && anchor ? anchor.y : 0) + (Number(pattern.phase?.y) || 0);
-    const wrap = (v, n) => ((v % n) + n) % n;
+    // Linked with the layer, it starts at the layer's reference point; otherwise at the document's.
+    const sample = patternSampler(pattern.picture, {
+      scale: scaleOf(pattern.scale),
+      ox: (pattern.align !== false && anchor ? anchor.x : 0) + (Number(pattern.phase?.x) || 0),
+      oy: (pattern.align !== false && anchor ? anchor.y : 0) + (Number(pattern.phase?.y) || 0),
+    });
     for (let i = 0; i < shape.length; i += 1) {
       if (shape[i] <= 0) continue;
-      const x = left + (i % width);
-      const y = top + Math.floor(i / width);
-      const j = (wrap(Math.floor((y - oy) / scale), ph) * pw + wrap(Math.floor((x - ox) / scale), pw)) * 4;
-      paintInside(i, [data[j], data[j + 1], data[j + 2]], (data[j + 3] / 255) * (pattern.opacity ?? 1), modeOf(pattern, 'normal'));
+      const [r, g, b, a] = sample(left + (i % width), top + Math.floor(i / width));
+      paintInside(i, [r, g, b], a * (pattern.opacity ?? 1), modeOf(pattern, 'normal'));
     }
     drawn.push('Pattern Overlay');
   }
@@ -502,7 +510,7 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     if (!layerBox) continue;
     // As Photoshop lays a gradient (utils/psdVectors.js gradientField), at whole pixel coordinates.
     const field = gradientField({ style: overlay.type, angle: overlay.angle, scale: overlay.scale, reverse: overlay.reverse, offset: overlay.offset }, overlay.align === false ? page : layerBox);
-    const ramp = gradientRamp(overlay.gradient);
+    const ramp = gradientRamp(overlay.gradient, { mirrored: overlay.type === 'reflected' });
     for (let i = 0; i < shape.length; i += 1) {
       if (shape[i] <= 0) continue;
       const x = i % width; const y = (i - x) / width;
@@ -611,17 +619,23 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     let paintAt = () => [...colour, 1];
     if (stroke.fillType === 'gradient' && stroke.gradient && layerBox) {
       const g = stroke.gradient;
-      // Aligned with the layer, it lies across the box the stroke itself fills: the layer's grown by as
-      // far as the stroke reaches out of it (effect-enums.psd, stroke-effects.psd).
-      const out = position === 'outside' ? size : position === 'center' ? size / 2 : 0;
+      // Aligned with the layer, an outside stroke's gradient lies across the layer's box grown by the
+      // Size less a pixel: read back from Photoshop's colours row by row, a 4 px stroke on a 24 px shape
+      // spans 30 (stroke-effects.psd), a 3 px one on 36 px of type 40 (effect-stroke-gradient.psd).
+      const out = position === 'outside' ? Math.max(0, size - 1) : 0;
       const strokeBox = { x: layerBox.x - out, y: layerBox.y - out, width: layerBox.width + 2 * out, height: layerBox.height + 2 * out };
       const field = gradientField({ style: g.style, angle: g.angle, scale: g.scale, reverse: g.reverse, offset: g.offset }, g.align === false ? page : strokeBox);
-      const ramp = gradientRamp(g);
+      const ramp = gradientRamp(g, { mirrored: g.style === 'reflected' });
       paintAt = (x, y) => ramp(field(x, y));
     } else if (stroke.fillType === 'pattern' && stroke.pattern?.picture) {
-      const { width: pw, height: ph, data } = stroke.pattern.picture;
-      const wrap = (v, n) => ((v % n) + n) % n;
-      paintAt = (x, y) => { const j = (wrap(y, ph) * pw + wrap(x, pw)) * 4; return [data[j], data[j + 1], data[j + 2], data[j + 3] / 255]; };
+      // Linked with the layer (as a Pattern Overlay is), from its reference point; else the document's
+      // corner (stroke-effects.psd).
+      const linked = (stroke.pattern.linked ?? stroke.linked) !== false && anchor;
+      paintAt = patternSampler(stroke.pattern.picture, {
+        scale: scaleOf(stroke.scale ?? stroke.pattern.scale),
+        ox: (linked ? anchor.x : 0) + (Number(stroke.pattern.phase?.x?.value ?? stroke.pattern.phase?.x) || 0),
+        oy: (linked ? anchor.y : 0) + (Number(stroke.pattern.phase?.y?.value ?? stroke.pattern.phase?.y) || 0),
+      });
     }
     // The band between `lo` and `hi` of the signed distance to the edge, its two sides antialiased,
     // split where it crosses the edge (psd-tools' reading, #846): the part within the layer paints over
@@ -649,10 +663,12 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
         under.alpha[i] = outer * a;
         under.rgb[i * 3] = r; under.rgb[i * 3 + 1] = g; under.rgb[i * 3 + 2] = b;
       } else {
-        // Under the content: what the pixel has over the band.
+        // Under the content: what the pixel has over the band, the band at its share of what the
+        // pixel leaves uncovered, as the flattening draws it beside the layer (compositePsd).
         const p = i * 4;
-        const t = outer * a * (stroke.opacity ?? 1);
         const ca = pixels[p + 3] / 255;
+        if (ca >= 1) continue;
+        const t = Math.min(1, (outer * a) / (1 - ca)) * (stroke.opacity ?? 1);
         const oa = ca + t * (1 - ca);
         if (oa <= 0) continue;
         for (let k = 0; k < 3; k += 1) pixels[p + k] = Math.round((pixels[p + k] * ca + [r, g, b][k] * t * (1 - ca)) / oa);

@@ -33,7 +33,7 @@
 import { convertedNotice, readPhotoshop } from './psdRead.js';
 // ag-psd is told once, by the panel importer, to make its pixel arrays without a canvas.
 import './psdPanelImport.js';
-import { compositePsd, layerMaskSampler } from './psdComposite.js';
+import { compositePsd, layerMaskSampler, styleGeometry } from './psdComposite.js';
 import { adjustArgb, adjustPixels, adjustmentFunction, psdRgb, unappliedAdjustment } from './psdAdjustments.js';
 import { LAYER_STYLES, drawLayerStyles, editableShadows, hasDrawnStyles, pxOf } from './psdLayerStyles.js';
 import { combinedPathData, psdGradient, vectorFillOf, vectorStrokeOf } from './psdVectors.js';
@@ -338,7 +338,9 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
       const full = fillOpacity < 1 ? flatten(1) : pixels;
       const shape = new Float32Array(width * height);
       for (let i = 0; i < shape.length; i += 1) shape[i] = full[i * 4 + 3] / 255;
-      for (const name of drawLayerStyles(pixels, shape, width, height, unit.effects)) report.drawn.add(name);
+      // Laid as the flattening lays them: its gradients across the layer's box, its linked patterns from
+      // its reference point.
+      for (const name of drawLayerStyles(pixels, shape, width, height, unit.effects, { ...styleGeometry(unit), document: { width, height } })) report.drawn.add(name);
     }
     // Clipped adjustments change this unit alone.
     for (const layer of clippedAdjustments) {
