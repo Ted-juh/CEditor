@@ -256,6 +256,9 @@ export function serializePanel(panel, options = {}) {
   // Snapshots, same rule. An empty array on every panel would be noise in every committed fixture.
   if (!Array.isArray(data.snapshots) || data.snapshots.length === 0) delete data.snapshots;
 
+  // Text styles (utils/textStyles.js), same rule: deleting the last one leaves no empty key behind.
+  if (!Array.isArray(data.textStyles) || data.textStyles.length === 0) delete data.textStyles;
+
   // Routes, same rule. Only the panel's OWN routes are stored — the ones derived from Macro slots
   // and Router destinations are a view, and writing them here would give the panel a stale second
   // copy of something the component already owns.

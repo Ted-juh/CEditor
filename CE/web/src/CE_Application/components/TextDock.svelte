@@ -5,6 +5,7 @@
   import { writable } from 'svelte/store';
   import Pin from 'lucide-svelte/icons/pin';
   import TextEditor from '../sections/TextEditor.svelte';
+  import TextStyleBar from './typography/TextStyleBar.svelte';
   import { panels, resolvedActivePanelId, selectedComponentIds } from '../stores/panels.js';
   import { selectedControl, getSection } from '../stores/controls.js';
   import { textDockState } from '../stores/textDock.js';
@@ -47,6 +48,11 @@
     {#if hasText}
       <span> / Text · {$stateEditScope.mode === 'state' ? $stateEditScope.stateName : 'Base state'}</span>
       {#if $textDockState.followSelection && $selectedComponentIds.size > 1}<span>· {$selectedComponentIds.size} selected</span>{/if}
+      <!-- Named styles (utils/textStyles.js), in this row so the fields below keep their height. The
+           document's control, not the drawn one: the style captures and compares what the document
+           says (a set's colour token included). -->
+      <TextStyleBar control={rawControl} {panel}
+        ids={$textDockState.followSelection ? [...$selectedComponentIds].map(String) : [String(core?.id ?? '')]} />
     {/if}
     <button type="button" class:pinned={!$textDockState.followSelection} aria-pressed={!$textDockState.followSelection}
       disabled={!core?.id && $textDockState.followSelection} onclick={togglePin}

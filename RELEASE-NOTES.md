@@ -494,6 +494,18 @@ should.
 - **Scripting toolchains** managed in-app (Settings → Scripting Toolchains). Lua, JavaScript and
   TypeScript need nothing. Python, C++, C# and Java download a toolchain on first use; C# and Java
   are large (~230 MB and ~195 MB) and entirely optional.
+- **Pictures of the design.** File → Export Picture... saves the panel or the selection as a PNG,
+  at 1× to 4×, or one control as a filmstrip of its values for other programs and plug-in
+  frameworks.
+- **Work is not lost on the way out.** Closing CEditor with unsaved panels, device profiles or
+  CTRL49 screens asks first. A new device profile is saved as a file of your own, and CTRL49
+  screens are saved and opened from the File menu.
+- **Accessibility checks.** The dock's **Access** tool lists controls a screen reader cannot tell
+  apart or names only by an id, with a field to name each, and measures every text's contrast
+  against what is drawn behind it, at WCAG AA. Preview, the player and the exported plug-in now
+  read out a control's caption instead of "<name> preview".
+- **Text styles.** Name a text's type once — *Section heading*, *Caption* — in the Text tool's Style
+  bar, and change it once for every text that uses it, in one undo step.
 
 ## Known limits, stated rather than discovered
 

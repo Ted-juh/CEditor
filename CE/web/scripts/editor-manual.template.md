@@ -555,6 +555,38 @@ The dock's **Text** tool has every text setting of the selected control: font, s
 alignment, how text wraps, its colour or fill, and effects. **Follow selection** switches to whichever
 control you select; **Pinned** keeps it on one.
 
+#### Text styles
+
+A panel with twelve section headings should not need twelve edits to change them. A **text style**
+is a text's type under a name — *Section heading*, *Caption*, *Readout* — and every text that uses it
+follows it. The **Style** list in the Text tool's top row, and the buttons beside it, hold them:
+
+- **New...** makes a style from the selected text as it is now, under a name you type, and links
+  that text to it.
+- **Style** chooses the style a text uses. Choosing one gives the text the style's look at once;
+  with **Follow selection** on and several controls selected, it gives it to all of them. The list
+  says how many texts use each style. **None** unlinks the text and leaves it looking as it does.
+- **Changed** appears when you have changed a text by hand after giving it its style. **Update
+  style** makes the style what this text is now, and every other text using it follows. **Reset**
+  puts this one text back to the style.
+- **Rename...** renames the style; the texts stay linked. **Delete** removes it; the texts that used
+  it keep their look and stop following anything.
+
+Each of these is a single step of undo, however many texts it reaches.
+
+A style holds the type, not the layout: the font, weight, size, letter and word spacing, case,
+underline, strikethrough and overline, the colour, and the line height. Alignment, wrapping, effects
+and the words themselves stay each text's own. A colour that comes from the colour roles (such as
+`{text.primary}`) stays linked to them in the style.
+
+Where a text still has the typeface its control set gives it, the style leaves that to the set: a
+heading in the *Graphite* set keeps drawing in its set's lettering, every text you give the style
+does the same, and switching the panel to another set changes them all. Choose a typeface yourself,
+and that typeface becomes part of the style.
+
+Styles are kept in the panel file. The values are written into each text as well, so the preview,
+the player and an exported plugin show the same panel with or without them.
+
 ### Fonts and icons
 
 CEditor has a set of fonts built in. You can add your own in **Settings → Fonts**, in two ways:
