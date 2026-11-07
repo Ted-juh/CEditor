@@ -86,15 +86,17 @@ any other. A PDF from Affinity, Inkscape or anywhere else comes in the same way.
 | Clipping masks | The layer's mask, as for SVG |
 | Opacity, blend modes, transparency groups | Kept |
 | Opacity masks (soft masks) | Applied: luminosity or alpha, over the mask's backdrop colour, through its transfer function; on a group, to the group as a whole |
-| Placed and embedded images | Picture layers, no finer than twice the size they are drawn at (4,096 pixels at most). JBIG2 (black-and-white scans) and JPEG 2000 pictures are read too: pdf.js's decoders for them come with the editor and are fetched only for a file that needs one |
+| Pattern fills | A tiling pattern is a pattern: its cell drawn as the page is and repeated (an uncoloured one in the colour it is painted with); a shape filled with it is drawn as its picture |
+| Placed and embedded images | Picture layers, no finer than twice the size they are drawn at (4,096 pixels at most). JBIG2 (black-and-white scans) and JPEG 2000 pictures are read too: pdf.js's decoders for them come with the editor and are fetched only for a file that needs one. An image mask (a stencil) is painted in its fill colour |
 | Text | Text in the font the file names, its size and colour |
 | CMYK colour | Converted as pdf.js shows it, as Acrobat does without colour management |
 | Sublayers and object names | Not read: Illustrator keeps them only in its own private data, which is undocumented. Name a moving part as a top-level layer, or export SVG |
-| Artboards, pages | One is read; with several the import asks which |
+| Artboards, pages | One is read; with several the import asks which. A page turned in the file comes in turned, as a viewer shows it |
 
 So a panel's placeholders, which a PDF keeps no names for, are typed by their colour and shape (red
 circles knobs, long red rectangles sliders, and so on, as above), and the notice says so; rename the
-controls after. Pattern fills and image masks are not drawn, and the Console lists any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
+controls after. A mesh used as a fill's pattern (rather than painted on its own) is drawn in its mean
+colour, and patterns nested more than three deep in grey; the Console lists any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
 is refused with what to do: save it again with Create PDF Compatible File ticked, or use Export As ›
 SVG.
 

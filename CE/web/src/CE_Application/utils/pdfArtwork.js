@@ -104,11 +104,15 @@ export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs
     for (const [id, group] of config) layers.set(id, { name: String(group?.name ?? '').trim(), visible: group?.visible !== false });
     const info = (await doc.getMetadata().catch(() => null))?.info ?? {};
     const creator = String(info.Creator ?? '');
+    // A page turned in the file (/Rotate) comes in turned, as a viewer shows it: pdf.js's own mapping
+    // from the page to the screen, which holds the turn.
+    const turned = pdfPage.rotate ? pdfPage.getViewport({ scale: 1 }) : null;
     const out = operatorsToSvg({
       fnArray: ops.fnArray, argsArray: ops.argsArray, OPS: lib.OPS,
-      objs: pdfPage.objs, commonObjs: pdfPage.commonObjs, view: pdfPage.view, layers,
+      objs: pdfPage.objs, commonObjs: pdfPage.commonObjs, layers,
+      view: turned ? [0, 0, turned.width, turned.height] : pdfPage.view,
+      space: turned ? Array.from(turned.transform) : null,
     });
-    if (pdfPage.rotate) out.notes.push({ kind: 'rotated', count: 1 });
     return { ok: true, ...out, pages, page: number, labels, creator, illustrator: /illustrator/i.test(creator) };
   } catch (error) {
     // A damaged file can open and still fail on its page (pdf.js's own errors): said so, as one that
@@ -188,14 +192,17 @@ function initialState() {
  * pdf.js's operator list for a page as SVG text. `fnArray`/`argsArray`: the operator list; `OPS`:
  * pdf.js's operator numbers; `objs`/`commonObjs`: the page's resolved objects (`get(id)`); `view`: the
  * page box [x0, y0, x1, y1]; `layers`: optional content group id → { name, visible }.
- * `{ svg, width, height, layers: [{ name, visible }], notes: [{ kind, count }] }`.
+ * `{ svg, width, height, layers: [{ name, visible }], notes: [{ kind, count }], defs, body }`.
+ *
+ * A tiling pattern's cell is drawn by the same reading, in its own space (`space`: the matrix from it
+ * to the SVG's, `prefix` keeping its ids apart, `colour` the one an uncoloured pattern is drawn in).
  */
-export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view, layers = new Map() }) {
+export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view, layers = new Map(), space = null, prefix = '', colour = null, depth = 0 }) {
   const [x0, y0, x1, y1] = view ?? [0, 0, 612, 792];
   const width = x1 - x0;
   const height = y1 - y0;
   // PDF space (y up) to the SVG's (y down, from the page's top left).
-  const flip = [1, 0, 0, -1, -x0, y1];
+  const flip = space ?? [1, 0, 0, -1, -x0, y1];
   const op = Object.fromEntries(Object.entries(OPS).map(([name, code]) => [code, name]));
   const defs = [];
   let body = [];
@@ -203,12 +210,17 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
   const note = (kind) => noted.set(kind, (noted.get(kind) ?? 0) + 1);
   const seenLayers = [];
   let ids = 0;
-  const nextId = (prefix) => `${prefix}${++ids}`;
+  const nextId = (kind) => `${prefix}${kind}${++ids}`;
   const get = (id) => {
     try { return (String(id).startsWith('g_') ? commonObjs : objs)?.get(id) ?? null; } catch { return null; }
   };
 
   let state = initialState();
+  // An uncoloured pattern's cell: drawn in the colour it is painted with, whatever it sets.
+  if (colour) {
+    state.fill = { kind: 'colour', value: colour };
+    state.stroke = { kind: 'colour', value: colour };
+  }
   const stack = [];
   // Groups that structure the drawing (a layer, a transparency group), and the clip groups open inside
   // the innermost of them; the clip groups are closed at every structural boundary and opened again
@@ -293,8 +305,42 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
       const value = gradient(get(paint.id), multiply(flip, multiply(paint.base, paint.matrix ?? IDENTITY)));
       return value ? { value, alpha } : { value: '#808080', alpha };
     }
+    const tile = paint.ir?.[0] === 'TilingPattern' ? tiling(paint) : null;
+    if (tile) return { value: tile, alpha };
     note(kind === 'fill' ? 'pattern-fill' : 'pattern-stroke');
     return { value: paint.value ?? '#808080', alpha };
+  };
+
+  // A tiling pattern: its cell, read as a page is, an SVG pattern repeated every XStep and YStep in
+  // the pattern's space and cut to its box. `url(#id)`, or null where it cannot be drawn.
+  const tilings = new Map();
+  const tiling = ({ ir, base }) => {
+    const [, tint, list, matrix, bbox, xstep, ystep, paintType] = ir;
+    if (!list?.fnArray || !bbox || bbox.length < 4 || !xstep || !ystep || depth >= 3) return null;
+    const m = multiply(flip, multiply(base ?? IDENTITY, matrix ? Array.from(matrix) : IDENTITY));
+    const key = `${matrixText(m)} ${tint ?? ''}`;
+    if (tilings.get(list)?.has(key)) return tilings.get(list).get(key);
+    const id = nextId('pt');
+    let cell;
+    try {
+      cell = operatorsToSvg({
+        fnArray: list.fnArray, argsArray: list.argsArray, OPS, objs, commonObjs, space: IDENTITY,
+        prefix: `${id}-`, colour: paintType === 2 && typeof tint === 'string' && /^#[0-9a-f]{6}$/i.test(tint) ? tint : null, depth: depth + 1,
+      });
+    } catch {
+      return null;
+    }
+    for (const kind of cell.notes.map((entry) => entry.kind)) note(kind);
+    const [bx0, by0, bx1, by1] = [Math.min(bbox[0], bbox[2]), Math.min(bbox[1], bbox[3]), Math.max(bbox[0], bbox[2]), Math.max(bbox[1], bbox[3])];
+    const clip = `${id}-box`;
+    defs.push(cell.defs);
+    defs.push(`<clipPath id="${clip}" clipPathUnits="userSpaceOnUse"><rect x="${num(bx0)}" y="${num(by0)}" width="${num(bx1 - bx0)}" height="${num(by1 - by0)}"/></clipPath>`);
+    // The tile starts at the box's corner; its contents are placed from there (SVG's), so moved back.
+    defs.push(`<pattern id="${id}" patternUnits="userSpaceOnUse" x="${num(bx0)}" y="${num(by0)}" width="${num(Math.abs(xstep))}" height="${num(Math.abs(ystep))}" patternTransform="${matrixText(m)}">`
+      + `<g transform="translate(${num(-bx0)} ${num(-by0)})"><g clip-path="url(#${clip})">${cell.body}</g></g></pattern>`);
+    if (!tilings.has(list)) tilings.set(list, new Map());
+    tilings.get(list).set(key, `url(#${id})`);
+    return `url(#${id})`;
   };
 
   const strokeAttributes = () => {
@@ -411,6 +457,30 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
     const m = multiply(page, [1 / w, 0, 0, -1 / h, 0, 1]);
     const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
     emit(`<image width="${w}" height="${h}" preserveAspectRatio="none" transform="${matrixText(m)}" href="${href}"${opacity}${blendStyle()}/>`);
+  };
+
+  // An image mask (a stencil): one bit a pixel, painted in the fill colour where it is 0, as PDF
+  // draws one (scanned type, a logo set as a mask). `at`: where it is drawn, on the current matrix.
+  const imageMask = (mask, at = IDENTITY) => {
+    const picture = typeof mask?.data === 'string' ? get(mask.data) : mask;
+    const { width: sw, height: sh, data } = picture ?? {};
+    if (!sw || !sh || !data?.length) { note('image-mask'); return; }
+    const colour = state.fill.kind === 'colour' && /^#[0-9a-f]{6}$/i.test(state.fill.value) ? state.fill.value : null;
+    if (!colour) { if (state.fill.kind !== 'colour') note('pattern-fill'); return; }
+    const page = multiply(multiply(flip, state.ctm), at);
+    const fit = (size, drawn) => Math.max(1, Math.min(size, Math.ceil(Math.min(4096, Math.max(drawn * 2, 64)))));
+    const w = fit(sw, Math.hypot(page[0], page[1]));
+    const h = fit(sh, Math.hypot(page[2], page[3]));
+    const key = `${w}x${h}${colour}`;
+    let made = encoded.get(data)?.get(key);
+    if (made === undefined) {
+      made = pngDataUrl(w, h, maskRgba(data, sw, sh, w, h, colour));
+      if (!encoded.has(data)) encoded.set(data, new Map());
+      encoded.get(data).set(key, made);
+    }
+    const m = multiply(page, [1 / w, 0, 0, -1 / h, 0, 1]);
+    const opacity = state.fillAlpha < 1 ? ` opacity="${num(state.fillAlpha)}"` : '';
+    emit(`<image width="${w}" height="${h}" preserveAspectRatio="none" transform="${matrixText(m)}" href="${made}"${opacity}${blendStyle()}/>`);
   };
 
   // --- Text ---
@@ -561,8 +631,8 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
       case 'setMiterLimit': state.miter = args[0]; break;
       case 'setDash': state.dash = args; break;
       case 'setGState': setGState(args[0]); break;
-      case 'setFillRGBColor': state.fill = { kind: 'colour', value: hexOf(args[0]) }; break;
-      case 'setStrokeRGBColor': state.stroke = { kind: 'colour', value: hexOf(args[0]) }; break;
+      case 'setFillRGBColor': if (!colour) state.fill = { kind: 'colour', value: hexOf(args[0]) }; break;
+      case 'setStrokeRGBColor': if (!colour) state.stroke = { kind: 'colour', value: hexOf(args[0]) }; break;
       case 'setFillTransparent': state.fill = { kind: 'colour', value: 'none' }; break;
       case 'setStrokeTransparent': state.stroke = { kind: 'colour', value: 'none' }; break;
       case 'setFillColorN': state.fill = patternPaint(args, state.base); break;
@@ -573,11 +643,18 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
       case 'shadingFill': shadingFill(args[0]); break;
       case 'paintImageXObject': image(get(args[0])); break;
       case 'paintInlineImageXObject': image(args[0]); break;
-      case 'paintImageMaskXObject':
+      case 'paintImageMaskXObject': imageMask(args[0]); break;
       case 'paintImageMaskXObjectGroup':
-      case 'paintImageMaskXObjectRepeat':
+        for (const mask of args?.[0] ?? []) imageMask(mask, Array.isArray(mask.transform) || ArrayBuffer.isView(mask.transform) ? Array.from(mask.transform) : IDENTITY);
+        break;
+      case 'paintImageMaskXObjectRepeat': {
+        const [mask, scaleX, skewX = 0, skewY = 0, scaleY, positions] = args ?? [];
+        for (let k = 0; k + 1 < (positions?.length ?? 0); k += 2) imageMask(mask, [scaleX, skewX, skewY, scaleY, positions[k], positions[k + 1]]);
+        break;
+      }
       case 'paintSolidColorImageMask':
-        note('image-mask');
+        // A mask of one pixel, painted: the unit square in the fill colour.
+        drawPath(pathSegments([0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 4]), { fill: true });
         break;
       case 'paintFormXObjectBegin': {
         stack.push({ ...state, clips: [...state.clips] });
@@ -673,14 +750,14 @@ export function operatorsToSvg({ fnArray, argsArray, OPS, objs, commonObjs, view
   closeClips();
   while (structure.length) {
     const closing = structure.pop();
-    if (closing === 'layer' || closing === 'group') body.push('</g>');
+    if (closing === 'layer' || closing === 'group' || closing === 'wrap') body.push('</g>');
   }
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${num(width)}" height="${num(height)}" viewBox="0 0 ${num(width)} ${num(height)}">`
     + (defs.length ? `<defs>${defs.join('')}</defs>` : '')
     + body.join('')
     + '</svg>';
-  return { svg, width, height, layers: seenLayers, notes: [...noted].map(([kind, count]) => ({ kind, count })) };
+  return { svg, width, height, layers: seenLayers, notes: [...noted].map(([kind, count]) => ({ kind, count })), defs: defs.join(''), body: body.join('') };
 }
 
 function segmentsText(segments) {
@@ -785,7 +862,6 @@ const NOTE_TEXT = {
   'pattern-stroke': (n) => `${n} pattern stroke${n === 1 ? '' : 's'}, drawn grey`,
   'image-mask': (n) => `${n} image mask${n === 1 ? '' : 's'}, not drawn`,
   image: (n) => `${n} image${n === 1 ? '' : 's'} that could not be read`,
-  rotated: () => 'the page is turned in the file and comes in unturned',
 };
 
 /** What a read could not carry, as lines for the import's report. */
@@ -796,8 +872,9 @@ export function describePdfNotes(notes = []) {
 function patternPaint(args, base) {
   const [type, id, matrix] = args ?? [];
   if (type === 'Shading') return { kind: 'shading', id, matrix: matrix ? Array.from(matrix) : null, base };
-  // A tiling pattern: its colour when it is an uncoloured one, else grey.
-  return { kind: 'pattern', value: typeof args?.[1] === 'string' && args[1].startsWith('#') ? args[1] : '#808080' };
+  // A tiling pattern: drawn as one (its IR kept); where it cannot be, its colour when it is an
+  // uncoloured one, else grey.
+  return { kind: 'pattern', ir: type === 'TilingPattern' ? args : null, base, value: typeof args?.[1] === 'string' && args[1].startsWith('#') ? args[1] : '#808080' };
 }
 
 function hexOf(value) {
@@ -808,7 +885,34 @@ function hexOf(value) {
   return '#000000';
 }
 
-/** A mesh gradient's mean colour, which is what can be drawn of it without a mesh. */
+/**
+ * An image mask's pixels as RGBA in `colour` (#rrggbb), at `width` by `height`: from `sw` by `sh` bits,
+ * rows padded to a byte, 0 painted and 1 clear (as pdf.js gives them), each pixel's opacity the share
+ * of the bits it covers that are painted.
+ */
+function maskRgba(bits, sw, sh, width, height, colour) {
+  const rgb = [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16));
+  const rowBytes = Math.ceil(sw / 8);
+  const out = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y += 1) {
+    const y0 = Math.floor((y * sh) / height);
+    const y1 = Math.max(y0 + 1, Math.floor(((y + 1) * sh) / height));
+    for (let x = 0; x < width; x += 1) {
+      const x0 = Math.floor((x * sw) / width);
+      const x1 = Math.max(x0 + 1, Math.floor(((x + 1) * sw) / width));
+      let painted = 0;
+      for (let yy = y0; yy < y1; yy += 1) {
+        const row = yy * rowBytes;
+        for (let xx = x0; xx < x1; xx += 1) if (!((bits[row + (xx >> 3)] >> (7 - (xx & 7))) & 1)) painted += 1;
+      }
+      const i = (y * width + x) * 4;
+      out[i] = rgb[0]; out[i + 1] = rgb[1]; out[i + 2] = rgb[2];
+      out[i + 3] = Math.round((255 * painted) / ((y1 - y0) * (x1 - x0)));
+    }
+  }
+  return out;
+}
+
 /** A mesh's mean colour, for a mesh used as a pattern's paint. pdf.js gives four bytes a vertex. */
 function meanMeshColour(ir) {
   const colours = ir?.[3];

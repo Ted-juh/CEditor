@@ -573,6 +573,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     return content;
   };
 
+  const transformOrigin = (node) => String(node.attributes?.['transform-origin'] ?? ownStyle(node, classes)['transform-origin'] ?? '').trim();
   /**
    * The box a clip in objectBoundingBox units measures against: the element's own, in its own space
    * (a shape's outline, a picture's rectangle), or null where it is not measured here (a group's).
@@ -598,7 +599,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   const clipInUserSpace = (entry) => {
     const clip = defs.clipPath.get(entry.id);
     const box = entry.box;
-    if (!box || !(box.width > 0 && box.height > 0) || String(clip?.attributes?.clipPathUnits ?? '') !== 'objectBoundingBox') return entry.id;
+    if (!box || !(box.width > 0 && box.height > 0) || String(clip?.attributes?.clipPathUnits ?? '') !== 'objectBoundingBox' || transformOrigin(clip)) return entry.id;
     const key = `${entry.id} ${box.x} ${box.y} ${box.width} ${box.height}`;
     if (!boxClips.has(key)) {
       const text = definitionText.get(entry.id) ?? '';
@@ -619,7 +620,9 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   /** A clip path's region in the document, as path data, or '' (for Paper.js to cut a shape to). */
   const clipRegion = (entry) => {
     const clip = defs.clipPath.get(entry.id);
-    if (!clip) return '';
+    // A transform about an origin of its own (SVG 2's transform-origin) is left to the browser: the
+    // clip is the layer's mask.
+    if (!clip || transformOrigin(clip)) return '';
     let own = multiply(entry.matrix, parseTransform(clip.attributes?.transform));
     if (String(clip.attributes?.clipPathUnits ?? '') === 'objectBoundingBox') {
       // Its shapes in the units of the clipped element's own box.
@@ -1027,9 +1030,10 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     const box = { x: Math.min(...xs), y: Math.min(...ys), width: Math.max(...xs) - Math.min(...xs), height: Math.max(...ys) - Math.min(...ys) };
     const section = deepClone(SECTION_DEFAULTS.Background);
     // Placed in its box as preserveAspectRatio says: by default whole and centred (meet), or filling
-    // it and cut (slice), or stretched to it (none).
+    // it and cut (slice), or stretched to it (none). A picture that is itself an SVG fills the box and
+    // places itself by its own viewBox, as a browser draws it.
     const [align = 'xMidYMid', meetOrSlice = 'meet'] = String(node.attributes?.preserveAspectRatio ?? '').trim().split(/\s+/).filter(Boolean);
-    const fit = align === 'none' ? 'stretch' : meetOrSlice === 'slice' ? 'cover' : 'contain';
+    const fit = align === 'none' || /^data:image\/svg/i.test(href) ? 'stretch' : meetOrSlice === 'slice' ? 'cover' : 'contain';
     const placed = /^x(Min|Mid|Max)Y(Min|Mid|Max)$/.exec(align);
     const column = { Min: 'left', Mid: '', Max: 'right' }[placed?.[1] ?? 'Mid'];
     const row = { Min: 'top', Mid: '', Max: 'bottom' }[placed?.[2] ?? 'Mid'];

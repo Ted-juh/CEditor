@@ -424,6 +424,9 @@ test('an embedded picture: its wrapped base64 joined, placed as preserveAspectRa
   assert.deepEqual([meet.imageFit, meet.imageAlign], ['contain', 'center']);
   assert.deepEqual([fillOf(parts(plan).slice).imageFit, fillOf(parts(plan).slice).imageAlign], ['cover', 'bottom-left']);
   assert.equal(fillOf(parts(plan).none).imageFit, 'stretch');
+  // A picture that is itself an SVG fills the box and places itself, as a browser draws it.
+  const inner = planSvgComponentImport(svg(`<image id="drawing" width="80" height="40" preserveAspectRatio="xMidYMid slice" href="data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2 2"/>')}"/>`));
+  assert.equal(fillOf(parts(inner).drawing).imageFit, 'stretch');
 });
 
 test('a clip in objectBoundingBox units on a turned shape clips it in the shape\'s own box', async () => {
@@ -439,6 +442,10 @@ test('a clip in objectBoundingBox units on a turned shape clips it in the shape\
   const cut = planSvgComponentImport(file, { geometry: await loadGeometry() });
   const layout = parts(cut).turned._children.Layout;
   assert.equal(parts(cut).turned.mask, undefined);
+  // A clip turned about an origin of its own (transform-origin) is left to the browser, as it was.
+  const about = planSvgComponentImport(svg('<clipPath id="c" clipPathUnits="objectBoundingBox" transform="scale(2)" transform-origin="center"><rect x="0.3" y="0.3" width="0.4" height="0.4"/></clipPath>'
+    + '<rect id="box" width="100" height="100" fill="green" clip-path="url(#c)"/>'), { geometry: await loadGeometry() });
+  assert.match(atob(parts(about).box.mask.src.split(',')[1]), /clip-path="url\(#c\)"/);
   // The 60 by 60 inner square turned 45°: 85 across, about its centre (50, 51).
   assert.deepEqual([layout.x, layout.y, layout.width, layout.height].map((v) => Math.round(v)), [8, 8, 85, 85]);
 });
@@ -447,4 +454,64 @@ test('style rules by type, id and class, as CSS ranks them; !important read past
   const plan = planSvgComponentImport(svg('<style>/* rules */ rect { fill: red } .a, .b { fill: #00f } #x { fill: green !important } path.e { fill: #ff0 } g > rect { fill: black }</style>'
     + '<rect id="r" width="20" height="20"/><rect class="a" id="q" x="30" width="20" height="20"/><rect class="b" id="x" x="60" width="20" height="20"/><path class="e" id="p" d="M0 50h30v30h-30z"/>'));
   assert.deepEqual(['r', 'q', 'x', 'p'].map((name) => fillOf(parts(plan)[name]).colour), ['FFFF0000', 'FF0000FF', 'FF008000', 'FFFFFF00']);
+});
+
+test('PDF: an image mask (a stencil) is painted in the fill colour, where it was dropped', async () => {
+  // 8 by 2 bits: the left half 1 (clear), the right half 0 (painted, PDF's default decode).
+  const bytes = illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: '1 0 0 rg q 80 0 0 20 10 10 cm /Im0 Do Q' }],
+    resources: { XObject: { Im0: { dict: '/Type /XObject /Subtype /Image /Width 8 /Height 2 /ImageMask true /BitsPerComponent 1', content: Buffer.from([0xf0, 0xf0]).toString('latin1') } } },
+  });
+  const read = await readPdfArtwork(bytes, { pdfjs: pdfjsLegacy });
+  assert.equal(read.ok, true, read.error);
+  assert.ok(!(read.notes ?? []).some((note) => note.kind === 'image-mask'), 'not noted as dropped');
+  const href = read.svg.match(/<image [^>]*href="([^"]+)"/)[1];
+  const picture = decodePng(href);
+  assert.deepEqual(picture.at(0, 0), [255, 0, 0, 0], 'clear on the left');
+  assert.deepEqual(picture.at(picture.width - 1, 0), [255, 0, 0, 255], 'red on the right');
+});
+
+test('PDF: a tiling pattern is drawn as one, its cell repeated, where it was grey', async () => {
+  // A 10-point cell with a red square in its lower left; and an uncoloured one painted blue.
+  const page = (paint) => illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: `${paint} 0 0 100 100 re f` }],
+    resources: {
+      Pattern: { P0: { dict: '/PatternType 1 /PaintType 1 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>', content: '1 0 0 rg 0 0 5 5 re f' } },
+      ColorSpace: { CS0: '[/Pattern /DeviceRGB]' },
+    },
+  });
+  const coloured = await readPdfArtwork(page('/Pattern cs /P0 scn'), { pdfjs: pdfjsLegacy });
+  assert.equal(coloured.ok, true, coloured.error);
+  assert.ok(!(coloured.notes ?? []).some((note) => note.kind === 'pattern-fill'), 'not noted as grey');
+  const id = coloured.svg.match(/<pattern id="([^"]+)" patternUnits="userSpaceOnUse" x="0" y="0" width="10" height="10" patternTransform="matrix\(1 0 0 -1 0 100\)">/)?.[1];
+  assert.ok(id, coloured.svg.slice(0, 600));
+  assert.match(coloured.svg, new RegExp(`<rect x="0" y="0" width="5" height="5" fill="#ff0000"/>`));
+  assert.match(coloured.svg, new RegExp(`fill="url\\(#${id}\\)"`));
+  // Through to a component: the pattern drawn as the layer's picture.
+  const plan = planSvgComponentImport(coloured.svg);
+  assert.ok(Object.values(parts(plan)).some((part) => /<pattern/.test(atob(String(fillOf(part).picture ?? fillOf(part).imageSrc ?? '').split(',')[1] ?? ''))));
+  const uncoloured = await readPdfArtwork(illustratorPdf({
+    width: 100, height: 100,
+    layers: [{ name: 'Art', content: '/CS0 cs 0 0 1 /P0 scn 0 0 100 100 re f' }],
+    resources: {
+      Pattern: { P0: { dict: '/PatternType 1 /PaintType 2 /TilingType 1 /BBox [0 0 10 10] /XStep 10 /YStep 10 /Resources << >>', content: '0 0 5 5 re f' } },
+      ColorSpace: { CS0: '[/Pattern /DeviceRGB]' },
+    },
+  }), { pdfjs: pdfjsLegacy });
+  assert.match(uncoloured.svg, /<pattern [^>]*><g [^>]*><g [^>]*><rect x="0" y="0" width="5" height="5" fill="#0000ff"\/>/);
+});
+
+test('PDF: a page turned in the file (/Rotate) comes in turned, as a viewer shows it', async () => {
+  // A 200 by 100 page turned a quarter clockwise: 100 wide and 200 high, its red square, at the bottom
+  // left of the page as written, at the top left (as poppler draws it); unturned it was at the bottom.
+  const plain = illustratorPdf({ width: 200, height: 100, layers: [{ name: 'Art', content: '1 0 0 rg 0 0 20 20 re f' }] });
+  const text = Buffer.from(plain).toString('latin1').replace('/MediaBox [0 0 200 100]', '/MediaBox [0 0 200 100] /Rotate 90');
+  // The cross-reference offsets after the change move by its length; pdf.js reads past that.
+  const read = await readPdfArtwork(new Uint8Array(Buffer.from(text, 'latin1')), { pdfjs: pdfjsLegacy });
+  assert.equal(read.ok, true, read.error);
+  assert.deepEqual([read.width, read.height], [100, 200]);
+  assert.ok(!(read.notes ?? []).some((note) => note.kind === 'rotated'));
+  assert.match(read.svg, /<rect x="0" y="0" width="20" height="20" fill="#ff0000"\/>/);
 });
