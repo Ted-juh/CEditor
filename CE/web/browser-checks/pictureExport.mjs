@@ -42,7 +42,10 @@ const server = createServer(async (req, res) => {
 await new Promise((resolve) => server.listen(0, resolve));
 const base = `http://127.0.0.1:${server.address().port}`;
 
-const browser = await chromium.launch(chromiumLaunchOptions());
+// LCD (subpixel) text off: on Windows the page's own text is drawn with ClearType's coloured edges,
+// and text drawn inside an image never is, so a screenshot and a picture of the same words differ at
+// every glyph edge for a reason that has nothing to do with the picture.
+const browser = await chromium.launch({ ...chromiumLaunchOptions(), args: ['--disable-lcd-text'] });
 const errors = [];
 
 async function openAt(deviceScaleFactor) {
@@ -90,7 +93,7 @@ try {
   console.log('1× against the screenshot:', JSON.stringify(one));
   await keep(page, 'panel-1x.png');
   assert.ok(!one.sizeMismatch, `same size as the screenshot: ${one.sizeMismatch}`);
-  assert.ok(one.far < 0.004, `at most 0.4% of pixels far from the screen (got ${(one.far * 100).toFixed(3)}%)`);
+  assert.ok(one.far < 0.004, `at most 0.4% of pixels far from the screen (got ${(one.far * 100).toFixed(3)}%, most at x,y:count ${one.cells.join(' ')})`);
   assert.ok(one.mean < 1.5, `mean difference under 1.5 levels (got ${one.mean.toFixed(2)})`);
 
   // --- The editor's marks stay out ----------------------------------------------------------------
@@ -106,6 +109,7 @@ try {
   const marked = await page.evaluate((url) => window.__picture.compareWith(url), selectedShot);
   console.log('selected: picture vs unselected screen', JSON.stringify(unmarked), '| vs selected screen', JSON.stringify(marked));
   assert.ok(unmarked.far <= one.far + 0.0002, 'a selected control is pictured as if nothing were selected');
+  assert.ok(marked.far > 0, 'and the comparison does see the handles on the screen, so it would see them in a picture');
 
   // --- The selection, alone on transparency ---------------------------------------------------------
   const knob = await page.evaluate(() => window.__picture.firstComponentWithRange());
@@ -150,7 +154,7 @@ try {
   console.log('2× against a 2× screenshot:', JSON.stringify(two), `${second.ms} ms`);
   await keep(page2, 'panel-2x.png');
   assert.ok(!two.sizeMismatch, `same size as the screenshot: ${two.sizeMismatch}`);
-  assert.ok(two.far < 0.004, `at most 0.4% of pixels far from the 2× screen (got ${(two.far * 100).toFixed(3)}%)`);
+  assert.ok(two.far < 0.004, `at most 0.4% of pixels far from the 2× screen (got ${(two.far * 100).toFixed(3)}%, most at x,y:count ${two.cells.join(' ')})`);
   await page2.close();
 
   assert.deepEqual(errors, [], 'the page must not throw');

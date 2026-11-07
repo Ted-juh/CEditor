@@ -33,16 +33,43 @@ async function imageData(dataUrl) {
   return { width: canvas.width, height: canvas.height, data: pixels(canvas) };
 }
 
-/** How far two pictures of the same size are apart: share of pixels off by more than 48 levels, and the mean. */
-function compare(a, b) {
+/**
+ * How far two pictures of the same size are apart, as the share of pixels with nothing like them in
+ * the other picture: a pixel counts only when no pixel within one of it, there, is within 48 levels
+ * in every channel. That forgives what differs between two drawings of the same text — where its
+ * antialiasing lands, a pixel either way — and nothing that is missing, extra or recoloured, which
+ * no neighbour can stand in for. Both ways round, so something the picture lacks counts as much as
+ * something it adds. `cells` are the worst 40-pixel squares, to say where when it is not.
+ */
+function compare(a, b, width, height) {
+  const near = (from, to, i, x, y) => {
+    for (let dy = -1; dy <= 1; dy += 1) {
+      const yy = y + dy;
+      if (yy < 0 || yy >= height) continue;
+      for (let dx = -1; dx <= 1; dx += 1) {
+        const xx = x + dx;
+        if (xx < 0 || xx >= width) continue;
+        const j = (yy * width + xx) * 4;
+        if (Math.abs(from[i] - to[j]) <= 48 && Math.abs(from[i + 1] - to[j + 1]) <= 48 && Math.abs(from[i + 2] - to[j + 2]) <= 48) return true;
+      }
+    }
+    return false;
+  };
   let far = 0; let sum = 0;
-  const n = a.data.length / 4;
-  for (let i = 0; i < a.data.length; i += 4) {
-    const d = Math.max(Math.abs(a.data[i] - b.data[i]), Math.abs(a.data[i + 1] - b.data[i + 1]), Math.abs(a.data[i + 2] - b.data[i + 2]));
-    sum += d;
-    if (d > 48) far += 1;
+  const cells = new Map();
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const i = (y * width + x) * 4;
+      sum += Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+      if (near(a, b, i, x, y) && near(b, a, i, x, y)) continue;
+      far += 1;
+      const key = `${Math.floor(x / 40) * 40},${Math.floor(y / 40) * 40}`;
+      cells.set(key, (cells.get(key) ?? 0) + 1);
+    }
   }
-  return { far: far / n, mean: sum / n };
+  const n = width * height;
+  const worst = [...cells].sort((p, q) => q[1] - p[1]).slice(0, 8).map(([at, count]) => `${at}:${count}`);
+  return { far: far / n, mean: sum / n, cells: worst };
 }
 
 let panel = null;
@@ -107,7 +134,7 @@ window.__picture = {
     if (shot.width !== canvas.width || shot.height !== canvas.height) {
       return { sizeMismatch: [shot.width, shot.height, canvas.width, canvas.height] };
     }
-    return compare({ data: pixels(canvas) }, shot);
+    return compare(pixels(canvas), shot.data, canvas.width, canvas.height);
   },
   /** Share of the last picture's pixels that are fully transparent, and that are opaque. */
   coverage() {
