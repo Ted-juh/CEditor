@@ -169,7 +169,7 @@ before.
 No import hangs, throws or makes bad output: the SVG and Photoshop files' 7,161 imports, the PDFs'
 1,128 (the two stress files apart, as before). Photoshop components that import went from 260 to
 290 of 316: the rest are files with nothing to draw (an adjustment layer alone) and one Multichannel
-file. PDFs note only the 4 pictures pdf.js cannot decode.
+file. PDFs note only the 4 pictures pdf.js cannot decode. CI run 538 (commit `174da91`) passed in all four jobs.
 
 ## Left, and why
 
