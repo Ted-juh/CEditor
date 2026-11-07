@@ -343,6 +343,50 @@ Twenty-two files came closer and none moved the other way by 0.05 points or more
 before; group-clips-child-stroke.psd from 0.8 % to 0, nothing else moved. No import hangs, throws or
 makes bad output (the 948 imports, as before). CI run 542 (commit `a704d17`) passed in all four jobs.
 
+## The eighth pass: a second corpus, made in Photoshop to test against
+
+PhotoCraft (storytold/photocraft, an open-source photo editor in Rust, MIT OR Apache-2.0) has
+measured many of Photoshop's adjustments and styles against Photoshop itself with scripted runs, and
+keeps the files it made for that in storytold/photocraft-corpus: 258 PSDs authored in Photoshop 2026
+by a script (MIT OR Apache-2.0), each with Photoshop's picture of itself. They test one setting at a
+time, in every colour mode and depth: what psd-tools' corpus could not isolate. Their models are
+ported here where they are measured (credited in the code), and the corpus measured as psd-tools' is.
+
+| Left, or found by the new corpus | Now |
+|---|---|
+| Photo Filter, Vibrance and Color Balance stacked (fill_adjustments.psd, 41 %) | PhotoCraft's measured models. Photo Filter multiplies the pixel's D50 XYZ, relative to white, by the filter colour's, in linear light; Preserve Luminosity puts the luminosity back as the Luminosity blend mode does. Color Balance folds the three tones into one Levels per channel (black and white points, a midtone gamma 2^(m/100)). Vibrance works in linear light: its Saturation toward the grey 0.288 R + 0.712 G, its Vibrance an HSV change. With PhotoCraft's current Brightness/Contrast too (within half a level of psd-tools' four settings, where psd-tools' model was 3 off), fill_adjustments.psd 41 % to 0, mean 8.1 levels to 1.0 |
+| Black & White with a tint (98 %) | The smallest channel, plus the secondary and primary parts by their sliders; a tint at the grey's luminosity, as the Color mode does. 98 % to 0 |
+| Exposure (10.8 %) | Through a plain 2.2 power in an RGB file, not sRGB's curve: 10.8 % to 0, and psd-tools' exposure_rgb.psd 0.5 to 0 |
+| A Grayscale file's Gradient Map (99.8 %) | Its stops, from the binary block, held a grey's ink over 0..255 where descriptors give a percent: read so, 0.6-0.9 levels off |
+| A 32-bit file's adjustments (26-63 %) | They work on its linear values, as Photoshop works them: Levels unclipped with a mirrored power, Photo Filter keeping luminance Y, Channel Mixer's percentages cut to 1/1024, Hue/Saturation scaling chroma about lightness by Photoshop's stepped factor; Selective Color alone on the encoded colours, as Photoshop's picture shows. All twenty RGB and grey 32-bit files under 1 % |
+| Type (56 files, 1-8 %) | Photoshop blends type at its "Blend Text Colors Using Gamma: 1.45", on by default: both colours to linear light, then to a 1.45 gamma, blended, and back. Fitted on 96,000 edge pixels of 50 files, 0.05 of a level RMS, where a plain blend is 30 and every simple power 2 or more. 2 to 54 of 56 type files under 1 %. (psd-tools' text.psd, made with the setting off, from 0 to 0.28 %: a setting of the application, not kept in the file) |
+| Chisel bevels (11-20 %) | PhotoCraft's measured ramps: straight facets, one step of 1 / (Size + 1) a pixel, each style and Hard or Soft its own (Inner, Outer, Emboss, Pillow). Inner 14 % to 0.4, Outer 12.5 to 1, Emboss and Pillow 15 to 3 |
+| Stroke Emboss (13-20 %) | An inner bevel of the stroke's outline, its light and shade laid on the stroke's own colour; and it no longer casts the outside half an Emboss does. Inside stroke 13 % to 0.2, Chisel Hard 20 to 1.3; a Smooth one over an outside stroke 16 to 7.7 (below) |
+| A CMYK file's Hue/Saturation and Color Balance (59 %, 8 %) | On the inks, cyan, magenta and yellow as an RGB colour's complement, black left alone (PhotoCraft's finding): both under half a level |
+
+Tried and not kept: PhotoCraft's Gloss Contour divisor (the flat face's sine rather than the contour's
+value there: the two gloss files from 26-31 % to 30-31); a gradient's ends rounded outward to whole
+pixels (the 4 by 4 files' 45° falls out of it, but 146 gradient layers whose pixels Photoshop kept go
+from 1.5 % off to 11 when redrawn so); psd-tools' gradient length (width and height mixed by angle:
+46 %); the box measured between pixel centres (11 %).
+
+**Measured: the panel flattening against Photoshop's own picture of the file.**
+
+| | Before | Now |
+|---|---|---|
+| PhotoCraft's corpus (258): under 1 % | 114 | 199 |
+| over 5 % | 104 | 44 |
+| over 20 % | 60 | 31 |
+| psd-tools' corpus (281): under 1 % | 264 | 265 |
+| over 5 % | 9 | 8 |
+| over 20 % | 8 | 7 |
+
+In PhotoCraft's corpus 110 files came closer and none moved the other way; every RGB and grey
+adjustment file at 8, 16 and 32 bits is under 1 %. In psd-tools' 17 came closer, and two by 0.1-0.3
+points the other way (text.psd, above; masks.psb). As components: 81 / 11 / 12 / 35, as before. No
+import hangs, throws or makes bad output: psd-tools' 948 imports as before, and all 258 of the new
+corpus's files import as components.
+
 ## Left, and why
 
 - **An SVG filter that is lighting, turbulence or displacement**, or colours in SVG's default
@@ -350,20 +394,25 @@ makes bad output (the 948 imports, as before). CI run 542 (commit `a704d17`) pas
 - **A Lab file** is converted plainly, and a CMYK file with a version 4 profile (or none) through the
   fit of the default press profile. A Multichannel file's display is Photoshop's model of inks, not
   checked against a picture of one.
-- **Parts of layer styles not measured**: a Chisel bevel, Soften, a Gloss Contour, a Precise glow, a
-  Noise gradient (its average colour) are drawn by the same readings and named in the Console; a
-  style's Noise and Jitter and a bevel's Texture are not drawn. A bevel far larger than its shape
+- **Parts of layer styles not measured**: Soften, a Precise glow and a Noise gradient (its average
+  colour) are drawn by the same readings and named in the Console; a style's Noise and Jitter and a
+  bevel's Texture are not drawn. A bevel far larger than its shape
   (layer_comps.psd, Size 100 on a face 160 px across) shades a little differently from the fitted
   one (1.5 % of pixels; most of what was put down to it was its shadow's Linear Burn, above).
 - **Dissolve's grain** is random in Photoshop; its density is matched, its pixels cannot be.
+- **A Lab file's adjustments** work on RGB colours here, where Photoshop works Invert, Posterize,
+  Threshold, Brightness/Contrast, Gradient Map, Levels and Curves on L, a and b (PhotoCraft's corpus,
+  lab8 and lab16: 11 of 12 files each over 10 % off). A CMYK file's Channel Mixer, Gradient Map,
+  Photo Filter, Selective Color and Colorize likewise run on the inks in Photoshop and in RGB here
+  (8-100 %). Both need a channel path of their own, as CMYK's inks have.
 - **The rest of the flattening's differences**, each measured and none with a file that pins a
-  rule for it: Photo Filter, Vibrance and Color Balance stacked (fill_adjustments.psd, 41 %: above);
-  a Noise gradient on a stroke (effect-stroke-gradient.psd, 14 %), Photoshop's random one; a Lighter
-  Color layer's half-transparent edge pixels in a Pass Through group below full Fill (4 %); a
-  Reflected gradient stroke, which Photoshop draws about a ninth longer than the box the linear
-  ones are measured across (effect-enums.psd, 3 %: the one file with one, and psd-tools no closer);
-  a Pillow Emboss's shading (layer_params.psd, 1.7 %); a stroke along a polygon's slanting edge
-  (shape-fx2.psd, 1.7 %), measured on the pixel grid and not from the path; and the 4 by 4 pixel 16-
-  and 32-bit files, which keep no pixels for their gradient fill and whose Reflected gradient
-  Photoshop draws at 45° where the file says 30°, at that size only (its 8-bit twin's own pixels show
-  the same).
+  rule for it: a bevel's Gloss Contour and Contour (13-31 %; PhotoCraft has not found Photoshop's
+  rule either); a Smooth Stroke Emboss over an outside stroke (7.7 %), whose light varies along each
+  side over far more than its Size; an Outer Glow with a gradient (18 %); a Noise gradient on a
+  stroke (effect-stroke-gradient.psd, 14 %), Photoshop's random one; a Lighter Color layer's
+  half-transparent edge pixels in a Pass Through group below full Fill (4 %); a Reflected gradient
+  stroke, about a ninth longer in Photoshop than the box the linear ones are measured across
+  (effect-enums.psd); a Pillow Emboss's shading (layer_params.psd, 1.7 %); a stroke along a
+  polygon's slanting edge (shape-fx2.psd, 1.7 %); smart filters with a filter mask (25-41 %); and
+  gradients on very small boxes, whose angle Photoshop moves a few degrees off what the file says
+  (psd-tools' 34-pixel swatches; at 4 by 4 pixels, 30° drawn as 45°), by a rule not found.

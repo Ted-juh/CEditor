@@ -90,8 +90,64 @@ test('Color Lookup through an ICC profile, or with a table it cannot read, is no
 test('a Color Lookup with nothing chosen leaves colours alone; a Photo Filter\'s Density reads as a fraction or a percent', () => {
   assert.deepEqual(adjustmentFunction({ type: 'color lookup' })([10, 20, 30]), [10, 20, 30]);
   const filter = (density) => adjustmentFunction({ type: 'photo filter', color: { r: 255, g: 0, b: 0 }, density, preserveLuminosity: false });
-  near(filter(0.25)([200, 200, 200]), [200, 150, 150], 0.01, 'a quarter of the way to the filtered colour');
-  near(filter(25)([200, 200, 200]), [200, 150, 150], 0.01, 'the same Density as a percent');
+  const quarter = filter(0.25)([200, 200, 200]);
+  assert.ok(quarter[0] > quarter[1] && quarter[1] < 200, `${quarter}`);
+  near(filter(25)([200, 200, 200]), quarter, 0.01, 'the same Density as a percent');
+});
+
+// Photoshop's own numbers for these, as PhotoCraft measured them (storytold/photocraft, MIT OR
+// Apache-2.0, crates/compose: adjust/tone_tests.rs and tests.rs): an 8-bit grey ramp through each.
+const RAMP = [0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 255];
+const throughRamp = (fn, channel) => RAMP.map((x) => Math.round(fn([x, x, x])[channel]));
+const within = (got, want, tolerance, what) => got.forEach((v, i) => assert.ok(Math.abs(v - want[i]) <= tolerance, `${what} at ${RAMP[i] ?? i}: ${v} vs Photoshop's ${want[i]}`));
+
+test('Color Balance: each channel through one Levels the tones fold into, as Photoshop measures', () => {
+  const tone = (name, cyanRed, preserveLuminosity) => adjustmentFunction({ type: 'color balance', preserveLuminosity,
+    shadows: { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 }, midtones: { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 }, highlights: { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 }, [name]: { cyanRed, magentaGreen: 0, yellowBlue: 0 } });
+  within(throughRamp(tone('midtones', 50, false), 0), [0, 36, 59, 78, 96, 112, 128, 142, 156, 170, 183, 196, 209, 221, 233, 244, 255], 1, 'midtones red +50');
+  within(throughRamp(tone('shadows', -100, false), 0), [0, 0, 0, 0, 0, 0, 0, 7, 23, 43, 67, 93, 122, 154, 186, 221, 255], 1, 'shadows red -100');
+  within(throughRamp(tone('highlights', 100, false), 0), [0, 51, 84, 111, 136, 160, 182, 202, 223, 242, 255, 255, 255, 255, 255, 255, 255], 1, 'highlights red +100');
+  // Preserve Luminosity: the other channels move the other way.
+  within(throughRamp(tone('shadows', 50, true), 1), [0, 0, 0, 0, 17, 37, 57, 77, 97, 117, 137, 157, 177, 197, 216, 236, 255], 1, 'shadows red +50, green');
+  within(throughRamp(tone('midtones', 100, true), 1), [0, 5, 14, 24, 36, 50, 64, 80, 97, 114, 132, 151, 171, 191, 212, 234, 255], 1, 'midtones red +100, green');
+  within(throughRamp(tone('highlights', -100, true), 1), [0, 26, 53, 79, 105, 132, 158, 184, 211, 237, 255, 255, 255, 255, 255, 255, 255], 1, 'highlights red -100, green');
+});
+
+test('Brightness/Contrast, the current one: Photoshop\'s measured curves', () => {
+  const xs = [0, 16, 32, 64, 96, 128, 160, 192, 224, 255];
+  const curve = (brightness, contrast) => { const fn = adjustmentFunction({ type: 'brightness/contrast', brightness, contrast }); return (x) => fn([x, x, x])[0]; };
+  const up = curve(50, 0); const down = curve(-50, 0);
+  xs.forEach((x, i) => {
+    assert.ok(Math.abs(up(x) - [0, 22, 44, 88, 132, 171, 203, 228, 246, 255][i]) <= 1.2, `+50 at ${x}: ${up(x)}`);
+    assert.ok(Math.abs(down(x) - [0, 12, 23, 47, 70, 93, 118, 148, 186, 255][i]) <= 1.2, `-50 at ${x}: ${down(x)}`);
+  });
+  // +25 with contrast +30 (PhotoCraft's corpus, rgb8 brightness-contrast.psd).
+  const both = curve(25, 30);
+  for (const [x, want] of [[8, 7], [24, 23], [48, 49], [72, 78], [88, 99], [104, 120], [128, 154], [144, 174], [160, 192], [176, 208], [192, 222], [216, 239], [248, 253]]) {
+    assert.ok(Math.abs(both(x) - want) <= 1.5, `+25/+30 at ${x}: ${both(x)} vs ${want}`);
+  }
+});
+
+test('Photo Filter, Vibrance, Black & White and Exposure as Photoshop draws them', () => {
+  // Photo Filter: the colour's XYZ multiplied in; Preserve Luminosity keeps the blend modes' luminosity.
+  const warm = adjustmentFunction({ type: 'photo filter', color: { r: 236, g: 138, b: 0 }, density: 0.25, preserveLuminosity: true });
+  const [r, g, b] = warm([128, 128, 128]);
+  assert.ok(r > g && g > b, `${[r, g, b]}`);
+  assert.ok(Math.abs(0.3 * r + 0.59 * g + 0.11 * b - 128) < 0.6);
+  assert.deepEqual(adjustmentFunction({ type: 'photo filter', color: { r: 236, g: 138, b: 0 }, density: 0, preserveLuminosity: false })([90, 40, 200]).map(Math.round), [90, 40, 200]);
+  // Vibrance's Saturation takes a colour toward the grey 0.288 R + 0.712 G in linear light: pure red
+  // to that grey at -100.
+  const grey = Math.round(255 * (1.055 * 0.288 ** (1 / 2.4) - 0.055));
+  assert.deepEqual(adjustmentFunction({ type: 'vibrance', vibrance: 0, saturation: -100 })([255, 0, 0]).map(Math.round), [grey, grey, grey]);
+  assert.deepEqual(adjustmentFunction({ type: 'vibrance', vibrance: 0, saturation: 0 })([200, 100, 50]).map(Math.round), [200, 100, 50]);
+  // Black & White: the smallest channel, plus the secondary part (middle − smallest) and the primary
+  // part (largest − middle) by their sliders.
+  const bw = adjustmentFunction({ type: 'black & white', reds: 40, yellows: 60, greens: 40, cyans: 60, blues: 20, magentas: 80 });
+  assert.equal(Math.round(bw([255, 0, 0])[0]), 102);
+  assert.equal(Math.round(bw([255, 255, 0])[0]), 153);
+  assert.equal(Math.round(bw([200, 120, 40])[0]), Math.round(40 + 80 * 0.6 + 80 * 0.4));
+  // Exposure in an RGB file through a plain 2.2 power: +1 stop on 128.
+  assert.equal(Math.round(adjustmentFunction({ type: 'exposure', exposure: 1, offset: 0, gamma: 1 })([128, 128, 128])[0]), Math.round(128 * 2 ** (1 / 2.2)));
 });
 
 function solid(name, left, top, w, h, rgba) {

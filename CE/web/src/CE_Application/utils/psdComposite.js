@@ -416,6 +416,10 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
   const through = blendIf(layer);
   // A 16- or 32-bit file's pixels at their full precision, where the reader kept it (psdRead.js eightBit).
   const fine = src.precise?.length === src.data.length ? src.precise : null;
+  // Type in an 8- or 16-bit file blends at Photoshop's "Blend Text Colors Using Gamma: 1.45", on by
+  // default: both colours taken to linear light and to a 1.45 gamma there, blended, and back (the
+  // PhotoCraft corpus's 50 type files: edge pixels to 0.05 of a level, where plain blending was 30 off).
+  const textGamma = Boolean(layer.text) && own && !inLinear && blend === 'normal' && !inTextless;
   for (let sy = 0; sy < src.height; sy += 1) {
     const y = top + sy;
     if (y < 0 || y >= height) continue;
@@ -433,6 +437,12 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
       if (through && sa > 0) sa *= through(sr, sg, sb, dst[d], dst[d + 1], dst[d + 2]);
       if (dissolve && sa > 0) sa = dissolveNoise(y * width + x) < sa ? 1 : 0;
       if (sa <= 0) continue;
+      if (textGamma && sa < 1 && dst[d + 3] > 0) {
+        for (let k = 0; k < 3; k += 1) dst[d + k] = toTextSpace(dst[d + k]);
+        blendPixel(dst, d, toTextSpace(sr), toTextSpace(sg), toTextSpace(sb), sa, blend, separable, nonSeparable);
+        for (let k = 0; k < 3; k += 1) dst[d + k] = fromTextSpace(dst[d + k]);
+        continue;
+      }
       blendPixel(dst, d, sr, sg, sb, sa, blend, separable, nonSeparable);
     }
   }
@@ -697,9 +707,12 @@ export function compositePsd(layers, width, height, options = {}) {
     // worked as a deep file unless the caller says.
     const linear = Boolean(options.linear);
     inLinear = linear;
+    // (A Grayscale or CMYK file's type is blended plainly: not measured there.)
+    inTextless = Boolean(options.grey || options.cmyk || options.textGamma === false);
     return compositeLayers(layers, width, height, { ...options, deep: options.deep ?? hasPrecise(layers), linear });
   } finally {
     inLinear = false;
+    inTextless = false;
     if (options.cmykProfile) useCmykProfile(previous);
   }
 }
@@ -709,6 +722,12 @@ export function compositePsd(layers, width, height, options = {}) {
 let inLinear = false;
 const toLight = (c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
 const fromLight = (c) => (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
+
+// Type's blending space (paintLayer): an sRGB colour in linear light, at a 1.45 gamma; and back.
+const TEXT_GAMMA = 1.45;
+const toTextSpace = (c) => toLight(clamp(c)) ** (1 / TEXT_GAMMA);
+const fromTextSpace = (c) => fromLight(clamp(c) ** TEXT_GAMMA);
+let inTextless = false;
 
 const hasPrecise = (layers) => (layers ?? []).some((layer) => Boolean(layer.imageData?.precise) || hasPrecise(layer.children));
 
@@ -1101,7 +1120,7 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
    * clipped to), by its opacity and Fill and its masks, its result blended in its own blend mode.
    */
   const adjustBelow = (dst, layer, inherited, within = null) => {
-    const fn = adjustmentFunction(layer.adjustment, closeAdjustments, { grey, cmyk, deep });
+    const fn = adjustmentFunction(layer.adjustment, closeAdjustments, { grey, cmyk, deep, linear });
     if (!fn) {
       notDrawn.adjustment.push(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
       return;
@@ -1120,13 +1139,17 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
         if (!(dst[d + 3] > 0)) continue;
         const k = strength * (mask ? mask(x, y) : 1);
         if (!(k > 0)) continue;
-        const at = (v) => (linear ? fromLight(clamp(v)) : clamp(v));
+        const direct = linear && !fn.encoded;
+        const at = (v) => (linear && !direct ? fromLight(clamp(v)) : clamp(v));
         const r0 = Math.round(at(dst[d]) * 255);
         const g0 = Math.round(at(dst[d + 1]) * 255);
         const b0 = Math.round(at(dst[d + 2]) * 255);
         const key = (r0 << 16) | (g0 << 8) | b0;
-        let out = fn.fine ? null : known.get(key);
-        if (fn.fine) {
+        let out = fn.fine || direct ? null : known.get(key);
+        if (direct) {
+          const [r, g, b] = fn([at(dst[d]) * 255, at(dst[d + 1]) * 255, at(dst[d + 2]) * 255]);
+          out = [clamp(r / 255), clamp(g / 255), clamp(b / 255)];
+        } else if (fn.fine) {
           const [r, g, b] = fn([at(dst[d]) * 255, at(dst[d + 1]) * 255, at(dst[d + 2]) * 255]);
           out = [clamp(r / 255), clamp(g / 255), clamp(b / 255)].map((v) => (linear ? toLight(v) : v));
         } else if (!out) {
@@ -1263,7 +1286,11 @@ function compositeLayers(layers, width, height, { skip = () => false, styles = n
 }
 
 // The adjustments that change each ink on its own, which is all Photoshop does with them in CMYK.
-const INK_ADJUSTMENTS = new Set(['invert', 'posterize', 'levels', 'curves', 'brightness/contrast']);
+const INK_ADJUSTMENTS = new Set(['invert', 'posterize', 'levels', 'curves', 'brightness/contrast', 'hue/saturation', 'color balance']);
+// Of those, the ones Photoshop works on cyan, magenta and yellow as an RGB colour's complement (the
+// stored values), black left as it is: Hue/Saturation (not Colorize, which separates again) and Color
+// Balance (PhotoCraft's finding, MIT OR Apache-2.0: its cmyk8 and cmyk16 hue-saturation.psd).
+const CMY_ONLY = new Set(['hue/saturation', 'color balance']);
 
 /**
  * A CMYK file flattened on its inks, as Photoshop flattens it: its cyan, magenta and yellow and its
@@ -1327,6 +1354,7 @@ function inkPlanesOf(layers, width, height, options = {}) {
     if (layer.hidden || options.skip?.(layer)) return true;
     if (layer.inkPlanes) inks = true;
     if (layer.adjustment && !INK_ADJUSTMENTS.has(layer.adjustment.type)) return false;
+    if (layer.adjustment?.type === 'hue/saturation' && layer.adjustment.master?.a) return false;
     // (Blend modes all work on the inks, Hue to Luminosity too: on black alone they keep its value or
     // take the layer's, as Photoshop's CMYK test file shows.)
     return fits(layer.children);
@@ -1357,6 +1385,7 @@ function inkPlanesOf(layers, width, height, options = {}) {
     if (plane === 'k' && (adjustment?.type === 'curves' || adjustment?.type === 'levels')) {
       out.adjustment = { type: adjustment.type, rgb: adjustment.rgb, red: adjustment.black, green: adjustment.black, blue: adjustment.black };
     }
+    if (plane === 'k' && CMY_ONLY.has(adjustment?.type)) out.adjustment = { type: 'curves' };
     return out;
   });
   const flatten = (plane) => {

@@ -570,43 +570,186 @@ function hueSaturationRanges(adjustment, ranges) {
 }
 
 
+// Four adjustments as PhotoCraft (storytold/photocraft, MIT OR Apache-2.0, crates/compose/src/adjust)
+// measured them against Photoshop with scripted runs, ported from its Rust: the current Brightness/
+// Contrast, Color Balance, Photo Filter and Vibrance. On 0..255 colours, 8- and 16-bit documents.
+
+const unitClamp = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
+const BRIGHTNESS_KNEE = 126 / 255;
+
 /**
- * The current Brightness/Contrast as psd-tools models it (MIT, psd_tools/composite/adjustments.py):
- * Contrast an S through Curves' spline about 63 and 191, moved 25 levels for each 100%; Brightness a
- * polynomial bend psd-tools fitted to Photoshop's pictures, put on as a shear along the diagonal.
+ * The current Brightness: raised, a line of slope 1.375^(b/50) from black up to an output of 126,
+ * then a Hermite to white whose end slope is 1 / (1 + 0.084 b) (past about +110, where no such cubic
+ * stays below white, a power roll-off); lowered, the inverse of the curve raised by as much.
+ */
+function raisedBrightness(b) {
+  const s = 1.375 ** (b / 50);
+  const e = 1 / (1 + 0.084 * b);
+  const x0 = Math.min(1, BRIGHTNESS_KNEE / s);
+  const secant = (1 - BRIGHTNESS_KNEE) / Math.max(1e-6, 1 - x0);
+  const alpha = s / secant;
+  const hermite = alpha * alpha + (e / secant) ** 2 <= 9;
+  return (x) => {
+    const y0 = BRIGHTNESS_KNEE;
+    if (x <= x0) return Math.min(y0, s * x);
+    const h = Math.max(1e-6, 1 - x0);
+    const t = unitClamp((x - x0) / h);
+    const t2 = t * t; const t3 = t2 * t;
+    const y = hermite
+      ? (2 * t3 - 3 * t2 + 1) * y0 + (t3 - 2 * t2 + t) * h * s + (-2 * t3 + 3 * t2) + (t3 - t2) * h * e
+      : 1 - (1 - y0) * (1 - t) ** alpha;
+    return unitClamp(y);
+  };
+}
+
+/** The current Contrast: an S about the middle, end slopes 1 − c/128 and centre slope 1 + c/128. */
+function contrastCurve(c) {
+  if (!c) return (v) => v;
+  const k = c / 128;
+  const end = 1 - k; const mid = 1 + k;
+  const half = (t) => end * 0.5 * (t ** 3 - 2 * t * t + t) + (-2 * t ** 3 + 3 * t * t) * 0.5 + mid * 0.5 * (t ** 3 - t * t);
+  return (v) => { const x = unitClamp(v); return x <= 0.5 ? half(x / 0.5) : 1 - half((1 - x) / 0.5); };
+}
+
+/**
+ * The current Brightness/Contrast, Brightness then Contrast, through one table: within half a level of
+ * Photoshop's pictures of psd-tools' test settings on average (brightnesscontrast_rgb.psd 0.56, where
+ * psd-tools' model this replaced was 3).
  */
 function brightnessContrastCurve(brightness, contrast) {
-  const b = brightness / 150;
-  const s = contrast * 25;
-  const curve = curveTable([{ input: 0, output: 0 }, { input: 63, output: 63 - s }, { input: 191, output: 191 + s }, { input: 255, output: 255 }]);
-  const pol = (a, x, r) => a * x ** r;
-  const xs = new Float64Array(256);
-  const ys = new Float64Array(256);
-  for (let i = 0; i < 256; i += 1) {
-    const t = i / 255;
-    const h = 0.5 * (Math.abs(b) * (pol(1.65, t, 0.35) + pol(-1, t, 10)) + (1 - Math.abs(b)) * (pol(1.96, t, 0.4) + pol(1, t, 4)) + pol(1, t, 1.25));
-    const bend = b * t * (1 - t) * h;
-    xs[i] = t - bend;
-    ys[i] = curve[i] / 255 + bend;
+  const N = 4096;
+  const table = new Float32Array(N);
+  const raised = brightness ? raisedBrightness(Math.abs(brightness)) : null;
+  const lower = (v) => {
+    if (v <= 0 || v >= 1) return v;
+    let lo = 0; let hi = 1;
+    for (let i = 0; i < 40; i += 1) { const m = (lo + hi) / 2; if (raised(m) < v) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  };
+  const shape = contrastCurve(contrast);
+  for (let i = 0; i < N; i += 1) {
+    const v = i / (N - 1);
+    table[i] = unitClamp(shape(!raised ? v : brightness > 0 ? raised(v) : lower(v)));
   }
-  const table = new Float32Array(256);
-  let k = 0;
-  for (let i = 0; i < 256; i += 1) {
-    const t = i / 255;
-    while (k < 254 && xs[k + 1] < t) k += 1;
-    const span = xs[k + 1] - xs[k];
-    const f = span > 1e-12 ? Math.max(0, Math.min(1, (t - xs[k]) / span)) : 0;
-    const y = t <= xs[0] ? ys[0] : t >= xs[255] ? ys[255] : ys[k] + (ys[k + 1] - ys[k]) * f;
-    table[i] = clamp(y * 255);
+  return (rgb) => rgb.map((v) => {
+    const x = unitClamp(v / 255) * (N - 1);
+    const i = Math.floor(x); const j = Math.min(N - 1, i + 1);
+    return 255 * (table[i] + (table[j] - table[i]) * (x - i));
+  });
+}
+
+/**
+ * Color Balance: the three tones folded into one Levels per channel (input black and white points,
+ * midtone gamma). Without Preserve Luminosity a slider moves its own channel only: lowered shadows
+ * set the black point to |shadows| levels, raised highlights the white point to 255 − highlights, and
+ * the gamma is 2^(m / 100), m = midtones + (shadows + highlights) / 2. With it, a channel's black point
+ * is (max − own) shadows levels, its white point 255 − (own − min) highlights, and m = own − (max +
+ * min) / 2 midtones. A gamma above 1 starts at slope 2^gamma, joined to the power curve by a Hermite.
+ */
+function colorBalanceCurve(tones, preserve, ch) {
+  const [shadows, midtones, highlights] = tones;
+  const own = (t) => t[ch];
+  const max = (t) => Math.max(...t);
+  const min = (t) => Math.min(...t);
+  const [black, white, m] = preserve
+    ? [max(shadows) - own(shadows), own(highlights) - min(highlights), own(midtones) - (max(midtones) + min(midtones)) / 2]
+    : [Math.max(0, -own(shadows)), Math.max(0, own(highlights)), own(midtones) + (own(shadows) + own(highlights)) / 2];
+  const gamma = 2 ** (m / 100);
+  const e = 1 / Math.max(gamma, 0.01);
+  let knee = null;
+  if (gamma > 1) {
+    const s0 = 2 ** gamma;
+    const u0 = Math.min(1, 2 * s0 ** (1 / (e - 1)));
+    if (u0 > 0) knee = { u0, s0, p: u0 ** e, d: e * u0 ** (e - 1) };
   }
-  return (rgb) => rgb.map((v) => table[Math.round(clamp(v))]);
+  const b = black / 255; const w = 1 - white / 255;
+  return (v) => {
+    const x = unitClamp(v);
+    if (x >= w) return 1;
+    if (x <= b) return 0;
+    const u = (x - b) / (w - b);
+    if (knee && u < knee.u0) {
+      const t = u / knee.u0; const t2 = t * t; const t3 = t2 * t;
+      return unitClamp((t3 - 2 * t2 + t) * knee.u0 * knee.s0 + (3 * t2 - 2 * t3) * knee.p + (t3 - t2) * knee.u0 * knee.d);
+    }
+    return u ** e;
+  };
+}
+
+const SRGB_TO_XYZ_D50 = [[0.436074, 0.385064, 0.143080], [0.222504, 0.716878, 0.060618], [0.013932, 0.097104, 0.714173]];
+const XYZ_D50_TO_SRGB = [[3.133856, -1.616867, -0.490615], [-0.978768, 1.916142, 0.033454], [0.071945, -0.228991, 1.405243]];
+const WHITE_D50 = [0.96422, 1, 0.82521];
+const times = (m, v) => m.map((row) => row[0] * v[0] + row[1] * v[1] + row[2] * v[2]);
+// The blend modes' luminosity (0.3, 0.59, 0.11), and SetLum with its ClipColor, on 0..1 colours.
+const blendLum = ([r, g, b]) => 0.3 * r + 0.59 * g + 0.11 * b;
+function withLum(c, l) {
+  const moved = c.map((v) => v + l - blendLum(c));
+  const L = blendLum(moved); const n = Math.min(...moved); const x = Math.max(...moved);
+  let out = moved;
+  if (n < 0) out = out.map((v) => L + ((v - L) * L) / (L - n));
+  if (x > 1) out = out.map((v) => L + ((v - L) * (1 - L)) / (x - L));
+  return out;
+}
+
+/**
+ * Photo Filter: the pixel's D50 XYZ, relative to white, multiplied by the filter colour's (mixed in by
+ * the Density), in linear light: one fixed matrix. Preserve Luminosity puts back the pixel's own
+ * luminosity as the Luminosity blend mode does (within 0.6 of a level of Photoshop's pictures).
+ */
+function photoFilterFunction(colour, density, preserve, linear = false) {
+  const d = unitClamp(density);
+  const xyz = times(SRGB_TO_XYZ_D50, colour.map((v) => toLinear(Math.max(0, Math.min(255, v)))));
+  let scale = xyz.map((v, i) => 1 - d + (d * v) / WHITE_D50[i]);
+  // In a 32-bit file, on its linear values, Preserve Luminosity keeping the luminance Y instead.
+  if (linear && preserve && scale[1] > 1e-6) scale = scale.map((v) => v / scale[1]);
+  const m = [0, 1, 2].map((r) => [0, 1, 2].map((c) => [0, 1, 2].reduce((sum, k) => sum + XYZ_D50_TO_SRGB[r][k] * scale[k] * SRGB_TO_XYZ_D50[k][c], 0)));
+  if (linear) return (rgb) => times(m, rgb);
+  return (rgb) => {
+    let out = times(m, rgb.map(toLinear)).map((v) => toSrgb(Math.max(0, v)) / 255);
+    if (preserve) out = withLum(out, blendLum(rgb.map((v) => v / 255)));
+    return out.map((v) => 255 * unitClamp(v));
+  };
+}
+
+const VIBRANCE_GREY = [0.288, 0.712];
+const VIBRANCE_BOOST = [0.5001, 0.0887, 0.4374, 0.7573, -0.8113, 0.5154, 2.8026];
+const skinShare = (h) => (h <= 30 ? 1 : h < 45 ? (45 - h) / 15 : h < 300 ? 0 : (h - 300) / 60);
+
+/**
+ * Vibrance on a linear-light colour (`v` the slider / 100), keeping its hue: with t = 1 − min/max and V
+ * = max, lowered t' = t(1 − a/4)(1 − a + a t(1 + t)/2) and V' = V − a t(1 − t)(2 − t + t²)V(1 − V); raised
+ * V' = V + v/4 of that and a fitted boost of t that grows as t and V fall, damped on reds and skin.
+ */
+function vibranceLinear(c, v) {
+  const mx = Math.max(...c); const mn = Math.min(...c);
+  if (mx <= 0 || mx - mn <= 1e-9) return c;
+  const t = 1 - mn / mx;
+  const shape = t * (1 - t) * (2 - t + t * t) * mx * Math.max(0, 1 - mx);
+  let t2; let v2;
+  if (v < 0) {
+    const a = -v;
+    t2 = t * (1 - a / 4) * (1 - a + (a * t * (1 + t)) / 2);
+    v2 = mx - a * shape;
+  } else {
+    const [c0, c1, p, q, r0, ra, rt] = VIBRANCE_BOOST;
+    const d = mx - mn;
+    const hue = 60 * (mx === c[0] ? ((((c[1] - c[2]) / d) % 6) + 6) % 6 : mx === c[1] ? (c[2] - c[0]) / d + 2 : (c[0] - c[1]) / d + 4);
+    const w = skinShare(hue);
+    const a = v * (1 - w) + 0.64 * v ** 1.6 * w;
+    const boost = (c0 * a + c1 * a * a) * t ** p * (1 - t) ** q * Math.exp((r0 + ra * a + rt * (1 - t)) * Math.max(0, 1 - mx));
+    t2 = Math.min(1, t * (1 + boost));
+    v2 = mx + (v / 4) * shape;
+  }
+  const m2 = v2 * (1 - t2);
+  const k = (v2 - m2) / (mx - mn);
+  return c.map((x) => m2 + (x - mn) * k);
 }
 
 /**
  * The adjustment as `([r, g, b]) => [r, g, b]` (0..255), or null when it is one this does not do.
  * `report` (a Set) collects what was only approximated.
  */
-export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false, deep = false } = {}) {
+export function adjustmentFunction(adjustment, report = new Set(), { grey = false, cmyk = false, deep = false, linear = false } = {}) {
   const type = adjustment?.type;
   switch (type) {
     case 'invert':
@@ -638,8 +781,27 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
     case 'levels': {
       // Each channel's own levels first, then the RGB ones over all three, as Photoshop draws them.
       // A Grayscale file has one channel, its levels the first after the master, which it ignores.
+      const names = grey ? ['red', 'red', 'red'] : ['red', 'green', 'blue'];
+      if (linear) {
+        // A 32-bit file's, on its linear values: neither clipped to the input range nor to the output
+        // range, the midtone a plain power mirrored below the black point (PhotoCraft's finding, MIT OR
+        // Apache-2.0; its rgb32 levels.psd).
+        const float = (channel) => {
+          const inLo = channel?.shadowInput ?? 0; const inHi = channel?.highlightInput ?? 255;
+          const outLo = channel?.shadowOutput ?? 0; const outHi = channel?.highlightOutput ?? 255;
+          const gamma = channel?.midtoneInput ?? 1;
+          return (v) => {
+            const t = (v - inLo) / Math.max(1e-6, inHi - inLo);
+            const bent = gamma === 1 ? t : Math.sign(t) * Math.abs(t) ** (1 / Math.max(0.01, gamma));
+            return outLo + bent * (outHi - outLo);
+          };
+        };
+        const all = float(grey ? null : adjustment.rgb);
+        const per = names.map((name) => float(adjustment[name]));
+        return (rgb) => rgb.map((v, i) => all(per[i](v)));
+      }
       const all = levelsTable(grey ? null : adjustment.rgb);
-      const per = (grey ? ['red', 'red', 'red'] : ['red', 'green', 'blue']).map((name) => levelsTable(adjustment[name]));
+      const per = names.map((name) => levelsTable(adjustment[name]));
       return (rgb) => rgb.map((v, i) => all[Math.round(clamp(per[i][Math.round(clamp(v))]))]);
     }
     case 'curves': {
@@ -653,11 +815,11 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
       const gain = Math.pow(2, adjustment.exposure ?? 0);
       const offset = adjustment.offset ?? 0;
       const gamma = adjustment.gamma ?? 1;
-      // In linear light, as Photoshop works exposure: through sRGB's curve, or in a Grayscale file
-      // through Dot Gain 20%'s, a power of 1.75 (psd-tools' finding, which its test files bear out).
-      const toLinear = grey ? (v) => (v / 255) ** 1.75 : (v) => { const c = v / 255; return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
-      const toSrgb = grey ? (c) => 255 * Math.max(0, c) ** (1 / 1.75) : (c) => 255 * (c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055);
-      return (rgb) => rgb.map((v) => clamp(toSrgb(unit(Math.pow(unit(toLinear(v) * gain + offset), 1 / (gamma || 1))))));
+      // In linear light, as Photoshop works exposure: an RGB file's through a plain 2.2 power, not sRGB's
+      // curve (PhotoCraft's finding, MIT OR Apache-2.0: its exposure.psd 10.8 % of pixels off to none),
+      // a Grayscale file's through Dot Gain 20%'s, a power of 1.75 (psd-tools').
+      const power = linear ? 1 : grey ? 1.75 : 2.2;
+      return (rgb) => rgb.map((v) => clamp(255 * unit(Math.pow(unit((v / 255) ** power * gain + offset), 1 / (gamma || 1))) ** (1 / power)));
     }
     case 'brightness/contrast': {
       const brightness = adjustment.brightness ?? 0;
@@ -669,11 +831,9 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
         const k = contrast >= 0 ? 1 / Math.max(0.01, 1 - contrast) : 1 + contrast;
         return (rgb) => rgb.map((v) => clamp(contrast >= 0 ? (v + brightness - 127.5) * k + 127.5 : (v - 127.5) * k + 127.5 + brightness));
       }
-      // The current one, which Photoshop took from Camera Raw and publishes no formula for: psd-tools'
-      // model (brightnessContrastCurve), within 3 levels of Photoshop's pictures of its four test
-      // settings on average and nowhere 16 off, where the curve fitted here before was 7 off.
-      report.add('Brightness/Contrast');
-      return brightnessContrastCurve(brightness, contrast);
+      // The current one, which Photoshop took from Camera Raw and publishes no formula for: PhotoCraft's
+      // measured model (brightnessContrastCurve), within about a level of Photoshop's pictures.
+      return brightnessContrastCurve(brightness, adjustment.contrast ?? 0);
     }
     case 'hue/saturation': {
       const master = adjustment.master ?? {};
@@ -704,73 +864,87 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
         };
       }).filter(Boolean);
       if (ranges.length) report.add('Hue/Saturation colour ranges');
+      if (linear && !ranges.length) {
+        // A 32-bit file's, on its linear values: Lightness first, then the hue turned and each colour's
+        // chroma scaled about its lightness by Photoshop's stepped factor, which keeps the hue of
+        // colours at or past white (PhotoCraft's measurements, MIT OR Apache-2.0).
+        const hue = (master.hue ?? 0) / 360;
+        const sat = Math.max(-1, Math.min(1, (master.saturation ?? 0) / 100));
+        const light = Math.max(-1, Math.min(1, (master.lightness ?? 0) / 100));
+        const factor = sat <= 0 ? 1 - Math.floor(-sat * 256 + 1e-4) / 256
+          : Math.min(32767, Math.floor(65280 / Math.max(1, 255 - Math.floor(sat * 254 + 1e-4)))) / 256;
+        const part = (p, q, t0) => { const t = ((t0 % 1) + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 0.5 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+        return (rgb) => {
+          const c = rgb.map((v) => { const x = v / 255; return light > 0 ? x + (1 - x) * light : x * (1 + light); });
+          const max = Math.max(...c); const min = Math.min(...c);
+          const l = (max + min) / 2;
+          let h = 0;
+          if (max > min) {
+            const d = max - min;
+            h = max === c[0] ? ((c[1] - c[2]) / d + (c[1] < c[2] ? 6 : 0)) / 6 : max === c[1] ? ((c[2] - c[0]) / d + 2) / 6 : ((c[0] - c[1]) / d + 4) / 6;
+          }
+          h = (((h + hue) % 1) + 1) % 1;
+          const half = ((max - min) * factor) / 2;
+          return [part(l - half, l + half, h + 1 / 3), part(l - half, l + half, h), part(l - half, l + half, h - 1 / 3)].map((v) => v * 255);
+        };
+      }
       return hueSaturationRanges(adjustment, ranges);
     }
     case 'vibrance': {
-      report.add('Vibrance');
+      // In linear light, Vibrance then Saturation (PhotoCraft's measurements, vibranceLinear): Saturation
+      // moves each colour from the grey 0.288 R + 0.712 G (blue has no weight) by 1 + s. Lowered,
+      // Vibrance is exact; raised, its boost is a fit, within a few levels.
       const vibrance = (adjustment.vibrance ?? 0) / 100;
       const saturation = (adjustment.saturation ?? 0) / 100;
-      return ([r, g, b]) => {
-        const [h, s, l] = rgbToHsl(r, g, b);
-        const boosted = unit(s + (1 - s) * vibrance * (1 - s) + s * saturation);
-        return hslToRgb(h, boosted, l);
+      if (vibrance > 0) report.add('Vibrance');
+      return (rgb) => {
+        let c = rgb.map((v) => toLinear(clamp(v)));
+        if (vibrance) c = vibranceLinear(c, vibrance);
+        if (saturation) {
+          const grey = VIBRANCE_GREY[0] * c[0] + VIBRANCE_GREY[1] * c[1];
+          c = c.map((x) => unitClamp(grey + (1 + saturation) * (x - grey)));
+        }
+        return c.map((x) => toSrgb(unitClamp(x)));
       };
     }
     case 'color balance': {
-      report.add('Color Balance');
-      const ranges = ['shadows', 'midtones', 'highlights'].map((name) => adjustment[name] ?? { cyanRed: 0, magentaGreen: 0, yellowBlue: 0 });
-      return ([r, g, b]) => {
-        const l = luma(r, g, b) / 255;
-        // How much each tonal range applies at this lightness.
-        const weights = [unit(1 - l * 3), unit(1 - Math.abs(l - 0.5) * 3), unit((l - 2 / 3) * 3)];
-        let dr = 0; let dg = 0; let db = 0;
-        ranges.forEach((range, i) => {
-          dr += (range.cyanRed ?? 0) * weights[i] * 0.6;
-          dg += (range.magentaGreen ?? 0) * weights[i] * 0.6;
-          db += (range.yellowBlue ?? 0) * weights[i] * 0.6;
-        });
-        let out = [clamp(r + dr), clamp(g + dg), clamp(b + db)];
-        if (adjustment.preserveLuminosity) {
-          const shift = luma(r, g, b) - luma(...out);
-          out = out.map((v) => clamp(v + shift));
-        }
-        return out;
-      };
+      // Each channel through one Levels curve the three tones fold into (PhotoCraft's measurements,
+      // colorBalanceCurve: within a level of Photoshop on 86 settings).
+      const keys = ['cyanRed', 'magentaGreen', 'yellowBlue'];
+      const tones = ['shadows', 'midtones', 'highlights'].map((name) => keys.map((key) => {
+        const v = Number(adjustment[name]?.[key] ?? 0);
+        return Number.isFinite(v) ? Math.max(-100, Math.min(100, v)) : 0;
+      }));
+      const curves = [0, 1, 2].map((ch) => colorBalanceCurve(tones, adjustment.preserveLuminosity !== false, ch));
+      return (rgb) => rgb.map((v, ch) => 255 * curves[ch](v / 255));
     }
     case 'black & white': {
-      report.add('Black & White');
-      const weights = { reds: 40, yellows: 60, greens: 40, cyans: 60, blues: 20, magentas: 80, ...adjustment };
-      const tint = adjustment.useTint ? psdRgb(adjustment.tintColor) : null;
+      // Each colour as its smallest channel (grey), plus its secondary part (middle − smallest: yellow,
+      // cyan or magenta) and its primary part (largest − middle: red, green or blue), the sliders
+      // weighting the two; a tint takes the grey's luminosity as the Color blend mode does
+      // (PhotoCraft's model, MIT OR Apache-2.0).
+      const weights = { reds: 40, yellows: 60, greens: 40, cyans: 60, blues: 20, magentas: 80 };
+      for (const name of Object.keys(weights)) if (Number.isFinite(Number(adjustment[name]))) weights[name] = Number(adjustment[name]);
+      const tint = adjustment.useTint ? psdRgb(adjustment.tintColor).map((v) => v / 255) : null;
       return ([r, g, b]) => {
-        const [h, s] = rgbToHsl(r, g, b);
-        // The hue's own weight, blended between the six named ones.
-        const names = ['reds', 'yellows', 'greens', 'cyans', 'blues', 'magentas'];
-        const at = h / 60;
-        const i = Math.floor(at) % 6;
-        const k = at - Math.floor(at);
-        const w = ((weights[names[i]] * (1 - k) + weights[names[(i + 1) % 6]] * k) / 100);
-        const base = luma(r, g, b);
-        const v = clamp(base + (Math.max(r, g, b) - base) * (w - 0.5) * 2 * s);
-        return tint ? [v * tint[0] / 255 + v * (1 - tint[0] / 255) * 0.5, v * tint[1] / 255 + v * (1 - tint[1] / 255) * 0.5, v * tint[2] / 255 + v * (1 - tint[2] / 255) * 0.5].map(clamp) : [v, v, v];
+        const max = Math.max(r, g, b); const min = Math.min(r, g, b); const mid = r + g + b - max - min;
+        const primary = r >= g && r >= b ? 'reds' : g >= b ? 'greens' : 'blues';
+        const secondary = b <= r && b <= g ? 'yellows' : r <= g ? 'cyans' : 'magentas';
+        const v = clamp(min + ((mid - min) * weights[secondary]) / 100 + ((max - mid) * weights[primary]) / 100);
+        return tint ? withLum(tint, v / 255).map((x) => clamp(x * 255)) : [v, v, v];
       };
     }
     case 'photo filter': {
-      report.add('Photo Filter');
-      const colour = psdRgb(adjustment.color);
       // ag-psd gives the Density as a fraction; a percent, where a reader gave one, still reads.
       const raw = Number(adjustment.density ?? 0.25);
-      const density = raw > 1 ? raw / 100 : raw;
-      return ([r, g, b]) => {
-        let out = [r * (1 - density) + (r * colour[0] / 255) * density, g * (1 - density) + (g * colour[1] / 255) * density, b * (1 - density) + (b * colour[2] / 255) * density];
-        if (adjustment.preserveLuminosity !== false) {
-          const shift = luma(r, g, b) - luma(...out);
-          out = out.map((v) => v + shift);
-        }
-        return out.map(clamp);
-      };
+      return photoFilterFunction(psdRgb(adjustment.color), raw > 1 ? raw / 100 : raw, adjustment.preserveLuminosity !== false, linear);
     }
     case 'channel mixer': {
-      const mix = (channel, rgb) => clamp(((channel?.red ?? 0) * rgb[0] + (channel?.green ?? 0) * rgb[1] + (channel?.blue ?? 0) * rgb[2]) / 100 + (channel?.constant ?? 0) * 2.55);
+      // In a 32-bit file each percentage is cut to 1/1024 (toward zero) and the constant counts 255/512 of
+      // its value (PhotoCraft's measurements, MIT OR Apache-2.0).
+      const cut = (p) => (linear ? Math.trunc((p / 100) * 1024) / 1024 : p / 100);
+      const constant = (c) => (linear ? (c / 100) * (255 / 512) * 255 : c * 2.55);
+      const mix = (channel, rgb) => clamp(cut(channel?.red ?? 0) * rgb[0] + cut(channel?.green ?? 0) * rgb[1] + cut(channel?.blue ?? 0) * rgb[2] + constant(channel?.constant ?? 0));
       if (adjustment.monochrome) return (rgb) => { const v = mix(adjustment.gray ?? { red: 40, green: 40, blue: 20 }, rgb); return [v, v, v]; };
       return (rgb) => [mix(adjustment.red ?? { red: 100 }, rgb), mix(adjustment.green ?? { green: 100 }, rgb), mix(adjustment.blue ?? { blue: 100 }, rgb)];
     }
@@ -785,7 +959,12 @@ export function adjustmentFunction(adjustment, report = new Set(), { grey = fals
     }
     case 'selective color':
       report.add('Selective Color');
-      return selectiveColour(adjustment);
+      {
+        // (On the encoded colours even in a 32-bit file, as Photoshop's rgb32 picture shows.)
+        const fn = selectiveColour(adjustment);
+        fn.encoded = true;
+        return fn;
+      }
     case 'color lookup': {
       // One with nothing chosen in it (no table, no profile, no name) leaves colours as they are, as a
       // freshly added Color Lookup does in Photoshop (fill_adjustments.psd).

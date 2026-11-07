@@ -188,12 +188,12 @@ function contourFunction(effect) {
 function approximations(effect, glow = false, bevel = false) {
   const notes = [];
   if (glow && effect.technique === 'precise') notes.push('Precise');
-  if (bevel && effect.technique && effect.technique !== 'smooth') notes.push('Chisel');
+
   if (bevel && pxOf(effect.soften, 0) > 0) notes.push('Soften');
   if (bevel && contourTable(effect.contour)) notes.push('its Gloss Contour');
   if (bevel && effect.useShape && contourTable(effect.shapeContour)) notes.push('its Contour');
   if (bevel && effect.useTexture) notes.push('its Texture not drawn');
-  if (bevel && effect.style === 'stroke emboss') notes.push('Stroke Emboss as Emboss');
+
   if (Number(effect.noise) > 0 || Number(effect.jitter) > 0) notes.push('its Noise not drawn');
   if (glow && effect.gradient?.type === 'noise') notes.push('a Noise gradient: its average colour');
   return notes.length ? ` (${notes.join(', ')})` : '';
@@ -254,12 +254,32 @@ function bevelShading(shape, width, height, bevel) {
   const heightOf = padded(width, height, pad, (x, y) => (x < 0 || y < 0 || x >= width || y >= height ? 0 : shape[y * width + x]), (h, w, hh) => {
     if (technique === 'smooth') styleBlur(h, w, hh, reach, { levels: false });
     else {
-      // Chisel: straight slopes up from the edge to the Size (a Soft chisel a little rounded).
+      // Chisel, as PhotoCraft measured it in Photoshop (MIT OR Apache-2.0, effects/bevel.rs): straight
+      // ramps of the distance to the edge, one step of 1 / (Size + 1) a pixel. Inner Hard rises from
+      // half a pixel inside the edge to Size + ½, Inner Soft a pixel further out (a steeper edge
+      // pixel); Outer Hard falls to nothing at Size + 1½ out, Outer Soft a pixel sooner; the emboss
+      // styles straddle the edge, half the Size each way, a Soft one rounded by a quarter of it.
       const d = signedDistance(h, w, hh);
-      for (let i = 0; i < h.length; i += 1) h[i] = clamp01(0.5 - d[i] / (2 * reach));
-      if (technique === 'chisel soft') blur(h, w, hh, 1);
+      const size = Math.max(1, pxOf(bevel.size, 5));
+      const ramp = size + 1;
+      const soft = technique === 'chisel soft';
+      const paint = style === 'outer bevel' ? 'outer' : style === 'emboss' || style === 'pillow emboss' ? 'both' : 'inner';
+      for (let i = 0; i < h.length; i += 1) {
+        const din = -d[i]; const dout = d[i];
+        if (paint === 'outer') {
+          const top = (size + 2) / ramp;
+          h[i] = dout > 0 ? (soft ? 1 - clamp01((dout + 0.5) / ramp) : Math.max(0, Math.min(top, (size + 1.5 - dout) / ramp))) : top;
+        } else if (paint === 'both') {
+          const half = size / 2 + 0.5;
+          h[i] = din > 0 ? 0.5 + 0.5 * clamp01(din / half) : 0.5 - 0.5 * clamp01(dout / half);
+        } else {
+          h[i] = din > 0 ? (soft ? Math.max(0, Math.min((size + 2) / ramp, (din + 1.5) / ramp)) : clamp01((din + 0.5) / ramp)) : 0;
+        }
+      }
+      if (soft && paint === 'both') blur(h, w, hh, Math.max(1, size / 4) / Math.sqrt(6));
     }
-    const scale = reach * depth * dir * (technique === 'smooth' ? 1 : 2);
+    // A chisel rises Depth × Size / 2 (PhotoCraft's measurement), a smooth bevel the Size × Depth.
+    const scale = technique === 'smooth' ? reach * depth * dir : (Math.max(1, pxOf(bevel.size, 5)) / 2) * depth * dir;
     for (let i = 0; i < h.length; i += 1) h[i] = scale * (shapeContour ? shapeContour(h[i]) : h[i]);
     if (soften > 0) blur(h, w, hh, SIZE_SIGMA * soften);
   });
@@ -386,7 +406,7 @@ export function castShadows(shape, width, height, effects) {
   // and over the part of a Stroke outside the layer, which they shade (`overStroke`: layer_params.psd,
   // its caption's red stroke lit and shaded by its Pillow Emboss, 19 % of pixels off to 14).
   const bevel = effects.bevel;
-  if (enabled(bevel) && (bevel.style ?? 'inner bevel') !== 'inner bevel') {
+  if (enabled(bevel) && ['outer bevel', 'emboss', 'pillow emboss'].includes(bevel.style ?? 'inner bevel')) {
     const reach = Math.max(1, pxOf(bevel.size, 5));
     const margin = Math.ceil(reach + pxOf(bevel.soften, 0)) + 2;
     const left = Math.max(0, x0 - margin); const top = Math.max(0, y0 - margin);
@@ -607,10 +627,12 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     }
     drawn.push(`Inner Shadow${approximations(shadow)}`);
   }
+  // A Stroke Emboss bevels the stroke, drawn with it (below), where there is one.
+  const strokeEmboss = enabled(effects.bevel) && effects.bevel.style === 'stroke emboss' && (effects.stroke ?? []).some(enabled) ? effects.bevel : null;
   if (enabled(effects.bevel)) {
     // Its inside (an Outer Bevel has none; what lies outside is cast, castShadows).
     const bevel = effects.bevel;
-    if ((bevel.style ?? 'inner bevel') !== 'outer bevel') {
+    if ((bevel.style ?? 'inner bevel') !== 'outer bevel' && !strokeEmboss) {
       const { hi, lo } = bevelShading(shape, width, height, bevel);
       const hiRgb = bevel.highlightColor ? psdRgb(bevel.highlightColor) : [255, 255, 255];
       const loRgb = bevel.shadowColor ? psdRgb(bevel.shadowColor) : [0, 0, 0];
@@ -659,6 +681,31 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
     const hi = position === 'outside' ? size : position === 'center' ? size / 2 : 0;
     const band = (d, a, b) => clamp01(b - d + 0.5) * clamp01(d - a + 0.5);
     const under = beside ? { x: left, y: top, width, height, alpha: new Float32Array(shape.length), rgb: new Uint8ClampedArray(shape.length * 3), mode: modeOf(stroke, 'normal'), opacity: stroke.opacity ?? 1, name: 'Stroke' } : null;
+    // Stroke Emboss: an inner bevel of the stroke's outline (the shape and the band beside it), its
+    // light and shade laid on the stroke's own colour, so on the stroke alone (PhotoCraft's corpus's
+    // bevel-stroke-smooth.psd: lit along its outer edge, the layer's colour untouched).
+    let embossed = null;
+    if (strokeEmboss) {
+      const outline = new Float32Array(shape.length);
+      for (let i = 0; i < shape.length; i += 1) outline[i] = clamp01(hi - edgeDistance[i] + 0.5);
+      const { hi: light, lo: shade } = bevelShading(outline, width, height, { ...strokeEmboss, style: 'inner bevel' });
+      const hiRgb = (strokeEmboss.highlightColor ? psdRgb(strokeEmboss.highlightColor) : [255, 255, 255]).map((v) => v / 255);
+      const loRgb = (strokeEmboss.shadowColor ? psdRgb(strokeEmboss.shadowColor) : [0, 0, 0]).map((v) => v / 255);
+      const over = (c, s0, k, mode) => {
+        const n = neutralOf(mode);
+        return c.map((v, ch) => {
+          if (n !== undefined) { const moved = n + k * (s0[ch] - n); return blendChannel(mode, v, moved) ?? moved; }
+          const blended = blendChannel(mode, v, s0[ch]) ?? s0[ch];
+          return v + (blended - v) * k;
+        });
+      };
+      embossed = (i, rgb) => {
+        let c = rgb.map((v) => v / 255);
+        if (shade[i] > 0) c = over(c, loRgb, shade[i] * (strokeEmboss.shadowOpacity ?? 0.75), String(strokeEmboss.shadowBlendMode ?? 'multiply'));
+        if (light[i] > 0) c = over(c, hiRgb, light[i] * (strokeEmboss.highlightOpacity ?? 0.75), String(strokeEmboss.highlightBlendMode ?? 'screen'));
+        return c.map((v) => Math.round(clamp01(v) * 255));
+      };
+    }
     for (let i = 0; i < shape.length; i += 1) {
       const d = edgeDistance[i];
       const amount = band(d, lo, hi);
@@ -668,7 +715,8 @@ export function drawLayerStyles(pixels, shape, width, height, effects, { left = 
       else if (lo < 0) { const within = band(d, lo, 0); const beyond = band(d, 0, hi); inner = within + beyond > 0 ? (amount * within) / (within + beyond) : 0; }
       const outer = amount - inner;
       const x = i % width; const y = (i - x) / width;
-      const [r, g, b, a] = paintAt(left + x, top + y);
+      let [r, g, b, a] = paintAt(left + x, top + y);
+      if (embossed) [r, g, b] = embossed(i, [r, g, b]);
       const cover = coverage(i);
       if (inner > 0 && cover > 0) paint(i, [r, g, b], Math.min(1, inner / cover) * a * (stroke.opacity ?? 1), modeOf(stroke, 'normal'), cover);
       if (outer <= 0) continue;

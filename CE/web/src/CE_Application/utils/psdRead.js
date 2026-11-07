@@ -649,7 +649,8 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
 /**
  * A Photo Filter's colour, which ag-psd reads from the binary colour structure in fractions (Lab's L
  * over 100, a and b over 128; HSB over 1), into the units its colours have everywhere else (L 0..100,
- * a and b ±128; degrees and percent): read as they were, a warming filter's orange was black.
+ * a and b ±128; degrees and percent): read as they were, a warming filter's orange was black. And a
+ * Gradient Map's grey stops, read over 0..255, as percent.
  */
 function binaryColours(layers) {
   for (const layer of layers ?? []) {
@@ -659,6 +660,15 @@ function binaryColours(layers) {
       adjustment.color = { l: colour.l * 100, a: colour.a * (colour.a < 0 ? 128 : 127), b: colour.b * (colour.b < 0 ? 128 : 127) };
     } else if (colour && Number.isFinite(colour.h) && colour.h <= 1 && colour.s <= 1) {
       adjustment.color = { h: colour.h * 360, s: colour.s * 100, b: colour.b * 100 };
+    }
+    // A Gradient Map's stops come from its binary block too, where a grey's ink is read over 0..255
+    // rather than as the percentage descriptors give (a Grayscale file's gradient-map.psd in
+    // PhotoCraft's corpus: 238.5 is 93.5 % ink).
+    if (adjustment?.type === 'gradient map') {
+      for (const stop of adjustment.colorStops ?? []) {
+        const c = stop.color;
+        if (c && Number.isFinite(c.k) && !Number.isFinite(c.c)) stop.color = { k: (c.k * 100) / 255 };
+      }
     }
     binaryColours(layer.children);
   }

@@ -179,9 +179,9 @@ test('an adjustment layer changes what is under it in its group, by its opacity 
   // In its own blend mode: Darken keeps the darker of the two.
   near(flatten([solid('a', 0, 0, 1, 1, grey(200)), invert({ blendMode: 'darken' })], 1).at(0), grey(55), 'darken');
   near(flatten([solid('a', 0, 0, 1, 1, grey(40)), invert({ blendMode: 'darken' })], 1).at(0), grey(40), 'darken keeps the darker');
-  // Approximated ones are said to be.
-  assert.deepEqual(flatten([solid('a', 0, 0, 1, 1, grey(100)), { name: 'BC', adjustment: { type: 'brightness/contrast', brightness: 20 } }], 1).closeTo.adjustments,
-    ['Brightness/Contrast']);
+  // Approximated ones are said to be (a raised Vibrance's boost is a fit).
+  assert.deepEqual(flatten([solid('a', 0, 0, 1, 1, grey(100)), { name: 'V', adjustment: { type: 'vibrance', vibrance: 20 } }], 1).closeTo.adjustments,
+    ['Vibrance']);
 });
 
 test('a vector mask on a layer of pixels hides what its paths leave out', () => {
@@ -311,7 +311,14 @@ test('a CMYK file is flattened on its inks: an Invert inverts each ink, Black ha
   const lighter = compositeInks([dark, { name: 'Curves', adjustment: { type: 'curves', black: [{ input: 0, output: 128 }, { input: 255, output: 255 }] } }], 1, 1);
   near([...lighter.pixels], [...rgbOf([0, 0, 0, 1 - 128 / 255]), 255], 'black lightened, nothing else');
   // An adjustment that works on whole colours cannot be drawn on inks: the RGB flattening draws it.
-  assert.equal(compositeInks([layer, { name: 'Hue/Saturation', adjustment: { type: 'hue/saturation', hue: 30 } }], 1, 1), null);
+  assert.equal(compositeInks([layer, { name: 'Colorize', adjustment: { type: 'hue/saturation', master: { a: 1 << 8, b: 30, c: 50, d: 0 } } }], 1, 1), null);
+  // Hue/Saturation works on cyan, magenta and yellow as an RGB colour's complement, black kept: black
+  // ink alone does not move when the hue turns (PhotoCraft's cmyk hue-saturation.psd), while 20% cyan
+  // turns to another ink.
+  const turned = (base) => [...compositeInks([base, { name: 'Hue/Saturation', adjustment: { type: 'hue/saturation', master: { hue: 120, saturation: 0, lightness: 0 } } }], 1, 1).pixels];
+  near(turned(dark), [...rgbOf([0, 0, 0, 1]), 255], 'black ink left alone');
+  const before = rgbOf([0.2, 0, 0, 0]);
+  assert.ok(Math.abs(turned(layer)[0] - before[0]) > 20, `${turned(layer)} from ${before}`);
   // A Threshold judges each pixel by its inks' plain RGB, 255·(1 − ink)(1 − black): 20% cyan is
   // 204, 255, 255, a luminance of 245; white (no ink) at 240, black ink alone at 250.
   const at = (level) => [...compositeInks([layer, { name: 'Threshold', adjustment: { type: 'threshold', level } }], 1, 1).pixels];

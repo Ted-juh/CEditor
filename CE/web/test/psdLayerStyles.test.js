@@ -356,6 +356,41 @@ test('deep files: Posterize on the colours\' full precision; a 32-bit file put t
   assert.ok(matted[0] < 0.01, `${matted[0]}`);
 });
 
+test('type blends at Photoshop\'s text gamma, 1.45; a 32-bit file\'s adjustments work on its linear values', () => {
+  const white = { name: 'w', left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255]) } };
+  const edge = (text) => ({ name: 'type', left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([0, 0, 0, 51]) }, ...(text ? { text: { text: 'A' } } : {}) });
+  // Black type at a fifth over white: 221 in Photoshop's pictures (PhotoCraft's 50 type files), where
+  // a layer of pixels gives 204.
+  assert.equal(compositePsd([white, edge(true)], 1, 1).pixels[0], 221);
+  assert.equal(compositePsd([white, edge(false)], 1, 1).pixels[0], 204);
+  // Exposure +1 doubles a 32-bit file's linear value (0.2 to 0.4), where an 8-bit file goes through 2.2.
+  const grey = { name: 'g', left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([124, 124, 124, 255]) } };
+  const up = { name: 'Exposure', adjustment: { type: 'exposure', exposure: 1, offset: 0, gamma: 1 } };
+  const enc = (c) => Math.round(255 * (1.055 * c ** (1 / 2.4) - 0.055));
+  const lin = ((124 / 255 + 0.055) / 1.055) ** 2.4;
+  assert.ok(Math.abs(compositePsd([grey, up], 1, 1, { linear: true }).pixels[0] - enc(2 * lin)) <= 1);
+});
+
+test('Stroke Emboss lights the stroke alone; a Chisel bevel is straight facets', () => {
+  const w = 30; const h = 30;
+  const data = new Uint8ClampedArray(16 * 16 * 4);
+  for (let i = 0; i < 256; i += 1) data.set([90, 120, 170, 255], i * 4);
+  const stroke = { enabled: true, position: 'outside', fillType: 'color', size: px(4), opacity: 1, blendMode: 'normal', color: { r: 200, g: 60, b: 40 } };
+  const bevel = (style, technique = 'smooth') => ({ enabled: true, style, technique, size: px(6), strength: 1, angle: 120, altitude: 30, direction: 'up',
+    highlightBlendMode: 'screen', highlightColor: { r: 255, g: 255, b: 255 }, highlightOpacity: 0.75, shadowBlendMode: 'multiply', shadowColor: { r: 0, g: 0, b: 0 }, shadowOpacity: 0.75 });
+  const layer = (effects) => ({ name: 'tile', left: 7, top: 7, right: 23, bottom: 23, blendMode: 'normal', opacity: 1, imageData: { width: 16, height: 16, data }, effects });
+  const out = compositePsd([layer({ stroke: [stroke], bevel: bevel('stroke emboss') })], w, h, { styles: LAYER_STYLES }).pixels;
+  const at = (x, y) => [...out.slice((y * w + x) * 4, (y * w + x) * 4 + 3)];
+  // The layer inside keeps its colour; the stroke along the lit (upper) side is lighter than its colour.
+  assert.deepEqual(at(15, 15), [90, 120, 170]);
+  assert.ok(at(15, 4)[1] > 60, `${at(15, 4)}`);
+  // An Inner Chisel Hard: a facet of one slope, so along the top edge its light is the same a pixel
+  // in and two in (PhotoCraft's measured ramp, one step of 1 / (Size + 1) a pixel).
+  const chisel = compositePsd([layer({ bevel: bevel('inner bevel', 'chisel hard') })], w, h, { styles: LAYER_STYLES }).pixels;
+  const g = (x, y) => chisel[(y * w + x) * 4 + 1];
+  assert.ok(g(15, 8) > 120 && Math.abs(g(15, 8) - g(15, 9)) <= 2, `${g(15, 8)} ${g(15, 9)}`);
+});
+
 /** A tiny ICC version 2 CMYK profile: A2B1 (mft2) from inks to Lab, B2A0 (mft1) from Lab to inks. */
 function cmykProfile({ darkest = 0 } = {}) {
   const writer = () => {
@@ -424,5 +459,6 @@ test('what is drawn as measured is not reported; what is only close says why', (
   assert.deepEqual(plain.closeTo.styles, []);
   assert.deepEqual(plain.styles.sort(), ['Bevel & Emboss', 'Outer Glow']);
   const close = compositePsd([layer({ outerGlow: { enabled: true, size: px(3), technique: 'precise', noise: 0.2 }, bevel: { enabled: true, size: px(2), technique: 'chisel hard' } })], 8, 8, { styles });
-  assert.deepEqual(close.closeTo.styles.sort(), ['Bevel & Emboss (Chisel)', 'Outer Glow (Precise, its Noise not drawn)']);
+  // (A Chisel bevel is drawn as measured now: PhotoCraft's corpus.)
+  assert.deepEqual(close.closeTo.styles.sort(), ['Outer Glow (Precise, its Noise not drawn)']);
 });

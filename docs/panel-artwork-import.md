@@ -139,9 +139,11 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   clipped to it and over its overlays, as a frame round a picture clipped into it.
 - **Adjustment layers** change everything under them in their group (or the layer they are clipped
   to), by their opacity, masks and blend mode: Levels, Curves, Exposure, Invert, Posterize,
-  Threshold, Channel Mixer, Gradient Map and legacy Brightness/Contrast exactly; Brightness/Contrast,
-  Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter and Selective Color closely;
-  Color Lookup from the table the layer carries (one with nothing chosen leaves colours alone).
+  Threshold, Channel Mixer, Gradient Map, Brightness/Contrast (both kinds), Hue/Saturation, Color
+  Balance, Photo Filter, Black & White and lowered Vibrance as Photoshop draws them, each checked
+  against its pictures; raised Vibrance and Selective Color closely; Color Lookup from the table the
+  layer carries (one with nothing chosen leaves colours alone). In a 32-bit file they work on its
+  linear values, as Photoshop works them there.
 - **Layer styles** are drawn as Photoshop draws them, each measured against its own pictures:
   Drop Shadow and Outer Glow cast under the layer, with what an Outer Bevel or an Emboss lights
   around it; the overlays, Satin, Inner Glow, Inner Shadow and Bevel into it; a Stroke's part
@@ -154,10 +156,13 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   does. Styles see a layer's pixels past the canvas, and a group's styles its layers': an inside
   stroke on a layer the size of the canvas borders the picture, and on a shape that runs on past the
   canvas is not seen there. A stroke rounds a square's corner from the corner itself, and an Outer
-  Bevel, an Emboss or a Pillow Emboss shades the part of a Stroke outside the layer. Drawn only
-  close, and named in the Console: a Chisel bevel, Soften, a
-  bevel's Gloss Contour, a Precise glow, and a Noise gradient (its average colour); a style's Noise
-  and a bevel's Texture are not drawn.
+  Bevel, an Emboss or a Pillow Emboss shades the part of a Stroke outside the layer. A Chisel bevel
+  is straight facets, Hard or Soft; a Stroke Emboss bevels the stroke and lights it alone. Drawn only
+  close, and named in the Console: Soften, a bevel's Gloss Contour and Contour, a Precise glow, and
+  a Noise gradient (its average colour); a style's Noise and a bevel's Texture are not drawn.
+- **Type** blends with what is under it as Photoshop blends type by default ("Blend Text Colors
+  Using Gamma", 1.45, in its Color Settings), so its antialiased edges come out as light as
+  Photoshop's. A file made with that setting changed blends a little differently there.
 - **Dissolve** is drawn with a grain of its own, as dense as Photoshop's. Photoshop's is random, so
   the pixels differ.
 - **A 16- or 32-bit file** is put together at the precision its pixels keep (a Posterize cuts its
@@ -165,8 +170,10 @@ not its Fill: over a base at Fill 0% it shows in full. An artboard draws its bac
   antialiased edge blends as it does there. A 32-bit file's own picture of itself, where it is partly
   transparent, is read back from the white Photoshop matted it against.
 - **A CMYK file** is flattened on its inks, as Photoshop flattens it, where every adjustment in it
-  works ink by ink (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast);
-  with one that works on whole colours (Hue/Saturation, ...) it is flattened in RGB. A Threshold
+  works on the inks (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast,
+  and Hue/Saturation and Color Balance on cyan, magenta and yellow, black left alone); with one that
+  works on whole colours (Channel Mixer, Gradient Map, Photo Filter, Selective Color, a Colorize) it
+  is flattened in RGB, and differs from Photoshop's, which works those on the inks too. A Threshold
   over the whole file is judged on the inks, as Photoshop judges it there, each pixel white or the
   black ink alone. Its colours are made RGB through the colour profile
   the file carries, as Photoshop shows them (Relative Colorimetric, Black Point Compensation).
@@ -275,7 +282,8 @@ colours made RGB through the colour profile it carries, as Photoshop shows them 
 profile, as Photoshop's own are; without one it can read, as U.S. Web Coated SWOP, Photoshop's
 default, shows them); a panel's background is flattened on its inks (above), a component's
 adjustment layers act on the RGB colours. A Lab file is read the same way, its colours made RGB
-plainly. The notice says so; a Duotone file comes in grey, an Indexed Color one through its palette,
+plainly, and its adjustments act on those, where Photoshop works most of them on L, a and b: they
+differ from Photoshop's there. The notice says so; a Duotone file comes in grey, an Indexed Color one through its palette,
 and a Multichannel one, which has no layers, as its channels printed one over another in their inks'
 colours (a spot channel's own, any other cyan, magenta, yellow or black by its place).
 
