@@ -805,6 +805,26 @@ export function savePanelPackageAs(suggestedName, data) {
   window.__JUCE__.backend.emitEvent('savePanelPackageAs', { suggestedName, data });
 }
 
+// --- Pictures (File → Export Picture, stores/pictureExport.js) ---
+// The PNG goes out as base64 with the name to offer; C++ shows a save dialog for .png files and
+// writes the bytes there, and answers with where (or that it could not).
+
+/** Request a "Save Picture As" dialog. C++ emits 'pictureSaved' with { ok, filePath, cancelled }. */
+export function savePictureAs(suggestedName, base64) {
+  if (!isJuceAvailable()) {
+    console.warn('[bridge] No JUCE backend — savePictureAs ignored');
+    return;
+  }
+  window.__JUCE__.backend.emitEvent('savePictureAs', { suggestedName, data: base64 });
+}
+
+/** Listen for 'pictureSaved'. Callback receives { ok, filePath, cancelled }. */
+export function onPictureSaved(callback) {
+  if (!isJuceAvailable()) return () => {};
+  const token = window.__JUCE__.backend.addEventListener('pictureSaved', callback);
+  return () => window.__JUCE__.backend.removeEventListener(token);
+}
+
 /** Request an "Open Shared Panel" dialog. C++ emits 'panelPackageOpened' with { filePath, name }. */
 export function openPanelPackage() {
   if (!isJuceAvailable()) {

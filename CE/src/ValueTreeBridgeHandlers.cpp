@@ -673,6 +673,66 @@ juce::WebBrowserComponent::Options ValueTreeBridge::buildOptions (const juce::We
                     });
             });
         })
+        // File → Export Picture (stores/pictureExport.js): a PNG the page drew of the panel, the
+        // selection or a filmstrip, as base64, and the name to offer. A save dialog for .png and the
+        // write, nothing more; the answer says where, or that it could not, because "saved" is what
+        // the author will go and look for.
+        .withEventListener ("savePictureAs", [this] (const juce::var& payload)
+        {
+            juce::MessageManager::callAsync ([this, payload]()
+            {
+                if (browser == nullptr)
+                    return;
+
+                auto* payloadObj = payload.getDynamicObject();
+                if (payloadObj == nullptr)
+                    return;
+
+                auto suggestedName = juce::File::createLegalFileName (payloadObj->getProperty ("suggestedName").toString());
+                auto bytes = std::make_shared<juce::MemoryBlock>();
+                {
+                    juce::MemoryOutputStream stream (*bytes, false);
+                    if (! juce::Base64::convertFromBase64 (stream, payloadObj->getProperty ("data").toString()))
+                        bytes->reset();
+                }
+
+                auto answer = [this] (bool ok, bool cancelled, const juce::String& path)
+                {
+                    auto* obj = new juce::DynamicObject();
+                    obj->setProperty ("ok", ok);
+                    obj->setProperty ("cancelled", cancelled);
+                    obj->setProperty ("filePath", path);
+                    if (browser != nullptr)
+                        browser->emitEventIfBrowserIsVisible ("pictureSaved", juce::var (obj));
+                };
+
+                if (bytes->getSize() == 0)
+                {
+                    answer (false, false, {});
+                    return;
+                }
+
+                auto startIn = juce::File::getSpecialLocation (juce::File::userPicturesDirectory);
+                if (! startIn.isDirectory())
+                    startIn = juce::File::getSpecialLocation (juce::File::userDocumentsDirectory);
+                startIn = startIn.getChildFile (suggestedName.isNotEmpty() ? suggestedName : juce::String ("Panel.png"));
+
+                fileChooser = std::make_unique<juce::FileChooser> ("Save Picture As", startIn, "*.png");
+                fileChooser->launchAsync (
+                    juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::warnAboutOverwriting,
+                    [bytes, answer] (const juce::FileChooser& fc)
+                    {
+                        auto result = fc.getResult();
+                        if (result == juce::File())
+                        {
+                            answer (false, true, {});
+                            return;
+                        }
+                        auto file = result.withFileExtension ("png");
+                        answer (ceditor::writeBytesAtomically (file, bytes->getData(), bytes->getSize()), false, file.getFullPathName());
+                    });
+            });
+        })
         // ce.file (ScriptFiles.h): a script's dialogs and the files the person chose with them. The
         // answer goes back as "scriptFileResult", with the request's id.
         .withEventListener ("scriptFile", [this] (const juce::var& payload)

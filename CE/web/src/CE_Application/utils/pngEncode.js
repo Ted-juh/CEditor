@@ -74,3 +74,40 @@ export function pngDataUrl(width, height, rgba) {
   for (let i = 0; i < bytes.length; i += CHUNK) binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
   return `data:image/png;base64,${btoa(binary)}`;
 }
+
+/**
+ * PNG bytes with their pixel density said: a pHYs chunk after the header, replacing any there was.
+ *
+ * A picture exported at 2× is twice as many pixels as the panel, and without a density a document
+ * or a page layout places it at twice the panel's size. A panel is measured in CSS pixels, 96 to the
+ * inch, so 96 × `scale` dots per inch places the picture at the panel's own size there, sharper as
+ * the scale goes up. The pixels are untouched.
+ */
+export function pngWithDensity(bytes, scale = 1) {
+  const SIGNATURE = 8;
+  if (!bytes || bytes.length < SIGNATURE + 25) return bytes;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const headerEnd = SIGNATURE + 12 + view.getUint32(SIGNATURE);
+  const perMetre = Math.round((96 * Math.max(0.01, Number(scale) || 1)) / 0.0254);
+  const data = new Uint8Array(9);
+  const dataView = new DataView(data.buffer);
+  dataView.setUint32(0, perMetre);
+  dataView.setUint32(4, perMetre);
+  data[8] = 1;   // the unit is the metre
+  const phys = chunk('pHYs', data);
+
+  // Every chunk but an existing pHYs, with the new one straight after IHDR.
+  const pieces = [bytes.subarray(0, headerEnd), phys];
+  let offset = headerEnd;
+  while (offset + 12 <= bytes.length) {
+    const length = view.getUint32(offset);
+    const end = offset + 12 + length;
+    const type = String.fromCharCode(bytes[offset + 4], bytes[offset + 5], bytes[offset + 6], bytes[offset + 7]);
+    if (type !== 'pHYs') pieces.push(bytes.subarray(offset, end));
+    offset = end;
+  }
+  const out = new Uint8Array(pieces.reduce((sum, piece) => sum + piece.length, 0));
+  let at = 0;
+  for (const piece of pieces) { out.set(piece, at); at += piece.length; }
+  return out;
+}

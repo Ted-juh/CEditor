@@ -9523,6 +9523,7 @@
 <div
   class="panel-surface preview-surface"
   style="width: {panel.width}px; height: {panel.height}px; transform: scale({scale}); transform-origin: 0 0;"
+  data-mount-pending={mountedCount < allRenderItems.length ? '' : undefined}
   use:bindSurface
 >
   {#if panelLit}

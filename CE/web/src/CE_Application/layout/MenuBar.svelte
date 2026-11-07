@@ -42,6 +42,7 @@
   import { runUpdateCheck } from '../stores/updateChannel.js';
   import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
   import { openSharedPanelFromFile, sharePanelToFile } from '../stores/panelSharingActions.js';
+  import { openPictureExport } from '../stores/pictureExport.js';
   import { clearSelection } from '../stores/panels.js';
   import { requestPropertiesTab } from '../stores/propertiesTab.js';
   import { generatePanelFromProfile } from '../stores/autoPanelActions.js';
@@ -210,6 +211,9 @@
       // the distinction the user has to make.
       { label: 'Share Panel...', enabled: hasPanel, action: () => sharePanelToFile() },
       { label: 'Open Shared Panel...', action: () => openSharedPanelFromFile() },
+      // The design as a picture: the panel, the selection or a filmstrip of one control, as a PNG
+      // drawn by the canvas's own renderer (stores/pictureExport.js).
+      { label: 'Export Picture...', enabled: hasPanel, action: () => openPictureExport() },
       { type: 'separator' },
       { label: 'Close Tab', shortcut: 'Ctrl+W', action: () => closeActiveEditorTab() },
       { label: 'Hostage...', action: () => openInstrumentHostTab() },

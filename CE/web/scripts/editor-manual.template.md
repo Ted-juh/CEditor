@@ -1385,6 +1385,40 @@ name and version, but with a different design, is kept as it is, and you are tol
 **Open Recent** in the File menu lists your recent panels, components, device profiles and script
 workspaces.
 
+### Pictures of the design
+
+**File → Export Picture...** saves a PNG of what you designed, for a mock-up, a product page, a
+manual, or another program. The picture is drawn by the same code that draws the canvas, so it is
+what you see there, without what only the editor shows: the grid, guides, rulers, the selection and
+its handles, the dashed "component" outlines and hidden controls. Choose:
+
+- **The whole panel**, as the canvas shows it now. In Preview that means the values the controls show
+  there, so you can set them first.
+- **The selection**, cropped to what the selected controls draw (a knob's scale can reach outside
+  its box). Tick **Only the selected controls, on a transparent background** to leave out the panel
+  and whatever is behind them, including the plate of a container they sit in. **Margin** adds room
+  around them.
+- **A filmstrip of the selected control**: the control at every position, one frame after another
+  in one picture. This is how JUCE's LookAndFeel, HISE and KnobMan read a knob, a fader or a switch.
+  A knob, a slider, a meter or a component with a number for its value gets as many **Frames** as you
+  ask for (64 is usual), from its lowest value to its highest, evenly along its travel. A switch gets
+  two (off and on), a button two (up and pressed), and a component whose value is a list one for each
+  entry. **Frames down** puts them one under another, which is what most programs expect; **Frames
+  across** puts them side by side. The frames are drawn as Preview draws the control, and nothing in
+  the panel changes.
+
+**Size** is 1× to 4×: at 2× every panel pixel is two pixels across, and text and shapes are drawn
+again at that size, not enlarged from a smaller picture. The window shows the size in pixels before
+you export. The file says its size in inches too (96 panel pixels to the inch), so a document or a
+page layout places a 2× picture at the panel's own size, only sharper.
+
+If an image or font the panel uses could not be read, the picture is drawn without it and a notice
+says so, with the details in the Console.
+
+The picture is a PNG. There is no SVG or PDF export: the controls are drawn from styles, effects and
+text the way a web page is, not as vector shapes, so an SVG or PDF of them would only be a PNG inside
+another file.
+
 ### Reading and editing the file as text
 
 The script editor can show the panel's file as text, one item at a time, and you can edit it there.
@@ -1626,6 +1660,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **Save As...** | Ctrl+Shift+S | Saves under a new name. |
 | **Share Panel...** | | Saves a `.cepanelpkg` with images, fonts, icons and library components inside, for another computer. |
 | **Open Shared Panel...** | | Opens a `.cepanelpkg`. |
+| **Export Picture...** | | Saves a PNG of the panel, the selection, or a filmstrip of the selected control, at 1× to 4×. See [Pictures of the design](#pictures-of-the-design). |
 | **Close Tab** | Ctrl+W | Closes the tab in front, asking first if it has unsaved changes. |
 | **Hostage...** | | Opens HoSTage, the instrument host. |
 | **Settings...** | Ctrl+, | Opens the Settings page. |
