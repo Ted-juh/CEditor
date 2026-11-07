@@ -341,7 +341,7 @@ Twenty-two files came closer and none moved the other way by 0.05 points or more
 
 **As components in the editor**, against the sixth pass in the same browser: 81 / 11 / 12 / 35, as
 before; group-clips-child-stroke.psd from 0.8 % to 0, nothing else moved. No import hangs, throws or
-makes bad output (the 948 imports, as before).
+makes bad output (the 948 imports, as before). CI run 542 (commit `a704d17`) passed in all four jobs.
 
 ## Left, and why
 
