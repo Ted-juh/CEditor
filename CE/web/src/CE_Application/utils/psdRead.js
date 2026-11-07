@@ -19,7 +19,7 @@
  * `knockout` says only whether it does.
  */
 import { initializeCanvas, readPsd } from 'ag-psd';
-import { labToRgb } from './psdAdjustments.js';
+import { cmykToRgb, labToRgb } from './psdAdjustments.js';
 
 // ag-psd makes its pixel arrays through a canvas unless told otherwise — a canvas it borrows from the
 // page in a browser, and has none of in node. A plain array is all `useImageData` needs, is the same
@@ -102,15 +102,17 @@ function layerRecords(view) {
         inner += 4 + data.getUint32(inner); // blending ranges
         inner += (((view[inner] + 1) + 3) & ~3); // name, a Pascal string padded to 4
         let knockout = 0;
+        let black = null;
         while (inner + 12 <= end) {
           if (tag(inner) !== '8BIM' && tag(inner) !== '8B64') { inner += 1; continue; }
           const key = tag(inner + 4);
           const long = large && LONG_KEYS.has(key);
           const body = inner + 8 + (long ? 8 : 4);
           if (key === 'knko') knockout = view[body];
+          if (key === 'curv' || key === 'levl') black = blackChannel(data, key, body);
           inner = body + length(inner + 8, long);
         }
-        out.push({ knockout, channels });
+        out.push({ knockout, channels, black });
         at = end;
       }
       return out;
@@ -137,6 +139,29 @@ function layerRecords(view) {
       p = body + length(p + 8, long);
     }
     return [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A CMYK file's Curves or Levels for its Black channel, which ag-psd does not read (it names the first
+ * three channels red, green and blue): Curves' fifth channel, Levels' fifth record. Null if none.
+ */
+function blackChannel(data, key, body) {
+  try {
+    if (key === 'levl') {
+      const at = body + 2 + 4 * 10;
+      const v = (i) => data.getInt16(at + i * 2);
+      return { shadowInput: v(0), highlightInput: v(1), shadowOutput: v(2), highlightOutput: v(3), midtoneInput: v(4) / 100 };
+    }
+    const bits = data.getUint16(body + 5);
+    if (!(bits & 16)) return null;
+    let at = body + 7;
+    for (let channel = 0; channel < 4; channel += 1) if (bits & (1 << channel)) at += 2 + 4 * data.getUint16(at);
+    const points = [];
+    for (let i = 0, count = data.getUint16(at); i < count; i += 1) points.push({ output: data.getInt16(at + 2 + i * 4), input: data.getInt16(at + 4 + i * 4) });
+    return points;
   } catch {
     return null;
   }
@@ -196,13 +221,16 @@ function compositeChannels(view, count) {
 }
 
 /** What the notice says of a file read from a colour mode other than RGB (readConverted). */
-export function convertedNotice(mode) {
+export function convertedNotice(mode, { inks = false } = {}) {
   if (mode === 'Duotone') return 'This Photoshop file is in Duotone colour: it comes in grey, without its inks\' colours.';
+  if (mode === 'CMYK') {
+    return `This Photoshop file is in CMYK colour: its colours are made RGB as a standard press profile shows them (U.S. Web Coated SWOP), not through the file's own, so they can differ a little from Photoshop's; ${inks ? 'it is flattened on its inks, as Photoshop flattens it' : 'its adjustment layers act on the RGB colours'}.`;
+  }
   return `This Photoshop file is in ${mode} colour: its colours are made RGB plainly, without the file's colour profile, so they can differ a little from Photoshop's own conversion; adjustment layers act on the RGB colours.`;
 }
 
-/** A Photoshop CMYK value pair as stored (255 no ink) to RGB, as a plain conversion does it. */
-const cmyk8 = (c, m, y, k) => [(c * k) / 255, (m * k) / 255, (y * k) / 255];
+/** Photoshop's CMYK as stored (255 no ink) to RGB, as a press's colours look (cmykToRgb). */
+const cmyk8 = (c, m, y, k) => cmykToRgb(1 - c / 255, 1 - m / 255, 1 - y / 255, 1 - k / 255);
 /** Photoshop's 8-bit Lab (L 0..255 for 0..100, a and b offset by 128) to sRGB. */
 const lab8 = (l, a, b) => labToRgb((l * 100) / 255, a - 128, b - 128);
 
@@ -259,8 +287,11 @@ function readConverted(view, mode, composite) {
     const inks = [];
     walkPictures(black.children, (data) => inks.push(data));
     let n = 0;
-    walkPictures(psd.children, (data) => {
+    walkPictures(psd.children, (data, layer) => {
       const k = inks[n++];
+      // The inks as stored (255 no ink) kept beside the colours: cyan, magenta and yellow in one
+      // picture, black in another, for the panel flattening to work on the inks as Photoshop does.
+      layer.inkPlanes = { cmy: Uint8ClampedArray.from(data), k: k ? Uint8ClampedArray.from(k) : null };
       for (let i = 0; i < data.length; i += 4) data.set(cmyk8(data[i], data[i + 1], data[i + 2], k ? k[i] : 255).map(Math.round), i);
     });
     return finishConverted(psd, view, composite, 4, (p) => cmyk8(p[0], p[1], p[2], p[3]));
@@ -271,7 +302,7 @@ function readConverted(view, mode, composite) {
 /** Each layer's own picture's pixels (8-bit), in order, groups' layers too. */
 function walkPictures(layers, visit) {
   for (const layer of layers ?? []) {
-    if (layer.imageData?.data instanceof Uint8ClampedArray || layer.imageData?.data instanceof Uint8Array) visit(layer.imageData.data);
+    if (layer.imageData?.data instanceof Uint8ClampedArray || layer.imageData?.data instanceof Uint8Array) visit(layer.imageData.data, layer);
     walkPictures(layer.children, visit);
   }
 }
@@ -343,11 +374,40 @@ export function readPhotoshop(bytes, { composite = false } = {}) {
   const records = layerRecords(view);
   const order = recordOrder(psd.children);
   if (records && records.length === order.length) {
-    order.forEach((layer, i) => { if (layer && records[i].knockout) layer.knockoutLevel = records[i].knockout; });
+    order.forEach((layer, i) => {
+      if (layer && records[i].knockout) layer.knockoutLevel = records[i].knockout;
+      if (layer?.adjustment && records[i].black && converted === 'CMYK') layer.adjustment.black = records[i].black;
+    });
   }
   if (psd.bitsPerChannel && psd.bitsPerChannel !== 8 && !converted) {
     eightBitLayers(psd.children);
     if (psd.imageData) psd.imageData = eightBit(psd.imageData);
   }
+  // (A converted file's patterns are in its own colours, not RGB.)
+  if (!converted) attachPatterns(psd);
   return { ok: true, psd, ...(converted ? { converted } : {}) };
+}
+
+/**
+ * The picture of each pattern a layer is filled with (a Pattern Fill layer, a Pattern Overlay), put
+ * beside its name as `picture` ({ width, height, data } RGBA), from the patterns the file keeps. A
+ * pattern the file does not keep (Photoshop saves only those in use, but not always) stays unfilled.
+ */
+function attachPatterns(psd) {
+  const pictures = new Map();
+  for (const pattern of psd.patterns ?? []) {
+    const width = pattern.bounds?.w ?? 0;
+    const height = pattern.bounds?.h ?? 0;
+    if (width > 0 && height > 0 && pattern.data?.length === width * height * 4) pictures.set(pattern.id, { width, height, data: pattern.data });
+  }
+  if (!pictures.size) return;
+  const walk = (layers) => {
+    for (const layer of layers ?? []) {
+      if (layer.vectorFill?.type === 'pattern' && pictures.has(layer.vectorFill.id)) layer.vectorFill.picture = pictures.get(layer.vectorFill.id);
+      const overlay = layer.effects?.patternOverlay;
+      if (overlay?.pattern && pictures.has(overlay.pattern.id)) overlay.picture = pictures.get(overlay.pattern.id);
+      walk(layer.children);
+    }
+  };
+  walk(psd.children);
 }

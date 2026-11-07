@@ -23,6 +23,7 @@
 // and a tiling pattern are dropped), for the import to say.
 
 import { pngDataUrl } from './pngEncode.js';
+import { pdfHazard } from './pdfGuard.js';
 
 /** The file types it reads, for a file dialog. */
 export const PDF_ARTWORK_EXTENSIONS = ['.pdf', '.ai'];
@@ -55,6 +56,9 @@ export async function readPdfArtwork(bytes, { page = 1, choosePage = null, pdfjs
   const kind = artworkFileKind(data);
   if (kind === 'ai') return { ok: false, reason: 'ai-without-pdf', error: AI_WITHOUT_PDF };
   if (kind !== 'pdf') return { ok: false, reason: 'not-pdf', error: 'This file is not a PDF or an Illustrator file.' };
+  // What would make pdf.js run out of memory, in the editor's own page, refused before it reads it.
+  const hazard = pdfHazard(data);
+  if (hazard) return { ok: false, reason: 'unreadable', error: `This PDF could not be read: ${hazard}.` };
   const lib = pdfjs ?? await loadPdfjs();
   // The decoders pdf.js loads for a picture that needs one: in the editor the ones it carries
   // (BundledDecoders), elsewhere a folder of them when given (`wasmUrl`, node's tests and tools).

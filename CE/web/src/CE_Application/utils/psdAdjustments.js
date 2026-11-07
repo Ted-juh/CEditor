@@ -17,21 +17,57 @@
 const clamp = (v) => (v < 0 ? 0 : v > 255 ? 255 : v);
 const unit = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
-/** Photoshop's colour objects as 0..255 RGB. */
+/**
+ * CMYK inks (each 0..1) as sRGB 0..255, as a press's colours look: a polynomial fitted to Adobe's
+ * U.S. Web Coated (SWOP) v2 profile, Photoshop's default CMYK, from pdf.js (Mozilla, Apache 2.0), which
+ * draws a PDF's DeviceCMYK with it. Not the file's own profile, which is not read: close, not exact.
+ */
+export function cmykToRgb(c, m, y, k) {
+  return [
+    255 + c * (-4.387332384609988 * c + 54.48615194189176 * m + 18.82290502165302 * y + 212.25662451639585 * k - 285.2331026137004) + m * (1.7149763477362134 * m - 5.6096736904047315 * y - 17.873870861415444 * k - 5.497006427196366) + y * (-2.5217340131683033 * y - 21.248923337353073 * k + 17.5119270841813) + k * (-21.86122147463605 * k - 189.48180835922747),
+    255 + c * (8.841041422036149 * c + 60.118027045597366 * m + 6.871425592049007 * y + 31.159100130055922 * k - 79.2970844816548) + m * (-15.310361306967817 * m + 17.575251261109482 * y + 131.35250912493976 * k - 190.9453302588951) + y * (4.444339102852739 * y + 9.8632861493405 * k - 24.86741582555878) + k * (-20.737325471181034 * k - 187.80453709719578),
+    255 + c * (0.8842522430003296 * c + 8.078677503112928 * m + 30.89978309703729 * y - 0.23883238689178934 * k - 14.183576799673286) + m * (10.49593273432072 * m + 63.02378494754052 * y + 50.606957656360734 * k - 112.23884253719248) + y * (0.03296041114873217 * y + 115.60384449646641 * k - 193.58209356861505) + k * (-22.33816807309886 * k - 180.12613974708367),
+  ].map(clamp);
+}
+
+// While a CMYK file is flattened on its inks (utils/psdComposite.js compositeInks), colours are its
+// stored inks (255 no ink): cyan, magenta and yellow for 'cmy', black for 'k'.
+let inkPlane = null;
+/** Colours as the inks of `plane` ('cmy', 'k'), or as RGB again (null). */
+export function inkPlaneColours(plane) {
+  inkPlane = plane;
+}
+
+/** Photoshop's colour objects as 0..255 RGB (or, while flattening on inks, as the plane's inks). */
 export function psdRgb(color) {
+  if (inkPlane) return inksOf(color, inkPlane);
   if (!color || typeof color !== 'object') return [0, 0, 0];
   if (Number.isFinite(color.r)) return [color.r, color.g, color.b];
   if (Number.isFinite(color.fr)) return [color.fr * 255, color.fg * 255, color.fb * 255];
-  if (Number.isFinite(color.k) && Number.isFinite(color.c)) {
-    const k = color.k / 100;
-    return [255 * (1 - color.c / 100) * (1 - k), 255 * (1 - color.m / 100) * (1 - k), 255 * (1 - color.y / 100) * (1 - k)];
-  }
+  if (Number.isFinite(color.k) && Number.isFinite(color.c)) return cmykToRgb(color.c / 100, color.m / 100, color.y / 100, color.k / 100);
   // A grey given as its ink (0 white, 100 black).
   if (Number.isFinite(color.k)) return [0, 1, 2].map(() => 255 * (1 - color.k / 100));
   if (Number.isFinite(color.h)) return hsbToRgb(color.h, color.s / 100, color.b / 100);
   if (Number.isFinite(color.l) && Number.isFinite(color.a)) return labToRgb(color.l, color.a, color.b);
   if (Number.isFinite(color.l)) return [color.l * 2.55, color.l * 2.55, color.l * 2.55];
   return [0, 0, 0];
+}
+
+/** A colour as one plane's stored inks: given as CMYK, its own; otherwise its RGB split plainly. */
+function inksOf(color, plane) {
+  let inks;
+  if (color && Number.isFinite(color.k) && Number.isFinite(color.c)) inks = [color.c, color.m, color.y, color.k].map((v) => v / 100);
+  else if (color && Number.isFinite(color.k)) inks = [0, 0, 0, color.k / 100];
+  else {
+    const previous = inkPlane;
+    inkPlane = null;
+    const [r, g, b] = psdRgb(color).map((v) => v / 255);
+    inkPlane = previous;
+    const k = 1 - Math.max(r, g, b);
+    inks = k >= 1 ? [0, 0, 0, 1] : [(1 - r - k) / (1 - k), (1 - g - k) / (1 - k), (1 - b - k) / (1 - k), k];
+  }
+  const stored = inks.map((v) => 255 * (1 - unit(v)));
+  return plane === 'k' ? [stored[3], stored[3], stored[3]] : stored.slice(0, 3);
 }
 
 /**
@@ -340,7 +376,9 @@ export function adjustmentFunction(adjustment, report = new Set()) {
       return ([r, g, b]) => [255 - r, 255 - g, 255 - b];
     case 'posterize': {
       const levels = Math.max(2, Math.min(255, Math.round(adjustment.levels ?? 4)));
-      const step = (v) => Math.round(Math.round((v / 255) * (levels - 1)) * (255 / (levels - 1)));
+      // Photoshop's: the range cut into `levels` equal bands, each drawn at its share of 255, rounded
+      // down (exactly as on psd-tools' test files).
+      const step = (v) => Math.floor(Math.min(levels - 1, Math.floor((clamp(v) * levels) / 256)) * (255 / (levels - 1)));
       return ([r, g, b]) => [step(r), step(g), step(b)];
     }
     case 'threshold': {
@@ -348,14 +386,16 @@ export function adjustmentFunction(adjustment, report = new Set()) {
       return ([r, g, b]) => { const v = luma(r, g, b) >= level ? 255 : 0; return [v, v, v]; };
     }
     case 'levels': {
+      // Each channel's own levels first, then the RGB ones over all three, as Photoshop draws them.
       const all = levelsTable(adjustment.rgb);
       const per = ['red', 'green', 'blue'].map((name) => levelsTable(adjustment[name]));
-      return (rgb) => rgb.map((v, i) => per[i][Math.round(clamp(all[Math.round(clamp(v))]))]);
+      return (rgb) => rgb.map((v, i) => all[Math.round(clamp(per[i][Math.round(clamp(v))]))]);
     }
     case 'curves': {
+      // Each channel's own curve first, then the RGB one over all three, as Photoshop draws them.
       const all = curveTable(adjustment.rgb);
       const per = ['red', 'green', 'blue'].map((name) => curveTable(adjustment[name]));
-      return (rgb) => rgb.map((v, i) => per[i][Math.round(all[Math.round(clamp(v))])]);
+      return (rgb) => rgb.map((v, i) => all[Math.round(clamp(per[i][Math.round(clamp(v))]))]);
     }
     case 'exposure': {
       const gain = Math.pow(2, adjustment.exposure ?? 0);
@@ -367,13 +407,26 @@ export function adjustmentFunction(adjustment, report = new Set()) {
       return (rgb) => rgb.map((v) => clamp(toSrgb(unit(Math.pow(unit(toLinear(v) * gain + offset), 1 / (gamma || 1))))));
     }
     case 'brightness/contrast': {
-      report.add('Brightness/Contrast');
-      const brightness = (adjustment.brightness ?? 0) / 100;
+      const brightness = adjustment.brightness ?? 0;
       const contrast = (adjustment.contrast ?? 0) / 100;
-      const k = contrast >= 0 ? 1 / Math.max(0.01, 1 - contrast) : 1 + contrast;
+      if (adjustment.useLegacy) {
+        // Legacy, as Photoshop draws it (exactly, on psd-tools' test files): Contrast stretches each
+        // channel about its middle, Brightness adds its own value, before the stretch when Contrast
+        // is up and after the squeeze when it is down.
+        const k = contrast >= 0 ? 1 / Math.max(0.01, 1 - contrast) : 1 + contrast;
+        return (rgb) => rgb.map((v) => clamp(contrast >= 0 ? (v + brightness - 127.5) * k + 127.5 : (v - 127.5) * k + 127.5 + brightness));
+      }
+      // The current one, which Photoshop took from Camera Raw and publishes no formula for: a curve
+      // fitted to its pictures of psd-tools' test files (four settings, in RGB and Grayscale), within
+      // 7 levels in 255 on average where the old guess was 30 off. Contrast as an S through Curves'
+      // own spline about the quarter tones, then Brightness bending the tones up or down.
+      report.add('Brightness/Contrast');
+      const bend = (brightness * (brightness >= 0 ? 1.124 : 0.809)) / 100;
+      const s = contrast * 100 * (contrast >= 0 ? 0.248 : 0.512);
+      const curve = curveTable([{ input: 0, output: 0 }, { input: 64, output: 64 - s }, { input: 192, output: 192 + s }, { input: 255, output: 255 }]);
       return (rgb) => rgb.map((v) => {
-        const lit = brightness >= 0 ? v + (255 - v) * brightness * 0.6 : v * (1 + brightness * 0.6);
-        return clamp((lit - 127.5) * k + 127.5);
+        const u = curve[Math.round(clamp(v))] / 255;
+        return clamp(255 * (u + bend * u * (1 - u)));
       });
     }
     case 'hue/saturation': {

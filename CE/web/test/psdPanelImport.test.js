@@ -96,8 +96,9 @@ test('blend modes, clipping and masks are drawn from the file as Photoshop draws
   assert.deepEqual(bg.at(160, 70), [0, 0, 255, 255], 'the masked layer shows where its mask is white');
   assert.deepEqual(bg.at(190, 70), [0, 0, 0, 255], 'and not where it is black');
   const warnings = plan.warnings.join('\n');
-  assert.doesNotMatch(warnings, /blending|Clipped layers|masks not applied/, 'nothing drawn is reported as not drawn');
-  assert.match(warnings, /Layer effects not drawn: Shadowed/);
+  assert.doesNotMatch(warnings, /blending|Clipped layers|not applied|not drawn/, 'nothing drawn is reported as not drawn');
+  // Its style is drawn (a black layer's shadow, on black), and said to be close to Photoshop's.
+  assert.match(warnings, /Layer styles drawn close to Photoshop's: Drop Shadow/);
   assert.equal(plan.placeholders[0].role, 'led');
 });
 

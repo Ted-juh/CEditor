@@ -7,6 +7,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { blendChannel, compositePsd, SUPPORTED_BLEND_MODES } from '../src/CE_Application/utils/psdComposite.js';
+import { LAYER_STYLES } from '../src/CE_Application/utils/psdLayerStyles.js';
 
 /** A solid layer: `rgba` over a w × h box at (left, top). */
 function solid(name, left, top, w, h, rgba, extra = {}) {
@@ -16,8 +17,8 @@ function solid(name, left, top, w, h, rgba, extra = {}) {
 }
 
 function flatten(layers, width = 4, height = 1, options) {
-  const { pixels, painted, notDrawn } = compositePsd(layers, width, height, options);
-  return { at: (x, y = 0) => [...pixels.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)], painted, notDrawn };
+  const { pixels, painted, notDrawn, closeTo, dissolve } = compositePsd(layers, width, height, options);
+  return { at: (x, y = 0) => [...pixels.subarray((y * width + x) * 4, (y * width + x) * 4 + 4)], pixels, painted, notDrawn, closeTo, dissolve };
 }
 
 const grey = (v) => [v, v, v, 255];
@@ -137,12 +138,177 @@ test('what cannot be drawn is named, and the rest of the layer still is', () => 
     solid('shadowed', 0, 0, 1, 1, grey(200), { effects: { dropShadow: [{ enabled: true }] } }),
     solid('off effects', 1, 0, 1, 1, grey(200), { effects: { dropShadow: [{ enabled: false }] } }),
     { name: 'Curves 1', adjustment: { type: 'curves' } },
-    solid('noise', 2, 0, 1, 1, grey(90), { blendMode: 'dissolve' }),
-    solid('pathed', 3, 0, 1, 1, grey(40), { vectorMask: { paths: [] } }),
+    { name: 'Lookup', adjustment: { type: 'color lookup', lookupType: 'abstractProfile' } },
+    solid('pathed', 3, 0, 1, 1, grey(40), { vectorMask: { paths: [], fillStartsWithAllPixels: true } }),
     { name: 'components', children: [solid('knob', 0, 0, 1, 1, grey(255))] },
   ], 4, 1, { skip: (layer) => layer.name === 'components' });
-  assert.deepEqual(out.notDrawn, { effects: ['shadowed'], vectorMask: ['pathed'], adjustment: ['Curves 1'], dissolve: ['noise'] });
+  // Without the styles to draw them with, a layer's styles are left out and named; an adjustment
+  // with no formula is named with what it is; a vector mask with no paths that reveals all hides nothing.
+  assert.deepEqual(out.notDrawn, { effects: ['shadowed'], adjustment: ['Lookup (Color Lookup through an ICC profile)'] });
   near(out.at(0), grey(200), 'the shadowed layer\'s own pixels are drawn');
-  near(out.at(2), grey(90), 'dissolve drawn as normal');
+  near(out.at(3), grey(40), 'Reveal All hides nothing');
   near(out.at(0), grey(200), 'and the skipped group is not painted over it');
+});
+
+test('an adjustment layer changes what is under it in its group, by its opacity and masks', () => {
+  const invert = (extra = {}) => ({ name: 'Invert', adjustment: { type: 'invert' }, ...extra });
+  // Everything under it, not what is above.
+  const plain = flatten([solid('a', 0, 0, 2, 1, grey(200)), invert(), solid('b', 1, 0, 1, 1, grey(30))], 2);
+  near(plain.at(0), grey(55), 'inverted');
+  near(plain.at(1), grey(30), 'the layer above it untouched');
+  assert.deepEqual(plain.notDrawn.adjustment, []);
+  // Half its opacity: halfway to the inverted colour.
+  near(flatten([solid('a', 0, 0, 1, 1, grey(200)), invert({ opacity: 0.5 })], 1).at(0), grey(128), 'half opacity');
+  // Its layer mask: black hides it.
+  const masked = invert({ mask: { left: 0, top: 0, imageData: { width: 2, height: 1, data: new Uint8ClampedArray([255, 255, 255, 255, 0, 0, 0, 255]) } } });
+  const out = flatten([solid('a', 0, 0, 2, 1, grey(200)), masked], 2);
+  near(out.at(0), grey(55), 'where the mask is white');
+  near(out.at(1), grey(200), 'where it is black');
+  // Clipped to a layer: that layer alone.
+  const clipped = flatten([solid('under', 0, 0, 2, 1, grey(100)), solid('base', 1, 0, 1, 1, grey(200)), invert({ clipping: true })], 2);
+  near(clipped.at(0), grey(100), 'not the layer under its base');
+  near(clipped.at(1), grey(55), 'its base');
+  // In an isolated group, only the group's own layers.
+  const grouped = flatten([solid('under', 0, 0, 2, 1, grey(100)),
+    { name: 'g', blendMode: 'normal', children: [solid('in', 1, 0, 1, 1, grey(200)), invert()] }], 2);
+  near(grouped.at(0), grey(100), 'not under the group');
+  near(grouped.at(1), grey(55), 'inside it');
+  // In a Pass Through group, everything below.
+  near(flatten([solid('under', 0, 0, 1, 1, grey(100)), { name: 'g', blendMode: 'pass through', children: [invert()] }], 1).at(0),
+    grey(155), 'through a pass-through group');
+  // In its own blend mode: Darken keeps the darker of the two.
+  near(flatten([solid('a', 0, 0, 1, 1, grey(200)), invert({ blendMode: 'darken' })], 1).at(0), grey(55), 'darken');
+  near(flatten([solid('a', 0, 0, 1, 1, grey(40)), invert({ blendMode: 'darken' })], 1).at(0), grey(40), 'darken keeps the darker');
+  // Approximated ones are said to be.
+  assert.deepEqual(flatten([solid('a', 0, 0, 1, 1, grey(100)), { name: 'BC', adjustment: { type: 'brightness/contrast', brightness: 20 } }], 1).closeTo.adjustments,
+    ['Brightness/Contrast']);
+});
+
+test('a vector mask on a layer of pixels hides what its paths leave out', () => {
+  // A path over the left half of a 4 × 1 strip.
+  const knot = (x, y) => ({ linked: false, points: [x, y, x, y, x, y] });
+  const half = { paths: [{ open: false, knots: [knot(0, 0), knot(2, 0), knot(2, 1), knot(0, 1)] }] };
+  const out = flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: half })]);
+  near(out.at(0), grey(200), 'inside the path');
+  assert.equal(out.at(3)[3], 0, 'outside it');
+  // Switched off, it hides nothing; inverted, the other half.
+  near(flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: { ...half, disable: true } })]).at(3), grey(200), 'disabled');
+  assert.equal(flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: { ...half, invert: true } })]).at(0)[3], 0, 'inverted');
+  // A shape's pixels are its shape already: its vector mask is not applied over them again.
+  const shape = solid('shape', 0, 0, 4, 1, grey(200), { vectorMask: half, vectorFill: { type: 'color', color: { r: 200, g: 200, b: 200 } } });
+  near(flatten([shape]).at(3), grey(200), 'a shape layer');
+  // No paths at all: Photoshop's Hide All, unless it starts with all pixels (Reveal All).
+  assert.equal(flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: { paths: [] } })]).at(0)[3], 0, 'hide all');
+  // Starting with all pixels does not matter once there are paths: the first one still draws the shape.
+  assert.equal(flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: { ...half, fillStartsWithAllPixels: true } })]).at(3)[3], 0, 'starts full, one path');
+  // A path with no operation of its own is part of the shape before it: a hole in it, even-odd.
+  const ring = { paths: [
+    { open: false, operation: 'combine', fillRule: 'even-odd', knots: [knot(0, 0), knot(4, 0), knot(4, 1), knot(0, 1)] },
+    { open: false, fillRule: 'even-odd', knots: [knot(1, 0), knot(3, 0), knot(3, 1), knot(1, 1)] },
+  ] };
+  const holed = flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: ring })]);
+  near(holed.at(0), grey(200), 'the ring');
+  assert.equal(holed.at(2)[3], 0, 'its hole');
+  // Its density lets what it hides show by the rest.
+  assert.equal(flatten([solid('a', 0, 0, 4, 1, grey(200), { vectorMask: half, mask: { fromVectorData: true, vectorMaskDensity: 0.75 } })]).at(3)[3], 64, 'density');
+  // On a group, over everything in it.
+  assert.equal(flatten([{ name: 'g', blendMode: 'pass through', vectorMask: half, children: [solid('a', 0, 0, 4, 1, grey(200))] }]).at(3)[3], 0, 'a group');
+});
+
+test('Dissolve draws whole pixels, as many as its opacity, the same every time', () => {
+  const layer = solid('noise', 0, 0, 64, 64, grey(90), { blendMode: 'dissolve', opacity: 0.25 });
+  const a = flatten([solid('white', 0, 0, 64, 64, grey(255)), layer], 64, 64);
+  const b = flatten([solid('white', 0, 0, 64, 64, grey(255)), layer], 64, 64);
+  assert.deepEqual(a.pixels, b.pixels, 'the same grain each time');
+  let dark = 0;
+  for (let i = 0; i < a.pixels.length; i += 4) {
+    assert.ok(a.pixels[i] === 90 || a.pixels[i] === 255, 'each pixel all one or all the other');
+    if (a.pixels[i] === 90) dark += 1;
+  }
+  assert.ok(Math.abs(dark / 4096 - 0.25) < 0.03, `a quarter of the pixels: ${dark / 4096}`);
+  assert.deepEqual(a.dissolve, ['noise']);
+});
+
+test('given the styles, a drop shadow is cast under the layer and a stroke drawn around it', () => {
+  // A 4 × 4 white square on white; a black shadow 4 px down and right, no softening.
+  const square = solid('sq', 4, 4, 4, 4, grey(255), {
+    effects: { dropShadow: [{ enabled: true, angle: 135, distance: { units: 'Pixels', value: Math.SQRT2 * 4 }, size: { units: 'Pixels', value: 0 }, opacity: 1, color: { r: 0, g: 0, b: 0 }, blendMode: 'normal' }] },
+  });
+  const out = flatten([solid('bg', 0, 0, 16, 16, grey(255)), square], 16, 16, { styles: LAYER_STYLES });
+  near(out.at(5, 5), grey(255), 'the layer over its own shadow');
+  near(out.at(10, 10), grey(0), 'the shadow beside it');
+  near(out.at(1, 1), grey(255), 'nothing where it does not fall');
+  assert.deepEqual(out.notDrawn.effects, []);
+  assert.ok(out.closeTo.styles.includes('Drop Shadow'));
+  // At Fill 0 the layer is gone and its shadow is still hidden under it (Layer Knocks Out Drop Shadow).
+  const empty = flatten([solid('bg', 0, 0, 16, 16, grey(255)), { ...square, fillOpacity: 0 }], 16, 16, { styles: LAYER_STYLES });
+  near(empty.at(5, 5), grey(255), 'knocked out under the layer');
+  near(empty.at(10, 10), grey(0), 'still cast beside it');
+  // An outside stroke of 2 px around it.
+  const stroked = solid('sq', 4, 4, 4, 4, grey(255), { effects: { stroke: [{ enabled: true, size: { units: 'Pixels', value: 2 }, position: 'outside', color: { r: 255, g: 0, b: 0 }, opacity: 1 }] } });
+  const ring = flatten([stroked], 16, 16, { styles: LAYER_STYLES });
+  near(ring.at(3, 5), [255, 0, 0, 255], 'stroke outside its edge');
+  near(ring.at(5, 5), grey(255), 'its pixels inside');
+  assert.equal(ring.at(0, 0)[3], 0, 'nothing beyond the stroke');
+});
+
+test('a pattern fill is tiled from the document corner, and a pattern overlay from the layer', () => {
+  // A 2 × 1 pattern: red then blue.
+  const picture = { width: 2, height: 1, data: new Uint8Array([255, 0, 0, 255, 0, 0, 255, 255]) };
+  const fill = { name: 'Pattern Fill', vectorFill: { type: 'pattern', id: 'p', name: 'p', picture } };
+  const out = flatten([fill], 4, 1);
+  near(out.at(0), [255, 0, 0, 255], 'first tile');
+  near(out.at(1), [0, 0, 255, 255], 'second');
+  near(out.at(2), [255, 0, 0, 255], 'and again');
+  // An overlay linked with the layer starts at its corner (here x = 1).
+  const overlaid = solid('o', 1, 0, 3, 1, grey(255), { effects: { patternOverlay: { enabled: true, opacity: 1, align: true, scale: 1, pattern: { id: 'p' }, picture } } });
+  const over = flatten([overlaid], 4, 1, { styles: LAYER_STYLES });
+  near(over.at(1), [255, 0, 0, 255], 'starts at the layer');
+  near(over.at(2), [0, 0, 255, 255], 'then the next');
+});
+
+test('a clipped layer shows in full over a base at Fill 0%, and clips to its shape', () => {
+  // The base: a 2 × 1 layer at x 1..2, Fill 0; clipped to it, white across the whole strip.
+  const base = solid('base', 1, 0, 2, 1, grey(0), { fillOpacity: 0 });
+  const white = solid('white', 0, 0, 4, 1, grey(255), { clipping: true });
+  const out = flatten([base, white]);
+  near(out.at(1), grey(255), 'inside the base, in full');
+  assert.equal(out.at(0)[3], 0, 'outside it, nothing');
+  // At Fill 50% the base shows under it as far as its Fill: a half-transparent clipped layer over it.
+  const half = flatten([solid('base', 0, 0, 1, 1, grey(0), { fillOpacity: 0.5 }), solid('w', 0, 0, 1, 1, [255, 255, 255, 128], { clipping: true })], 1);
+  near(half.at(0), [170, 170, 170, 191], 'blended with the base by its Fill, covering as both do');
+});
+
+test('"Blend Interior Effects as Group" puts a Color Overlay under the layer\'s Fill', () => {
+  const red = { r: 255, g: 0, b: 0 };
+  const layer = (extra) => solid('l', 0, 0, 1, 1, grey(255), { fillOpacity: 0.5, effects: { solidFill: [{ enabled: true, opacity: 1, color: red, blendMode: 'normal' }] }, ...extra });
+  const plain = flatten([layer({})], 1, 1, { styles: LAYER_STYLES });
+  near(plain.at(0), [255, 0, 0, 255], 'drawn over the Fill: in full');
+  const grouped = flatten([layer({ blendInteriorElements: true })], 1, 1, { styles: LAYER_STYLES });
+  assert.equal(grouped.at(0)[3], 128, 'under the Fill: by it');
+});
+
+test('an adjustment clipped to an adjustment layer applies where that one does', () => {
+  const invert = { type: 'invert' };
+  const out = flatten([solid('a', 0, 0, 1, 1, grey(200)), { name: 'Levels', adjustment: { type: 'levels' } }, { name: 'Invert', clipping: true, adjustment: invert }], 1);
+  near(out.at(0), grey(55), 'the clipped invert is applied');
+});
+
+test('a CMYK file is flattened on its inks: an Invert inverts each ink, Black has its own curve', async () => {
+  const { compositeInks } = await import('../src/CE_Application/utils/psdComposite.js');
+  const { cmykToRgb } = await import('../src/CE_Application/utils/psdAdjustments.js');
+  // One pixel of 20% cyan and nothing else, stored as Photoshop stores ink (255 none); its RGB
+  // picture is what the reader made of it.
+  const ink = (cmy, k) => ({ cmy: new Uint8ClampedArray([...cmy, 255]), k: new Uint8ClampedArray([k, k, k, 255]) });
+  const layer = { name: 'a', left: 0, top: 0, imageData: { width: 1, height: 1, data: new Uint8ClampedArray([...cmykToRgb(0.2, 0, 0, 0).map(Math.round), 255]) }, inkPlanes: ink([204, 255, 255], 255) };
+  const rgbOf = (inks) => cmykToRgb(...inks).map(Math.round);
+  // Inverted on inks: 80% cyan, and full magenta, yellow and black, as Photoshop inverts a CMYK file.
+  const inverted = compositeInks([layer, { name: 'Invert', adjustment: { type: 'invert' } }], 1, 1);
+  near([...inverted.pixels], [...rgbOf([0.8, 1, 1, 1]), 255], 'inverted inks');
+  // A Curves that lightens black only (its fifth channel, read from the file beside ag-psd's four).
+  const dark = { ...layer, inkPlanes: ink([255, 255, 255], 0) };
+  const lighter = compositeInks([dark, { name: 'Curves', adjustment: { type: 'curves', black: [{ input: 0, output: 128 }, { input: 255, output: 255 }] } }], 1, 1);
+  near([...lighter.pixels], [...rgbOf([0, 0, 0, 1 - 128 / 255]), 255], 'black lightened, nothing else');
+  // An adjustment that works on whole colours cannot be drawn on inks: the RGB flattening draws it.
+  assert.equal(compositeInks([layer, { name: 'Threshold', adjustment: { type: 'threshold' } }], 1, 1), null);
 });

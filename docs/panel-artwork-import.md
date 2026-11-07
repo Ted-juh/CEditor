@@ -99,7 +99,10 @@ controls after. A mesh used as a fill's pattern is the mesh's picture cut to the
 painted with a pattern or a gradient is that paint through the stencil. Patterns nested more than
 three deep are grey; the Console lists any the file had. An `.ai` saved without PDF compatibility holds only Illustrator's own format, and
 is refused with what to do: save it again with Create PDF Compatible File ticked, or use Export As ›
-SVG.
+SVG. A file built to make pdf.js run out of memory (a colour function that is not a program, an
+embedded font whose character map claims more codes than there are; pdf.js's own test files, fixed
+in a pdf.js later than the one the editor carries) is refused with what is wrong in it before
+pdf.js reads it, where it took the editor's page down with it: no program writes either.
 
 ## New Panel from Photoshop Artwork
 
@@ -115,24 +118,34 @@ SVG.
   group's.
 
 The flattening follows Photoshop's own rules. It draws every blend mode, Opacity and Fill (a
-group's too), layer masks, clipping masks, knockout, and groups the way Photoshop does: a Pass
-Through group paints its layers straight onto what is below, and a group in any other mode is put
-together first and then blended in as one layer. A knockout layer or group (Blending Options ›
-Knockout) cuts through what is under it to where its group began (Shallow) or to the Background
-layer (Deep, through Pass Through groups), and is drawn there at its Fill: a Fill of 0 cuts a hole.
+group's too), layer masks and vector masks (with their density; Reveal All and Hide All), clipping
+masks, knockout, and groups the way Photoshop does: a Pass Through group paints its layers straight
+onto what is below (its opacity and mask saying how far what is below goes toward that), and a group
+in any other mode, or a Pass Through one below 100% Fill, is put together first and then blended in
+as one layer. A knockout layer or group (Blending Options › Knockout) cuts through what is under it
+to where its group began (Shallow) or to the Background layer (Deep, through Pass Through groups),
+and is drawn there at its Fill: a Fill of 0 cuts a hole. A clipped layer clips to its base's shape,
+not its Fill: over a base at Fill 0% it shows in full. An artboard draws its background colour.
 
-A fill layer saved without pixels (a shape, a Color or Gradient Fill) is drawn from its fill and its
-vector mask, the mask's paths joined by their operations; a pattern fill is not.
+- **Fill layers** saved without pixels (a shape, a Color, Gradient or Pattern Fill) are drawn from
+  their fill and their vector mask: a pattern tiled from the document's corner, from the patterns
+  the file keeps.
+- **Adjustment layers** change everything under them in their group (or the layer they are clipped
+  to), by their opacity, masks and blend mode: Levels, Curves, Exposure, Invert, Posterize,
+  Threshold, Channel Mixer, Gradient Map and legacy Brightness/Contrast exactly; Brightness/Contrast,
+  Hue/Saturation, Vibrance, Color Balance, Black & White, Photo Filter and Selective Color closely;
+  Color Lookup from the table the layer carries.
+- **Layer styles** are drawn: Drop Shadow and Outer Glow cast under the layer, the overlays, Satin,
+  Inner Glow, Inner Shadow, Bevel and Stroke into it, "Blend Interior Effects as Group" honoured.
+  Close to Photoshop's, not its exact contours.
+- **Dissolve** is drawn with a grain of its own, as dense as Photoshop's. Photoshop's is random, so
+  the pixels differ.
+- **A CMYK file** is flattened on its inks, as Photoshop flattens it, where every adjustment in it
+  works ink by ink (Levels, Curves with their Black channel, Invert, Posterize, Brightness/Contrast);
+  with one that works on whole colours (Hue/Saturation, Threshold, ...) it is flattened in RGB.
 
-It cannot draw four things:
-
-- layer styles (effects), such as shadows, glows and strokes;
-- a vector mask on a layer of pixels;
-- adjustment layers;
-- Dissolve's noise. A Dissolve layer is drawn as Normal.
-
-Each affected layer is named in the Console. The fix is to merge or rasterize that layer in
-Photoshop before importing.
+What is only close, and what is not applied (a Color Lookup through an ICC profile), is named in the
+Console. The fix for exact pixels is Photoshop's own: rasterize or merge that layer before importing.
 
 **File › Update Panel from Photoshop Artwork...** brings a revised file into the panel you already
 worked on, by the same rules as the SVG update below. Controls are matched to their layers by
@@ -161,9 +174,14 @@ parts are named by its top-level layers, and the notice lists them.
   joining the opacity; gradient stops are placed as SVG places them. A shape's own `mix-blend-mode`
   is its layer's, and so is a group's that holds one shape. A filter that is a blur or a drop shadow
   (as Inkscape, Illustrator and `feDropShadow` write them) on a shape is the layer's own blur or
-  shadow, which the Component Designer edits; any other filter (lighting, turbulence, a colour
-  matrix), one whose region cuts its effect off, and a group of several shapes with a blend mode make
-  that element a picture of itself, as SVG draws it, so the filter shows and the group blends as one.
+  shadow, which the Component Designer edits; so are its colour primitives (`saturate`,
+  `hueRotate`, a grayscale, sepia, brightness or invert matrix, a component transfer that is
+  brightness, contrast or invert) where the filter works in sRGB (`color-interpolation-filters`;
+  SVG's default, linearRGB, changes colours differently) and they come in the order the layer's
+  Filters draw them, and CSS's filter functions (`filter: blur(2px) saturate(50%)`, `drop-shadow()`)
+  the same way. Any other filter (lighting, turbulence, displacement, `opacity()`), one whose region
+  cuts its effect off, and a group of several shapes with a blend mode or a filter make that element
+  a picture of itself, as SVG draws it, so the filter shows and the group blends as one.
   A stroke painted with a pattern is a picture of the stroke over the shape. An `<image>` is placed in its box as its
   `preserveAspectRatio` says. A `<use>` of what holds it (a loop) is not drawn, as SVG does not draw
   it. An SVG written with its namespace as a prefix (`<svg:svg>`) is read as plain SVG.
@@ -181,8 +199,9 @@ parts are named by its top-level layers, and the notice lists them.
   Hue/Saturation with its colour ranges, Vibrance, Color Balance, Black & White, Photo Filter, Selective Color closely; Color
   Lookup from the .cube, .3dl or .look table the layer carries) are applied to every layer under
   them, pictures and colours alike. A Color Lookup through an ICC profile is not. Pass Through groups are unfolded; a group with its
-  own mode or mask, a Normal group whose layers blend (Photoshop blends them with each other only), and
-  one with a knockout that stops at it, is one layer. A layer or group that knocks out through layers
+  own mode or mask, a Normal group whose layers blend or that holds an adjustment (Photoshop keeps
+  both to the group), a Pass Through group below 100% Fill, and one with a knockout that stops at it,
+  is one layer, drawn with its layers' styles and adjustments. A layer or group that knocks out through layers
   that come in as layers of their own cuts them: a hole of its shape, as deep as its opacity, in their
   pictures or their masks. A shape or text layer's Fill opacity is on its fill and stroke, not its
   styles. Text layers stay text where the file says their size and colour.
@@ -223,17 +242,19 @@ would swing round with it; name a cap that should turn `rotor`.
 
 A Photoshop file saved in 16 or 32 bits a channel is read as 8 (a 32-bit file's colour from the
 linear light Photoshop works it in); one of a single Background layer, which has no layers, only the
-picture of the whole file, comes in as that one picture layer. A file in CMYK or Lab colour is read,
-its colours made RGB plainly (without the file's colour profile, so a little apart from Photoshop's
-own conversion; adjustment layers act on the RGB colours), and the notice says so; a Duotone file
+picture of the whole file, comes in as that one picture layer. A file in CMYK colour is read, its
+colours made RGB as a standard press profile shows them (U.S. Web Coated SWOP, Photoshop's default;
+not the file's own profile, so a little apart from Photoshop's conversion of a file with another);
+a panel's background is flattened on its inks (above), a component's adjustment layers act on the
+RGB colours. A Lab file is read the same way, its colours made RGB plainly. The notice says so; a Duotone file
 comes in grey, and an Indexed Color one through its palette. A Multichannel file is not read, and the
 notice says to convert it to RGB (Image › Mode › RGB Color).
 
 Listed in the Console: what was drawn close to rather than exactly (Photoshop's Bevel, Satin and the
-approximate adjustments), Color Lookup through an ICC profile (not applied), adjustment
-layers inside groups with their own blend mode, references to anything not in the file, the SVG
-filters read as a layer's own blur or shadow, and the SVG elements drawn as pictures of themselves
-(for any other filter, or a group's blend mode).
+approximate adjustments, a Dissolve grain), Color Lookup through an ICC profile (not applied),
+references to anything not in the file, the SVG filters read as a layer's own blur, shadows or
+colour filters, and the SVG elements drawn as pictures of themselves (for any other filter, or a
+group's blend mode).
 
 ## New Component from 3D Model (glTF)
 

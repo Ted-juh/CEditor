@@ -171,14 +171,58 @@ No import hangs, throws or makes bad output: the SVG and Photoshop files' 7,161 
 290 of 316: the rest are files with nothing to draw (an adjustment layer alone) and one Multichannel
 file. PDFs note only the 4 pictures pdf.js cannot decode. CI run 538 (commit `174da91`) passed in all four jobs.
 
+## The fourth pass: what was left, done
+
+| Left after the third pass | Now |
+|---|---|
+| A panel's flattening cannot draw layer styles, vector masks on pixel layers, adjustment layers, Dissolve; pattern fills without pixels | All drawn. Adjustment layers change what is under them in their group (or the layer they are clipped to, or wherever the adjustment they are clipped to applies), by opacity, masks and blend mode. Layer styles: Drop Shadow and Outer Glow cast under the layer (moved, spread, blurred, hidden under it as "Layer Knocks Out Drop Shadow" says), the overlays, Satin, Inner Glow, Inner Shadow, Bevel and Stroke drawn into it from its shape, Pattern Overlay from the file's patterns; "Blend Interior Effects as Group" honoured. Vector masks with their density, Reveal All and Hide All. Pattern Fill layers tiled from the file's patterns. Dissolve with a fixed grain as dense as Photoshop's |
+| CMYK adjustments act on RGB; no colour profile | A panel's CMYK file is flattened on its inks, as Photoshop flattens it: cyan, magenta and yellow, and black, each flattened on its own, then made RGB. Curves' and Levels' Black channel, which ag-psd does not read, is read from the file. Colours go through a polynomial fitted to U.S. Web Coated (SWOP), Photoshop's default CMYK (pdf.js's), where they were multiplied out plainly. A file with an adjustment that works on whole colours (Hue/Saturation, Threshold) is flattened in RGB |
+| An SVG filter other than a blur or drop shadow is a picture | Its colour primitives (saturate, hueRotate, grayscale, sepia, brightness and invert matrices, component transfers that are brightness, contrast or invert) are the layer's own Filters where the filter works in sRGB and they come in the order the layer draws them; CSS's filter functions (`filter: blur(2px) saturate(50%)`), which were ignored, the same, and a picture where they cannot be |
+| The two pdf.js stress files exhaust memory | Refused with what is wrong before pdf.js reads them: a PostScript function that is not a program, a font whose format 12 map claims more codes than Unicode has. Over the 1,130 PDFs, those two and no others |
+| Found on the way | Levels and Curves applied the RGB channel before each colour's own; Photoshop does the reverse (exact now on psd-tools' files, as is Posterize, which Photoshop cuts into bands rounded down). Legacy Brightness/Contrast is exact; the current one, which Photoshop publishes no formula for, is a curve fitted to its pictures, 7 levels off on average where the old guess was 30. Every gradient and pattern Scale was read as a percent of a fraction, so a scaled gradient was drawn at a hundredth of its size. A vector mask's paths with no operation of their own belong to the shape before them (one outline, so a hole stays a hole), and "starts with all pixels" only counts with no paths. A clipped layer clips to its base's shape, not its Fill: over a base at Fill 0% it shows in full. A Pass Through group below 100% Fill is drawn as a Normal one, and one below 100% opacity, or masked, mixes what is below toward itself rather than thinning each layer. An artboard draws its background. Files saved without Maximize Compatibility carry a blank picture of themselves and are left out of the measuring |
+
+**Measured: the panel flattening against Photoshop's own picture of the file**, every psd-tools file
+that carries one (281), share of pixels off by more than 16 levels:
+
+| | Third pass | Fourth pass |
+|---|---|---|
+| Under 1 % | 174 | 212 |
+| Over 5 % | 97 | 60 |
+| Over 20 % | 78 | 34 |
+
+Sixty-two files came closer, four moved the other way, by 2 to 7 points: three whose shadows
+are close and not exact (the means came down), and one Pass Through group at 47 % Fill with a
+Lighter Color layer in it, which Photoshop draws between the two readings; the one that fits its
+adjustments exactly is kept. psd-tools' CMYK adjustment tests, on inks: Curves from 85 % to 0,
+Levels 63 to 0, Invert 50 to 0, Posterize 37 to 0, legacy Brightness/Contrast 9 to 0, the CMYK blend
+modes 34 to 0.1.
+
+**Measured: as components in the editor**, the commit before and this one in the same browser, as the
+third pass measured them (under 1 % / 1-5 % / 5-20 % / over 20 % of pixels visibly off):
+
+| Corpus | Before | After |
+|---|---|---|
+| Photoshop, as a component on a white panel (139) | 68 / 9 / 19 / 43 | 75 / 8 / 17 / 39 |
+| resvg's filter and blend tests (84) | 0 / 75 / 4 / 5 | 0 / 79 / 1 / 4 |
+
+None worse by more than 2 points. The largest moves: Levels, Curves and Brightness/Contrast files
+from 13-42 % to under 1 %, a Pass Through group with Fill and an adjustment from wholly off to exact,
+resvg's `hue-rotate()` and colour-function tests from 16-67 % to 4 % (now the layer's own Filters).
+
+No import hangs, throws or makes bad output: the SVG and Photoshop files' 7,161 imports, and the PDFs'
+1,130, the two stress files now among them and refused with what is wrong. Photoshop components that
+import went from 290 to 293 of 316 (pattern fills drawn).
+
 ## Left, and why
 
-- **An SVG filter that is neither a blur nor a drop shadow** is a picture of its element, drawn
-  right, edited as one.
-- **CMYK and Lab colours** are made RGB without the file's profile; adjustment layers in a CMYK file
-  act on the RGB colours where Photoshop's act on its inks, so those files differ most (psd-tools'
-  CMYK adjustment tests). A Multichannel file is not read.
-- **Hue/Saturation's colour ranges** are close, not exact (above).
-- **A pattern fill layer saved without pixels** is not drawn in a panel's flattening (a component
-  draws its picture); a vector mask on a layer of pixels is not applied there either.
-- **The two pdf.js stress files** exhaust memory inside pdf.js.
+- **An SVG filter that is lighting, turbulence or displacement**, or colours in SVG's default
+  linearRGB, is a picture of its element, drawn right, edited as one.
+- **CMYK through the file's own profile**: colours go through a fit of the default press profile,
+  so a file made for another press differs a little. A Lab file is converted plainly; a Multichannel
+  file is not read.
+- **Hue/Saturation's colour ranges** and the current Brightness/Contrast are close, not exact: Photoshop
+  publishes neither formula, and both were fitted to its pictures.
+- **Layer styles' exact contours** (a shadow's or bevel's), and Dissolve's random grain, are close.
+- **Photoshop's other remaining differences** against its own pictures are in blend modes it draws
+  its own way at the edges (Hard Mix, Vivid Light), masks whose parameters ag-psd reads in part
+  (feather), and blending options CEditor does not read (Blend If).

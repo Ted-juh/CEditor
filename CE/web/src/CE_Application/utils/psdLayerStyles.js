@@ -15,9 +15,14 @@
 //
 // Interior styles are drawn at full strength whatever the layer's Fill opacity, as Photoshop draws
 // them; a layer at Fill 0% with a Color Overlay shows the overlay.
+//
+// The panel import's flattening (utils/psdComposite.js) draws them all: the shadows and glows cast
+// under the layer (castShadows), the rest into its pixels (drawLayerStyles). It takes both as
+// LAYER_STYLES, since this module draws with its blend modes.
 
 import { blendChannel } from './psdComposite.js';
 import { psdRgb } from './psdAdjustments.js';
+import { scaleOf } from './psdVectors.js';
 
 const INF = 1e20;
 const clamp01 = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
@@ -65,6 +70,36 @@ function distanceTo(seed, width, height) {
   return out;
 }
 
+/**
+ * A Gaussian blur of `a` (`w` × `h`, one value a pixel) in place, as three box blurs (Wells), nothing
+ * outside it.
+ */
+function blur(a, w, h, sigma) {
+  if (!(sigma > 0.25)) return;
+  const ideal = Math.sqrt(4 * sigma * sigma + 1);
+  let lower = Math.floor(ideal);
+  if (lower % 2 === 0) lower -= 1;
+  const m = Math.round((12 * sigma * sigma - 3 * lower * lower - 12 * lower - 9) / (-4 * lower - 4));
+  const line = new Float32Array(Math.max(w, h));
+  const pass = (start, step, n, r) => {
+    let sum = 0;
+    for (let k = 0; k <= Math.min(r, n - 1); k += 1) sum += a[start + k * step];
+    const scale = 1 / (2 * r + 1);
+    for (let i = 0; i < n; i += 1) {
+      line[i] = sum * scale;
+      if (i + r + 1 < n) sum += a[start + (i + r + 1) * step];
+      if (i - r >= 0) sum -= a[start + (i - r) * step];
+    }
+    for (let i = 0; i < n; i += 1) a[start + i * step] = line[i];
+  };
+  for (let k = 0; k < 3; k += 1) {
+    const r = ((k < m ? lower : lower + 2) - 1) / 2;
+    if (r < 1) continue;
+    for (let y = 0; y < h; y += 1) pass(y * w, 1, w, r);
+    for (let x = 0; x < w; x += 1) pass(x, w, h, r);
+  }
+}
+
 const argb = (rgb, alpha = 1) => `${Math.round(clamp01(alpha) * 255).toString(16).padStart(2, '0')}${rgb.map((c) => Math.round(Math.max(0, Math.min(255, c))).toString(16).padStart(2, '0')).join('')}`.toUpperCase();
 
 /** Photoshop's light angle (0 from the right, counter-clockwise) as the direction a shadow falls. */
@@ -95,6 +130,83 @@ export function editableShadows(effects) {
     kept.push('Outer Glow');
   }
   return { items, kept };
+}
+
+/**
+ * The Drop Shadows and the Outer Glow a layer casts, bottom first, from `shape` (its alpha at full
+ * Fill, 0..1, `width` × `height`): each `{ x, y, width, height, alpha, rgb, mode, opacity, name }`, its
+ * alpha over that box of the document. A shadow is the shape moved by its distance, grown by its
+ * spread and softened by the rest of its size (a Gaussian, the size twice its deviation, as the
+ * layer's own shadows are drawn), and hidden under the layer ("Layer Knocks Out Drop Shadow").
+ */
+export function castShadows(shape, width, height, effects) {
+  const casts = [];
+  if (!effects || effects.disabled) return casts;
+  let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      if (shape[y * width + x] <= 0) continue;
+      if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+  }
+  if (x1 < 0) return casts;
+  const cast = (effect, offset, rgb, mode, name, conceal) => {
+    const size = Math.max(0, pxOf(effect.size, 5));
+    const spread = clamp01(pxOf(effect.choke, 0) / 100);
+    const sigma = ((1 - spread) * size) / 2;
+    const dx = Math.round(offset.x);
+    const dy = Math.round(offset.y);
+    const margin = Math.ceil(spread * size + 3 * sigma) + 2;
+    const left = Math.max(0, x0 + dx - margin);
+    const top = Math.max(0, y0 + dy - margin);
+    const w = Math.min(width - 1, x1 + dx + margin) - left + 1;
+    const h = Math.min(height - 1, y1 + dy + margin) - top + 1;
+    if (w <= 0 || h <= 0) return;
+    const alpha = new Float32Array(w * h);
+    for (let y = 0; y < h; y += 1) {
+      const sy = top + y - dy;
+      if (sy < 0 || sy >= height) continue;
+      for (let x = 0; x < w; x += 1) {
+        const sx = left + x - dx;
+        if (sx >= 0 && sx < width) alpha[y * w + x] = shape[sy * width + sx];
+      }
+    }
+    if (spread > 0 && size > 0) {
+      const reach = spread * size;
+      const from = distanceTo((i) => alpha[i] >= 0.5, w, h);
+      for (let i = 0; i < alpha.length; i += 1) alpha[i] = Math.max(alpha[i], clamp01(reach + 0.5 - from[i]));
+    }
+    blur(alpha, w, h, sigma);
+    if (conceal) {
+      for (let y = 0; y < h; y += 1) {
+        for (let x = 0; x < w; x += 1) alpha[y * w + x] *= 1 - shape[(top + y) * width + left + x];
+      }
+    }
+    casts.push({ x: left, y: top, width: w, height: h, alpha, rgb, mode, opacity: effect.opacity ?? 0.75, name });
+  };
+  for (const shadow of effects.dropShadow ?? []) {
+    if (!enabled(shadow)) continue;
+    cast(shadow, shadowOffset(shadow.angle, pxOf(shadow.distance, 5)), shadow.color ? psdRgb(shadow.color) : [0, 0, 0],
+      String(shadow.blendMode ?? 'multiply'), 'Drop Shadow', shadow.layerConceals !== false);
+  }
+  if (enabled(effects.outerGlow)) {
+    const glow = effects.outerGlow;
+    const rgb = glow.color ? psdRgb(glow.color) : glow.gradient ? gradientAt(glow.gradient, 0).rgb : [255, 255, 190];
+    cast(glow, { x: 0, y: 0 }, rgb, String(glow.blendMode ?? 'screen'), 'Outer Glow', false);
+  }
+  return casts;
+}
+
+/** How far outside its shape a layer's drawn styles reach (an outside or centred Stroke), in pixels. */
+export function stylesReach(effects) {
+  let reach = 0;
+  for (const stroke of effects?.stroke ?? []) {
+    if (!enabled(stroke)) continue;
+    const size = pxOf(stroke.size, 3);
+    const position = stroke.position ?? 'outside';
+    reach = Math.max(reach, position === 'outside' ? size : position === 'center' ? size / 2 : 0);
+  }
+  return Math.ceil(reach) + 2;
 }
 
 /** Whether the layer has a style that must be drawn into its pixels. */
@@ -129,8 +241,11 @@ function gradientAt(gradient, t) {
  * Draw the layer's interior and stroke styles into `pixels` (RGBA 8-bit, document-sized), from
  * `shape` (its own alpha at full Fill, 0..1, document-sized). The pixels grow where an outside stroke
  * reaches. Returns the names of the styles drawn.
+ *
+ * Given a part of the document instead, `left` and `top` say where it is, and `anchor` (the layer's
+ * top left) is where a Pattern Overlay linked with the layer starts.
  */
-export function drawLayerStyles(pixels, shape, width, height, effects) {
+export function drawLayerStyles(pixels, shape, width, height, effects, { left = 0, top = 0, anchor = null } = {}) {
   const drawn = [];
   if (!effects || effects.disabled || !hasDrawnStyles(effects)) return drawn;
   const inside = (i) => shape[i] >= 0.5;
@@ -164,7 +279,24 @@ export function drawLayerStyles(pixels, shape, width, height, effects) {
   };
   const modeOf = (effect, fallback) => String(effect?.blendMode ?? fallback);
 
-  // Overlays first (bottom of the interior styles), as Photoshop stacks them.
+  // Overlays first (bottom of the interior styles), as Photoshop stacks them: pattern, gradient, colour.
+  const pattern = effects.patternOverlay;
+  if (enabled(pattern) && pattern.picture) {
+    const { width: pw, height: ph, data } = pattern.picture;
+    const scale = scaleOf(pattern.scale);
+    // Linked with the layer, it starts at the layer's corner; otherwise at the document's.
+    const ox = (pattern.align !== false && anchor ? anchor.x : 0) + (Number(pattern.phase?.x) || 0);
+    const oy = (pattern.align !== false && anchor ? anchor.y : 0) + (Number(pattern.phase?.y) || 0);
+    const wrap = (v, n) => ((v % n) + n) % n;
+    for (let i = 0; i < shape.length; i += 1) {
+      if (shape[i] <= 0) continue;
+      const x = left + (i % width);
+      const y = top + Math.floor(i / width);
+      const j = (wrap(Math.floor((y - oy) / scale), ph) * pw + wrap(Math.floor((x - ox) / scale), pw)) * 4;
+      paintInside(i, [data[j], data[j + 1], data[j + 2]], (data[j + 3] / 255) * (pattern.opacity ?? 1), modeOf(pattern, 'normal'));
+    }
+    drawn.push('Pattern Overlay');
+  }
   for (const overlay of (effects.gradientOverlay ?? []).filter(enabled)) {
     let minX = width; let minY = height; let maxX = -1; let maxY = -1;
     for (let i = 0; i < shape.length; i += 1) if (shape[i] > 0) { const x = i % width; const y = (i - x) / width; minX = Math.min(minX, x); maxX = Math.max(maxX, x); minY = Math.min(minY, y); maxY = Math.max(maxY, y); }
@@ -172,8 +304,8 @@ export function drawLayerStyles(pixels, shape, width, height, effects) {
     const a = ((overlay.angle ?? 90) * Math.PI) / 180;
     const dir = { x: Math.cos(a), y: -Math.sin(a) };
     const cx = (minX + maxX) / 2; const cy = (minY + maxY) / 2;
-    const half = (Math.abs((maxX - minX) * dir.x) + Math.abs((maxY - minY) * dir.y)) / 2 * ((overlay.scale ?? 100) / 100) || 1;
-    const radius = Math.max(maxX - minX, maxY - minY) / 2 * ((overlay.scale ?? 100) / 100) || 1;
+    const half = (Math.abs((maxX - minX) * dir.x) + Math.abs((maxY - minY) * dir.y)) / 2 * scaleOf(overlay.scale) || 1;
+    const radius = Math.max(maxX - minX, maxY - minY) / 2 * scaleOf(overlay.scale) || 1;
     for (let i = 0; i < shape.length; i += 1) {
       if (shape[i] <= 0) continue;
       const x = i % width; const y = (i - x) / width;
@@ -280,6 +412,9 @@ export function drawLayerStyles(pixels, shape, width, height, effects) {
     }
     drawn.push(stroke.fillType === 'gradient' ? 'Stroke (its gradient as one colour)' : 'Stroke');
   }
-  if (enabled(effects.patternOverlay)) drawn.push('Pattern Overlay (not drawn)');
+  if (enabled(pattern) && !pattern.picture) drawn.push('Pattern Overlay (not drawn: the file does not keep its pattern)');
   return drawn;
 }
+
+/** What the panel flattening takes to draw layer styles (utils/psdComposite.js compositePsd). */
+export const LAYER_STYLES = Object.freeze({ cast: castShadows, draw: drawLayerStyles, reach: stylesReach });

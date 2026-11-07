@@ -415,11 +415,140 @@ function enclosedArea(model) {
   return total;
 }
 
+// The colour filters a layer has (Effects › Filters), in the order CEditor draws them, as CSS names.
+const FILTER_ORDER = ['brightness', 'contrast', 'saturate', 'hue-rotate', 'grayscale', 'sepia', 'invert'];
+const FILTER_FIELDS = { brightness: 'brightness', contrast: 'contrast', saturate: 'saturation', 'hue-rotate': 'hueRotate', grayscale: 'grayscale', sepia: 'sepia', invert: 'invert' };
+
+/**
+ * Colour filters as the layer's own Filters (percent, and degrees for the hue), or null where they
+ * are not in the order CEditor draws them, or one comes twice: a different order draws differently.
+ */
+function layerFilters(list) {
+  let at = -1;
+  const out = {};
+  for (const [name, value] of list) {
+    const index = FILTER_ORDER.indexOf(name);
+    if (index <= at) return null;
+    at = index;
+    if (name === 'hue-rotate') out.hueRotate = round(((((value + 180) % 360) + 360) % 360) - 180, 3);
+    else out[FILTER_FIELDS[name]] = round(value * 100, 3);
+  }
+  return out;
+}
+
+/**
+ * CSS's filter functions' matrices (Filter Effects 1), each for an amount, to read one back by. Grayscale
+ * first: at full strength it is saturate(0) to within a rounding, and reads as what it more likely is.
+ */
+const CSS_MATRICES = {
+  grayscale: (a) => [0.2126 + 0.7874 * (1 - a), 0.7152 - 0.7152 * (1 - a), 0.0722 - 0.0722 * (1 - a), 0.2126 - 0.2126 * (1 - a), 0.7152 + 0.2848 * (1 - a), 0.0722 - 0.0722 * (1 - a), 0.2126 - 0.2126 * (1 - a), 0.7152 - 0.7152 * (1 - a), 0.0722 + 0.9278 * (1 - a)],
+  sepia: (a) => [0.393 + 0.607 * (1 - a), 0.769 - 0.769 * (1 - a), 0.189 - 0.189 * (1 - a), 0.349 - 0.349 * (1 - a), 0.686 + 0.314 * (1 - a), 0.168 - 0.168 * (1 - a), 0.272 - 0.272 * (1 - a), 0.534 - 0.534 * (1 - a), 0.131 + 0.869 * (1 - a)],
+  saturate: (s) => [0.213 + 0.787 * s, 0.715 - 0.715 * s, 0.072 - 0.072 * s, 0.213 - 0.213 * s, 0.715 + 0.285 * s, 0.072 - 0.072 * s, 0.213 - 0.213 * s, 0.715 - 0.715 * s, 0.072 + 0.928 * s],
+};
+
+/**
+ * A 4 × 5 colour matrix as one CSS filter function, `[name, amount]`, or null: identity, brightness
+ * (a diagonal), invert (every channel 1 − itself), or saturate, grayscale or sepia for some amount.
+ */
+function matrixFilter(values) {
+  const v = values;
+  const near = (a, b) => Math.abs(a - b) < 2e-3;
+  // The alpha row untouched, and no channel taking from alpha.
+  if (![15, 16, 17, 19].every((i) => near(v[i], 0)) || !near(v[18], 1) || ![3, 8, 13].every((i) => near(v[i], 0))) return null;
+  const rgb = [v[0], v[1], v[2], v[5], v[6], v[7], v[10], v[11], v[12]];
+  const offsets = [v[4], v[9], v[14]];
+  if (offsets.every((o) => near(o, 1)) && rgb.every((x, i) => near(x, [0, 4, 8].includes(i) ? -1 : 0))) return ['invert', 1];
+  if (!offsets.every((o) => near(o, 0))) return null;
+  if (rgb.every((x, i) => ([0, 4, 8].includes(i) ? near(x, rgb[0]) : near(x, 0)))) return near(rgb[0], 1) ? ['identity', 1] : ['brightness', rgb[0]];
+  for (const [name, of] of Object.entries(CSS_MATRICES)) {
+    // The amount from the first entry, then every entry checked against it.
+    const amount = name === 'saturate' ? (rgb[0] - 0.213) / 0.787 : 1 - (rgb[0] - of(1)[0]) / (of(0)[0] - of(1)[0]);
+    if (Number.isFinite(amount) && of(amount).every((x, i) => near(x, rgb[i]))) return [name, Math.max(0, name === 'saturate' ? amount : Math.min(1, amount))];
+  }
+  return null;
+}
+
+/**
+ * CSS filter functions (`blur(2px) saturate(50%) drop-shadow(...)`) as a layer effect: `{ blur,
+ * shadows, filters }` as filterEffect gives them, `{}` for none, or null for what the layer cannot
+ * hold as it is written: opacity(), a url() among functions, colour functions out of CEditor's order,
+ * or a drop shadow followed by more, or of a blurred shape.
+ */
+export function cssFilterEffect(value) {
+  const text = String(value ?? '').trim();
+  if (!text || text === 'none') return {};
+  const functions = [];
+  let i = 0;
+  while (i < text.length) {
+    while (/\s/.test(text[i] ?? '')) i += 1;
+    if (i >= text.length) break;
+    const name = /^[a-z-]+(?=\()/i.exec(text.slice(i))?.[0];
+    if (!name) return null;
+    let depth = 0;
+    let j = i + name.length;
+    const start = j + 1;
+    for (; j < text.length; j += 1) {
+      if (text[j] === '(') depth += 1;
+      else if (text[j] === ')') { depth -= 1; if (!depth) break; }
+    }
+    if (depth) return null;
+    functions.push([name.toLowerCase(), text.slice(start, j).trim()]);
+    i = j + 1;
+  }
+  const amount = (arg) => {
+    if (!arg) return 1;
+    const m = /^([-+]?(?:\d+\.?\d*|\.\d+))(%?)$/.exec(arg);
+    return m ? Number(m[1]) / (m[2] ? 100 : 1) : NaN;
+  };
+  const length = (arg) => {
+    const m = /^([-+]?(?:\d+\.?\d*|\.\d+))(px)?$/.exec(String(arg ?? '').trim());
+    return m && (m[2] || Number(m[1]) === 0) ? Number(m[1]) : NaN;
+  };
+  const angle = (arg) => {
+    const m = /^([-+]?(?:\d+\.?\d*|\.\d+))(deg|rad|grad|turn)?$/.exec(arg || '0');
+    if (!m || (!m[2] && Number(m[1]) !== 0)) return NaN;
+    return Number(m[1]) * { deg: 1, rad: 180 / Math.PI, grad: 0.9, turn: 360 }[m[2] ?? 'deg'];
+  };
+  let blur = 0;
+  const colours = [];
+  const shadows = [];
+  for (const [name, arg] of functions) {
+    if (shadows.length && name !== 'drop-shadow') return null;
+    if (name === 'blur') {
+      const sigma = arg ? length(arg) : 0;
+      if (!(sigma >= 0)) return null;
+      blur = Math.hypot(blur, sigma);
+    } else if (name === 'drop-shadow') {
+      if (blur) return null;
+      // Its colour (first or last), then two or three lengths: the offset and the blur.
+      const parts = arg.match(/(?:rgba?|hsla?)\([^)]*\)|#[0-9a-f]+|[^\s]+/gi) ?? [];
+      const lengths = parts.map(length);
+      const colourText = parts.filter((_, k) => !Number.isFinite(lengths[k])).join(' ') || 'black';
+      const numbers = lengths.filter(Number.isFinite);
+      const colour = parseColour(colourText, 'black');
+      if (numbers.length < 2 || numbers.length > 3 || parts.filter((_, k) => !Number.isFinite(lengths[k])).length > 1 || !colour) return null;
+      shadows.push({ dx: numbers[0], dy: numbers[1], deviation: (numbers[2] ?? 0) / 2, colour, opacity: colourAlpha(colourText, 'black') });
+    } else if (FILTER_ORDER.includes(name)) {
+      const v = name === 'hue-rotate' ? angle(arg) : amount(arg);
+      if (!Number.isFinite(v) || v < (name === 'hue-rotate' ? -Infinity : 0)) return null;
+      colours.push([name, ['grayscale', 'sepia', 'invert'].includes(name) ? Math.min(1, v) : v]);
+    } else {
+      return null;
+    }
+  }
+  const filters = layerFilters(colours);
+  if (!filters) return null;
+  return { ...(blur ? { blur } : {}), ...(shadows.length ? { shadows } : {}), ...(Object.keys(filters).length ? { filters } : {}) };
+}
+
 /**
  * A filter that is a layer effect, read as one: `{ blur }` (a Gaussian blur of the element, its
  * deviation in the element's units), `{ shadows: [{ dx, dy, deviation, colour, opacity }] }` (drop
- * shadows under it, as Inkscape, Illustrator and feDropShadow write them), `{}` (no effect), or null
- * for anything else, which is drawn as SVG draws it. `classes`: the style rules, for flood colours.
+ * shadows under it, as Inkscape, Illustrator and feDropShadow write them), `{ filters }` (its colour
+ * changed as the layer's Filters change it: saturate, hue-rotate, grayscale, sepia, brightness,
+ * contrast and invert, in CSS's sRGB, so only where the filter works in sRGB, and in the order the
+ * layer draws them), any of those together, `{}` (no effect), or null for anything else, which is
+ * drawn as SVG draws it. `classes`: the style rules, for flood colours.
  */
 export function filterEffect(filter, classes = [], byId = new Map()) {
   if (!filter || String(filter.attributes?.primitiveUnits ?? '') === 'objectBoundingBox') return null;
@@ -430,7 +559,7 @@ export function filterEffect(filter, classes = [], byId = new Map()) {
     if (!href || !byId.get(href)) break;
     source = byId.get(href);
   }
-  const SOURCE = { kind: 'source', blur: 0 };
+  const SOURCE = { kind: 'source', blur: 0, colours: [] };
   const ALPHA = { kind: 'shape', colour: '000000', opacity: 1, blur: 0, dx: 0, dy: 0 };
   const results = new Map();
   let last = SOURCE;
@@ -442,6 +571,9 @@ export function filterEffect(filter, classes = [], byId = new Map()) {
     return results.get(key) ?? null;
   };
   const attr = (node, name) => node.attributes?.[name] ?? ownStyle(node, classes)[name];
+  // Colour primitives match CSS's functions only where they work in sRGB; SVG's default is linearRGB.
+  const inSrgb = (node) => /^srgb$/i.test(String(attr(node, 'color-interpolation-filters') ?? attr(source, 'color-interpolation-filters') ?? attr(filter, 'color-interpolation-filters') ?? '').trim());
+  const recolour = (a, node, change) => (a?.kind === 'source' && change && inSrgb(node) ? { ...a, colours: change[0] === 'identity' ? a.colours : [...a.colours, change] } : null);
   const deviation = (node) => {
     const values = String(attr(node, 'stdDeviation') ?? '0').trim().split(/[\s,]+/).map(Number);
     if (values.some((v) => !Number.isFinite(v) || v < 0)) return null;
@@ -511,8 +643,17 @@ export function filterEffect(filter, classes = [], byId = new Map()) {
         break;
       }
       case 'feColorMatrix': {
+        const type = String(node.attributes?.type ?? 'matrix');
+        const values = String(node.attributes?.values ?? '').trim().split(/[\s,]+/).filter(Boolean).map(Number);
+        // The element's colours changed, as a layer's Filters change them.
+        if (a?.kind === 'source') {
+          if (type === 'saturate') out = recolour(a, node, ['saturate', values.length ? values[0] : 1]);
+          else if (type === 'hueRotate') out = recolour(a, node, ['hue-rotate', values.length ? values[0] : 0]);
+          else if (type === 'matrix' && values.length === 20 && values.every(Number.isFinite)) out = recolour(a, node, matrixFilter(values));
+          if (out && !values.every(Number.isFinite)) out = null;
+          break;
+        }
         // A shadow's colour set by a matrix: every channel a constant, the alpha scaled.
-        const values = String(node.attributes?.values ?? '').trim().split(/[\s,]+/).map(Number);
         if (a?.kind === 'shape' && String(node.attributes?.type ?? 'matrix') === 'matrix' && values.length === 20 && values.every(Number.isFinite)
           && [0, 1, 2, 3, 5, 6, 7, 8, 10, 11, 12, 13, 15, 16, 17, 19].every((i) => Math.abs(values[i]) < 1e-6)) {
           const hex = (v) => Math.round(Math.max(0, Math.min(1, v)) * 255).toString(16).padStart(2, '0');
@@ -524,6 +665,24 @@ export function filterEffect(filter, classes = [], byId = new Map()) {
         // A shadow's opacity scaled: feFuncA linear (slope) or table (0 to a).
         const funcs = (node.children ?? []).filter((child) => /^feFunc[RGBA]$/.test(child.name));
         const alpha = funcs.find((child) => child.name === 'feFuncA');
+        if (a?.kind === 'source') {
+          // The same function on red, green and blue, alpha untouched: brightness, contrast or invert.
+          const rgb = ['feFuncR', 'feFuncG', 'feFuncB'].map((name) => funcs.find((child) => child.name === name));
+          const describe = (f) => (f ? JSON.stringify([f.attributes?.type ?? 'identity', f.attributes?.slope ?? '1', f.attributes?.intercept ?? '0', f.attributes?.tableValues ?? '']) : '["identity","1","0",""]');
+          if ((alpha && String(alpha.attributes?.type ?? 'identity') !== 'identity') || new Set(rgb.map(describe)).size !== 1) break;
+          const f = rgb[0];
+          const type = String(f?.attributes?.type ?? 'identity');
+          const slope = num(f?.attributes?.slope, 1);
+          const intercept = num(f?.attributes?.intercept, 0);
+          const table = String(f?.attributes?.tableValues ?? '').trim().split(/[\s,]+/).filter(Boolean).map(Number);
+          let change = null;
+          if (type === 'identity') change = ['identity', 1];
+          else if (type === 'linear' && Math.abs(intercept) < 1e-6) change = ['brightness', slope];
+          else if (type === 'linear' && Math.abs(intercept - (0.5 - 0.5 * slope)) < 1e-6) change = ['contrast', slope];
+          else if (type === 'table' && table.length === 2 && Math.abs(table[0] + table[1] - 1) < 1e-6 && table[0] <= 0.5) change = ['invert', table[0]];
+          out = recolour(a, node, change);
+          break;
+        }
         if (a?.kind !== 'shape' || !alpha || funcs.some((child) => child !== alpha && String(child.attributes?.type ?? 'identity') !== 'identity')) break;
         const type = String(alpha.attributes?.type ?? 'identity');
         const table = String(alpha.attributes?.tableValues ?? '').trim().split(/[\s,]+/).map(Number);
@@ -539,20 +698,30 @@ export function filterEffect(filter, classes = [], byId = new Map()) {
     if (name) results.set(name, out);
     last = out;
   }
-  if (last.kind === 'source') return last.blur ? { blur: last.blur } : {};
+  const filtersOf = (layer) => {
+    const filters = layerFilters(layer.colours ?? []);
+    return filters && Object.keys(filters).length ? { filters } : filters ? {} : null;
+  };
+  if (last.kind === 'source') {
+    const filters = filtersOf(last);
+    return filters && { ...(last.blur ? { blur: last.blur } : {}), ...filters };
+  }
   if (last.kind !== 'over') return null;
   const top = last.layers[last.layers.length - 1];
   const below = last.layers.slice(0, -1);
   if (top.kind !== 'source' || top.blur || !below.length || below.some((layer) => layer.kind !== 'shape')) return null;
-  return { shadows: below.map((layer) => ({ dx: layer.dx, dy: layer.dy, deviation: layer.blur, colour: layer.colour, opacity: layer.opacity })) };
+  const filters = filtersOf(top);
+  if (!filters) return null;
+  return { shadows: below.map((layer) => ({ dx: layer.dx, dy: layer.dy, deviation: layer.blur, colour: layer.colour, opacity: layer.opacity })), ...filters };
 }
 
-/** A filter's effect (filterEffect) as the layer's own: its blur, or its drop shadows. */
+/** A filter's effect (filterEffect) as the layer's own: its blur, its drop shadows, its colour filters. */
 function applyEffect(part, effect, m) {
   if (!part._children.Effects) part._children.Effects = deepClone(SECTION_DEFAULTS.Effects);
   const effects = part._children.Effects._children;
   const k = scaleOf(m);
   if (effect.blur) effects.Filters.blur = round(effect.blur * k, 3);
+  if (effect.filters) Object.assign(effects.Filters, effect.filters);
   if (effect.shadows) {
     // CSS's blur is twice the deviation (utils/outlineShadows.js); the offset turned with the shape.
     effects.Shadows.items = effect.shadows.map((shadow) => {
@@ -861,10 +1030,35 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     // effect its layer's own, which the Component Designer edits.
     const filterValue = String(node.attributes?.filter ?? own.filter ?? '').trim();
     const lone = /^url\(\s*["']?#[^)"'\s]+["']?\s*\)$/.test(filterValue);
-    const effect = filtered && lone && !measuring && SHAPES.has(node.name) ? fitsRegion(filterEffect(defs.filter.get(filterId), classes, defs.filter), defs.filter.get(filterId), node) : null;
-    if (!measuring && sliced && ((filtered && !effect) || groupBlend)) {
-      note(filtered ? 'filter' : 'blend', label);
+    // CSS's filter functions (`filter: blur(2px) saturate(50%)`), no filter element: on a shape, the
+    // layer's own effects where they are ones it has; anything else a picture, as a filter is.
+    const functions = !filterId && /^[a-z-]+\(/i.test(filterValue);
+    const effect = !measuring && SHAPES.has(node.name)
+      ? (filtered && lone ? fitsRegion(filterEffect(defs.filter.get(filterId), classes, defs.filter), defs.filter.get(filterId), node) : functions ? cssFilterEffect(filterValue) : null)
+      : null;
+    if (!measuring && sliced && (((filtered || functions) && !effect) || groupBlend)) {
+      note(filtered || functions ? 'filter' : 'blend', label);
       pictureLayer(node, pictureOf);
+      return;
+    }
+    // Measured for a picture: CSS's functions draw past the shapes too, by their blur and offsets.
+    if (measuring && functions && !regionOf.has(node)) {
+      const mark = layers.length;
+      regionOf.add(node);
+      try {
+        visit(node, matrix, inherited, opacity, names, stack, depth);
+      } finally {
+        regionOf.delete(node);
+      }
+      const held = layers.slice(mark);
+      const reach = 3 * (filterValue.match(/[-+]?(?:\d+\.?\d*|\.\d+)px/g) ?? []).reduce((sum, value) => sum + Math.abs(parseFloat(value)), 0) * scaleOf(m);
+      if (held.length) {
+        const x0 = Math.min(...held.map((layer) => layer.box.x)) - reach;
+        const y0 = Math.min(...held.map((layer) => layer.box.y)) - reach;
+        const x1 = Math.max(...held.map((layer) => layer.box.x + layer.box.width)) + reach;
+        const y1 = Math.max(...held.map((layer) => layer.box.y + layer.box.height)) + reach;
+        layers.push({ box: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 }, part: {}, names: [] });
+      }
       return;
     }
     // Measured for a picture: a filter draws over its region, past the shapes it holds.
@@ -907,7 +1101,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
     else if (node.name === 'text') textLayer(node, m, style, alpha, label, chain, here);
     else if (node.name === 'image') imageLayer(node, m, alpha, label, chain, here);
     else note('unknown', `<${node.name}>`);
-    if (effect && (effect.blur || effect.shadows)) {
+    if (effect && (effect.blur || effect.shadows || effect.filters)) {
       note('effect', label);
       for (let i = before; i < layers.length; i += 1) applyEffect(layers[i].part, effect, m);
     }
@@ -1294,7 +1488,7 @@ export function planSvgComponentImport(text, { fileName = '', files = {}, geomet
   if (noted.has('link')) warnings.push(`Linked pictures that could not be read: ${list('link')}. Keep them beside the SVG, or embed them before exporting.`);
   if (noted.has('use')) warnings.push(`References to nothing in the file: ${list('use')}.`);
   if (noted.has('loop')) warnings.push(`References that loop back to what holds them, not drawn (as SVG does not draw them): ${list('loop')}.`);
-  if (noted.has('effect')) warnings.push(`SVG filters read as the layer's own blur or drop shadow, which the Component Designer edits: ${list('effect')}.`);
+  if (noted.has('effect')) warnings.push(`SVG filters read as the layer's own blur, drop shadows or colour filters, which the Component Designer edits: ${list('effect')}.`);
   if (noted.has('filter')) warnings.push(`Drawn as pictures of themselves, with their SVG filters (blur, drop shadow, lighting) as SVG draws them: ${list('filter')}. They are pictures, not shapes to edit.`);
   if (noted.has('blend')) warnings.push(`Groups with a blend mode, each drawn as a picture of itself so it blends as one: ${list('blend')}.`);
   if (noted.has('unknown')) warnings.push(`Not read: ${list('unknown')}.`);

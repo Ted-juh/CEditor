@@ -128,3 +128,41 @@ test('in a Photoshop file: the two layers change the pictures under them, as the
   assert.ok(plan.warnings.some((line) => /not applied: Look \(Color Lookup through an ICC profile\)/.test(line)), plan.warnings.join('\n'));
   assert.ok(!plan.warnings.some((line) => /Teal/.test(line)), 'the table is applied, not listed');
 });
+
+test('Brightness/Contrast: Legacy exactly as Photoshop draws it; the current one close to its pictures', () => {
+  const at = (adjustment, v) => adjustmentFunction({ type: 'brightness/contrast', ...adjustment })([v, v, v])[0];
+  // Read off Photoshop's own composites of psd-tools' test files (brightnesscontrast_legacy_*.psd).
+  const legacyDown = { brightness: -23, contrast: -26, useLegacy: true };
+  for (const [v, want] of [[4, 13], [124, 102], [184, 146]]) assert.ok(Math.abs(at(legacyDown, v) - want) <= 1, `legacy, contrast down: ${v} → ${at(legacyDown, v)}, not ${want}`);
+  const legacyUp = { brightness: 20, contrast: 57, useLegacy: true };
+  for (const [v, want] of [[72, 46], [108, 129], [144, 213]]) assert.ok(Math.abs(at(legacyUp, v) - want) <= 1.5, `legacy, contrast up: ${v} → ${at(legacyUp, v)}, not ${want}`);
+  // The current one (brightnesscontrast_rgb.psd): a fitted curve, 7 levels off on average over the
+  // whole range and never more than 25 at these points (the old guess was 30 off on average).
+  const current = [
+    [{ brightness: -31, contrast: 47 }, [[64, 42], [128, 99], [192, 171]]],
+    [{ brightness: 23, contrast: 70 }, [[64, 57], [128, 157], [192, 229]]],
+    [{ brightness: 150, contrast: -21 }, [[64, 158], [128, 236], [224, 254]]],
+  ];
+  for (const [adjustment, points] of current) {
+    for (const [v, want] of points) assert.ok(Math.abs(at(adjustment, v) - want) <= 25, `${JSON.stringify(adjustment)}: ${v} → ${at(adjustment, v)}, not ${want}`);
+  }
+  // Black and white stay put, as in Photoshop.
+  assert.equal(at({ brightness: 40, contrast: 30 }, 0), 0);
+  assert.equal(at({ brightness: -40, contrast: 30 }, 255), 255);
+});
+
+test('Posterize, Levels and Curves draw as Photoshop draws them', () => {
+  // Read off Photoshop's own composites of psd-tools' test files (posterize_rgb, levels_rgb, curves_rgb).
+  const posterize = (levels, v) => adjustmentFunction({ type: 'posterize', levels })([v, v, v])[0];
+  assert.deepEqual([67, 87, 167, 187].map((v) => posterize(3, v)), [0, 127, 127, 255]);
+  assert.deepEqual([26, 60, 117, 193, 231].map((v) => posterize(7, v)), [0, 42, 127, 212, 255]);
+  // A channel's own levels first, then the RGB ones: 0 → red's 0 → RGB's 48.
+  const levels = adjustmentFunction({ type: 'levels',
+    rgb: { shadowInput: 0, highlightInput: 213, shadowOutput: 48, highlightOutput: 255, midtoneInput: 1.22 },
+    red: { shadowInput: 0, highlightInput: 255, shadowOutput: 0, highlightOutput: 194, midtoneInput: 0.47 } });
+  assert.deepEqual([0, 136, 250].map((v) => Math.round(levels([v, 0, 0])[0])), [48, 112, 233]);
+  // A channel's curve first, then the RGB one: 47 → red's 60 → RGB's ×1.275 = 76.
+  const curves = adjustmentFunction({ type: 'curves', rgb: [{ input: 0, output: 0 }, { input: 200, output: 255 }],
+    red: [{ input: 49, output: 60 }, { input: 94, output: 218 }, { input: 102, output: 0 }, { input: 185, output: 229 }, { input: 195, output: 36 }] });
+  assert.ok(Math.abs(curves([47, 0, 0])[0] - 76) <= 1, `${curves([47, 0, 0])[0]}`);
+});

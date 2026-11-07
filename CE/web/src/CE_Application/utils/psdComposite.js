@@ -4,10 +4,11 @@
  *
  * What it draws:
  *
- *   - Every blend mode Photoshop has but Dissolve, which is random by design (it is drawn as Normal and
- *     reported). The separable modes use Photoshop's own formulas, which match the W3C compositing
- *     spec except for Soft Light, where Photoshop's curve differs and is the one used. Hue, Saturation,
- *     Color and Luminosity use the spec's SetLum/SetSat, which is how Photoshop describes them.
+ *   - Every blend mode Photoshop has. The separable modes use Photoshop's own formulas, which match the
+ *     W3C compositing spec except for Soft Light, where Photoshop's curve differs and is the one used.
+ *     Hue, Saturation, Color and Luminosity use the spec's SetLum/SetSat, which is how Photoshop
+ *     describes them. Dissolve is random by design: its grain here is a fixed noise of its own, as
+ *     dense as Photoshop's, not Photoshop's pixels (reported).
  *   - Opacity and Fill opacity, a group's on everything inside it.
  *   - Knockout (Blending Options): where a knockout layer or group covers, what is under it gives way,
  *     by its opacity, to the backdrop its group began with (Shallow: clear in a group drawn on its own,
@@ -15,20 +16,30 @@
  *     only, a group drawn on its own stopping it as Shallow; clear without a Background), and it is
  *     drawn there with its Fill opacity. A Fill of 0 cuts a hole.
  *   - Layer masks, from their own pixels, with the mask's default colour outside its rectangle and its
- *     density. A disabled mask is ignored, as Photoshop ignores it.
- *   - Clipping masks: a clipped layer is drawn only where the layer it clips to has pixels, and
- *     blends with that layer rather than with what lies under it (Photoshop's default, "Blend Clipped
- *     Layers as Group").
- *   - Groups: Pass Through paints its layers straight onto what is below; any other mode, Normal
- *     included, composites the group on its own first and then blends the result, as Photoshop does.
+ *     density; vector masks, their paths filled and joined by their operations. A disabled mask is
+ *     ignored, as Photoshop ignores it. (A shape layer's pixels are already its shape: its vector mask
+ *     is not applied to them twice.)
+ *   - Clipping masks: a clipped layer is drawn only where the layer it clips to is, and blends with
+ *     that layer rather than with what lies under it (Photoshop's default, "Blend Clipped Layers as
+ *     Group"). The base's shape clips, not its Fill: over a base at Fill 0% a clipped layer shows in
+ *     full. What is clipped to an adjustment layer goes wherever that layer's masks let it.
+ *   - Groups: Pass Through paints its layers straight onto what is below, and its opacity and mask
+ *     say how far what is below goes toward that; any other mode, Normal included, composites the
+ *     group on its own first and then blends the result, as Photoshop does, and so does Pass Through
+ *     below 100% Fill. An artboard draws its background colour.
  *
- *   - A fill layer saved without pixels (a shape, a Color or Gradient Fill): its colour or gradient
- *     (Photoshop's styles and angle, across the layer's box) inside its vector mask, the mask's paths
- *     filled and joined by their operations.
+ *   - A fill layer saved without pixels (a shape, a Color, Gradient or Pattern Fill): its colour,
+ *     gradient (Photoshop's styles and angle, across the layer's box) or pattern (tiled from the
+ *     document's corner, the pattern the file keeps) inside its vector mask.
+ *   - Adjustment layers: what each does (utils/psdAdjustments.js) to everything under it in its group,
+ *     or to the layer it is clipped to, by its opacity, its masks and its blend mode.
+ *   - Layer styles, when the caller passes them (`styles`: utils/psdLayerStyles.js LAYER_STYLES, which
+ *     draws with this module's blend modes and so cannot be imported here): Drop Shadows and Outer
+ *     Glow cast under the layer, the rest drawn into it, from its shape. Close to Photoshop's, not its
+ *     exact contours (reported).
  *
- * What it does not, and says so by layer name (`notDrawn`): layer effects (shadows, glows, strokes —
- * Photoshop does not store them as pixels), a vector mask on a layer of pixels, adjustment layers
- * (they have no pixels; they change the ones below), and Dissolve's noise.
+ * What it does not, and says so by layer name (`notDrawn`): an adjustment it has no formula for
+ * (utils/psdAdjustments.js unappliedAdjustment says which), and layer styles when not given `styles`.
  *
  * Compositing is the W3C model, which is Photoshop's: the colour is blended with the backdrop first,
  * in proportion to the backdrop's coverage, and the result composited source-over:
@@ -41,8 +52,8 @@
  * Pure and canvas-free, so node tests it exactly as the editor runs it.
  */
 
-import { psdRgb } from './psdAdjustments.js';
-import { psdGradient } from './psdVectors.js';
+import { adjustmentFunction, cmykToRgb, inkPlaneColours, psdRgb, unappliedAdjustment } from './psdAdjustments.js';
+import { psdGradient, scaleOf } from './psdVectors.js';
 
 const clamp = (v) => (v < 0 ? 0 : v > 1 ? 1 : v);
 
@@ -120,6 +131,24 @@ const NON_SEPARABLE = {
 /** The blend modes this draws exactly. Dissolve and Pass Through are handled by the caller. */
 export const SUPPORTED_BLEND_MODES = [...Object.keys(SEPARABLE), ...Object.keys(NON_SEPARABLE)];
 
+/** The functions `blendPixel` takes for `mode`. */
+function modeFunctions(mode) {
+  const separable = SEPARABLE[mode];
+  return { separable, nonSeparable: separable ? null : NON_SEPARABLE[mode] ?? SEPARABLE.normal };
+}
+
+/**
+ * Dissolve's grain: a fixed noise, 0..1 by pixel index, so a file flattens the same every time. A
+ * pixel is drawn whole where the noise is under its alpha, and not at all where it is not.
+ */
+function dissolveNoise(i) {
+  let h = Math.imul(i ^ 0x9e3779b9, 0x85ebca6b);
+  h ^= h >>> 13;
+  h = Math.imul(h, 0xc2b2ae35);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
 /**
  * Composite one straight-RGBA source pixel over the backdrop buffer at `d`, with the source's alpha
  * already including opacity and masks. `mode` is a SEPARABLE or NON_SEPARABLE name.
@@ -150,17 +179,48 @@ function blendPixel(dst, d, sr, sg, sb, sa, mode, separable, nonSeparable) {
 
 /** Composite a whole buffer `src` (same size as `dst`) over `dst` with `mode` and `opacity`. */
 function compositeBuffer(dst, src, mode, opacity) {
-  const separable = SEPARABLE[mode];
-  const nonSeparable = separable ? null : NON_SEPARABLE[mode] ?? SEPARABLE.normal;
+  const dissolve = mode === 'dissolve';
+  const blend = dissolve ? 'normal' : mode;
+  const { separable, nonSeparable } = modeFunctions(blend);
   for (let d = 0; d < dst.length; d += 4) {
-    const sa = src[d + 3] * opacity;
-    if (sa > 0) blendPixel(dst, d, src[d], src[d + 1], src[d + 2], sa, mode, separable, nonSeparable);
+    let sa = src[d + 3] * opacity;
+    if (dissolve && sa > 0) sa = dissolveNoise(d >> 2) < sa ? 1 : 0;
+    if (sa > 0) blendPixel(dst, d, src[d], src[d + 1], src[d + 2], sa, blend, separable, nonSeparable);
   }
 }
 
-/** The mask's value (0..1) at document pixel (x, y), or 1 when the layer has no usable mask. */
-export function layerMaskSampler(layer) {
-  return maskSampler(layer);
+/**
+ * The layer's mask (0..1) at document pixel (x, y), or null when it has none to apply: its pixel
+ * mask, and with the document's size its vector mask too.
+ */
+export function layerMaskSampler(layer, size = null) {
+  return size ? layerCoverage(layer, size.width, size.height) : maskSampler(layer);
+}
+
+const vectorMasks = new WeakMap();
+/**
+ * A layer's vector mask as coverage of the document, or null where it has none to apply: none, one
+ * switched off, or a shape's or fill layer's (its pixels, or fillPicture, are already its shape).
+ */
+function vectorMaskOf(layer, width, height) {
+  const vectorMask = layer.vectorMask;
+  if (!vectorMask || vectorMask.disable || layer.vectorFill) return null;
+  const key = `${width}x${height}`;
+  const known = vectorMasks.get(vectorMask);
+  if (known?.key === key) return known.coverage;
+  const coverage = vectorCoverage(vectorMask, width, height);
+  vectorMasks.set(vectorMask, { key, coverage });
+  return coverage;
+}
+
+/** Both of a layer's masks at document pixel (x, y), or null when it has neither to apply. */
+function layerCoverage(layer, width, height) {
+  const pixel = maskSampler(layer);
+  const vector = vectorMaskOf(layer, width, height);
+  if (!vector) return pixel;
+  // A vector mask's density below 100% lets what it hides show through by that much.
+  const density = layer.mask?.vectorMaskDensity ?? 1;
+  return (x, y) => (1 - density * (1 - (x < 0 || y < 0 || x >= width || y >= height ? 0 : vector[y * width + x]))) * (pixel ? pixel(x, y) : 1);
 }
 
 function maskSampler(layer) {
@@ -190,9 +250,10 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
   const own = layer.imageData?.data?.length ? layer.imageData : null;
   const src = own ?? fillPicture(layer, width, height);
   if (!src?.data?.length || alpha <= 0) return false;
-  const mask = maskSampler(layer);
-  const separable = SEPARABLE[mode];
-  const nonSeparable = separable ? null : NON_SEPARABLE[mode] ?? SEPARABLE.normal;
+  const mask = layerCoverage(layer, width, height);
+  const dissolve = mode === 'dissolve';
+  const blend = dissolve ? 'normal' : mode;
+  const { separable, nonSeparable } = modeFunctions(blend);
   const left = own ? Math.round(layer.left ?? 0) : 0;
   const top = own ? Math.round(layer.top ?? 0) : 0;
   for (let sy = 0; sy < src.height; sy += 1) {
@@ -204,9 +265,10 @@ function paintLayer(dst, width, height, layer, mode, alpha) {
       const s = (sy * src.width + sx) * 4;
       let sa = (src.data[s + 3] / 255) * alpha;
       if (mask) sa *= mask(x, y);
+      if (dissolve && sa > 0) sa = dissolveNoise(y * width + x) < sa ? 1 : 0;
       if (sa <= 0) continue;
       blendPixel(dst, (y * width + x) * 4, src.data[s] / 255, src.data[s + 1] / 255, src.data[s + 2] / 255,
-        sa, mode, separable, nonSeparable);
+        sa, blend, separable, nonSeparable);
     }
   }
   return true;
@@ -243,13 +305,27 @@ function fillPicture(layer, width, height) {
   return picture;
 }
 
-/** What a fill paints at a point: a colour, or a gradient across `box` as CEditor draws one. */
+/**
+ * What a fill paints at a point: a colour; a pattern, tiled from the document's corner (moved by its
+ * phase); or a gradient across `box` as Photoshop draws one.
+ */
 function fillPaint(fill, box) {
   if (fill.type === 'color') {
     const [r, g, b] = psdRgb(fill.color);
     return () => [r, g, b, 1];
   }
-  const gradient = fill.type === 'pattern' ? null : psdGradient(fill);
+  if (fill.type === 'pattern') {
+    if (!fill.picture) return null;
+    const { width: pw, height: ph, data } = fill.picture;
+    const px = Number(fill.phase?.x) || 0;
+    const py = Number(fill.phase?.y) || 0;
+    const wrap = (v, n) => ((v % n) + n) % n;
+    return (x, y) => {
+      const i = (wrap(Math.floor(y - py), ph) * pw + wrap(Math.floor(x - px), pw)) * 4;
+      return [data[i], data[i + 1], data[i + 2], data[i + 3] / 255];
+    };
+  }
+  const gradient = psdGradient(fill);
   if (!gradient) return null;
   const stops = gradient.stops.map((stop) => ({
     t: stop.position / 100,
@@ -274,7 +350,7 @@ function fillPaint(fill, box) {
   const theta = ((Number(fill.angle) || 0) * Math.PI) / 180;
   const ux = Math.cos(theta);
   const uy = -Math.sin(theta);
-  const length = ((Math.abs(box.width * ux) + Math.abs(box.height * uy)) || 1) * ((Number(fill.scale) || 100) / 100);
+  const length = ((Math.abs(box.width * ux) + Math.abs(box.height * uy)) || 1) * scaleOf(fill.scale);
   const half = length / 2;
   const style = String(fill.style ?? 'linear');
   return (x, y) => {
@@ -294,27 +370,42 @@ function fillPaint(fill, box) {
 }
 
 /**
- * A vector mask as coverage of the document's pixels (0 to 1), or null where it shows everything: each
- * path filled (non-zero), joined to those before by its operation, as Photoshop combines them.
+ * A vector mask as coverage of the document's pixels (0 to 1), or null where it shows everything.
+ * Its paths come in shapes: a path with an operation of its own starts one, and the paths after it
+ * with none are the same shape (one outline, filled by its fill rule, so a hole in it stays a hole).
+ * The shapes are joined in order by their operations, from nothing, or from everything where the
+ * first one subtracts or intersects. With no paths it hides everything, or shows everything where
+ * it starts with all pixels (Photoshop's Hide All and Reveal All).
  */
 function vectorCoverage(vectorMask, width, height) {
-  const paths = (vectorMask?.paths ?? []).filter((path) => (path.knots ?? []).length >= 2);
+  if (!vectorMask || vectorMask.disable) return null;
+  const paths = (vectorMask.paths ?? []).filter((path) => (path.knots ?? []).length >= 2);
+  let result;
   if (!paths.length) {
-    if (vectorMask?.invert) return new Float32Array(width * height);
-    return null;
-  }
-  let result = vectorMask.fillStartsWithAllPixels ? new Float32Array(width * height).fill(1) : null;
-  for (const path of paths) {
-    const p = pathCoverage(path, width, height);
-    if (!result) { result = path.operation === 'subtract' ? new Float32Array(width * height) : p; continue; }
-    for (let i = 0; i < result.length; i += 1) {
-      const a = result[i];
-      const b = p[i];
-      switch (path.operation) {
-        case 'subtract': result[i] = a * (1 - b); break;
-        case 'intersect': result[i] = a * b; break;
-        case 'exclude': result[i] = a + b - 2 * a * b; break;
-        default: result[i] = a + b - a * b;
+    if (vectorMask.fillStartsWithAllPixels && !vectorMask.invert) return null;
+    result = new Float32Array(width * height).fill(vectorMask.fillStartsWithAllPixels ? 1 : 0);
+  } else {
+    const shapes = [];
+    for (const path of paths) {
+      if (path.operation === undefined && shapes.length) shapes[shapes.length - 1].push(path);
+      else shapes.push([path]);
+    }
+    for (const shape of shapes) {
+      const p = pathCoverage(shape, width, height);
+      const operation = shape[0].operation ?? 'combine';
+      if (!result) {
+        if (operation !== 'subtract' && operation !== 'intersect') { result = p; continue; }
+        result = new Float32Array(width * height).fill(1);
+      }
+      for (let i = 0; i < result.length; i += 1) {
+        const a = result[i];
+        const b = p[i];
+        switch (operation) {
+          case 'subtract': result[i] = a * (1 - b); break;
+          case 'intersect': result[i] = a * b; break;
+          case 'exclude': result[i] = a + b - 2 * a * b; break;
+          default: result[i] = a + b - a * b;
+        }
       }
     }
   }
@@ -322,31 +413,38 @@ function vectorCoverage(vectorMask, width, height) {
   return result;
 }
 
-/** One path of a vector mask as coverage: its Béziers flattened, filled non-zero, four rows a pixel. */
-function pathCoverage(path, width, height) {
-  const knots = path.knots;
-  const points = [];
-  const segment = (a, b) => {
-    // From a's anchor through a's outgoing and b's incoming handles to b's anchor.
-    const p0 = [a.points[2], a.points[3]];
-    const p1 = [a.points[4], a.points[5]];
-    const p2 = [b.points[0], b.points[1]];
-    const p3 = [b.points[2], b.points[3]];
-    const reach = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) + Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) + Math.hypot(p3[0] - p2[0], p3[1] - p2[1]);
-    const steps = Math.max(1, Math.min(64, Math.ceil(reach / 2)));
-    for (let k = points.length ? 1 : 0; k <= steps; k += 1) {
-      const t = k / steps;
-      const u = 1 - t;
-      points.push([
-        u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
-        u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
-      ]);
-    }
-  };
-  for (let i = 1; i < knots.length; i += 1) segment(knots[i - 1], knots[i]);
-  segment(knots[knots.length - 1], knots[0]);
+/**
+ * One shape of a vector mask (its paths) as coverage: the Béziers flattened, filled by the shape's
+ * fill rule (non-zero or even-odd), four rows a pixel.
+ */
+function pathCoverage(paths, width, height) {
+  const loops = paths.map((path) => {
+    const knots = path.knots;
+    const points = [];
+    const segment = (a, b) => {
+      // From a's anchor through a's outgoing and b's incoming handles to b's anchor.
+      const p0 = [a.points[2], a.points[3]];
+      const p1 = [a.points[4], a.points[5]];
+      const p2 = [b.points[0], b.points[1]];
+      const p3 = [b.points[2], b.points[3]];
+      const reach = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) + Math.hypot(p2[0] - p1[0], p2[1] - p1[1]) + Math.hypot(p3[0] - p2[0], p3[1] - p2[1]);
+      const steps = Math.max(1, Math.min(64, Math.ceil(reach / 2)));
+      for (let k = points.length ? 1 : 0; k <= steps; k += 1) {
+        const t = k / steps;
+        const u = 1 - t;
+        points.push([
+          u * u * u * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t * t * t * p3[0],
+          u * u * u * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t * t * t * p3[1],
+        ]);
+      }
+    };
+    for (let i = 1; i < knots.length; i += 1) segment(knots[i - 1], knots[i]);
+    segment(knots[knots.length - 1], knots[0]);
+    return points;
+  });
+  const evenOdd = paths[0]?.fillRule === 'even-odd';
   const out = new Float32Array(width * height);
-  const ys = points.map((p) => p[1]);
+  const ys = loops.flat().map((p) => p[1]);
   const top = Math.max(0, Math.floor(Math.min(...ys)));
   const bottom = Math.min(height - 1, Math.ceil(Math.max(...ys)));
   const ROWS = 4;
@@ -354,16 +452,18 @@ function pathCoverage(path, width, height) {
     for (let k = 0; k < ROWS; k += 1) {
       const sy = y + (k + 0.5) / ROWS;
       const crossings = [];
-      for (let i = 0; i < points.length; i += 1) {
-        const [x0, y0] = points[i];
-        const [x1, y1] = points[(i + 1) % points.length];
-        if ((y0 <= sy && y1 > sy) || (y1 <= sy && y0 > sy)) crossings.push({ x: x0 + ((sy - y0) / (y1 - y0)) * (x1 - x0), w: y1 > y0 ? 1 : -1 });
+      for (const points of loops) {
+        for (let i = 0; i < points.length; i += 1) {
+          const [x0, y0] = points[i];
+          const [x1, y1] = points[(i + 1) % points.length];
+          if ((y0 <= sy && y1 > sy) || (y1 <= sy && y0 > sy)) crossings.push({ x: x0 + ((sy - y0) / (y1 - y0)) * (x1 - x0), w: y1 > y0 ? 1 : -1 });
+        }
       }
       crossings.sort((a, b) => a.x - b.x);
       let winding = 0;
       for (let i = 0; i < crossings.length - 1; i += 1) {
-        winding += crossings[i].w;
-        if (!winding) continue;
+        winding += evenOdd ? 1 : crossings[i].w;
+        if (evenOdd ? winding % 2 === 0 : !winding) continue;
         const xa = Math.max(0, crossings[i].x);
         const xb = Math.min(width, crossings[i + 1].x);
         for (let x = Math.floor(xa); x < Math.ceil(xb); x += 1) {
@@ -385,6 +485,29 @@ function coverageBounds(coverage, width, height) {
   }
   return x1 < 0 ? null : { x: x0, y: y0, width: x1 - x0 + 1, height: y1 - y0 + 1 };
 }
+/** A buffer's alpha, one value a pixel. */
+function alphaOf(buffer) {
+  const alpha = new Float32Array(buffer.length / 4);
+  for (let i = 0; i < alpha.length; i += 1) alpha[i] = buffer[i * 4 + 3];
+  return alpha;
+}
+
+function scaleAlpha(buffer, k) {
+  if (k >= 1) return;
+  for (let i = 3; i < buffer.length; i += 4) buffer[i] *= k;
+}
+
+// The styles Photoshop calls interior (under the Fill with "Blend Interior Effects as Group"), and the
+// ones drawn over the layers clipped to the layer.
+const INTERIOR_STYLES = ['solidFill', 'gradientOverlay', 'patternOverlay', 'satin', 'innerGlow'];
+const EDGE_STYLES = ['innerShadow', 'bevel', 'stroke'];
+/** A layer's effects with only the `keys` styles in them. */
+function withOnly(effects, keys) {
+  const out = { ...effects };
+  for (const key of [...INTERIOR_STYLES, ...EDGE_STYLES, 'dropShadow', 'outerGlow']) if (!keys.includes(key)) delete out[key];
+  return out;
+}
+
 // Inside a group drawn on its own, a knockout reaches only its clear start.
 const CLEAR = Object.freeze({ shallow: null, deep: null });
 
@@ -396,28 +519,30 @@ function hasEffects(layer) {
 
 /**
  * Flatten `layers` (ag-psd's `children`, bottom first) into a `width` × `height` image.
- * `skip(layer)` leaves a layer and everything in it out (the importer's placeholder group).
+ * `skip(layer)` leaves a layer and everything in it out (the importer's placeholder group); `styles`
+ * (utils/psdLayerStyles.js LAYER_STYLES) draws layer styles, which are otherwise left out and named.
  *
- * `{ pixels: Uint8Array RGBA, painted, notDrawn: { effects, vectorMask, adjustment, dissolve } }`,
- * each `notDrawn` list holding layer names.
+ * `{ pixels: Uint8Array RGBA, painted, notDrawn: { effects, adjustment }, closeTo: { styles,
+ * adjustments }, dissolve }`: `notDrawn` by layer name (an adjustment with what it is), `closeTo` the
+ * styles and adjustments drawn close to Photoshop's rather than exactly, `dissolve` the layers drawn
+ * with a Dissolve grain of their own.
  */
-export function compositePsd(layers, width, height, { skip = () => false } = {}) {
-  const notDrawn = { effects: [], vectorMask: [], adjustment: [], dissolve: [] };
+export function compositePsd(layers, width, height, { skip = () => false, styles = null } = {}) {
+  const notDrawn = { effects: [], adjustment: [] };
+  const closeStyles = new Set();
+  const closeAdjustments = new Set();
+  const dissolve = [];
   let painted = 0;
 
   const modeOf = (layer) => {
     const mode = String(layer.blendMode ?? 'normal');
-    if (mode === 'dissolve') { notDrawn.dissolve.push(layer.name || 'unnamed'); return 'normal'; }
+    if (mode === 'dissolve') { dissolve.push(layer.name || 'unnamed'); return 'dissolve'; }
     return SEPARABLE[mode] || NON_SEPARABLE[mode] || mode === 'pass through' ? mode : 'normal';
   };
 
+  const styled = (layer) => Boolean(styles) && hasEffects(layer);
   const note = (layer) => {
-    const name = layer.name || 'unnamed';
-    if (hasEffects(layer)) notDrawn.effects.push(name);
-    // (A fill layer with no pixels is drawn from its vector mask: fillPicture.)
-    const drawnFromVectors = layer.vectorFill && !(layer.imageData?.width > 0) && layer.vectorFill.type !== 'pattern';
-    if (layer.vectorMask && !drawnFromVectors && !(layer.mask?.imageData && !layer.mask.fromVectorData)) notDrawn.vectorMask.push(name);
-    if (layer.adjustment) notDrawn.adjustment.push(name);
+    if (!styles && hasEffects(layer)) notDrawn.effects.push(layer.name || 'unnamed');
   };
 
   /**
@@ -432,46 +557,224 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
     if (level > 0) {
       // Where it covers (its pixels and masks, at full fill), what is under it gives way.
       const shape = new Float32Array(dst.length);
-      drawUnit(shape, { ...base, opacity: 1, fillOpacity: 1, blendMode: 'normal', knockoutLevel: 0, knockout: false }, [], 1, CLEAR);
+      drawUnit(shape, { ...base, opacity: 1, fillOpacity: 1, blendMode: 'normal', knockoutLevel: 0, knockout: false, effects: undefined }, [], 1, CLEAR);
       knock(dst, shape, opacity, level >= 2 ? reach.deep : reach.shallow);
+    }
+    if (styled(base)) {
+      drawStyled(dst, base, clipped, opacity, mode);
+      return;
     }
 
     if (isGroup(base)) {
-      if (mode === 'pass through' && !clipped.length && !maskSampler(base)) {
-        // Straight onto what is below; a shallow knockout inside gives way to what was there.
-        drawList(dst, base.children, opacity * fill, { shallow: knocksInside(base) ? Float32Array.from(dst) : null, deep: reach.deep });
+      // Pass Through, its Fill at 100%: straight onto what is below; a shallow knockout inside gives
+      // way to what was there. Below 100% opacity, what is below goes only that far toward the group
+      // drawn on it in full (its adjustments too), as Photoshop mixes it. (Below 100% Fill, Photoshop
+      // draws the group as a Normal one: on its own, at its opacity and Fill.)
+      // A mask on it does the same, by the mask.
+      if (mode === 'pass through' && fill >= 1 && !clipped.length) {
+        const mask = layerCoverage(base, width, height);
+        const before = opacity < 1 || mask ? Float32Array.from(dst) : null;
+        drawList(dst, base.children, 1, { shallow: knocksInside(base) ? Float32Array.from(dst) : null, deep: reach.deep });
+        if (before) mix(dst, before, opacity, mask);
         return;
       }
       // Isolated: the group on its own, then blended in as one layer would be.
       const buffer = new Float32Array(dst.length);
+      artboardBackground(buffer, base);
       drawList(buffer, base.children, 1, CLEAR);
       applyMask(buffer, base);
-      for (const layer of clipped) drawClipped(buffer, layer);
+      clipInto(buffer, alphaOf(buffer), clipped);
       compositeBuffer(dst, buffer, mode === 'pass through' ? 'normal' : mode, opacity * fill);
       return;
     }
 
     if (!clipped.length) {
-      if (paintLayer(dst, width, height, base, mode, opacity * (base.fillOpacity ?? 1))) painted += 1;
+      if (paintLayer(dst, width, height, base, mode, opacity * fill)) painted += 1;
       return;
     }
-    // A clipping group: the base on its own, the clipped layers blended into it where it has pixels,
-    // then the whole blended in with the base's mode and opacity.
+    // A clipping group: the base on its own, the clipped layers blended into it where it is, then the
+    // whole blended in with the base's mode and opacity.
     const buffer = new Float32Array(dst.length);
-    if (paintLayer(buffer, width, height, base, 'normal', base.fillOpacity ?? 1)) painted += 1;
-    for (const layer of clipped) drawClipped(buffer, layer);
+    if (paintLayer(buffer, width, height, base, 'normal', 1)) painted += 1;
+    const shape = alphaOf(buffer);
+    scaleAlpha(buffer, fill);
+    clipInto(buffer, shape, clipped);
     compositeBuffer(dst, buffer, mode, opacity);
   };
 
-  /** A clipped layer into its base's buffer: its own mode, but never beyond the base's coverage. */
+  /**
+   * The layers clipped to a base, into `buffer`, which holds the base at its Fill; `shape` is the
+   * base's coverage at full Fill. They go over the base's colour as if it were opaque wherever it is
+   * at all, and the whole is then cut to its shape: a clipped layer shows in full over a base at Fill
+   * 0% (Fill is the base's own pixels, not its shape), and blends with the base as far as its Fill.
+   */
+  const clipInto = (buffer, shape, clipped) => {
+    if (!clipped.length) return;
+    for (let i = 0; i < shape.length; i += 1) buffer[i * 4 + 3] = shape[i] > 0 ? Math.min(1, buffer[i * 4 + 3] / shape[i]) : 0;
+    for (const layer of clipped) drawClipped(buffer, layer);
+    for (let i = 0; i < shape.length; i += 1) buffer[i * 4 + 3] *= shape[i];
+  };
+
+  /** An artboard's own background colour, over its rectangle (white, black, or its colour). */
+  const artboardBackground = (buffer, group) => {
+    const board = group.artboard;
+    const type = Number(board?.backgroundType ?? 3);
+    if (!board?.rect || type === 3) return;
+    const [r, g, b] = type === 1 ? [255, 255, 255] : type === 2 ? [0, 0, 0] : psdRgb(board.color ?? { r: 255, g: 255, b: 255 });
+    const { left = 0, top = 0, right = 0, bottom = 0 } = board.rect;
+    for (let y = Math.max(0, Math.round(top)); y < Math.min(height, Math.round(bottom)); y += 1) {
+      for (let x = Math.max(0, Math.round(left)); x < Math.min(width, Math.round(right)); x += 1) {
+        buffer.set([r / 255, g / 255, b / 255, 1], (y * width + x) * 4);
+      }
+    }
+  };
+
+  /**
+   * A layer or group with layer styles: drawn on its own, its shadows and glows cast under it and its
+   * other styles drawn into it from its shape (at full Fill, as Photoshop draws them whatever the
+   * Fill), then blended in as the layer.
+   */
+  const drawStyled = (dst, base, clipped, opacity, mode) => {
+    const own = new Float32Array(dst.length);
+    if (isGroup(base)) {
+      artboardBackground(own, base);
+      drawList(own, base.children, 1, CLEAR);
+      applyMask(own, base);
+    } else if (paintLayer(own, width, height, base, 'normal', 1)) {
+      painted += 1;
+    }
+    const shape = new Float32Array(width * height);
+    let x0 = width; let y0 = height; let x1 = -1; let y1 = -1;
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const a = own[(y * width + x) * 4 + 3];
+        if (!(a > 0)) continue;
+        shape[y * width + x] = a;
+        if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+    if (x1 < 0) return;
+    const fill = base.fillOpacity ?? 1;
+    const effects = base.effects;
+
+    // Shadows and glows under it, each in its own blend mode, at the layer's opacity.
+    for (const cast of styles.cast(shape, width, height, effects)) {
+      const castMode = SEPARABLE[cast.mode] || NON_SEPARABLE[cast.mode] ? cast.mode : 'normal';
+      const { separable, nonSeparable } = modeFunctions(castMode);
+      const [r, g, b] = cast.rgb.map((v) => v / 255);
+      for (let y = 0; y < cast.height; y += 1) {
+        for (let x = 0; x < cast.width; x += 1) {
+          const sa = cast.alpha[y * cast.width + x] * cast.opacity * opacity;
+          if (sa > 0) blendPixel(dst, ((cast.y + y) * width + cast.x + x) * 4, r, g, b, sa, castMode, separable, nonSeparable);
+        }
+      }
+      closeStyles.add(cast.name);
+    }
+
+    // The other styles into it, over its box and as far out as a stroke reaches.
+    const margin = styles.reach(effects);
+    const box = { x: Math.max(0, x0 - margin), y: Math.max(0, y0 - margin) };
+    box.width = Math.min(width - 1, x1 + margin) - box.x + 1;
+    box.height = Math.min(height - 1, y1 + margin) - box.y + 1;
+    const anchor = { x: Math.round(base.left ?? 0), y: Math.round(base.top ?? 0) };
+    const drawInto = (some) => {
+      const pixels = new Uint8Array(box.width * box.height * 4);
+      const part = new Float32Array(box.width * box.height);
+      for (let y = 0; y < box.height; y += 1) {
+        for (let x = 0; x < box.width; x += 1) {
+          const i = (box.y + y) * width + box.x + x;
+          const p = y * box.width + x;
+          part[p] = shape[i];
+          for (let k = 0; k < 4; k += 1) pixels[p * 4 + k] = Math.round(clamp(own[i * 4 + k]) * 255);
+        }
+      }
+      const drawn = styles.draw(pixels, part, box.width, box.height, some, { left: box.x, top: box.y, anchor });
+      if (!drawn.length) return;
+      for (let y = 0; y < box.height; y += 1) {
+        for (let x = 0; x < box.width; x += 1) {
+          const i = (box.y + y) * width + box.x + x;
+          const p = y * box.width + x;
+          for (let k = 0; k < 4; k += 1) own[i * 4 + k] = pixels[p * 4 + k] / 255;
+        }
+      }
+      for (const name of drawn) closeStyles.add(name);
+    };
+    // The overlays, Satin and Inner Glow are drawn over its pixels at full strength whatever its Fill,
+    // unless "Blend Interior Effects as Group" puts them under it; the layers clipped to it go over
+    // them; its Inner Shadow, Bevel and Stroke over those.
+    const interior = withOnly(effects, INTERIOR_STYLES);
+    if (base.blendInteriorElements) {
+      drawInto(interior);
+      scaleAlpha(own, fill);
+    } else {
+      scaleAlpha(own, fill);
+      drawInto(interior);
+    }
+    clipInto(own, shape, clipped);
+    drawInto(withOnly(effects, EDGE_STYLES));
+    compositeBuffer(dst, own, mode === 'pass through' ? 'normal' : mode, opacity);
+  };
+
+  /**
+   * An adjustment layer: what it does to `dst` (everything under it in its group, or the layer it is
+   * clipped to), by its opacity and Fill and its masks, its result blended in its own blend mode.
+   */
+  const adjustBelow = (dst, layer, inherited, within = null) => {
+    const fn = adjustmentFunction(layer.adjustment, closeAdjustments);
+    if (!fn) {
+      notDrawn.adjustment.push(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
+      return;
+    }
+    const strength = inherited * (layer.opacity ?? 1) * (layer.fillOpacity ?? 1);
+    if (!(strength > 0)) return;
+    const mode = modeOf(layer);
+    const blend = mode === 'pass through' || mode === 'dissolve' ? 'normal' : mode;
+    const { separable, nonSeparable } = modeFunctions(blend);
+    const own = layerCoverage(layer, width, height);
+    const mask = own && within ? (x, y) => own(x, y) * within(x, y) : own ?? within;
+    const known = new Map();
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const d = (y * width + x) * 4;
+        if (!(dst[d + 3] > 0)) continue;
+        const k = strength * (mask ? mask(x, y) : 1);
+        if (!(k > 0)) continue;
+        const r0 = Math.round(clamp(dst[d]) * 255);
+        const g0 = Math.round(clamp(dst[d + 1]) * 255);
+        const b0 = Math.round(clamp(dst[d + 2]) * 255);
+        const key = (r0 << 16) | (g0 << 8) | b0;
+        let out = known.get(key);
+        if (!out) {
+          const [r, g, b] = fn([r0, g0, b0]);
+          out = [clamp(r / 255), clamp(g / 255), clamp(b / 255)];
+          if (known.size < 1 << 18) known.set(key, out);
+        }
+        let [r, g, b] = out;
+        if (blend !== 'normal') {
+          if (separable) { r = separable(dst[d], r); g = separable(dst[d + 1], g); b = separable(dst[d + 2], b); }
+          else [r, g, b] = nonSeparable([dst[d], dst[d + 1], dst[d + 2]], [r, g, b]);
+        }
+        dst[d] += (r - dst[d]) * k;
+        dst[d + 1] += (g - dst[d + 1]) * k;
+        dst[d + 2] += (b - dst[d + 2]) * k;
+      }
+    }
+  };
+
+  /** A clipped layer into its base's buffer, in its own mode (clipInto cuts it to the base). */
   const drawClipped = (buffer, layer) => {
     if (layer.hidden || skip(layer)) return;
     note(layer);
-    const coverage = new Float32Array(buffer.length / 4);
-    for (let i = 0; i < coverage.length; i += 1) coverage[i] = buffer[i * 4 + 3];
+    if (layer.adjustment) {
+      // It changes the layer it is clipped to, and only that.
+      adjustBelow(buffer, layer, 1);
+      return;
+    }
     const mode = modeOf(layer);
     const opacity = (layer.opacity ?? 1);
-    if (isGroup(layer)) {
+    if (styled(layer)) {
+      drawStyled(buffer, layer, [], opacity, mode);
+    } else if (isGroup(layer)) {
       const inner = new Float32Array(buffer.length);
       drawList(inner, layer.children, 1, CLEAR);
       applyMask(inner, layer);
@@ -479,8 +782,6 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
     } else if (paintLayer(buffer, width, height, layer, mode, opacity * (layer.fillOpacity ?? 1))) {
       painted += 1;
     }
-    // Source-atop: whatever the clipped layer added outside the base, or added to its alpha, goes.
-    for (let i = 0; i < coverage.length; i += 1) buffer[i * 4 + 3] = coverage[i];
   };
 
   /** A layer stack, bottom first, gathering each base with the clipped layers above it. */
@@ -495,6 +796,21 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
       // A clipped layer with nothing under it to clip to is drawn as Photoshop does: not at all.
       if (base.hidden || skip(base) || base.clipping) continue;
       note(base);
+      if (base.adjustment) {
+        adjustBelow(dst, base, inherited);
+        // What is clipped to an adjustment layer goes where it goes: wherever its masks let it.
+        const within = layerCoverage(base, width, height);
+        for (const layer of clipped) {
+          if (layer.hidden || skip(layer)) continue;
+          note(layer);
+          if (layer.adjustment) { adjustBelow(dst, layer, inherited, within); continue; }
+          const buffer = new Float32Array(dst.length);
+          drawUnit(buffer, { ...layer, clipping: false, blendMode: 'normal', opacity: 1 }, [], 1, CLEAR);
+          if (within) for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) buffer[(y * width + x) * 4 + 3] *= within(x, y);
+          compositeBuffer(dst, buffer, modeOf(layer) === 'pass through' ? 'normal' : modeOf(layer), inherited * (layer.opacity ?? 1));
+        }
+        continue;
+      }
       drawUnit(dst, base, clipped, inherited, reach);
     }
   };
@@ -516,8 +832,21 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
     }
   };
 
+  /** `dst` only `amount` (times `mask` at each pixel) of the way from `before` to what it is now. */
+  const mix = (dst, before, amount, mask = null) => {
+    for (let i = 0; i < dst.length; i += 4) {
+      const p = i >> 2;
+      const k = mask ? amount * mask(p % width, Math.floor(p / width)) : amount;
+      const ab = before[i + 3] * (1 - k);
+      const an = dst[i + 3] * k;
+      const a = ab + an;
+      for (let k = 0; k < 3; k += 1) dst[i + k] = a > 0 ? (before[i + k] * ab + dst[i + k] * an) / a : 0;
+      dst[i + 3] = a;
+    }
+  };
+
   const applyMask = (buffer, layer) => {
-    const mask = maskSampler(layer);
+    const mask = layerCoverage(layer, width, height);
     if (!mask) return;
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) buffer[(y * width + x) * 4 + 3] *= mask(x, y);
@@ -538,7 +867,75 @@ export function compositePsd(layers, width, height, { skip = () => false } = {})
   const pixels = new Uint8Array(canvas.length);
   for (let i = 0; i < canvas.length; i += 1) pixels[i] = Math.round(clamp(canvas[i]) * 255);
   for (const key of Object.keys(notDrawn)) notDrawn[key] = [...new Set(notDrawn[key])];
-  return { pixels, painted, notDrawn };
+  return {
+    pixels,
+    painted,
+    notDrawn,
+    closeTo: { styles: [...closeStyles], adjustments: [...closeAdjustments] },
+    dissolve: [...new Set(dissolve)],
+  };
+}
+
+// The adjustments that change each ink on its own, which is all Photoshop does with them in CMYK.
+const INK_ADJUSTMENTS = new Set(['invert', 'posterize', 'levels', 'curves', 'brightness/contrast']);
+
+/**
+ * A CMYK file flattened on its inks, as Photoshop flattens it: its cyan, magenta and yellow and its
+ * black each flattened on their own, the blend modes and adjustments working on the stored inks, then
+ * made RGB as a press profile shows them (cmykToRgb). The layers need their inks (utils/psdRead.js
+ * keeps them as `inkPlanes`). As compositePsd, or null where the file has something that works on
+ * whole colours, not ink by ink (an adjustment such as Hue/Saturation or Threshold), which
+ * the RGB flattening draws instead.
+ */
+export function compositeInks(layers, width, height, options = {}) {
+  let inks = false;
+  const fits = (list) => (list ?? []).every((layer) => {
+    if (layer.hidden || options.skip?.(layer)) return true;
+    if (layer.inkPlanes) inks = true;
+    if (layer.adjustment && !INK_ADJUSTMENTS.has(layer.adjustment.type)) return false;
+    // (Blend modes all work on the inks, Hue to Luminosity too: on black alone they keep its value or
+    // take the layer's, as Photoshop's CMYK test file shows.)
+    return fits(layer.children);
+  });
+  if (!fits(layers) || !inks) return null;
+  const tree = (list, plane) => (list ?? []).map((layer) => {
+    const out = { ...layer };
+    if (layer.children) out.children = tree(layer.children, plane);
+    if (layer.inkPlanes && layer.imageData) {
+      let data = layer.inkPlanes.cmy;
+      if (plane === 'k') {
+        data = new Uint8ClampedArray(data.length);
+        const k = layer.inkPlanes.k;
+        for (let i = 0; i < data.length; i += 4) {
+          const v = k ? k[i] : 255;
+          data[i] = v; data[i + 1] = v; data[i + 2] = v; data[i + 3] = layer.inkPlanes.cmy[i + 3];
+        }
+      }
+      out.imageData = { ...layer.imageData, data };
+    }
+    // Curves and Levels: cyan, magenta and yellow as red, green and blue; black on its own.
+    const adjustment = layer.adjustment;
+    if (plane === 'k' && (adjustment?.type === 'curves' || adjustment?.type === 'levels')) {
+      out.adjustment = { type: adjustment.type, rgb: adjustment.rgb, red: adjustment.black, green: adjustment.black, blue: adjustment.black };
+    }
+    return out;
+  });
+  const flatten = (plane) => {
+    inkPlaneColours(plane);
+    try {
+      return compositePsd(tree(layers, plane), width, height, options);
+    } finally {
+      inkPlaneColours(null);
+    }
+  };
+  const cmy = flatten('cmy');
+  const black = flatten('k').pixels;
+  const pixels = new Uint8Array(cmy.pixels.length);
+  for (let i = 0; i < pixels.length; i += 4) {
+    const [r, g, b] = cmykToRgb(1 - cmy.pixels[i] / 255, 1 - cmy.pixels[i + 1] / 255, 1 - cmy.pixels[i + 2] / 255, 1 - black[i] / 255);
+    pixels[i] = Math.round(r); pixels[i + 1] = Math.round(g); pixels[i + 2] = Math.round(b); pixels[i + 3] = cmy.pixels[i + 3];
+  }
+  return { ...cmy, pixels };
 }
 
 /** One channel of `mode` (for tests and for anybody checking a formula). */

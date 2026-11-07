@@ -35,7 +35,7 @@ import { convertedNotice, readPhotoshop } from './psdRead.js';
 import './psdPanelImport.js';
 import { compositePsd, layerMaskSampler } from './psdComposite.js';
 import { adjustArgb, adjustPixels, adjustmentFunction, psdRgb, unappliedAdjustment } from './psdAdjustments.js';
-import { drawLayerStyles, editableShadows, hasDrawnStyles, pxOf } from './psdLayerStyles.js';
+import { LAYER_STYLES, drawLayerStyles, editableShadows, hasDrawnStyles, pxOf } from './psdLayerStyles.js';
 import { combinedPathData, psdGradient, vectorFillOf, vectorStrokeOf } from './psdVectors.js';
 import { modelBounds, parsePathData, serializePathData } from './bezierPath.js';
 import { pngDataUrl } from './pngEncode.js';
@@ -68,6 +68,9 @@ const knocksInside = (group) => (group.children ?? []).some((layer) => !layer.hi
 // Whether a group holds a layer that blends in a mode of its own (Multiply, Screen, ...).
 const blendsInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
   && (!['normal', 'pass through'].includes(String(layer.blendMode ?? 'normal')) || (isGroup(layer) && blendsInside(layer))));
+// Whether a group holds an adjustment layer (in a group of its own mode it changes that group only).
+const adjustsInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
+  && (layer.adjustment || (isGroup(layer) && String(layer.blendMode ?? 'pass through') === 'pass through' && adjustsInside(layer))));
 const knocksShallowInside = (group) => (group.children ?? []).some((layer) => !layer.hidden
   && (knockoutOf(layer) === 1 || (isGroup(layer) && knocksShallowInside(layer))));
 /** An AARRGGBB colour at `k` of its opacity. */
@@ -197,7 +200,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   const taken = new Set();
   const report = {
     kept: new Set(), drawn: new Set(), approximated: new Set(), unsupported: new Set(), nearest: new Set(),
-    flattened: new Set(), adjustedInGroup: new Set(), pattern: new Set(),
+    flattened: new Set(), pattern: new Set(), dissolve: new Set(),
   };
 
   const blendOf = (layer, label) => {
@@ -308,14 +311,28 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     if (unit.vectorFill?.type === 'pattern') report.pattern.add(label);
 
     // A picture: drawn on its own, at full opacity and in Normal mode (those are the layer's), its
-    // masks kept apart as its mask, then its styles drawn in from its shape.
+    // masks kept apart as its mask, then its styles drawn in from its shape. A fill layer with no
+    // pixels is drawn from its vector mask, which is then its shape rather than a mask of it. What is
+    // inside it (a group's layers, the layers clipped to it) is drawn with its styles and adjustments.
     const mode = String(unit.blendMode ?? 'normal');
-    const alone = { ...unit, hidden: false, opacity: 1, blendMode: isGroup(unit) && mode === 'pass through' ? 'pass through' : 'normal', clipping: false, mask: undefined };
+    const fromPaths = Boolean(unit.vectorFill) && !(unit.imageData?.width > 0);
+    const alone = {
+      ...unit, hidden: false, opacity: 1, blendMode: isGroup(unit) && mode === 'pass through' ? 'pass through' : 'normal', clipping: false,
+      mask: undefined, vectorMask: fromPaths ? unit.vectorMask : undefined, effects: undefined,
+    };
     const stack = (fillOpacity) => [{ ...alone, fillOpacity }, ...clippedPixels.map((layer) => ({ ...layer, clipping: true }))];
     const fillOpacity = unit.fillOpacity ?? 1;
-    const { pixels } = compositePsd(stack(fillOpacity), width, height);
+    const flatten = (fill) => {
+      const out = compositePsd(stack(fill), width, height, { styles: LAYER_STYLES });
+      for (const name of out.closeTo.styles) report.drawn.add(name);
+      for (const name of out.closeTo.adjustments) report.approximated.add(name);
+      for (const name of out.notDrawn.adjustment) report.unsupported.add(name);
+      for (const name of out.dissolve) report.dissolve.add(name);
+      return out.pixels;
+    };
+    const pixels = flatten(fillOpacity);
     if (hasDrawnStyles(unit.effects)) {
-      const full = fillOpacity < 1 ? compositePsd(stack(1), width, height).pixels : pixels;
+      const full = fillOpacity < 1 ? flatten(1) : pixels;
       const shape = new Float32Array(width * height);
       for (let i = 0; i < shape.length; i += 1) shape[i] = full[i * 4 + 3] / 255;
       for (const name of drawLayerStyles(pixels, shape, width, height, unit.effects)) report.drawn.add(name);
@@ -323,7 +340,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     // Clipped adjustments change this unit alone.
     for (const layer of clippedAdjustments) {
       const fn = adjustmentFunction(layer.adjustment, report.approximated);
-      if (fn) adjustPixels(pixels, width, 0, 0, fn, { strength: layer.opacity ?? 1, mask: layerMaskSampler(layer) });
+      if (fn) adjustPixels(pixels, width, 0, 0, fn, { strength: layer.opacity ?? 1, mask: layerMaskSampler(layer, { width, height }) });
       else report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`);
     }
     const box = opaqueBounds(pixels, width, height);
@@ -332,7 +349,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
       type: 'picture', label, chain, visible, alpha, css, box,
       pixels: crop(pixels, width, box),
       shadows: shadowsOf(unit),
-      mask: maskOver(unit, box),
+      mask: maskOver(unit, box, { vector: !fromPaths }),
     });
   };
 
@@ -341,7 +358,7 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
     const fn = adjustmentFunction(layer.adjustment, report.approximated);
     if (!fn) { report.unsupported.add(`${layer.name || 'unnamed'} (${unappliedAdjustment(layer.adjustment)})`); return; }
     const strength = opacity * (layer.opacity ?? 1);
-    const mask = layerMaskSampler(layer);
+    const mask = layerMaskSampler(layer, { width, height });
     for (const record of records) {
       if (record.type === 'picture') adjustPixels(record.pixels, record.box.width, record.box.x, record.box.y, fn, { strength, mask });
       else if (record.type === 'vector') {
@@ -417,18 +434,21 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
       const knock = knockoutOf(base);
       if (knock > 0 && !base.hidden && !hidden) cutBelow(base, opacity * (base.opacity ?? 1), knock >= 2 || top ? 0 : start);
       if (isGroup(base)) {
-        const mode = String(base.blendMode ?? 'pass through');
+        // Below 100% Fill, Photoshop draws a Pass Through group as a Normal one.
+        const passes = String(base.blendMode ?? 'pass through') === 'pass through';
+        const mode = passes && (base.fillOpacity ?? 1) < 1 ? 'normal' : String(base.blendMode ?? 'pass through');
         // A group holding a knockout that stops at it is one picture, drawn as Photoshop draws it: one
         // that knocks out to the group's start (shallow), or any in a group of its own mode, Normal
         // included, which Photoshop puts together on its own. A deep one in a Pass Through group
         // reaches past it to the Background, and cuts the layers on its way (cutBelow).
         // A Normal group whose layers blend (Multiply, Screen) blends them with each other only, not with
-        // what is under the group: one picture too.
-        const isolated = (mode !== 'pass through' && mode !== 'normal') || clipped.length || (base.mask && !base.mask.disabled)
-          || knocksShallowInside(base) || (mode !== 'pass through' && (knocksInside(base) || blendsInside(base)));
+        // what is under the group, and an adjustment in it changes only the group: one picture too. So
+        // is a group with a mask, which is the picture's mask.
+        const masked = (base.mask && !base.mask.disabled) || (base.vectorMask?.paths?.length && !base.vectorMask.disable);
+        const isolated = (mode !== 'pass through' && mode !== 'normal') || clipped.length || masked
+          || knocksShallowInside(base) || (mode !== 'pass through' && (knocksInside(base) || blendsInside(base) || adjustsInside(base)));
         if (isolated) {
           report.flattened.add(base.name || 'a group');
-          if ((base.children ?? []).some((child) => child.adjustment)) report.adjustedInGroup.add(base.name || 'a group');
           unitRecord(unit, clipped, opacity, names);
         } else {
           walk(base.children, opacity * (base.opacity ?? 1) * (base.fillOpacity ?? 1), base.name ? [base.name, ...names] : names, hidden || base.hidden, records.length, false);
@@ -564,9 +584,9 @@ export function planPsdComponentImport(bytes, { fileName = '', geometry = null }
   if (report.drawn.size) warnings.push(`Layer styles drawn into the pictures, close to Photoshop's: ${list(report.drawn)}.`);
   if (report.approximated.size) warnings.push(`Adjustments applied close to Photoshop's: ${list(report.approximated)}.`);
   if (report.unsupported.size) warnings.push(`Adjustments not applied: ${list(report.unsupported)}. Merge them into the layers below in Photoshop first.`);
-  if (report.adjustedInGroup.size) warnings.push(`Adjustment layers inside groups with their own blend mode are not applied: ${list(report.adjustedInGroup)}.`);
+  if (report.dissolve.size) warnings.push(`Dissolve drawn with a grain of its own in pictures: ${list(report.dissolve)}. Photoshop's is random; merge the layer in Photoshop for its exact pixels.`);
   if (report.nearest.size) warnings.push(`Blend modes drawn as the nearest one the editor has: ${list(report.nearest)}.`);
-  if (report.flattened.size) warnings.push(`Groups drawn as one layer each, as Photoshop puts them together on their own (their own blend mode or mask, a knockout inside, or a Normal group whose layers blend): ${list(report.flattened)}.`);
+  if (report.flattened.size) warnings.push(`Groups drawn as one layer each, as Photoshop puts them together on their own (their own blend mode or mask, a knockout inside, or a Normal group whose layers blend or hold an adjustment): ${list(report.flattened)}.`);
   if (report.pattern.size) warnings.push(`Pattern-filled shapes come in as their pictures: ${list(report.pattern)}.`);
 
   const name = String(fileName ?? '').replace(/\.[^.]+$/, '').trim() || 'Photoshop Artwork';

@@ -13,11 +13,13 @@
  *     green a button, blue a label, magenta an LED, yellow a display.
  *   - Every other visible layer is the artwork, flattened into the panel's background image.
  *
- * Flattening is utils/psdComposite.js: Photoshop's blend modes, opacity and fill, layer masks,
- * clipping masks and isolated groups, drawn as Photoshop draws them. What it cannot draw — layer
- * effects, vector masks, adjustment layers, Dissolve's noise — is reported by layer name, because a
- * background that looks slightly wrong with no explanation is worse than one that says why. The fix
- * the report suggests is Photoshop's own: rasterize or merge that layer before importing.
+ * Flattening is utils/psdComposite.js: Photoshop's blend modes, opacity and fill, layer and vector
+ * masks, clipping masks, knockouts and isolated groups, drawn as Photoshop draws them; adjustment
+ * layers applied; layer styles drawn (utils/psdLayerStyles.js). What is only close to Photoshop's —
+ * a style's exact contour, an adjustment Photoshop publishes no formula for, Dissolve's grain — or
+ * not drawn at all is reported by name, because a background that looks slightly wrong with no
+ * explanation is worse than one that says why. The fix the report suggests is Photoshop's own:
+ * rasterize or merge that layer before importing.
  *
  * The file is read by ag-psd (MIT) with `useImageData`, so pixels arrive as plain RGBA arrays with no
  * canvas — the same in node, where this is tested, as in the editor — and the background is written
@@ -29,7 +31,8 @@
 import { convertedNotice, readPhotoshop } from './psdRead.js';
 import { PLACEHOLDER_LAYER_NAMES, ROLE_CONTROL_TYPES, colourRole, roleFromName } from './svgPanelImport.js';
 import { pngDataUrl } from './pngEncode.js';
-import { compositePsd } from './psdComposite.js';
+import { compositeInks, compositePsd } from './psdComposite.js';
+import { LAYER_STYLES } from './psdLayerStyles.js';
 
 function isGroup(layer) {
   return Array.isArray(layer?.children);
@@ -145,17 +148,21 @@ export function planPsdPanelImport(bytes) {
 
   // The artwork: every other visible layer, flattened as Photoshop would (ag-psd lists children
   // bottom first, which is the order they are drawn in).
-  const { pixels, painted, notDrawn } = compositePsd(psd.children, width, height, { skip: (layer) => layer === group });
+  // A CMYK file on its inks, as Photoshop flattens it, where everything in it works ink by ink.
+  const options = { skip: (layer) => layer === group, styles: LAYER_STYLES };
+  const onInks = read.converted === 'CMYK' ? compositeInks(psd.children, width, height, options) : null;
+  const { pixels, painted, notDrawn, closeTo, dissolve } = onInks ?? compositePsd(psd.children, width, height, options);
 
   const warnings = [];
-  if (read.converted) warnings.push(convertedNotice(read.converted));
+  if (read.converted) warnings.push(convertedNotice(read.converted, { inks: Boolean(onInks) }));
   if (!placeholders.length) warnings.push(`The "${group.name}" group has no layers to place.`);
   const outside = placeholders.filter((p) => p.x + p.width <= 0 || p.y + p.height <= 0 || p.x >= width || p.y >= height);
   if (outside.length) warnings.push(`${outside.length} placeholder(s) sit outside the canvas and will be off the panel.`);
-  if (notDrawn.effects.length) warnings.push(`Layer effects not drawn: ${notDrawn.effects.join(', ')}. Rasterize the layer style in Photoshop first.`);
-  if (notDrawn.vectorMask.length) warnings.push(`Vector masks not applied: ${notDrawn.vectorMask.join(', ')}. Rasterize the vector mask (or the layer) in Photoshop first.`);
-  if (notDrawn.adjustment.length) warnings.push(`Adjustment layers not applied: ${notDrawn.adjustment.join(', ')}. Merge each into the layers below it in Photoshop first.`);
-  if (notDrawn.dissolve.length) warnings.push(`Dissolve drawn as Normal: ${notDrawn.dissolve.join(', ')}. Its noise is random, so merge the layer in Photoshop for its exact pixels.`);
+  const list = (names) => names.slice(0, 5).join(', ') + (names.length > 5 ? ` and ${names.length - 5} more` : '');
+  if (closeTo.styles.length) warnings.push(`Layer styles drawn close to Photoshop's: ${list(closeTo.styles)}. Rasterize a layer style in Photoshop for its exact pixels.`);
+  if (closeTo.adjustments.length) warnings.push(`Adjustments applied close to Photoshop's: ${list(closeTo.adjustments)}.`);
+  if (notDrawn.adjustment.length) warnings.push(`Adjustments not applied: ${list(notDrawn.adjustment)}. Merge them into the layers below in Photoshop first.`);
+  if (dissolve.length) warnings.push(`Dissolve drawn with a grain of its own: ${list(dissolve)}. Photoshop's is random; merge the layer in Photoshop for its exact pixels.`);
 
   const dataUrl = painted ? pngDataUrl(width, height, pixels) : '';
   return {

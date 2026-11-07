@@ -16,7 +16,7 @@ import { compositePsd } from '../src/CE_Application/utils/psdComposite.js';
 import { readPdfArtwork } from '../src/CE_Application/utils/pdfArtwork.js';
 import { readGltf } from '../src/CE_Application/utils/scene3dGltf.js';
 import * as pdfjsLegacy from 'pdfjs-dist/legacy/build/pdf.mjs';
-import { illustratorPdf } from './support/pdfFixture.js';
+import { buildPdf, illustratorPdf } from './support/pdfFixture.js';
 import { render } from 'svelte/server';
 import OutlineBorder from '../src/CE_Panel/components/OutlineBorder.svelte';
 import { svgGradientStops } from '../src/CE_Application/utils/gradientStops.js';
@@ -610,7 +610,7 @@ test('a filter that is a blur or a drop shadow is the shape\'s own effect, and i
   // Under the group's scale of two: twice the offset and the blur.
   assert.deepEqual(shadow('c'), [true, 'drop', 2, 4, 8, '66000000']);
   assert.deepEqual(shadow('d'), [true, 'drop', 2, 3, 3, '99FF0000']);
-  assert.ok(plan.warnings.some((line) => /own blur or drop shadow.*a, b, c, d/.test(line)), plan.warnings.join(' | '));
+  assert.ok(plan.warnings.some((line) => /own blur, drop shadows or colour filters.*a, b, c, d/.test(line)), plan.warnings.join(' | '));
   // The default region, a tenth round the shape, cuts a large blur off; and a filter list with more
   // than the one url: both drawn by SVG, as pictures.
   const cut = planSvgComponentImport(svg('<filter id="f"><feGaussianBlur stdDeviation="4"/></filter>'
@@ -659,8 +659,9 @@ function cmykPsd(cmyk, name = 'ink') {
 }
 
 test('Photoshop: CMYK and Lab files are read, their colours converted to RGB, where they were refused', () => {
-  // Stored as Photoshop stores ink (255 none): no ink is white; full cyan, cyan; full black, black.
-  for (const [cmyk, rgb] of [[[255, 255, 255, 255], [255, 255, 255]], [[0, 255, 255, 255], [0, 255, 255]], [[255, 255, 255, 0], [0, 0, 0]]]) {
+  // Stored as Photoshop stores ink (255 none): no ink is white; full cyan and full black as a press
+  // shows them (U.S. Web Coated SWOP, which Photoshop draws as 0 174 239 and 35 31 32).
+  for (const [cmyk, rgb] of [[[255, 255, 255, 255], [255, 255, 255]], [[0, 255, 255, 255], [0, 185, 242]], [[255, 255, 255, 0], [44, 46, 53]]]) {
     const read = readPhotoshop(cmykPsd(cmyk), { composite: true });
     assert.equal(read.ok, true, read.error);
     assert.equal(read.converted, 'CMYK');
@@ -669,8 +670,8 @@ test('Photoshop: CMYK and Lab files are read, their colours converted to RGB, wh
   }
   const plan = planPsdComponentImport(cmykPsd([0, 255, 255, 255], 'cyan'), { fileName: 'cyan.psd' });
   assert.equal(plan.ok, true, plan.error);
-  assert.ok(plan.warnings.some((line) => /CMYK colour: its colours are made RGB plainly/.test(line)), plan.warnings.join(' | '));
-  assert.deepEqual(decodePng(fillOf(parts(plan).cyan).imageSrc).at(0, 0), [0, 255, 255, 255]);
+  assert.ok(plan.warnings.some((line) => /CMYK colour: its colours are made RGB as a standard press profile shows them.*adjustment layers act on the RGB/.test(line)), plan.warnings.join(' | '));
+  assert.deepEqual(decodePng(fillOf(parts(plan).cyan).imageSrc).at(0, 0), [0, 185, 242, 255]);
 
   // Lab: an RGB file's channels read as L, a and b (L 255 is white, a and b 128 neutral).
   const rgb = writePsdUint8Array({ width: 2, height: 1, children: [{ name: 'lab', left: 0, top: 0, right: 2, bottom: 1, imageData: { width: 2, height: 1, data: new Uint8ClampedArray([255, 128, 128, 255, 0, 128, 128, 255]) } }] });
@@ -696,7 +697,7 @@ test('Photoshop: a fill layer saved without pixels is drawn from its fill and ve
   assert.deepEqual(at(3, 3), [255, 0, 0, 255]);
   assert.deepEqual(at(0, 0)[3], 0);
   assert.deepEqual(at(6, 3)[3], 0, 'the square ends at 6');
-  assert.deepEqual(notDrawn.vectorMask, []);
+  assert.deepEqual(notDrawn, { effects: [], adjustment: [] });
   // With a hole subtracted, and a fill layer of the whole document.
   const holed = { ...shape, vectorMask: { paths: [...shape.vectorMask.paths, { open: false, operation: 'subtract', knots: [corner(3, 3), corner(5, 3), corner(5, 5), corner(3, 5)] }] } };
   assert.equal(compositePsd([holed], 8, 8).pixels[(4 * 8 + 4) * 4 + 3], 0);
@@ -718,4 +719,84 @@ test('Photoshop: an Indexed Color file ag-psd cannot read is read through its pa
   assert.equal(read.ok, true, read.error);
   assert.deepEqual([...read.psd.imageData.data], [255, 0, 0, 255, 0, 0, 255, 255]);
   assert.equal(planPsdComponentImport(bytes, { fileName: 'indexed.psd' }).ok, true);
+});
+
+test('PDF: what would make pdf.js run out of memory is refused with what is wrong, before pdf.js reads it', async () => {
+  const { postScriptRuns, fontMapRuns, pdfHazard } = await import('../src/CE_Application/utils/pdfGuard.js');
+  // PostScript calculator programs: valid ones run, an unknown operator or an empty stack does not.
+  assert.equal(postScriptRuns('{ 1 exch sub }', 1), true);
+  assert.equal(postScriptRuns('{ dup 0.5 gt { 1 } { 0 } ifelse exch pop }', 1), true);
+  assert.equal(postScriptRuns('{ 2 copy add }', 2), true);
+  assert.equal(postScriptRuns('{+}', 1), false, 'pdf.js test bug2086012');
+  assert.equal(postScriptRuns('{ add }', 1), false, 'two taken from one');
+  assert.equal(postScriptRuns('{ 1 add', 1), false, 'no closing brace');
+  // pdf.js's bug2086012, as it is: an axial shading through `{+}`.
+  const bad = buildPdf([
+    '<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << /Shading << /Sh1 5 0 R >> >> /Contents 4 0 R >>',
+    '<< /Length 12 >>\nstream\nq\n/Sh1 sh\nQ\nendstream',
+    '<< /ShadingType 2 /ColorSpace /DeviceRGB /Coords [0 0 200 0] /Function 6 0 R /Extend [true true] >>',
+    '<< /FunctionType 4 /Domain [0 1] /Range [0 1 0 1 0 1] /Length 3 >>\nstream\n{+}\nendstream',
+  ]);
+  assert.match(pdfHazard(bad), /colour function/);
+  const read = await readPdfArtwork(bad, { pdfjs: pdfjsLegacy });
+  assert.equal(read.ok, false);
+  assert.match(read.error, /could not be read: a colour function in it is not a program that can be run/);
+  // A TrueType font whose format 12 character map runs to FFFFFFFF (pdf.js's issue_cmap12).
+  const u16 = (v) => [(v >> 8) & 255, v & 255];
+  const u32 = (v) => [(v >>> 24) & 255, (v >> 16) & 255, (v >> 8) & 255, v & 255];
+  const cmap = [...u16(0), ...u16(1), ...u16(3), ...u16(10), ...u32(12), ...u16(12), ...u16(0), ...u32(28), ...u32(0), ...u32(1), ...u32(0), ...u32(0xffffffff), ...u32(1)];
+  const font = new Uint8Array([...u32(0x00010000), ...u16(1), 0, 16, 0, 0, 0, 0, ...[...'cmap'].map((c) => c.charCodeAt(0)), ...u32(0), ...u32(28), ...u32(cmap.length), ...cmap]);
+  assert.equal(fontMapRuns(font), false);
+  const sane = font.slice();
+  sane.set(u32(0x7e), 28 + 32); // the group ends at 7E
+  assert.equal(fontMapRuns(sane), true, 'a map of a few codes is a map');
+});
+
+test('SVG colour filters and CSS filter functions become the layer\'s own Filters, where it draws them alike', async () => {
+  const { cssFilterEffect, filterEffect } = await import('../src/CE_Application/utils/svgComponentImport.js');
+  const node = (name, attributes = {}, children = []) => ({ name, attributes, children });
+  const srgb = { 'color-interpolation-filters': 'sRGB' };
+  // Each primitive, in sRGB, as the CSS function it is.
+  const read = (...primitives) => filterEffect(node('filter', srgb, primitives));
+  assert.deepEqual(read(node('feColorMatrix', { type: 'saturate', values: '0.4' })), { filters: { saturation: 40 } });
+  assert.deepEqual(read(node('feColorMatrix', { type: 'hueRotate', values: '270' })), { filters: { hueRotate: -90 } });
+  const grey = [0.2126, 0.7152, 0.0722, 0, 0, 0.2126, 0.7152, 0.0722, 0, 0, 0.2126, 0.7152, 0.0722, 0, 0, 0, 0, 0, 1, 0].join(' ');
+  assert.deepEqual(read(node('feColorMatrix', { values: grey })), { filters: { grayscale: 100 } });
+  assert.deepEqual(read(node('feColorMatrix', { values: '-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0' })), { filters: { invert: 100 } });
+  const same = (attrs) => ['feFuncR', 'feFuncG', 'feFuncB'].map((name) => node(name, attrs));
+  assert.deepEqual(read(node('feComponentTransfer', {}, same({ type: 'linear', slope: '1.5' }))), { filters: { brightness: 150 } });
+  assert.deepEqual(read(node('feComponentTransfer', {}, same({ type: 'linear', slope: '2', intercept: '-0.5' }))), { filters: { contrast: 200 } });
+  assert.deepEqual(read(node('feComponentTransfer', {}, same({ type: 'table', tableValues: '0.25 0.75' }))), { filters: { invert: 25 } });
+  // A blur and a colour together; a drop shadow under a recoloured shape.
+  assert.deepEqual(read(node('feGaussianBlur', { stdDeviation: '2' }), node('feColorMatrix', { type: 'saturate', values: '0' })), { blur: 2, filters: { saturation: 0 } });
+  // In SVG's default linearRGB the colours differ from CSS's: drawn by SVG, a picture.
+  assert.equal(filterEffect(node('filter', {}, [node('feColorMatrix', { type: 'saturate', values: '0.4' })])), null);
+  // Out of the order the layer draws them in (invert, then brightness): a picture too.
+  assert.equal(read(node('feColorMatrix', { values: '-1 0 0 0 1 0 -1 0 0 1 0 0 -1 0 1 0 0 0 1 0' }), node('feComponentTransfer', {}, same({ type: 'linear', slope: '2' }))), null);
+  // Different functions per channel: no CSS function.
+  assert.equal(read(node('feComponentTransfer', {}, [node('feFuncR', { type: 'linear', slope: '2' })])), null);
+
+  // CSS's functions.
+  assert.deepEqual(cssFilterEffect('blur(3px) saturate(50%) hue-rotate(0.25turn)'), { blur: 3, filters: { saturation: 50, hueRotate: 90 } });
+  assert.deepEqual(cssFilterEffect('brightness(1.2) drop-shadow(2px 4px 6px rgba(0, 0, 0, 0.5))'),
+    { shadows: [{ dx: 2, dy: 4, deviation: 3, colour: '000000', opacity: 0.5 }], filters: { brightness: 120 } });
+  assert.deepEqual(cssFilterEffect('none'), {});
+  assert.equal(cssFilterEffect('invert(1) brightness(2)'), null, 'out of order');
+  assert.equal(cssFilterEffect('opacity(50%)'), null, 'not a filter the layer has');
+  assert.equal(cssFilterEffect('drop-shadow(1px 1px red) grayscale(1)'), null, 'something after the shadow');
+
+  // Through the import: the shape stays a shape with its Filters; what cannot be one is a picture.
+  const plan = planSvgComponentImport(svg('<defs><filter id="desat" style="color-interpolation-filters:sRGB"><feColorMatrix type="saturate" values="0.25"/></filter></defs>'
+    + '<rect id="dull" width="40" height="40" fill="red" filter="url(#desat)"/>'
+    + '<rect id="css" x="50" width="40" height="40" fill="blue" style="filter: grayscale(100%) sepia(50%)"/>'
+    + '<rect id="faded" y="50" width="40" height="40" fill="green" style="filter: opacity(50%)"/>'));
+  assert.equal(plan.ok, true, plan.error);
+  const filters = (name) => parts(plan)[name]._children.Effects?._children.Filters;
+  assert.equal(filters('dull').saturation, 25);
+  assert.notEqual(fillOf(parts(plan).dull).imageEnabled, true, 'still a shape');
+  assert.equal(filters('css').grayscale, 100);
+  assert.equal(filters('css').sepia, 50);
+  assert.equal(fillOf(parts(plan).faded).imageEnabled, true, 'a CSS filter the layer has not: a picture, as the browser draws it');
+  assert.ok(plan.warnings.some((line) => /colour filters.*dull, css/.test(line)), plan.warnings.join(' | '));
 });

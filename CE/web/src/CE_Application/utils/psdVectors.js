@@ -62,6 +62,16 @@ export function stopScale(...lists) {
   return lists.flat().some((stop) => Number(stop?.location) > 1) ? 4096 : 1;
 }
 
+/**
+ * A gradient's or pattern's Scale as a fraction: ag-psd gives 1 for 100% (it was read as a percent,
+ * which drew every gradient at a hundredth of its size); a percent, if given as one, still reads.
+ */
+export function scaleOf(value) {
+  const v = Number(value);
+  if (!(v > 0)) return 1;
+  return v > 20 ? v / 100 : v;
+}
+
 /** Photoshop's gradient (colour and opacity stops) as the fill's gradient. */
 export function psdGradient(content) {
   const colours = [...(content?.colorStops ?? [])].sort((a, b) => a.location - b.location);
@@ -83,7 +93,7 @@ export function psdGradient(content) {
   if (content.reverse) stops = stops.map((stop) => ({ ...stop, position: Math.round((100 - stop.position) * 10) / 10 })).reverse();
   const style = String(content.style ?? content.type ?? 'linear');
   if (style === 'radial') {
-    const reach = 50 * ((content.scale ?? 100) / 100);
+    const reach = 50 * scaleOf(content.scale);
     return { type: 'radial', centerX: 50, centerY: 50, radiusX: reach, radiusY: reach, edge: 0, stops };
   }
   // Photoshop's angle runs counter-clockwise from the right; CSS's clockwise from the top.
