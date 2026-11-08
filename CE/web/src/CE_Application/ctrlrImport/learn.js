@@ -220,6 +220,9 @@ export async function runPanelLua(read, { createEngine, channel, nudge = true, m
     };
     hook('luaPanelBeforeLoad', true, false);
     hook('luaPanelLoaded', false, true);
+    // The panel's first seconds: the timers it started while loading fire.
+    const timerErrors = call('__ctrlr_fire_timers', 5);
+    if (timerErrors) loadErrors.push(...String(timerErrors).split('\n'));
 
     call('__ctrlr_loaded');
 

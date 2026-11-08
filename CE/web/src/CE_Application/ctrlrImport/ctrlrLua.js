@@ -510,6 +510,10 @@ Component.getComponentValue = function(self) return self.mod:getValue() end
 Component.setComponentValue = function(self, v, notify) self.mod:setValue(v, true, not notify) end
 Component.getValue = Component.getComponentValue
 Component.setValue = Component.setComponentValue
+-- A combo box, as JUCE numbers it: item ids from 1, indexes from 0 — the control's value is the index.
+Component.getSelectedId = function(self) return toint(self.mod:getValue()) + 1 end
+Component.getSelectedItemIndex = function(self) return toint(self.mod:getValue()) end
+Component.getNumItems = function(self) local l = rawget(self.mod, 'list') return l and #l or 0 end
 Component.getWidth = function(self) return rawget(self, 'width') or 0 end
 Component.getHeight = function(self) return rawget(self, 'height') or 0 end
 Component.isVisible = function(self) return self.props.componentVisibility ~= '0' end
@@ -589,12 +593,18 @@ _G._DBG, _G._INF, _G._WRN, _G._ERR, _G._LERR = console, console, console, consol
 _G.J = function(s) return tostring(s) end
 _G.L = function(s) return tostring(s) end
 _G.sleep = function() rec('ui', 'sleep') end
+-- CtrlrLuaMultiTimer: callbacks by id, started and stopped. They fire only when the stand-in says
+-- time has passed (__ctrlr_fire_timers): after the panel loads, as Ctrlr's do in its first seconds
+-- — a panel that sets a "loading" flag and clears it from a timer is ready afterwards, as in Ctrlr.
 local Timer = class('CtrlrLuaMultiTimer', true)
-Timer.setCallback = function() end
-Timer.startTimer = function() rec('ui', 'timer:startTimer') end
-Timer.stopTimer = function() end
-Timer.isTimerRunning = function() return false end
-Timer.isRegistered = function() return false end
+local timers = {}
+local function timerOf(id) id = toint(id) timers[id] = timers[id] or { id = id } return timers[id] end
+Timer.setCallback = function(self, id, fn) timerOf(id).fn = fn end
+Timer.startTimer = function(self, id, ms) rec('ui', 'timer:startTimer') local t = timerOf(id) t.running = true t.ms = tonumber(ms) or 0 end
+Timer.stopTimer = function(self, id) timerOf(id).running = false end
+Timer.isTimerRunning = function(self, id) return timerOf(id).running == true end
+Timer.isRegistered = function(self, id) return timerOf(id).fn ~= nil end
+Timer.getTimerInterval = function(self, id) return timerOf(id).ms or 0 end
 _G.timer = setmetatable({}, Timer)
 -- CtrlrLuaUtils (Source/Lua/CtrlrLuaUtils.cpp): static functions, called with a dot
 -- (utils.infoWindow(...)). Its dialogs are UI: they answer as a person who closes them would (no,
@@ -851,6 +861,25 @@ local function restore(s)
 end
 local LOADED = nil
 function __ctrlr_loaded() LOADED = snapshot() end
+
+-- Time passes: every running timer fires, shortest interval first, Ctrlr's way (callback(timerId)),
+-- for up to that many rounds — a repeating timer ticks that many times. '' or the errors.
+function __ctrlr_fire_timers(rounds)
+  local errors = {}
+  for _ = 1, toint(rounds or 3) do
+    local due = {}
+    for _, t in pairs(timers) do if t.running and t.fn then due[#due + 1] = t end end
+    if #due == 0 then break end
+    table.sort(due, function(a, b) return (a.ms or 0) < (b.ms or 0) end)
+    for _, t in ipairs(due) do
+      if t.running then
+        local ok, err = guardedWith(LOAD_LIMIT, t.fn, t.id)
+        if not ok then errors[#errors + 1] = 'timer ' .. t.id .. ': ' .. clean(err) t.running = false end
+      end
+    end
+  end
+  return table.concat(errors, '\n')
+end
 
 -- One control through a list of values: luaModulatorValueChange(mod, value, source) for each, as
 -- Ctrlr calls it when a hand moves the control (changedByGUI), from the state as loaded. With a
