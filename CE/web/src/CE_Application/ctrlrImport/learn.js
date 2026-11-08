@@ -78,7 +78,7 @@ export function panelLiteral(read, { channel } = {}) {
       value: Number.isFinite(value) ? value : 0,
       min: values.length ? values[0] : attrNumber(node, 'modulatorMin', 0),
       max: values.length ? values.at(-1) : attrNumber(node, 'modulatorMax', 127),
-      ...(list.length ? { list: list.map((entry) => entry.value) } : {}),
+      ...(list.length ? { list: list.map((entry) => entry.value), texts: list.map((entry) => entry.label) } : {}),
       props: { ...(node.attributes ?? {}) },
       compProps: { ...(component?.attributes ?? {}) },
       midiProps: { ...(midi?.attributes ?? {}) },
@@ -190,7 +190,7 @@ export async function runPanelLua(read, { createEngine, channel, nudge = true, m
   const nodes = modulatorsOf(read.root);
   const targets = nodes.map((node, index) => ({ node, index, method: attr(node, 'luaModulatorValueChange', '').trim() }))
     .filter((t) => !NO_METHOD.has(t.method));
-  if (!targets.length) return { ok: true, load: { errors: [], notRead: [] }, controls: [] };
+  if (!targets.length) return { ok: true, load: { errors: [], notRead: [], methods: [] }, controls: [] };
 
   const lua = await createEngine();
   try {
@@ -203,6 +203,7 @@ export async function runPanelLua(read, { createEngine, channel, nudge = true, m
     // the caller says where to find it, or it is counted as not read.
     const loadErrors = [];
     const notRead = [];
+    const methods = new Set(read.luaMethods.map((method) => method.name));
     for (const method of read.luaMethods) {
       let source = String(method.source ?? '');
       if (!source.trim() && method.file) {
@@ -271,7 +272,9 @@ export async function runPanelLua(read, { createEngine, channel, nudge = true, m
         }
       }
     }
-    return { ok: true, load: { errors: loadErrors, notRead }, controls };
+    const hookErrors = call('__ctrlr_hook_errors');
+    if (hookErrors) loadErrors.push(...String(hookErrors).split('\n'));
+    return { ok: true, load: { errors: loadErrors, notRead, methods: [...methods] }, controls };
   } finally {
     lua.global.close();
   }
@@ -499,6 +502,8 @@ export async function learnFromLua(read, harvest, { createEngine, methodSource =
       notLearned.push({ name: c.name, method: c.method, reason: `its Lua method ${c.method} is kept in a file beside the panel, which the import was not given` });
       continue;
     }
+    // A method the panel does not have: Ctrlr finds no callback and the control sends nothing.
+    if (!run.load.methods.includes(c.method)) { silent += 1; continue; }
     const judged = judgeRuns(c);
     if (judged.silent) { silent += 1; continue; }
     if (judged.reason) { notLearned.push({ name: c.name, method: c.method, reason: judged.reason }); continue; }

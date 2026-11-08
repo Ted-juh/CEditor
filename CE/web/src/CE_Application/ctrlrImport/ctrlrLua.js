@@ -20,6 +20,8 @@
 // write that would make another control send, an error. Any of those and the control is not
 // learned; nothing is guessed.
 
+import { CTRLR_BOUND, CTRLR_VALUE_METHODS } from './ctrlrBindings.js';
+
 /** Lua 5.1 / LuaJIT behaviour on Lua 5.4. */
 export const CTRLR_LUA_PRELUDE = String.raw`
 local math_type, tointeger, floor, ceil = math.type, math.tointeger, math.floor, math.ceil
@@ -33,8 +35,38 @@ local function toint(x)
 end
 __ctrlr_toint = toint
 
+-- LuaJIT has one kind of number and writes it with %.14g: 32 whether it came from 64 / 2 or not.
+-- Lua 5.4 writes a float as "32.0". (Joining one into text with .. still gives "32.0" here; no
+-- function reaches that.)
+do
+  local tostring54, tonumber54, format = tostring, tonumber, string.format
+  tostring = function(x)
+    if math_type(x) == 'float' then return format('%.14g', x) end
+    return tostring54(x)
+  end
+  -- With a base, LuaJIT reads a number as its text: tonumber(10, 16) is 16. Lua 5.4 refuses it.
+  tonumber = function(x, base)
+    if base == nil then return tonumber54(x) end
+    if type(x) == 'number' then x = tostring(x) end
+    return tonumber54(x, base)
+  end
+end
+
 unpack = unpack or table.unpack
 loadstring = loadstring or load
+do
+  -- table.concat writes a number as tostring does: LuaJIT's way, above.
+  local concat = table.concat
+  table.concat = function(t, sep, i, j)
+    local a, b = toint(i or 1), toint(j or #t)
+    local float = false
+    for k = a, b do if math_type(t[k]) == 'float' then float = true break end end
+    if not float then return concat(t, sep, a, b) end
+    local copy = {}
+    for k = a, b do local v = t[k] if math_type(v) == 'float' then v = tostring(v) end copy[k - a + 1] = v end
+    return concat(copy, sep, 1, b - a + 1)
+  end
+end
 table.getn = table.getn or function(t) return #t end
 table.setn = table.setn or function() end
 table.maxn = table.maxn or function(t) local n = 0 for k in pairs(t) do if type(k) == 'number' and k > n then n = k end end return n end
@@ -66,10 +98,47 @@ do
     for i = 1, args.n do args[i] = toint(args[i]) end
     return char(table.unpack(args, 1, args.n))
   end
-  local insert = table.insert
-  table.insert = function(t, a, b)
-    if b == nil then return insert(t, a) end
-    return insert(t, toint(a), b)
+  -- LuaJIT's table.insert and table.remove (lib_table.c): raw, as LuaJIT's table functions are,
+  -- and with no check on the position. Lua 5.4 goes through __index and stops with "position out
+  -- of bounds" where LuaJIT inserts there, or removes nothing.
+  local function checkTable(t, name)
+    if type(t) ~= 'table' then error("bad argument #1 to '" .. name .. "' (table expected, got " .. type(t) .. ')', 3) end
+  end
+  table.insert = function(t, ...)
+    checkTable(t, 'insert')
+    local n = select('#', ...)
+    if n == 1 then rawset(t, rawlen(t) + 1, (...)) return end
+    if n ~= 2 then error("wrong number of arguments to 'insert'", 2) end
+    local pos, value = ...
+    pos = toint(pos)
+    local i = rawlen(t) + 1
+    while i > pos do rawset(t, i, rawget(t, i - 1)) i = i - 1 end
+    rawset(t, pos, value)
+  end
+  table.remove = function(t, pos)
+    checkTable(t, 'remove')
+    local len = rawlen(t)
+    if pos == nil then
+      if len ~= 0 then local old = rawget(t, len) rawset(t, len, nil) return old end
+      return
+    end
+    pos = toint(pos)
+    if pos >= 1 and pos <= len then
+      local old = rawget(t, pos)
+      for i = pos + 1, len do rawset(t, i - 1, rawget(t, i)) end
+      rawset(t, len, nil)
+      return old
+    end
+  end
+  -- ipairs reads raw in LuaJIT and stops at the first nil. Lua 5.4's goes through __index, so a
+  -- table whose __index invents a value for any key (a JD-990 panel's list of tones) never ends.
+  ipairs = function(t)
+    checkTable(t, 'ipairs')
+    return function(tt, i)
+      i = i + 1
+      local v = rawget(tt, i)
+      if v ~= nil then return i, v end
+    end, t, 0
   end
   local format = string.format
   string.format = function(fmt, ...)
@@ -81,6 +150,8 @@ do
         if (conv == 'd' or conv == 'i' or conv == 'x' or conv == 'X' or conv == 'o' or conv == 'c' or conv == 'u')
             and type(args[i]) == 'number' then
           args[i] = toint(args[i])
+        elseif conv == 's' and math_type(args[i]) == 'float' then
+          args[i] = tostring(args[i])
         end
       end
     end
@@ -140,7 +211,9 @@ end
  * The Ctrlr objects, with the recorder. The panel itself is `__CTRLR_PANEL`, a table the caller
  * defines before this runs (see `panelLiteral`).
  */
-export const CTRLR_LUA_STANDIN = String.raw`
+export const CTRLR_LUA_STANDIN = `__CTRLR_BOUND = ${luaLiteral(CTRLR_BOUND)}
+__CTRLR_VALUE_METHODS = ${luaLiteral(CTRLR_VALUE_METHODS)}
+` + String.raw`
 local toint = __ctrlr_toint
 local P = __CTRLR_PANEL
 
@@ -221,19 +294,26 @@ do
   loadstring = function(source, name) return rawload(source, name, 't') end
 end
 
--- A class. A UI class (drawing, showing, colouring: nothing that changes what is sent) absorbs a
--- method it does not have, recorded as "Class:method". Any other class answers nil for it, as Lua
--- does for a missing field: "if block.getRawAddress then" takes the path that works here, and a
--- call to it fails with the method's name in the error.
-local function class(name, ui)
+-- A class. A method it does not have is nil, as in Ctrlr for a name CtrlrX does not bind: "if
+-- block.getRawAddress then" takes the path that works, and a call fails with the method's name in
+-- the error. A class Ctrlr draws (a component, the canvas) names the lists in ctrlrBindings.js it
+-- has from CtrlrX; a method on those that the stand-in leaves undone is absorbed, recorded as
+-- "Class:method": as drawing, or, if it reads or moves a value, as not reproduced. A class of data
+-- (data = true: JUCE's String) absorbs nothing as drawing.
+local VALUE_METHODS = {}
+for _, k in ipairs(__CTRLR_VALUE_METHODS) do VALUE_METHODS[k] = true end
+local function class(name, lists, data)
   local c = {}
   c.__name = name
+  local bound = {}
+  for _, list in ipairs(lists or {}) do for _, k in ipairs(__CTRLR_BOUND[list]) do bound[k] = true end end
   c.__index = function(t, k)
     local m = rawget(c, k)
     if m ~= nil then return m end
-    if not ui then return nil end
+    if not bound[k] then return nil end
     local full = name .. ':' .. tostring(k)
-    return function(...) rec('ui', full) return absorber(full) end
+    local kind = (data or VALUE_METHODS[k]) and 'unknown' or 'ui'
+    return function(...) rec(kind, full) return absorber(full) end
   end
   return c
 end
@@ -349,6 +429,13 @@ end
 MemoryBlock.toString = function(self) local t = {} for i, v in ipairs(self.b) do t[i] = string.char(v) end return table.concat(t) end
 MemoryBlock.getData = function(self) return self end
 setmetatable(MemoryBlock, { __call = function(_, ...) return MemoryBlock.new(...) end })
+-- LMemoryBlock's static makers: from a table of bytes, or from a string's own bytes (not hex).
+-- Called with a dot or a colon, as CtrlrX's overloads allow.
+local function staticArg(a, b) if a == MemoryBlock then return b end return a end
+MemoryBlock.fromLuaTable = function(a, b) return MemoryBlock.new(staticArg(a, b)) end
+local function stringBytes(text) local t = {} text = tostring(text) for i = 1, #text do t[i] = string.byte(text, i) end return newBlock(t) end
+MemoryBlock.fromLuaString = function(a, b) return stringBytes(staticArg(a, b)) end
+MemoryBlock.fromLuaBinaryString = MemoryBlock.fromLuaString
 _G.MemoryBlock = MemoryBlock
 
 -- ---- CtrlrMidiMessage --------------------------------------------------------------------------
@@ -390,7 +477,7 @@ local function send(x)
 end
 
 -- ---- Components and modulators -----------------------------------------------------------------
-local Component = class('CtrlrComponent', true)
+local Component = class('CtrlrComponent', { 'component', 'ctrlrComponent' })
 local Modulator = class('CtrlrModulator')
 local mods, modByName = {}, {}
 local function component(m)
@@ -491,7 +578,6 @@ Modulator.setPropertyColour = Modulator.setProperty
 Modulator.removeProperty = function(self, k) self.props[k] = nil end
 
 Component.getOwner = function(self) return self.mod end
-Component.getOwnerModulator = Component.getOwner
 Component.getProperty = function(self, k) return propValue(self.props, k, 'component', self.props.uiType) end
 Component.getPropertyString = function(self, k) local v = self:getProperty(k) return v == nil and '' or tostring(v) end
 Component.getPropertyInt = function(self, k) return toint(tonumber(self:getProperty(k)) or 0) end
@@ -513,7 +599,18 @@ Component.setValue = Component.setComponentValue
 -- A combo box, as JUCE numbers it: item ids from 1, indexes from 0; the control's value is the index.
 Component.getSelectedId = function(self) return toint(self.mod:getValue()) + 1 end
 Component.getSelectedItemIndex = function(self) return toint(self.mod:getValue()) end
-Component.getNumItems = function(self) local l = rawget(self.mod, 'list') return l and #l or 0 end
+-- A button is on when its value is not 0.
+Component.getToggleState = function(self) return toint(self.mod:getValue()) ~= 0 end
+-- The JUCE box inside a CtrlrCombo: its items are the control's list.
+local ComboBox = class('ComboBox', { 'component', 'comboBox' })
+Component.getOwnedComboBox = function(self) return setmetatable({ mod = self.mod }, ComboBox) end
+ComboBox.getNumItems = function(self) local l = rawget(self.mod, 'texts') return l and #l or 0 end
+ComboBox.getItemId = function(self, i) return toint(i) + 1 end
+ComboBox.indexOfItemId = function(self, id) return toint(id) - 1 end
+ComboBox.getItemText = function(self, i) local l = rawget(self.mod, 'texts') return l and l[toint(i) + 1] or '' end
+ComboBox.getSelectedId = Component.getSelectedId
+ComboBox.getSelectedItemIndex = Component.getSelectedItemIndex
+ComboBox.getText = function(self) return ComboBox.getItemText(self, self.mod:getValue()) end
 Component.getWidth = function(self) return rawget(self, 'width') or 0 end
 Component.getHeight = function(self) return rawget(self, 'height') or 0 end
 Component.isVisible = function(self) return self.props.componentVisibility ~= '0' end
@@ -532,8 +629,8 @@ end
 
 -- ---- The panel ---------------------------------------------------------------------------------
 local Panel = class('CtrlrPanel')
-local Layer = class('CtrlrPanelCanvasLayer', true)
-local Canvas = class('CtrlrPanelCanvas', true)
+local Layer = class('CtrlrPanelCanvasLayer', { 'component', 'layer' })
+local Canvas = class('CtrlrPanelCanvas', { 'component', 'canvas' })
 local state = { bootstrap = false, restore = false, program = false }
 local panel = setmetatable({ props = P.props or {}, globals = P.globals or {} }, Panel)
 __ctrlr_state = state
@@ -577,8 +674,8 @@ Panel.setProperty = function(self, k, v) self.props[k] = v end
 Panel.setPropertyString = Panel.setProperty
 Panel.setPropertyInt = Panel.setProperty
 Panel.getCanvas = function() return setmetatable({}, Canvas) end
-Panel.getPanelEditor = function() return setmetatable({}, class('CtrlrPanelEditor', true)) end
-Panel.getInputComparator = function() return setmetatable({}, class('CtrlrMIDIInputComparator', true)) end
+Panel.getPanelEditor = function() return setmetatable({}, class('CtrlrPanelEditor', { 'editor' })) end
+Panel.getInputComparator = function() return setmetatable({}, class('CtrlrMidiInputComparator')) end
 Canvas.getLayerByName = function() return setmetatable({}, Layer) end
 Canvas.getLayer = Canvas.getLayerByName
 Layer.setProperty = function() end
@@ -596,7 +693,7 @@ _G.sleep = function() rec('ui', 'sleep') end
 -- CtrlrLuaMultiTimer: callbacks by id, started and stopped. They fire only when the stand-in says
 -- time has passed (__ctrlr_fire_timers): after the panel loads, as Ctrlr's do in its first seconds,
 -- so a panel that sets a "loading" flag and clears it from a timer is ready afterwards, as in Ctrlr.
-local Timer = class('CtrlrLuaMultiTimer', true)
+local Timer = class('CtrlrLuaMultiTimer')
 local timers = {}
 local function timerOf(id) id = toint(id) timers[id] = timers[id] or { id = id } return timers[id] end
 Timer.setCallback = function(self, id, fn) timerOf(id).fn = fn end
@@ -609,7 +706,7 @@ _G.timer = setmetatable({}, Timer)
 -- CtrlrLuaUtils (Source/Lua/CtrlrLuaUtils.cpp): static functions, called with a dot
 -- (utils.infoWindow(...)). Its dialogs are UI: they answer as a person who closes them would (no,
 -- nothing typed, no file chosen).
-local Utils = class('CtrlrLuaUtils', true)
+local Utils = class('CtrlrLuaUtils')
 Utils.getVersionMajor = function() return 5 end
 Utils.getVersionMinor = function() return 6 end
 Utils.getVersionRevision = function() return 36 end
@@ -688,7 +785,6 @@ local Big = class('BigInteger')
 local function newBig(v) return setmetatable({ v = toint(tonumber(v) or 0) }, Big) end
 Big.setBit = function(self, i, value) i = toint(i) if value == false then self.v = self.v & ~(1 << i) else self.v = self.v | (1 << i) end return self end
 Big.clearBit = function(self, i) self.v = self.v & ~(1 << toint(i)) return self end
-Big.getBit = function(self, i) return (self.v >> toint(i)) & 1 == 1 end
 Big.getBitRangeAsInt = function(self, start, count) start, count = toint(start), toint(count) return (self.v >> start) & ((1 << count) - 1) end
 Big.getBitRange = function(self, start, count) return newBig(Big.getBitRangeAsInt(self, start, count)) end
 Big.setBitRangeAsInt = function(self, start, count, value)
@@ -703,13 +799,11 @@ Big.setRange = function(self, start, count, on)
   if on then self.v = self.v | mask else self.v = self.v & ~mask end
   return self
 end
-Big.clearRange = function(self, start, count) return Big.setRange(self, start, count, false) end
 Big.clear = function(self) self.v = 0 return self end
 Big.isZero = function(self) return self.v == 0 end
 Big.isOne = function(self) return self.v == 1 end
 Big.isNegative = function(self) return self.v < 0 end
 Big.toInteger = function(self) local v = self.v & 0xFFFFFFFF if v >= 0x80000000 then v = v - 0x100000000 end return v end
-Big.toInt64 = function(self) return self.v end
 Big.getHighestBit = function(self) local h = -1 for i = 0, 63 do if (self.v >> i) & 1 == 1 then h = i end end return h end
 Big.countNumberOfSetBits = function(self) local n = 0 for i = 0, 63 do if (self.v >> i) & 1 == 1 then n = n + 1 end end return n end
 Big.findNextSetBit = function(self, i) for b = toint(i), 63 do if (self.v >> b) & 1 == 1 then return b end end return -1 end
@@ -740,6 +834,144 @@ for _, name in ipairs({ 'Colour', 'Colours', 'Justification', 'Font', 'Rectangle
   _G[name] = absorber(name)
 end
 _G.jlimit = function(lo, hi, v) if v < lo then return lo elseif v > hi then return hi end return v end
+_G.jmax = function(...) return math.max(...) end
+_G.jmin = function(...) return math.min(...) end
+
+-- CtrlrPanel's enums, as CtrlrX binds them (CtrlrLuaManager.cpp; the values are CtrlrMacros.h's).
+_G.CtrlrPanel = setmetatable({
+  PanelFileXML = 0, PanelFileXMLCompressed = 1, PanelFileBinary = 2, PanelFileBinaryCompressed = 3, PanelFileExport = 4,
+  NotifySuccess = 0, NotifyFailure = 1, NotifyInformation = 2, NotifyWarning = 3,
+  EncodeNormal = 0, Encode7bitMSBFirst = 1, Encode7bitLSBFirst = 2, EncodeMSBFirst = 1, EncodeLSBFirst = 2,
+  Encode4bitMsbFirst = 3, Encode4bitLsbFirst = 4, EncodeMsbFirst = 3, EncodeLsbFirst = 4,
+  EncodeNibbleMsbFirst = 3, EncodeNibbleLsbFirst = 4, EncodeSignedNibbleMsbFirst = 5, EncodeSignedNibbleLsbFirst = 6,
+  Encode16bitLsbFirst = 7, Encode16bitMsbFirst = 8,
+  SplitNone = 0, Split4Bits = 1, Split7Bits = 2, Split8Bits = 3,
+}, {})
+
+-- What CtrlrX gives every panel besides panel, utils and timer: its resources (pictures, fonts).
+_G.resources = setmetatable({}, class('CtrlrPanelResourceManager', { 'resources' }))
+_G.CtrlrLuaComponentAnimator = function() return setmetatable({}, class('CtrlrLuaComponentAnimator', { 'animator' })) end
+_G.BubbleMessageComponent = function() return setmetatable({}, class('BubbleMessageComponent', { 'component', 'bubble' })) end
+
+-- juce::String as CtrlrX binds it: made from text, or from a number as JUCE writes one (%g, or so
+-- many decimals); its methods count from 0 and hand back Lua strings, as CtrlrX's converter does.
+-- It has + but no .. and no tostring, as in Ctrlr.
+local JString = class('String', { 'string' }, true)
+local function jtext(x)
+  if type(x) == 'table' and getmetatable(x) == JString then return x.s end
+  if type(x) == 'number' then return tostring(x) end
+  return x
+end
+local function newJString(a, b)
+  local s
+  if a == nil then s = ''
+  elseif type(a) == 'number' then
+    if b ~= nil and toint(b) > 0 then s = string.format('%.' .. toint(b) .. 'f', a) else s = string.format('%g', a) end
+  elseif type(a) == 'string' then s = a if type(b) == 'number' then s = s:sub(1, toint(b)) end
+  elseif type(a) == 'table' and getmetatable(a) == JString then s = a.s
+  else error('No matching overload found for String(' .. type(a) .. ')', 2) end
+  return setmetatable({ s = s }, JString)
+end
+JString.__add = function(a, b) return tostring(jtext(a)) .. tostring(jtext(b)) end
+local function plainFind(s, t, from) return string.find(s, t, from or 1, true) end
+JString.length = function(self) return #self.s end
+JString.isEmpty = function(self) return self.s == '' end
+JString.isNotEmpty = function(self) return self.s ~= '' end
+JString.startsWith = function(self, t) t = jtext(t) return self.s:sub(1, #t) == t end
+JString.endsWith = function(self, t) t = jtext(t) return t == '' or self.s:sub(-#t) == t end
+JString.startsWithIgnoreCase = function(self, t) t = jtext(t):lower() return self.s:lower():sub(1, #t) == t end
+JString.contains = function(self, t) return plainFind(self.s, jtext(t)) ~= nil end
+JString.containsIgnoreCase = function(self, t) return plainFind(self.s:lower(), jtext(t):lower()) ~= nil end
+JString.equalsIgnoreCase = function(self, t) return self.s:lower() == jtext(t):lower() end
+JString.indexOf = function(self, t) local at = plainFind(self.s, jtext(t)) return at and at - 1 or -1 end
+JString.lastIndexOf = function(self, t)
+  t = jtext(t)
+  local last, from = -1, 1
+  while true do local at = plainFind(self.s, t, from) if not at then return last end last, from = at - 1, at + 1 end
+end
+JString.substring = function(self, a, b)
+  local len = #self.s
+  a = math.max(0, toint(a))
+  b = b == nil and len or math.min(len, toint(b))
+  if b <= a then return '' end
+  return self.s:sub(a + 1, b)
+end
+JString.toUpperCase = function(self) return self.s:upper() end
+JString.toLowerCase = function(self) return self.s:lower() end
+JString.trim = function(self) return (self.s:gsub('^%s+', ''):gsub('%s+$', '')) end
+JString.trimStart = function(self) return (self.s:gsub('^%s+', '')) end
+JString.trimEnd = function(self) return (self.s:gsub('%s+$', '')) end
+JString.getIntValue = function(self) local n = self.s:match('^%s*([%+%-]?%d+)') return n and toint(tonumber(n)) or 0 end
+JString.getDoubleValue = function(self) local n = self.s:match('^%s*([%+%-]?%d*%.?%d+[eE]?[%+%-]?%d*)') return n and tonumber(n) or 0 end
+JString.getFloatValue = JString.getDoubleValue
+-- Every hex digit in the text, whatever is between them, as JUCE reads it; 32 bits, signed.
+JString.getHexValue32 = function(self)
+  local v = 0
+  for d in self.s:gmatch('%x') do v = ((v << 4) | tonumber(d, 16)) & 0xFFFFFFFF end
+  if v >= 0x80000000 then v = v - 0x100000000 end
+  return v
+end
+JString.replace = function(self, a, b)
+  a, b = jtext(a), jtext(b)
+  if a == '' then return self.s end
+  local out, from = {}, 1
+  while true do
+    local at = plainFind(self.s, a, from)
+    if not at then out[#out + 1] = self.s:sub(from) break end
+    out[#out + 1] = self.s:sub(from, at - 1) .. b
+    from = at + #a
+  end
+  return table.concat(out)
+end
+JString.upToFirstOccurrenceOf = function(self, t, include)
+  t = jtext(t)
+  local at = plainFind(self.s, t)
+  if not at then return self.s end
+  return self.s:sub(1, include and at + #t - 1 or at - 1)
+end
+JString.fromFirstOccurrenceOf = function(self, t, include)
+  t = jtext(t)
+  local at = plainFind(self.s, t)
+  if not at then return '' end
+  return self.s:sub(include and at or at + #t)
+end
+JString.dropLastCharacters = function(self, n) return self.s:sub(1, math.max(0, #self.s - toint(n))) end
+JString.getLastCharacters = function(self, n) n = toint(n) if n <= 0 then return '' end return self.s:sub(-n) end
+JString.paddedLeft = function(self, c, n) c = jtext(c):sub(1, 1) return string.rep(c, math.max(0, toint(n) - #self.s)) .. self.s end
+JString.paddedRight = function(self, c, n) c = jtext(c):sub(1, 1) return self.s .. string.rep(c, math.max(0, toint(n) - #self.s)) end
+setmetatable(JString, { __call = function(_, ...) return newJString(...) end })
+_G.String = JString
+
+-- juce::StringArray: counted from 0; an index past the end of set() appends, as JUCE's Array does.
+local JStringArray = class('StringArray', { 'stringArray' }, true)
+_G.StringArray = setmetatable(JStringArray, { __call = function(_, ...)
+  local a = setmetatable({ items = {} }, JStringArray)
+  for _, v in ipairs({ ... }) do if type(v) == 'table' and v.items then for _, x in ipairs(v.items) do a.items[#a.items + 1] = x end end end
+  return a
+end })
+JStringArray.size = function(self) return #self.items end
+JStringArray.add = function(self, t) self.items[#self.items + 1] = tostring(jtext(t)) end
+JStringArray.set = function(self, i, t)
+  i = toint(i)
+  if i >= 0 and i < #self.items then self.items[i + 1] = tostring(jtext(t)) elseif i >= 0 then self.items[#self.items + 1] = tostring(jtext(t)) end
+end
+JStringArray.get = function(self, i) return self.items[toint(i) + 1] or '' end
+JStringArray.clear = function(self) self.items = {} end
+JStringArray.joinIntoString = function(self, sep, start, count)
+  start = toint(start or 0)
+  local last = count and math.min(#self.items, start + toint(count)) or #self.items
+  local part = {}
+  for i = start + 1, last do part[#part + 1] = self.items[i] end
+  return table.concat(part, jtext(sep) or ' ')
+end
+JStringArray.addLines = function(self, text)
+  text = tostring(jtext(text))
+  for line in (text .. '\n'):gmatch('(.-)\r?\n') do self.items[#self.items + 1] = line end
+  if text:sub(-1) == '\n' then self.items[#self.items] = nil end
+end
+JStringArray.contains = function(self, t) t = jtext(t) for _, x in ipairs(self.items) do if x == t then return true end end return false end
+JStringArray.indexOf = function(self, t) t = jtext(t) for i, x in ipairs(self.items) do if x == t then return i - 1 end end return -1 end
+JStringArray.remove = function(self, i) i = toint(i) if i >= 0 and i < #self.items then table.remove(self.items, i + 1) end end
 
 -- Ctrlr's old wrapper for a Lua table handed to C++: the table, with getObject().
 _G.CtrlrLuaObjectWrapper = function(t)
@@ -835,6 +1067,42 @@ end
 -- The panel's state as loaded: every control's value, the panel's variables and properties, and
 -- the scalar globals the panel's Lua keeps. Each control is learned from it, so what one control's
 -- run changes (a mute switch, the active edit buffer) does not silence the next.
+-- A panel's own tables count as well (a table of flags, the last value each page sent): every plain
+-- table its globals reach is copied, and put back in place, so what refers to it still does.
+local LIBRARIES = { _G = true, package = true, string = true, table = true, math = true, io = true, os = true,
+                    coroutine = true, debug = true, utf8 = true, bit = true, bit32 = true }
+local TABLE_ENTRIES = 200000
+local function isPlain(v) return type(v) == 'table' and getmetatable(v) == nil end
+local function panelTable(k, v)
+  return type(k) == 'string' and not LIBRARIES[k] and k:sub(1, 7):lower() ~= '__ctrlr' and isPlain(v)
+end
+local function copyTables()
+  local copies, count = {}, 0
+  local function walk(t)
+    if copies[t] then return end
+    local c = {}
+    copies[t] = c
+    for k, v in pairs(t) do
+      count = count + 1
+      c[k] = v
+      if isPlain(v) then walk(v) end
+    end
+  end
+  local roots = {}
+  for k, v in pairs(_G) do if panelTable(k, v) then roots[k] = v walk(v) end end
+  -- Too much to copy before every control: the tables are left as the runs leave them.
+  if count > TABLE_ENTRIES then copies = {} end
+  return { roots = roots, copies = copies }
+end
+local function putTablesBack(s)
+  for k, v in pairs(_G) do if panelTable(k, v) and s.roots[k] == nil then _G[k] = nil end end
+  for k, v in pairs(s.roots) do _G[k] = v end
+  for t, c in pairs(s.copies) do
+    for k in pairs(t) do if c[k] == nil then t[k] = nil end end
+    for k, v in pairs(c) do t[k] = v end
+  end
+end
+
 local function snapshot()
   local values, globals, plain = {}, {}, {}
   for i, m in ipairs(mods) do values[i] = m.value end
@@ -845,7 +1113,7 @@ local function snapshot()
   for k, v in pairs(panel.props) do plain[k] = v end
   local vars = {}
   for i, v in pairs(panel.globals) do vars[i] = v end
-  return { values = values, globals = globals, props = plain, vars = vars }
+  return { values = values, globals = globals, props = plain, vars = vars, tables = copyTables() }
 end
 local function restore(s)
   for i, m in ipairs(mods) do m.value = s.values[i] end
@@ -854,6 +1122,7 @@ local function restore(s)
     if type(k) == 'string' and (t == 'number' or t == 'string' or t == 'boolean') and s.globals[k] == nil and k:sub(1, 8) ~= '__ctrlr_' then _G[k] = nil end
   end
   for k, v in pairs(s.globals) do _G[k] = v end
+  putTablesBack(s.tables)
   panel.props = {}
   for k, v in pairs(s.props) do panel.props[k] = v end
   panel.globals = {}
@@ -885,6 +1154,10 @@ end
 -- Ctrlr calls it when a hand moves the control (changedByGUI), from the state as loaded. With a
 -- channel, the panel's MIDI channel is that one for these runs. One line per value:
 --   value | sent messages (hex, ',' between) | unknown | ui | reads | writes | tainted | error
+-- Locals, so restoring the panel as it loaded before each control does not undo them.
+local HOOK_DISABLED, HOOK_ERRORS = false, {}
+function __ctrlr_hook_errors() return table.concat(HOOK_ERRORS, '\n') end
+
 function __ctrlr_learn(modIndex, methodName, valuesText, keep, channel)
   local m = mods[toint(modIndex)]
   local fn = _G[methodName]
@@ -895,11 +1168,25 @@ function __ctrlr_learn(modIndex, methodName, valuesText, keep, channel)
     panel.props.panelMidiOutputChannelHost = tostring(channel)
   end
   local before = m.value
+  -- Ctrlr calls the panel's luaPanelModulatorValueChanged(mod, value) when any control's value
+  -- changes, before the control's own method (CtrlrPanel::modulatorValueChanged). Some panels send
+  -- from there, by the control's name. Like any callback, it is disabled after its first error,
+  -- for the rest of the session; the control's own method runs regardless.
+  local hookName = panel.props.luaPanelModulatorValueChanged
+  local hook = type(hookName) == 'string' and rawget(_G, hookName) or nil
+  if type(hook) ~= 'function' or HOOK_DISABLED then hook = nil end
   for v in tostring(valuesText):gmatch('[^,]+') do
     local value = tonumber(v)
     REC = fresh(m)
     m.value = value
     local ok, err = true, nil
+    if hook and not HOOK_DISABLED then
+      local hookOk, hookErr = guarded(hook, m, value)
+      if not hookOk then
+        HOOK_DISABLED = true
+        HOOK_ERRORS[#HOOK_ERRORS + 1] = 'luaPanelModulatorValueChanged (' .. hookName .. '), moving ' .. tostring(m.name) .. ': ' .. clean(hookErr) .. '; Ctrlr disables it after this'
+      end
+    end
     if type(fn) ~= 'function' then ok, err = false, 'the method ' .. methodName .. ' is not defined' else ok, err = guarded(fn, m, value, 4) end
     local sent = {}
     for i, s in ipairs(REC.sends) do sent[i] = hex(s) end
