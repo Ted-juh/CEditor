@@ -555,5 +555,6 @@ export async function learnFromLua(read, harvest, { createEngine, methodSource =
   }
   addParameters(harvest, entries);
   for (const entry of entries) learned.push({ ...entry.learned, parameterId: harvest.parameterIdOf.get(entry.node) });
-  return { ok: true, learned, notLearned, silent, load: run.load };
+  // `controls`: every run, for a tool that wants to hold them to something else (Ctrlr itself).
+  return { ok: true, learned, notLearned, silent, load: run.load, controls: run.controls };
 }
