@@ -3992,7 +3992,10 @@ int main (int argc, char** argv)
         root.getChildFile ("test-sysex-synth.ceditor-device.json"),
         root.getChildFile ("test-nrpn-synth.ceditor-device.json"),
         root.getChildFile ("roland-sh-201.ceditor-device.json"),
-        root.getChildFile ("roland-gaia.ceditor-device.json")
+        root.getChildFile ("roland-gaia.ceditor-device.json"),
+        // Generated from Roland's MIDI Implementation by tools/profiles/roland/. Its vectors are the
+        // manual's own printed example message, so this is the engine against Roland, not against us.
+        root.getChildFile ("roland-jd-xi.ceditor-device.json")
     };
 
     auto failures = 0;
