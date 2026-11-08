@@ -201,7 +201,14 @@ for (const { synth, profile, text, out } of BUILT) {
   test(`${synth.id}: the manual's own example messages come out byte for byte`, () => {
     // Through the app's engine, not the generator's arithmetic: the generator already refuses to
     // build when its own sum disagrees with the manual, so this is the second, independent reading.
-    assert.ok((synth.examples ?? []).length >= 1, 'a profile from a manual should carry at least one printed example');
+    // A manual whose only printed example contradicts its own table (the JD-XA's p20 puts Reverb
+    // Type at the Reverb Switch's address) has no example to check against. The layout must then
+    // say so and why, in `examplesUnavailable`; silence is not allowed.
+    if (!(synth.examples ?? []).length) {
+      assert.match(String(synth.examplesUnavailable ?? ''), /\S{20,}|\S+(\s+\S+){5,}/,
+        'a profile from a manual should carry at least one printed example, or say in examplesUnavailable why it cannot');
+      return;
+    }
     for (const example of synth.examples) {
       const result = localCompileParameter(profile, { parameterId: example.parameter, value: example.value });
       assert.ok(result.ok, result.error);

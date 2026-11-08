@@ -24,6 +24,18 @@ export function documentHeader(text) {
   return { model: field('Model'), date: field('Date'), version: field('Version') };
 }
 
+/**
+ * The largest single message the instrument sends: "Data larger than 256 bytes will be divided into
+ * packets of 256 bytes or less". 256 in nearly every Roland manual; 128 in the MC-09's and VR-09's.
+ * A block bigger than this arrives as several DT1s, so the generator requests it in pieces no
+ * bigger than this. Null when the manual does not say, and the generator then assumes 128, the
+ * smallest any of them states.
+ */
+export function packetSize(text) {
+  const match = /larger\s+than\s+(\d+)\s+bytes\s+(?:will|must)\s+be\s+divided\s+into\s+packets\s+of\s+(\d+)/i.exec(text.replace(/\s+/g, ' '));
+  return match ? Number(match[2]) : null;
+}
+
 /** One table header per line, one row per line: a re-import that changes one row changes one line. */
 export function stringifyMap(map) {
   const { tables, ...head } = map;
@@ -65,10 +77,12 @@ function main() {
       file: path.basename(pdf),
       sha256: createHash('sha256').update(readFileSync(pdf)).digest('hex'),
       pages: text.split('\f').length,
+      packetSize: packetSize(text),
       ...(url ? { url } : {}),
       reader: 'tools/profiles/roland/parse-address-map.mjs',
     },
     modelId: parsed.modelId,
+    ...(parsed.modelIdFrom ? { modelIdFrom: parsed.modelIdFrom } : {}),
     issues,
     tables: parsed.tables,
   };

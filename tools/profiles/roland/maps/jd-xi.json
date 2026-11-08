@@ -1,5 +1,5 @@
 {
-  "source": {"model":"JD-Xi","date":"May 1, 2015","version":"1.00","file":"JD-Xi_MIDI_Imple_e01_W.pdf","sha256":"aa516bd31d972c3a7cbfe4f952712f09c9a8856a2c1d854e2f8b7c67ed6bb4a3","pages":18,"url":"https://static.roland.com/assets/media/pdf/JD-Xi_MIDI_Imple_e01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"JD-Xi","date":"May 1, 2015","version":"1.00","file":"JD-Xi_MIDI_Imple_e01_W.pdf","sha256":"aa516bd31d972c3a7cbfe4f952712f09c9a8856a2c1d854e2f8b7c67ed6bb4a3","pages":18,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JD-Xi_MIDI_Imple_e01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 00 0E",
   "issues": [],
   "tables": [

@@ -3995,7 +3995,10 @@ int main (int argc, char** argv)
         root.getChildFile ("roland-gaia.ceditor-device.json"),
         // Generated from Roland's MIDI Implementation by tools/profiles/roland/. Its vectors are the
         // manual's own printed example message, so this is the engine against Roland, not against us.
-        root.getChildFile ("roland-jd-xi.ceditor-device.json")
+        root.getChildFile ("roland-jd-xi.ceditor-device.json"),
+        root.getChildFile ("roland-jd-xa.ceditor-device.json"),
+        root.getChildFile ("roland-gaia-2.ceditor-device.json"),
+        root.getChildFile ("roland-fa-06.ceditor-device.json")
     };
 
     auto failures = 0;

@@ -267,11 +267,31 @@ export function parseAddressMap(text) {
   closeTable();
   joinContinuations(tables);
 
+  // Older documents (SH-32, MC-909, SD-90, VariOS, the RD pianos) never print a `(ModelID = …)`
+  // heading; they list the id a byte at a time in the exclusive-message tables — `00H Model ID #1
+  // (SH-32)`, `4AH Model ID #2 (SH-32)`. Assembled from those, first value per position, and only
+  // when there was no heading: where a document prints both, the address map's heading is the one
+  // its own tables are written against (the JUPITER-X prints #4 as 52H once and 65H everywhere else).
+  let modelIdFrom = modelId ? 'heading' : null;
+  if (!modelId) {
+    const bytes = new Map();
+    for (const match of text.matchAll(/\b([0-9A-F]{2})H\s+model\s*ID\s*#\s*(\d)/gi)) {
+      const position = Number(match[2]);
+      if (!bytes.has(position)) bytes.set(position, match[1].toUpperCase());
+    }
+    const positions = [...bytes.keys()].sort((a, b) => a - b);
+    if (positions.length && positions.every((p, i) => p === i + 1)) {
+      modelId = positions.map((p) => bytes.get(p)).join(' ');
+      modelIdFrom = 'byte list';
+    }
+  }
+
   for (const t of tables) {
     for (const r of t.rows) {
       if (r.gap) continue;
       // `(reserve) <*>` in the JD-Xi, `(reserved)` in the GAIA, `Reserved (0 - 0)` in the JUNO-X.
-      if (/^\(?reserved?\)?(\s*\d*)?$/i.test(r.name ?? '') || /<\*>/.test(r.name ?? '')) r.reserved = true;
+      // `<Reserved>` in the RD-2000, `(dummy)` in the SH-32, `(reserve) <*1>` in the TB-3.
+      if (/^[<(]?\s*(reserved?|dummy)\s*[>)]?(\s*\d*)?(\s*<\*\d*>)?$/i.test(r.name ?? '') || /<\*\d*>/.test(r.name ?? '')) r.reserved = true;
       r.display = r.display.join(' ').replace(/\s+/g, ' ').trim();
       if (!r.display) delete r.display;
       // A few rows print no bracketed range at all, only the display line beneath — the JD-XA's
@@ -292,7 +312,7 @@ export function parseAddressMap(text) {
     t.rows = expandSeries(t.rows, (r) => r.offset, (r, offset) => ({ ...r, offset }), (r) => !r.reserved);
     t.entries = expandSeries(t.entries, (e) => e.address, (e, address) => ({ ...e, address }), () => true);
   }
-  return { modelId, tables };
+  return { modelId, ...(modelIdFrom === 'byte list' ? { modelIdFrom } : {}), tables };
 }
 
 /* ------------------------------------------------------------------ series */
