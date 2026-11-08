@@ -242,6 +242,9 @@ in [**ctrlr-import-plan.md**](design/ctrlr-import-plan.md). Short version: the g
 the MIDI map are a data-mapping problem and genuinely easy; the Lua is hard and should be
 quarantined rather than translated; nothing about it requires porting JUCE.
 
+Since built, and run on 482 public panels: [What real panels showed](design/ctrlr-import-plan.md#what-real-panels-showed)
+has the numbers, and where the plan's guesses about the format were wrong.
+
 ### 5. Verified profiles — a trust signal nobody else can offer
 
 Because profiles carry **test vectors** that actually run, CEditor can state something no other
@@ -329,7 +332,7 @@ whether they compound or merely impress. Summary:
 | 1 | ~~Capture-and-infer profiling~~ **built** (S1–S5; never run on a real synth) | **Highest — structurally uncopyable** | Medium | Beta headline |
 | 2 | Total Recall (**all four stages done**) | High — the #1 user pain | Low–medium | **Beta** |
 | 3 | ~~Auto-Panel~~ **built** | High — adoption + onboarding | Medium | **Beta** |
-| 4 | ~~Ctrlr harvest → profiles~~ **built, in the File menu** (never run on a real panel) | High — network effect, migration | Low (staged) | **Beta** |
+| 4 | ~~Ctrlr harvest → profiles~~ **built, in the File menu**, run on 482 real panels (bytes checked against Ctrlr, not yet on a synth) | High — network effect, migration | Low (staged) | **Beta** |
 | 5 | Verified-profile badge | Medium — trust | **Very low** | Beta |
 | 6 | MIDI-CI discovery | Medium — first mover, press | Low (code exists) | Beta+1 |
 | 7 | Patch Diff / Compare | Medium — daily driver | Low | Beta+1 |

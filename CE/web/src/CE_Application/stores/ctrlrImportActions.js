@@ -4,7 +4,8 @@
 // that translates one had been built and tested for months — behind a command line nobody using the
 // editor would find. This is the same four stages (ctrlrImport/), run from the File menu:
 //
-//   S1  read     the .panel or .bpanelz, decoded and parsed; what is in it, said in the Console
+//   S1  read     a .panel (XML), a .bpanelz or .bpanel (JUCE's binary tree), or a program or plug-in
+//                Ctrlr exported, which carries its panel inside; what is in it, said in the Console
 //   S2  harvest  its modulators as a device profile, saved into the engine as a new profile
 //                (DeviceProfileService gives it a file of its own on its first save)
 //   S3  rebuild  its components as controls on a new panel, bound to that profile's parameters
@@ -25,12 +26,15 @@ import { harvestProfile } from '../ctrlrImport/harvest.js';
 import { planReconstruction } from '../ctrlrImport/reconstruct.js';
 import { buildCtrlrPanel } from '../ctrlrImport/buildPanel.js';
 
-const READ_TIMEOUT_MS = 60000;
+// A Ctrlr-made program is tens of megabytes (the JD-990 Super Editor's is 57 MB).
+const READ_TIMEOUT_MS = 180000;
+const PANEL_FILE = /\.(panel|bpanelz|bpanel)$/i;
+const PROGRAM_FILE = /\.(exe|dll|vst3|clap|so|component|vst|dylib|aaxplugin)$/i;
 const REQUEST_PREFIX = 'ctrlrpanel_';
 
 /** The panel's file name without its folder or ending. */
 export function ctrlrBaseName(path) {
-  return String(path ?? '').split(/[\\/]/).pop().replace(/\.(panel|bpanelz)$/i, '') || 'Ctrlr panel';
+  return String(path ?? '').split(/[\\/]/).pop().replace(PANEL_FILE, '').replace(PROGRAM_FILE, '') || 'Ctrlr panel';
 }
 
 /** `wanted`, or `wanted-2`, `wanted-3`… — the first no loaded profile has. A re-import never writes over an earlier one. */
@@ -46,8 +50,12 @@ export function unusedProfileId(wanted, taken) {
 export function importReportNote(fileName, { harvest, plan }) {
   const lines = [`Imported from ${fileName}.`, ''];
   if (harvest?.ok) {
-    lines.push(`Device profile: ${harvest.report.converted} of ${harvest.report.modulators} modulators became parameters of "${harvest.profile.name}" (${harvest.profile.id}).`);
-    for (const flag of harvest.report.flagged) lines.push(`- not converted: ${flag.name || flag.id} — ${flag.reason}`);
+    const { report } = harvest;
+    lines.push(`Device profile: ${report.converted} of the ${report.sending} controls that send MIDI themselves became parameters of "${harvest.profile.name}" (${harvest.profile.id}), each checked to send what Ctrlr sends.`);
+    if (report.sendsFromLua.length) lines.push(`${report.sendsFromLua.length} control(s) send nothing of their own: Lua sends for them when they change (Ctrlr Lua note), and none of that runs here yet.`);
+    if (report.silent) lines.push(`${report.silent} component(s) send nothing at all: labels, groups, pictures.`);
+    for (const flag of report.flagged) lines.push(`- not converted: ${flag.name || flag.id} — ${flag.reason}`);
+    for (const note of report.notes) lines.push(`- note: ${note}`);
   } else {
     lines.push(`No device profile: ${harvest?.error ?? 'nothing to harvest'}.`);
   }
@@ -66,7 +74,8 @@ export function luaNote(luaMethods) {
     'shimmable: value and MIDI logic that maps onto ce.* · port: panel orchestration · paint: drawing, which has no mapping',
   ];
   for (const method of luaMethods) {
-    parts.push('', `-- ${method.name || '(unnamed)'} [${method.classification}]${method.hooks.length ? ` hooks: ${method.hooks.join(', ')}` : ''}`, String(method.source ?? '').trim());
+    const uses = Object.entries(method.uses ?? {}).map(([hook, count]) => (count > 1 ? `${hook} ×${count}` : hook));
+    parts.push('', `-- ${method.name || '(unnamed)'} [${method.classification}]${uses.length ? ` called by: ${uses.join(', ')}` : ''}`, String(method.source ?? '').trim());
   }
   return { name: 'Ctrlr Lua', content: parts.join('\n') };
 }
@@ -95,16 +104,17 @@ export async function importCtrlrPanelBytes(bytes, fileName = '', { saveProfile 
   if (harvest.ok && harvest.profile.parameters.length) {
     profileId = harvest.profile.id;
     saveProfile(profileId, JSON.stringify(harvest.profile, null, 2), `ctrlr_profile_${profileId}`);
-    cinfo(`[ctrlr import] device profile "${harvest.profile.name}" (${profileId}): ${harvest.report.converted}/${harvest.report.modulators} modulators became parameters`);
+    cinfo(`[ctrlr import] device profile "${harvest.profile.name}" (${profileId}): ${harvest.report.converted} of ${harvest.report.sending} sending controls became parameters`);
   } else if (harvest.ok) {
     cwarn('[ctrlr import] no modulator converted to a parameter, so no device profile was made');
   }
   for (const flag of harvest.ok ? harvest.report.flagged : []) cwarn(`[ctrlr import]   not converted: ${flag.name || flag.id} — ${flag.reason}`);
 
-  // S3: the panel.
+  // S3: the panel, each control bound to the parameter its own modulator became.
   const plan = planReconstruction(read, {
     profileId,
-    parameterIds: new Set(profileId ? harvest.profile.parameters.map((parameter) => parameter.id) : []),
+    parameterIdOf: profileId ? harvest.parameterIdOf : null,
+    profile: profileId ? harvest.profile : null,
   });
   if (!plan.ok) {
     cerror('[ctrlr import]', plan.error);
@@ -172,8 +182,8 @@ function ensureListeners() {
     pendingBrowse = null;
     const filePath = String(payload?.filePath ?? '').trim();
     if (!filePath) return;
-    if (!/\.(panel|bpanelz)$/i.test(filePath)) {
-      notify('Choose a Ctrlr .panel or .bpanelz file.', { kind: 'warn' });
+    if (!PANEL_FILE.test(filePath) && !PROGRAM_FILE.test(filePath)) {
+      notify('Choose a Ctrlr panel (.panel, .bpanelz, .bpanel), or a program or plug-in made with Ctrlr.', { kind: 'warn' });
       return;
     }
     try {
@@ -199,7 +209,7 @@ export function newPanelFromCtrlrPanel() {
     if (typeof window === 'undefined' || !window.document) return;
     const input = window.document.createElement('input');
     input.type = 'file';
-    input.accept = '.panel,.bpanelz';
+    input.accept = '.panel,.bpanelz,.bpanel,.exe,.dll,.vst3,.clap,.so,.component,.vst,.dylib';
     input.onchange = async () => {
       const file = input.files?.[0];
       if (file) await importCtrlrPanelBytes(new Uint8Array(await file.arrayBuffer()), file.name);
@@ -209,5 +219,8 @@ export function newPanelFromCtrlrPanel() {
   }
   ensureListeners();
   pendingBrowse = { requestId: `${REQUEST_PREFIX}browse_${++requestCounter}` };
-  browseImage(pendingBrowse.requestId, { patterns: '*.panel;*.bpanelz', title: 'Ctrlr panel' });
+  browseImage(pendingBrowse.requestId, {
+    patterns: '*.panel;*.bpanelz;*.bpanel;*.exe;*.dll;*.vst3;*.clap;*.so;*.component;*.vst;*.dylib',
+    title: 'Ctrlr panel, or a program or plug-in made with Ctrlr',
+  });
 }

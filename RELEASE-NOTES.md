@@ -537,17 +537,21 @@ should.
 
 ## Bringing a Ctrlr panel across
 
-**File → New Panel from Ctrlr Panel...** opens a Ctrlr `.panel` or `.bpanelz` as a new panel: its
+**File → New Panel from Ctrlr Panel...** opens a Ctrlr panel as a new panel — a `.panel`, a
+`.bpanelz` or `.bpanel`, or a program Ctrlr exported, which carries its panel inside it. Its
 modulators become a new device profile, saved with your others, and its controls are placed where
-they were and bound to it. The same is on the command line for a checkout, report only by default:
-`node tools/scripts/ctrlr-import.mjs <your.panel>`, with `--profile out.json` and `--panel
-out.cepanel`, or `--corpus <folder>`.
+they were and bound to it: inside their groups and tabs, on their layers, with their captions, and
+drawn from the panel's own picture strips when the file carries them. The same is on the command
+line for a checkout, report only by default: `node tools/scripts/ctrlr-import.mjs <your.panel>`,
+with `--profile out.json`, `--panel out.cepanel` and `--verify`, or `--corpus <folder>`.
 
-It converts a file you already have and fetches nothing. Two things it will not do: guess at a MIDI
-message it cannot express (those modulators are flagged with the reason instead), and translate
-Lua (the methods go into the new panel's notes as text, each marked by whether it could be ported or
-drew the panel and cannot be; what did not convert is listed in a note of its own). **No real community panel has been through it yet** — if you
-have one, the report alone is useful and worth sending.
+It has been run on 482 public community panels, John Goodland's among them: every one reads, 94% of
+the controls that send MIDI themselves become parameters, and each of those sends the bytes Ctrlr
+sends, checked value by value against a port of Ctrlr's own code — 2.5 million values, none
+different. Two things it will not do: guess at a message it cannot express (those controls are
+named in the panel's notes with the reason), and run or translate Lua (the methods go into the
+notes as text; a control that only Lua sends for is placed and sends nothing). The bytes have not
+yet been played to a synth; if you have one a panel was made for, that is the check worth sending.
 
 ## Reporting something
 

@@ -700,24 +700,35 @@ which one to read.
 
 ### A panel made in Ctrlr
 
-**File → New Panel from Ctrlr Panel...** opens a panel made in Ctrlr (a `.panel` or `.bpanelz` file)
-as a new CEditor panel, in three parts:
+**File → New Panel from Ctrlr Panel...** opens a panel made in Ctrlr as a new CEditor panel. It reads
+every form a Ctrlr panel comes in: a `.panel`, a `.bpanelz` or `.bpanel`, and a program or plug-in
+Ctrlr exported (an `.exe`, `.dll`, `.vst3`, `.so` or `.dylib`), which carries its panel inside it.
+The panel comes across in three parts:
 
-- Its **MIDI map** becomes a new device profile, one parameter for each control that sends a CC, an
-  NRPN or a SysEx message from a fixed template. The profile is saved with your other profiles, under
-  the Ctrlr panel's name; importing the same panel again makes a second profile rather than replacing
-  the first.
+- Its **MIDI map** becomes a new device profile, one parameter for each control that sends a message
+  of its own: a CC, an NRPN, a pair of CCs, or a SysEx message — with its address, its channel and its
+  checksum, of whichever kind Ctrlr writes. A value that goes through a formula
+  (an offset, a signed value, a list whose rows send their own numbers) is worked out the way Ctrlr
+  works it out. Each parameter sends the bytes the Ctrlr panel sent, value for value. The profile is
+  saved with your other profiles, under the Ctrlr panel's name; importing the same panel again makes a
+  second profile rather than replacing the first.
 - Its **controls** are placed where they were, at their size and in their colours, each bound to its
-  parameter: knobs, sliders, buttons, switches, lists and labels.
-- Its **Lua** does not run. Each method is kept, as text, in the panel's notes (**Ctrlr Lua**), marked by
-  what porting it takes: value and MIDI logic that maps onto CEditor's scripting, panel logic, or
-  drawing, which has no counterpart.
+  parameter: knobs, sliders, buttons, switches, lists, labels, LCD displays and keyboards. Controls
+  inside a group or on a tab page are placed inside it, on their page; captions become labels
+  attached to their control; Ctrlr's layers become the panel's layers, and the ones that started
+  hidden start hidden. Knobs, sliders and buttons drawn from a strip of pictures draw from the same
+  pictures, and the panel keeps its background picture — when the file carries them.
+- Its **Lua** does not run. Each method is kept, as text, in the panel's notes (**Ctrlr Lua**), with
+  the hooks that call it, marked by what porting it takes: value and MIDI logic that maps onto
+  CEditor's scripting, panel logic, or drawing, which has no counterpart.
 
-Not everything converts, and what does not is listed, with the reason, in the Console and in the note
-**Ctrlr import**: a control whose value goes through a formula, a SysEx message built by Lua, a control
-whose position cannot be read. Fonts, the look of the controls and anything Ctrlr drew with Lua will
-look different: the aim is a panel that works and that you can restyle, not a copy of the original's
-look. The new panel is not saved until you save it.
+Not everything converts, and what does not is listed, by name and with the reason, in the Console
+and in the note **Ctrlr import**: a control whose bytes Lua computes, a program change, a message
+that sends several SysEx messages at once, a picture the file does not carry. Controls that send
+nothing themselves because Lua sends for them are counted there too; they are placed, and send
+nothing until you give them a script or a parameter. Fonts, the look of the controls and anything
+Ctrlr drew with Lua will look different: the aim is a panel that works and that you can restyle,
+not a copy of the original's look. The new panel is not saved until you save it.
 
 ### Importing a control you drew
 
@@ -1738,7 +1749,7 @@ CEditor is a beta. Things to know before you rely on it:
 | **New Panel from Vector Artwork...** | | Builds a panel from an SVG, PDF or Illustrator drawing; see [Importing artwork](#importing-artwork). |
 | **Update Panel from Vector Artwork...** | | Applies a revised drawing to the open panel, after showing what will change. |
 | **New Panel from Photoshop Artwork...** | | The same from a Photoshop file. |
-| **New Panel from Ctrlr Panel...** | | Opens a Ctrlr `.panel` or `.bpanelz` as a new panel, its MIDI map as a new device profile. See [A panel made in Ctrlr](#a-panel-made-in-ctrlr). |
+| **New Panel from Ctrlr Panel...** | | Opens a Ctrlr panel (`.panel`, `.bpanelz`, `.bpanel`, or a program Ctrlr exported) as a new panel, its MIDI map as a new device profile. See [A panel made in Ctrlr](#a-panel-made-in-ctrlr). |
 | **Update Panel from Photoshop Artwork...** | | The same update from a Photoshop file. |
 | **Open Recent** | | Recently used panels, components, device profiles and script workspaces. |
 | **New Custom Component** | | Opens an empty custom component in its own tab. |

@@ -1,80 +1,189 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- A HAND-BUILT fixture, not a real community panel.
-     Every attribute here is from Ctrlr's own identifier table (Source/Resources/XML/CtrlrIDs.xml),
-     which is the complete vocabulary a panel file can use. It exercises one of each mapping the
-     importer claims, plus the three things it must refuse. Nobody here has a real .panel or
-     .bpanelz, and the importer's docs say so rather than implying this stands in for one. -->
-<panel panelName="Test Synth Editor" panelAuthor="Somebody" panelVersion="1.2"
-       panelManufacturer="Acme" panelInstrument="TS-1"
-       panelCanvasRectangleWidth="640" panelCanvasRectangleHeight="400"
+<!-- A HAND-BUILT fixture in the format real Ctrlr panels are written in.
+     Not a community panel: those belong to their authors and are not committed here. Every attribute
+     and value form below was seen in the 421 public panels surveyed for the importer (see
+     docs/design/ctrlr-import-plan.md, "What real panels showed"): message types as NUMBERS, colours
+     as 0xAARRGGBB, the visible name in componentVisibleName, Lua in luaMethodCode, controls inside a
+     group and on a tab page positioned relative to them, layers, a picture in JUCE's base64. Each
+     modulator is one case the importer must get right, or must refuse with the reason. -->
+<panel name="Test Synth Editor" panelAuthorName="Somebody" panelVersionMajor="1" panelVersionMinor="2"
+       panelVersionName="1" panelVendor="Acme" panelDevice="TS-1" panelMidiOutputChannelDevice="3"
+       panelGlobalVariables="5:-1:-1:-1:-1:-1:-1:-1"
        luaPanelLoaded="onLoad" luaPanelPaintBackground="paintBg">
 
-  <modulator modulatorName="Filter Cutoff" modulatorMin="0" modulatorMax="127" modulatorValue="64"
-             vstIndex="0" modulatorVstExported="1">
-    <component uiType="uiSlider" uiSliderStyle="rotary" componentRectangle="10 20 60 60"
-               uiSliderThumbColour="ffcc4400" uiSliderTrackColour="ff202020" uiLabelText="Cutoff" />
-    <midi midiMessageType="cc" midiMessageCtrlrNumber="74" midiMessageChannel="1" />
+  <uiPanelEditor uiPanelCanvasRectangle="0 0 640 400" uiPanelBackgroundColour="0xff202020" uiPanelImageResource="-- None">
+    <uiPanelCanvasLayer uiPanelCanvasLayerName="MAIN" uiPanelCanvasLayerUid="aaaa1111fffe" uiPanelCanvasLayerVisibility="True" uiPanelCanvasLayerIndex="1"/>
+    <uiPanelCanvasLayer uiPanelCanvasLayerName="HIDDEN" uiPanelCanvasLayerUid="bbbb2222fffe" uiPanelCanvasLayerVisibility="False" uiPanelCanvasLayerIndex="0"/>
+  </uiPanelEditor>
+
+  <luaManager>
+    <luaManagerMethods>
+      <luaMethodGroup name="Built-In">
+        <luaMethod luaMethodName="onLoad" luaMethodCode="function onLoad()&#10;  console(&quot;loaded&quot;)&#10;end"/>
+        <luaMethod luaMethodName="paintBg" luaMethodCode="function paintBg(mod, g)&#10;  g:fillAll(Colour(0xff000000))&#10;end"/>
+        <luaMethod luaMethodName="sendThing" luaMethodCode="function sendThing(mod, value)&#10;  panel:getModulatorByName(&quot;Pan&quot;):setValue(value, false)&#10;end"/>
+      </luaMethodGroup>
+    </luaManagerMethods>
+  </luaManager>
+
+  <panelResources>
+    <resource resourceName="knob" resourceType="Image" resourceFile="knob.png" resourceSize="84"
+              resourceData="84.IBkSG0fBZn....PCIgDQRA...P.....DHX....PL1587....ajDQAQEdbNFzPCM9OxXFFfD3N24N+GY7.j...HYGgFzQhjOK.....jTQNQjqBAlf"/>
+  </panelResources>
+
+  <!-- CC, identity, with a caption band at the top and a Lua hook. -->
+  <modulator name="Filter Cutoff" modulatorMin="0" modulatorMax="127" modulatorValue="64" vstIndex="0"
+             modulatorVstExported="1" luaModulatorValueChange="sendThing" modulatorValueExpression="modulatorValue">
+    <midi midiMessageType="0" midiMessageChannelOverride="0" midiMessageChannel="1" midiMessageCtrlrNumber="74"
+          midiMessageMultiList="" midiMessageSysExFormula=""/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="10 20 60 74"
+               componentVisibleName="Cutoff" componentLabelVisible="1" componentLabelPosition="top"
+               componentLabelHeight="14" componentLabelColour="0xffcccccc" componentLabelFont="&lt;Sans-Serif&gt;;12;1;0;0;0;1;3"
+               uiSliderThumbColour="0xffcc4400" uiSliderTrackColour="ff202020" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <modulator modulatorName="Resonance" modulatorMin="0" modulatorMax="127" modulatorValue="0">
-    <component uiType="uiSlider" uiSliderStyle="LinearVertical" componentRectangle="90,20,24,80" componentAlpha="128" />
-    <midi midiMessageType="cc" midiMessageCtrlrNumber="71" midiMessageChannel="1" />
+  <!-- CC, a negative range sent as "value + 64". -->
+  <modulator name="Pan" modulatorMin="-64" modulatorMax="63" modulatorValue="0" modulatorValueExpression="modulatorValue + 64">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="10" midiMessageSysExFormula=""/>
+    <component uiType="uiSlider" uiSliderStyle="LinearHorizontal" componentRectangle="80 20 120 24"
+               componentVisibleName="Pan" componentAlpha="128" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <modulator modulatorName="LFO Shape" modulatorMin="0" modulatorMax="3" modulatorValue="0">
-    <component uiType="uiCombo" componentRectangle="130 20 120 24"
-               uiComboContent="Triangle&#10;Saw&#10;Square&#10;Random" />
-    <midi midiMessageType="cc" midiMessageCtrlrNumber="12" />
+  <!-- A Roland DT1 with the value split over two bytes, two's complement, and a checksum. -->
+  <modulator name="Detune" modulatorMin="-100" modulatorMax="100" modulatorValue="0"
+             modulatorValueExpression="lt(modulatorValue,0,16384+modulatorValue,modulatorValue)">
+    <midi midiMessageType="5" midiMessageSysExFormula="F0 41 10 00 00 00 1D 12 03 00 06 00 MS LS z6 F7"/>
+    <component uiType="uiSlider" uiSliderStyle="Rotary" componentRectangle="210 20 60 60" componentVisibleName="Detune"
+               componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <modulator modulatorName="Osc Sync" modulatorMin="0" modulatorMax="1" modulatorValue="0">
-    <component uiType="uiToggleButton" componentRectangle="270 20 80 24" uiLabelText="SYNC" />
-    <midi midiMessageType="cc" midiMessageCtrlrNumber="65" />
+  <!-- A list whose rows send their own values. -->
+  <modulator name="LFO Shape" modulatorValue="1">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="12"/>
+    <component uiType="uiCombo" componentRectangle="280 20 120 24" componentVisibleName="LFO Shape"
+               uiComboContent="Triangle=0&#10;Saw=32&#10;Square=65&#10;Random=127" uiComboTextColour="0xff000000"
+               uiComboBgColour="0xffffffff" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <modulator modulatorName="Patch Level" modulatorMin="0" modulatorMax="127" modulatorValue="100">
-    <component uiType="uiSlider" uiSliderStyle="rotary" componentRectangle="360 20 60 60" />
-    <midi midiMessageType="sysex" midiMessageSysExFormula="F0 41 10 00 00 xx F7" />
+  <!-- A toggle. -->
+  <modulator name="Osc Sync" modulatorMin="0" modulatorMax="1" modulatorValue="0">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="65"/>
+    <component uiType="uiToggleButton" componentRectangle="410 20 80 24" componentVisibleName="Sync"
+               uiButtonContent="Off&#10;On" uiButtonColourOn="0xff00aa00" uiButtonColourOff="0xff333333"
+               componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <!-- Refused: a value expression that is not the identity. -->
-  <modulator modulatorName="Scaled Thing" modulatorMin="0" modulatorMax="100"
-             modulatorValueExpression="modulatorValue * 1.27">
-    <component uiType="uiSlider" componentRectangle="430 20 60 60" />
-    <midi midiMessageType="cc" midiMessageCtrlrNumber="20" />
+  <!-- A Yamaha message: the channel in the low nibble of "1y", a fixed slider over a list. -->
+  <modulator name="Mode" modulatorValue="2">
+    <midi midiMessageType="5" midiMessageSysExFormula="F0 43 1y 5C 10 xx F7"/>
+    <component uiType="uiFixedSlider" uiSliderStyle="LinearVertical" componentRectangle="500 20 24 80"
+               componentVisibleName="Mode" uiFixedSliderContent="Off&#10;Low&#10;Mid&#10;High" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <!-- Refused: the SysEx formula is Lua, not a byte template. -->
-  <modulator modulatorName="Computed Dump" modulatorMin="0" modulatorMax="127">
-    <component uiType="uiSlider" componentRectangle="500 20 60 60" />
-    <midi midiMessageType="sysex" midiMessageSysExFormula="function() return {0xF0, 0xF7} end" />
+  <!-- An NRPN written as four CCs (a Multi message). -->
+  <modulator name="Resonance" modulatorMin="0" modulatorMax="16383" modulatorValue="0">
+    <midi midiMessageType="6" midiMessageCtrlrNumber="300"
+          midiMessageMultiList="CC,ByteValue,MSB7bitValue,99,-2:CC,ByteValue,LSB7bitValue,98,-2:CC,ByteValue,MSB7bitValue,6,-1:CC,ByteValue,LSB7bitValue,38,-1"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="10 110 60 60"
+               componentVisibleName="Reso" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <!-- Refused: a program change is a message, not a parameter send. -->
-  <modulator modulatorName="Program" modulatorMin="0" modulatorMax="127">
-    <component uiType="uiSlider" componentRectangle="10 100 60 60" />
-    <midi midiMessageType="programChange" />
+  <!-- A 14-bit CC pair (another Multi message). -->
+  <modulator name="Fine" modulatorMin="0" modulatorMax="16383" modulatorValue="0">
+    <midi midiMessageType="6" midiMessageCtrlrNumber="1"
+          midiMessageMultiList="CC,ByteValue,MSB7bitValue,1,-1:CC,ByteValue,LSB7bitValue,33,-1"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="80 110 60 60"
+               componentVisibleName="Fine" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 
-  <!-- Placed but not bound, and a rectangle the importer must refuse rather than default. -->
-  <uiComponent uiType="uiLabel" uiLabelText="OSCILLATOR" componentRectangle="10 180 200 20"
-               uiLabelBgColour="ff101010" />
-  <uiComponent uiType="uiSlider" uiLabelText="Broken Rect" componentRectangle="not numbers" />
-  <uiComponent uiType="uiTheremin" uiLabelText="Unknown Type" componentRectangle="10 220 60 60" />
-  <uiComponent uiType="uiSlider" uiLabelText="Painted" componentRectangle="90 220 60 60"
-               uiCustomPaintCallback="paintKnob" uiImageSliderResource="knobStrip" />
+  <!-- A modulator with no name, and one that moves in steps. -->
+  <modulator name="" modulatorMin="0" modulatorMax="127" modulatorValue="0">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="20"/>
+    <component uiType="uiSlider" uiSliderStyle="Rotary" componentRectangle="150 110 50 50" componentVisibleName="" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Octave" modulatorMin="0" modulatorMax="96" modulatorValue="48">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="21"/>
+    <component uiType="uiSlider" uiSliderStyle="Rotary" uiSliderInterval="12" componentRectangle="210 110 50 50"
+               componentVisibleName="Octave" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
 
-  <luaMethod luaMethodName="onLoad"><![CDATA[
-    panel:getModulatorByName("Filter Cutoff"):setValue(64)
-  ]]></luaMethod>
+  <!-- Nothing of its own to send: Lua sends for it. -->
+  <modulator name="Patch Select" modulatorMin="0" modulatorMax="127" luaModulatorValueChange="sendThing">
+    <midi midiMessageType="9"/>
+    <component uiType="uiButton" componentRectangle="270 110 80 24" componentVisibleName="Patch" uiButtonContent="Select"
+               componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
 
-  <luaMethod luaMethodName="paintBg"><![CDATA[
-    g:setColour(Colour(0xff101010)); g:fillAll()
-  ]]></luaMethod>
+  <!-- A group, and a control inside it, positioned relative to it. -->
+  <modulator name="Group A" modulatorValue="0">
+    <midi midiMessageType="9"/>
+    <component uiType="uiGroup" componentRectangle="300 140 200 120" uiGroupText="AMP" uiGroupTextColour="0xffffffff"
+               uiGroupBackgroundColour1="0xff334455" uiGroupOutlineThickness="2" uiGroupOutlineColour1="0xff8899aa"
+               uiGroupOutlineRoundAngle="6" uiGroupBackgroundImage="-- None" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Amp Level" modulatorMin="0" modulatorMax="127" modulatorValue="100">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="7"/>
+    <component uiType="uiSlider" uiSliderStyle="Rotary" componentRectangle="10 30 50 50" componentVisibleName="Level"
+               componentGroupName="Group A" componentGroupped="1" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
 
-  <luaMethod luaMethodName="assembleBank"><![CDATA[
-    local out = {} for i = 1, 128 do out[i] = i end return out
-  ]]></luaMethod>
+  <!-- Tabs, and a control on the second page. -->
+  <modulator name="Pages" modulatorValue="0">
+    <midi midiMessageType="9"/>
+    <component uiType="uiTabs" componentRectangle="10 270 280 120" uiTabsDepth="24" uiTabsOrientation="0" uiTabsCurrentTab="0"
+               uiTabsTextTabColour="0xff909090" uiTabsFrontTabTextColour="0xff000000" componentLayerUid="aaaa1111fffeffff">
+      <uiTabsTab uiTabsTabName="Main" uiTabsTabBackgroundColour="0xffdadada" uiTabsTabContentBackgroundColour="0xffeeeeee"/>
+      <uiTabsTab uiTabsTabName="Extra" uiTabsTabBackgroundColour="0xffd3d3d3" uiTabsTabContentBackgroundColour="0xffeeeeee"/>
+    </component>
+  </modulator>
+  <modulator name="Extra Knob" modulatorMin="0" modulatorMax="127" modulatorValue="0">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="8"/>
+    <component uiType="uiSlider" uiSliderStyle="Rotary" componentRectangle="5 5 40 40" componentVisibleName="Extra"
+               componentTabName="Pages" componentTabId="1" componentGroupName="" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
 
-  <resource resourceName="knobStrip" resourceType="image" resourceSize="20480" />
+  <!-- A knob drawn by a strip of frames carried in the file. -->
+  <modulator name="Picture Knob" modulatorMin="0" modulatorMax="127" modulatorValue="0">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="9"/>
+    <component uiType="uiImageSlider" uiSliderStyle="RotaryVerticalDrag" uiImageSliderResource="knob"
+               resourceImageWidth="4" resourceImageHeight="8" resourceImageOrientation="1"
+               componentRectangle="520 140 40 40" componentVisibleName="Pic" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+
+  <!-- On a layer that starts hidden. -->
+  <modulator name="Hidden Thing" modulatorMin="0" modulatorMax="127" modulatorValue="0">
+    <midi midiMessageType="0" midiMessageCtrlrNumber="11"/>
+    <component uiType="uiSlider" uiSliderStyle="Rotary" componentRectangle="580 140 40 40" componentVisibleName="Secret"
+               componentLayerUid="bbbb2222fffeffff"/>
+  </modulator>
+
+  <!-- Refused, each with its reason: Lua making a byte, a program change, a formula that sets panel state. -->
+  <modulator name="Computed Dump" modulatorMin="0" modulatorMax="127">
+    <midi midiMessageType="5" midiMessageSysExFormula="F0 41 u1 xx F7"/>
+    <component uiType="uiSlider" componentRectangle="300 300 40 40" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Program" modulatorMin="0" modulatorMax="127">
+    <midi midiMessageType="7"/>
+    <component uiType="uiSlider" componentRectangle="350 300 40 40" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Packed Bits" modulatorMin="0" modulatorMax="1" modulatorValueExpression="setGlobal (0, setBit (global.k0, 4, modulatorValue))">
+    <midi midiMessageType="5" midiMessageSysExFormula="F0 01 k0 F7"/>
+    <component uiType="uiButton" componentRectangle="400 300 40 20" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+
+  <!-- Drawn by Lua, a label, and a rectangle that cannot be read. -->
+  <modulator name="Painted" modulatorValue="0">
+    <midi midiMessageType="9"/>
+    <component uiType="uiCustomComponent" uiCustomPaintCallback="paintBg" componentRectangle="450 300 60 40" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Title" modulatorValue="0">
+    <midi midiMessageType="9"/>
+    <component uiType="uiLabel" uiLabelText="OSCILLATOR" uiLabelTextColour="0xffffcc00" uiLabelBgColour="fad3d"
+               uiLabelFont="&lt;Sans-Serif&gt;;14;1;0;0;0;1;3" uiLabelJustification="left" componentRectangle="10 2 200 16"
+               componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Broken Rect" modulatorValue="0">
+    <midi midiMessageType="9"/>
+    <component uiType="uiLabel" uiLabelText="?" componentRectangle="10 180"/>
+  </modulator>
 </panel>
