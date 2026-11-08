@@ -510,7 +510,7 @@ Component.getComponentValue = function(self) return self.mod:getValue() end
 Component.setComponentValue = function(self, v, notify) self.mod:setValue(v, true, not notify) end
 Component.getValue = Component.getComponentValue
 Component.setValue = Component.setComponentValue
--- A combo box, as JUCE numbers it: item ids from 1, indexes from 0 — the control's value is the index.
+-- A combo box, as JUCE numbers it: item ids from 1, indexes from 0; the control's value is the index.
 Component.getSelectedId = function(self) return toint(self.mod:getValue()) + 1 end
 Component.getSelectedItemIndex = function(self) return toint(self.mod:getValue()) end
 Component.getNumItems = function(self) local l = rawget(self.mod, 'list') return l and #l or 0 end
@@ -594,8 +594,8 @@ _G.J = function(s) return tostring(s) end
 _G.L = function(s) return tostring(s) end
 _G.sleep = function() rec('ui', 'sleep') end
 -- CtrlrLuaMultiTimer: callbacks by id, started and stopped. They fire only when the stand-in says
--- time has passed (__ctrlr_fire_timers): after the panel loads, as Ctrlr's do in its first seconds
--- — a panel that sets a "loading" flag and clears it from a timer is ready afterwards, as in Ctrlr.
+-- time has passed (__ctrlr_fire_timers): after the panel loads, as Ctrlr's do in its first seconds,
+-- so a panel that sets a "loading" flag and clears it from a timer is ready afterwards, as in Ctrlr.
 local Timer = class('CtrlrLuaMultiTimer', true)
 local timers = {}
 local function timerOf(id) id = toint(id) timers[id] = timers[id] or { id = id } return timers[id] end
@@ -863,7 +863,7 @@ local LOADED = nil
 function __ctrlr_loaded() LOADED = snapshot() end
 
 -- Time passes: every running timer fires, shortest interval first, Ctrlr's way (callback(timerId)),
--- for up to that many rounds — a repeating timer ticks that many times. '' or the errors.
+-- for up to that many rounds: a repeating timer ticks that many times. '' or the errors.
 function __ctrlr_fire_timers(rounds)
   local errors = {}
   for _ = 1, toint(rounds or 3) do

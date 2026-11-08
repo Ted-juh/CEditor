@@ -52,6 +52,13 @@ async function learned({ methodSource = null } = {}) {
 
 // --- Lua 5.1 and LuaJIT on Lua 5.4 ---------------------------------------------------------------
 
+test('the Lua source the bundle carries is ASCII: a raw template cannot be escaped, and the build refuses one that is not', () => {
+  for (const [name, source] of Object.entries({ CTRLR_LUA_PRELUDE, CTRLR_LUA_STANDIN })) {
+    const at = source.search(/[^\x00-\x7f]/);
+    assert.equal(at, -1, `${name} has a non-ASCII character at ${JSON.stringify(source.slice(Math.max(0, at - 30), at + 10))}`);
+  }
+});
+
 test('what 5.1 and LuaJIT panels rely on: unpack, the bit library, numbers truncated where 5.4 refuses them', async () => {
   const lua = await standIn();
   try {
