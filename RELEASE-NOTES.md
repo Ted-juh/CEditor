@@ -553,8 +553,10 @@ different.
 Many panels send a control's MIDI from Lua. Each such control is run, in a sandbox (no files, no
 programs, nothing loaded from disk), through every value it can take, and what it sends becomes a
 parameter where the bytes follow from it — checked to send exactly what the Lua sent, value for
-value. Over the same panels that is 7,269 of 18,971 such controls; one whose Lua also reads other
-controls is learned with them as the panel loads, and the notes say which. Two things it will not
+value. Over the same panels that is 5,414 of 18,971 such controls; one whose Lua also reads other
+controls is learned with them as the panel loads, and the notes say which. Real Ctrlr was then run
+over the same panels, sandboxed, moving each of those controls: for 4,233 of the 4,238 learned
+parameters it could compare, Ctrlr sends exactly the same bytes. Two things it will not
 do: guess at a message it cannot express (those controls are named in the panel's notes with the
 reason), and translate Lua (the methods go into the notes as text; what they do besides sending a
 control's value does not run yet). The bytes have not yet been played to a synth; if you have one a

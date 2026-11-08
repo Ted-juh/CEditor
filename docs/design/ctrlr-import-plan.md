@@ -6,8 +6,9 @@
 > and corpora. **Run on real panels since 2026-11-08:** 482 distinct community panels, every one
 > read; 94.3% of the controls that send MIDI themselves become parameters; and every value of every
 > one of those parameters, 2.5 million in all, sends the same bytes Ctrlr sends. **Since the same day,
-> a control whose MIDI the panel's Lua sends is run and learned**: 7,269 of 18,971 such controls
-> become parameters ([Lua: learning what it sends](#lua-learning-what-it-sends)). The plan below is
+> a control whose MIDI the panel's Lua sends is run and learned**: 5,414 of 18,971 such controls
+> become parameters, and real Ctrlr, run over the same panels, sends the same bytes for 4,233 of
+> the 4,238 it could be compared on ([Lua: learning what it sends](#lua-learning-what-it-sends)). The plan below is
 > kept as it was written, before anybody here had seen a panel; where the panels proved it wrong,
 > [What real panels showed](#what-real-panels-showed) says so.
 >
@@ -429,10 +430,27 @@ JUCE's `File` (where no file exists). What a file leaves out, Ctrlr's constructo
 panel's Lua reads those defaults as if they were in the file; `ctrlrDefaults.js` holds them,
 extracted from CtrlrX's constructors.
 
+What the stand-in draws but does not reproduce — a component's look, the canvas and its layers,
+the panel editor, a combo box's JUCE box — answers only to the names CtrlrX binds on it
+(`ctrlrBindings.js`, extracted from its luabind registrations). Those it absorbs: as drawing, or,
+when the method reads or moves a value (`setToggleState`, `setSelectedId`, a list box's selection),
+as something not reproduced, so the control is not learned. A name CtrlrX does not bind is nil, as
+it is in Ctrlr, and a call to it stops the method here where it stops there. Before the lists, the
+stand-in absorbed every name, and a panel that called something CtrlrX lacks ran on here and was
+learned while Ctrlr sent nothing (see "Real Ctrlr as the judge").
+
+Ctrlr also calls the panel's `luaPanelModulatorValueChanged` on every change, before the control's
+own method; some panels send from there by the control's name, and the stand-in calls it the same
+way.
+
 It runs in CEditor's own Lua — 5.4, where Ctrlr runs LuaJIT (5.1). The differences panels trip on
 are bridged in a prelude: `unpack`, `loadstring`, `module`, the `bit` library with LuaJIT's signed
-32-bit results, and a number with a fraction truncated where 5.4 refuses one (`string.format("%02x",
-value / 128)` is everywhere). A string escape 5.1 let through and 5.4 refuses (`"\I"`) is rewritten
+32-bit results, a number with a fraction truncated where 5.4 refuses one (`string.format("%02x",
+value / 128)` is everywhere), `table.insert` and `table.remove` that take any position as LuaJIT's
+do (5.4 stops with "position out of bounds"), `tonumber(10, 16)` reading the number as text, and a
+whole number written without ".0" by `tostring`, `string.format("%s")` and `table.concat`, as
+LuaJIT writes it. One difference no function reaches remains: a float joined into text with `..`
+is still written "32.0". A string escape 5.1 let through and 5.4 refuses (`"\I"`) is rewritten
 before the method is compiled.
 
 **It is a sandbox.** A panel's Lua is somebody else's code. It runs in WebAssembly (wasmoon), and
@@ -445,7 +463,9 @@ instructions.
 
 Each control is run through every value it can take (up to 4,096 of them; a wider range is sampled
 and must then follow a straight rule), from the state the panel loads in: what one control's run
-changed — a mute switch, the active edit buffer — is put back before the next. The recorder notes
+changed — a mute switch, the active edit buffer, a table of flags — is put back before the next:
+every control's value, the panel's variables and properties, the Lua globals, and every plain
+table the globals reach, in place. The recorder notes
 everything the run touched, and the control is **not** learned if its Lua
 
 - stopped with an error, or used something the stand-in does not reproduce;
@@ -476,20 +496,23 @@ Over the collection (`ctrlr-import.mjs --corpus --verify`), 18,971 controls are 
 
 | Controls | |
 |---:|---|
-| **7,269** | became parameters (38%), each sending exactly what its Lua sent for every value run |
-| 1,423 | of those depend on nothing but their own value — or read other controls and sent the same bytes when every one of those was moved |
-| 5,846 | of those were learned as the panel loads: what they send changed when other controls moved |
-| 5,146 | send nothing when moved: page switches, displays, buttons that open a dialog |
-| 6,556 | not learned, each named in the panel's notes with the reason |
+| **5,414** | became parameters (29%), each sending exactly what its Lua sent for every value run |
+| 1,428 | of those depend on nothing but their own value — or read other controls and sent the same bytes when every one of those was moved |
+| 3,986 | of those were learned as the panel loads: what they send changed when other controls moved |
+| 7,351 | send nothing when moved: page switches, displays, buttons that open a dialog, and controls that name a method the panel does not have (Ctrlr calls nothing for those) |
+| 6,206 | not learned, each named in the panel's notes with the reason |
 
-The reasons, most common first: the Lua stopped with an error (3,643 — in the state the panel loads
-in, often code that only works with another page or mode selected, which Ctrlr meets the same way,
-and calls the stand-in does not have); several messages with SysEx among them per move (782 — a
-D-20 sends its display text and the parameter); a SysEx without its F7 (430); no values to run
-(411); the value split around other bytes (256); moving controls that send MIDI of their own (about
-330); different shapes for different values (174); a channel written some other way (105). The
-importer's own MIDI side is unchanged: 29,432 parameters, 2,502,717 values, none different from
-Ctrlr.
+The reasons, most common first: the Lua stopped with an error (3,217 — in the state the panel loads
+in, often code that only works with another page or mode selected, which Ctrlr meets the same way);
+several messages with SysEx among them per move (694 — a D-20 sends its display text and the
+parameter); a SysEx without its F7 (430); no values to run (411); moving controls that send MIDI of
+their own (about 395); different shapes for different values (183); the value split around other
+bytes (129); a channel written some other way (55). The importer's own MIDI side is unchanged:
+29,432 parameters, 2,502,717 values, none different from Ctrlr.
+
+The first count, 7,269 learned, was made before the stand-in was held to real Ctrlr (below). Most
+of the difference is controls whose Lua Ctrlr stops before they send — something the stand-in
+absorbed that CtrlrX does not have — and that the stand-in had learned anyway.
 
 ### Real Ctrlr as the judge
 
@@ -498,14 +521,49 @@ sends what **Ctrlr** sends is a separate question, and Ctrlr's maintainer has bu
 that answers it: CtrlrX's test suite runs the real Ctrlr engine headless — it loads a panel, moves a
 parameter, runs the Lua and captures every MIDI message on a mock device. It builds here (Ubuntu
 packages, LuaJIT, its own JUCE), and a recording harness added to a local copy of it (not in this
-repository) moves each Lua-driven control through its values and writes down what Ctrlr sent. On the
-test panel it shows the cascade the stand-in refuses to learn, as Ctrlr does it: moving Filter
-Cutoff to 16 sends its own `B2 4A 10`, and its Lua's move of Pan sends Pan's `B2 0A 50`; Pan already
-at the value it is moved to sends nothing.
+repository) moves each Lua-driven control through up to seven of its values and writes down what
+Ctrlr sent, a marker message after each move saying where one move's messages end.
 
-It has **not** been run over the collection. That would execute 455 third-party panels' Lua natively,
-in LuaJIT with the machine's files and processes open to it — the opposite of the sandbox above — and
-it waits for a sandbox of its own and the owner's go-ahead.
+It was run over the collection: 303 distinct panels with Lua-driven controls, 24,603 controls. That
+executes other people's Lua natively, so it ran in a sandbox of its own: read-only filesystem but
+for its output folder, no network, its own process space, and inside Ctrlr a Lua with the same
+`io`, `os` and `File` as the stand-in's — no file exists, no process runs, nothing native or
+precompiled loads.
+
+Getting the two to compare like with like took three passes, and each mistake is worth knowing:
+
+- **Order.** The first pass moved the controls one after another, and each one's Lua saw what the
+  ones before had left (a Triton's effect sizes clamp each other, a mode switch sends only when the
+  mode changes). The stand-in runs each control from the panel as it loads. The harness now puts
+  the panel back before each control — values set quietly, the Lua's globals and every plain table
+  they reach, the panel's variables and properties — and stops the timers the control before had
+  started.
+- **The sandbox itself.** Taking `io` away entirely, as the first lockdown did, made a panel that
+  looks for a settings file at load stop there, where Ctrlr finds no file and goes on; seven
+  Sequential editors sent nothing. `io` now answers as for a missing file, as the stand-in's does.
+- **Start-up.** The stand-in fires the timers a panel starts while loading before it runs a
+  control; the harness first waited one second, and a REV500 lifts its freeze after one and a
+  half. It waits four now.
+
+What it found in the stand-in is in "The stand-in" above: names it absorbed that CtrlrX does not
+have, Lua 5.4 where LuaJIT differs, the panel hook, missing methods, the panel's own tables. With
+those fixed:
+
+| | |
+|---:|---|
+| **4,233 of 4,238** | learned parameters send exactly what Ctrlr sends: 22,426 of 22,439 values, 13 differing in 5 parameters |
+| 1,195 of 1,198 | of the parameters that depend on nothing else |
+| 3,038 of 3,040 | of those learned as the panel loads |
+| 51,387 of 54,625 | values of every control the stand-in ran without error, learned or not, the same as Ctrlr's |
+
+Not compared: 14 panels CtrlrX here opens with no controls at all (CEditor reads them); 32 with no
+moves recorded (the 15-minute limit, or Lua that never returns — real Ctrlr has no instruction
+limit); 351 controls whose method is kept in a file beside the panel, which the stand-in is handed
+by name and Ctrlr looks for where the author's machine kept it; and 4,455 controls whose method
+Ctrlr had disabled by then, after an earlier control's error (Ctrlr disables a method for every
+control that uses it). The values of controls the stand-in did not learn differ in a few panels —
+Polymorph, a C-V50, an Emagic AMT, a CrumarBit, a 05RW, a JD-990 — and are not looked into yet;
+none of them became a parameter.
 
 ### Still not done
 
