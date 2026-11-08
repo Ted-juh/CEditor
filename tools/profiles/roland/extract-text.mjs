@@ -41,10 +41,19 @@ function pageGeometry(pdf) {
 const RIGHT_COLUMN_START = 60;
 
 export function isTwoColumn(fullPageText) {
-  for (const line of fullPageText.split('\n')) {
+  // Any table border, separator or addressed row that starts past the middle. Every occurrence on
+  // the line counts, not just the first: on the JD-XA's p17 the right column's only border shares a
+  // line with the left column's, so the first match on every line sat at column 0.
+  // Addressed rows may carry the `#` packet mark (`|#   00 2D |`), and a continuation row has only
+  // its bit pattern (`|          | 0000 dddd |`) — the JD-XA's p18 right column is nothing else.
+  const TABLE_MARK = /\+-{20,}|\|-{10,}|\|#?\s+(?:[0-9A-F]{2} ){1,3}[0-9A-F]{2}\s*\||\| [0a-h]{4} [0a-h]{4} \|/g;
+  for (const raw of fullPageText.split('\n')) {
     // The SH-201's document draws its borders with em dashes; normalise before looking.
-    const at = line.replace(/[‒-―−]/g, '-').search(/\+-{20,}/);
-    if (at >= RIGHT_COLUMN_START) return true;
+    const line = raw.replace(/[‒-―−]/g, '-');
+    for (const match of line.matchAll(TABLE_MARK)) if (match.index >= RIGHT_COLUMN_START) return true;
+    // A left-column table with PROSE beside it (the JD-XA's p19, whose right column is the
+    // supplementary notes): an 80-character table line, closed, and more text after a gap.
+    if (/^\s{0,6}[|+].{70,84}[|+]\s{3,}\S/.test(line)) return true;
   }
   return false;
 }

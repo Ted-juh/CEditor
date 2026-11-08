@@ -107,6 +107,58 @@ test('the older documents\' em dashes read the same as hyphens', () => {
   assert.deepEqual([pitch.min, pitch.max, pitch.display], [40, 88, '-24 - +24']);
 });
 
+// The newer documents' grammar (JUNO-X, JUPITER-X, FANTOM, GAIA-2, AX-Edge), and the slips the
+// parser meets in Roland's own typesetting. Written for this test; the numbers are invented.
+const NEW_STYLE = `
+EXAMPLE-2 (ModelID = 00H 00H 00 65H)
++------------------------------------------------------------------------------+
+| Start       |                                                                |
+|     Address |                  Description                                   |
+|-------------+----------------------------------------------------------------|
+| 18 00 00 00 | Temporary Tone                                    [Tone]       |
+|-------------+----------------------------------------------------------------|
+Tone Common
++------------------------------------------------------------------------------+
+| Offset      |                                                                |
+|     Address |                  Description                                   |
+|-------------+----------------------------------------------------------------|
+|#      00 00 | 0000 aaaa |                                                    |
+|       00 01 | 0000 bbbb |                                                    |
+|       00 02 | 0000 cccc |                                                    |
+|       00 03 | 0000 dddd | Master Tune                            (24 - 2024) |    beside it, the other column
+|             |           |                                      -1000 - 1000 |
+|       00 04 | 0aaa aaaa | Assign 5                                  (0 - 99) |
+|       00 05 | 0aaa aaaa | Assign 6                                  (0 - 99) |
+|       00 04 | 0aaa aaaa | Assign 5                                  (0 - 99) |
+|       00 06 | 0aaa aaaa | Fade Width                                         |
+|             |           |                                           0 - 127 |
+|       00 07 | 0aaa aaaa | Reserved                                   (0 - 0) |
+|-------------+----------------------------------------------------------------|
+| 00 00 00 0C |Total Size                                                      |
++------------------------------------------------------------------------------+
+`;
+
+test('the newer documents\' grammar, and Roland\'s typesetting slips', () => {
+  const map = parseAddressMap(NEW_STYLE);
+  assert.equal(map.modelId, '00 00 00 65', 'a model id byte printed without its H is still a byte');
+  const top = map.tables.find((t) => t.kind === 'offsets');
+  assert.deepEqual(top.entries, [{ address: '18 00 00 00', name: 'Temporary Tone', table: 'Tone' }],
+    'the bracketed table name is a link, kept apart from the entry\'s name');
+
+  const tone = map.tables.find((t) => t.name === 'Tone Common');
+  assert.ok(tone, 'a heading set without its asterisk still names the table under it (and a separator closed the one before)');
+  const live = tone.rows.filter((r) => !r.reserved);
+  const tune = live.find((r) => r.name === 'Master Tune');
+  assert.equal(tune.offset, '00 00');
+  assert.equal(tune.nibbles, 4, 'each packet printed with its own offset is still one four-packet value');
+  assert.deepEqual(live.map((r) => r.name), ['Master Tune', 'Assign 5', 'Assign 6', 'Fade Width'],
+    'a row the manual prints twice is one parameter');
+  assert.equal(tone.repeatedRows, 1);
+  const fade = live.find((r) => r.name === 'Fade Width');
+  assert.deepEqual([fade.min, fade.max, fade.rangeFromDisplay], [0, 127, true], 'a range printed only beneath');
+  assert.deepEqual(checkTables(map.tables), [], 'a closing Reserved row stands for the bytes up to Total Size');
+});
+
 test('a display line becomes labels only when it counts out', () => {
   const row = (min, max, display, extra = {}) => ({ min, max, display, ...extra });
   assert.deepEqual(interpretRow(row(0, 2, 'LPF, HPF, BPF')).labels, ['LPF', 'HPF', 'BPF']);
@@ -131,7 +183,9 @@ test('addresses add in 7-bit digits, with carry', () => {
 
 /* ------------------------------------------------------------------ the profiles */
 
-const BUILT = await Promise.all(SYNTHS.map((name) => build(name)));
+// ROLAND_SYNTH=jd-xa,juno-ds checks just those layouts — for working on one while another is open.
+const ONLY = process.env.ROLAND_SYNTH ? process.env.ROLAND_SYNTH.split(',') : null;
+const BUILT = await Promise.all(SYNTHS.filter((name) => !ONLY || ONLY.includes(name)).map((name) => build(name)));
 
 test('there is at least one Roland profile built from a manual', () => {
   assert.ok(BUILT.length >= 1);

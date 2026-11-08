@@ -42,8 +42,10 @@ function cellsOf(line) {
   const trimmed = line.trim();
   if (!trimmed.startsWith('|')) return null;
   const parts = trimmed.split('|');
-  // A row ends in '|', so split leaves an empty string at each end.
-  const cells = parts.slice(1, parts.at(-1) === '' ? -1 : undefined);
+  // A row ends in '|', so split leaves an empty string at each end. Anything after the last '|' is
+  // not a cell — it is the other column's text, run onto the line when a page's columns were not
+  // separated — and is dropped rather than read as a fourth column.
+  const cells = parts.slice(1, -1);
   // A bare `|` (a border clipped at a page edge) has no cells and nothing to say.
   return cells.length ? cells : null;
 }
@@ -106,12 +108,19 @@ export function parseAddressMap(text) {
   let modelId = null;
   let page = 1;
   let heading = null;
+  let titleLine = null;
+  let afterTableLine = false;
   let table = null;
   let row = null;
 
   const closeRow = () => {
     if (!row) return;
-    table.rows.push(row);
+    // An exact repeat of a row already in the table — same offset, same name — is a slip in the
+    // manual, not a second parameter: the AX-Edge's prints `00 09 Assignable Button(5) Function`
+    // again after Buttons 6, 7 and 8. Kept once; the repeats are counted so a reader can see them.
+    const repeat = row.offset && table.rows.some((r) => !r.gap && r.offset === row.offset && r.name === row.name);
+    if (repeat) table.repeatedRows = (table.repeatedRows ?? 0) + 1;
+    else table.rows.push(row);
     row = null;
   };
   const closeTable = () => {
@@ -127,22 +136,52 @@ export function parseAddressMap(text) {
     // alike: `(0 — 127)`, `—63 — +63`. One character class, folded before anything reads the line.
     const line = rawLine.replace(/\f/g, '').replace(/[‒-―−]/g, '-');
 
-    const model = /ModelID\s*=\s*((?:[0-9A-F]{2}H\s*)+)/i.exec(line);
+    // `(ModelID = 00H 00H 00H 0EH)`. Read up to the closing bracket, with the H optional: the
+    // AX-Edge and JUPITER-X documents both print `00H 00H 00 65H`, and stopping at the first byte
+    // without its H gave a two-byte model id that addresses nothing.
+    const model = /ModelID\s*=\s*((?:[0-9A-F]{2}H?\s*)+)\)/i.exec(line);
     if (model && !modelId) {
       modelId = model[1].trim().split(/\s+/).map((b) => b.replace(/H$/i, '').toUpperCase()).join(' ');
       heading = line.trim().replace(/^\d+\.\s*/, '');
     }
 
+    const text = line.trim();
     if (isBorder(line)) {
-      if (table) closeTable();
-      else table = { name: heading ?? '(unnamed)', page, kind: null, entries: [], rows: [], totalSize: null };
+      // A border straight after a table line closes that table. A border after anything else —
+      // a heading set without its asterisk, a page number — cannot be closing a table that has
+      // already stopped: the open one ended on a separator (the FA-06/07/08 does this), and this
+      // border opens the next. A headless one that merely carries a table over a page break is
+      // joined back onto it once everything is read (joinContinuations, below).
+      if (table && afterTableLine) closeTable();
+      else {
+        closeTable();
+        table = { name: heading ?? titleLine ?? '(unnamed)', page, kind: null, entries: [], rows: [], totalSize: null };
+      }
       heading = null;
+      titleLine = null;
+      afterTableLine = true;
       continue;
     }
+    if (text) afterTableLine = text.startsWith('|');
+    // Some documents set a table's heading without the asterisk — the FA-06/07/08's
+    // `PCM Synth Tone Common` sits alone on the line above its border. Remember the last short,
+    // title-like line, and use it only when no starred heading came first.
+    if (text && !text.startsWith('|')) {
+      titleLine = /^[A-Z][A-Za-z0-9 ()/&+\-]{2,59}$/.test(text) && !/\s(is|are|the|of|to)\s/i.test(text) ? text : null;
+    }
 
+    const h = headingOf(line);
     if (!table) {
-      const h = headingOf(line);
       if (h) heading = h;
+      continue;
+    }
+    // A heading while a table is open means the open table has ended without its bottom border —
+    // the FA-06/07/08's top table closes on a `|----+----|` separator and the next line is
+    // `* System`. Inside a table every line starts with `|`, and a table carried over a column or
+    // page break resumes with a row, never a heading, so this cannot cut one in two.
+    if (h) {
+      closeTable();
+      heading = h;
       continue;
     }
 
@@ -164,9 +203,13 @@ export function parseAddressMap(text) {
       const address = cells[0].trim();
       const name = cells[1].trim();
       table.kind ??= 'offsets';
+      // The newer documents end an entry with the table it points to — `Tone Partial 1
+      // [Tone Partial]` — which is a link, not part of the name: kept apart as `table`.
+      const linked = /^(.*?)\s*\[([^\]]+)\]$/.exec(name);
+      const entry = linked ? { name: linked[1].replace(/\s+/g, ' '), table: linked[2].trim() } : { name: name.replace(/\s+/g, ' ') };
       if (address === ':') table.entries.push({ gap: true });
-      else if (HEX_BYTES.test(address)) table.entries.push({ address, name });
-      else if (name && table.entries.length) table.entries.at(-1).name += ` ${name}`;
+      else if (HEX_BYTES.test(address)) table.entries.push({ address, ...entry });
+      else if (name && table.entries.length) table.entries.at(-1).name += ` ${entry.name}`;
       continue;
     }
 
@@ -185,13 +228,21 @@ export function parseAddressMap(text) {
       }
 
       const offsetMatch = /^(#?)\s*((?:[0-9A-F]{2} ?)+)$/.exec(offsetCell);
-      if (offsetMatch) {
+      // The newer documents (JUNO-X, JUPITER-X, FANTOM, GAIA-2) print every packet of a `#` value
+      // with its OWN offset — `#00 00 | 0000 aaaa`, `00 01 | 0000 bbbb`, … `00 03 | 0000 dddd |
+      // Master Tune` — where the older ones leave the offset cell blank after the first. A row whose
+      // bits continue the letters of an open, still-unnamed packet row is that row's next packet.
+      const continuesPacket = offsetMatch && !offsetMatch[1] && row?.packets && row.name === null
+        && /^0000 [b-h]{4}$/.test(bits) && row.bits.length > 0;
+      if (continuesPacket) {
+        row.bits.push(bits);
+      } else if (offsetMatch) {
         closeRow();
         row = { offset: offsetMatch[2].trim(), bits: bits ? [bits] : [], name: null, display: [] };
         if (offsetMatch[1]) row.packets = true;
       } else if (!row) {
         continue; // a continuation with nothing to continue: header debris
-      } else if (bits) {
+      } else if (bits && !continuesPacket) {
         row.bits.push(bits);
       }
 
@@ -214,14 +265,28 @@ export function parseAddressMap(text) {
     }
   }
   closeTable();
+  joinContinuations(tables);
 
   for (const t of tables) {
     for (const r of t.rows) {
       if (r.gap) continue;
-      // `(reserve) <*>` in the JD-Xi, `(reserved)` in the GAIA.
-      if (/^\(reserved?\)/i.test(r.name ?? '') || /<\*>/.test(r.name ?? '')) r.reserved = true;
+      // `(reserve) <*>` in the JD-Xi, `(reserved)` in the GAIA, `Reserved (0 - 0)` in the JUNO-X.
+      if (/^\(?reserved?\)?(\s*\d*)?$/i.test(r.name ?? '') || /<\*>/.test(r.name ?? '')) r.reserved = true;
       r.display = r.display.join(' ').replace(/\s+/g, ' ').trim();
       if (!r.display) delete r.display;
+      // A few rows print no bracketed range at all, only the display line beneath — the JD-XA's
+      // `Keyboard Fade Width Lower … 0 - 127`. When that line is a bare integer range and nothing
+      // else, it IS the range; `rangeFromDisplay` says where it was found.
+      const bare = !r.reserved && r.min === undefined && /^(-?\d+) - (-?\d+)$/.exec(r.display ?? '');
+      if (bare) {
+        r.min = Number(bare[1]);
+        r.max = Number(bare[2]);
+        r.rangeFromDisplay = true;
+        delete r.display;
+      }
+      // A row printed with no name and no range at all (the FA-06/07/08's Drum Kit Common, 00 0D
+      // to 00 10) is a byte the manual does not describe: it occupies its address and is no control.
+      if (r.name === null && r.min === undefined && !r.display) { r.reserved = true; r.undocumented = true; }
       if (r.bits.length > 1) r.nibbles = r.bits.length;
     }
     t.rows = expandSeries(t.rows, (r) => r.offset, (r, offset) => ({ ...r, offset }), (r) => !r.reserved);
@@ -306,6 +371,23 @@ function fillBetween(twoBefore, before, after, addressOf, withAddress) {
   return rows;
 }
 
+/**
+ * A table carried over a page break that the document re-opens with a fresh border and header, and
+ * no heading, comes out as an `(unnamed)` table right after one with no Total Size yet: it is that
+ * table's second half, and its rows go back where they belong.
+ */
+function joinContinuations(tables) {
+  for (let i = tables.length - 1; i > 0; i--) {
+    const t = tables[i];
+    const before = tables[i - 1];
+    if (t.name !== '(unnamed)' || t.entries.length || before.kind !== 'parameters' || before.totalSize) continue;
+    before.rows.push(...t.rows);
+    before.totalSize = t.totalSize;
+    if (t.repeatedRows) before.repeatedRows = (before.repeatedRows ?? 0) + t.repeatedRows;
+    tables.splice(i, 1);
+  }
+}
+
 /* ------------------------------------------------------------------ checks */
 
 const toBytes = (hex) => hex.trim().split(/\s+/).map((b) => parseInt(b, 16));
@@ -330,6 +412,7 @@ export function checkTables(tables) {
     if (!t.totalSize) { issues.push(`${t.name} (p${t.page}): no Total Size row`); continue; }
     let previousEnd = 0;
     let lastEnd = 0;
+    let lastReserved = false;
     for (const r of t.rows) {
       if (r.gap) { previousEnd = -1; continue; }
       const start = flat(r.offset);
@@ -337,8 +420,13 @@ export function checkTables(tables) {
       const end = start + (r.nibbles ?? 1);
       previousEnd = end;
       lastEnd = end;
+      lastReserved = Boolean(r.reserved);
       if (!r.reserved && r.min === undefined) issues.push(`${t.name}: ${r.offset} "${r.name}" has no (min - max)`);
     }
+    // The newer documents close a block with ONE `Reserved` row standing for every byte left up to
+    // Total Size (FANTOM's Analog Filter: `00 23 Reserved`, size 00 28). Ending short behind a
+    // reserve is that, not a lost row; ending short behind a live parameter, or past the size, is not.
+    if (lastReserved && lastEnd < flat(t.totalSize)) lastEnd = flat(t.totalSize);
     if (lastEnd !== flat(t.totalSize)) {
       issues.push(`${t.name}: rows end at ${lastEnd}, Total Size says ${flat(t.totalSize)} (${t.totalSize})`);
     }
