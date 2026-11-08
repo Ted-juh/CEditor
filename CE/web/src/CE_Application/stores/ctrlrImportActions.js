@@ -9,7 +9,9 @@
 //   S2  harvest  its modulators as a device profile, saved into the engine as a new profile
 //                (DeviceProfileService gives it a file of its own on its first save)
 //   S3  rebuild  its components as controls on a new panel, bound to that profile's parameters
-//   S4  Lua      reported, never run: each method's text goes into the panel's notes, to port by hand
+//   S4  Lua      a control whose MIDI the panel's Lua sends is run, in CEditor's Lua against a stand-in
+//                for Ctrlr (ctrlrImport/learn.js), and what it sends becomes a parameter where the bytes
+//                follow from its value; every method's text also goes into the panel's notes
 //
 // What could not be converted is said, not hidden: the notice counts it and the Console and the
 // panel's "Ctrlr import" note list each thing and why. The new panel is unsaved until it is saved.
@@ -25,6 +27,17 @@ import { formatReport, readCtrlrPanel } from '../ctrlrImport/read.js';
 import { harvestProfile } from '../ctrlrImport/harvest.js';
 import { planReconstruction } from '../ctrlrImport/reconstruct.js';
 import { buildCtrlrPanel } from '../ctrlrImport/buildPanel.js';
+import { learnFromLua } from '../ctrlrImport/learn.js';
+import luaWasmUrl from 'wasmoon/dist/glue.wasm?url';
+
+/**
+ * A fresh Lua engine for learning (not the panel scripts' shared one): wasmoon, with the wasm the
+ * bundle ships; under node (tests, no window) wasmoon finds its own.
+ */
+async function createLearningEngine() {
+  const { LuaFactory } = await import('wasmoon');
+  return new LuaFactory(typeof window === 'undefined' ? undefined : luaWasmUrl).createEngine();
+}
 
 // A Ctrlr-made program is tens of megabytes (the JD-990 Super Editor's is 57 MB).
 const READ_TIMEOUT_MS = 180000;
@@ -52,7 +65,23 @@ export function importReportNote(fileName, { harvest, plan }) {
   if (harvest?.ok) {
     const { report } = harvest;
     lines.push(`Device profile: ${report.converted} of the ${report.sending} controls that send MIDI themselves became parameters of "${harvest.profile.name}" (${harvest.profile.id}), each checked to send what Ctrlr sends.`);
-    if (report.sendsFromLua.length) lines.push(`${report.sendsFromLua.length} control(s) send nothing of their own: Lua sends for them when they change (Ctrlr Lua note), and none of that runs here yet.`);
+    const lua = report.lua;
+    if (lua?.learned.length) {
+      const asLoaded = lua.learned.filter((l) => l.reads);
+      lines.push(`${lua.learned.length} control(s) whose MIDI the panel's Lua sends became parameters too: each one's Lua was run through its values here, and the parameter sends exactly what the Lua sent, for every value.`);
+      const readsOnly = lua.learned.filter((l) => l.readsOnly);
+      if (readsOnly.length) lines.push(`${readsOnly.length} of them read other controls too, but sent the same bytes however those were set: the import moved them to see.`);
+      if (asLoaded.length) {
+        lines.push(`${asLoaded.length} of them were learned as the panel loads: their Lua also reads other controls, and sends what it sent with those as they load.`);
+        for (const l of asLoaded) lines.push(`- as loaded: ${l.name} — reads ${l.reads.join(', ')}`);
+      }
+    }
+    const remaining = report.sendsFromLua.length - (lua?.learned.length ?? 0) - (lua?.silent ?? 0);
+    if (remaining > 0) lines.push(`${remaining} control(s) send nothing of their own and their Lua was not learned (Ctrlr Lua note); that Lua does not run here yet.`);
+    for (const n of lua?.notLearned ?? []) lines.push(`- not learned: ${n.name} — ${n.reason}`);
+    if (lua?.silent) lines.push(`${lua.silent} control(s) have Lua that sends nothing when they move.`);
+    if (lua?.notRead?.length) lines.push(`${lua.notRead.length} Lua method(s) keep their code in files beside the panel, which the import was not given: ${lua.notRead.join(', ')}.`);
+    if (lua?.error) lines.push(`The panel's Lua could not be run: ${lua.error}`);
     if (report.silent) lines.push(`${report.silent} component(s) send nothing at all: labels, groups, pictures.`);
     for (const flag of report.flagged) lines.push(`- not converted: ${flag.name || flag.id} — ${flag.reason}`);
     for (const note of report.notes) lines.push(`- note: ${note}`);
@@ -84,7 +113,7 @@ export function luaNote(luaMethods) {
  * Build and open a panel from a Ctrlr panel file's bytes. Returns `{ panel, profileId }`, or null
  * with the reason already reported. `saveProfile` is how the harvested profile reaches the engine.
  */
-export async function importCtrlrPanelBytes(bytes, fileName = '', { saveProfile = saveProfileSource } = {}) {
+export async function importCtrlrPanelBytes(bytes, fileName = '', { saveProfile = saveProfileSource, createLuaEngine = createLearningEngine } = {}) {
   const label = String(fileName ?? '').split(/[\\/]/).pop() || 'the Ctrlr panel';
   const read = readCtrlrPanel(bytes);
   for (const line of formatReport(read, label).split('\n')) cinfo(`[ctrlr import] ${line}`);
@@ -100,6 +129,22 @@ export async function importCtrlrPanelBytes(bytes, fileName = '', { saveProfile 
   const first = harvestProfile(read);
   const taken = (get(deviceProfiles) ?? []).map((profile) => profile?.id);
   const harvest = first.ok ? harvestProfile(read, { id: unusedProfileId(first.profile.id, taken) }) : first;
+
+  // S4: controls whose MIDI the Lua sends, learned by running it.
+  if (harvest.ok && harvest.report.sendsFromLua.length && createLuaEngine) {
+    notify(`${label}: learning what the panel's Lua sends…`, { kind: 'info', duration: 4000 });
+    try {
+      const learned = await learnFromLua(read, harvest, { createEngine: createLuaEngine });
+      harvest.report.lua = learned.ok
+        ? { learned: learned.learned, notLearned: learned.notLearned, silent: learned.silent, notRead: learned.load.notRead, loadErrors: learned.load.errors }
+        : { learned: [], notLearned: [], silent: 0, error: learned.error };
+      for (const error of learned.load?.errors ?? []) cwarn(`[ctrlr import]   Lua: ${error}`);
+      if (learned.ok) cinfo(`[ctrlr import] ${learned.learned.length} control(s) learned from what their Lua sends; ${learned.notLearned.length} not`);
+    } catch (error) {
+      harvest.report.lua = { learned: [], notLearned: [], silent: 0, error: error.message };
+      cwarn('[ctrlr import] the panel\'s Lua could not be run:', error.message);
+    }
+  }
   let profileId = '';
   if (harvest.ok && harvest.profile.parameters.length) {
     profileId = harvest.profile.id;

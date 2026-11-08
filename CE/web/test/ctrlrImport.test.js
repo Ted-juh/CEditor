@@ -157,7 +157,7 @@ test('message types are numbers, sometimes decimals, in a few old panels names',
   assert.equal(messageTypeName('CC'), 'CC');
   assert.equal(messageTypeName(''), 'None');
   assert.equal(messageTypeName('42'), '');
-  assert.deepEqual(read().histograms.messageType, { CC: 10, None: 6, SysEx: 4, Multi: 2, ProgramChange: 1 });
+  assert.deepEqual(read().histograms.messageType, { CC: 10, None: 13, SysEx: 4, Multi: 2, ProgramChange: 1 });
 });
 
 test('a method that draws is paint even when no hook says so; a method name cannot claim every hook', () => {
@@ -250,7 +250,7 @@ test('what is refused says why, and what Lua sends is counted, not refused', () 
   assert.match(reasons['Computed Dump'], /runs a Lua method/);
   assert.match(reasons.Program, /program change/);
   assert.match(reasons['Packed Bits'], /cannot be read/);
-  assert.deepEqual(report.sendsFromLua, ['Patch']);
+  assert.deepEqual(report.sendsFromLua, ['Patch', 'Roland', 'NRPN', 'Mode', 'Depth', 'Bits', 'Broken', 'File']);
   assert.equal(report.converted, 14);
   assert.equal(report.sending, 17);
 });
@@ -410,7 +410,7 @@ test('the File menu import: a profile for the engine, a panel bound to it, and t
   });
   assert.ok(result, 'the import went through');
   assert.equal(saved.length, 1);
-  assert.equal(saved[0].profile.parameters.length, 14);
+  assert.equal(saved[0].profile.parameters.length, 19, '14 from the modulators\' own MIDI, 5 learned from their Lua');
 
   const panel = get(activePanel);
   assert.equal(panel, result.panel);
@@ -419,7 +419,11 @@ test('the File menu import: a profile for the engine, a panel bound to it, and t
 
   const [report, lua] = panel.notepad.notes;
   assert.match(report.content, /14 of the 17 controls that send MIDI themselves became parameters/);
-  assert.match(report.content, /1 control\(s\) send nothing of their own: Lua sends for them/);
+  assert.match(report.content, /5 control\(s\) whose MIDI the panel's Lua sends became parameters too/);
+  assert.match(report.content, /1 of them were learned as the panel loads/);
+  assert.match(report.content, /as loaded: Lua Depth — reads modulator Lua Mode/);
+  assert.match(report.content, /not learned: Patch Select — its Lua moves "Pan", which sends MIDI of its own/);
+  assert.match(report.content, /not learned: Lua From File — its Lua method fromFile is kept in a file beside the panel/);
   assert.match(report.content, /not converted: Program — a program change/);
   assert.equal(lua.name, 'Ctrlr Lua');
   assert.match(lua.content, /-- sendThing \[shimmable\] called by: luaModulatorValueChange ×2/);

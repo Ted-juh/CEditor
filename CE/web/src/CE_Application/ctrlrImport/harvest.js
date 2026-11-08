@@ -34,7 +34,7 @@ import { compileForwardExpression } from './expression.js';
 const MAX_DOMAIN = 65536;
 // The longest wire table written into a profile: a formula with branches over 0..4095 at most.
 const MAX_TABLE = 4096;
-const NO_METHOD = new Set(['', '-- None', '--None', 'None']);
+export const NO_METHOD = new Set(['', '-- None', '--None', 'None']);
 
 export const slug = (text) => String(text ?? '')
   .trim()
@@ -628,9 +628,42 @@ export function harvestModulator(node, ctx = {}) {
   const defaultValue = Math.min(domain.at(-1), Math.max(domain[0], Math.round(rawValue)));
 
   const fixedChannel = attrBool(midi, 'midiMessageChannelOverride', false);
-  const channelNumber = fixedChannel ? Math.min(16, Math.max(1, attrNumber(midi, 'midiMessageChannel', 1))) : (ctx.panel?.outputChannel ?? 1);
+  const built = buildParameter({
+    id, name, label, group: ctx.group, type,
+    number: attrNumber(midi, 'midiMessageCtrlrNumber', -1),
+    formula: attr(midi, 'midiMessageSysExFormula', ''),
+    multiList: attr(midi, 'midiMessageMultiList', ''),
+    fixedChannel,
+    channelNumber: fixedChannel ? Math.min(16, Math.max(1, attrNumber(midi, 'midiMessageChannel', 1))) : (ctx.panel?.outputChannel ?? 1),
+    globals: ctx.panel?.globals,
+    list, domain, wires,
+    wireAt: (v) => (list.length && compiled.identity ? list[v].value : compiled.forward(v)),
+    expression, defaultValue, step,
+    uiType: String(attr(component, 'uiType', '')).toLowerCase(),
+    ctrlr: {
+      modulator: name,
+      messageType: type,
+      ...(source && !compiled.identity ? { valueExpression: source } : {}),
+      vstIndex: attrNumber(node, 'vstIndex', -1),
+      vstExported: attrBool(node, 'modulatorVstExported', false),
+    },
+  });
+  return built.ok ? built : flag(built.reason);
+}
+
+/**
+ * A parameter from what a control sends: the message (a CC number, a SysEx formula in Ctrlr's
+ * codes, or a Multi list), and the wire value of each of the control's values. A modulator's own
+ * MIDI comes here (harvestModulator), and so does what a control's Lua was seen to send (learn.js),
+ * so both are held to the same encodings and the same checks. `{ ok, parameter, recipe, variables,
+ * notes }` or `{ ok: false, reason }`.
+ */
+export function buildParameter({
+  id, name, label, group, type, number = -1, formula = '', multiList = '', fixedChannel = false, channelNumber = 1, globals,
+  list = [], domain, wires, wireAt, expression, defaultValue, step = 1, uiType = '', ctrlr = {}, inbound = true,
+}) {
+  const flag = (reason) => ({ ok: false, reason });
   const channel = fixedChannel ? channelNumber : '$channel';
-  const number = attrNumber(midi, 'midiMessageCtrlrNumber', -1);
 
   let recipe;
   let encoding;
@@ -644,7 +677,7 @@ export function harvestModulator(node, ctx = {}) {
     // juce::MidiMessage::controllerEvent: value & 127. A negative value goes out as its low 7 bits.
     encoding = { type: 'u7', max: 127, mask: 0x7f };
   } else if (type === 'SysEx') {
-    const sysex = readSysexFormula(attr(midi, 'midiMessageSysExFormula', ''), { channel: channelNumber, channelFixed: fixedChannel, globals: ctx.panel?.globals });
+    const sysex = readSysexFormula(formula, { channel: channelNumber, channelFixed: fixedChannel, globals });
     if (!sysex.ok) return flag(sysex.reason);
     recipe = { kind: 'sysex', template: sysex.template, ...(sysex.checksum ? { checksum: sysex.checksum } : {}) };
     encoding = sysex.encoding;
@@ -653,7 +686,7 @@ export function harvestModulator(node, ctx = {}) {
     variables = sysex.variables;
     notes = sysex.notes;
   } else {
-    const multi = readMultiList(attr(midi, 'midiMessageMultiList', ''), { number, channel });
+    const multi = readMultiList(multiList, { number, channel });
     if (!multi.ok) return flag(multi.reason);
     recipe = multi.recipe;
     encoding = multi.encoding;
@@ -662,15 +695,14 @@ export function harvestModulator(node, ctx = {}) {
   // What Ctrlr's own code does to the value on its way into the message (VALUE_RUNS, the CC mask).
   const mask = (w) => (encoding?.mask !== undefined ? w & encoding.mask : w);
   const masked = encoding?.mask !== undefined ? wires.map(mask) : wires;
-  const wireAt = (v) => mask(list.length && compiled.identity ? list[v].value : compiled.forward(v));
-  const uiType = String(attr(component, 'uiType', '')).toLowerCase();
-  const value = representValue({ domain, wires: masked, wireAt, list, encoding, expression, defaultValue, fixed, masked: masked !== wires, uiType });
+  const maskedAt = (v) => mask(wireAt(v));
+  const value = representValue({ domain, wires: masked, wireAt: maskedAt, list, encoding, expression, defaultValue, fixed, masked: masked !== wires, uiType });
   if (!value.ok) return flag(value.reason);
 
   const parameter = {
     id,
     name: label,
-    group: ctx.group ?? 'Imported',
+    group: group ?? 'Imported',
     ...value.fields,
     ...(address ? { address } : {}),
     display: { mode: value.fields.type === 'choice' ? 'choice' : 'number', shortLabel: label, ...(value.fields.display ?? {}) },
@@ -678,16 +710,9 @@ export function harvestModulator(node, ctx = {}) {
     access: { canRead: type === 'CC', canWrite: true, realtimeSafe: true, source: 'singleParameter' },
     sendPolicy: { mode: 'continuous', coalesce: true, minIntervalMs: 20, sendFinalOnRelease: true },
     ui: { preferredComponent: value.fields.type === 'choice' ? 'Combobox' : 'Knob', ...(step !== 1 ? { step } : {}) },
-    ...(type === 'CC' ? { inbound: [{ kind: 'cc', controller: number }] } : {}),
+    ...(type === 'CC' && inbound ? { inbound: [{ kind: 'cc', controller: number }] } : {}),
     // Kept so a human reading the profile can find the modulator it came from. The engine ignores it.
-    ctrlr: {
-      modulator: name,
-      messageType: type,
-      ...(source && !compiled.identity ? { valueExpression: source } : {}),
-      vstIndex: attrNumber(node, 'vstIndex', -1),
-      vstExported: attrBool(node, 'modulatorVstExported', false),
-      ...(notes.length ? { notes } : {}),
-    },
+    ctrlr: { ...ctrlr, ...(notes.length ? { notes } : {}) },
   };
   return { ok: true, parameter, recipe, variables, notes };
 }
@@ -803,4 +828,37 @@ export function harvestProfile(read, { id = '', group = 'Imported' } = {}) {
       coverage: sending ? parameters.length / sending : 0,
     },
   };
+}
+
+/**
+ * Add parameters made elsewhere (learn.js: what a control's Lua was seen to send) to a harvest, as
+ * harvestProfile adds its own: recipes shared by content, ids unique, each control's node mapped to
+ * its parameter for the rebuild. `entries`: [{ node, built }] with built from buildParameter.
+ */
+export function addParameters(harvest, entries) {
+  const profile = harvest.profile;
+  const recipes = new Map(profile.messageRecipes.map((recipe) => {
+    const { id: recipeId, ...rest } = recipe;
+    return [recipeKey(rest), recipe];
+  }));
+  const takenRecipeIds = new Set(profile.messageRecipes.map((recipe) => recipe.id));
+  const seen = new Set(profile.parameters.map((parameter) => parameter.id));
+  for (const { node, built } of entries) {
+    const key = recipeKey(built.recipe);
+    if (!recipes.has(key)) {
+      const recipeId = recipeIdFor(built.recipe, takenRecipeIds);
+      takenRecipeIds.add(recipeId);
+      const recipe = { id: recipeId, ...built.recipe };
+      recipes.set(key, recipe);
+      profile.messageRecipes.push(recipe);
+    }
+    Object.assign(profile.variables, built.variables);
+    let unique = built.parameter.id || 'modulator';
+    let n = 2;
+    while (seen.has(unique)) { unique = `${built.parameter.id}.${n}`; n += 1; }
+    seen.add(unique);
+    harvest.parameterIdOf.set(node, unique);
+    profile.parameters.push({ ...built.parameter, id: unique, messageRecipe: recipes.get(key).id });
+  }
+  return harvest;
 }

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- A HAND-BUILT fixture in the format real Ctrlr panels are written in.
      Not a community panel: those belong to their authors and are not committed here. Every attribute
-     and value form below was seen in the 421 public panels surveyed for the importer (see
+     and value form below was seen in the 482 public panels surveyed for the importer (see
      docs/design/ctrlr-import-plan.md, "What real panels showed"): message types as NUMBERS, colours
      as 0xAARRGGBB, the visible name in componentVisibleName, Lua in luaMethodCode, controls inside a
      group and on a tab page positioned relative to them, layers, a picture in JUCE's base64. Each
@@ -22,6 +22,13 @@
         <luaMethod luaMethodName="onLoad" luaMethodCode="function onLoad()&#10;  console(&quot;loaded&quot;)&#10;end"/>
         <luaMethod luaMethodName="paintBg" luaMethodCode="function paintBg(mod, g)&#10;  g:fillAll(Colour(0xff000000))&#10;end"/>
         <luaMethod luaMethodName="sendThing" luaMethodCode="function sendThing(mod, value)&#10;  panel:getModulatorByName(&quot;Pan&quot;):setValue(value, false)&#10;end"/>
+        <luaMethod luaMethodName="sendRoland" luaMethodCode="-- A Roland DT1 built by hand: the device id from the panel's channel, a checksum over the&#10;-- address and the value, as Ctrlr panels write them.&#10;function sendRoland(mod, value)&#10;  local ch = panel:getProperty(&quot;panelMidiOutputChannelDevice&quot;) - 1&#10;  local addr = { 0x03, 0x00, 0x10 }&#10;  local sum = addr[1] + addr[2] + addr[3] + value&#10;  local cs = (128 - (sum % 128)) % 128&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage({ 0xF0, 0x41, 0x10 + ch, 0x00, 0x00, 0x00, 0x1D, 0x12,&#10;    addr[1], addr[2], addr[3], value, cs, 0xF7 }))&#10;end"/>
+        <luaMethod luaMethodName="sendNrpn" luaMethodCode="-- An NRPN as four CCs, written as hex text the way Lua 5.1 lets you: value / 128 has a fraction,&#10;-- and %02x drops it.&#10;function sendNrpn(mod, value)&#10;  local ch = panel:getProperty(&quot;panelMidiOutputChannelDevice&quot;) - 1&#10;  local cc = string.format(&quot;%x&quot;, 0xB0 + ch)&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage(string.format(&quot;%s 63 %02x&quot;, cc, 1)))&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage(string.format(&quot;%s 62 %02x&quot;, cc, 20)))&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage(string.format(&quot;%s 06 %02x&quot;, cc, value / 128)))&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage(string.format(&quot;%s 26 %02x&quot;, cc, value % 128)))&#10;end"/>
+        <luaMethod luaMethodName="sendMode" luaMethodCode="function sendMode(mod, value)&#10;  local ch = panel:getProperty(&quot;panelMidiOutputChannelDevice&quot;) - 1&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage({ 0xB0 + ch, 30, mod:getValueMapped() }))&#10;end"/>
+        <luaMethod luaMethodName="sendDepth" luaMethodCode="-- Reads another control: what it sends depends on where &quot;Lua Mode&quot; is.&#10;function sendDepth(mod, value)&#10;  local ch = panel:getProperty(&quot;panelMidiOutputChannelDevice&quot;) - 1&#10;  local mode = panel:getModulatorByName(&quot;Lua Mode&quot;):getValue()&#10;  if mode == 2 then value = 127 - value end&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage({ 0xB0 + ch, 31, value }))&#10;end"/>
+        <luaMethod luaMethodName="sendBits" luaMethodCode="function sendBits(mod, value)&#10;  local b = BigInteger(0)&#10;  b:setBitRangeAsInt(0, 4, value)&#10;  local m = MemoryBlock({ 0xF0, 0x43, 0x10, 0x7F, 0x00, 0xF7 })&#10;  m:setByte(4, bit.band(b:toInteger(), 0x0F))&#10;  panel:sendMidiMessageNow(CtrlrMidiMessage(m))&#10;end"/>
+        <luaMethod luaMethodName="sendBroken" luaMethodCode="function sendBroken(mod, value)&#10;  local m = MemoryBlock(4)&#10;  m:notAMethod(value)&#10;end"/>
+        <luaMethod luaMethodName="fromFile" luaMethodSourcePath="C:\\Users\\somebody\\panel\\lua\\fromFile.lua" luaMethodSource="1"/>
       </luaMethodGroup>
     </luaManagerMethods>
   </luaManager>
@@ -185,5 +192,35 @@
   <modulator name="Broken Rect" modulatorValue="0">
     <midi midiMessageType="9"/>
     <component uiType="uiLabel" uiLabelText="?" componentRectangle="10 180"/>
+  </modulator>
+
+  <!-- Controls whose MIDI the panel's Lua sends (learn.js runs each through its values). -->
+  <modulator name="Lua Roland" modulatorMin="0" modulatorMax="127" modulatorValue="64" luaModulatorValueChange="sendRoland">
+    <midi midiMessageType="9"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="10 330 60 60" componentVisibleName="Roland" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Lua NRPN" modulatorMin="0" modulatorMax="1000" modulatorValue="0" luaModulatorValueChange="sendNrpn">
+    <midi midiMessageType="9"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="80 330 60 60" componentVisibleName="NRPN" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Lua Mode" modulatorValue="0" luaModulatorValueChange="sendMode">
+    <midi midiMessageType="9"/>
+    <component uiType="uiCombo" uiComboContent="Off=0&#10;Soft=10&#10;Hard=20" componentRectangle="150 330 80 24" componentVisibleName="Mode" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Lua Depth" modulatorMin="0" modulatorMax="127" modulatorValue="0" luaModulatorValueChange="sendDepth">
+    <midi midiMessageType="9"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="240 330 60 60" componentVisibleName="Depth" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Lua Bits" modulatorMin="0" modulatorMax="15" modulatorValue="0" luaModulatorValueChange="sendBits">
+    <midi midiMessageType="9"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="310 330 60 60" componentVisibleName="Bits" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Lua Broken" modulatorMin="0" modulatorMax="127" modulatorValue="0" luaModulatorValueChange="sendBroken">
+    <midi midiMessageType="9"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="380 330 60 60" componentVisibleName="Broken" componentLayerUid="aaaa1111fffeffff"/>
+  </modulator>
+  <modulator name="Lua From File" modulatorMin="0" modulatorMax="127" modulatorValue="0" luaModulatorValueChange="fromFile">
+    <midi midiMessageType="9"/>
+    <component uiType="uiSlider" uiSliderStyle="RotaryVerticalDrag" componentRectangle="450 330 60 60" componentVisibleName="File" componentLayerUid="aaaa1111fffeffff"/>
   </modulator>
 </panel>

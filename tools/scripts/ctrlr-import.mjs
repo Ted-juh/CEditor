@@ -1,7 +1,7 @@
 // ctrlr-import.mjs — read a Ctrlr panel, harvest a device profile, rebuild the panel.
 //
-//   node tools/scripts/ctrlr-import.mjs <file> [--profile out.json] [--panel out.cepanel] [--verify]
-//   node tools/scripts/ctrlr-import.mjs --corpus <directory> [--verify]
+//   node tools/scripts/ctrlr-import.mjs <file> [--profile out.json] [--panel out.cepanel] [--verify] [--no-lua]
+//   node tools/scripts/ctrlr-import.mjs --corpus <directory> [--verify] [--no-lua]
 //
 // <file> is anything the editor's File > New > From Ctrlr Panel… opens: a `.panel` (XML), a
 // `.bpanelz` or `.bpanel` (JUCE's binary tree, compressed or not), or a program Ctrlr exported —
@@ -16,6 +16,12 @@
 // engine and compared byte for byte with what Ctrlr sends for the same value — computed by
 // `CE/web/test/support/ctrlrReference.js`, a separate port of CtrlrX's byte-building code. A
 // mismatch means the profile would send something the panel's author never sent.
+//
+// A control whose MIDI the panel's Lua sends is LEARNED, as File > New > From Ctrlr Panel… does:
+// its Lua is run, in Lua 5.4 against a stand-in for Ctrlr (ctrlrImport/learn.js), and what it sent
+// becomes a parameter where the bytes follow from its value — checked against what the Lua sent,
+// for every value run. A method kept in a file beside the panel (luaMethodSourcePath) is looked for
+// there by its name. --no-lua leaves the Lua alone.
 //
 // --corpus walks a directory (recursively), reads every panel and program in it once (identical
 // files are counted once), and prints one line per file and the totals. Every throw is caught: a
@@ -33,6 +39,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = path.resolve(HERE, '../..');
@@ -42,18 +49,20 @@ const APP = path.join(WEB, 'src/CE_Application');
 // pathToFileURL, not a bare path: `await import('C:\\...')` is not a valid specifier on Windows,
 // and this is a tool that has to run wherever the packaging does.
 const load = (...parts) => import(pathToFileURL(path.join(...parts)).href);
+const webRequire = createRequire(path.join(WEB, 'package.json'));
 
 const PANEL_FILE = /\.(panel|bpanel|bpanelz)$/i;
 const PROGRAM_FILE = /\.(exe|dll|vst3|so|dylib|clap)$/i;
 
 function parseArgs(argv) {
-  const args = { file: '', profile: '', panel: '', corpus: '', verify: false };
+  const args = { file: '', profile: '', panel: '', corpus: '', verify: false, lua: true };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--profile') { args.profile = argv[++i] ?? ''; continue; }
     if (arg === '--panel') { args.panel = argv[++i] ?? ''; continue; }
     if (arg === '--corpus') { args.corpus = argv[++i] ?? ''; continue; }
     if (arg === '--verify') { args.verify = true; continue; }
+    if (arg === '--no-lua') { args.lua = false; continue; }
     if (!arg.startsWith('--') && !args.file) { args.file = arg; continue; }
   }
   return args;
@@ -91,11 +100,14 @@ async function verifyHarvest(read, harvest) {
   const result = { parameters: 0, values: 0, mismatches: [], invalid: '' };
   const { profile } = harvest;
   if (!profile.parameters.length) return result;
+  // Learned parameters were checked against what their Lua sent when they were learned; the
+  // reference reproduces Ctrlr's own MIDI, which those controls do not have.
   const validation = validateLocalProfileSource(profile.id, JSON.stringify(profile));
   if (!validation.ok) result.invalid = JSON.stringify(validation.validation ?? validation.error).slice(0, 300);
 
   const modulatorOf = new Map([...harvest.parameterIdOf].map(([node, id]) => [id, node]));
   for (const parameter of profile.parameters) {
+    if (parameter.ctrlr?.messageType === 'Lua') continue;
     result.parameters += 1;
     const modulator = modulatorOf.get(parameter.id);
     const component = (modulator.children ?? []).find((c) => c.name === 'component' || c.name === 'uiComponent');
@@ -135,6 +147,37 @@ function printVerify(check, indent = '') {
   }
 }
 
+
+/** A Lua method kept in a file beside the panel: looked for there, and below, by its file name. */
+function methodFinder(panelFile) {
+  const dir = path.dirname(path.resolve(panelFile));
+  const find = (base, d = dir, depth = 0) => {
+    if (depth > 3) return null;
+    let entries;
+    try { entries = readdirSync(d, { withFileTypes: true }); } catch { return null; }
+    for (const e of entries) if (e.isFile() && e.name === base) return path.join(d, e.name);
+    for (const e of entries) {
+      if (e.isDirectory() && e.name !== '.git' && e.name !== 'node_modules') {
+        const found = find(base, path.join(d, e.name), depth + 1);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+  return (method) => {
+    const found = find(String(method.file ?? '').split(/[\\/]/).pop());
+    return found ? readFileSync(found, 'utf8') : null;
+  };
+}
+
+/** Learn what the panel's Lua sends (ctrlrImport/learn.js), into the harvest. */
+async function learnLua(read, harvest, file) {
+  if (!harvest.report.sendsFromLua.length) return null;
+  const { learnFromLua } = await load(APP, 'ctrlrImport/learn.js');
+  const { LuaFactory } = webRequire('wasmoon');
+  return learnFromLua(read, harvest, { createEngine: () => new LuaFactory().createEngine(), methodSource: methodFinder(file) });
+}
+
 /**
  * Build a `.cepanel` from a reconstruction plan, with the builder the editor's File menu uses
  * (ctrlrImport/buildPanel.js), so the command line and the app make the same panel from one file.
@@ -155,7 +198,7 @@ function listFiles(directory, out = []) {
   return out;
 }
 
-async function reportCorpus(directory, { verify }) {
+async function reportCorpus(directory, { verify, lua }) {
   const { readCtrlrPanel, formatReport, harvestProfile } = await stages();
   const files = listFiles(directory).sort();
   if (files.length === 0) {
@@ -167,8 +210,10 @@ async function reportCorpus(directory, { verify }) {
   const t = {
     files: 0, duplicates: 0, read: 0, refused: 0, programsWithout: 0, threw: 0,
     sending: 0, converted: 0, luaDriven: 0, silent: 0, parameters: 0, values: 0, differ: 0, invalid: 0,
+    learned: 0, learnedAsLoaded: 0, notLearned: 0, luaSilent: 0,
   };
   const reasons = new Map();
+  const luaReasons = new Map();
 
   for (const file of files) {
     const label = path.relative(directory, file);
@@ -215,6 +260,25 @@ async function reportCorpus(directory, { verify }) {
     }
     let line = `${label}: ${report.converted}/${report.sending} sending controls converted`
       + `${report.sendsFromLua.length ? `, ${report.sendsFromLua.length} sent by Lua` : ''}`;
+    if (lua && report.sendsFromLua.length) {
+      try {
+        const learned = await learnLua(read, harvest, file);
+        if (learned?.ok) {
+          t.learned += learned.learned.length;
+          t.learnedAsLoaded += learned.learned.filter((l) => l.reads).length;
+          t.notLearned += learned.notLearned.length;
+          t.luaSilent += learned.silent;
+          for (const miss of learned.notLearned) {
+            const reason = miss.reason.replace(/"[^"]*"/g, '"…"').replace(/\d+/g, 'N').replace(/: .*$/, ': …');
+            luaReasons.set(reason, (luaReasons.get(reason) ?? 0) + 1);
+          }
+          line += ` (${learned.learned.length} learned from their Lua)`;
+        }
+      } catch (error) {
+        t.threw += 1;
+        console.log(`${label}: THREW while learning its Lua — ${error.message}`);
+      }
+    }
     if (verify) {
       try {
         const check = await verifyHarvest(read, harvest);
@@ -241,9 +305,19 @@ async function reportCorpus(directory, { verify }) {
     + `${t.programsWithout} program(s) with no panel inside, ${t.threw} threw`);
   console.log(`--- ${t.converted} of ${t.sending} controls that send MIDI themselves became parameters (${share(t.converted, t.sending)}); `
     + `${t.luaDriven} more are sent by Lua; ${t.silent} send nothing`);
+  if (lua) {
+    console.log(`--- Lua: ${t.learned} of the ${t.luaDriven} controls the Lua sends for became parameters (${share(t.learned, t.luaDriven)}), `
+      + `${t.learnedAsLoaded} of them as the panel loads; ${t.luaSilent} send nothing when moved; ${t.notLearned} not learned`);
+  }
   if (verify) {
     console.log(`--- verify: ${t.values} value(s) of ${t.parameters} parameter(s); ${t.differ} parameter(s) differ from Ctrlr; `
       + `${t.invalid} profile(s) do not validate`);
+  }
+  if (luaReasons.size) {
+    console.log('--- not learned from Lua, most common reasons:');
+    for (const [reason, count] of [...luaReasons].sort((a, b) => b[1] - a[1]).slice(0, 25)) {
+      console.log(`  ${String(count).padStart(6)}  ${reason}`);
+    }
   }
   if (reasons.size) {
     console.log('--- not converted, most common reasons:');
@@ -260,8 +334,8 @@ async function main() {
   if (args.corpus) return reportCorpus(args.corpus, args);
 
   if (!args.file) {
-    console.error('usage: ctrlr-import.mjs <file> [--profile out.json] [--panel out.cepanel] [--verify]');
-    console.error('       ctrlr-import.mjs --corpus <directory> [--verify]');
+    console.error('usage: ctrlr-import.mjs <file> [--profile out.json] [--panel out.cepanel] [--verify] [--no-lua]');
+    console.error('       ctrlr-import.mjs --corpus <directory> [--verify] [--no-lua]');
     return 2;
   }
 
@@ -278,9 +352,20 @@ async function main() {
   const harvest = harvestProfile(read);
   const { report } = harvest;
   console.log(`\nharvest: ${report.converted} of the ${report.sending} controls that send MIDI themselves became parameters`);
-  if (report.sendsFromLua.length) console.log(`  ${report.sendsFromLua.length} control(s) are sent by Lua, which does not run here`);
   for (const flag of report.flagged) console.log(`  not converted  ${flag.name || flag.id}: ${flag.reason}`);
   for (const note of report.notes) console.log(`  note  ${note}`);
+  if (report.sendsFromLua.length) {
+    if (!args.lua) console.log(`  ${report.sendsFromLua.length} control(s) are sent by Lua (--no-lua: not learned)`);
+    else {
+      const learned = await learnLua(read, harvest, args.file);
+      console.log(`\nlua: ${learned.learned.length} of the ${report.sendsFromLua.length} controls the Lua sends for became parameters, `
+        + `each sending exactly what its Lua sent; ${learned.silent} send nothing when moved`);
+      for (const l of learned.learned.filter((x) => x.reads)) console.log(`  as loaded     ${l.name}: reads ${l.reads.join(', ')}`);
+      for (const miss of learned.notLearned) console.log(`  not learned   ${miss.name}: ${miss.reason}`);
+      for (const error of learned.load.errors) console.log(`  load          ${error}`);
+      if (learned.load.notRead.length) console.log(`  not read      ${learned.load.notRead.join(', ')} (kept in files that were not found)`);
+    }
+  }
 
   let status = 0;
   if (args.verify) {
@@ -323,7 +408,7 @@ async function main() {
   // that looks right and behaves subtly wrong is worse than one that says plainly which methods
   // are not running.
   if (read.luaMethods.length) {
-    console.log(`\nlua: ${read.luaMethods.length} method(s) kept as reference text, none running`);
+    console.log(`\nlua: ${read.luaMethods.length} method(s), kept in the panel's notes as text (none of them runs in the panel)`);
     for (const method of read.luaMethods) {
       const uses = Object.entries(method.uses ?? {}).map(([hook, n]) => (n > 1 ? `${hook}×${n}` : hook));
       console.log(`  ${method.classification.padEnd(10)} ${method.name || '(unnamed)'}${uses.length ? `  [${uses.join(', ')}]` : ''}`);

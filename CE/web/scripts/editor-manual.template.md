@@ -718,15 +718,23 @@ The panel comes across in three parts:
   attached to their control; Ctrlr's layers become the panel's layers, and the ones that started
   hidden start hidden. Knobs, sliders and buttons drawn from a strip of pictures draw from the same
   pictures, and the panel keeps its background picture — when the file carries them.
-- Its **Lua** does not run. Each method is kept, as text, in the panel's notes (**Ctrlr Lua**), with
-  the hooks that call it, marked by what porting it takes: value and MIDI logic that maps onto
-  CEditor's scripting, panel logic, or drawing, which has no counterpart.
+- Many panels send a control's MIDI from **Lua** rather than from the control itself. For each such
+  control, the import runs its Lua, in CEditor's own Lua against a stand-in for Ctrlr, through every
+  value the control can take, and records what it sends. Where those bytes follow from the control's
+  value, it becomes a parameter of the profile like any other, checked to send exactly what the Lua
+  sent, value for value. A control whose Lua also reads other controls (a mode switch, a mute) is
+  learned with those as the panel loads, and the note says which it reads. The panel's Lua runs in a
+  sandbox while it is learned: it cannot reach your files, start programs or load anything from disk.
+- The rest of the **Lua** does not run in the new panel. Each method is kept, as text, in the panel's
+  notes (**Ctrlr Lua**), with the hooks that call it, marked by what porting it takes: value and MIDI
+  logic that maps onto CEditor's scripting, panel logic, or drawing, which has no counterpart.
 
 Not everything converts, and what does not is listed, by name and with the reason, in the Console
-and in the note **Ctrlr import**: a control whose bytes Lua computes, a program change, a message
-that sends several SysEx messages at once, a picture the file does not carry. Controls that send
-nothing themselves because Lua sends for them are counted there too; they are placed, and send
-nothing until you give them a script or a parameter. Fonts, the look of the controls and anything
+and in the note **Ctrlr import**: a control whose Lua moves other controls or sends something
+different depending on the rest of the panel, a program change, a message that sends several SysEx
+messages at once, a picture the file does not carry. Such a control is placed, and sends nothing
+until you give it a script or a parameter. Some panels keep their Lua in files beside the panel
+rather than in it; the import is given only the panel, so those methods are listed as not read. Fonts, the look of the controls and anything
 Ctrlr drew with Lua will look different: the aim is a panel that works and that you can restyle,
 not a copy of the original's look. The new panel is not saved until you save it.
 
