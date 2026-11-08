@@ -195,7 +195,88 @@ function encodeTextValue(parameter, value) {
  * bytes cannot be a value of this shape, so a caller can ignore a message rather than move a control
  * to a number it invented.
  */
+/**
+ * `encoding.transform`: what a value is on the wire when the two differ by a formula, as Ctrlr
+ * panels' values do ("value + 64", a negative value in two's complement, an inverted range).
+ *
+ *   wire = trunc(scale × value + offset)          scale 1 and offset 0 unless given
+ *   below zero, `negativeScale` / `negativeOffset` instead, when the profile gives either
+ *
+ * The parameter's range stays in the values a player sees (−8192..8191, say) and the encoding
+ * then writes the wire number as it always does: two bytes, nibbles, one byte. MIRRORS
+ * DeviceProfileEngine.cpp (transformToWire / transformFromWire); the two must agree byte for byte.
+ */
+export function transformToWire(transform, value) {
+  const number = Number(value);
+  if (!transform || typeof transform !== 'object') return number;
+  const negative = number < 0 && (transform.negativeScale !== undefined || transform.negativeOffset !== undefined);
+  const scale = Number(negative ? (transform.negativeScale ?? transform.scale ?? 1) : (transform.scale ?? 1));
+  const offset = Number(negative ? (transform.negativeOffset ?? transform.offset ?? 0) : (transform.offset ?? 0));
+  const wire = Math.trunc(scale * number + offset);
+  return Number.isFinite(wire) ? wire : NaN;
+}
+
+/**
+ * The value a wire number stands for: the transform run backwards on whichever branch lands on its
+ * own side of zero, inside the parameter's `range` when given, and re-encodes to the same wire
+ * number. NaN when none does. The range is what tells two's complement apart: 16383 is +16383 on
+ * the positive branch and -1 on the negative one, and only -1 is a value of a -8192..8191 parameter.
+ */
+export function transformFromWire(transform, wire, range = null) {
+  const target = Number(wire);
+  const min = Number.isFinite(Number(range?.min)) ? Number(range.min) : -Infinity;
+  const max = Number.isFinite(Number(range?.max)) ? Number(range.max) : Infinity;
+  if (!transform || typeof transform !== 'object') return target;
+  const hasNegative = transform.negativeScale !== undefined || transform.negativeOffset !== undefined;
+  const branches = [
+    [Number(transform.scale ?? 1), Number(transform.offset ?? 0), (v) => !hasNegative || v >= 0],
+    ...(hasNegative
+      ? [[Number(transform.negativeScale ?? transform.scale ?? 1), Number(transform.negativeOffset ?? transform.offset ?? 0), (v) => v < 0]]
+      : []),
+  ];
+  for (const [scale, offset, onSide] of branches) {
+    if (!scale) continue;
+    const guess = Math.round((target - offset) / scale);
+    for (const candidate of [guess, guess - 1, guess + 1]) {
+      // `+ 0` turns the -0 an inverted range's top reads back as into 0, as the C++ int has it.
+      if (onSide(candidate) && candidate >= min && candidate <= max && transformToWire(transform, candidate) === target) return candidate + 0;
+    }
+  }
+  return NaN;
+}
+
+/**
+ * `encoding.table`: the wire number of each value, from `range.min` up — for values whose wire
+ * numbers follow no formula (a Ctrlr list "Off=0, 1=32, 2=65, 3=127", or a formula with branches).
+ * Takes precedence over `transform`. MIRRORS DeviceProfileEngine.cpp (wireTableOf).
+ */
+export function tableToWire(parameter, value) {
+  const table = parameter?.encoding?.table;
+  const index = Math.round(Number(value)) - Number(parameter?.range?.min ?? 0);
+  const wire = Array.isArray(table) ? table[index] : undefined;
+  return Number.isInteger(wire) ? wire : NaN;
+}
+
+/** The value a wire number stands for under `encoding.table`: the first position holding it. */
+export function tableFromWire(parameter, wire) {
+  const table = parameter?.encoding?.table;
+  const index = Array.isArray(table) ? table.indexOf(Number(wire)) : -1;
+  return index >= 0 ? Number(parameter?.range?.min ?? 0) + index : NaN;
+}
+
 export function decodeParameterValue(parameter, bytes) {
+  const wire = decodeWireValue(parameter, bytes);
+  if (Array.isArray(parameter?.encoding?.table) && typeof wire === 'number' && String(parameter?.type ?? '') !== 'text') {
+    const value = tableFromWire(parameter, wire);
+    return Number.isFinite(value) ? value : null;
+  }
+  const transform = parameter?.encoding?.transform;
+  if (!transform || wire === null || typeof wire !== 'number' || String(parameter?.type ?? '') === 'text') return wire;
+  const value = transformFromWire(transform, wire, parameter?.range);
+  return Number.isFinite(value) ? value : null;
+}
+
+function decodeWireValue(parameter, bytes) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
   const list = Array.isArray(bytes) ? bytes.map((b) => Number(b)) : [];
   if (list.some((b) => !Number.isFinite(b))) return null;
@@ -236,6 +317,25 @@ export function decodeParameterValue(parameter, bytes) {
 }
 
 export function encodeParameterValue(parameter, value) {
+  const transform = parameter?.encoding?.transform;
+  const type = String(parameter?.type ?? '');
+  if (Array.isArray(parameter?.encoding?.table) && type !== 'text' && type !== 'choice') {
+    const wire = tableToWire(parameter, value);
+    if (!Number.isFinite(wire)) return { error: `Value ${value} has no entry in the wire table of ${parameter?.id ?? ''}` };
+    const encoded = encodeWireValue(parameter, wire);
+    return encoded.error ? encoded : { ...encoded, displayed: String(value) };
+  }
+  if (transform && type !== 'text' && type !== 'choice') {
+    // The value as the player sees it, the wire number as the encoder writes it (transformToWire).
+    const wire = transformToWire(transform, value);
+    if (!Number.isFinite(wire)) return { error: `Value has no wire value for ${parameter?.id ?? ''}` };
+    const encoded = encodeWireValue(parameter, wire);
+    return encoded.error ? encoded : { ...encoded, displayed: String(value) };
+  }
+  return encodeWireValue(parameter, value);
+}
+
+function encodeWireValue(parameter, value) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
   if (String(parameter?.type ?? '') === 'text') return encodeTextValue(parameter, value);
   if (String(parameter?.type ?? '') === 'choice') {
@@ -360,6 +460,26 @@ export function localCompileParameter(profile, request = {}) {
     if (recipe.nullAfterSend === true) {
       bytes.push(status, selectMsb, 127);
       bytes.push(status, selectLsb, 127);
+    }
+  } else if (kind === 'ccSequence') {
+    // Several CCs on one channel, in the recipe's order, each carrying a fixed number or one of the
+    // encoded value's bytes ("$byte0" is the first byte the encoding writes). What a 14-bit CC pair
+    // is (MSB on n, LSB on n + 32), an NRPN that sends its data LSB first, and the CC lists Ctrlr
+    // panels call Multi messages. MIRRORS DeviceProfileEngine.cpp compileCcSequence.
+    const steps = Array.isArray(recipe.messages) ? recipe.messages : [];
+    if (!steps.length) return { ok: false, error: 'CC sequence recipe has no messages' };
+    for (const step of steps) {
+      const controller = Number(step?.controller);
+      if (!Number.isInteger(controller) || controller < 0 || controller > 127) {
+        return { ok: false, error: 'CC sequence controller must be 0-127' };
+      }
+      const source = step?.value;
+      const byteRef = typeof source === 'string' ? /^\$byte([0-7])$/.exec(source.trim()) : null;
+      const value = byteRef ? encoded.bytes[Number(byteRef[1])] : Number(source);
+      if (!Number.isInteger(value) || value < 0 || value > 127) {
+        return { ok: false, error: `CC sequence value ${String(source)} is not a MIDI data byte` };
+      }
+      bytes.push(status, controller, value);
     }
   } else if (kind === 'sysex') {
     // This built a DIFFERENT message from DeviceProfileEngine.cpp, which is the one thing a fallback
@@ -655,6 +775,24 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
 
   if (type === 'boolean' || type === 'momentary') {
     return { ok: true, value: numeric === Number(parameter?.trueValue ?? 1) };
+  }
+
+  // The wire number back to the value it stands for (encoding.table, else encoding.transform), as
+  // DeviceProfileEngine.cpp decodeDumpParameterValue does.
+  if (Array.isArray(encoding?.table)) {
+    const value = tableFromWire({ ...parameter, encoding }, numeric);
+    if (!Number.isFinite(value)) {
+      return { ok: false, error: `Wire value ${numeric} is in no position of the wire table of ${parameter?.id ?? ''}` };
+    }
+    return { ok: true, value };
+  }
+  const transform = encoding?.transform;
+  if (transform && typeof transform === 'object') {
+    const value = transformFromWire(transform, numeric, parameter?.range);
+    if (!Number.isFinite(value)) {
+      return { ok: false, error: `Wire value ${numeric} stands for no value of ${parameter?.id ?? ''}` };
+    }
+    return { ok: true, value };
   }
 
   return { ok: true, value: numeric };

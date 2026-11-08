@@ -4081,7 +4081,10 @@ int main (int argc, char** argv)
         root.getChildFile ("test-sysex-synth.ceditor-device.json"),
         root.getChildFile ("test-nrpn-synth.ceditor-device.json"),
         root.getChildFile ("roland-sh-201.ceditor-device.json"),
-        root.getChildFile ("roland-gaia.ceditor-device.json")
+        root.getChildFile ("roland-gaia.ceditor-device.json"),
+        // encoding.transform and the ccSequence recipe, which deviceProfileLocalEngine.js mirrors:
+        // CE/web/test/deviceProfileTransform.test.js runs the same tests there, byte for byte.
+        root.getChildFile ("test-transform-synth.ceditor-device.json")
     };
 
     auto failures = 0;

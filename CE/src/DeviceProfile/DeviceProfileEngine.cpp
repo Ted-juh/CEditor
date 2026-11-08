@@ -35,6 +35,94 @@ bool propBool (const juce::DynamicObject& object, const juce::Identifier& name, 
     return value.isVoid() ? fallback : (bool) value;
 }
 
+double propDouble (const juce::DynamicObject& object, const juce::Identifier& name, double fallback)
+{
+    auto value = object.getProperty (name);
+    return value.isVoid() ? fallback : (double) value;
+}
+
+// encoding.transform: what a value is on the wire when the two differ by a formula, as Ctrlr panels'
+// values do ("value + 64", a negative value in two's complement, an inverted range).
+//
+//   wire = trunc (scale * value + offset)          scale 1 and offset 0 unless given
+//   below zero, negativeScale / negativeOffset instead, when the profile gives either
+//
+// The parameter's range stays in the values a player sees; the encoding then writes the wire number
+// as it always does. MIRRORS deviceProfileLocalEngine.js transformToWire / transformFromWire.
+struct WireTransform
+{
+    bool present = false;
+    bool hasNegative = false;
+    double scale = 1.0, offset = 0.0, negativeScale = 1.0, negativeOffset = 0.0;
+};
+
+WireTransform wireTransformOf (const juce::DynamicObject* encoding)
+{
+    WireTransform t;
+    auto* transform = encoding != nullptr ? asObject (encoding->getProperty ("transform")) : nullptr;
+    if (transform == nullptr)
+        return t;
+
+    t.present = true;
+    t.scale = propDouble (*transform, "scale", 1.0);
+    t.offset = propDouble (*transform, "offset", 0.0);
+    t.hasNegative = transform->hasProperty ("negativeScale") || transform->hasProperty ("negativeOffset");
+    t.negativeScale = propDouble (*transform, "negativeScale", t.scale);
+    t.negativeOffset = propDouble (*transform, "negativeOffset", t.offset);
+    return t;
+}
+
+double transformToWire (const WireTransform& t, double value)
+{
+    if (! t.present)
+        return value;
+    const bool negative = value < 0 && t.hasNegative;
+    return std::trunc ((negative ? t.negativeScale : t.scale) * value + (negative ? t.negativeOffset : t.offset));
+}
+
+// encoding.table: the wire number of each value, from range.min up, for values whose wire numbers
+// follow no formula. Takes precedence over transform. MIRRORS deviceProfileLocalEngine.js tableToWire.
+const juce::Array<juce::var>* wireTableOf (const juce::DynamicObject* encoding)
+{
+    return encoding != nullptr ? asArray (encoding->getProperty ("table")) : nullptr;
+}
+
+// The value a wire number stands for: the transform run backwards on whichever branch lands on its
+// own side of zero, inside the parameter's range, and re-encodes to the same wire number. The range
+// is what tells two's complement apart: 16383 is +16383 on the positive branch and -1 on the
+// negative one, and only -1 is a value a -8192..8191 parameter has.
+bool transformFromWire (const WireTransform& t, int wire, int& value, double rangeMin, double rangeMax)
+{
+    if (! t.present)
+    {
+        value = wire;
+        return true;
+    }
+
+    struct Branch { double scale, offset; bool negativeSide; };
+    juce::Array<Branch> branches { Branch { t.scale, t.offset, false } };
+    if (t.hasNegative)
+        branches.add (Branch { t.negativeScale, t.negativeOffset, true });
+
+    for (const auto& branch : branches)
+    {
+        if (branch.scale == 0.0)
+            continue;
+        const auto guess = (int) std::round (((double) wire - branch.offset) / branch.scale);
+        for (auto candidate : { guess, guess - 1, guess + 1 })
+        {
+            const bool onSide = branch.negativeSide ? candidate < 0 : (! t.hasNegative || candidate >= 0);
+            const bool inRange = candidate >= rangeMin && candidate <= rangeMax;
+            if (onSide && inRange && (int) transformToWire (t, candidate) == wire)
+            {
+                value = candidate;
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
 bool isMidiDataByte (int value)
 {
     return value >= 0 && value <= 127;
@@ -2363,7 +2451,25 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
         return juce::Result::ok();
     }
 
-    semanticValue = numeric;
+    // The wire number back to the value it stands for (encoding.table, else encoding.transform).
+    int value = numeric;
+    auto* valueRange = asObject (parameter.getProperty ("range"));
+    const auto rangeMin = valueRange != nullptr && valueRange->hasProperty ("min") ? (double) valueRange->getProperty ("min") : -1.0e12;
+    const auto rangeMax = valueRange != nullptr && valueRange->hasProperty ("max") ? (double) valueRange->getProperty ("max") : 1.0e12;
+    if (auto* table = wireTableOf (encoding))
+    {
+        for (int index = 0; index < table->size(); ++index)
+            if ((int) (*table)[index] == numeric)
+            {
+                semanticValue = (int) (valueRange != nullptr && valueRange->hasProperty ("min") ? (double) valueRange->getProperty ("min") : 0.0) + index;
+                return juce::Result::ok();
+            }
+        return juce::Result::fail ("Wire value " + juce::String (numeric) + " is in no position of the wire table of " + propString (parameter, "id"));
+    }
+    if (! transformFromWire (wireTransformOf (encoding), numeric, value, rangeMin, rangeMax))
+        return juce::Result::fail ("Wire value " + juce::String (numeric) + " stands for no value of " + propString (parameter, "id"));
+
+    semanticValue = value;
     return juce::Result::ok();
 }
 
@@ -2400,6 +2506,8 @@ CompileResult DeviceProfileEngine::compileWithParameter (const juce::String& dev
                                        normalizedValue, displayedValue, dryRun, 101, 100, "RPN");
     if (kind == "sysex")
         return compileSysex (deviceRole, parameter, *recipe, semanticValue, encodedBytes, normalizedValue, displayedValue, dryRun);
+    if (kind == "ccSequence")
+        return compileCcSequence (deviceRole, parameter, *recipe, semanticValue, encodedBytes, normalizedValue, displayedValue, dryRun);
 
     return { false, "Unsupported message recipe kind: " + kind, {} };
 }
@@ -2450,6 +2558,23 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
         semanticValue = type == "integer" ? juce::var ((int) std::round (numeric)) : juce::var (numeric);
         normalizedValue = normalizeLinear (numeric, min, max);
         displayedValue = semanticValue.toString();
+
+        // From here on `numeric` is the wire number: the value as the player sees it went into the
+        // range check, the readout and the semantic value above.
+        if (auto* table = wireTableOf (encoding))
+        {
+            const auto index = (int) std::round (numeric - min);
+            if (index < 0 || index >= table->size() || ! ((*table)[index].isInt() || (*table)[index].isInt64() || (*table)[index].isDouble()))
+                return juce::Result::fail ("Value " + juce::String (numeric) + " has no entry in the wire table of " + propString (parameter, "id"));
+            numeric = (double) (int) (*table)[index];
+        }
+        else
+        {
+            const auto transform = wireTransformOf (encoding);
+            numeric = transformToWire (transform, numeric);
+            if (! std::isfinite (numeric))
+                return juce::Result::fail ("Value has no wire value for " + propString (parameter, "id"));
+        }
 
         if (encodingType == "u7")
         {
@@ -2674,6 +2799,78 @@ CompileResult DeviceProfileEngine::compileCc (const juce::String& deviceRole,
     transaction.encodedValueHex = bytesToHex (encodedBytes);
     transaction.checksumStatus = "none";
     applyParameterPolicies (transaction, parameter);
+
+    juce::ignoreUnused (dryRun);
+    return { true, {}, transaction };
+}
+
+CompileResult DeviceProfileEngine::compileCcSequence (const juce::String& deviceRole,
+                                                      const juce::DynamicObject& parameter,
+                                                      const juce::DynamicObject& recipe,
+                                                      const juce::var& semanticValue,
+                                                      const juce::Array<int>& encodedBytes,
+                                                      double normalizedValue,
+                                                      const juce::String& displayedValue,
+                                                      bool dryRun) const
+{
+    // Several CCs on one channel, in the recipe's order, each carrying a fixed number or one of the
+    // encoded value's bytes ("$byte0" is the first byte the encoding writes): a 14-bit CC pair, an
+    // NRPN that sends its data LSB first, the CC lists Ctrlr panels call Multi messages.
+    // MIRRORS deviceProfileLocalEngine.js, kind 'ccSequence'.
+    auto channel = valueFromVarOrVariable (recipe, "channel", [this] (const juce::String& name) { return resolveVariable (name); }, 1);
+    if (channel < 1 || channel > 16)
+        return { false, "CC sequence channel must be 1-16", {} };
+
+    auto* steps = asArray (recipe.getProperty ("messages"));
+    if (steps == nullptr || steps->isEmpty())
+        return { false, "CC sequence recipe has no messages", {} };
+
+    MidiTransaction transaction;
+    transaction.transactionId = "dry_tx";
+    transaction.deviceRole = deviceRole;
+    transaction.parameterId = propString (parameter, "id");
+    transaction.semanticValue = semanticValue;
+    transaction.displayedValue = displayedValue;
+    transaction.normalizedValue = normalizedValue;
+    transaction.encodedValueHex = bytesToHex (encodedBytes);
+    transaction.checksumStatus = "none";
+    applyParameterPolicies (transaction, parameter);
+
+    for (const auto& stepValue : *steps)
+    {
+        auto* step = asObject (stepValue);
+        if (step == nullptr)
+            return { false, "CC sequence message must be an object", {} };
+
+        const auto controller = propInt (*step, "controller", -1);
+        if (! isMidiDataByte (controller))
+            return { false, "CC sequence controller must be 0-127", {} };
+
+        const auto source = step->getProperty ("value");
+        int value = -1;
+        const auto text = source.toString().trim();
+        if (source.isString() && text.startsWith ("$byte"))
+        {
+            const auto index = text.substring (5).getIntValue();
+            if (text.length() != 6 || index < 0 || index >= encodedBytes.size())
+                return { false, "CC sequence value " + text + " names no encoded byte", {} };
+            value = encodedBytes[index];
+        }
+        else if (! source.isVoid())
+        {
+            value = (int) source;
+        }
+
+        if (! isMidiDataByte (value))
+            return { false, "CC sequence value " + text + " is not a MIDI data byte", {} };
+
+        MidiMessageSpec message;
+        message.kind = "cc";
+        message.bytes.add (0xb0 + (channel - 1));
+        message.bytes.add (controller);
+        message.bytes.add (value);
+        transaction.messages.add (message);
+    }
 
     juce::ignoreUnused (dryRun);
     return { true, {}, transaction };

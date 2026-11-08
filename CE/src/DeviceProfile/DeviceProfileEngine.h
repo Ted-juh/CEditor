@@ -365,5 +365,16 @@ private:
                                 double normalizedValue,
                                 const juce::String& displayedValue,
                                 bool dryRun) const;
+
+    // Several CCs on one channel, each a fixed number or one of the encoded value's bytes: a 14-bit
+    // CC pair, an NRPN sending its data LSB first, a Ctrlr Multi message.
+    CompileResult compileCcSequence (const juce::String& deviceRole,
+                                     const juce::DynamicObject& parameter,
+                                     const juce::DynamicObject& recipe,
+                                     const juce::var& semanticValue,
+                                     const juce::Array<int>& encodedBytes,
+                                     double normalizedValue,
+                                     const juce::String& displayedValue,
+                                     bool dryRun) const;
 };
 }
