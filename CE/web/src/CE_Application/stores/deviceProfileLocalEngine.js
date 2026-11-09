@@ -235,8 +235,83 @@ export function decodeParameterValue(parameter, bytes) {
   return list[0] & 0x7f;
 }
 
+/** The parameter types DeviceProfileEngine.cpp encodes as numbers — its `isIntegerType`. */
+const NUMERIC_TYPES = new Set(['integer', 'float', 'bipolar']);
+
+/**
+ * A value as a number, read the way `(double) juce::var` reads it — because C++ decides what to
+ * refuse from THAT number, and this engine has to decide from the same one.
+ *
+ * Plain `Number()` disagrees in the cases that reach it: an absent value (a property the bridge
+ * dropped) is 0 to JUCE and NaN to Number; so is a word; "12 dB" is 12 to JUCE; "inf" is infinite
+ * to JUCE and NaN to Number. Read with Number(), each would be refused here and sent by C++ — the
+ * same disagreement as the one this replaces, pointing the other way.
+ */
+function numberAsJuceReadsIt(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value === 'boolean') return value ? 1 : 0;
+  if (typeof value !== 'string') return 0;              // void, null, an object or a list
+  // String::getDoubleValue: leading space, a sign, then "nan", "inf" or the leading number.
+  const text = value.trimStart();
+  const unsigned = text.replace(/^[+-]/, '');
+  if (/^nan/i.test(unsigned)) return NaN;
+  if (/^inf/i.test(unsigned)) return text.startsWith('-') ? -Infinity : Infinity;
+  const parsed = parseFloat(text);
+  return Number.isNaN(parsed) ? 0 : parsed;
+}
+
+/** std::round, which takes a half away from zero. Math.round takes -2.5 to -2; C++ to -3. */
+const roundAsCpp = (n) => Math.sign(n) * Math.round(Math.abs(n));
+
+/** A bound as `juce::String (double)` writes it: an ostream's default, six significant digits. */
+function cppNumberText(n) {
+  if (!Number.isFinite(n)) return String(n);
+  const [mantissa, power] = n.toExponential(5).split('e');
+  const exponent = Number(power);
+  const trim = (s) => (s.includes('.') ? s.replace(/\.?0+$/, '') : s);
+  if (exponent < -4 || exponent >= 6) {
+    return `${trim(mantissa)}e${exponent < 0 ? '-' : '+'}${String(Math.abs(exponent)).padStart(2, '0')}`;
+  }
+  return trim(n.toFixed(5 - exponent));
+}
+
+/**
+ * Why a number is refused for this parameter's RANGE, or null — DeviceProfileEngine.cpp's
+ * `validateAndEncodeValue`, before it looks at the encoder, and in its words.
+ *
+ * This engine did not check the range at all. A value outside it went to the encoder, and the u7
+ * and 14-bit encoders CLAMPED it to what the bytes could hold, so a bank select declared 0-3 compiled
+ * 100 as B0 00 64 and reported ok. C++ refuses that value. The DPD preview therefore showed a
+ * message the export would never send — the one disagreement a fallback engine is not allowed.
+ *
+ * No range means 0-127, and a range missing a bound reads that bound as 0, both as C++ has it. The
+ * value is compared unrounded, so 3.4 is outside 0-3 here as it is there.
+ */
+function rangeRefusal(parameter, number) {
+  const id = parameter?.id ?? '';
+  if (!Number.isFinite(number)) return `Value is not numeric for ${id}`;
+  const range = parameter?.range && typeof parameter.range === 'object' && !Array.isArray(parameter.range)
+    ? parameter.range : null;
+  const min = range ? numberAsJuceReadsIt(range.min) : 0;
+  const max = range ? numberAsJuceReadsIt(range.max) : 127;
+  if (number < min || number > max) {
+    return `Value outside range ${cppNumberText(min)}-${cppNumberText(max)} for ${id}`;
+  }
+  return null;
+}
+
+/**
+ * A value to the bytes that carry it, or `{ error }` — never a value the bytes cannot hold.
+ *
+ * For a number, in DeviceProfileEngine.cpp's order: not a number, outside the parameter's range
+ * (integer, float and bipolar parameters, the types C++ encodes as numbers), then more than the
+ * encoder's bytes can hold. Every refusal is C++'s, in C++'s words. Nothing C++ refuses is clamped
+ * into a message here: a value the device would not get from the program is not one the preview may
+ * show it getting.
+ */
 export function encodeParameterValue(parameter, value) {
   const encoding = String(parameter?.encoding?.type ?? 'u7');
+  const id = parameter?.id ?? '';
   if (String(parameter?.type ?? '') === 'text') return encodeTextValue(parameter, value);
   if (String(parameter?.type ?? '') === 'choice') {
     const choices = Array.isArray(parameter.choices) ? parameter.choices : [];
@@ -254,6 +329,16 @@ export function encodeParameterValue(parameter, value) {
       normalized: choices.length > 1 ? choices.indexOf(choice) / (choices.length - 1) : 1,
       displayed: choice.label || choice.id };
   }
+  if (String(parameter?.type ?? '') === 'action') {
+    // An action sends its own trigger byte whatever value it is given, as DeviceProfileEngine.cpp's
+    // action branch does. It went to the u7 encoder here, so All Notes Off went out as B0 7B 7F for
+    // a press where C++ sends B0 7B 00, and a value outside a byte is not one to refuse.
+    const number = Number(parameter?.triggerValue ?? parameter?.value ?? 0);
+    if (!Number.isInteger(number) || number < 0 || number > 127) {
+      return { error: `Action encoded value outside MIDI data byte range for ${id}` };
+    }
+    return { bytes: [number], number, semantic: true, normalized: 1, displayed: 'Trigger' };
+  }
   if (encoding === 'boolean-u7') {
     const on = value === true || ['true', 'on', 'yes', '1'].includes(String(value).toLowerCase());
     // The values the parameter names, as the native engine sends them (falseValue / trueValue):
@@ -263,23 +348,30 @@ export function encodeParameterValue(parameter, value) {
     if (!Number.isInteger(number) || number < 0 || number > 127) return { error: `Boolean wire value outside MIDI data byte range for ${parameter?.id ?? ''}` };
     return { bytes: [number], number, normalized: on ? 1 : 0, displayed: on ? 'On' : 'Off' };
   }
-  if (encoding === 'u14' || encoding === '14bit' || encoding === 'u14-msb-lsb') {
-    const number = clampInt(value, 0, 16383);
-    return { bytes: [(number >> 7) & 0x7f, number & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  const numeric = numberAsJuceReadsIt(value);
+  if (NUMERIC_TYPES.has(String(parameter?.type ?? ''))) {
+    const refused = rangeRefusal(parameter, numeric);
+    if (refused) return { error: refused };
   }
-  if (encoding === 'u14-lsb-msb') {
-    // The same 14 bits, least significant byte first, as decodeParameterValue reads them. It fell
-    // through to the u7 line and went out as one byte, clamped to 127.
-    const number = clampInt(value, 0, 16383);
-    return { bytes: [number & 0x7f, (number >> 7) & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  // Rounded once, as C++ does, and compared as a whole: NaN is in no byte's range, so a type that is
+  // not range-checked still cannot send one.
+  const rounded = roundAsCpp(numeric);
+
+  if (isU14(encoding)) {
+    if (!(rounded >= 0 && rounded <= 16383)) return { error: `Encoded u14 value outside 0-16383 for ${id}` };
+    const [msb, lsb] = [(rounded >> 7) & 0x7f, rounded & 0x7f];
+    // u14-lsb-msb keeps the same 14 bits least significant byte first, as decodeParameterValue reads
+    // them. It used to fall through to the u7 line and go out as one byte.
+    const bytes = encoding === 'u14-lsb-msb' ? [lsb, msb] : [msb, lsb];
+    return { bytes, number: rounded, normalized: rounded / 16383, displayed: String(rounded) };
   }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return { error };
     const max = 16 ** nibbles;
-    const number = Math.round(Number(value) || 0);
-    if (number < 0 || number >= max) {
-      return { error: `Nibbled value outside 0-${max - 1} for ${parameter?.id ?? ''}` };
+    const number = rounded;
+    if (!(number >= 0 && number < max)) {
+      return { error: `Nibbled value outside 0-${max - 1} for ${id}` };
     }
     const bytes = [];
     for (let shift = (nibbles - 1) * 4; shift >= 0; shift -= 4) bytes.push((number >> shift) & 0x0f);
@@ -293,15 +385,26 @@ export function encodeParameterValue(parameter, value) {
     // pan of 0 read back as -64. A value the byte cannot hold is refused, as a nibbled one is.
     const offset = Number(parameter?.encoding?.signedOffset ?? 64);
     const bias = Number.isFinite(offset) ? offset : 64;
-    const signed = Math.round(Number(value) || 0);
+    const signed = rounded;
     const byte = signed + bias;
-    if (byte < 0 || byte > 127) {
-      return { error: `Signed value outside ${-bias} to ${127 - bias} for ${parameter?.id ?? ''}` };
+    if (!(byte >= 0 && byte <= 127)) {
+      return { error: `Encoded s7 value outside MIDI data byte range for ${id}` };
     }
     return { bytes: [byte], number: byte, normalized: byte / 127, displayed: String(signed) };
   }
-  const number = clampInt(value, 0, 127);
-  return { bytes: [number], number, normalized: number / 127, displayed: String(number) };
+  if (['boolean', 'momentary'].includes(String(parameter?.type ?? ''))) {
+    // A switch C++ reads as on or off (its boolean branch), and never refuses for its value. Without
+    // a boolean-u7 encoder this engine writes one as a byte instead: a separate difference from C++,
+    // left exactly as it was rather than made into a refusal C++ does not make.
+    const number = clampInt(value, 0, 127);
+    return { bytes: [number], number, normalized: number / 127, displayed: String(number) };
+  }
+  // u7, and the fallback for an encoder name this engine does not know. This line CLAMPED to 0-127,
+  // which is how a value outside its parameter's range came out as a plausible message.
+  if (!(rounded >= 0 && rounded <= 127)) {
+    return { error: `Encoded u7 value outside MIDI data byte range for ${id}` };
+  }
+  return { bytes: [rounded], number: rounded, normalized: rounded / 127, displayed: String(rounded) };
 }
 
 export function localCompileParameter(profile, request = {}) {
@@ -347,7 +450,8 @@ export function localCompileParameter(profile, request = {}) {
       const lsbFirst = String(parameter?.encoding?.type ?? '') === 'u14-lsb-msb';
       const value14 = encoded.bytes.length > 1 && !lsbFirst
         ? encoded
-        : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
+        : encodeParameterValue({ id: parameterId, encoding: { type: 'u14' } }, encoded.number);
+      if (value14.error) return { ok: false, error: value14.error };
       bytes.push(status, 6, value14.bytes[0] ?? 0);
       bytes.push(status, 38, value14.bytes[1] ?? 0);
     } else {

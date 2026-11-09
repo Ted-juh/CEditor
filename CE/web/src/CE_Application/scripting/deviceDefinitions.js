@@ -685,6 +685,10 @@ function syntheticProfile(role) {
   const parameters = [...s.parameters.values()].map((e) => ({
     id: e.descriptor.id,
     type: e.descriptor.type,
+    // The declared range, which defineParameter already held to what the wire can carry. Without
+    // it the encoder reads an `integer` the way DeviceProfileEngine.cpp reads a profile parameter
+    // that declares none, as 0-127, and refuses every 14-bit or nibbled value above that.
+    range: { min: Math.min(e.descriptor.min, e.descriptor.max), max: Math.max(e.descriptor.min, e.descriptor.max) },
     choices: e.choices,
     trueValue: e.trueValue,
     encoding: {

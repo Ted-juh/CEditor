@@ -41,9 +41,14 @@ test('every value of the range reads back as itself', () => {
 });
 
 test('a value the byte cannot hold is refused, not clamped', () => {
-  assert.match(encodeParameterValue(PAN, -65).error, /^Signed value outside -64 to 63 for lfo\.pan$/);
-  assert.match(encodeParameterValue(PAN, 64).error, /outside -64 to 63/);
+  // The pan's range is the byte's, and the range is checked first, in DeviceProfileEngine.cpp's
+  // order and words — so that is the refusal these get.
+  assert.equal(encodeParameterValue(PAN, -65).error, 'Value outside range -64-63 for lfo.pan');
+  assert.equal(encodeParameterValue(PAN, 64).error, 'Value outside range -64-63 for lfo.pan');
   assert.equal(localCompileParameter(SYNTH, { parameterId: 'lfo.pan', value: 100 }).ok, false);
+  // A bias that leaves the byte short of the value is the encoder's refusal, also C++'s words.
+  assert.equal(encodeParameterValue({ id: 't', encoding: { type: 's7', signedOffset: 24 } }, 104).error,
+    'Encoded s7 value outside MIDI data byte range for t');
 });
 
 test('the parameter\'s own message carries the signed byte', () => {

@@ -145,6 +145,11 @@ export function fingerprintParameter(profile, parameterId) {
   const encoded = probes.map((value) => encodeParameterValue(parameter, value)?.bytes ?? []);
   let lead = 0;
   while (lead < width && encoded.every((bytes) => bytes[lead] === encoded[0][lead])) lead++;
+  // They are the prefix's LAST bytes only when its constant part ends on the value. A parameter
+  // every probe builds the same whole message for (an action, which sends its own trigger byte
+  // whatever it is given) ends on a checksum or F7 instead, and counting that as the value read the
+  // F7 back as 119.
+  if (lead > 0 && raw.slice(raw.length - lead).join() !== encoded[0].slice(0, lead).join()) lead = 0;
 
   return {
     parameterId,
