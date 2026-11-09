@@ -1552,6 +1552,11 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
     juce::Array<juce::var> diagnostics;
     std::set<int> coveredBytes;
 
+    // A collection whose size the instrument decides (a Yamaha Performance: as many part blocks as
+    // it has parts) names the dump that ends it, its Bulk Footer, and is complete when that arrives.
+    juce::String endsWith;
+    auto ended = false;
+
     auto appendDiagnostic = [&] (const juce::String& code, const juce::String& message, const juce::String& sourceId = {})
     {
         appendDiagnostics (diagnostics, dumpDiagnosticList (code, message, sourceId));
@@ -1586,6 +1591,13 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
         const auto collectionId = completion != nullptr
             ? completion->getProperty ("collectionId").toString()
             : juce::String {};
+        const auto messageEndsWith = completion != nullptr
+            ? completion->getProperty ("endsWith").toString()
+            : juce::String {};
+        if (endsWith.isEmpty())
+            endsWith = messageEndsWith;
+        if (parsed.dumpId.isNotEmpty() && parsed.dumpId == messageEndsWith)
+            ended = true;
         if (result.collectionId.isEmpty())
             result.collectionId = collectionId.isNotEmpty() ? collectionId : parsed.dumpId;
         else if (collectionId.isNotEmpty() && collectionId != result.collectionId)
@@ -1647,7 +1659,8 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
     auto missingRanges = result.expectedBytes > 0 ? missingRangesForCoverage (result.expectedBytes, coveredBytes)
                                                   : juce::Array<juce::var> {};
 
-    if (result.expectedMessageCount <= 0)
+    // Ended, the collection is as many messages as came: the footer is what says so.
+    if (ended || result.expectedMessageCount <= 0)
         result.expectedMessageCount = result.receivedMessageCount;
 
     result.values = juce::var (values);
@@ -1657,8 +1670,10 @@ DumpCollectionResult DeviceProfileEngine::collectDumpMessages (const juce::Strin
     result.duplicateRanges = juce::var (duplicateRanges);
     result.diagnostics = juce::var (diagnostics);
 
+    const auto counted = endsWith.isNotEmpty() ? ended
+                                          : result.receivedMessageCount >= result.expectedMessageCount;
     result.complete = result.failedMessageCount == 0
-        && result.receivedMessageCount >= result.expectedMessageCount
+        && counted
         && missingRanges.isEmpty();
     result.ok = result.failedMessageCount == 0;
     result.status = result.complete ? "complete" : (result.ok ? "partial" : "error");
@@ -2225,9 +2240,16 @@ DumpParseResult DeviceProfileEngine::parseDumpWithDefinition (const juce::Dynami
         checksumStatus = "ok";
     }
 
+    // A member of a collection may carry no value of its own (a Yamaha Bulk Header or Footer, the
+    // block of a part not laid out): it parses to nothing and counts toward the collection. Alone,
+    // a definition that reads nothing is a mistake.
     auto* mappings = asArray (dump.getProperty ("mappings"));
-    if (mappings == nullptr || mappings->isEmpty())
+    const auto inCollection = completion != nullptr && completion->getProperty ("collectionId").toString().isNotEmpty();
+    if ((mappings == nullptr || mappings->isEmpty()) && ! inCollection)
         return failForMatchedDump ("invalidDefinition", "Dump definition has no mappings: " + dumpId, checksumStatus);
+    const juce::Array<juce::var> noMappings;
+    if (mappings == nullptr)
+        mappings = &noMappings;
 
     // Resolve the buffer that mappings decode against. A block-packed payload (Korg 8->7) is unpacked
     // here so mapping offsets address the UNPACKED bytes; otherwise mappings decode in place from the

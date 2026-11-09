@@ -878,7 +878,10 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
   }
 
   const mappings = Array.isArray(dump?.mappings) ? dump.mappings : [];
-  if (mappings.length === 0) return failMatched('invalidDefinition', `Dump definition has no mappings: ${dumpId}`, checksumStatus);
+  // A member of a collection may carry no value of its own (a Yamaha Bulk Header or Footer, the
+  // block of a part not laid out): it parses to nothing and counts toward the collection. Alone, a
+  // definition that reads nothing is a mistake.
+  if (mappings.length === 0 && !completion.collectionId) return failMatched('invalidDefinition', `Dump definition has no mappings: ${dumpId}`, checksumStatus);
 
   // A packed payload (Korg's 8-in-7) is unpacked first, so mapping offsets address the unpacked
   // bytes, as DeviceProfileEngine.cpp does. This engine read the wire bytes in place: every field
@@ -1131,6 +1134,10 @@ export function localCollectDumpMessages(profile, hexMessages = []) {
   let expectedBytes = 0;
   let parsedMessageCount = 0;
   let failedMessageCount = 0;
+  // A collection whose size the instrument decides (a Yamaha Performance: as many part blocks as it
+  // has parts) names the dump that ends it, its Bulk Footer, and is complete when that arrives.
+  let endsWith = '';
+  let ended = false;
 
   for (const hex of hexMessages) {
     const parsed = localParseDumpMessage(profile, hex);
@@ -1154,6 +1161,8 @@ export function localCollectDumpMessages(profile, hexMessages = []) {
 
     parsedMessageCount += 1;
     const completion = parsed.completion && typeof parsed.completion === 'object' ? parsed.completion : {};
+    if (!endsWith && completion.endsWith) endsWith = String(completion.endsWith);
+    if (parsed.dumpId && parsed.dumpId === String(completion.endsWith ?? '')) ended = true;
     const parsedCollectionId = String(completion.collectionId ?? '');
     if (!collectionId) collectionId = parsedCollectionId || String(parsed.dumpId ?? '');
     else if (parsedCollectionId && parsedCollectionId !== collectionId) {
@@ -1178,9 +1187,11 @@ export function localCollectDumpMessages(profile, hexMessages = []) {
     Object.assign(values, parsed.values ?? {});
   }
 
-  if (!expectedMessageCount) expectedMessageCount = hexMessages.length;
+  // Ended, the collection is as many messages as came: the footer is what says so.
+  if (ended || !expectedMessageCount) expectedMessageCount = hexMessages.length;
   const missingRanges = expectedBytes > 0 ? rangesForMissingCoverage(expectedBytes, covered) : [];
-  const complete = failedMessageCount === 0 && hexMessages.length >= expectedMessageCount && missingRanges.length === 0;
+  const counted = endsWith ? ended : hexMessages.length >= expectedMessageCount;
+  const complete = failedMessageCount === 0 && counted && missingRanges.length === 0;
   const ok = failedMessageCount === 0;
   const status = complete ? 'complete' : ok ? 'partial' : 'error';
   const error = complete ? '' : failedMessageCount > 0 ? `${failedMessageCount} dump message(s) failed` : 'Dump collection incomplete';

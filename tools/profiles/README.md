@@ -99,6 +99,15 @@ only where the document says which controller carries the low bits: the Moog man
 `LSB`; Novation's guides print `CC pair 14,46` without saying, so those profiles send the first
 controller alone.
 
+**Reading a dump back.** A dump definition matches a message by its `matcher` prefix and reads each
+mapping at its offset into the payload. Several dumps answering one request share
+`completion.collectionId`, and the collection is complete at `completion.expectedMessages`, or,
+where the instrument decides how many it sends, when the dump named by `completion.endsWith` arrives
+(a Yamaha Bulk Footer: a MODX part sends its elements, keys or operators as its type has). A member
+of a collection may have no mappings (a Bulk Header or Footer): it counts toward the collection and
+reads nothing; alone, a definition without mappings is refused. A message that matches no definition
+is let pass, so a collection can name only the blocks a profile lays out.
+
 ## About midi.guide
 
 [midi.guide](https://midi.guide) (`github.com/pencilresearch/midi`) is licensed CC BY-SA 4.0. It is

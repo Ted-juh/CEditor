@@ -18,17 +18,24 @@ export const MODX_TABLES = {
 };
 export const MODX_NOTES = [
   'The parameter change tables repeat for each of the 16 parts, at addresses a part apart (the part number is the low nibble of the second address byte); this profile lays out the Performance Common and Part 1 with its 8 elements, 73 drum keys and 8 FM-X operators. The other parts are the same parameters at their own addresses and are not laid out.',
-  'Not read back yet: the bulk dumps are not mapped (Pull does nothing).',
+  'Pull asks for the Performance Edit Buffer Common (0E 53 00) and the Performance Edit Buffer Part 1 (0E 52 00) from the Bulk Control table, the two halves this profile lays out, rather than the whole Performance (0E 25 00). Part 1 answers with the blocks of its type, a Normal part\'s elements, a Drum part\'s keys or an FM-X part\'s operators, so its collection is complete at its Bulk Footer.',
 ];
+// The bulk dump table prints each header `0E mm nn`; the Bulk Control table says which.
+export const MODX_PULL = {
+  'PERFORMANCE PART': { id: 'part1', name: 'Performance Edit Buffer Part 1', header: ['0E', '52', '00'] },
+  'PERFORMANCE COMMON': { id: 'performanceCommon', name: 'Performance Edit Buffer Common' },
+};
+export const MODX_BULK = [{ page: 192, right: 300 }, { page: 192, left: 300 }];
 
 export default {
   id: 'yamaha-modx',
   name: 'Yamaha MODX',
   family: 'MODX',
-  description: 'Yamaha MODX6/7/8 synthesizer: its data list\'s parameter change tables for the Performance and Part 1 (its elements, drum keys and FM-X operators).',
+  description: 'Yamaha MODX6/7/8 synthesizer: its data list\'s parameter change tables for the Performance and Part 1 (its elements, drum keys and FM-X operators), and Pull from their edit buffers.',
   documents: [{ title: 'MODX6/MODX7/MODX8 Data List (D0)', file: 'modx_en_dl_d0.pdf', url: 'https://usa.yamaha.com/files/download/other_assets/2/1192592/modx_en_dl_d0.pdf' }],
-  read: { formatPages: [188], tablePages: Array.from({ length: 30 }, (u, i) => 193 + i) },
+  read: { formatPages: [188], tablePages: Array.from({ length: 30 }, (u, i) => 193 + i), bulk: MODX_BULK },
   placeholders: PART_1,
+  pull: MODX_PULL,
   noIdentity: 'the data list prints the identity reply with the family and model bytes as `dd dd`',
   tables: MODX_TABLES,
   notes: [...MODX_NOTES, 'The data format prints the Model ID as 07 in hex and 00000010 in binary; the hex is taken, as the MODX+ data list prints both alike.'],

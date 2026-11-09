@@ -174,6 +174,21 @@ export function seriesNames(first, last, count) {
   return Array.from({ length: count }, (u, i) => `${prefix}${i + 1}`);
 }
 
+// An address byte is printed, or a placeholder: the whole byte (`op`, `kk`), or a nibble each (`ep`:
+// element in the high nibble, part in the low; `5p`: 50H plus the part).
+const placeholderVars = (byte, holders) => (/^[0-9A-F]{2}$/.test(byte) ? [] : holders[byte] ? [byte] : byte.split('').filter((c) => !/[0-9A-F]/.test(c)));
+const resolveByte = (byte, at, holders) => {
+  if (/^[0-9A-F]{2}$/.test(byte)) return byte;
+  if (holders[byte]) return hex(at[byte]);
+  return hex(parseInt(byte.split('').map((c) => (/[0-9A-F]/.test(c) ? c : at[c].toString(16))).join(''), 16));
+};
+/** Every assignment of the placeholders `vars` over their values, each with the values' labels. */
+const assignments = (vars, holders) => {
+  let out = [{}];
+  for (const v of vars) out = out.flatMap((at) => holders[v].values.map((value, i) => ({ ...at, [v]: value, [`${v}:label`]: holders[v].labels[i] })));
+  return out;
+};
+
 const titleOf = (title) => (/\(([^)]*)\)\s*$/.exec(title)?.[1] ?? title).trim();
 const titleCase = (s) => (s === s.toUpperCase() ? s.replace(/\w\S*/g, (w) => (/^(TG|EG|LFO|OP|SYSTEM)$/.test(w) && w !== 'SYSTEM' ? w : w[0] + w.slice(1).toLowerCase())) : s.replace(/\b([A-Z]{3,})\b/g, (w) => (/^(EG|LFO|TG)$/.test(w) ? w : w[0] + w.slice(1).toLowerCase())));
 
@@ -199,7 +214,7 @@ export function buildYamahaProfile(data, layout) {
   const parameters = [];
   const ids = new Set();
   const skipped = new Map();
-  const skip = (why, what) => skipped.set(why, [...(skipped.get(why) ?? []), what]);
+  const skip = (why, what) => { const list = skipped.get(why) ?? []; if (!list.includes(what)) skipped.set(why, [...list, what]); };
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
   // The bytes between the device number and the address, as the data format prints them: the group
   // number and model ID (7F 1C 03, the reface), or a model ID of two bytes (7F 17, the MX). A bulk dump
@@ -224,9 +239,15 @@ export function buildYamahaProfile(data, layout) {
       const names = seriesNames(blockName(b.name), clean(b.last.name), to - M + 1);
       return names.map((name, i) => ({ ...b, name, at: [H, M + i, L] }));
     }
+    // A block printed with placeholders (the MODX's `41 ep 00 [p: Part No. (0...15), e: Element No.
+    // (0...7)]`): one for each value the layout gives them (its laid-out part's elements). A Bulk
+    // Header's or Footer's `mm nn` is the edit buffer's, from the layout.
+    const vars = b.frame ? [] : [...new Set(b.address.flatMap((x) => placeholderVars(x, blockHolders)))];
+    if (vars.some((v) => !blockHolders[v])) { skip('bulk dump blocks printed with a placeholder the layout does not give, not read (their messages are let pass)', `${blockName(b.name)} (${b.address.join(' ')})`); return []; }
+    if (vars.length) return assignments(vars, blockHolders).map((at) => ({ ...b, name: `${blockName(b.name)} ${vars.map((v) => at[`${v}:label`]).join(' ')}`, at: b.address.map((x) => parseInt(resolveByte(x, at, blockHolders), 16)) }));
     return [{ ...b, at: [H, M, L] }];
   };
-  // `COMMON Voice Common`, `Operator Operator 1`: the block column and its description run together.
+  const blockHolders = { ...(layout.placeholders ?? {}), ...(layout.bulkPlaceholders ?? {}) };
   // The block column and the description run together: `COMMON TG Common`, `AUDIO IN PART Audio Part
   // (A/D)`, `QUICK SETUP CONFIG MIDI Config 1`. The label's words are left off up to the last the
   // description repeats (`TG Common`, `Audio Part (A/D)`, `MIDI Config 1`); `SYSTEM Common` keeps it.
@@ -237,7 +258,10 @@ export function buildYamahaProfile(data, layout) {
       return last < 0 ? m : [...words.slice(last + 1), rest].join(' ');
     })
     .replace(/\b(\w+)\s+\1\b/g, '$1');
-  const blocks = data.bulk.map((b) => ({ ...b, label: clean(b.name).replace(/\s*Bulk (Header|Footer)$/i, ''), name: blockName(b.name), size: Math.max(0, b.bytes - overhead) }))
+  // A Bulk Header is at 0E, a Bulk Footer at 0F (the Bulk Control table's addresses), whatever the
+  // row is called: the reface YC's data list prints its footer `Bulk`.
+  const frameOf = (b) => (b.address[0] === '0E' || /Bulk Header/i.test(b.name) ? 'header' : b.address[0] === '0F' || /Bulk Footer/i.test(b.name) ? 'footer' : null);
+  const blocks = data.bulk.map((b) => ({ ...b, frame: frameOf(b), label: clean(b.name).replace(/\s*Bulk (Header|Footer)?$/i, ''), name: frameOf(b) === 'footer' ? 'Bulk Footer' : blockName(b.name), size: Math.max(0, b.bytes - overhead) }))
     .flatMap(expandBlock)
     .map((b) => ({ ...b, name: layout.blockName?.(b.name, b.at) ?? b.name }));
   const blockAt = (address) => blocks.find((b) => b.at[0] === address[0] && b.at[1] === address[1] && address[2] >= b.at[2] && address[2] < b.at[2] + b.size);
@@ -247,14 +271,8 @@ export function buildYamahaProfile(data, layout) {
     const holders = { ...readPlaceholders(table.notes), ...(layout.placeholders ?? {}), ...(layout.tables?.[title]?.placeholders ?? {}) };
     const own = layout.tables?.[title] ?? {};
     if (own.skip) { skip(own.skip, title); continue; }
-    // An address byte is printed, or a placeholder: the whole byte (`op`, `kk`), or a nibble each
-    // (`ep`: element in the high nibble, part in the low; `5p`: 50H plus the part).
-    const varsOf = (byte) => (/^[0-9A-F]{2}$/.test(byte) ? [] : holders[byte] ? [byte] : byte.split('').filter((c) => !/[0-9A-F]/.test(c)));
-    const resolve = (byte, at) => {
-      if (/^[0-9A-F]{2}$/.test(byte)) return byte;
-      if (holders[byte]) return hex(at[byte]);
-      return hex(parseInt(byte.split('').map((c) => (/[0-9A-F]/.test(c) ? c : at[c].toString(16))).join(''), 16));
-    };
+    const varsOf = (byte) => placeholderVars(byte, holders);
+    const resolve = (byte, at) => resolveByte(byte, at, holders);
     // Rows run by the placeholders in their own address: a run of rows with the same ones is laid
     // out once per assignment of them (a Part row once per part, a Scene Part row once per scene and
     // part), and a row with none once.
@@ -281,8 +299,7 @@ export function buildYamahaProfile(data, layout) {
     for (const run of runs) {
       const unknown = run.vars.filter((v) => !holders[v]);
       if (unknown.length) { skip('an address byte printed as a placeholder neither its table nor the layout explains', run.rows.map((r) => `${title}: ${r.name} (${r.address.join(' ')})`).join(', ')); continue; }
-      let instances = [{}];
-      for (const v of run.vars) instances = instances.flatMap((at) => holders[v].values.map((value, i) => ({ ...at, [v]: value, [`${v}:label`]: holders[v].labels[i] })));
+      const instances = assignments(run.vars, holders);
     for (const at of instances) {
       const labels = run.vars.map((v) => at[`${v}:label`]);
       const inst = labels.length ? { label: labels.join(' ') } : null;
@@ -439,7 +456,7 @@ export function buildYamahaProfile(data, layout) {
       matcher: { prefix: ['F0', '43', '00', ...bulkHead.map((x, i) => (i === counted ? hex(bc >> 7) : i === counted + 1 ? hex(bc & 127) : x)), ...b.at.map(hex)], suffix: ['F7'] },
       payload: { offset: at, size },
       checksum: { type: 'roland-7bit', fromOffset: from, toOffset: at + size - 1, byteOffset: at + size },
-      completion: { expectedMessages: collection ? collection.count : 1, expectedBytes: at + size + 2, ...(collection ? { collectionId: collection.id } : {}) },
+      completion: { expectedMessages: collection ? collection.count : 1, expectedBytes: at + size + 2, ...(collection ? { collectionId: collection.id, ...(collection.endsWith ? { endsWith: collection.endsWith } : {}) } : {}) },
       mappings,
     };
   };
@@ -449,18 +466,23 @@ export function buildYamahaProfile(data, layout) {
   // alone, when it holds a parameter laid out here.
   for (let i = 0; i < blocks.length; i++) {
     const b = blocks[i];
-    if (/Bulk Header/i.test(b.name)) {
+    if (b.frame === 'header') {
       let j = i;
-      while (j < blocks.length && !/Bulk Footer/i.test(blocks[j].name)) j++;
+      while (j < blocks.length && blocks[j].frame !== 'footer') j++;
       const pull = layout.pull?.[b.label];
       // The header's address as printed (the reface's 0E 0F 00), or, printed `0E mm nn`, the one the
       // layout picks from the Bulk Control table (the MOXF's Normal Voice Edit Buffer, 0E 0F 00).
       const header = pull?.header?.map((x) => parseInt(x, 16)) ?? (b.address.every(isHex) ? b.at : null);
       if (!header) { skip('a bulk dump whose header the data list prints as `0E mm nn` and the layout does not pick', b.label); i = j; continue; }
-      const members = blocks.slice(i, j + 1).map((m) => (/Bulk (Header|Footer)/i.test(m.name) && !m.address.every(isHex) ? { ...m, at: [m.at[0], header[1], header[2]] } : m));
+      const members = blocks.slice(i, j + 1).map((m) => (m.frame && !m.address.every(isHex) ? { ...m, at: [m.at[0], header[1], header[2]] } : m));
       const id = pull?.id ?? layout.pullName ?? 'editBuffer';
-      const collection = { id, count: members.length };
-      for (const m of members) take(dumpFor(m, collection));
+      // Complete at its Bulk Footer: the data list says the blocks between may come in any order and
+      // not all of them, and a MODX part sends element, key or operator blocks as its type has.
+      const footer = members.at(-1);
+      const collection = { id, count: members.length, ...(footer.frame === 'footer' ? { endsWith: `bulk${footer.at.map(hex).join('')}` } : {}) };
+      const dumps = members.map((m) => dumpFor(m, collection));
+      if (!dumps.some((d) => d.mappings.length)) { notAsked.push(pull?.name ?? b.label); i = j; continue; }
+      dumps.forEach(take);
       requests.push({ id: `request${id.replace(/^./, (c) => c.toUpperCase())}`, name: `Bulk dump request (${pull?.name ?? members.slice(1, -1).map((m) => m.name).join(', ')})`, kind: 'sysex', template: ['F0', '43', '20', ...head, ...members[0].at.map(hex), 'F7'], response: { kind: 'bulkDump', collectionId: collection.id }, timeoutMs: 3000, retries: 1 });
       i = j;
     } else {

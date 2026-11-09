@@ -121,9 +121,9 @@
       {"parameter":"system.speakerOutput","offset":13},
       {"parameter":"system.midiControl","offset":14}
     ]},
-    {"id":"bulk0E0F00","name":"TG Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","04","0E","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":3,"expectedBytes":13,"collectionId":"toneGenerator"},"mappings":[
+    {"id":"bulk0E0F00","name":"TG Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","04","0E","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":3,"expectedBytes":13,"collectionId":"toneGenerator","endsWith":"bulk0F0F00"},"mappings":[
     ]},
-    {"id":"bulk300000","name":"TG Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","14","04","30","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":16},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":26,"byteOffset":27},"completion":{"expectedMessages":3,"expectedBytes":29,"collectionId":"toneGenerator"},"mappings":[
+    {"id":"bulk300000","name":"TG Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","14","04","30","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":16},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":26,"byteOffset":27},"completion":{"expectedMessages":3,"expectedBytes":29,"collectionId":"toneGenerator","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"toneGenerator.volume","offset":0},
       {"parameter":"toneGenerator.waveTypeType","offset":2},
       {"parameter":"toneGenerator.driveDrive","offset":3},
@@ -138,7 +138,7 @@
       {"parameter":"toneGenerator.effect3TimeTime","offset":12},
       {"parameter":"toneGenerator.reverbDepthReverbDepth","offset":13}
     ]},
-    {"id":"bulk0F0F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","04","0F","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":3,"expectedBytes":13,"collectionId":"toneGenerator"},"mappings":[
+    {"id":"bulk0F0F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","04","0F","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":3,"expectedBytes":13,"collectionId":"toneGenerator","endsWith":"bulk0F0F00"},"mappings":[
     ]}
   ],
   "startup": {

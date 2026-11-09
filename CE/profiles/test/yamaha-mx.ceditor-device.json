@@ -4023,9 +4023,9 @@
       {"parameter":"remote.dawSelect","offset":0},
       {"parameter":"remote.programChangeMode","offset":1}
     ]},
-    {"id":"bulk0E5F00","name":"MULTI Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0E","5F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":39,"expectedBytes":12,"collectionId":"performance"},"mappings":[
+    {"id":"bulk0E5F00","name":"MULTI Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0E","5F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":39,"expectedBytes":12,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
     ]},
-    {"id":"bulk360000","name":"Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","50","36","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":80},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":89,"byteOffset":90},"completion":{"expectedMessages":39,"expectedBytes":92,"collectionId":"performance"},"mappings":[
+    {"id":"bulk360000","name":"Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","50","36","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":80},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":89,"byteOffset":90},"completion":{"expectedMessages":39,"expectedBytes":92,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceCommon.performanceName","offset":0},
       {"parameter":"performanceCommon.knobFunctionSelect","offset":30},
       {"parameter":"performanceCommon.pan","offset":31},
@@ -4045,18 +4045,18 @@
       {"parameter":"performanceCommon.part12Link","offset":68},
       {"parameter":"performanceCommon.autoKeyOnStart","offset":73}
     ]},
-    {"id":"bulk360100","name":"Reverb","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","26","36","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":38},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":47,"byteOffset":48},"completion":{"expectedMessages":39,"expectedBytes":50,"collectionId":"performance"},"mappings":[
+    {"id":"bulk360100","name":"Reverb","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","26","36","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":38},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":47,"byteOffset":48},"completion":{"expectedMessages":39,"expectedBytes":50,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceReverb.presetNumber","offset":2},
       {"parameter":"performanceReverb.reverbReturn","offset":36},
       {"parameter":"performanceReverb.reverbPan","offset":37}
     ]},
-    {"id":"bulk360200","name":"Chorus","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","28","36","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":40},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":49,"byteOffset":50},"completion":{"expectedMessages":39,"expectedBytes":52,"collectionId":"performance"},"mappings":[
+    {"id":"bulk360200","name":"Chorus","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","28","36","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":40},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":49,"byteOffset":50},"completion":{"expectedMessages":39,"expectedBytes":52,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceChorus.presetNumber","offset":2},
       {"parameter":"performanceChorus.chorusReturn","offset":36},
       {"parameter":"performanceChorus.chorusPan","offset":37},
       {"parameter":"performanceChorus.sendChorusToReverb","offset":38}
     ]},
-    {"id":"bulk361000","name":"Master EQ","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","14","36","10","00"],"suffix":["F7"]},"payload":{"offset":10,"size":20},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":29,"byteOffset":30},"completion":{"expectedMessages":39,"expectedBytes":32,"collectionId":"performance"},"mappings":[
+    {"id":"bulk361000","name":"Master EQ","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","14","36","10","00"],"suffix":["F7"]},"payload":{"offset":10,"size":20},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":29,"byteOffset":30},"completion":{"expectedMessages":39,"expectedBytes":32,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceMasterEq.eqLowGain","offset":0},
       {"parameter":"performanceMasterEq.eqLowFrequency","offset":1},
       {"parameter":"performanceMasterEq.eqLowQ","offset":2},
@@ -4075,7 +4075,7 @@
       {"parameter":"performanceMasterEq.eqHighQ","offset":18},
       {"parameter":"performanceMasterEq.eqHighShape","offset":19}
     ]},
-    {"id":"bulk363000","name":"Arpeggio Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","0E","36","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":14},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":23,"byteOffset":24},"completion":{"expectedMessages":39,"expectedBytes":26,"collectionId":"performance"},"mappings":[
+    {"id":"bulk363000","name":"Arpeggio Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","0E","36","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":14},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":23,"byteOffset":24},"completion":{"expectedMessages":39,"expectedBytes":26,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioCommon.arpSfSelect","offset":0},
       {"parameter":"performanceArpeggioCommon.tempo","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioCommon.arpCommonSwitch","offset":4},
@@ -4085,7 +4085,7 @@
       {"parameter":"performanceArpeggioCommon.arpVelocityRateOffset","offset":10,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioCommon.arpSwingOffset","offset":12,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk370000","name":"Part 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370000","name":"Part 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart1.bankSelectMsb","offset":1},
       {"parameter":"performancePart1.bankSelectLsb","offset":2},
       {"parameter":"performancePart1.programNumber","offset":3},
@@ -4124,7 +4124,7 @@
       {"parameter":"performancePart1.assignableKnob1Value","offset":60},
       {"parameter":"performancePart1.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370100","name":"Part 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370100","name":"Part 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart2.bankSelectMsb","offset":1},
       {"parameter":"performancePart2.bankSelectLsb","offset":2},
       {"parameter":"performancePart2.programNumber","offset":3},
@@ -4163,7 +4163,7 @@
       {"parameter":"performancePart2.assignableKnob1Value","offset":60},
       {"parameter":"performancePart2.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370200","name":"Part 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370200","name":"Part 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart3.bankSelectMsb","offset":1},
       {"parameter":"performancePart3.bankSelectLsb","offset":2},
       {"parameter":"performancePart3.programNumber","offset":3},
@@ -4202,7 +4202,7 @@
       {"parameter":"performancePart3.assignableKnob1Value","offset":60},
       {"parameter":"performancePart3.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370300","name":"Part 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370300","name":"Part 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart4.bankSelectMsb","offset":1},
       {"parameter":"performancePart4.bankSelectLsb","offset":2},
       {"parameter":"performancePart4.programNumber","offset":3},
@@ -4241,7 +4241,7 @@
       {"parameter":"performancePart4.assignableKnob1Value","offset":60},
       {"parameter":"performancePart4.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370400","name":"Part 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370400","name":"Part 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart5.bankSelectMsb","offset":1},
       {"parameter":"performancePart5.bankSelectLsb","offset":2},
       {"parameter":"performancePart5.programNumber","offset":3},
@@ -4280,7 +4280,7 @@
       {"parameter":"performancePart5.assignableKnob1Value","offset":60},
       {"parameter":"performancePart5.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370500","name":"Part 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370500","name":"Part 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart6.bankSelectMsb","offset":1},
       {"parameter":"performancePart6.bankSelectLsb","offset":2},
       {"parameter":"performancePart6.programNumber","offset":3},
@@ -4319,7 +4319,7 @@
       {"parameter":"performancePart6.assignableKnob1Value","offset":60},
       {"parameter":"performancePart6.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370600","name":"Part 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370600","name":"Part 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart7.bankSelectMsb","offset":1},
       {"parameter":"performancePart7.bankSelectLsb","offset":2},
       {"parameter":"performancePart7.programNumber","offset":3},
@@ -4358,7 +4358,7 @@
       {"parameter":"performancePart7.assignableKnob1Value","offset":60},
       {"parameter":"performancePart7.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370700","name":"Part 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370700","name":"Part 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart8.bankSelectMsb","offset":1},
       {"parameter":"performancePart8.bankSelectLsb","offset":2},
       {"parameter":"performancePart8.programNumber","offset":3},
@@ -4397,7 +4397,7 @@
       {"parameter":"performancePart8.assignableKnob1Value","offset":60},
       {"parameter":"performancePart8.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370800","name":"Part 9","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370800","name":"Part 9","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart9.bankSelectMsb","offset":1},
       {"parameter":"performancePart9.bankSelectLsb","offset":2},
       {"parameter":"performancePart9.programNumber","offset":3},
@@ -4436,7 +4436,7 @@
       {"parameter":"performancePart9.assignableKnob1Value","offset":60},
       {"parameter":"performancePart9.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370900","name":"Part 10","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","09","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370900","name":"Part 10","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","09","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart10.bankSelectMsb","offset":1},
       {"parameter":"performancePart10.bankSelectLsb","offset":2},
       {"parameter":"performancePart10.programNumber","offset":3},
@@ -4475,7 +4475,7 @@
       {"parameter":"performancePart10.assignableKnob1Value","offset":60},
       {"parameter":"performancePart10.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370A00","name":"Part 11","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370A00","name":"Part 11","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart11.bankSelectMsb","offset":1},
       {"parameter":"performancePart11.bankSelectLsb","offset":2},
       {"parameter":"performancePart11.programNumber","offset":3},
@@ -4514,7 +4514,7 @@
       {"parameter":"performancePart11.assignableKnob1Value","offset":60},
       {"parameter":"performancePart11.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370B00","name":"Part 12","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370B00","name":"Part 12","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart12.bankSelectMsb","offset":1},
       {"parameter":"performancePart12.bankSelectLsb","offset":2},
       {"parameter":"performancePart12.programNumber","offset":3},
@@ -4553,7 +4553,7 @@
       {"parameter":"performancePart12.assignableKnob1Value","offset":60},
       {"parameter":"performancePart12.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370C00","name":"Part 13","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370C00","name":"Part 13","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart13.bankSelectMsb","offset":1},
       {"parameter":"performancePart13.bankSelectLsb","offset":2},
       {"parameter":"performancePart13.programNumber","offset":3},
@@ -4592,7 +4592,7 @@
       {"parameter":"performancePart13.assignableKnob1Value","offset":60},
       {"parameter":"performancePart13.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370D00","name":"Part 14","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370D00","name":"Part 14","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart14.bankSelectMsb","offset":1},
       {"parameter":"performancePart14.bankSelectLsb","offset":2},
       {"parameter":"performancePart14.programNumber","offset":3},
@@ -4631,7 +4631,7 @@
       {"parameter":"performancePart14.assignableKnob1Value","offset":60},
       {"parameter":"performancePart14.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370E00","name":"Part 15","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370E00","name":"Part 15","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart15.bankSelectMsb","offset":1},
       {"parameter":"performancePart15.bankSelectLsb","offset":2},
       {"parameter":"performancePart15.programNumber","offset":3},
@@ -4670,7 +4670,7 @@
       {"parameter":"performancePart15.assignableKnob1Value","offset":60},
       {"parameter":"performancePart15.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk370F00","name":"Part 16","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance"},"mappings":[
+    {"id":"bulk370F00","name":"Part 16","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3E","37","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":62},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":71,"byteOffset":72},"completion":{"expectedMessages":39,"expectedBytes":74,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performancePart16.bankSelectMsb","offset":1},
       {"parameter":"performancePart16.bankSelectLsb","offset":2},
       {"parameter":"performancePart16.programNumber","offset":3},
@@ -4709,7 +4709,7 @@
       {"parameter":"performancePart16.assignableKnob1Value","offset":60},
       {"parameter":"performancePart16.assignableKnob2Value","offset":61}
     ]},
-    {"id":"bulk380000","name":"Arpeggio Part 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380000","name":"Arpeggio Part 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart1.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart1.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart1.arpTransmitChannel","offset":2},
@@ -4750,7 +4750,7 @@
       {"parameter":"performanceArpeggioPart1.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart1.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380100","name":"Arpeggio Part 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380100","name":"Arpeggio Part 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart2.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart2.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart2.arpTransmitChannel","offset":2},
@@ -4791,7 +4791,7 @@
       {"parameter":"performanceArpeggioPart2.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart2.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380200","name":"Arpeggio Part 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380200","name":"Arpeggio Part 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart3.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart3.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart3.arpTransmitChannel","offset":2},
@@ -4832,7 +4832,7 @@
       {"parameter":"performanceArpeggioPart3.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart3.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380300","name":"Arpeggio Part 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380300","name":"Arpeggio Part 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart4.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart4.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart4.arpTransmitChannel","offset":2},
@@ -4873,7 +4873,7 @@
       {"parameter":"performanceArpeggioPart4.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart4.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380400","name":"Arpeggio Part 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380400","name":"Arpeggio Part 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart5.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart5.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart5.arpTransmitChannel","offset":2},
@@ -4914,7 +4914,7 @@
       {"parameter":"performanceArpeggioPart5.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart5.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380500","name":"Arpeggio Part 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380500","name":"Arpeggio Part 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart6.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart6.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart6.arpTransmitChannel","offset":2},
@@ -4955,7 +4955,7 @@
       {"parameter":"performanceArpeggioPart6.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart6.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380600","name":"Arpeggio Part 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380600","name":"Arpeggio Part 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart7.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart7.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart7.arpTransmitChannel","offset":2},
@@ -4996,7 +4996,7 @@
       {"parameter":"performanceArpeggioPart7.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart7.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380700","name":"Arpeggio Part 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380700","name":"Arpeggio Part 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart8.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart8.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart8.arpTransmitChannel","offset":2},
@@ -5037,7 +5037,7 @@
       {"parameter":"performanceArpeggioPart8.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart8.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380800","name":"Arpeggio Part 9","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380800","name":"Arpeggio Part 9","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart9.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart9.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart9.arpTransmitChannel","offset":2},
@@ -5078,7 +5078,7 @@
       {"parameter":"performanceArpeggioPart9.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart9.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380900","name":"Arpeggio Part 10","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","09","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380900","name":"Arpeggio Part 10","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","09","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart10.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart10.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart10.arpTransmitChannel","offset":2},
@@ -5119,7 +5119,7 @@
       {"parameter":"performanceArpeggioPart10.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart10.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380A00","name":"Arpeggio Part 11","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380A00","name":"Arpeggio Part 11","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart11.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart11.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart11.arpTransmitChannel","offset":2},
@@ -5160,7 +5160,7 @@
       {"parameter":"performanceArpeggioPart11.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart11.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380B00","name":"Arpeggio Part 12","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380B00","name":"Arpeggio Part 12","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart12.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart12.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart12.arpTransmitChannel","offset":2},
@@ -5201,7 +5201,7 @@
       {"parameter":"performanceArpeggioPart12.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart12.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380C00","name":"Arpeggio Part 13","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380C00","name":"Arpeggio Part 13","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart13.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart13.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart13.arpTransmitChannel","offset":2},
@@ -5242,7 +5242,7 @@
       {"parameter":"performanceArpeggioPart13.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart13.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380D00","name":"Arpeggio Part 14","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380D00","name":"Arpeggio Part 14","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart14.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart14.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart14.arpTransmitChannel","offset":2},
@@ -5283,7 +5283,7 @@
       {"parameter":"performanceArpeggioPart14.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart14.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380E00","name":"Arpeggio Part 15","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380E00","name":"Arpeggio Part 15","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart15.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart15.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart15.arpTransmitChannel","offset":2},
@@ -5324,7 +5324,7 @@
       {"parameter":"performanceArpeggioPart15.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart15.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk380F00","name":"Arpeggio Part 16","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance"},"mappings":[
+    {"id":"bulk380F00","name":"Arpeggio Part 16","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","38","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":39,"expectedBytes":84,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
       {"parameter":"performanceArpeggioPart16.arpSwitch","offset":0},
       {"parameter":"performanceArpeggioPart16.arpMidiOutSwitch","offset":1},
       {"parameter":"performanceArpeggioPart16.arpTransmitChannel","offset":2},
@@ -5365,11 +5365,11 @@
       {"parameter":"performanceArpeggioPart16.arpAssignVelocityRateOffsetSf6","offset":56,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"performanceArpeggioPart16.arpAssignGateTimeOffsetSf6","offset":58,"codec":{"type":"u14-msb-lsb"}}
     ]},
-    {"id":"bulk0F5F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0F","5F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":39,"expectedBytes":12,"collectionId":"performance"},"mappings":[
+    {"id":"bulk0F5F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0F","5F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":39,"expectedBytes":12,"collectionId":"performance","endsWith":"bulk0F5F00"},"mappings":[
     ]},
-    {"id":"bulk0E0F00","name":"VOICE (NORMAL) Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0E","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":22,"expectedBytes":12,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk0E0F00","name":"VOICE (NORMAL) Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0E","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":22,"expectedBytes":12,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
     ]},
-    {"id":"bulk400000","name":"Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","50","40","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":80},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":89,"byteOffset":90},"completion":{"expectedMessages":22,"expectedBytes":92,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk400000","name":"Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","50","40","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":80},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":89,"byteOffset":90},"completion":{"expectedMessages":22,"expectedBytes":92,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceCommon.voiceName","offset":0},
       {"parameter":"voiceCommon.voiceCategoryMain","offset":24},
       {"parameter":"voiceCommon.volume","offset":63},
@@ -5379,10 +5379,10 @@
       {"parameter":"voiceCommon.portamentoTimeMode","offset":73},
       {"parameter":"voiceCommon.legatoSlope","offset":74}
     ]},
-    {"id":"bulk400300","name":"Insertion A","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","24","40","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":36},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":45,"byteOffset":46},"completion":{"expectedMessages":22,"expectedBytes":48,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk400300","name":"Insertion A","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","24","40","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":36},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":45,"byteOffset":46},"completion":{"expectedMessages":22,"expectedBytes":48,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceInsertionA.presetNumber","offset":2}
     ]},
-    {"id":"bulk400600","name":"Controller+LFO","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3C","40","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":60},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":69,"byteOffset":70},"completion":{"expectedMessages":22,"expectedBytes":72,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk400600","name":"Controller+LFO","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","3C","40","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":60},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":69,"byteOffset":70},"completion":{"expectedMessages":22,"expectedBytes":72,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceControllerLfo.controllerSet1Depth","offset":0},
       {"parameter":"voiceControllerLfo.controllerSet1Source","offset":1},
       {"parameter":"voiceControllerLfo.controllerSet2Depth","offset":4},
@@ -5432,9 +5432,9 @@
       {"parameter":"voiceControllerLfo.userWaveStepValue16","offset":58},
       {"parameter":"voiceControllerLfo.lfoRandomSpeedDepth","offset":59}
     ]},
-    {"id":"bulk403000","name":"Arpeggio","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","56","40","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":86},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":95,"byteOffset":96},"completion":{"expectedMessages":22,"expectedBytes":98,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk403000","name":"Arpeggio","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","56","40","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":86},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":95,"byteOffset":96},"completion":{"expectedMessages":22,"expectedBytes":98,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
     ]},
-    {"id":"bulk410000","name":"Osc+Amp+Pit Element 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410000","name":"Osc+Amp+Pit Element 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement1.elementSwitch","offset":0},
       {"parameter":"voiceElement1.elementGroupNumber","offset":4},
       {"parameter":"voiceElement1.pan","offset":5},
@@ -5504,7 +5504,7 @@
       {"parameter":"voiceElement1.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement1.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410100","name":"Osc+Amp+Pit Element 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410100","name":"Osc+Amp+Pit Element 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement2.elementSwitch","offset":0},
       {"parameter":"voiceElement2.elementGroupNumber","offset":4},
       {"parameter":"voiceElement2.pan","offset":5},
@@ -5574,7 +5574,7 @@
       {"parameter":"voiceElement2.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement2.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410200","name":"Osc+Amp+Pit Element 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410200","name":"Osc+Amp+Pit Element 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement3.elementSwitch","offset":0},
       {"parameter":"voiceElement3.elementGroupNumber","offset":4},
       {"parameter":"voiceElement3.pan","offset":5},
@@ -5644,7 +5644,7 @@
       {"parameter":"voiceElement3.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement3.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410300","name":"Osc+Amp+Pit Element 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410300","name":"Osc+Amp+Pit Element 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement4.elementSwitch","offset":0},
       {"parameter":"voiceElement4.elementGroupNumber","offset":4},
       {"parameter":"voiceElement4.pan","offset":5},
@@ -5714,7 +5714,7 @@
       {"parameter":"voiceElement4.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement4.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410400","name":"Osc+Amp+Pit Element 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410400","name":"Osc+Amp+Pit Element 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement5.elementSwitch","offset":0},
       {"parameter":"voiceElement5.elementGroupNumber","offset":4},
       {"parameter":"voiceElement5.pan","offset":5},
@@ -5784,7 +5784,7 @@
       {"parameter":"voiceElement5.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement5.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410500","name":"Osc+Amp+Pit Element 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410500","name":"Osc+Amp+Pit Element 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement6.elementSwitch","offset":0},
       {"parameter":"voiceElement6.elementGroupNumber","offset":4},
       {"parameter":"voiceElement6.pan","offset":5},
@@ -5854,7 +5854,7 @@
       {"parameter":"voiceElement6.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement6.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410600","name":"Osc+Amp+Pit Element 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410600","name":"Osc+Amp+Pit Element 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement7.elementSwitch","offset":0},
       {"parameter":"voiceElement7.elementGroupNumber","offset":4},
       {"parameter":"voiceElement7.pan","offset":5},
@@ -5924,7 +5924,7 @@
       {"parameter":"voiceElement7.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement7.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk410700","name":"Osc+Amp+Pit Element 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk410700","name":"Osc+Amp+Pit Element 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","58","41","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":88},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":97,"byteOffset":98},"completion":{"expectedMessages":22,"expectedBytes":100,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement8.elementSwitch","offset":0},
       {"parameter":"voiceElement8.elementGroupNumber","offset":4},
       {"parameter":"voiceElement8.pan","offset":5},
@@ -5994,7 +5994,7 @@
       {"parameter":"voiceElement8.pegTimeKeyFollowSensitivity","offset":85},
       {"parameter":"voiceElement8.pegTimeKeyFollowSensitivityCenterKey","offset":86}
     ]},
-    {"id":"bulk420000","name":"Flt+EQ+LFO Element 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420000","name":"Flt+EQ+LFO Element 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement1.filterType","offset":0},
       {"parameter":"voiceElement1.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement1.filterCutoffVelocitySensitivity","offset":4},
@@ -6040,7 +6040,7 @@
       {"parameter":"voiceElement1.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement1.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420100","name":"Flt+EQ+LFO Element 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420100","name":"Flt+EQ+LFO Element 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement2.filterType","offset":0},
       {"parameter":"voiceElement2.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement2.filterCutoffVelocitySensitivity","offset":4},
@@ -6086,7 +6086,7 @@
       {"parameter":"voiceElement2.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement2.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420200","name":"Flt+EQ+LFO Element 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420200","name":"Flt+EQ+LFO Element 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement3.filterType","offset":0},
       {"parameter":"voiceElement3.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement3.filterCutoffVelocitySensitivity","offset":4},
@@ -6132,7 +6132,7 @@
       {"parameter":"voiceElement3.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement3.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420300","name":"Flt+EQ+LFO Element 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420300","name":"Flt+EQ+LFO Element 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement4.filterType","offset":0},
       {"parameter":"voiceElement4.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement4.filterCutoffVelocitySensitivity","offset":4},
@@ -6178,7 +6178,7 @@
       {"parameter":"voiceElement4.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement4.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420400","name":"Flt+EQ+LFO Element 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420400","name":"Flt+EQ+LFO Element 5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement5.filterType","offset":0},
       {"parameter":"voiceElement5.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement5.filterCutoffVelocitySensitivity","offset":4},
@@ -6224,7 +6224,7 @@
       {"parameter":"voiceElement5.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement5.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420500","name":"Flt+EQ+LFO Element 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420500","name":"Flt+EQ+LFO Element 6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement6.filterType","offset":0},
       {"parameter":"voiceElement6.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement6.filterCutoffVelocitySensitivity","offset":4},
@@ -6270,7 +6270,7 @@
       {"parameter":"voiceElement6.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement6.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420600","name":"Flt+EQ+LFO Element 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420600","name":"Flt+EQ+LFO Element 7","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement7.filterType","offset":0},
       {"parameter":"voiceElement7.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement7.filterCutoffVelocitySensitivity","offset":4},
@@ -6316,7 +6316,7 @@
       {"parameter":"voiceElement7.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement7.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk420700","name":"Flt+EQ+LFO Element 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk420700","name":"Flt+EQ+LFO Element 8","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","4A","42","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":74},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":83,"byteOffset":84},"completion":{"expectedMessages":22,"expectedBytes":86,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceElement8.filterType","offset":0},
       {"parameter":"voiceElement8.filterCutoffFrequency","offset":2,"codec":{"type":"u14-msb-lsb"}},
       {"parameter":"voiceElement8.filterCutoffVelocitySensitivity","offset":4},
@@ -6362,21 +6362,21 @@
       {"parameter":"voiceElement8.commonLfoBox2DepthRatio","offset":72},
       {"parameter":"voiceElement8.commonLfoBox3DepthRatio","offset":73}
     ]},
-    {"id":"bulk0F0F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0F","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":22,"expectedBytes":12,"collectionId":"normalVoice"},"mappings":[
+    {"id":"bulk0F0F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0F","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":22,"expectedBytes":12,"collectionId":"normalVoice","endsWith":"bulk0F0F00"},"mappings":[
     ]},
-    {"id":"bulk0E2F00","name":"VOICE (DRUM) Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0E","2F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":79,"expectedBytes":12,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk0E2F00","name":"VOICE (DRUM) Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0E","2F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":79,"expectedBytes":12,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
     ]},
-    {"id":"bulk460000","name":"Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","46","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":79,"expectedBytes":84,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk460000","name":"Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","48","46","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":72},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":81,"byteOffset":82},"completion":{"expectedMessages":79,"expectedBytes":84,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumCommon.voiceName","offset":0},
       {"parameter":"drumCommon.voiceCategory1Main","offset":24},
       {"parameter":"drumCommon.volume","offset":63},
       {"parameter":"drumCommon.insEfReverbSendLevel","offset":70},
       {"parameter":"drumCommon.insEfChorusSendLevel","offset":71}
     ]},
-    {"id":"bulk460300","name":"Insertion A","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","24","46","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":36},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":45,"byteOffset":46},"completion":{"expectedMessages":79,"expectedBytes":48,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk460300","name":"Insertion A","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","24","46","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":36},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":45,"byteOffset":46},"completion":{"expectedMessages":79,"expectedBytes":48,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumInsertionA.presetNumber","offset":2}
     ]},
-    {"id":"bulk460800","name":"Controller","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","18","46","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":24},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":33,"byteOffset":34},"completion":{"expectedMessages":79,"expectedBytes":36,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk460800","name":"Controller","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","18","46","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":24},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":33,"byteOffset":34},"completion":{"expectedMessages":79,"expectedBytes":36,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumController.controllerSet1Depth","offset":0},
       {"parameter":"drumController.controllerSet1Source","offset":1},
       {"parameter":"drumController.controllerSet2Depth","offset":4},
@@ -6390,9 +6390,9 @@
       {"parameter":"drumController.controllerSet6Depth","offset":20},
       {"parameter":"drumController.controllerSet6Source","offset":21}
     ]},
-    {"id":"bulk463000","name":"Arpeggio","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","56","46","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":86},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":95,"byteOffset":96},"completion":{"expectedMessages":79,"expectedBytes":98,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk463000","name":"Arpeggio","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","56","46","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":86},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":95,"byteOffset":96},"completion":{"expectedMessages":79,"expectedBytes":98,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
     ]},
-    {"id":"bulk470000","name":"Key C0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470000","name":"Key C0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","00","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC0.elementSwitch","offset":0},
       {"parameter":"drumKeyC0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC0.keyAssignMode","offset":5},
@@ -6416,7 +6416,7 @@
       {"parameter":"drumKeyC0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470100","name":"Key C#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470100","name":"Key C#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","01","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyCSharp0.elementSwitch","offset":0},
       {"parameter":"drumKeyCSharp0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyCSharp0.keyAssignMode","offset":5},
@@ -6440,7 +6440,7 @@
       {"parameter":"drumKeyCSharp0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyCSharp0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470200","name":"Key D0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470200","name":"Key D0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","02","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyD0.elementSwitch","offset":0},
       {"parameter":"drumKeyD0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyD0.keyAssignMode","offset":5},
@@ -6464,7 +6464,7 @@
       {"parameter":"drumKeyD0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyD0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470300","name":"Key D#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470300","name":"Key D#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","03","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyDSharp0.elementSwitch","offset":0},
       {"parameter":"drumKeyDSharp0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyDSharp0.keyAssignMode","offset":5},
@@ -6488,7 +6488,7 @@
       {"parameter":"drumKeyDSharp0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyDSharp0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470400","name":"Key E0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470400","name":"Key E0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","04","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyE0.elementSwitch","offset":0},
       {"parameter":"drumKeyE0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyE0.keyAssignMode","offset":5},
@@ -6512,7 +6512,7 @@
       {"parameter":"drumKeyE0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyE0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470500","name":"Key F0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470500","name":"Key F0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","05","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyF0.elementSwitch","offset":0},
       {"parameter":"drumKeyF0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyF0.keyAssignMode","offset":5},
@@ -6536,7 +6536,7 @@
       {"parameter":"drumKeyF0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyF0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470600","name":"Key F#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470600","name":"Key F#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","06","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyFSharp0.elementSwitch","offset":0},
       {"parameter":"drumKeyFSharp0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyFSharp0.keyAssignMode","offset":5},
@@ -6560,7 +6560,7 @@
       {"parameter":"drumKeyFSharp0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyFSharp0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470700","name":"Key G0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470700","name":"Key G0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","07","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyG0.elementSwitch","offset":0},
       {"parameter":"drumKeyG0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyG0.keyAssignMode","offset":5},
@@ -6584,7 +6584,7 @@
       {"parameter":"drumKeyG0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyG0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470800","name":"Key G#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470800","name":"Key G#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","08","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyGSharp0.elementSwitch","offset":0},
       {"parameter":"drumKeyGSharp0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyGSharp0.keyAssignMode","offset":5},
@@ -6608,7 +6608,7 @@
       {"parameter":"drumKeyGSharp0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyGSharp0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470900","name":"Key A0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","09","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470900","name":"Key A0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","09","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyA0.elementSwitch","offset":0},
       {"parameter":"drumKeyA0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyA0.keyAssignMode","offset":5},
@@ -6632,7 +6632,7 @@
       {"parameter":"drumKeyA0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyA0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470A00","name":"Key A#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470A00","name":"Key A#0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyASharp0.elementSwitch","offset":0},
       {"parameter":"drumKeyASharp0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyASharp0.keyAssignMode","offset":5},
@@ -6656,7 +6656,7 @@
       {"parameter":"drumKeyASharp0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyASharp0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470B00","name":"Key B0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470B00","name":"Key B0","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyB0.elementSwitch","offset":0},
       {"parameter":"drumKeyB0.receiveNoteOff","offset":4},
       {"parameter":"drumKeyB0.keyAssignMode","offset":5},
@@ -6680,7 +6680,7 @@
       {"parameter":"drumKeyB0.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyB0.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470C00","name":"Key C1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470C00","name":"Key C1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC1.elementSwitch","offset":0},
       {"parameter":"drumKeyC1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC1.keyAssignMode","offset":5},
@@ -6704,7 +6704,7 @@
       {"parameter":"drumKeyC1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470D00","name":"Key C#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470D00","name":"Key C#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyCSharp1.elementSwitch","offset":0},
       {"parameter":"drumKeyCSharp1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyCSharp1.keyAssignMode","offset":5},
@@ -6728,7 +6728,7 @@
       {"parameter":"drumKeyCSharp1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyCSharp1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470E00","name":"Key D1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470E00","name":"Key D1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyD1.elementSwitch","offset":0},
       {"parameter":"drumKeyD1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyD1.keyAssignMode","offset":5},
@@ -6752,7 +6752,7 @@
       {"parameter":"drumKeyD1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyD1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk470F00","name":"Key D#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk470F00","name":"Key D#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","0F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyDSharp1.elementSwitch","offset":0},
       {"parameter":"drumKeyDSharp1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyDSharp1.keyAssignMode","offset":5},
@@ -6776,7 +6776,7 @@
       {"parameter":"drumKeyDSharp1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyDSharp1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471000","name":"Key E1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","10","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471000","name":"Key E1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","10","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyE1.elementSwitch","offset":0},
       {"parameter":"drumKeyE1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyE1.keyAssignMode","offset":5},
@@ -6800,7 +6800,7 @@
       {"parameter":"drumKeyE1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyE1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471100","name":"Key F1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","11","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471100","name":"Key F1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","11","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyF1.elementSwitch","offset":0},
       {"parameter":"drumKeyF1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyF1.keyAssignMode","offset":5},
@@ -6824,7 +6824,7 @@
       {"parameter":"drumKeyF1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyF1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471200","name":"Key F#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","12","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471200","name":"Key F#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","12","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyFSharp1.elementSwitch","offset":0},
       {"parameter":"drumKeyFSharp1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyFSharp1.keyAssignMode","offset":5},
@@ -6848,7 +6848,7 @@
       {"parameter":"drumKeyFSharp1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyFSharp1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471300","name":"Key G1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","13","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471300","name":"Key G1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","13","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyG1.elementSwitch","offset":0},
       {"parameter":"drumKeyG1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyG1.keyAssignMode","offset":5},
@@ -6872,7 +6872,7 @@
       {"parameter":"drumKeyG1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyG1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471400","name":"Key G#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","14","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471400","name":"Key G#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","14","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyGSharp1.elementSwitch","offset":0},
       {"parameter":"drumKeyGSharp1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyGSharp1.keyAssignMode","offset":5},
@@ -6896,7 +6896,7 @@
       {"parameter":"drumKeyGSharp1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyGSharp1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471500","name":"Key A1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","15","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471500","name":"Key A1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","15","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyA1.elementSwitch","offset":0},
       {"parameter":"drumKeyA1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyA1.keyAssignMode","offset":5},
@@ -6920,7 +6920,7 @@
       {"parameter":"drumKeyA1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyA1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471600","name":"Key A#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","16","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471600","name":"Key A#1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","16","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyASharp1.elementSwitch","offset":0},
       {"parameter":"drumKeyASharp1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyASharp1.keyAssignMode","offset":5},
@@ -6944,7 +6944,7 @@
       {"parameter":"drumKeyASharp1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyASharp1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471700","name":"Key B1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","17","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471700","name":"Key B1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","17","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyB1.elementSwitch","offset":0},
       {"parameter":"drumKeyB1.receiveNoteOff","offset":4},
       {"parameter":"drumKeyB1.keyAssignMode","offset":5},
@@ -6968,7 +6968,7 @@
       {"parameter":"drumKeyB1.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyB1.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471800","name":"Key C2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","18","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471800","name":"Key C2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","18","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC2.elementSwitch","offset":0},
       {"parameter":"drumKeyC2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC2.keyAssignMode","offset":5},
@@ -6992,7 +6992,7 @@
       {"parameter":"drumKeyC2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471900","name":"Key C#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","19","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471900","name":"Key C#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","19","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyCSharp2.elementSwitch","offset":0},
       {"parameter":"drumKeyCSharp2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyCSharp2.keyAssignMode","offset":5},
@@ -7016,7 +7016,7 @@
       {"parameter":"drumKeyCSharp2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyCSharp2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471A00","name":"Key D2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471A00","name":"Key D2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyD2.elementSwitch","offset":0},
       {"parameter":"drumKeyD2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyD2.keyAssignMode","offset":5},
@@ -7040,7 +7040,7 @@
       {"parameter":"drumKeyD2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyD2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471B00","name":"Key D#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471B00","name":"Key D#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyDSharp2.elementSwitch","offset":0},
       {"parameter":"drumKeyDSharp2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyDSharp2.keyAssignMode","offset":5},
@@ -7064,7 +7064,7 @@
       {"parameter":"drumKeyDSharp2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyDSharp2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471C00","name":"Key E2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471C00","name":"Key E2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyE2.elementSwitch","offset":0},
       {"parameter":"drumKeyE2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyE2.keyAssignMode","offset":5},
@@ -7088,7 +7088,7 @@
       {"parameter":"drumKeyE2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyE2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471D00","name":"Key F2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471D00","name":"Key F2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyF2.elementSwitch","offset":0},
       {"parameter":"drumKeyF2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyF2.keyAssignMode","offset":5},
@@ -7112,7 +7112,7 @@
       {"parameter":"drumKeyF2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyF2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471E00","name":"Key F#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471E00","name":"Key F#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyFSharp2.elementSwitch","offset":0},
       {"parameter":"drumKeyFSharp2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyFSharp2.keyAssignMode","offset":5},
@@ -7136,7 +7136,7 @@
       {"parameter":"drumKeyFSharp2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyFSharp2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk471F00","name":"Key G2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk471F00","name":"Key G2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","1F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyG2.elementSwitch","offset":0},
       {"parameter":"drumKeyG2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyG2.keyAssignMode","offset":5},
@@ -7160,7 +7160,7 @@
       {"parameter":"drumKeyG2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyG2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472000","name":"Key G#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","20","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472000","name":"Key G#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","20","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyGSharp2.elementSwitch","offset":0},
       {"parameter":"drumKeyGSharp2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyGSharp2.keyAssignMode","offset":5},
@@ -7184,7 +7184,7 @@
       {"parameter":"drumKeyGSharp2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyGSharp2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472100","name":"Key A2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","21","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472100","name":"Key A2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","21","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyA2.elementSwitch","offset":0},
       {"parameter":"drumKeyA2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyA2.keyAssignMode","offset":5},
@@ -7208,7 +7208,7 @@
       {"parameter":"drumKeyA2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyA2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472200","name":"Key A#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","22","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472200","name":"Key A#2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","22","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyASharp2.elementSwitch","offset":0},
       {"parameter":"drumKeyASharp2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyASharp2.keyAssignMode","offset":5},
@@ -7232,7 +7232,7 @@
       {"parameter":"drumKeyASharp2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyASharp2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472300","name":"Key B2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","23","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472300","name":"Key B2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","23","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyB2.elementSwitch","offset":0},
       {"parameter":"drumKeyB2.receiveNoteOff","offset":4},
       {"parameter":"drumKeyB2.keyAssignMode","offset":5},
@@ -7256,7 +7256,7 @@
       {"parameter":"drumKeyB2.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyB2.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472400","name":"Key C3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","24","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472400","name":"Key C3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","24","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC3.elementSwitch","offset":0},
       {"parameter":"drumKeyC3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC3.keyAssignMode","offset":5},
@@ -7280,7 +7280,7 @@
       {"parameter":"drumKeyC3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472500","name":"Key C#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","25","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472500","name":"Key C#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","25","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyCSharp3.elementSwitch","offset":0},
       {"parameter":"drumKeyCSharp3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyCSharp3.keyAssignMode","offset":5},
@@ -7304,7 +7304,7 @@
       {"parameter":"drumKeyCSharp3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyCSharp3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472600","name":"Key D3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","26","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472600","name":"Key D3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","26","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyD3.elementSwitch","offset":0},
       {"parameter":"drumKeyD3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyD3.keyAssignMode","offset":5},
@@ -7328,7 +7328,7 @@
       {"parameter":"drumKeyD3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyD3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472700","name":"Key D#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","27","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472700","name":"Key D#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","27","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyDSharp3.elementSwitch","offset":0},
       {"parameter":"drumKeyDSharp3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyDSharp3.keyAssignMode","offset":5},
@@ -7352,7 +7352,7 @@
       {"parameter":"drumKeyDSharp3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyDSharp3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472800","name":"Key E3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","28","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472800","name":"Key E3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","28","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyE3.elementSwitch","offset":0},
       {"parameter":"drumKeyE3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyE3.keyAssignMode","offset":5},
@@ -7376,7 +7376,7 @@
       {"parameter":"drumKeyE3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyE3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472900","name":"Key F3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","29","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472900","name":"Key F3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","29","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyF3.elementSwitch","offset":0},
       {"parameter":"drumKeyF3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyF3.keyAssignMode","offset":5},
@@ -7400,7 +7400,7 @@
       {"parameter":"drumKeyF3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyF3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472A00","name":"Key F#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472A00","name":"Key F#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyFSharp3.elementSwitch","offset":0},
       {"parameter":"drumKeyFSharp3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyFSharp3.keyAssignMode","offset":5},
@@ -7424,7 +7424,7 @@
       {"parameter":"drumKeyFSharp3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyFSharp3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472B00","name":"Key G3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472B00","name":"Key G3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyG3.elementSwitch","offset":0},
       {"parameter":"drumKeyG3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyG3.keyAssignMode","offset":5},
@@ -7448,7 +7448,7 @@
       {"parameter":"drumKeyG3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyG3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472C00","name":"Key G#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472C00","name":"Key G#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyGSharp3.elementSwitch","offset":0},
       {"parameter":"drumKeyGSharp3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyGSharp3.keyAssignMode","offset":5},
@@ -7472,7 +7472,7 @@
       {"parameter":"drumKeyGSharp3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyGSharp3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472D00","name":"Key A3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472D00","name":"Key A3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyA3.elementSwitch","offset":0},
       {"parameter":"drumKeyA3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyA3.keyAssignMode","offset":5},
@@ -7496,7 +7496,7 @@
       {"parameter":"drumKeyA3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyA3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472E00","name":"Key A#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472E00","name":"Key A#3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyASharp3.elementSwitch","offset":0},
       {"parameter":"drumKeyASharp3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyASharp3.keyAssignMode","offset":5},
@@ -7520,7 +7520,7 @@
       {"parameter":"drumKeyASharp3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyASharp3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk472F00","name":"Key B3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk472F00","name":"Key B3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","2F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyB3.elementSwitch","offset":0},
       {"parameter":"drumKeyB3.receiveNoteOff","offset":4},
       {"parameter":"drumKeyB3.keyAssignMode","offset":5},
@@ -7544,7 +7544,7 @@
       {"parameter":"drumKeyB3.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyB3.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473000","name":"Key C4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473000","name":"Key C4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","30","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC4.elementSwitch","offset":0},
       {"parameter":"drumKeyC4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC4.keyAssignMode","offset":5},
@@ -7568,7 +7568,7 @@
       {"parameter":"drumKeyC4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473100","name":"Key C#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","31","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473100","name":"Key C#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","31","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyCSharp4.elementSwitch","offset":0},
       {"parameter":"drumKeyCSharp4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyCSharp4.keyAssignMode","offset":5},
@@ -7592,7 +7592,7 @@
       {"parameter":"drumKeyCSharp4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyCSharp4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473200","name":"Key D4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","32","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473200","name":"Key D4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","32","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyD4.elementSwitch","offset":0},
       {"parameter":"drumKeyD4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyD4.keyAssignMode","offset":5},
@@ -7616,7 +7616,7 @@
       {"parameter":"drumKeyD4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyD4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473300","name":"Key D#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","33","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473300","name":"Key D#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","33","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyDSharp4.elementSwitch","offset":0},
       {"parameter":"drumKeyDSharp4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyDSharp4.keyAssignMode","offset":5},
@@ -7640,7 +7640,7 @@
       {"parameter":"drumKeyDSharp4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyDSharp4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473400","name":"Key E4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","34","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473400","name":"Key E4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","34","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyE4.elementSwitch","offset":0},
       {"parameter":"drumKeyE4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyE4.keyAssignMode","offset":5},
@@ -7664,7 +7664,7 @@
       {"parameter":"drumKeyE4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyE4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473500","name":"Key F4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","35","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473500","name":"Key F4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","35","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyF4.elementSwitch","offset":0},
       {"parameter":"drumKeyF4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyF4.keyAssignMode","offset":5},
@@ -7688,7 +7688,7 @@
       {"parameter":"drumKeyF4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyF4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473600","name":"Key F#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","36","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473600","name":"Key F#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","36","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyFSharp4.elementSwitch","offset":0},
       {"parameter":"drumKeyFSharp4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyFSharp4.keyAssignMode","offset":5},
@@ -7712,7 +7712,7 @@
       {"parameter":"drumKeyFSharp4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyFSharp4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473700","name":"Key G4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","37","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473700","name":"Key G4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","37","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyG4.elementSwitch","offset":0},
       {"parameter":"drumKeyG4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyG4.keyAssignMode","offset":5},
@@ -7736,7 +7736,7 @@
       {"parameter":"drumKeyG4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyG4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473800","name":"Key G#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","38","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473800","name":"Key G#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","38","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyGSharp4.elementSwitch","offset":0},
       {"parameter":"drumKeyGSharp4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyGSharp4.keyAssignMode","offset":5},
@@ -7760,7 +7760,7 @@
       {"parameter":"drumKeyGSharp4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyGSharp4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473900","name":"Key A4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","39","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473900","name":"Key A4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","39","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyA4.elementSwitch","offset":0},
       {"parameter":"drumKeyA4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyA4.keyAssignMode","offset":5},
@@ -7784,7 +7784,7 @@
       {"parameter":"drumKeyA4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyA4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473A00","name":"Key A#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473A00","name":"Key A#4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3A","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyASharp4.elementSwitch","offset":0},
       {"parameter":"drumKeyASharp4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyASharp4.keyAssignMode","offset":5},
@@ -7808,7 +7808,7 @@
       {"parameter":"drumKeyASharp4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyASharp4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473B00","name":"Key B4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473B00","name":"Key B4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3B","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyB4.elementSwitch","offset":0},
       {"parameter":"drumKeyB4.receiveNoteOff","offset":4},
       {"parameter":"drumKeyB4.keyAssignMode","offset":5},
@@ -7832,7 +7832,7 @@
       {"parameter":"drumKeyB4.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyB4.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473C00","name":"Key C5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473C00","name":"Key C5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3C","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC5.elementSwitch","offset":0},
       {"parameter":"drumKeyC5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC5.keyAssignMode","offset":5},
@@ -7856,7 +7856,7 @@
       {"parameter":"drumKeyC5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473D00","name":"Key C#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473D00","name":"Key C#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3D","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyCSharp5.elementSwitch","offset":0},
       {"parameter":"drumKeyCSharp5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyCSharp5.keyAssignMode","offset":5},
@@ -7880,7 +7880,7 @@
       {"parameter":"drumKeyCSharp5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyCSharp5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473E00","name":"Key D5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473E00","name":"Key D5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3E","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyD5.elementSwitch","offset":0},
       {"parameter":"drumKeyD5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyD5.keyAssignMode","offset":5},
@@ -7904,7 +7904,7 @@
       {"parameter":"drumKeyD5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyD5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk473F00","name":"Key D#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk473F00","name":"Key D#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","3F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyDSharp5.elementSwitch","offset":0},
       {"parameter":"drumKeyDSharp5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyDSharp5.keyAssignMode","offset":5},
@@ -7928,7 +7928,7 @@
       {"parameter":"drumKeyDSharp5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyDSharp5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474000","name":"Key E5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","40","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474000","name":"Key E5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","40","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyE5.elementSwitch","offset":0},
       {"parameter":"drumKeyE5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyE5.keyAssignMode","offset":5},
@@ -7952,7 +7952,7 @@
       {"parameter":"drumKeyE5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyE5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474100","name":"Key F5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","41","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474100","name":"Key F5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","41","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyF5.elementSwitch","offset":0},
       {"parameter":"drumKeyF5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyF5.keyAssignMode","offset":5},
@@ -7976,7 +7976,7 @@
       {"parameter":"drumKeyF5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyF5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474200","name":"Key F#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","42","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474200","name":"Key F#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","42","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyFSharp5.elementSwitch","offset":0},
       {"parameter":"drumKeyFSharp5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyFSharp5.keyAssignMode","offset":5},
@@ -8000,7 +8000,7 @@
       {"parameter":"drumKeyFSharp5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyFSharp5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474300","name":"Key G5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","43","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474300","name":"Key G5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","43","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyG5.elementSwitch","offset":0},
       {"parameter":"drumKeyG5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyG5.keyAssignMode","offset":5},
@@ -8024,7 +8024,7 @@
       {"parameter":"drumKeyG5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyG5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474400","name":"Key G#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","44","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474400","name":"Key G#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","44","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyGSharp5.elementSwitch","offset":0},
       {"parameter":"drumKeyGSharp5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyGSharp5.keyAssignMode","offset":5},
@@ -8048,7 +8048,7 @@
       {"parameter":"drumKeyGSharp5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyGSharp5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474500","name":"Key A5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","45","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474500","name":"Key A5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","45","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyA5.elementSwitch","offset":0},
       {"parameter":"drumKeyA5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyA5.keyAssignMode","offset":5},
@@ -8072,7 +8072,7 @@
       {"parameter":"drumKeyA5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyA5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474600","name":"Key A#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","46","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474600","name":"Key A#5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","46","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyASharp5.elementSwitch","offset":0},
       {"parameter":"drumKeyASharp5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyASharp5.keyAssignMode","offset":5},
@@ -8096,7 +8096,7 @@
       {"parameter":"drumKeyASharp5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyASharp5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474700","name":"Key B5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","47","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474700","name":"Key B5","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","47","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyB5.elementSwitch","offset":0},
       {"parameter":"drumKeyB5.receiveNoteOff","offset":4},
       {"parameter":"drumKeyB5.keyAssignMode","offset":5},
@@ -8120,7 +8120,7 @@
       {"parameter":"drumKeyB5.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyB5.lpfResonance","offset":33}
     ]},
-    {"id":"bulk474800","name":"Key C6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","48","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk474800","name":"Key C6","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","2E","47","48","00"],"suffix":["F7"]},"payload":{"offset":10,"size":46},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":55,"byteOffset":56},"completion":{"expectedMessages":79,"expectedBytes":58,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
       {"parameter":"drumKeyC6.elementSwitch","offset":0},
       {"parameter":"drumKeyC6.receiveNoteOff","offset":4},
       {"parameter":"drumKeyC6.keyAssignMode","offset":5},
@@ -8144,7 +8144,7 @@
       {"parameter":"drumKeyC6.lpfCutoffVelocitySensitivity","offset":32},
       {"parameter":"drumKeyC6.lpfResonance","offset":33}
     ]},
-    {"id":"bulk0F2F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0F","2F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":79,"expectedBytes":12,"collectionId":"drumVoice"},"mappings":[
+    {"id":"bulk0F2F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","17","00","00","0F","2F","00"],"suffix":["F7"]},"payload":{"offset":10,"size":0},"checksum":{"type":"roland-7bit","fromOffset":5,"toOffset":9,"byteOffset":10},"completion":{"expectedMessages":79,"expectedBytes":12,"collectionId":"drumVoice","endsWith":"bulk0F2F00"},"mappings":[
     ]}
   ],
   "startup": {

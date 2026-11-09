@@ -232,11 +232,13 @@ positions. A Yamaha profile:
   (`-24 – +24 (semitones)`, `-12 – +12 [dB]`);
 - checks identity against the reply the data list prints, where it prints one in full;
 - **reads the synth back (Pull)** from its bulk dumps, a block at a time or a header's blocks as one
-  collection, with the checksum the data list prints; the sound's name is read, not written;
+  collection, complete at its Bulk Footer, with the checksum the data list prints; the sound's name
+  is read, not written;
 - takes the device number to be 1 (parameter changes on 10H, requests on 20H);
 - on the MODX and MODX+, lays out the Performance and Part 1 (its elements, drum keys and FM-X
   operators): the other 15 parts are the same parameters at their own addresses, which would make
-  some 85,000 in all. Their identity and Pull are not there yet;
+  some 85,000 in all, and Pulls the Performance Common and Part 1 from their edit buffers. Their
+  identity is not checked: the data list prints it with `dd dd`;
 - on the MOXF, lays out every table in full (the Performance's 4 parts, the Song/Pattern mixing's
   16, the Normal Voice's 8 elements and the Drum Voice's 73 keys), and Pulls each edit buffer:
   Normal Voice, Drum Voice, Performance, Multi and Master, and the System's blocks;
@@ -480,8 +482,8 @@ authoring note.
 | Profile | Instrument | Family | Talks in | Parameters | Read from | Made by |
 |---|---|---|---|---:|---|---|
 | `yamaha-an1x-dpd` | Yamaha AN1x (from DPD) | AN | SysEx parameters and dumps | 1,296 | — | Device Profile Designer |
-| `yamaha-modx` | Yamaha MODX | MODX | SysEx parameters | 4,521 | MODX6/MODX7/MODX8 Data List (D0) | `yamaha/make-profiles.mjs` |
-| `yamaha-modx-plus` | Yamaha MODX+ | MODX | SysEx parameters | 4,521 | MODX6+/MODX7+/MODX8+ Data List (A0) | `yamaha/make-profiles.mjs` |
+| `yamaha-modx` | Yamaha MODX | MODX | SysEx parameters and dumps | 4,521 | MODX6/MODX7/MODX8 Data List (D0) | `yamaha/make-profiles.mjs` |
+| `yamaha-modx-plus` | Yamaha MODX+ | MODX | SysEx parameters and dumps | 4,521 | MODX6+/MODX7+/MODX8+ Data List (A0) | `yamaha/make-profiles.mjs` |
 | `yamaha-moxf` | Yamaha MOXF | MOXF | SysEx parameters and dumps | 5,317 | MOXF6/MOXF8 Data List (A0) | `yamaha/make-profiles.mjs` |
 | `yamaha-mx` | Yamaha MX49/MX61/MX88 | MX | SysEx parameters and dumps | 3,880 | MX49/MX61/MX88 Data List (C0) | `yamaha/make-profiles.mjs` |
 | `yamaha-reface-cp` | Yamaha reface CP | reface | SysEx parameters and dumps | 22 | reface Data List (B0) | `yamaha/make-profiles.mjs` |

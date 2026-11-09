@@ -22,7 +22,7 @@ import { readText } from './support/readText.mjs';
 import { pageBulkBlocks, pageParameterTables, readByteCount, readFormat } from '../../../tools/profiles/yamaha/read-yamaha-pdf.mjs';
 import { readHexRange, readPlaceholders, readShownRange, readValues, seriesNames, splitList } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/yamaha/make-profiles.mjs';
-import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { localCollectDumpMessages, localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
 /* ------------------------------------------------------------------ the reader */
 
@@ -132,6 +132,25 @@ test('the description says what each value shows: a list of names, a range of nu
 const BUILT = await Promise.all(SYNTHS.map((name) => build(name)));
 const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
 
+/**
+ * A dump made by hand, as the instrument would send it: each mapped parameter at its lowest value
+ * (or at `values[id]`), the rest 0, and its checksum worked out. A Bulk Header or Footer carries none.
+ */
+function handMade(profile, d, values = {}, at = null) {
+  const byId = new Map(profile.parameters.map((p) => [p.id, p]));
+  const data = new Array(d.payload.size).fill(0);
+  for (const m of d.mappings) {
+    const p = byId.get(m.parameter);
+    const low = values[p.id] ?? (p.type === 'choice' ? p.choices[0].value : p.type === 'text' ? 32 : p.range.min);
+    const bytes = p.type === 'text' ? new Array(p.encoding.length).fill(32) : p.encoding.type === 'u14-msb-lsb' ? [low >> 7, low & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((k) => (low >> (k * 4)) & 15) : [low];
+    bytes.forEach((b, k) => { data[m.offset + k] = b; });
+  }
+  const prefix = d.matcher.prefix.map((b) => parseInt(b, 16));
+  if (at) prefix.splice(prefix.length - 3, 3, ...at);
+  const summed = [...prefix, ...data].slice(d.checksum.fromOffset);
+  return hex([...prefix, ...data, (128 - (summed.reduce((t, b) => t + b, 0) % 128)) % 128, 0xf7]);
+}
+
 for (const { name, profile, text, out, data } of BUILT) {
   test(`${profile.id}: the committed profile is what the generator makes`, () => {
     assert.equal(readText(out), text, `stale — run: node tools/profiles/yamaha/make-profiles.mjs ${name}`);
@@ -178,6 +197,20 @@ for (const { name, profile, text, out, data } of BUILT) {
     }
     const readable = new Set(profile.parameters.filter((p) => p.access.canRead).map((p) => p.id));
     for (const d of profile.dumpDefinitions ?? []) for (const m of d.mappings) assert.ok(readable.has(m.parameter), m.parameter);
+  });
+
+  test(`${profile.id}: each Pull's answer, every block of it made by hand, is a complete collection`, { skip: !profile.requests?.length }, () => {
+    const message = (d) => handMade(profile, d);
+    for (const r of profile.requests.filter((x) => x.response.kind === 'bulkDump')) {
+      const members = profile.dumpDefinitions.filter((d) => d.completion.collectionId === r.response.collectionId);
+      const collected = localCollectDumpMessages(profile, members.map(message));
+      assert.ok(collected.complete, `${r.name}: ${collected.error} ${JSON.stringify(collected.diagnostics.slice(0, 2))}`);
+      assert.equal(collected.parsedMessageCount, members.length);
+    }
+    for (const r of profile.requests.filter((x) => x.response.dump)) {
+      const parsed = localParseDumpMessage(profile, message(profile.dumpDefinitions.find((d) => d.id === r.response.dump)));
+      assert.ok(parsed.ok, `${r.name}: ${parsed.error}`);
+    }
   });
 
   test(`${profile.id}: the source is the data list, and nobody has tried it on an instrument`, () => {
@@ -243,4 +276,28 @@ test('the MX: a model ID of two bytes, a byte count the checksum adds up, and it
   assert.equal(common.matcher.prefix.join(' '), 'F0 43 00 7F 17 00 50 40 00 00', 'no model ID after the byte count');
   assert.deepEqual([common.payload.offset, common.checksum.fromOffset, common.completion.expectedBytes], [10, 5, 92], 'the checksum adds up from the byte count');
   assert.equal(profile.requests.find((r) => r.id === 'requestPerformance').template.join(' '), 'F0 43 20 7F 17 0E 5F 00 F7');
+});
+
+test('the MODX: Pull asks for the Performance Common and Part 1, and Part 1 is complete at its footer, whatever its type sends', { skip: !builtProfile('yamaha-modx') }, () => {
+  const profile = builtProfile('yamaha-modx');
+  const request = (id) => profile.requests.find((r) => r.id === id).template.join(' ');
+  assert.equal(request('requestPerformanceCommon'), 'F0 43 20 7F 1C 07 0E 53 00 F7');
+  assert.equal(request('requestPart1'), 'F0 43 20 7F 1C 07 0E 52 00 F7', 'the Bulk Control table\'s Performance Edit Buffer Part nn, nn = 0');
+  const part1 = profile.dumpDefinitions.filter((d) => d.completion.collectionId === 'part1');
+  assert.ok(part1.every((d) => d.completion.endsWith === 'bulk0F5200'));
+  // A Normal part: its part blocks and its eight elements twice over, no drum keys, no operators.
+  const normal = part1.filter((d) => !/^(50|48|49)$/.test(d.matcher.prefix.at(-3)));
+  assert.ok(normal.length < part1.length - 80);
+  const element2 = profile.parameters.find((p) => p.group === 'Element 2 Part 1' && p.type === 'integer' && p.range.max > 1 && normal.some((d) => d.mappings.some((m) => m.parameter === p.id)));
+  const messages = normal.map((d) => handMade(profile, d, d.mappings.some((m) => m.parameter === element2.id) ? { [element2.id]: element2.range.max } : {}));
+  const begun = localCollectDumpMessages(profile, messages.slice(0, -1));
+  assert.equal(begun.complete, false, 'not before the footer');
+  const collected = localCollectDumpMessages(profile, messages);
+  assert.ok(collected.complete, collected.error);
+  assert.equal(collected.values[element2.id], element2.range.max);
+  // Part 2's blocks are not this profile's: the instrument would not send them for Part 1, and a
+  // stray one is no dump of it.
+  const performancePart = part1.find((d) => d.matcher.prefix.slice(-3).join(' ') === '31 00 00');
+  assert.equal(localParseDumpMessage(profile, handMade(profile, performancePart, {}, [0x31, 0x01, 0x00])).ok, false);
+  assert.equal(profile.dumpDefinitions.find((d) => d.id === 'bulk304000').completion.collectionId, 'performanceCommon');
 });

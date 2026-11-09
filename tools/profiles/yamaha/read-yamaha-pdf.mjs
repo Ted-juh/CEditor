@@ -104,7 +104,7 @@ function findHeads(lines, width) {
  * bottom): { title, notes, rows: [{ address: [H, M, L], size, range: [..], name, description,
  * default, notes }] }. A table with no title over it on this page continues the one before it.
  */
-export function pageParameterTables(xml) {
+export function pageParameterTables(xml, addressBytes = 3) {
   const { words, width, height } = pageWords(xml);
   const lines = visualLines(words);
   const heads = findHeads(lines, width).sort((a, b) => a.x0 - b.x0 || a.y0 - b.y0);
@@ -127,6 +127,8 @@ export function pageParameterTables(xml) {
       title = text(above[titleAt]);
       const rest = above.slice(titleAt + 1);
       if (rest[0] && /^\(/.test(text(rest[0])) && !/PARAMETER CHANGE TABLE \(/i.test(title)) title += ` ${text(rest.shift())}`;
+      // The MODX M sets `Group Number =7F 1C, Model ID = 0D` beside its title.
+      title = title.replace(/\s*Group Number\s*=.*$/i, '');
       for (const l of rest) if (text(l)) notes.push(text(l));
     }
     // It also ends at its `Total Size`: the notes printed under it are not its columns.
@@ -166,7 +168,7 @@ export function pageParameterTables(xml) {
       const text = (k) => (cells[k] ?? []).join(' ');
       if (/^Total Size/i.test(text('address') || text('size'))) break;
       const addressWords = cells.address ?? [];
-      const isRow = addressWords.length >= 1 && addressWords.length <= 3 && addressWords.every((t) => ADDRESS_BYTE.test(t)) && HEX_BYTE.test(addressWords.at(-1)) && /^\d+$/.test(text('size'));
+      const isRow = addressWords.length >= 1 && addressWords.length <= addressBytes && addressWords.every((t) => ADDRESS_BYTE.test(t)) && HEX_BYTE.test(addressWords.at(-1)) && /^\d+$/.test(text('size'));
       if (isRow) {
         current = { address: addressWords, size: Number(text('size')), range: text('range') ? [text('range')] : [], name: text('name'), description: text('description'), ...(h.defaultHead ? { default: text('default') } : {}), notes: text('notes') };
         rows.push(current);
@@ -188,19 +190,20 @@ const join = (s) => String(s ?? '').replace(/([A-Za-z])- (?=[a-z])/g, '$1').repl
  * prints its low byte, and its high and mid bytes when they change) and a table without a title
  * continuing the one before it.
  */
-export function readParameterTables(pdf, pages) {
+export function readParameterTables(pdf, pages, addressBytes = 3) {
   const tables = [];
   for (const page of pages) {
-    for (const t of pageParameterTables(pageXml(pdf, page))) {
+    for (const t of pageParameterTables(pageXml(pdf, page), addressBytes)) {
       const continues = !t.title && tables.length;
       const table = continues ? tables.at(-1) : { title: t.title ?? '', notes: t.notes, page, rows: [] };
       if (!continues) tables.push(table);
-      let [high, mid] = table.rows.length ? table.rows.at(-1).address : [null, null];
+      // A row prints its last byte, and the ones before it when they change: those it leaves out
+      // are carried from the row above (three bytes an address, or four on the MODX M).
+      let carried = table.rows.length ? table.rows.at(-1).address : new Array(addressBytes).fill(null);
       for (const r of t.rows) {
-        const a = r.address;
-        if (a.length === 3) [high, mid] = [a[0], a[1]];
-        else if (a.length === 2) mid = a[0];
-        table.rows.push({ page, address: [high, mid, a.at(-1)], size: r.size, range: r.range.map(join), name: join(r.name), description: join(r.description), ...(r.default !== undefined ? { default: join(r.default) } : {}), notes: join(r.notes) });
+        const address = [...carried.slice(0, addressBytes - r.address.length), ...r.address];
+        carried = address;
+        table.rows.push({ page, address, size: r.size, range: r.range.map(join), name: join(r.name), description: join(r.description), ...(r.default !== undefined ? { default: join(r.default) } : {}), notes: join(r.notes) });
       }
     }
   }
@@ -218,7 +221,7 @@ function readHeader(lines, status) {
   if (start < 0) return null;
   const out = [];
   for (const l of lines.slice(start + 1, start + 16)) {
-    if (/Address High/i.test(l)) return out.length ? out : null;
+    if (/Address (High|1st)/i.test(l)) return out.length ? out : null;
     const m = /\b[01nb]{8}\s+(?:([0-9A-F]{2})H?|b{7})\s+(?:Group (?:Number|ID) (?:High|Low)|Model ID|Byte Count)\b/i.exec(l);
     if (m) out.push(m[1] ?? 'bb');
   }
@@ -247,6 +250,9 @@ export function readFormat(text) {
   const header = readHeader(lines, '0001');
   const bulkHeader = readHeader(lines, '0000');
   const sum = /Check sum is the value[^\n]*?when the (Model ID|Byte Count)\b/i.exec(t)?.[1];
+  // `Address High`, `Mid`, `Low`; the MODX M's `Address 1st` … `4th`.
+  const start = lines.findIndex((l) => /\b0001nnnn\s+\w{2}H?\s+Device Number/i.test(l));
+  const addressLines = start < 0 ? [] : lines.slice(start, start + 20).filter((l) => /\b0a{7}\s+a{7}\s+Address (High|Mid|Low|1st|2nd|3rd|4th)\b/i.test(l));
   const reply = identity?.replace(/H/g, '').split(/\s+/).filter(Boolean);
   return {
     ...(reply && reply.slice(0, 10).every((b) => /^[0-9A-F]{2}$/.test(b)) ? { identityReply: reply } : {}),
@@ -255,6 +261,7 @@ export function readFormat(text) {
     ...(header ? { header } : {}),
     ...(bulkHeader ? { bulkHeader } : {}),
     ...(sum ? { checksumFrom: /Byte/i.test(sum) ? 'byteCount' : 'modelId' } : {}),
+    ...(addressLines.length === 4 ? { addressBytes: 4 } : {}),
   };
 }
 
@@ -296,10 +303,12 @@ export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}) {
     if (!words.length) continue;
     const text = words.join(' ');
     if (/^:(\s+:)*$/.test(text)) { series = out.length > 0; continue; }
-    const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,4})\\s+${BYTE}\\s+${BYTE}\\s+${BYTE}$`).exec(text);
+    const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,5})\\s+${BYTE}\\s+${BYTE}\\s+${BYTE}$`).exec(text);
     const last = series && /^(.*?)\s+([0-9A-F]{2})$/.exec(text);
     series = false;
-    if (m) out.push({ name: m[1].trim(), bytes: Number(m[2]), address: [m[4], m[5], m[6]] });
+    // A side note set beside the rows (the MODX's `Only the Part No. p same as the Part number
+    // specified in "nn" is available.`) shares their lines: its lowercase words before the name are not it.
+    if (m) out.push({ name: m[1].trim().replace(/^(?:[a-z“"]\S*\s+)+(?=[A-Z])/, ''), bytes: Number(m[2]), address: [m[4], m[5], m[6]] });
     else if (last) out.at(-1).last = { name: last[1].trim(), mid: last[2] };
     else if (/^(MIDI|Program|Control|Parameter)\b/.test(text) && out.length) break;
   }

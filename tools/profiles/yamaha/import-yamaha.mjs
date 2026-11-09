@@ -30,7 +30,7 @@ export function importDocuments(layout, files) {
   const r = layout.read;
   const file = files[r.doc ?? 0];
   const format = readFormat(pagesText(file, r.formatPages));
-  const tables = readParameterTables(file, r.tablePages);
+  const tables = readParameterTables(file, r.tablePages, format.addressBytes ?? 3);
   // The bulk dump block table, in one or more spans (a column of a page each).
   const spans = [r.bulk ?? []].flat();
   const bulk = spans.flatMap((s) => readBulkBlocks(file, s.page, s));

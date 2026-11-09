@@ -237,9 +237,9 @@
       {"parameter":"system.speakerOutputSp","offset":13},
       {"parameter":"system.midiControlControl","offset":14}
     ]},
-    {"id":"bulk0E0F00","name":"VOICE Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","05","0E","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":7,"expectedBytes":13,"collectionId":"voice"},"mappings":[
+    {"id":"bulk0E0F00","name":"VOICE Bulk Header","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","05","0E","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":7,"expectedBytes":13,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
     ]},
-    {"id":"bulk300000","name":"Voice Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","2A","05","30","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":38},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":48,"byteOffset":49},"completion":{"expectedMessages":7,"expectedBytes":51,"collectionId":"voice"},"mappings":[
+    {"id":"bulk300000","name":"Voice Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","2A","05","30","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":38},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":48,"byteOffset":49},"completion":{"expectedMessages":7,"expectedBytes":51,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"voiceCommon.voiceName","offset":0},
       {"parameter":"voiceCommon.transposeTp","offset":12},
       {"parameter":"voiceCommon.partMode","offset":13},
@@ -265,7 +265,7 @@
       {"parameter":"voiceCommon.effect2Parameter1Note","offset":33},
       {"parameter":"voiceCommon.effect2Parameter2Note","offset":34}
     ]},
-    {"id":"bulk310000","name":"Operator 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310000","name":"Operator 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"op1.op1OnOffOp","offset":0},
       {"parameter":"op1.op1EgRate1","offset":1},
       {"parameter":"op1.op1EgRate2","offset":2},
@@ -292,7 +292,7 @@
       {"parameter":"op1.op1FreqFineRatioFreq","offset":23},
       {"parameter":"op1.op1FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk310100","name":"Operator 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","01","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310100","name":"Operator 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","01","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"op2.op2OnOffOp","offset":0},
       {"parameter":"op2.op2EgRate1","offset":1},
       {"parameter":"op2.op2EgRate2","offset":2},
@@ -319,7 +319,7 @@
       {"parameter":"op2.op2FreqFineRatioFreq","offset":23},
       {"parameter":"op2.op2FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk310200","name":"Operator 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","02","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310200","name":"Operator 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","02","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"op3.op3OnOffOp","offset":0},
       {"parameter":"op3.op3EgRate1","offset":1},
       {"parameter":"op3.op3EgRate2","offset":2},
@@ -346,7 +346,7 @@
       {"parameter":"op3.op3FreqFineRatioFreq","offset":23},
       {"parameter":"op3.op3FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk310300","name":"Operator 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","03","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310300","name":"Operator 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","03","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
       {"parameter":"op4.op4OnOffOp","offset":0},
       {"parameter":"op4.op4EgRate1","offset":1},
       {"parameter":"op4.op4EgRate2","offset":2},
@@ -373,7 +373,7 @@
       {"parameter":"op4.op4FreqFineRatioFreq","offset":23},
       {"parameter":"op4.op4FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk0F0F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","05","0F","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":7,"expectedBytes":13,"collectionId":"voice"},"mappings":[
+    {"id":"bulk0F0F00","name":"Bulk Footer","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","04","05","0F","0F","00"],"suffix":["F7"]},"payload":{"offset":11,"size":0},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":10,"byteOffset":11},"completion":{"expectedMessages":7,"expectedBytes":13,"collectionId":"voice","endsWith":"bulk0F0F00"},"mappings":[
     ]}
   ],
   "startup": {

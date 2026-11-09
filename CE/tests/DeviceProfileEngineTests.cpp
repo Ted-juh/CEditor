@@ -1342,6 +1342,56 @@ int runLsbFirstEncodingTests (const juce::File& nrpnFile)
 // A 14-bit CC pair: the MSB on `controller`, then the LSB on `lsbController`, as two messages; a 7-bit
 // encoder sends the coarse half with its fine half 0; an LSB on the MSB's own controller is refused.
 // deviceProfileLocalEngine.js builds the same bytes (inboundParameterIndex.test.js checks them).
+int runCollectionEndsWithTests()
+{
+    // A collection whose size the instrument decides: complete when the dump it names arrives,
+    // however many came before it, and not before, however many have.
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-endswith", "name": "Probe", "manufacturer": "Probe",
+      "parameters": [
+        { "id": "level", "name": "Level", "messageRecipe": "cc7", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true, "canRead": true } }
+      ],
+      "messageRecipes": [ { "id": "cc7", "kind": "cc", "channel": 1, "controller": 7, "value": "$encodedValue" } ],
+      "dumpDefinitions": [
+        { "id": "header", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "01"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 0 },
+          "completion": { "expectedMessages": 2, "expectedBytes": 4, "collectionId": "performance", "endsWith": "footer" }, "mappings": [] },
+        { "id": "part", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "02"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 1 },
+          "completion": { "expectedMessages": 2, "expectedBytes": 5, "collectionId": "performance", "endsWith": "footer" },
+          "mappings": [ { "parameter": "level", "offset": 0 } ] },
+        { "id": "footer", "kind": "sysex", "matcher": { "prefix": ["F0", "7D", "03"], "suffix": ["F7"] }, "payload": { "offset": 3, "size": 0 },
+          "completion": { "expectedMessages": 2, "expectedBytes": 4, "collectionId": "performance", "endsWith": "footer" }, "mappings": [] }
+      ]
+    })JSON";
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] Collection endsWith: probe profile load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    juce::StringArray begun { "F0 7D 01 F7", "F0 7D 02 40 F7" };
+    const auto partial = engine.collectDumpMessages (begun);
+    if (partial.complete)
+    {
+        std::cerr << "[FAIL] Collection endsWith: complete before its footer, at its expected count\n";
+        ++failures;
+    }
+    juce::StringArray whole { "F0 7D 01 F7", "F0 7D 02 40 F7", "F0 7D 02 41 F7", "F0 7D 03 F7" };
+    const auto complete = engine.collectDumpMessages (whole);
+    if (! complete.complete || complete.expectedMessageCount != 4 || (int) complete.values.getProperty ("level", -1) != 65)
+    {
+        std::cerr << "[FAIL] Collection endsWith: the footer should complete it with 4 messages and level 65, got "
+                  << (complete.complete ? "complete" : "incomplete") << ", " << complete.expectedMessageCount << " expected\n";
+        ++failures;
+    }
+    if (failures == 0)
+        std::cout << "[PASS] Collection endsWith :: complete when its footer arrives, not at a count\n";
+    return failures;
+}
+
 int runCcPairTests()
 {
     const char* json = R"JSON({
@@ -4257,6 +4307,7 @@ int main (int argc, char** argv)
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runCcPairTests();
+    failures += runCollectionEndsWithTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);

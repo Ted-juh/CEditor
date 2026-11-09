@@ -76,9 +76,15 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
   list does not say ten characters may go in one.
 - **Pull** asks for each block the Bulk Dump Block table lists: a block on its own at its address
   (System), when it holds a parameter laid out here, and a Bulk Header's blocks with one request at
-  the header's address, read as one collection (header, Common, the operators, footer). Where the
-  table prints the header `0E mm nn`, the layout picks the edit buffer from the Bulk Control table
-  (the MOXF's Normal Voice Edit Buffer, `0E 0F 00`). The byte count is what the data list says it
+  the header's address, read as one collection (header, Common, the operators, footer), complete
+  when its Bulk Footer arrives: the data lists say the blocks between may come in any order and not
+  all of them, and a MODX part sends the blocks of its type. A header is at `0E`, a footer at `0F`,
+  whatever the row is called (the reface YC's prints its footer `Bulk`). Where the table prints the
+  header `0E mm nn`, the layout picks the edit buffer from the Bulk Control table (the MOXF's Normal
+  Voice Edit Buffer, `0E 0F 00`). A block printed with placeholders (`41 ep 00 [p: Part No., e:
+  Element No.]`) is one for each value the layout gives them; one with a placeholder the layout does
+  not give is not read, and its messages are let pass. A collection or block holding no parameter
+  laid out here (the MODX's curves, Live Sets, micro tunings) is not asked for. The byte count is what the data list says it
   counts: `from Model ID onward` on the reface (the data and four bytes more), `the data size` on the
   MOXF and MX (a header's is 0). The checksum is the one the data format prints: over the model ID,
   the address and the data, or, on the MX, from the byte count. Requests go out as 2n and dumps come
@@ -95,8 +101,8 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
 | `yamaha-reface-dx` | reface Data List (B0), pp. 6-10 | 135 | 39 | System, Voice Common and four operators |
 | `yamaha-reface-cp` | reface Data List (B0), pp. 11-14 | 22 | 11 | System, TG Common |
 | `yamaha-reface-yc` | reface Data List (B0), pp. 15-19 | 27 | 11 | System, TG Common |
-| `yamaha-modx` | MODX6/MODX7/MODX8 Data List (D0), pp. 188, 193-222 | 4,521 | 884 | — |
-| `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 193-222 | 4,521 | 884 | — |
+| `yamaha-modx` | MODX6/MODX7/MODX8 Data List (D0), pp. 188, 192-222 | 4,521 | 884 | System, Performance Common, Part 1 |
+| `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 192-222 | 4,521 | 884 | System, Performance Common, Part 1 |
 | `yamaha-moxf` | MOXF6/MOXF8 Data List (A0), pp. 121, 124-146 | 5,317 | 1,216 | the five edit buffers, the System's blocks |
 | `yamaha-mx` | MX49/MX61/MX88 Data List (C0), pp. 55, 57-66 | 3,880 | 736 | the three edit buffers, the System's blocks |
 
@@ -116,8 +122,15 @@ What the MODX's data list leaves out or the reader does not take:
 - **Bit-packed rows** (`Receive Pitch Bend … Receive Control Change`, a bit each) are left out:
   sending one means knowing the others.
 - **Micro tunings, curves and Live Sets** are user data, not part of a Performance: left out.
-- **Pull** is not mapped yet: the Performance's bulk dump is a header, a block per part and element,
-  and a footer, as the reface's are, but larger.
+- **Motion sequences and the Super Knob sequence** (`30 lm 00`, `32 sp 00`, `30 6m 00`) are not laid
+  out, and their blocks are not read.
+
+Pull asks for the Performance Edit Buffer Common (`0E 53 00`) and the Performance Edit Buffer Part 1
+(`0E 52 00`), the two halves these profiles lay out, rather than the whole Performance (`0E 25 00`),
+which would send all 16 parts. Part 1 answers with its part blocks and the blocks of its type: a
+Normal part's elements, a Drum part's keys or an FM-X part's operators, which is why the collection
+is complete at its footer and not at a count. Every one of the 4,521 parameters falls in a block
+asked for.
 
 The MOXF's tables are laid out in full: the System with its six Quick Setups and their audio and
 MIDI configs, the Master's four zones, the Performance and its four parts, the Song/Pattern mixing
