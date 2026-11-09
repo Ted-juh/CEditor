@@ -4046,7 +4046,29 @@ int main (int argc, char** argv)
         root.getChildFile ("roland-rd-700gx.ceditor-device.json"),
         root.getChildFile ("roland-rd-700.ceditor-device.json"),
         root.getChildFile ("roland-rd-2000.ceditor-device.json"),
-        root.getChildFile ("roland-rd-2000ex.ceditor-device.json")
+        root.getChildFile ("roland-rd-2000ex.ceditor-device.json"),
+        // The instruments whose MIDI is a Control Change list, read from their charts by
+        // tools/profiles/roland/read-cc-list.mjs. Each vector's bytes are worked out from the
+        // chart's controller number and channel, not by asking an engine.
+        root.getChildFile ("roland-jp-08.ceditor-device.json"),
+        root.getChildFile ("roland-ju-06.ceditor-device.json"),
+        root.getChildFile ("roland-ju-06a.ceditor-device.json"),
+        root.getChildFile ("roland-jx-08.ceditor-device.json"),
+        root.getChildFile ("roland-jd-08.ceditor-device.json"),
+        root.getChildFile ("roland-sh-01a.ceditor-device.json"),
+        root.getChildFile ("roland-se-02.ceditor-device.json"),
+        root.getChildFile ("roland-tr-06.ceditor-device.json"),
+        root.getChildFile ("roland-tr-08.ceditor-device.json"),
+        root.getChildFile ("roland-system-1.ceditor-device.json"),
+        root.getChildFile ("roland-s-1.ceditor-device.json"),
+        root.getChildFile ("roland-p-6.ceditor-device.json"),
+        root.getChildFile ("roland-sh-4d.ceditor-device.json"),
+        root.getChildFile ("roland-tr-6s.ceditor-device.json"),
+        root.getChildFile ("roland-tr-8s.ceditor-device.json"),
+        root.getChildFile ("roland-tr-1000.ceditor-device.json"),
+        root.getChildFile ("roland-mc-101.ceditor-device.json"),
+        root.getChildFile ("roland-mc-707.ceditor-device.json"),
+        root.getChildFile ("roland-vt-4.ceditor-device.json")
     };
 
     auto failures = 0;

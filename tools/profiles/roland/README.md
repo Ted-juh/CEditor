@@ -167,12 +167,105 @@ Every product page on the global, US and UK sites was checked (1,104 of them). P
 | **Reads with a few issues** | the original FANTOM (2001), Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, RD-700SX and RD-300SX (tables mixing full addresses with offsets) |
 | **Address map in the owner's manual, still reading with issues** | XP-30, JV-1010 (no ModelID heading, appendix tables), VR-760 |
 | **Scanned, no text** — OCR plus an independent transcription to check against | JV-1080, JV-2080, XP-10/50/60/80, JP-8000, MC-303, MC-505, MC-80, MC-50mkII |
-| **No address map published** | The Boutiques (JP-08, JU-06/06A, JX-03/08, JD-08, SE-02, SH-01A, …), SYSTEM-1/1m/8, SH-4d, the AIRA and TR lines, MC-101/707: CC tables only, a different and simpler source |
+| **No address map published** | The Boutiques, the AIRA and TR lines, the grooveboxes: a Control Change list instead. Nineteen are profiles, below |
 
 OCR was tried on the JV-1080's: at 300 dpi it reads the tables but misreads offsets (`00 2B` as
 `00 28`) and labels (`1600` as `2600`), and the 1994 table grammar differs. The address arithmetic
 can catch the offsets; nothing automatic can catch a label, so the scanned machines wait for a second
 source to check against.
+
+## The instruments whose MIDI is a Control Change list
+
+```bash
+node tools/profiles/roland/make-cc-profiles.mjs            # rebuild every profile from charts/ + cc-synths/
+node tools/profiles/roland/make-cc-profiles.mjs --check    # fail if a committed profile is stale
+node tools/profiles/roland/import-cc-chart.mjs <chart.pdf> <name> --format chart|list|hex --url <where it came from>
+cd CE/web && node --test test/rolandCcProfiles.test.js
+```
+
+The Boutiques, the AIRA and TR boxes and the grooveboxes publish no address map. What they do
+publish is which controller does what, and Roland prints that four ways, all of which
+`read-cc-list.mjs` reads:
+
+| Style | Where | Instruments |
+|---|---|---|
+| `chart` | the MIDI Implementation Chart's own Control Change rows, one number per row, the name in Remarks | JP-08, JU-06, JU-06A, JX-08, JD-08, SYSTEM-1, SH-4d, TR-6S, TR-8S, TR-1000, MC-101, MC-707, VT-4 |
+| `list` | a "Control Change / Explanation" table beside or after the chart, often two side by side; the chart gives spans and points to it | SH-01A, TR-06, TR-08, S-1, SE-02 (`CC# / Patch parameter`) |
+| `hex` | decimal and hexadecimal side by side, the hexadecimal checking the decimal | P-6 |
+
+The chart is read in every case, for what it says each number does on the wire (sent, received,
+both) and as a check: a list that names a number the chart does not count, or the other way
+round, is reported. The chart's legend says which glyph is Yes, which is not always a letter: the
+VT-4's font extracts its circle as `6`, and its legend says `6 : Yes`.
+
+A profile is every controller the list names, 0 - 127 on its number, named as printed, with the
+panel control the manual says edits it as the description. A controller the chart marks as sent
+but not received is read-only, so a panel can follow it and never sends it. **No value range is
+invented**: Roland does not print how a Boutique divides 0 - 127 among a switch's positions, so a
+switch is a number until a manual or an instrument says. The exceptions are values the manual
+prints itself: the VT-4's `ROBOT (0, 127)` is those two choices, the SE-02's Bank select is
+0 - 3, the JD-08's WAVEFORM receives 0 - 108.
+
+| Profile | Controllers | Read from |
+|---|---:|---|
+| `roland-jp-08` | 48 (85 parameters: Upper and Lower) | MIDI Implementation Chart 1.01 |
+| `roland-ju-06` | 34 | MIDI Implementation Chart 1.01 |
+| `roland-ju-06a` | 39 | MIDI Implementation Chart 1.01 |
+| `roland-jx-08` | 49 | Reference Manual 1.00, p62 |
+| `roland-jd-08` | 85 | Reference Manual 1.00, p59 |
+| `roland-sh-01a` | 42 | MIDI Implementation Chart 1.00, Control change list |
+| `roland-se-02` | 58 + Bank select | MIDI Implementation Chart 1.00, p2 |
+| `roland-tr-06` | 42 | MIDI Implementation Chart 1.00, Control change list |
+| `roland-tr-08` | 38 | MIDI Implementation Chart 1.00, Control change list |
+| `roland-system-1` | 54 | MIDI Implementation Chart 1.10 |
+| `roland-s-1` | 54 | Owner's Manual 1.02, p73-74 |
+| `roland-p-6` | 40 | Owner's Manual 1.02, p149-150 |
+| `roland-sh-4d` | 32 | Owner's Manual 2.00, p240 |
+| `roland-tr-6s` | 34 | MIDI Implementation Chart 1.00 |
+| `roland-tr-8s` | 55 | MIDI Implementation Chart 1.10 |
+| `roland-tr-1000` | 66 | MIDI Implementation Chart 1.50 |
+| `roland-mc-101` | 25 | MIDI Implementation Chart 1.60 |
+| `roland-mc-707` | 25 | MIDI Implementation Chart 1.60 |
+| `roland-vt-4` | 20 | MIDI Implementation 1.02, p7 |
+
+The JP-08 is two parts, and its chart's note \*1 sends the Lower part's controllers one channel
+above the Upper's (16 wraps to 1). Every row marked \*1 is therefore two parameters, on `channel`
+and `lowerChannel`; the engine reads a channel from a variable, so `lowerChannel` is kept beside
+`channel` and must be set to match.
+
+**What the manuals print wrong**, kept visible with the reason in each layout:
+
+- SYSTEM-1: `OSC1 TYPE` at both CC 46 and 61. By every other oscillator pair (RANGE 47/62, MOD
+  60/63, COLOR 50/55), 61 is probably OSC2 TYPE; the parameter keeps the printed name with its
+  number and says so, unconfirmed. `PORTAMNETO` (CC 5) is corrected.
+- JX-08: `DCO-1 RANGE` at both CC 20 and 47, and `PORTAMENTO TIME` at both 5 (received only)
+  and 117; kept, each with its number. `DCO-1 ENEV MOD` (CC 21) is corrected.
+- JD-08 `TVF RESONANSE` and SH-01A `PORTAMENT MODE` are corrected.
+- S-1: five entries print a waveform icon the text layer drops; read off the rendered page
+  (pulse at CC 15, 19 and 102, sawtooth at 20 and 107).
+
+**Checked against midi.guide** (the community CC database, CC BY-SA, `github.com/pencilresearch/midi`,
+as of November 2026), which covers eighteen of the nineteen. It agrees with Roland on all but
+these, where Roland's own chart says otherwise and the profile follows Roland:
+
+| Instrument | midi.guide | Roland's chart |
+|---|---|---|
+| JP-08 | ENV-1 RELEASE on CC 5, which it also gives Portamento time; 54 missing | ENV-1 RELEASE is CC 54 |
+| SH-4d | PAN on CC 11 | AMP PAN on CC 10; CC 65 (Porta Sw) also received |
+| SE-02 | Oscillator 2 mix on CC 4; Filter 1 decay on CC 5, which it also gives Control glide | MIX OSC2 is CC 49, FLT DECAY 1 is CC 52 |
+| TR-06 | cowbell on CC 86-88; DELAY TIME and DEPTH missing | no cowbell (the TR-606 has none); DELAY TIME 18, DELAY DEPTH 19 |
+| SYSTEM-1 | Osc1/Osc2 variant toggles on CC 105/106 | not in the chart |
+| MC-101 | Bank select MSB on CC 0; CC 84 missing | 84 Portamento control; 0/32 are a pair |
+| JD-08 | CC 68-71 missing | TONE PALETTE A-D, sent only |
+
+That is the case for reading the manual first: four of the eighteen put a controller on the wrong
+number, which would have gone straight into a profile, and three more differ from the chart.
+
+**No Control Change list found** in any English document Roland publishes for SYSTEM-8, SYSTEM-1m,
+TB-03, VP-03, TR-09, D-05, TB-3, TR-8 or MV-1; JX-03, J-6, T-8 and E-4 receive only performance
+controllers (modulation, expression, hold) or none, which is not an editor's worth. The SP-404MKII
+lists its controllers per effect, which wants a layout of its own. And the JD-Xi's and JD-XA's
+Control Change and NRPN lists, which their SysEx profiles do not map yet, read the same way.
 
 ## Adding a synth
 

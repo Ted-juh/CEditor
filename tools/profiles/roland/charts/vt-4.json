@@ -1,0 +1,28 @@
+{
+  "source": {"model":"VT-4","date":"Nov. 16. 2018","version":"1.02","file":"VT-4_MIDI_Imple_eng02_W.pdf","sha256":"fa3cdf876b24ddaf7af28abbe4cb8d64acb3f9bee613b25cff8d42521ae21a78","pages":8,"chartPage":7,"url":"https://static.roland.com/assets/media/pdf/VT-4_MIDI_Imple_eng02_W.pdf"},
+  "format": "chart",
+  "chart": {"numbers":[1,46,47,48,49,50,51,52,53,54,55,56,57,58,76,79,80,81,82,83],"spans":[],"notes":{}},
+  "issues": [],
+  "rows": [
+    {"cc":1,"name":"MODULATION","tx":false,"rx":true,"marks":[],"page":7},
+    {"cc":46,"name":"VOLUME","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":47,"name":"MIC SENS","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":48,"name":"KEY","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":49,"name":"ROBOT (0, 127)","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":50,"name":"MEGAPHONE (0, 127)","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":51,"name":"BYPASS (0, 127)","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":52,"name":"VOCODER (0, 127)","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":53,"name":"HARMONY (0, 127)","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":54,"name":"FORMANT","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":55,"name":"AUTO PITCH","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":56,"name":"BALANCE","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":57,"name":"REVERB","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":58,"name":"LINE OUT SELECT (0, 127)","tx":true,"rx":true,"marks":[],"page":7},
+    {"cc":76,"name":"MODULATION RATE","tx":false,"rx":true,"marks":[],"page":7},
+    {"cc":79,"name":"ROBOT VARIATION","tx":false,"rx":true,"marks":[],"page":7},
+    {"cc":80,"name":"MEGAPHONE VARIATION","tx":false,"rx":true,"marks":[],"page":7},
+    {"cc":81,"name":"VOCODER VARIATION","tx":false,"rx":true,"marks":[],"page":7},
+    {"cc":82,"name":"HARMONY VARIATION","tx":false,"rx":true,"marks":[],"page":7},
+    {"cc":83,"name":"REVERB VARIATION","tx":false,"rx":true,"marks":[],"page":7}
+  ]
+}
