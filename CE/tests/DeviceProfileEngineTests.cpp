@@ -4130,7 +4130,10 @@ int main (int argc, char** argv)
         root.getChildFile ("sequential-mopho.ceditor-device.json"),
         root.getChildFile ("sequential-mopho-keyboard.ceditor-device.json"),
         root.getChildFile ("sequential-mopho-x4.ceditor-device.json"),
-        root.getChildFile ("sequential-prophet-08.ceditor-device.json")
+        root.getChildFile ("sequential-prophet-08.ceditor-device.json"),
+        root.getChildFile ("oberheim-ob-6.ceditor-device.json"),
+        root.getChildFile ("oberheim-ob-x8.ceditor-device.json"),
+        root.getChildFile ("oberheim-teo-5.ceditor-device.json")
     };
 
     auto failures = 0;

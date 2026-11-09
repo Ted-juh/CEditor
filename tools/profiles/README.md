@@ -17,7 +17,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | Folder | What it builds |
 |---|---|
 | [`roland/`](roland/README.md) | 52 profiles from Roland's Parameter Address Maps (SysEx), and 19 from the Control Change lists of the instruments that have no address map. |
-| [`sequential/`](sequential/README.md) | 14 profiles from the NRPN tables of Sequential's and Dave Smith Instruments' manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, and the three Mophos. |
+| [`sequential/`](sequential/README.md) | 17 profiles from the NRPN tables of Sequential's, Dave Smith Instruments' and Oberheim's manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, the three Mophos, and the OB-6, OB-X8 and TEO-5. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 
 ## The rules every profile here follows

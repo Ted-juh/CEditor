@@ -63,6 +63,7 @@ export function interpretRow(row, table, layout) {
     if (cut >= 0) description = text.slice(cut).join(' ');
     name = [printed, ...wrapped].reduce((all, part) => {
       if (/\w-$/.test(all) && /^[a-z]/.test(part)) return `${all.slice(0, -1)}${part}`;   // Screen- / saver
+      if (/\s[-–]$/.test(all)) return `${all} ${part}`;                                   // Normal - / Bandpass: a dash, not a split word
       if (/[-/]$/.test(all)) return `${all}${part}`;                                      // ON/ / OFF
       return `${all} ${part}`;
     }).replace(/\s+/g, ' ').replace(/,$/, '');
@@ -314,7 +315,7 @@ export function buildNrpnProfile(data, layout) {
     ],
     variables,
     ...(layout.identity ? {
-      identity: { manufacturerId: ['01'], familyCode: layout.identity.familyCode, modelNumber: layout.identity.modelNumber, timeoutMs: 1000, retries: 0 },
+      identity: { manufacturerId: layout.identity.manufacturerId ?? ['01'], familyCode: layout.identity.familyCode, modelNumber: layout.identity.modelNumber, timeoutMs: 1000, retries: 0 },
     } : {}),
     coverage: {
       singleParameterWrite: 'complete-for-the-manual\'s-nrpn-tables',
