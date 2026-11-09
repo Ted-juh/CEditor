@@ -24,6 +24,8 @@ import {
   buildKorgProfile, identityFrom, parseNrpnValue, receivedLabels, splitDescription, transmittedLabels,
 } from '../../../tools/profiles/korg/build-korg-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
+import { modes as omModes, readOmCcPage } from '../../../tools/profiles/korg/read-korg-om-cc.mjs';
+import { foldKnobs, matchKnobs, readOmValue } from '../../../tools/profiles/korg/build-korg-knobs.mjs';
 import {
   localCompileDeviceRequest,
   localCompileParameter,
@@ -141,6 +143,73 @@ test('the builder: agreement makes a choice, disagreement a number, and a wide N
   assert.equal(by('WIDE'), undefined, 'wider than 7 bits with no format printed: left out');
   assert.ok(profile.authoringNotes.some((n) => /NRPN -- 15H \(WIDE\)/.test(n)));
   assert.deepEqual(identityFrom(PROBE.identity), { familyCode: ['51', '01'], modelNumber: ['00', '00'] });
+});
+
+/* ------------------------------------------------------------------ the microKORG's Owner's Manual */
+
+// p. 56 of the microKORG Owner's Manual as `pdftotext -layout` sets it: headings centred over their
+// columns (so not where the columns start), values that wrap above and below their row, and each
+// mode's value on a line of its own.
+const at = (cols) => Object.entries(cols).reduce((line, [col, text]) => line.padEnd(Number(col)) + text, '');
+const OM_PAGE = [
+  at({ 45: 'Messages transmitted and received by the microKORG' }),
+  at({ 60: 'Synth Parameter', 79: 'Vocoder Parameter', 99: 'Initial', 128: 'Value (transmitted)', 190: 'Value (received)' }),
+  at({ 45: 'PITCH', 58: 'Portamento', 78: 'Portamento', 99: 'CC#05', 109: '0...127', 176: '0...127' }),
+  at({ 109: '0:Saw, 18: Square', 176: '0...15: Saw, 16...31:' }),
+  at({ 58: 'Wave', 78: 'Wave', 99: 'CC#77', 109: '36: Tri' }),
+  at({ 176: 'Square, 32...127: Tri' }),
+  at({ 45: 'OSC 1', 58: 'Control1', 78: 'Control1', 99: 'CC#14', 109: '0...127', 176: '0...127' }),
+  at({ 58: 'Semitone', 78: 'HPF Level', 99: 'CC#18' }),
+  at({ 109: 'Synth; see p.57', 176: 'Synth; see p.57' }),
+  at({ 109: 'Vocoder; 0... 127', 176: 'Vocoder; 0... 127' }),
+  at({ 109: 'Synth; 0 / 1: –63, 64: 0, 127: +63' }),
+  at({ 58: 'Tune', 78: 'Threshold', 99: 'CC#19', 176: 'Synth; 0 / 1: –63, 64: 0, 127: +63' }),
+  at({ 109: 'Vocoder; 0... 127', 176: 'Vocoder; 0... 127' }),
+  at({ 58: 'Noise Level', 78: 'Noise Level', 99: 'CC#22', 109: '0...127', 176: '0...127' }),
+  at({ 109: 'Synth; 0: LPF, 127: HPF', 176: 'Synth; 0...63: LPF, 64...127: HPF' }),
+  at({ 58: 'Type', 78: 'Formant Shift', 99: 'CC#83', 109: 'Vocoder; 0: 0, 126: –2', 176: 'Vocoder; 0...63: 0, 64...127: –2' }),
+  at({ 45: 'F.EG', 58: 'Attack', 78: '–––––––––––', 99: 'CC#23', 109: '0...127', 176: '0...127' }),
+].join('\n');
+
+test('the Owner\'s Manual page: columns found from the rows, each wrapped line given to the row it belongs to', () => {
+  assert.deepEqual(readOmCcPage(OM_PAGE), [
+    { cc: 5, synth: 'Portamento', vocoder: 'Portamento', sent: '0...127', received: '0...127' },
+    { cc: 77, synth: 'Wave', vocoder: 'Wave', sent: '0:Saw, 18: Square 36: Tri', received: '0...15: Saw, 16...31: Square, 32...127: Tri' },
+    { cc: 14, synth: 'Control1', vocoder: 'Control1', sent: '0...127', received: '0...127' },
+    { cc: 18, synth: 'Semitone', vocoder: 'HPF Level', sent: 'Synth; see p.57 Vocoder; 0... 127', received: 'Synth; see p.57 Vocoder; 0... 127' },
+    { cc: 19, synth: 'Tune', vocoder: 'Threshold', sent: 'Synth; 0 / 1: –63, 64: 0, 127: +63 Vocoder; 0... 127', received: 'Synth; 0 / 1: –63, 64: 0, 127: +63 Vocoder; 0... 127' },
+    { cc: 22, synth: 'Noise Level', vocoder: 'Noise Level', sent: '0...127', received: '0...127' },
+    { cc: 83, synth: 'Type', vocoder: 'Formant Shift', sent: 'Synth; 0: LPF, 127: HPF Vocoder; 0: 0, 126: –2', received: 'Synth; 0...63: LPF, 64...127: HPF Vocoder; 0...63: 0, 64...127: –2' },
+    { cc: 23, synth: 'Attack', vocoder: '', sent: '0...127', received: '0...127' },
+  ]);
+});
+
+test('an Owner\'s Manual value: a number, one centred on 64, and a choice sent as the instrument sends it', () => {
+  assert.deepEqual(readOmValue('0...127', '0...127, Tempo Sync=ON; see p.57'), { min: 0, max: 127, aside: 'Tempo Sync=ON; see p.57' });
+  assert.deepEqual(readOmValue('', '0 / 1: L63, 2: L62...63: L01, 64: CNT, 65: R01...127: R63'), { min: 1, max: 127, displayMin: -63, displayMax: 63, shown: '1~127 = L63 ~ CNT ~ R63; 0 is L63 too' });
+  assert.deepEqual(readOmValue('0: Saw, 64: Squ 127: Tri', '0...42: Saw, 43...85: Squ, 86...127: Tri').choices, [{ value: 0, label: 'Saw' }, { value: 64, label: 'Squ' }, { value: 127, label: 'Tri' }]);
+  assert.equal(readOmValue('0: Saw, 50: Squ, 127: Tri', '0...42: Saw, 43...85: Tri, 86...127: Squ'), null, 'a value sent outside its own name\'s range settles nothing');
+  const { synth, vocoder } = omModes('Synth; 0...127 Vocoder; 0 / 1: -63, 64: 0, 127: +63');
+  assert.deepEqual([synth, vocoder], ['0...127', '0 / 1: -63, 64: 0, 127: +63']);
+});
+
+test('the knobs are matched by name across the two documents, which print some sections in another order', () => {
+  const knobs = foldKnobs([
+    { cells: ['AMP', 'Level', 'Level', '00~7F:0~127'] },
+    { cells: ['EG1', 'Attack', '', '00~7F:0~127'] },
+    { cells: ['FILTER', 'EG1 Int', 'Mod Int', '*2-6'] },
+    { cells: ['Sync Control', '00~3F/40~7F:No/Sync'] },
+  ]);
+  const rows = [
+    { cc: 23, synth: 'Attack', vocoder: '' },
+    { cc: 79, synth: 'Filter EG Int', vocoder: 'Mod Int' },
+    { cc: 7, synth: 'Level', vocoder: 'Level' },
+    { cc: 90, synth: 'Sync Ctrl', vocoder: 'Sync Ctrl' },
+  ];
+  assert.deepEqual(matchKnobs(rows, knobs).map((m) => [m.row.cc, m.knob.section, m.knob.synth, m.how]), [
+    [23, 'EG1', 'Attack', 'name'], [79, 'FILTER', 'EG1 Int', 'vocoder name'], [7, 'AMP', 'Level', 'name'], [90, '', 'Sync Control', 'abbreviation'],
+  ]);
+  assert.throws(() => matchKnobs([{ cc: 1, synth: 'Wobble', vocoder: '' }], knobs), /CC 1 \("Wobble"/);
 });
 
 /* ------------------------------------------------------------------ the profiles */
@@ -362,4 +431,31 @@ test('the microKORG2: its hex notation, a choice per range, and a signed value o
   const pan = localCompileParameter(profile, { parameterId: by('Vocoder Band 1 Pan').id, value: -63 });
   assert.equal(pan.hex, 'B0 63 05 B0 62 20 B0 06 7F B0 26 41');
   assert.deepEqual(by('Arpeggiator Swing').range, { min: -100, max: 100 });
+});
+
+test('the microKORG: its knobs on the Owner\'s Manual\'s control changes, named by its MIDI Implementation, each mode its own', { skip: !builtProfile('korg-microkorg') }, () => {
+  const profile = builtProfile('korg-microkorg');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  const send = (name, value) => localCompileParameter(profile, { parameterId: by(name).id, value });
+  // The manual prints the filter EG before AMP, the Implementation after: matched by name, not row.
+  assert.equal(send('EG 1 Attack', 100).hex, 'B0 17 64');
+  assert.equal(send('Amp Level', 100).hex, 'B0 07 64');
+  // A choice sends what the instrument sends (the manual's "transmitted"), inside its received range.
+  assert.deepEqual(by('OSC 1 Wave').choices.map((c) => c.value), [0, 18, 36, 54, 72, 90, 108, 126]);
+  assert.equal(send('OSC 1 Wave', 'dwgs').hex, 'B0 4D 5A');
+  // One controller, two meanings: Filter Type in a synth program, Formant Shift in a vocoder one.
+  assert.equal(send('Filter Type', by('Filter Type').choices[1].id).hex, 'B0 53 2B');
+  assert.equal(send('Vocoder Formant Shift', by('Vocoder Formant Shift').choices.at(-1).id).hex, 'B0 53 7E');
+  assert.equal(by('Vocoder Cutoff').type, 'bipolar');
+  assert.deepEqual([by('Vocoder Cutoff').range, by('Vocoder Cutoff').display.min, by('Vocoder Cutoff').display.max], [{ min: 1, max: 127 }, -63, 63]);
+  assert.equal(by('Filter Cutoff').type, 'integer');
+  assert.ok(profile.authoringNotes.some((n) => /CC 18, 19, 83, 74, 85, 10 mean one thing in a synth program/.test(n)));
+  // Its NRPNs: a mark that is the whole value, and a row printed for each mode.
+  assert.deepEqual(by('Arpeggio Type').choices.map((c) => [c.value, c.label]), [[0, 'Up'], [0x16, 'Down'], [0x2b, 'Alt1'], [0x40, 'Alt2'], [0x56, 'Random'], [0x6b, 'Trigger']]);
+  assert.match(by('Patch1 Source').description, /In a vocoder program: Fc Mod Source/);
+  assert.equal(send('Vocoder Band 1 Pan', 1).hex, 'B0 63 04 B0 62 20 B0 06 01');
+  // The member byte is printed as mm, its value below the table.
+  assert.deepEqual([profile.identity.familyCode, profile.identity.modelNumber], [['58', '00'], ['11', '00']]);
+  assert.equal(profile.sources.length, 2);
+  assert.match(profile.sources[1].notes, /microKORG_OM_E2\.pdf \(sha256 [0-9a-f]{64}\)/);
 });

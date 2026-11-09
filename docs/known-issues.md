@@ -413,6 +413,12 @@ something the program does with every profile, which the larger library makes ea
   sends one of these the CC 63 byte is an ordinary controller and the value is read from its top
   bits. The fix is for the assembler to keep the last value of the controller a recipe names and
   combine it with CC 6.
+- **A controller that means two things is not read back.** Six microKORG (2002) knobs mean one
+  setting in a synth program and another in a vocoder program (CC 83 is Filter Type or Formant
+  Shift), so its profile has two parameters on each. `inboundParameterIndex.js` maps a message two
+  parameters share to neither, so when the instrument sends one of those controllers nothing follows
+  it. Closing it means a profile saying which parameter applies under which setting (the program's
+  Voice Mode), and the index asking.
 - **The startup read stops at the first request that is not answered.**
   `processPendingRequestTimeouts` drops a timed-out request without starting the next in the
   `startup.sync` chain. Generated profiles work around it (blocks that may not answer are read on

@@ -14,7 +14,9 @@
 //   - every NRPN with a printed range is a parameter, its value on CC 6; a value wider than 7 bits
 //     goes as the document prints the format, its low bits first on their own controller (CC 63);
 //   - a list the document prints for a value (`*3-5 (VOICE MODE)`, `*note P6`) makes it a choice
-//     only when it names every value of the range, one each.
+//     only when it names every value of the range, one each;
+//   - where the document leaves the panel's control changes assignable and the Owner's Manual numbers
+//     them (the microKORG), those are parameters too (build-korg-knobs.mjs).
 //
 // The layout says what the document cannot: groups, what to leave out and why, and corrections,
 // each with its reason, which go into the profile's notes.
@@ -23,6 +25,7 @@ import { camel } from '../roland/build-profile.mjs';
 import { addPull } from './build-korg-dump.mjs';
 import { addParameterChange, parameterChangeVectors } from './build-korg-sysex.mjs';
 import { readHexValue } from './build-korg-hex.mjs';
+import { knobControllers } from './build-korg-knobs.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
@@ -127,6 +130,13 @@ export function parseNrpnValue(cell) {
   return { values: parseValues(spec), ascii: /^ASCII\b/i.test(spec ?? ''), shown: shown ?? null, marks, notes };
 }
 
+/** `BAND[1] LEVEL` -> `Band 1 Level`: a name printed in capitals, as words. */
+const ACRONYMS = new Set(['OSC', 'LFO', 'EG', 'FX', 'HPF', 'LPF', 'BPF', 'MIDI', 'DWGS', 'KBD', 'CC', 'FC']);
+export function printedName(text) {
+  return String(text).trim().replace(/\[(\d+)\]/g, ' $1').replace(/\s+/g, ' ')
+    .replace(/\b([A-Z]{2,})\b/g, (w) => (ACRONYMS.has(w) ? w : `${w[0]}${w.slice(1).toLowerCase()}`));
+}
+
 function groupOf(name, groups) {
   for (const [group, pattern] of groups ?? []) {
     const m = pattern.exec(name);
@@ -184,6 +194,13 @@ export function buildKorgProfile(data, layout) {
     encoding: { type: encoding },
     sendPolicy: max - min > 8 ? { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } : { mode: 'onCommit', coalesce: true },
     ui: { preferredComponent: preferredComponent(base.name, null) },
+  });
+  // Centred on 64 and shown as -63 ~ +63 (`00,01~40~7F:-63,-63~0~63`): 1 - 127, 64 the default.
+  const bipolarParameter = (base, read) => ({
+    ...numberParameter(base, read.min, read.max, 'u7'),
+    type: 'bipolar',
+    default: Math.round((read.min + read.max) / 2),
+    display: { mode: 'number', unit: '', shortLabel: base.shortLabel, min: read.displayMin, max: read.displayMax },
   });
   const choiceParameter = (base, choices) => ({
     ...base,
@@ -310,17 +327,40 @@ export function buildKorgProfile(data, layout) {
   const skipped = new Map();
   const skip = (why, at) => skipped.set(why, [...(skipped.get(why) ?? []), at]);
   // A setting in the microKORG documents' hex notation (build-korg-hex.mjs), as a parameter.
-  const hexParameter = (name, read, recipeId, suffix) => {
+  const hexParameter = (name, read, recipeId, suffix, extra = null) => {
     const { group, leaf } = groupOf(name, layout.groups);
+    const words = [read.shown, read.note, read.unit && !read.shown ? `In ${read.unit}.` : null, extra].filter(Boolean);
     const base = {
       id: unique(`${camel(group)}.${camel(leaf) || recipeId}`, suffix),
       name, group,
-      ...(read.shown || read.note || read.unit ? { description: [read.shown, read.note, read.unit && !read.shown ? `In ${read.unit}.` : null].filter(Boolean).join(' ') } : {}),
+      ...(words.length ? { description: words.join(' ') } : {}),
       access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
       messageRecipe: recipeId, shortLabel: camel(leaf),
     };
-    push(read.choices ? choiceParameter(base, choiceList(read.choices)) : numberParameter(base, read.min, read.max, read.wide ? (read.signed ? 's14-lsb-msb' : 'u14-lsb-msb') : 'u7'));
+    push(read.choices ? choiceParameter(base, choiceList(read.choices))
+      : read.displayMin !== undefined ? bipolarParameter(base, read)
+        : numberParameter(base, read.min, read.max, read.wide ? (read.signed ? 's14-lsb-msb' : 'u14-lsb-msb') : 'u7'));
   };
+  // The microKORG (2002)'s knobs: control changes the Owner's Manual numbers (build-korg-knobs.mjs).
+  if (data.ownersManual) {
+    const knobs = knobControllers(data, layout);
+    for (const spec of knobs.specs) {
+      const recipeId = `cc${spec.cc}`;
+      recipes.set(recipeId, { id: recipeId, kind: 'cc', channel: '$channel', controller: spec.cc, value: '$encodedValue' });
+      const leaf = spec.name.startsWith(`${spec.group} `) ? spec.name.slice(spec.group.length + 1) : spec.name;
+      const base = {
+        id: unique(`${camel(spec.group)}.${camel(leaf) || recipeId}`, `Cc${spec.cc}`),
+        name: spec.name, group: spec.group,
+        ...(spec.description ? { description: spec.description } : {}),
+        access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
+        messageRecipe: recipeId, shortLabel: camel(leaf),
+      };
+      push(spec.read.choices ? choiceParameter(base, choiceList(spec.read.choices))
+        : spec.read.displayMin !== undefined ? bipolarParameter(base, spec.read)
+          : numberParameter(base, spec.read.min, spec.read.max, 'u7'));
+    }
+    notes.push(...knobs.notes);
+  }
   if (layout.hexValues && data.controllerTable) {
     for (const row of data.controllerTable) {
       if (profile_ccs.has(row.cc)) continue;
@@ -332,6 +372,19 @@ export function buildKorgProfile(data, layout) {
     }
   }
   let msbDashes = false;
+  // Rows after a `(Synth Mode /Vocoder Mode )` heading (the microKORG's) print each mode's name and
+  // value apart at a `/`: `Patch1 Source/Fc Mod Source | *2-3 / *2-3`, `/BAND[1] LEVEL | / 00~7F:0~127`.
+  let modeSplit = false;
+  const modeHalves = (row, name) => {
+    if (!modeSplit || !name.includes('/')) return [{ name, value: row.value }];
+    const [synth, ...rest] = name.split('/');
+    const vocoder = `Vocoder ${printedName(rest.join('/'))}`;
+    const values = /^(.*?)\s*\/\s*(.*)$/.exec(row.value);
+    const [synthValue, vocoderValue] = values ? [values[1].trim(), values[2].trim()] : [row.value, row.value];
+    if (!synth.trim()) return [{ name: vocoder, value: vocoderValue }];
+    if (synthValue === vocoderValue) return [{ name: synth.trim(), value: synthValue, extra: `In a vocoder program: ${printedName(rest.join('/'))}.` }];
+    return [{ name: synth.trim(), value: synthValue, extra: `In a vocoder program this NRPN is ${vocoder} instead.` }, { name: vocoder, value: vocoderValue, extra: `In a synth program this NRPN is ${synth.trim()} instead.` }];
+  };
   for (const row of data.nrpn) {
     const lsb = Number.parseInt(row.lsb, 16);
     const msb = row.msb === '--' ? 0 : Number.parseInt(row.msb, 16);
@@ -342,12 +395,15 @@ export function buildKorgProfile(data, layout) {
     const own = (layout.skip ?? []).find(([pattern]) => pattern.test(name));
     if (own) { skip(own[1], number); continue; }
     if (layout.hexValues) {
-      const read = readHexValue(row.value, marks, data.lists);
-      if (read.why) { skip(read.why, `${number} (${name})`); continue; }
-      if (!read.wide && ((read.max ?? 0) > 127 || read.choices?.some((c) => c.value > 127))) { skip('wider than 7 bits', `${number} (${name})`); continue; }
-      const recipeId = `nrpn${hex(msb)}${hex(lsb)}`;
-      recipes.set(recipeId, { id: recipeId, kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: read.wide ? 14 : 7, value: '$encodedValue', nullAfterSend: false });
-      hexParameter(name, read, recipeId, `Nrpn${hex(lsb)}`);
+      for (const half of modeHalves(row, name)) {
+        const read = readHexValue(half.value, marks, data.lists);
+        if (read.why) { skip(read.why, `${number} (${half.name})`); continue; }
+        if (!read.wide && ((read.max ?? 0) > 127 || read.choices?.some((c) => c.value > 127))) { skip('wider than 7 bits', `${number} (${half.name})`); continue; }
+        const recipeId = `nrpn${hex(msb)}${hex(lsb)}`;
+        recipes.set(recipeId, { id: recipeId, kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: read.wide ? 14 : 7, value: '$encodedValue', nullAfterSend: false });
+        hexParameter(half.name, read, recipeId, `Nrpn${hex(lsb)}`, half.extra);
+      }
+      if (row.more.some((m) => /Synth Mode\s*\/\s*Vocoder Mode/i.test(m))) modeSplit = true;
       continue;
     }
     const value = parseNrpnValue(row.value);
@@ -404,7 +460,7 @@ export function buildKorgProfile(data, layout) {
   for (const [mark, other] of Object.entries(layout.markFor ?? {})) notes.push(`Mark *${mark} is read from the footnote printed as *${other}: ${layout.markWhy?.[mark] ?? 'the document prints it under that number'}.`);
 
   // ------------------------------------------------------------ identity, presets, tests
-  const identity = layout.identity ?? identityFrom(data.identity);
+  const identity = layout.identity ?? identityFrom(data.identity, data.identityValues);
   const variables = { channel: 1, ...(layout.variables ?? {}) };
   const status = 0xb0 + variables.channel - 1;
   const writable = parameters.filter((p) => p.access.canWrite);
@@ -455,7 +511,11 @@ export function buildKorgProfile(data, layout) {
       type: 'manual',
       title: `${source.title}${source.revision ? ` (Revision ${source.revision}${source.date ? `, ${source.date}` : ''})` : ''}`,
       notes: `Tables read by tools/profiles/korg/read-korg-text.mjs from ${source.file} (sha256 ${source.sha256}), ${source.url}. Not yet checked against the instrument itself.`,
-    }],
+    }, ...(data.ownersManual ? [{
+      type: 'manual',
+      title: `${data.ownersManual.source.title}, p. ${data.ownersManual.source.printedPage}`,
+      notes: `The knobs' control changes, read by tools/profiles/korg/read-korg-om-cc.mjs from ${data.ownersManual.source.file} (sha256 ${data.ownersManual.source.sha256}), PDF page ${data.ownersManual.source.pdfPage}, ${data.ownersManual.source.url}.`,
+    }] : [])],
     testedWith: [],
     authoringNotes: [
       'Generated by tools/profiles/korg/make-profiles.mjs; edit the layout in tools/profiles/korg/synths/, not this file.',
@@ -500,10 +560,12 @@ export function buildKorgProfile(data, layout) {
 }
 
 /** The Device Inquiry reply's family and member bytes: the two after KORG's ID, then the next two. */
-export function identityFrom(rows) {
+export function identityFrom(rows, values = []) {
   const at = (rows ?? []).findIndex((r) => /^42$/i.test(r.byte) && /KORG/i.test(r.description));
   if (at < 0) return null;
-  const bytes = rows.slice(at + 1, at + 5).map((r) => r.byte.toUpperCase());
+  // A byte printed as a symbol, its value given below the table (`mm = 11 : micro KORG`).
+  const resolve = (byte) => values.find((v) => v.symbol.toLowerCase() === byte.toLowerCase())?.value ?? byte;
+  const bytes = rows.slice(at + 1, at + 5).map((r) => resolve(r.byte).toUpperCase());
   if (bytes.length < 4 || !bytes.every((b) => /^[0-7][0-9A-F]$/.test(b))) return null;
   return { familyCode: bytes.slice(0, 2), modelNumber: bytes.slice(2, 4) };
 }

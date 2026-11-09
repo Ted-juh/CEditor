@@ -4,6 +4,7 @@
 node tools/profiles/korg/make-profiles.mjs            # rebuild every profile from tables/ + synths/
 node tools/profiles/korg/make-profiles.mjs --check    # fail if a committed profile is stale
 node tools/profiles/korg/import-korg.mjs <MIDIImp.txt> <name>   # re-read a document
+node tools/profiles/korg/import-korg.mjs microKORG_MIDIimp.TXT microkorg microKORG_OM_E2.pdf   # + its Owner's Manual (pdftotext)
 cd CE/web && node --test test/korgProfiles.test.js
 ```
 
@@ -23,6 +24,7 @@ heading above each, and footnotes after. The control changes an instrument recog
 | 3 | `synths/<name>.mjs` | The layout: the document, groups, corrections with their reasons, what to leave out. |
 | 4 | `build-korg-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
 | 5 | `build-korg-dump.mjs` | Pull: the program table → the dump request, the dump definition and its field mappings, and a packed test dump (see [Pull](#pull)). |
+| — | `read-korg-om-cc.mjs`, `build-korg-knobs.mjs` | The microKORG (2002) only: its Owner's Manual page of knob control changes, and those knobs as parameters (see [The Owner's Manual's knobs](#the-owners-manuals-knobs-microkorg-2002)). |
 
 What the builder takes as settled, and what it does not:
 
@@ -53,6 +55,7 @@ What the builder takes as settled, and what it does not:
 | `korg-microkorg-s` | microKORG S MIDI Implementation 1.01 | 205 | 78 | 128 | 40H 01H |
 | `korg-kingkorg` | KingKORG MIDI Implementation 1.00 | 210 | 60 | — | 18H 01H |
 | `korg-microkorg2` | microKORG 2 MIDI Implementation 1.0 | 180 | 40 | — | 71H 01H |
+| `korg-microkorg` | micro KORG MIDI Implementation 1.4, with the Owner's Manual p. 56 | 77 | 21 | — | 58H 00H |
 | `korg-kingkorg-neo` | KingKORG NEO MIDI Implementation 1.00 (same tables, same product ID) | 210 | 60 | — | 18H 01H |
 | `korg-minikorg-700sm` | miniKORG 700Sm MIDI Implementation 1.00 | 29 | 15 | 14 | 62H 01H |
 | `korg-volca-fm2` | volca fm2 MIDI Implementation 1.00 | 13 | 2 | — | 2FH 01H |
@@ -113,6 +116,46 @@ choice sending the first value of its range; a value printed over two bytes (`7F
 as the document prints it. Its footnotes are printed side by side, two or three to a line
 (`*3-1 : 00~15 : Saw      *3-2 : 00~1F : LPF`); the reader takes them apart by column. Left out:
 Vocoder E.F.Sens (`00~7E,7F:0~126,Hold`).
+
+The same reader serves the microKORG (2002)'s NRPNs, which print the older forms of the notation: a
+cell that is only a mark (`*2-1`, whose footnote is `00~15 : Up  16~2A : Down …`), a centred value
+(`00,01~40~7F = L63,L63~CNT~R63`: 1~127 shown as -63~+63, 00 the same as 01, a `bipolar` parameter),
+and a footnote that tabulates every value (`00~07 :  0,  0,  1, …`), a number whose first, middle and
+last the description gives. After a `(Synth Mode /Vocoder Mode )` row each row prints the two modes
+apart at a `/` (`Patch1 Source/Fc Mod Source | *2-3 / *2-3`, `/BAND[1] LEVEL | / 00~7F:0~127`): one
+parameter where both read it alike, a `Vocoder …` one where only the vocoder has it.
+
+## The Owner's Manual's knobs (microKORG (2002))
+
+The microKORG's MIDI Implementation names its 41 panel knobs and switches (`*3 :Panel Knob & Switch
+Control (assignable)`), each in its section and with what it means in a synth and a vocoder program,
+and prints no control change numbers: they are assignable, kept in GLOBAL. The ones they leave the
+factory with are in the **Owner's Manual, p. 56** ("Messages transmitted and received by the
+microKORG"), with the values each knob sends and takes, in decimal. `import-korg.mjs` reads that page
+with `pdftotext -layout` when the layout names it (`ownersManual`), and keeps its rows in the
+transcription with the PDF's name, SHA-256 and address; the PDF, like the text, is not committed.
+
+`read-korg-om-cc.mjs` reads the page. Its headings are centred over their columns, so the columns are
+where the rows start them; a value that wraps onto the line above or below its row, and the
+`Synth; …` and `Vocoder; …` lines of a knob that means two things, go to the nearest row not already
+whole on its own line. `build-korg-knobs.mjs` then:
+
+- finds each of the manual's rows in the Implementation's table **by name**, not by position: the
+  manual prints the filter EG before AMP and the table after it, and a first attempt that paired them
+  by row put Amp Level on CC 23. The two name two knobs differently (`Filter EG Int` and `EG1 Int`,
+  matched by its vocoder name; `Sync Ctrl` and `Sync Control`, by abbreviation), which the profile
+  says;
+- takes the values from the manual: `0...127` a number; `0 / 1: –63, …, 64: 0, …, 127: +63` centred
+  on 64; a list a choice that sends what the knob itself sends (`0: Saw, 18: Square, …`), checked to
+  fall in the range the manual says is received under the same name;
+- makes a knob that reads alike in both modes one parameter, named as the synth calls it, and says
+  the vocoder's name for it where that differs (`OSC2 Level`: Inst Level). Six (CC 18, 19, 83, 74,
+  85, 10) mean something else in a vocoder program — Filter Type is Formant Shift, the synth's
+  Cutoff 0~127 is the vocoder's -63~+63 — and are two parameters each, the second a `Vocoder …` one.
+  Two parameters on one controller are not attributed when the instrument sends it.
+
+No Pull: its program dump lays a program out two ways, a synth's two timbres or the vocoder, chosen by
+the Voice Mode inside it, and a dump definition has one layout.
 
 ## Pull
 
@@ -183,9 +226,8 @@ Kept as printed and said where it applies:
   the LSB's bits count, so the profile offers the coarse controller alone and leaves the fine one
   out. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.
-- **microKORG (2002)**: its knobs' control changes are assignable, and the document names the 42
-  slots without their default numbers, which are in the Owner's Manual (p. 62). **The microKORG S's Pull**: its
-  program tables print offsets and bits in a form of their own (`+1 B6,7`).
+- **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
+  of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
 - **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives, not yet read.
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document
   for these, not a parameter table.

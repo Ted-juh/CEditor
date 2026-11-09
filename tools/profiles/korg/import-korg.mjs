@@ -1,17 +1,24 @@
 // import-korg.mjs — a Korg MIDI Implementation text -> tools/profiles/korg/tables/<name>.json
 //
 //   node tools/profiles/korg/import-korg.mjs <MIDIImp.txt> <name>
+//   node tools/profiles/korg/import-korg.mjs <MIDIImp.txt> <name> <Owner's Manual.pdf>   # the microKORG
 //
 // Keeps what a profile is made from, as printed: the control changes the instrument recognises and
 // the ones it transmits (2-1 and 1-1), its NRPN table, every footnote and list those point to, and
 // the Device Inquiry reply. With the document's file name, SHA-256 and URL. This is committed; the
 // text file is Korg's copyright and is not. Anyone with the same file can re-run this and diff.
+//
+// The microKORG (2002) prints its knobs' control changes only in its Owner's Manual; its layout names
+// the page, which is read with pdftotext (poppler) and kept the same way, as rows with the manual's
+// hash and address.
 
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
+import { readOmCcPage } from './read-korg-om-cc.mjs';
 import { documentTitle, readFootnotes, readTables } from './read-korg-text.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -70,6 +77,36 @@ function nrpnRows(table) {
     out.push({ line: row.line, msb: m[1], lsb: m[2], name: row.cells[1] ?? '', value: row.cells[2] ?? '', more: row.more.map((c) => c.slice(1).join(' ').trim()).filter(Boolean) });
   }
   return out;
+}
+
+/**
+ * The panel's knob and switch table printed as a footnote, with what each means in synth and in
+ * vocoder programs (the microKORG's `*3 :Panel Knob & Switch Control (assignable)`): every row as
+ * printed, the rows a section heads included, in order.
+ */
+function knobTable(tables) {
+  const table = tables.find((t) => t.header.some((h) => h.some((c) => /^Synth Mode$/i.test(c)) && h.some((c) => /^Vocoder Mode$/i.test(c))));
+  if (!table) return null;
+  return table.rows.flatMap((r) => [{ line: r.line, cells: r.cells }, ...r.more.map((cells, i) => ({ line: r.line + i + 1, cells }))]);
+}
+
+/** A symbol the Device Inquiry reply prints, given its value below the table: `mm = 11 : micro KORG`. */
+function identityValues(text) {
+  return [...String(text).replace(/\r/g, '').matchAll(/^\s*([a-z]{2})\s*=\s*([0-9A-F]{2})\s*:\s*(.+?)\s*$/gm)].map((m) => ({ symbol: m[1], value: m[2], meaning: m[3] }));
+}
+
+/**
+ * The Owner's Manual page that gives the knobs their control changes, where the MIDI Implementation
+ * leaves them assignable and prints no numbers (the microKORG's): its rows, read by
+ * read-korg-om-cc.mjs from `pdftotext -layout`, with the manual's own name, hash and address.
+ */
+export function importOwnersManual(pdf, layout) {
+  const om = layout.ownersManual;
+  const text = execFileSync('pdftotext', ['-layout', '-f', String(om.pdfPage), '-l', String(om.pdfPage), pdf, '-'], { encoding: 'utf8' });
+  return {
+    source: { title: om.title, file: path.basename(pdf), sha256: createHash('sha256').update(readFileSync(pdf)).digest('hex'), url: om.url, pdfPage: om.pdfPage, printedPage: om.printedPage },
+    rows: readOmCcPage(text),
+  };
 }
 
 /** The Device Inquiry reply: each byte and what it is. */
@@ -143,8 +180,10 @@ export function importText(file, layout) {
     transmitted,
     programChange: programChange(titled(layout.tables?.received ?? '2-1')),
     ...(controllerTable(tables) ? { controllerTable: controllerTable(tables) } : {}),
+    ...(knobTable(tables) ? { knobs: knobTable(tables) } : {}),
     nrpn: nrpnRows(nrpnTable),
     identity: identityRows(tables),
+    ...(identityValues(text).length ? { identityValues: identityValues(text) } : {}),
     programDump: programDump(tables) ? { ...programDump(tables), size: programDumpSize(text) } : null,
     parameterChange: parameterChange(tables),
     marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, v.text])),
@@ -155,7 +194,9 @@ export function importText(file, layout) {
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   const out = ['{', `  "source": ${JSON.stringify(data.source)},`, `  "programChange": ${JSON.stringify(data.programChange)},`];
-  for (const key of ['received', 'transmitted', ...(data.controllerTable ? ['controllerTable'] : []), 'nrpn', 'identity']) {
+  if (data.ownersManual) out.push(`  "ownersManual": {`, `    "source": ${JSON.stringify(data.ownersManual.source)},`, '    "rows": [', ...data.ownersManual.rows.map((r, i) => `      ${JSON.stringify(r)}${i < data.ownersManual.rows.length - 1 ? ',' : ''}`), '    ]', '  },');
+  if (data.identityValues) out.push(`  "identityValues": ${JSON.stringify(data.identityValues)},`);
+  for (const key of ['received', 'transmitted', ...(data.controllerTable ? ['controllerTable'] : []), ...(data.knobs ? ['knobs'] : []), 'nrpn', 'identity']) {
     out.push(`  "${key}": [`);
     data[key].forEach((row, i) => out.push(`    ${JSON.stringify(row)}${i < data[key].length - 1 ? ',' : ''}`));
     out.push('  ],');
@@ -190,9 +231,9 @@ export function stringifyTranscription(data) {
 }
 
 async function main() {
-  const [file, name] = process.argv.slice(2);
+  const [file, name, manual] = process.argv.slice(2);
   if (!file || !name) {
-    console.error('usage: node tools/profiles/korg/import-korg.mjs <MIDIImp.txt> <name>');
+    console.error('usage: node tools/profiles/korg/import-korg.mjs <MIDIImp.txt> <name> [<Owner\'s Manual.pdf>]');
     process.exitCode = 2;
     return;
   }
@@ -202,7 +243,13 @@ async function main() {
     process.exitCode = 2;
     return;
   }
+  if (layout.ownersManual && path.basename(manual ?? '') !== layout.ownersManual.file) {
+    console.error(`${name}'s layout also reads ${layout.ownersManual.file} (the Owner's Manual, for its knobs' control changes); pass it third`);
+    process.exitCode = 2;
+    return;
+  }
   const data = importText(file, layout);
+  if (layout.ownersManual) data.ownersManual = importOwnersManual(manual, layout);
   const out = path.join(HERE, 'tables', `${name}.json`);
   writeFileSync(out, stringifyTranscription(data));
   console.log(`Wrote ${path.relative(process.cwd(), out)}: ${data.received.length} received and ${data.transmitted.length} transmitted controllers, ${data.nrpn.length} NRPNs, ${Object.keys(data.marks).length} marks, ${Object.keys(data.lists).length} lists`);
