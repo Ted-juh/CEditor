@@ -75,9 +75,10 @@ name, through a `bitfields` codec both engines learned for these profiles:
   in byte 52);
 - a block printed once for several copies (the prologue's `TIMBRE 1 PARAMETERS`, `+0`, `+1`, … from
   byte 80), read for the copy the layout names (`dumpBlock`);
-- a value over two bytes marked H and L (minilogue xd, prologue). The letters do not say which byte is which; the
-  prologue's TEMPO does, 300~6000 printed as `H:0~7` then `L:0~4`, so the first byte is the low eight
-  bits.
+- a value over two bytes marked H and L (minilogue xd, prologue, miniKORG 700Sm). The xd and prologue
+  print H first, the 700Sm L first. The prologue's TEMPO settles which is which, 300~6000 printed as
+  `H:0~7` then `L:0~4`, so the first byte is the low eight bits; the 700Sm, printing L first,
+  agrees.
 
 A controller parameter (0 - 127) is read as the top seven bits of a 10-bit field, the value its
 controller sends; an NRPN parameter with the field's own range, as it is; a choice, by matching the
@@ -92,6 +93,7 @@ korgProfiles.test.js reads a minilogue dump packed by hand from the document.
 | `korg-monologue` | 23 of 24 | EG TARGET: the dump's list prints `PICTH 2` |
 | `korg-prologue` | 44 of 57 | read from TIMBRE 1, taken to be the main timbre (the document numbers its two timbres and does not name them); RING-SYNC, DELAY/REVERB TYPE, MULTI TYPE and PITCH EG, whose dump names differ (`RING ON`, `OFF`, `USER`, `+`); MOD EFFECT TYPE, still a number; the sub types, which depend on a type |
 | `korg-nts-1-mk2` | 20 of 62 | the type selectors and the arpeggiator, which its dump does not hold; the OSC and FX edit parameters, 14-bit on NRPN and 10-bit in the dump; EG TYPE and FILTER TYPE, whose dump names differ (`ASR`, `Thru`) |
+| `korg-minikorg-700sm` | 27 of 29 | the joystick's Modulation1 and 2, not part of a program; its dump names the panel more fully (`EXPAND Switch`, `REVERB Level`), aliased in `dumpNames` |
 | `korg-minilogue-xd` | 79 of 101 | the performance controllers, which are not part of a program; SYNC and RING, still numbers; VOICE MODE TYPE, whose dump list prints 2 twice; PORTAMENTO, PROGRAM LEVEL and Program Transpose, whose dump ranges differ from their controllers' (0,1; 0~132; 0~25) |
 
 The request and the dump carry the global MIDI channel (`3g`); the profiles' `deviceId` variable is

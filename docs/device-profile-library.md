@@ -159,8 +159,8 @@ Korg publishes each instrument's MIDI Implementation as a plain-text file, read 
 - sends a value wider than 7 bits as Korg prints the format, its low bits first on CC 63;
 - recalls presets by the document's own Bank Select and Program Change lines, and knows the identity
   reply, except on the first volcas, which have no MIDI Out;
-- **reads the current program back (Pull)** on the minilogue, minilogue xd, monologue, prologue and
-  NTS-1 mkII: the
+- **reads the current program back (Pull)** on the minilogue, minilogue xd, monologue, prologue,
+  NTS-1 mkII and miniKORG 700Sm: the
   documents print the program dump byte by byte, and each setting found there under the parameter's
   name is read from it, a controller as the top seven bits of its 10-bit field. The prologue's is
   read from its first timbre, taken to be the main one; the volcas send no dump. The request

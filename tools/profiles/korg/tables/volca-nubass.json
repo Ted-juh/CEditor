@@ -20,6 +20,7 @@
   ],
   "identity": [
   ],
+  "programDump": null,
   "marks": {
     "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
     "2": "vv:0~64~127 = -12note~0~+12note",

@@ -20,6 +20,8 @@ export function lines(text) {
 
 const BORDER = /^\s*\+[-+=]+\+\s*$/;
 const ROW = /^\s*\|.*\|\s*$/;
+// A rule inside a row, between the bit fields that share a byte: `|    -------+-------+---+`.
+const INNER = /^\s*\|[\s-]*\+[-+]*\+?\s*$/;
 const HEADING = /^\s*(?:(\d+-\d+)\s+(.+?)\s*(?:\[H\].*)?$|(TABLE\s+\d+)\s*:\s*(.+?)\s*$|\*(\d+)\s*:\s*(.+?)\s*$|\((\d+)\)\s+(.+?)\s{2,}.*$|\((\d+)\)\s+(.+?)\s*$)/;
 
 /** The cells of a `| a | b | c |` line, trimmed. */
@@ -48,7 +50,10 @@ export function readTables(text) {
     // A table: borders and rows until a line that is neither.
     const start = i;
     const block = [];
-    while (i < all.length && (BORDER.test(all[i]) || ROW.test(all[i]))) block.push({ text: all[i], line: ++i });
+    while (i < all.length && (BORDER.test(all[i]) || ROW.test(all[i]) || INNER.test(all[i]))) {
+      if (!INNER.test(all[i]) || ROW.test(all[i]) && !/\+\s*$/.test(all[i])) block.push({ text: all[i], line: i + 1 });
+      i++;
+    }
     i--;
     const borders = block.map((b, k) => (BORDER.test(b.text) ? k : -1)).filter((k) => k >= 0);
     // Header: the rows between the first two borders, when a third border follows (a table whose

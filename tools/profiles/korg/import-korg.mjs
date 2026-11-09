@@ -88,6 +88,21 @@ function programDumpSize(text) {
   return null;
 }
 
+/**
+ * The SysEx parameter change, where the document prints one (the microKORG S, the KingKORG): the
+ * message as printed, and every table that gives a setting its Param ID, with the section rows
+ * (`|  OSC 1  |`) that head their parts.
+ */
+function parameterChange(tables) {
+  const message = tables.find((t) => /^PARAMETER CHANGE$/i.test(t.heading?.title ?? ''));
+  const parameterTables = tables.filter((t) => t.header.some((h) => h.some((c) => /Param\s*ID/i.test(c))));
+  if (!message || !parameterTables.length) return null;
+  return {
+    message: printedRows(message),
+    tables: parameterTables.map((t) => ({ title: `${t.heading?.id ?? ''} : ${t.heading?.title ?? ''}`.trim(), header: t.header, rows: printedRows(t).filter((r) => !r.cells.every((c) => /^-*$/.test(c))) })),
+  };
+}
+
 export function importText(file, layout) {
   const text = readFileSync(file, 'utf8');
   const tables = readTables(text);
@@ -113,6 +128,7 @@ export function importText(file, layout) {
     nrpn: nrpnRows(nrpnTable),
     identity: identityRows(tables),
     programDump: programDump(tables) ? { ...programDump(tables), size: programDumpSize(text) } : null,
+    parameterChange: parameterChange(tables),
     marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, v.text])),
     lists: Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { title: v.title, entries: v.entries, lines: v.lines }])),
   };
@@ -135,6 +151,15 @@ export function stringifyTranscription(data) {
       out.push(`    ]${key === 'table' ? '' : ','}`);
     }
     out.push('  },');
+  }
+  if (data.parameterChange) {
+    out.push('  "parameterChange": {', `    "message": ${JSON.stringify(data.parameterChange.message)},`, '    "tables": [');
+    data.parameterChange.tables.forEach((t, ti) => {
+      out.push(`      {"title":${JSON.stringify(t.title)},"header":${JSON.stringify(t.header)},"rows":[`);
+      t.rows.forEach((row, i) => out.push(`        ${JSON.stringify(row)}${i < t.rows.length - 1 ? ',' : ''}`));
+      out.push(`      ]}${ti < data.parameterChange.tables.length - 1 ? ',' : ''}`);
+    });
+    out.push('    ]', '  },');
   }
   out.push('  "marks": {');
   const marks = Object.entries(data.marks);

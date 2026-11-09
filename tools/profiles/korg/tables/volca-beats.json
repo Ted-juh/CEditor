@@ -29,6 +29,7 @@
   ],
   "identity": [
   ],
+  "programDump": null,
   "marks": {
     "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
     "2": "This message is recognized when the \"MIDI Clock Src\" is set to \"Auto\"."

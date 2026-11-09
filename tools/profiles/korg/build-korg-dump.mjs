@@ -9,10 +9,11 @@
 //   - a whole byte, or bits of one (`52 | 4~5 | 0~3 | VCO 1 OCTAVE`), several settings to a byte;
 //   - a 10-bit value in two places, its top bits in one byte and its bottom bits in another, named
 //     by the bits each holds (`20 | 0~7 | VCO 1 PITCH (bit2~9)`, `52 | 0~1 | VCO 1 PITCH (bit0~1)`);
-//   - a value over two bytes marked H and L (the minilogue xd, the prologue). Which byte is which
-//     the labels do not settle; the prologue's own TEMPO does: 300~6000 printed `H:0~7` then
-//     `L:0~4`, and only the top bits of a 13-bit value fit in five. So the first byte is the low
-//     eight bits and the second the rest, whatever the letters say.
+//   - a value over two bytes marked H and L (the minilogue xd, the prologue, the miniKORG 700Sm).
+//     The xd and prologue print H first, the 700Sm L first; the prologue's own TEMPO settles which is
+//     which: 300~6000 printed `H:0~7` then `L:0~4`, and only the top bits of a 13-bit value fit in
+//     five. The 700Sm, printing L first, agrees. So the first byte is the low eight bits and the
+//     second the rest, whatever the letters say.
 //
 // A field reaches a parameter by name. A controller parameter (0 - 127) is read as the top seven
 // bits of a wider field, the value its controller sends; a choice, by matching the field's printed
@@ -88,7 +89,9 @@ export function programFields(rows, { block: wanted = null } = {}) {
       const described = describeField(cells[3] ?? '');
       const part = /^([HL])\s*:/i.exec(cells[1] ?? '')?.[1]?.toUpperCase() ?? null;
       if (!span) continue;
-      if (part === 'L' && !described.name && fields.at(-1)?.part === 'H') {
+      // The second byte of a two-byte value, printed after the first with no name of its own: the
+      // xd prints H then L, the miniKORG 700Sm L then H. Either way the later byte holds the high bits.
+      if (part && !described.name && fields.at(-1)?.part && fields.at(-1).part !== part) {
         fields.at(-1).high = { offset, from: span[0], bits: span[1] - span[0] + 1 };
         continue;
       }
@@ -256,7 +259,7 @@ export function addPull(profile, data, layout, notes) {
   );
 
   notes.push(`Pull: CURRENT PROGRAM DATA DUMP REQUEST, answered by the current program in Korg's 8-in-7 packing (${dump.size.printed}). ${mappings.length} parameter(s) are read back from it by the program table's offsets; a controller parameter reads the top seven bits of its 10-bit field, the value its controller sends.`);
-  if (mappings.some((m) => m.setting.twoBytes)) notes.push('The program table marks two-byte values H and L without saying which is which; they are read low byte first, which the prologue document\'s own TEMPO (300~6000 as H:0~7 then L:0~4) settles.');
+  if (mappings.some((m) => m.setting.twoBytes)) notes.push('Two-byte values are read low byte first, the earlier byte holding the low eight bits: the prologue document\'s own TEMPO settles it (300~6000 as H:0~7 then L:0~4), and the miniKORG 700Sm\'s document, which prints L first, agrees.');
   notes.push('The exclusive header carries the global MIDI channel as 3g; the profile\'s deviceId variable is that byte, 30H for channel 1.');
   if (unmapped.length) notes.push(`In the program dump but not read back: ${unmapped.join('; ')}.`);
   const notInDump = profile.parameters.filter((p) => !used.has(p.id) && p.access.canWrite).map((p) => p.name);

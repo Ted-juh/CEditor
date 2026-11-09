@@ -26,7 +26,7 @@
     "Not a parameter here, Bank Select, part of preset recall: CC 0, 32.",
     "Not a parameter here, a channel mode message: CC 120, 122, 123.",
     "Pull: CURRENT PROGRAM DATA DUMP REQUEST, answered by the current program in Korg's 8-in-7 packing (384Bytes (7bit) -> 336Bytes (8bit)). 44 parameter(s) are read back from it by the program table's offsets; a controller parameter reads the top seven bits of its 10-bit field, the value its controller sends.",
-    "The program table marks two-byte values H and L without saying which is which; they are read low byte first, which the prologue document's own TEMPO (300~6000 as H:0~7 then L:0~4) settles.",
+    "Two-byte values are read low byte first, the earlier byte holding the low eight bits: the prologue document's own TEMPO settles it (300~6000 as H:0~7 then L:0~4), and the miniKORG 700Sm's document, which prints L first, agrees.",
     "The exclusive header carries the global MIDI channel as 3g; the profile's deviceId variable is that byte, 30H for channel 1.",
     "In the program dump but not read back: MOD EFFECT TYPE (the dump holds 0 - 4 where the parameter is 0 - 127); DELAY/REVERB TYPE (the dump names a value \"OFF\" the parameter has no choice for); RING-SYNC (the dump names a value \"RING ON\" the parameter has no choice for); MULTI TYPE (the dump names a value \"USER\" the parameter has no choice for).",
     "Not found under its own name in the program dump, so not read back: TIMBRE BALANCE, MULTI SHAPE, DAMPER, PITCH EG, TIMBRE EDIT, MOD EFFECT SUB TYPE, DELAY/REVERB SUB TYPE, MULTI SUB TYPE SELECT, MULTI SHIFT SHAPE.",

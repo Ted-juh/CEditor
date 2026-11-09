@@ -50,6 +50,7 @@
     {"byte":"xx","description":"( Major Ver. (MSB))"},
     {"byte":"F7","description":"END OF EXCLUSIVE"}
   ],
+  "programDump": null,
   "marks": {
     "1": "This message is recognized when the \"MIDI Short Message\" is set to \"On\".",
     "2": "Transmitted when R  : Request message is received. E  : Exclusive message is received.",

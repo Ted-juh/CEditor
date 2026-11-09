@@ -282,7 +282,7 @@ test('the minilogue xd reads a two-byte value low byte first, as the prologue\'s
   assert.equal(mapping.offset, 24);
   assert.deepEqual(mapping.codec.parts, [{ at: 1, from: 0, bits: 8, shift: 8 }, { at: 0, from: 0, bits: 8, shift: 0 }]);
   assert.equal(mapping.codec.shiftRight, 3);
-  assert.ok(profile.authoringNotes.some((n) => /TEMPO \(300~6000 as H:0~7 then L:0~4\)/.test(n)));
+  assert.ok(profile.authoringNotes.some((n) => /TEMPO settles it \(300~6000 as H:0~7 then L:0~4\).*700Sm/.test(n)));
 });
 
 test('the prologue reads TIMBRE 1, its settings counted from the block\'s start', { skip: !builtProfile('korg-prologue') }, () => {
@@ -305,4 +305,12 @@ test('the NTS-1 mkII: the coarse half of each pair, a comma put back, its 14-bit
   assert.ok(profile.authoringNotes.some((n) => /an NRPN or RPN selector.*CC 98, 99/.test(n)), 'NRPN (LSB) is plumbing, not a fine half');
   assert.equal(by('DELAY TYPE').choices.length, 13);
   assert.deepEqual([recipe(by('OSC EDIT PARAM1')).lowBitsController, recipe(by('OSC EDIT PARAM1')).lowBits], [38, 7]);
+});
+
+test('the miniKORG 700Sm prints its two-byte values L first, and reads them low byte first like the rest', { skip: !builtProfile('korg-minikorg-700sm') }, () => {
+  const profile = builtProfile('korg-minikorg-700sm');
+  const reverb = profile.dumpDefinitions[0].mappings.find((m) => profile.parameters.find((p) => p.id === m.parameter).name === 'REVERB');
+  assert.equal(reverb.offset, 32);
+  assert.deepEqual(reverb.codec.parts, [{ at: 1, from: 0, bits: 8, shift: 8 }, { at: 0, from: 0, bits: 8, shift: 0 }]);
+  assert.equal(reverb.codec.shiftRight, 7, '0~16383 read as its top seven bits');
 });

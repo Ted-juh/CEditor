@@ -14,6 +14,14 @@ export default {
   sameLabels: {
     cc72: 'the transmit footnote prints the last as 2, without the foot mark the receive footnote gives it (2\')',
   },
+  // The program dump names the panel's controls more fully than the controller list does.
+  dumpNames: {
+    'TRAVELER (Lower: HPF)': 'TRAVELER Lower Slider (HPF)', 'TRAVELER (Upper: LPF)': 'TRAVELER Upper Slider (LPF)',
+    ATTACK: 'ATTACK/SLOW', PERCUSSION: 'SINGING/PERCUSSION', REVERB: 'REVERB Level',
+    'VCO2 PITCH COARSE': 'VCO2 COARSE Tune', 'VCO2 PITCH FINE': 'VCO2 FINE Tune', 'VCO1 SCALE': 'SCALE',
+    EXPAND: 'EXPAND Switch', BRIGHT: 'BRIGHT Switch', SUSTAIN: 'SUSTAIN Switch', 'SUSTAIN LONG': 'SUSTAIN LONG Switch',
+    BENDER: 'BENDER Switch', HOLD: 'HOLD Switch', EFFECT: 'EFFECT Switch',
+  },
   groups: [
     ['Oscillator 1', /^VCO1\s+/],
     ['Oscillator 2', /^VCO2\s+/],
