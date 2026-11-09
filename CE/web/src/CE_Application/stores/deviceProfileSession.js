@@ -225,7 +225,10 @@ export function followInboundMessage(payload) {
     }
   }
   if (readingContext) return;
-  const hit = decodeInbound(indexed.index, hex, values);
+  // The role's own variables, because a profile can put two parameters on one controller and tell
+  // them apart only by channel — the JP-08's Upper and Lower parts — and which channel each part is
+  // on is this session's setting, not the profile's.
+  const hit = decodeInbound(indexed.index, hex, values, get(deviceRoleMappings)?.[role]?.variables ?? {});
   if (!hit) return;
 
   noteDeviceFeedbackReceived(role, { [hit.parameterId]: hit.value });

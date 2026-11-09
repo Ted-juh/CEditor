@@ -40,6 +40,7 @@ const profile = (name) =>
 
 const CC = profile('test-cc-synth');
 const GAIA = profile('roland-gaia-sh01');
+const JP08 = profile('roland-jp-08');
 
 test('a CC parameter is identified by its status and controller', () => {
   const print = fingerprintParameter(CC, 'filter.cutoff');
@@ -315,4 +316,81 @@ test('GAIA hardware CCs use their measured value conversion and tone', () => {
     assert.deepEqual(decodeInbound(index, cc(16, 64), { [`tone${tone}.lfo.tempoSyncSwitch`]: 0 }),
       { parameterId: `tone${tone}.lfo.rate`, value: 64 });
   }
+});
+
+
+// The JP-08 has two parts on two channels: the Upper part's controllers go out on `$channel`, the
+// Lower part's on `$lowerChannel`, and most controller numbers are used by both. Only `channel` was
+// varied when fingerprinting, so the Upper cutoff matched CC 74 on ANY channel and the Lower one
+// only on channel 2 — two fingerprints that overlap, and the Upper came first. `B1 4A 40`, the Lower
+// part's own cutoff, moved the Upper control, and no collision was reported because the two masks
+// differed. Which part a CC belongs to is a fact about the session's channels, so that is what has
+// to decide it.
+
+test('the JP-08\'s two parts are told apart by the session\'s channels', () => {
+  const index = buildInboundIndex(JP08);
+  for (const [variables, upper, lower] of [
+    [{}, 'B0', 'B1'],                               // the profile's own: channel 1, lowerChannel 2
+    [{ channel: 5, lowerChannel: 6 }, 'B4', 'B5'],
+  ]) {
+    const label = JSON.stringify(variables);
+    assert.equal(matchInbound(index, `${upper} 4A 40`, variables)?.parameterId, 'upper.vcf.cutoff', `${label}: ${upper}`);
+    assert.equal(matchInbound(index, `${lower} 4A 40`, variables)?.parameterId, 'lower.vcf.cutoff', `${label}: ${lower}`);
+    assert.deepEqual(decodeInbound(index, `${lower} 4A 40`, {}, variables), { parameterId: 'lower.vcf.cutoff', value: 64 });
+    assert.deepEqual(decodeInbound(index, `${upper} 4A 7F`, {}, variables), { parameterId: 'upper.vcf.cutoff', value: 127 });
+  }
+});
+
+test('every JP-08 parameter reads back as itself, wherever the session puts the parts', () => {
+  // The round trip again, under the session's variables as well as the profile's — including the
+  // wrap the manual describes, Upper on 16 and Lower on 1, where the Lower part is the LOWER channel.
+  const index = buildInboundIndex(JP08);
+  assert.equal(index.unresolved.length, 0);
+  assert.deepEqual(index.collisions, [], 'two parts on two channels are not one message');
+  for (const variables of [{}, { channel: 5, lowerChannel: 6 }, { channel: 16, lowerChannel: 1 }]) {
+    const wrong = [];
+    for (const parameter of JP08.parameters) {
+      const compiled = localCompileParameter(JP08, { parameterId: parameter.id, value: 100, variables });
+      assert.ok(compiled.ok, parameter.id);
+      const back = decodeInbound(index, compiled.hex, {}, variables);
+      if (back?.parameterId !== parameter.id || back?.value !== 100) wrong.push(`${parameter.id} read ${JSON.stringify(back)}`);
+    }
+    assert.deepEqual(wrong, [], JSON.stringify(variables));
+  }
+});
+
+test('a JP-08 controller on a channel neither part is on is reported, not guessed', () => {
+  // The masks still let a message through on any channel, because the session's channel need not
+  // be right for a controller only one parameter uses. Where two parameters share it, the channel
+  // is all that tells them apart, so a channel that is neither part's cannot name either.
+  const index = buildInboundIndex(JP08);
+  const moved = { channel: 5, lowerChannel: 6 };
+  assert.deepEqual(matchInbound(index, 'B0 4A 40', moved), { ambiguous: ['upper.vcf.cutoff', 'lower.vcf.cutoff'] });
+  assert.equal(decodeInbound(index, 'B0 4A 40', {}, moved), null);
+
+  // CC 1 is a performance controller only the Upper channel carries: still any channel.
+  assert.equal(matchInbound(index, 'B9 01 40', moved)?.parameterId, 'performance.modulation');
+  assert.equal(matchInbound(index, 'B9 01 40')?.parameterId, 'performance.modulation');
+});
+
+test('a message two entries of the same length match is settled by the exact one', () => {
+  // The general case of the JP-08's: one parameter whose channel is the session's, one whose
+  // channel is written into its recipe. Their masks differ, so they are different entries, and the
+  // first one listed used to win whatever the message's channel was.
+  const twoChannels = {
+    ...CC,
+    messageRecipes: [
+      ...CC.messageRecipes,
+      { id: 'cutoffOnTwo', kind: 'cc', channel: 2, controller: 74, value: '$encodedValue' },
+    ],
+    parameters: [CC.parameters[0], { ...CC.parameters[0], id: 'filter.cutoffOnTwo', messageRecipe: 'cutoffOnTwo' }],
+  };
+  assert.equal(CC.parameters[0].id, 'filter.cutoff', 'guard: the first test-cc-synth parameter is CC 74');
+  const index = buildInboundIndex(twoChannels);
+  assert.deepEqual(index.collisions, []);
+  assert.equal(matchInbound(index, 'B1 4A 40')?.parameterId, 'filter.cutoffOnTwo');
+  assert.equal(matchInbound(index, 'B0 4A 40')?.parameterId, 'filter.cutoff');
+  assert.equal(matchInbound(index, 'B7 4A 40')?.parameterId, 'filter.cutoff', 'only one of them can be on channel 8');
+  assert.deepEqual(matchInbound(index, 'B1 4A 40', { channel: 2 }), { ambiguous: ['filter.cutoff', 'filter.cutoffOnTwo'] },
+    'a session that puts both on channel 2 cannot tell them apart');
 });

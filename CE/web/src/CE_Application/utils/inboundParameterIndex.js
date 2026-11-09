@@ -34,6 +34,19 @@
  * deliberately different variable sets and keep, per byte, only the BITS that agree. A DT1's device
  * id byte comes out masked to 0x80 (any 7-bit value matches) and a CC status to 0xF0 (any channel,
  * but still only a CC — a note-on does not slip through a whole-byte wildcard).
+ *
+ * EVERY variable the profile declares is varied, not just those two, and the session's own values
+ * decide what the masks then cannot. The JP-08 sends its Upper part on `$channel` and its Lower part
+ * on `$lowerChannel`. Varying `channel` alone masked the Upper part's channel and left the Lower's
+ * pinned to channel 2, so the two fingerprints overlapped: `B1 4A 40` matched both, the Upper came
+ * first, and every Lower knob moved the Upper control. Varying both gives them the same head, which
+ * is the truth — on the wire, which part a CC belongs to is a fact about the session, not the
+ * message. So when a message matches more than one parameter equally well, each is compiled under
+ * the session's actual variables (the profile's own when the session sets none) and the one that
+ * produces exactly this head wins. A message only one parameter can mean still matches on any
+ * channel; two parameters that differ only by session variables need those variables to be right,
+ * because nothing else can tell them apart. If they still cannot be told apart, the answer is
+ * `ambiguous`, never a guess.
  */
 
 import {
@@ -73,11 +86,26 @@ function probeValues(parameter) {
  *
  * The two must differ in every bit each field can span, or the mask comes out too tight and a real
  * message is rejected: device id across the whole 7-bit range, channel across all sixteen.
+ *
+ * Every other variable the profile declares goes from 0x00 to 0x7F. Nothing here knows whether one
+ * is a channel or a byte, and it does not need to: the compiler clamps a channel to 1..16, so the
+ * pair spans all sixteen as a channel and every bit of a 7-bit byte as a sysex token. A variable no
+ * parameter uses moves nothing and costs nothing.
  */
-const VARIABLE_PROBES = [
+const BASE_VARIABLE_PROBES = [
   { deviceId: 0x00, channel: 1 },
   { deviceId: 0x7f, channel: 16 },
 ];
+
+function variableProbes(profile) {
+  const [low, high] = BASE_VARIABLE_PROBES.map((probe) => ({ ...probe }));
+  for (const name of Object.keys(profile?.variables ?? {})) {
+    if (name in low) continue;
+    low[name] = 0x00;
+    high[name] = 0x7f;
+  }
+  return [low, high];
+}
 
 const U7 = { type: 'u7' };
 
@@ -106,6 +134,7 @@ export function fingerprintParameter(profile, parameterId) {
   if (!parameter) return null;
 
   const probes = probeValues(parameter);
+  const variableSets = variableProbes(profile);
   const compile = (value, variables) => {
     const result = localCompileParameter(profile, { parameterId, value, variables });
     if (!result?.ok) return null;
@@ -115,7 +144,7 @@ export function fingerprintParameter(profile, parameterId) {
 
   const shots = [];
   for (const value of probes) {
-    const shot = compile(value, VARIABLE_PROBES[0]);
+    const shot = compile(value, variableSets[0]);
     if (!shot) return null;
     shots.push(shot);
   }
@@ -132,8 +161,8 @@ export function fingerprintParameter(profile, parameterId) {
   // Keep only the bits that survive a change of session variables. A byte the other probe does not
   // reach at all is masked out entirely rather than trusted.
   const mask = raw.map(() => 0xff);
-  for (let probe = 1; probe < VARIABLE_PROBES.length; probe++) {
-    const shot = compile(probes[0], VARIABLE_PROBES[probe]);
+  for (let probe = 1; probe < variableSets.length; probe++) {
+    const shot = compile(probes[0], variableSets[probe]);
     if (!shot) return null;
     for (let i = 0; i < raw.length; i++) {
       mask[i] &= shot[i] === undefined ? 0 : ~(raw[i] ^ shot[i]) & 0xff;
@@ -161,6 +190,9 @@ export function fingerprintParameter(profile, parameterId) {
     // A switch's own wire values, which the decoder needs to read it (Tempo Sync is ON at 0).
     ...(parameter?.trueValue != null ? { trueValue: parameter.trueValue } : {}),
     ...(parameter?.falseValue != null ? { falseValue: parameter.falseValue } : {}),
+    // A value this parameter is known to compile at, for compiling it again under a session's own
+    // variables when they are what tells it from another parameter with the same head.
+    probe: probes[0],
     source: 'compiled',
   };
 }
@@ -200,12 +232,109 @@ function declaredInboundEntries(parameter) {
 }
 
 /**
+ * Looking a message up, without scanning every entry for it.
+ *
+ * Built once per index. Entries are grouped by prefix length, longest first, and within a length by
+ * the prefix's last byte, which identifies the parameter (a CC's controller, a DT1's address) and so
+ * is almost never masked; the few entries whose last byte is part-masked are checked at their length
+ * whatever it holds. Returns every entry the message matches at the LONGEST length any of them
+ * match — not merely the first — because two entries of one length can both match, and choosing
+ * between them is `resolve`'s job, not the order the profile happened to list them in.
+ */
+function lookupFor(entries) {
+  const lengths = [...new Set(entries.map((entry) => entry.prefix.length))].sort((a, b) => b - a);
+  const byLastByte = new Map();
+  const partMasked = new Map();
+  const push = (map, key, entry) => (map.get(key) ?? map.set(key, []).get(key)).push(entry);
+  for (const entry of entries) {
+    const last = entry.prefix.length - 1;
+    if (entry.mask[last] === 0xff) push(byLastByte, `${last + 1}:${entry.prefix[last]}`, entry);
+    else push(partMasked, last + 1, entry);
+  }
+  const matches = (entry, bytes) => entry.prefix.every((byte, i) => (bytes[i] & entry.mask[i]) === byte);
+
+  return (bytes) => {
+    for (const length of lengths) {
+      if (length > bytes.length) continue;
+      const found = [
+        ...(byLastByte.get(`${length}:${bytes[length - 1]}`) ?? []),
+        ...(partMasked.get(length) ?? []),
+      ].filter((entry) => matches(entry, bytes));
+      if (found.length) return found;
+    }
+    return [];
+  };
+}
+
+const variablesKey = (variables) =>
+  JSON.stringify(Object.keys(variables ?? {}).sort().map((name) => [name, variables[name]]));
+
+/** How many sessions' worth of compiled heads to keep. A session realistically has one or two. */
+const HEAD_CACHE_LIMIT = 8;
+
+/**
+ * A parameter's head as it would be SENT under a given session's variables, asked of the compiler.
+ *
+ * The bits a mask throws away are exactly the ones these variables set, so this is how two
+ * parameters that share a fingerprint are told apart: compile each the way the session would, and
+ * see which one produced the message. Cached per variable set, because a knob sends a stream.
+ * Null for a member that has no recipe to compile — a declared inbound CC.
+ */
+function headsFor(profile) {
+  const bySession = new Map();
+  return (member, variables = {}) => {
+    if (member?.source !== 'compiled') return null;
+    const key = variablesKey(variables);
+    let heads = bySession.get(key);
+    if (!heads) {
+      heads = new Map();
+      bySession.set(key, heads);
+      if (bySession.size > HEAD_CACHE_LIMIT) bySession.delete(bySession.keys().next().value);
+    }
+    if (!heads.has(member.parameterId)) {
+      const result = localCompileParameter(profile, { parameterId: member.parameterId, value: member.probe, variables });
+      const bytes = result?.ok ? bytesFromHex(result.hex) : [];
+      heads.set(member.parameterId, bytes.length >= member.prefix.length ? bytes.slice(0, member.prefix.length) : null);
+    }
+    return heads.get(member.parameterId);
+  };
+}
+
+/**
+ * Which member of the index this message belongs to, under these session variables.
+ *
+ * `{ member }` when exactly one parameter can mean it, `{ ambiguous: [ids] }` when more than one
+ * can, null when none does. One candidate is taken as it stands, on any channel and any device id,
+ * which is the tolerance the masks exist for. Several are compiled under the session's variables
+ * and kept only if they produce this exact head; a declared CC has no recipe to compile, so a
+ * message it shares with anything stays ambiguous.
+ */
+function resolve(index, bytes, variables = {}) {
+  const members = (index?.lookup?.(bytes) ?? []).flatMap((entry) => entry.members);
+  if (!members.length) return null;
+  if (members.length === 1) return { member: members[0] };
+
+  const exact = members.every((member) => member.source === 'compiled')
+    ? members.filter((member) => {
+      const head = index.headUnder?.(member, variables);
+      return !!head && head.every((byte, i) => bytes[i] === byte);
+    })
+    : [];
+  if (exact.length === 1) return { member: exact[0] };
+  return { ambiguous: (exact.length ? exact : members).map((member) => member.parameterId) };
+}
+
+/**
  * Fingerprint every parameter in a profile.
  *
  * `unresolved` and `collisions` are returned rather than swallowed. A profile that indexes badly
  * will resolve little, and a caller that can say "this profile only recognises 40 of its 793
  * parameters" is more use than one showing an empty result that reads as silence from the
  * instrument.
+ *
+ * A collision is what `matchInbound` would call ambiguous for a message a parameter sends under the
+ * profile's own variables — so the JP-08's Upper and Lower cutoff, which share a fingerprint and are
+ * told apart by their channels, are not one, and two parameters on one controller still are.
  */
 export function buildInboundIndex(profile) {
   const byPrefix = new Map();
@@ -213,23 +342,10 @@ export function buildInboundIndex(profile) {
 
   const add = (print) => {
     const key = keyOf(print.prefix, print.mask);
-    if (!byPrefix.has(key)) {
-      byPrefix.set(key, {
-        prefix: print.prefix,
-        mask: print.mask,
-        parameterIds: [],
-        valueStart: print.valueStart,
-        valueLength: print.valueLength,
-        encoding: print.encoding,
-        valueType: print.valueType ?? '',
-        ...(print.trueValue != null ? { trueValue: print.trueValue } : {}),
-        ...(print.falseValue != null ? { falseValue: print.falseValue } : {}),
-        source: print.source,
-        valueMap: print.valueMap,
-        alternate: print.alternate,
-      });
-    }
-    byPrefix.get(key).parameterIds.push(print.parameterId);
+    if (!byPrefix.has(key)) byPrefix.set(key, { prefix: print.prefix, mask: print.mask, parameterIds: [], members: [] });
+    const entry = byPrefix.get(key);
+    entry.parameterIds.push(print.parameterId);
+    entry.members.push(print);
   };
 
   for (const parameter of profile?.parameters ?? []) {
@@ -243,24 +359,32 @@ export function buildInboundIndex(profile) {
 
   // Longest first, so a more specific message wins over a shorter one that happens to be its head.
   const entries = [...byPrefix.values()].sort((a, b) => b.prefix.length - a.prefix.length);
-  const collisions = entries.filter((e) => e.parameterIds.length > 1).map((e) => e.parameterIds);
-
-  return {
+  const index = {
     profileId: String(profile?.id ?? ''),
     entries,
     size: entries.reduce((n, e) => n + e.parameterIds.length, 0),
     unresolved,
-    collisions,
+    collisions: [],
+    // Functions over the profile rather than data: how a message is looked up, and how a member is
+    // compiled under a session's variables. Closures, not a side table keyed by the index, because
+    // the Player keeps the index in $state and gets a proxy of it back, which no WeakMap would know.
+    lookup: lookupFor(entries),
+    headUnder: headsFor(profile),
   };
-}
 
-function entryFor(index, bytes) {
-  for (const entry of index?.entries ?? []) {
-    if (entry.prefix.length > bytes.length) continue;
-    if (!entry.prefix.every((byte, i) => (bytes[i] & entry.mask[i]) === byte)) continue;
-    return entry;
+  const reported = new Set();
+  for (const entry of entries) {
+    for (const member of entry.members) {
+      const head = member.source === 'compiled' ? index.headUnder(member, {}) : member.prefix;
+      const hit = head ? resolve(index, head, {}) : null;
+      if (!hit?.ambiguous) continue;
+      const key = hit.ambiguous.join('\n');
+      if (reported.has(key)) continue;
+      reported.add(key);
+      index.collisions.push(hit.ambiguous);
+    }
   }
-  return null;
+  return index;
 }
 
 /**
@@ -268,27 +392,28 @@ function entryFor(index, bytes) {
  *
  * Returns { parameterId, prefixLength } on a single match, { ambiguous: [ids] } when the profile
  * puts two parameters on the same message — picking one would bind a control to a coin toss — and
- * null when nothing matches.
+ * null when nothing matches. `variables` are the session's (a role mapping's), for the parameters
+ * only they can tell apart; left out, the profile's own apply.
  */
-export function matchInbound(index, hex) {
+export function matchInbound(index, hex, variables = {}) {
   const bytes = bytesFromHex(hex);
   if (!bytes.length) return null;
-  const entry = entryFor(index, bytes);
-  if (!entry) return null;
-  if (entry.parameterIds.length > 1) return { ambiguous: [...entry.parameterIds] };
-  return { parameterId: entry.parameterIds[0], prefixLength: entry.prefix.length };
+  const hit = resolve(index, bytes, variables);
+  if (!hit) return null;
+  if (hit.ambiguous) return { ambiguous: hit.ambiguous };
+  return { parameterId: hit.member.parameterId, prefixLength: hit.member.prefix.length };
 }
 
 /**
  * The value bytes, still undecoded — exactly as many as this parameter's encoder occupies, so the
  * checksum and the F7 that trail a DT1 are not mistaken for part of the value.
  */
-export function inboundValueBytes(index, hex) {
+export function inboundValueBytes(index, hex, variables = {}) {
   const bytes = bytesFromHex(hex);
-  const entry = entryFor(index, bytes);
-  if (!entry || entry.parameterIds.length > 1) return [];
-  const value = bytes.slice(entry.valueStart, entry.valueStart + entry.valueLength);
-  return value.length === entry.valueLength ? value : [];
+  const member = resolve(index, bytes, variables)?.member;
+  if (!member) return [];
+  const value = bytes.slice(member.valueStart, member.valueStart + member.valueLength);
+  return value.length === member.valueLength ? value : [];
 }
 
 /**
@@ -297,24 +422,27 @@ export function inboundValueBytes(index, hex) {
  * The whole point of the module, and the reason the width matters: read a nibbled parameter as one
  * byte and you get its top nibble, which is a plausible number and the wrong one. Returns null
  * rather than guessing when the message is unknown, ambiguous, or too short to hold its own value.
+ *
+ * `values` are the parameters' current values, for a declared CC whose meaning depends on another
+ * parameter; `variables` are the session's, as for matchInbound.
  */
-export function decodeInbound(index, hex, values = {}) {
+export function decodeInbound(index, hex, values = {}, variables = {}) {
   const bytes = bytesFromHex(hex);
   if (!bytes.length) return null;
-  const entry = entryFor(index, bytes);
-  if (!entry || entry.parameterIds.length > 1) return null;
+  const member = resolve(index, bytes, variables)?.member;
+  if (!member) return null;
 
-  const raw = bytes.slice(entry.valueStart, entry.valueStart + entry.valueLength);
-  if (raw.length !== entry.valueLength) return null;
-  const alternate = entry.alternate;
-  const mapping = alternate?.whenValues?.includes(values?.[alternate.whenParameter]) ? alternate : entry;
-  const parameterId = mapping === alternate ? alternate.parameterId : entry.parameterIds[0];
+  const raw = bytes.slice(member.valueStart, member.valueStart + member.valueLength);
+  if (raw.length !== member.valueLength) return null;
+  const alternate = member.alternate;
+  const mapping = alternate?.whenValues?.includes(values?.[alternate.whenParameter]) ? alternate : member;
+  const parameterId = mapping === alternate ? alternate.parameterId : member.parameterId;
   if (Array.isArray(mapping.valueMap)) {
     const value = mapping.valueMap[raw[0]];
     return Number.isFinite(value) ? { parameterId, value } : null;
   }
   const value = decodeParameterValue(
-    { id: parameterId, type: entry.valueType, encoding: entry.encoding, trueValue: entry.trueValue, falseValue: entry.falseValue }, raw);
+    { id: parameterId, type: member.valueType, encoding: member.encoding, trueValue: member.trueValue, falseValue: member.falseValue }, raw);
   return value === null ? null : { parameterId, value };
 }
 
@@ -328,12 +456,13 @@ export function decodeInbound(index, hex, values = {}) {
 export function inboundReadTargets(index) {
   const out = [];
   for (const entry of index?.entries ?? []) {
-    if (entry.parameterIds.length !== 1 || entry.source !== 'compiled') continue;
+    const [member, ...others] = entry.members ?? [];
+    if (!member || others.length || member.source !== 'compiled') continue;
     if (entry.prefix[0] !== 0xf0 || entry.prefix.length <= 7) continue;
     out.push({
-      parameterId: entry.parameterIds[0],
+      parameterId: member.parameterId,
       address: entry.prefix.slice(7).map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' '),
-      valueLength: entry.valueLength,
+      valueLength: member.valueLength,
     });
   }
   return out;

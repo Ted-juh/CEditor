@@ -7,7 +7,7 @@
 // replay their current value on subscribing, and that value is passed over, as MidiLearnChips does.
 
 import { get } from 'svelte/store';
-import { latestMidiInputMessage, latestSysexInputMessage, profileSources } from './deviceProfileStores.js';
+import { deviceRoleMappings, latestMidiInputMessage, latestSysexInputMessage, profileSources } from './deviceProfileStores.js';
 import { inboundIndexFor } from './inboundIndexCache.js';
 import { EMPTY_CHIP_STATE, applyChipHex, chipList } from '../utils/midiLearnChips.js';
 
@@ -21,11 +21,15 @@ export function learnNext(takes, onchip, { profileId = '' } = {}) {
   let lastSysex = get(latestSysexInputMessage);
   let done = false;
   const indexed = () => inboundIndexFor(profileId, get(profileSources)?.[profileId]?.source);
+  // The variables of the device set up against this profile, as the chip strip reads them: a
+  // message can mean two parameters that only the session's channel tells apart.
+  const variables = () => Object.values(get(deviceRoleMappings) ?? {})
+    .find((mapping) => String(mapping?.profileId ?? '') === String(profileId))?.variables ?? {};
   const fold = (payload) => {
     if (done) return;
     const index = indexed();
-    state = applyChipHex(state, payload.hex, index?.index ?? null);
-    const chip = chipList(state, { index: index?.index ?? null, parameterById: index?.parameterById ?? {} }).find(takes);
+    state = applyChipHex(state, payload.hex, index?.index ?? null, variables());
+    const chip = chipList(state, { index: index?.index ?? null, parameterById: index?.parameterById ?? {}, variables: variables() }).find(takes);
     if (!chip) return;
     stop();
     onchip(chip);

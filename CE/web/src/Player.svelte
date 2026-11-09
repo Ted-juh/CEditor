@@ -24,7 +24,7 @@
   import { fileCache, loadFile } from './CE_Application/stores/fileCache.js';
   import { midiDestinations, midiInputs, mapDeviceRole, initDeviceProfileBridge, commitDeviceParameter, deviceSessionState, requestProfileSource, startDeviceSync } from './CE_Application/stores/deviceProfiles.js';
   import { playerDeviceTarget, startupReadPlan, createHostSeedTracker, sendFromBoundControls } from './CE_Application/utils/playerStartup.js';
-  import { profileSources, latestPresetListScan } from './CE_Application/stores/deviceProfileStores.js';
+  import { profileSources, latestPresetListScan, deviceRoleMappings } from './CE_Application/stores/deviceProfileStores.js';
   import { injectPresetRowsIntoPanel } from './CE_Application/utils/presetChoiceRows.js';
   import { decodeInbound, inboundReadTargets } from './CE_Application/utils/inboundParameterIndex.js';
   import { inboundIndexFor } from './CE_Application/stores/inboundIndexCache.js';
@@ -332,9 +332,11 @@
 
   // Both paths, once the index is up: it recognises the message and decodes the value with the
   // parameter's own encoder, which is what makes a nibbled parameter read as its whole value rather
-  // than as its top nibble. An unknown or ambiguous message returns null and is ignored.
+  // than as its top nibble. An unknown or ambiguous message returns null and is ignored. The role's
+  // variables go with it: two parameters on one controller (the JP-08's Upper and Lower parts) are
+  // told apart by channel, and the channels are this session's, not the profile's defaults.
   function applyDecoded(hex) {
-    const hit = decodeInbound(inboundIndex, hex);
+    const hit = decodeInbound(inboundIndex, hex, {}, get(deviceRoleMappings)?.[deviceRole]?.variables ?? {});
     if (hit) queueControlValue(hit.parameterId, hit.value);
   }
 
@@ -581,8 +583,8 @@
   });
 
   // The inbound index for this profile, from the shared cache — built once per profile because it
-  // compiles every parameter five times, measured at ~87ms for the GAIA's 793, which would be
-  // absurd on a CC stream (a matched message costs ~4us, a wholly unrecognised one ~9us). The MIDI
+  // compiles every parameter six times, about 65ms for the GAIA's 882, which would be absurd on a
+  // CC stream (a matched message costs a few microseconds, an unrecognised one less). The MIDI
   // tab reads the same cache, so the two cannot disagree about what a message means. Deliberately
   // independent of `panel`: the index describes the instrument, not the layout.
   $effect(() => {

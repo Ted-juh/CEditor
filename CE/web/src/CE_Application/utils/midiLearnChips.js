@@ -52,14 +52,15 @@ const isNumeric = (parameter) =>
  * Fold one incoming message into the chip state.
  *
  * `index` may be null — the profile source arrives asynchronously, and until it does the CC side
- * still works, it just cannot name anything.
+ * still works, it just cannot name anything. `variables` are the device role's, for the parameters
+ * only a session's channel tells apart (see inboundParameterIndex.js).
  */
-export function applyChipHex(state, hex, index = null) {
+export function applyChipHex(state, hex, index = null, variables = {}) {
   const current = state ?? EMPTY_CHIP_STATE;
   if (!hex) return current;
 
   if (isSysexHex(hex)) {
-    const hit = index ? decodeInbound(index, hex) : null;
+    const hit = index ? decodeInbound(index, hex, {}, variables) : null;
     // An unrecognised sysex is not a candidate. It could be an identity reply, a dump, or another
     // instrument entirely, and a chip that says "some sysex happened" is not something you can bind.
     if (!hit?.parameterId) return current;
@@ -135,7 +136,7 @@ function candidateHex(candidate) {
  * produce. A chip that can offer neither is still listed, with the reason, because a controller that
  * appears dead teaches nothing.
  */
-export function chipList(state, { index = null, parameterById = {} } = {}) {
+export function chipList(state, { index = null, parameterById = {}, variables = {} } = {}) {
   const current = state ?? EMPTY_CHIP_STATE;
   const chips = [];
 
@@ -190,7 +191,7 @@ export function chipList(state, { index = null, parameterById = {} } = {}) {
   }
 
   for (const candidate of learnCandidates(current.learn)) {
-    const parameterId = index ? decodeInbound(index, candidateHex(candidate))?.parameterId ?? null : null;
+    const parameterId = index ? decodeInbound(index, candidateHex(candidate), {}, variables)?.parameterId ?? null : null;
     const parameter = parameterId ? parameterById[parameterId] ?? null : null;
     const raw = learnCandidateLabel(candidate);
     chips.push({

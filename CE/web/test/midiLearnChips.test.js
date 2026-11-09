@@ -269,3 +269,18 @@ test('the drag payload is the shape the drop handler already parses', () => {
   assert.equal(payload.parameter.type, 'integer', 'the whole parameter travels, not just its id');
   assert.equal(payload.deviceRole, 'Roland GAIA SH-01');
 });
+
+test('a chip names the part its channel belongs to, on the device\'s own channels', () => {
+  // The JP-08's Upper and Lower parts share controller numbers and differ by channel, and the
+  // channels are the device role's. Without its variables the strip could only call CC 74 on
+  // channel 6 a raw controller; with them it is the Lower cutoff.
+  const JP08 = JSON.parse(readText(fileURLToPath(
+    new URL('../../profiles/test/roland-jp-08.ceditor-device.json', import.meta.url))));
+  const jp08 = buildInboundIndex(JP08);
+  const variables = { channel: 5, lowerChannel: 6 };
+  const state = ['B5 4A 10', 'B5 4A 60'].reduce((s, hex) => applyChipHex(s, hex, jp08, variables), EMPTY_CHIP_STATE);
+  const named = chipList(state, { index: jp08, parameterById: Object.fromEntries(JP08.parameters.map((p) => [p.id, p])), variables });
+  assert.equal(named[0].parameterId, 'lower.vcf.cutoff');
+  assert.equal(chipList(state, { index: jp08 })[0].parameterId, null,
+    'on the profile\'s own channels 6 is neither part, so it is not named at all rather than named wrong');
+});

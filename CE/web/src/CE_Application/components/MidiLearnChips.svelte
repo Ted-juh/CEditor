@@ -60,6 +60,9 @@
     Object.entries($deviceRoleMappings ?? {}).find(([, m]) => String(m?.profileId ?? '') === profileId)?.[0]
       ?? DEFAULT_DEVICE_ROLE
   );
+  // That device's variables. A message can mean two parameters that only its channel tells apart —
+  // the JP-08's Upper and Lower parts — and the channels are the session's, not the profile's.
+  let sessionVariables = $derived($deviceRoleMappings?.[deviceRole]?.variables ?? {});
 
   // Subscribed rather than read as $latestMidiInputMessage, and that is not a style choice: an
   // $effect flushes once per microtask, so two messages arriving in the same tick collapse and the
@@ -72,17 +75,17 @@
     const stopInbound = untrack(() => latestMidiInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastInbound) return;
       lastInbound = payload;
-      state = applyChipHex(state, payload.hex, indexed?.index ?? null);
+      state = applyChipHex(state, payload.hex, indexed?.index ?? null, sessionVariables);
     }));
     const stopSysex = untrack(() => latestSysexInputMessage.subscribe((payload) => {
       if (!payload?.hex || payload === lastSysex) return;
       lastSysex = payload;
-      state = applyChipHex(state, payload.hex, indexed?.index ?? null);
+      state = applyChipHex(state, payload.hex, indexed?.index ?? null, sessionVariables);
     }));
     return () => { stopInbound(); stopSysex(); };
   });
 
-  let chips = $derived(chipList(state, { index: indexed?.index ?? null, parameterById: indexed?.parameterById ?? {} }));
+  let chips = $derived(chipList(state, { index: indexed?.index ?? null, parameterById: indexed?.parameterById ?? {}, variables: sessionVariables }));
 
   function onDragStart(event, chip) {
     const payload = chipDragPayload(chip, deviceRole);

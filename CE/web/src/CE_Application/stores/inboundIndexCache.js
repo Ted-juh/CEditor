@@ -1,10 +1,11 @@
 /**
  * One inbound index per profile, built once.
  *
- * buildInboundIndex compiles every parameter five times — ~87ms for the GAIA's 793 — so it must not
- * happen per message, per keystroke, or per component mount. Two places want the same answer for the
- * same profile: the Player, decoding what the instrument sends, and the MIDI tab, naming what just
- * moved. This is the shared cache so they cannot disagree or pay for it twice.
+ * buildInboundIndex compiles every parameter six times — five to fingerprint it, one more under the
+ * profile's own variables to find collisions — about 65ms for the GAIA's 882 on a Linux container,
+ * so it must not happen per message, per keystroke, or per component mount. Two places want the
+ * same answer for the same profile: the Player, decoding what the instrument sends, and the MIDI
+ * tab, naming what just moved. This is the shared cache so they cannot disagree or pay for it twice.
  *
  * Keyed by profile id AND the source text, because a profile can be edited in the app: saving a
  * draft replaces the string, and an index built from the old one would name the wrong parameters.
