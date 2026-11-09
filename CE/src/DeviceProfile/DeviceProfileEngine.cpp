@@ -2732,15 +2732,28 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
     auto resolution = propInt (recipe, "valueResolution", 7);
     if (resolution == 14)
     {
-        if (encodedBytes.size() < 2)
-            return { false, label + " 14-bit recipe requires two encoded bytes", {} };
+        if (encodedBytes.isEmpty())
+            return { false, label + " 14-bit recipe requires an encoded value", {} };
 
-        // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
-        // two bytes in elsewhere.
-        auto* encoding = asObject (parameter.getProperty ("encoding"));
-        const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
-        addCc (transaction.messages, 6, encodedBytes[lsbFirst ? 1 : 0]);
-        addCc (transaction.messages, 38, encodedBytes[lsbFirst ? 0 : 1]);
+        if (encodedBytes.size() == 1)
+        {
+            // One byte (a choice, a switch, a u7 number) on a 14-bit recipe is a value below 128:
+            // MSB 0 on CC 6, the byte on CC 38. The local engine has always sent it this way; this one
+            // refused it, so a choice on a synth whose NRPNs are all 14-bit (every Sequential
+            // instrument sends "0 = Off, 1 = On" as MSB 0, LSB 1) worked in a preview and failed in
+            // the program.
+            addCc (transaction.messages, 6, 0);
+            addCc (transaction.messages, 38, encodedBytes[0]);
+        }
+        else
+        {
+            // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps
+            // its two bytes in elsewhere.
+            auto* encoding = asObject (parameter.getProperty ("encoding"));
+            const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+            addCc (transaction.messages, 6, encodedBytes[lsbFirst ? 1 : 0]);
+            addCc (transaction.messages, 38, encodedBytes[lsbFirst ? 0 : 1]);
+        }
     }
     else
     {

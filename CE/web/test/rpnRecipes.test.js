@@ -123,3 +123,18 @@ test('the null that closes a selection uses the pair that opened it', () => {
   const nrpn = ccPairs(compile(profileWith('nrpn', { nullAfterSend: true }), 2));
   assert.deepEqual(nrpn.slice(-2), [[99, 127], [98, 127]]);
 });
+
+test('a choice on a 14-bit recipe goes out as MSB 0 and its value as LSB, as the C++ engine now sends it', () => {
+  // Every Sequential NRPN is 14-bit, its switches and menus included ("0 = Off, 1 = On"). The C++
+  // engine refused a one-byte value on a 14-bit recipe until it was brought into line with this one;
+  // test-nrpn-synth's "Osc Wave Triangle" vector pins the same bytes there.
+  const profile = profileWith('nrpn', { resolution: 14, msb: 2, lsb: 17 });
+  profile.parameters[0] = {
+    id: 'probe.value',
+    messageRecipe: 'probe-recipe',
+    type: 'choice',
+    choices: [{ id: 'saw', label: 'Saw', value: 0 }, { id: 'square', label: 'Square', value: 1 }, { id: 'triangle', label: 'Triangle', value: 2 }],
+    encoding: { type: 'enum' },
+  };
+  assert.deepEqual(ccPairs(compile(profile, 'triangle')), [[99, 2], [98, 17], [6, 0], [38, 2]]);
+});
