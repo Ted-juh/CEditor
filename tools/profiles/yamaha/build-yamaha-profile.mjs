@@ -4,15 +4,17 @@
 // What the data list says, and nothing it does not:
 //
 //   - every row of a MIDI PARAMETER CHANGE TABLE that prints a data range is a parameter, sent as
-//     the parameter change the data format prints (F0 43 1n 7F 1C <model> <address> <data> F7) at
-//     the row's address; `reserved` rows are not;
+//     the parameter change the data format prints (F0 43 1n 7F 1C <model> <address> <data> F7; the
+//     MX's F0 43 1n 7F 17 <address> <data> F7) at the row's address; `reserved` rows are not;
 //   - the description column says what each value shows, in order. A list of names exactly as long
 //     as the range (`00 – 04` beside `OFF, AMP, FILTER, PITCH, OSC`) is a choice; a range of numbers
 //     as long as the data range (`28 – 58` beside `-24 – +24 (semitones)`) is the values shown; a
 //     range in parts (`00 – 0F, 7F` beside `1 – 16, off`) is matched part for part. Anything else
 //     is a number, and the description is said;
 //   - a value over several bytes is read as the description says it is split: `1st bit 3-0 : bit
-//     15-12` is four nibbles, `1st bit 6-0 : bit 13-7` two 7-bit halves;
+//     15-12` is four nibbles, `1st bit 6-0 : bit 13-7` two 7-bit halves; two bytes printed as a high
+//     and a low range are two 7-bit halves when the description counts out exactly the values
+//     between (`00 – 02` over `05 – 2C` beside `5 ... 300`);
 //   - a name printed one character a row (`Voice Name1` … `Voice Name10`, `32 – 126 (ASCII)`) is one
 //     text parameter, read from the bulk dump and not written: a parameter change carries one
 //     parameter, and the data list does not say ten characters may go in one;
@@ -38,7 +40,8 @@ export function readHexRange(text) {
   if (!parts.length) return null;
   const out = [];
   for (const p of parts) {
-    const m = /^([0-9A-F]{2})(?:\s*[–-]\s*([0-9A-F]{2}))?$/.exec(p);
+    // Two digits a byte, or one (the MX's `0 – 2`).
+    const m = /^([0-9A-F]{1,2})(?:\s*[–-]\s*([0-9A-F]{1,2}))?$/.exec(p);
     if (!m) return null;
     const from = parseInt(m[1], 16);
     const to = m[2] ? parseInt(m[2], 16) : from;
@@ -128,7 +131,12 @@ export function readValueList(to, items) {
   for (const item of items) {
     let m;
     const next = out.length;
-    if ((m = /^(\d+)\s*–\s*(\d+)\s*[:=]\s*(.+)$/.exec(item))) {
+    if ((m = /^(\d+)\s*[:=]\s*(\D*?)(\d+)\s*–\s*(\d+)\s*[:=]\s*\2(\d+)$/.exec(item))) {
+      // `2 = Library1 … 9 = Library8`: the values between, named in turn.
+      const [a, b, first] = [Number(m[1]), Number(m[4]), Number(m[3])];
+      if (a !== next || b - a !== Number(m[5]) - first) return null;
+      for (let v = a; v <= b; v++) out.push({ value: v, label: `${m[2]}${first + v - a}` });
+    } else if ((m = /^(\d+)\s*–\s*(\d+)\s*[:=]\s*(.+)$/.exec(item))) {
       const [a, b] = [Number(m[1]), Number(m[2])];
       const named = /^(.*?)(\d+)\s*–\s*(\d+)$/.exec(m[3].trim());
       if (a !== next || !named || Number(named[3]) - Number(named[2]) !== b - a) return null;
@@ -193,9 +201,14 @@ export function buildYamahaProfile(data, layout) {
   const skipped = new Map();
   const skip = (why, what) => skipped.set(why, [...(skipped.get(why) ?? []), what]);
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
-  const model = layout.modelId ?? data.format.modelId;
+  // The bytes between the device number and the address, as the data format prints them: the group
+  // number and model ID (7F 1C 03, the reface), or a model ID of two bytes (7F 17, the MX). A bulk dump
+  // carries its byte count among them (`bb`), before the model ID or after it.
+  const model = data.format.modelId;
   const group = data.format.group ?? ['7F', '1C'];
-  const recipe = { id: 'parameterChange', kind: 'sysex', template: ['F0', '43', '$deviceId', ...group, model, '$address', '$encodedValue', 'F7'] };
+  const head = data.format.header ?? [...group, model];
+  const bulkHead = data.format.bulkHeader ?? [...group, 'bb', 'bb', model];
+  const recipe = { id: 'parameterChange', kind: 'sysex', template: ['F0', '43', '$deviceId', ...head, '$address', '$encodedValue', 'F7'] };
   const placed = [];   // { parameter, address: [H, M, L], width }
 
   // The bulk dump blocks, each where it starts and how many bytes of data it holds. The byte count is
@@ -284,8 +297,9 @@ export function buildYamahaProfile(data, layout) {
         const label = `${groupName}: ${name} (${address.join(' ')})`;
         if (/^reserved$/i.test(name) || !row.range.length) { continue; }
         if (inst && rowVars.length && !own.groupOf && !own.group) name = /^OP\b/.test(name) && /^OP\d/.test(inst.label) ? name.replace(/^OP\b/, inst.label) : `${inst.label} ${name}`;
-        // `1..16`, `0 .. 59 (Minute)`: a range printed with two dots.
-        const description = clean(row.description).replace(/(\d)\s*\.\.\s*(?=[+-]?\d)/g, '$1 – ');
+        // `1..16`, `0 .. 59 (Minute)`, `5 ... 300`, `-120 … +120`: a range printed with dots.
+        const asPrinted = clean(row.description);
+        const description = asPrinted.replace(/(\d)\s*(?:\.{2,3}|…)\s*(?=[+-]?\d)/g, '$1 – ');
         const describe = [];
         // Several switches in one byte (`bit 6: Off, On Assignable Knob 8 bit 5: …`): sending one means
         // knowing the others.
@@ -301,7 +315,7 @@ export function buildYamahaProfile(data, layout) {
             id: unique(`${camel(groupName)}.${camel(base)}`),
             name: base,
             group: groupName,
-            description: `${n} characters, one per address from ${address.join(' ')}, ${description}. Read from the bulk dump; not written, since a parameter change carries one character.`,
+            description: `${n} characters, one per address from ${address.join(' ')}, ${asPrinted}. Read from the bulk dump; not written, since a parameter change carries one character.`,
             type: 'text',
             default: '',
             address: address.join(' '),
@@ -343,10 +357,18 @@ export function buildYamahaProfile(data, layout) {
             if (shown && shown.max - shown.min === read.max - read.min && shown.min !== read.min) read = { ...read, shown: { min: shown.min, max: shown.max }, ...(shown.unit ? { unit: shown.unit } : {}) };
             else if (shown && shown.min >= read.min && shown.max <= read.max) read = { min: shown.min, max: shown.max };
             name = name.replace(/^(.*?)\s+MSB\s+\1\s+LSB$/, '$1');
+          } else if (row.size === 2 && readShownRange(description) && ((bounds[0][1] << 7) | bounds[1][1]) - ((bounds[0][0] << 7) | bounds[1][0]) === readShownRange(description).max - readShownRange(description).min) {
+            // A high and a low 7-bit range whose description counts out exactly the values between
+            // (Tempo, `00 – 02` over `05 – 2C` beside `5 ... 300`; `00 – 01` over `08 – 78` beside
+            // `-120 … +120`).
+            encoding = { type: 'u14-msb-lsb' };
+            const shown = readShownRange(description);
+            read = { min: (bounds[0][0] << 7) | bounds[1][0], max: (bounds[0][1] << 7) | bounds[1][1] };
+            if (shown.min !== read.min) read = { ...read, shown: { min: shown.min, max: shown.max }, ...(shown.unit ? { unit: shown.unit } : {}) };
           } else { skip(`a value over ${row.size} bytes split in a way not read`, label); continue; }
           width = row.size;
-          describe.push(`${row.size} bytes: ${description.replace(/^.*?(1st bit)/, '$1')}.`);
-          const shownText = description.replace(/\s*1st bit.*$/, '');
+          describe.push(/1st bit/.test(description) ? `${row.size} bytes: ${description.replace(/^.*?(1st bit)/, '$1')}.` : `${row.size} bytes, the high 7 bits first.`);
+          const shownText = asPrinted.replace(/\s*1st bit.*$/, '');
           if (shownText) describe.push(`Printed: ${shownText}.`);
         }
         if (row.notes) describe.push(clean(row.notes).replace(/([^.])$/, '$1.'));
@@ -371,7 +393,7 @@ export function buildYamahaProfile(data, layout) {
           p = { ...base, ...(describe.length ? { description: describe.join(' ') } : {}), type: 'choice', default: (list.find((c) => c.value === printedDefault) ?? list[0]).id, choices: list, display: { mode: 'choice', shortLabel: camel(name) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'enum' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: list.length === 2 ? 'ToggleButton' : list.length <= 5 ? 'RadioButtonGroup' : 'Combobox' } };
         } else {
           const same = readShownRange(description);
-          if (row.size === 1 && description && !read.shown && !(same && same.min === read.min && same.max === read.max)) describe.push(`Printed: ${description}.`);
+          if (row.size === 1 && description && !read.shown && !(same && same.min === read.min && same.max === read.max)) describe.push(`Printed: ${asPrinted}.`);
           if (read.unit) describe.push(`In ${read.unit}.`);
           const bipolar = read.shown && read.shown.min < 0 && read.shown.max > 0;
           const zero = bipolar ? read.min - read.shown.min : null;
@@ -406,14 +428,18 @@ export function buildYamahaProfile(data, layout) {
     const mappings = size > 0 ? placed.filter((x) => x.address[0] === b.at[0] && x.address[1] === b.at[1] && x.address[2] >= b.at[2] && x.address[2] + x.width <= b.at[2] + size)
       .map((x) => ({ parameter: x.parameter, offset: x.address[2] - b.at[2], ...(x.parameter.encoding.type !== 'u7' && x.parameter.type !== 'choice' && x.parameter.type !== 'text' ? { codec: { type: x.parameter.encoding.type === 'nibbled' ? 'nibbled' : x.parameter.encoding.type, ...(x.parameter.encoding.nibbles ? { nibbles: x.parameter.encoding.nibbles } : {}) } } : {}) })) : [];
     const bc = b.bytes;
+    const counted = bulkHead.indexOf('bb');
+    const at = 3 + bulkHead.length + 3;   // F0 43 0n, the header, the address
+    // The checksum adds up from the model ID (the reface, the MOXF) or from the byte count (the MX).
+    const from = 3 + counted + (data.format.checksumFrom === 'byteCount' ? 0 : 2);
     return {
       id,
       name: b.name,
       kind: 'sysex',
-      matcher: { prefix: ['F0', '43', '00', ...group, hex(bc >> 7), hex(bc & 127), model, ...b.at.map(hex)], suffix: ['F7'] },
-      payload: { offset: 11, size },
-      checksum: { type: 'roland-7bit', fromOffset: 7, toOffset: 10 + size, byteOffset: 11 + size },
-      completion: { expectedMessages: collection ? collection.count : 1, expectedBytes: 13 + size, ...(collection ? { collectionId: collection.id } : {}) },
+      matcher: { prefix: ['F0', '43', '00', ...bulkHead.map((x, i) => (i === counted ? hex(bc >> 7) : i === counted + 1 ? hex(bc & 127) : x)), ...b.at.map(hex)], suffix: ['F7'] },
+      payload: { offset: at, size },
+      checksum: { type: 'roland-7bit', fromOffset: from, toOffset: at + size - 1, byteOffset: at + size },
+      completion: { expectedMessages: collection ? collection.count : 1, expectedBytes: at + size + 2, ...(collection ? { collectionId: collection.id } : {}) },
       mappings,
     };
   };
@@ -435,14 +461,14 @@ export function buildYamahaProfile(data, layout) {
       const id = pull?.id ?? layout.pullName ?? 'editBuffer';
       const collection = { id, count: members.length };
       for (const m of members) take(dumpFor(m, collection));
-      requests.push({ id: `request${id.replace(/^./, (c) => c.toUpperCase())}`, name: `Bulk dump request (${pull?.name ?? members.slice(1, -1).map((m) => m.name).join(', ')})`, kind: 'sysex', template: ['F0', '43', '20', ...group, model, ...members[0].at.map(hex), 'F7'], response: { kind: 'bulkDump', collectionId: collection.id }, timeoutMs: 3000, retries: 1 });
+      requests.push({ id: `request${id.replace(/^./, (c) => c.toUpperCase())}`, name: `Bulk dump request (${pull?.name ?? members.slice(1, -1).map((m) => m.name).join(', ')})`, kind: 'sysex', template: ['F0', '43', '20', ...head, ...members[0].at.map(hex), 'F7'], response: { kind: 'bulkDump', collectionId: collection.id }, timeoutMs: 3000, retries: 1 });
       i = j;
     } else {
       const d = dumpFor(b, null);
       if (!d.mappings.length) { notAsked.push(b.name); continue; }
       take(d);
       const rid = `request${camel(b.name).replace(/^./, (c) => c.toUpperCase())}`;
-      requests.push({ id: requests.some((r) => r.id === rid) ? `${rid}${b.at.map(hex).join('')}` : rid, name: `Bulk dump request (${b.name})`, kind: 'sysex', template: ['F0', '43', '20', ...group, model, ...b.at.map(hex), 'F7'], response: { dump: d.id }, timeoutMs: 3000, retries: 1 });
+      requests.push({ id: requests.some((r) => r.id === rid) ? `${rid}${b.at.map(hex).join('')}` : rid, name: `Bulk dump request (${b.name})`, kind: 'sysex', template: ['F0', '43', '20', ...head, ...b.at.map(hex), 'F7'], response: { dump: d.id }, timeoutMs: 3000, retries: 1 });
     }
   }
   if (notAsked.length) notes.push(`Not asked for, holding no parameter laid out here: ${notAsked.join(', ')}.`);
@@ -460,7 +486,7 @@ export function buildYamahaProfile(data, layout) {
   for (const p of pick) {
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
     const v = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, 100));
-    tests.push({ name: `${p.group}: ${p.name} = ${choice ? choice.label : v}`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['F0', '43', hex(variables.deviceId), ...group, model, p.address, ...valueBytes(p, v).map(hex), 'F7'].join(' ') });
+    tests.push({ name: `${p.group}: ${p.name} = ${choice ? choice.label : v}`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['F0', '43', hex(variables.deviceId), ...head, p.address, ...valueBytes(p, v).map(hex), 'F7'].join(' ') });
   }
   for (const r of requests) tests.push({ name: r.name, kind: 'request', request: r.id, expectedHex: r.template.join(' ') });
   // A dump made by hand from the block's own layout, its checksum worked out: every mapped value at
@@ -480,10 +506,10 @@ export function buildYamahaProfile(data, layout) {
     const n = rich.mappings.map((m) => byId.get(m.parameter)).find((p) => p.type !== 'choice' && p.type !== 'text');
     if (c) { set(rich.mappings.find((m) => m.parameter === c.id), c.choices.at(-1).value); expected[c.id] = c.choices.at(-1).id; }
     if (n) { set(rich.mappings.find((m) => m.parameter === n.id), n.range.max); expected[n.id] = n.range.max; }
-    const head = rich.matcher.prefix.map((b) => parseInt(b, 16));
-    const summed = [...head.slice(7), ...data];
+    const prefix = rich.matcher.prefix.map((b) => parseInt(b, 16));
+    const summed = [...prefix.slice(rich.checksum.fromOffset), ...data];
     const sum = (128 - (summed.reduce((t, b) => t + b, 0) % 128)) % 128;
-    tests.push({ name: `${rich.name}, read back`, kind: 'dumpParse', inputHex: [...head, ...data, sum, 0xf7].map(hex).join(' '), expectedValues: expected });
+    tests.push({ name: `${rich.name}, read back`, kind: 'dumpParse', inputHex: [...prefix, ...data, sum, 0xf7].map(hex).join(' '), expectedValues: expected });
   }
 
   const reply = data.format.identityReply ?? [];
@@ -508,7 +534,7 @@ export function buildYamahaProfile(data, layout) {
     authoringNotes: [
       'Generated by tools/profiles/yamaha/make-profiles.mjs; edit the layout in tools/profiles/yamaha/synths/, not this file.',
       'Every parameter is a row of the data list\'s MIDI parameter change tables, with its printed name. Nothing here has been sent to a real instrument yet.',
-      `Parameter change: F0 43 1n ${group.join(' ')} ${model} <address> <data> F7, n the device number (the deviceId variable is 1n, 10H for device number 1); bulk dumps are asked for with 2n and answered with 0n, both taken as device number 1.`,
+      `Parameter change: F0 43 1n ${head.join(' ')} <address> <data> F7, n the device number (the deviceId variable is 1n, 10H for device number 1); bulk dumps are asked for with 2n and answered with 0n, both taken as device number 1.`,
       identity ? `Identity: the reply the data list prints, ${reply.join(' ')}.` : `No identity check: ${layout.noIdentity ?? 'the data list prints no identity reply'}.`,
       ...(layout.notes ?? []),
       ...notes,

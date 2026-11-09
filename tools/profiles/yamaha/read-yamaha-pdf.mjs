@@ -3,7 +3,7 @@
 //
 // Yamaha has set these tables the same way for twenty years: a title, `MIDI PARAMETER CHANGE TABLE
 // (VOICE Common)`, then the headings `Address (hex)` (over `High Mid Low`, or alone), `Size`, `Data
-// Range (hex)`, `Parameter Name`, `Description`, sometimes `Default (HEX)`, `Notes`, and the rows set
+// Range (hex)`, `Parameter Name`, `Description` (or `Settings`), sometimes `Default (HEX)`, `Notes`, and the rows set
 // from the top: the address printed in full on a block's first row and its low byte alone after, a
 // name or a description wrapped onto the lines below. Two tables often stand side by side on a page,
 // and a table runs on over the next page under its headings without its title. `Total Size = 32`
@@ -86,13 +86,14 @@ function findHeads(lines, width) {
   }
   for (const h of heads) {
     const band = (x) => Math.abs(middle(x) - middle(h.name)) <= 13 && x.x0 > h.name.x1 && x.x0 < h.x1;
-    h.description = words.find((x) => band(x) && x.text === 'Description');
+    // The MX heads it `Settings` on some pages.
+    h.description = words.find((x) => band(x) && (x.text === 'Description' || x.text === 'Settings'));
     h.defaultHead = words.find((x) => band(x) && x.text === 'Default');
     h.notes = words.find((x) => band(x) && x.text === 'Notes');
     // The headings' own lines: `(hex)`, `High Mid Low` below them.
     // (Close enough to the band that a first row printing `Name` in a parameter's name is not one.)
     const own = words.filter((x) => x.x0 >= h.x0 && x.x0 < h.x1 && x.y0 >= h.y0 - 14 && x.y0 <= middle(h.name) + 9.5
-      && /^(Address|\(hex\)|\(HEX\)|Size|Data|Range|Parameter|Name|Description|Default|Notes|High|Mid|Low)$/.test(x.text));
+      && /^(Address|\(hex\)|\(HEX\)|Size|Data|Range|Parameter|Name|Description|Settings|Default|Notes|High|Mid|Low)$/.test(x.text));
     h.bottom = Math.max(...own.map((x) => x.y1));
   }
   return heads;
@@ -207,20 +208,53 @@ export function readParameterTables(pdf, pages) {
 }
 
 /**
+ * The bytes a message carries between its device number and its address, as the data format prints
+ * them a line each (`01111111 7F Group Number High`, `00011100 1C Group Number Low`, `00000000 00
+ * Model ID`; the MX's `7F Model ID`, `17 Model ID`), a byte count as `bb`. `status` is the device
+ * number line's high nibble: 0001 for a parameter change, 0000 for a bulk dump.
+ */
+function readHeader(lines, status) {
+  const start = lines.findIndex((l) => new RegExp(`\\b${status}nnnn\\s+\\w{2}H?\\s+Device Number`, 'i').test(l));
+  if (start < 0) return null;
+  const out = [];
+  for (const l of lines.slice(start + 1, start + 16)) {
+    if (/Address High/i.test(l)) return out.length ? out : null;
+    const m = /\b[01nb]{8}\s+(?:([0-9A-F]{2})H?|b{7})\s+(?:Group (?:Number|ID) (?:High|Low)|Model ID|Byte Count)\b/i.exec(l);
+    if (m) out.push(m[1] ?? 'bb');
+  }
+  return null;
+}
+
+/**
  * The data format: the identity reply, the model ID and the group number, as the MIDI Data Format
- * pages print them (`F0H 7EH 7FH 06H 02H 43H 00H 41H 51H 06H …`, `00000011 03H Model ID`).
+ * pages print them (`F0H 7EH 7FH 06H 02H 43H 00H 41H 51H 06H …`, `00000011 03H Model ID`); the bytes
+ * a parameter change and a bulk dump carry before the address; and what the checksum adds up, from
+ * the model ID (`when the Model ID, Start Address, Data …`) or from the byte count (the MX's).
  */
 export function readFormat(text) {
   const t = String(text);
-  const identity = /IDENTITY REPLY[^\n]*\n[^\n]*?(F0H(?:\s+[0-9A-F]{2}H){8,16}\s+F7H?)/.exec(t)?.[1];
+  const lines = t.split('\n');
+  let identity = /IDENTITY REPLY[^\n]*\n[^\n]*?(F0H(?:\s+(?:[0-9A-F]{2}|[a-z]{2})H){8,16}\s+F7H?)/.exec(t)?.[1];
+  // `ddH ddH` with one code printed under it (`dd; Device Number Code` / `47 06`, the MX); a code for
+  // each model (`MOXF6: 4CH 06H`) leaves it unknown.
+  // The code ends the next line, whatever the column beside it prints.
+  const code = /\bdd[;:]\s*Device (?:Number Code|family number)\s*\n(?:[^\n]*\s{3})?\s*([0-9A-F]{2})H?\s+([0-9A-F]{2})H?[ \t]*(?:\n|$)/i.exec(t);
+  if (identity && code) identity = identity.replace(/ddH\s+ddH/, `${code[1]}H ${code[2]}H`);
   // `00000011 03H Model ID` (the reface), `00000010 07 Model ID` (the MODX: the hex column is read).
   const model = /\b([0-9A-F]{2})H?\s+Model ID/.exec(t)?.[1];
   const groupHigh = /\b([0-9A-F]{2})H?\s+Group (?:Number|ID) High/.exec(t)?.[1];
   const groupLow = /\b([0-9A-F]{2})H?\s+Group (?:Number|ID) Low/.exec(t)?.[1];
+  const header = readHeader(lines, '0001');
+  const bulkHeader = readHeader(lines, '0000');
+  const sum = /Check sum is the value[^\n]*?when the (Model ID|Byte Count)\b/i.exec(t)?.[1];
+  const reply = identity?.replace(/H/g, '').split(/\s+/).filter(Boolean);
   return {
-    ...(identity ? { identityReply: identity.replace(/H/g, '').split(/\s+/).filter(Boolean) } : {}),
+    ...(reply && reply.slice(0, 10).every((b) => /^[0-9A-F]{2}$/.test(b)) ? { identityReply: reply } : {}),
     ...(model ? { modelId: model } : {}),
     ...(groupHigh ? { group: [groupHigh, groupLow] } : {}),
+    ...(header ? { header } : {}),
+    ...(bulkHeader ? { bulkHeader } : {}),
+    ...(sum ? { checksumFrom: /Byte/i.test(sum) ? 'byteCount' : 'modelId' } : {}),
   };
 }
 

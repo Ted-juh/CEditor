@@ -830,7 +830,7 @@ choices; the MIDI message that changes each one (CC, NRPN or SysEx); how the syn
 whole sound in one go (a **dump**); and its banks of presets. With a profile, you bind controls by
 choosing a parameter by name, and CEditor builds the right message.
 
-CEditor comes with over a hundred profiles: a generic MIDI CC profile, the Yamaha AN1x, reface synths, MODX and MOXF, Roland synths
+CEditor comes with over a hundred profiles: a generic MIDI CC profile, the Yamaha AN1x, reface synths, MODX, MOXF and MX, Roland synths
 from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, Novation's Peak, Summit, Bass Station II and Circuits, Moog's Sub 37, Subsequent, Matriarch, Grandmother and Muse, Korg's minilogue,
 prologue and volca families, Sequential and Dave Smith Instruments synths from the Mopho to the Prophet-6, and the Oberheim OB-6, OB-X8 and
 TEO-5, most of them read out of the maker's

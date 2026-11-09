@@ -2,7 +2,7 @@
   "sources": [
     {"title":"MOXF6/MOXF8 Data List (A0)","file":"moxf6moxf8_en_dl_a0.pdf","sha256":"c15d90d0d47a24f6e4c5f3522f8e757ca3df1bf379e01664f0d66267c9a6124b","url":"https://usa.yamaha.com/files/download/other_assets/2/330242/moxf6moxf8_en_dl_a0.pdf"}
   ],
-  "format": {"modelId":"00","group":["7F","1C"],"byteCount":"data"},
+  "format": {"modelId":"00","group":["7F","1C"],"header":["7F","1C","00"],"bulkHeader":["7F","1C","bb","bb","00"],"checksumFrom":"modelId","byteCount":"data"},
   "tables": [
     {
       "title": "MIDI PARAMETER CHANGE TABLE (MODE CHANGE)",

@@ -84,6 +84,26 @@ test('the bulk dump block table: two columns, a series printed first and last, a
   assert.equal(readByteCount('“Byte Count” indicates the data size contained in each block designated by bulk dump'), 'data', 'the MOXF: the data alone');
 });
 
+test('the data format: the bytes before the address, a byte count among them, and what the checksum adds up', () => {
+  // The MX: a model ID of two bytes where the MOXF has a group number and a model ID; its identity's
+  // `dd dd` printed under it, beside another column's text.
+  const mx = [
+    '(3-6-1-3) IDENTITY REPLY (Transmit only)',
+    '      F0H 7EH 7FH 06H 02H 43H 00H 41H ddH ddH 00H 00H 00H 7FH F7H',
+    '      dd; Device Number Code',
+    '(3-2) CHANNEL MODE MESSAGES          47 06',
+    '      0001nnnn   1n   Device Number', '      01111111   7F   Model ID', '      00010100   17   Model ID', '      0aaaaaaa   aaaaaaa   Address High',
+    '      0000nnnn   0n   Device Number', '      01111111   7F   Model ID', '      00010100   17   Model ID',
+    '      0bbbbbbb   bbbbbbb   Byte Count', '      0bbbbbbb   bbbbbbb   Byte Count', '      0aaaaaaa   aaaaaaa   Address High',
+    '      The Check sum is the value that results in a value of 0 for the lower 7 bits when the Byte Count, Start Address,',
+  ].join('\n');
+  const format = readFormat(mx);
+  assert.deepEqual([format.header, format.bulkHeader, format.checksumFrom], [['7F', '17'], ['7F', '17', 'bb', 'bb'], 'byteCount']);
+  assert.deepEqual(format.identityReply.slice(8, 10), ['47', '06']);
+  // The MOXF: one code for each model, so no identity.
+  assert.equal(readFormat('IDENTITY REPLY (Transmit only)\n F0H 7EH 7FH 06H 02H 43H 00H 41H ddH ddH mmH 00H 00H 7FH F7H\n dd: Device family number\n MOXF6: 4CH 06H\n MOXF8: 4DH 06H\n').identityReply, undefined);
+});
+
 /* ------------------------------------------------------------------ the builder's rules */
 
 test('the description says what each value shows: a list of names, a range of numbers, a range in parts', () => {
@@ -100,6 +120,8 @@ test('the description says what each value shows: a list of names, a range of nu
   assert.deepEqual(readValues([[0x28, 0x58]], '-24 – +24 [semitones]'), { shown: { min: -24, max: 24 }, unit: 'semitones' }, 'the MOXF brackets its units');
   assert.deepEqual(readValues([[0x34, 0x4C]], '-12 – +12 [dB]'), { shown: { min: -12, max: 12 }, unit: 'dB' });
   assert.deepEqual(readValues([[0, 4]], '0: Voice, 1: Performance, 2: Pattern (Multi), 3: Song (Multi), 4: Master').choices.map((c) => c.label), ['Voice', 'Performance', 'Pattern (Multi)', 'Song (Multi)', 'Master'], 'the value printed before each name is left off');
+  assert.deepEqual(readValues([[0, 9]], '0 = Preset, 1 = User, 2 = Library1 – 9 = Library8').choices.map((c) => c.label).slice(1, 4), ['User', 'Library1', 'Library2']);
+  assert.deepEqual(readHexRange('0 – 2'), [[0, 2]], 'the MX prints a byte with one digit');
   const omni = readValues([[0, 16], [127, 127]], '1 – 16, omni, off').choices;
   assert.deepEqual([omni.length, omni[15], omni[16], omni[17]], [18, { value: 15, label: '16' }, { value: 16, label: 'omni' }, { value: 127, label: 'off' }], 'counted out over the parts in turn');
   assert.deepEqual(readPlaceholders(['op = operator number', '00 – 03 (hex)', 'OP1 – OP4']), { op: { what: 'operator number', values: [0, 1, 2, 3], labels: ['OP1', 'OP2', 'OP3', 'OP4'] } });
@@ -121,7 +143,8 @@ for (const { name, profile, text, out, data } of BUILT) {
   });
 
   test(`${profile.id}: every parameter is a parameter change at its address, at both ends of its range`, () => {
-    const model = profile.messageRecipes[0].template[5];
+    const { template } = profile.messageRecipes[0];
+    const head = template.slice(3, template.indexOf('$address')).join(' ');
     const ids = new Set();
     for (const p of profile.parameters) {
       assert.ok(!ids.has(p.id), `${p.id} twice`);
@@ -132,7 +155,7 @@ for (const { name, profile, text, out, data } of BUILT) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
         const bytes = p.encoding.type === 'u14-msb-lsb' ? [wire >> 7, wire & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((s) => (wire >> (s * 4)) & 15) : [wire];
-        assert.equal(compiled.hex, `F0 43 10 7F 1C ${model} ${p.address} ${hex(bytes)} F7`, `${p.id} = ${value}`);
+        assert.equal(compiled.hex, `F0 43 10 ${head} ${p.address} ${hex(bytes)} F7`, `${p.id} = ${value}`);
       }
     }
   });
@@ -204,4 +227,20 @@ test('the MOXF: every part, element and drum key at its own address, and each ed
   assert.equal(request('requestDrumVoice'), 'F0 43 20 7F 1C 00 0E 2F 00 F7');
   assert.equal(request('requestPerformance'), 'F0 43 20 7F 1C 00 0E 4F 00 F7');
   assert.equal(profile.identity, undefined, 'the data list prints the family as dd dd: no identity check');
+});
+
+test('the MX: a model ID of two bytes, a byte count the checksum adds up, and its identity', { skip: !builtProfile('yamaha-mx') }, () => {
+  const profile = builtProfile('yamaha-mx');
+  const at = (group, name) => profile.parameters.find((p) => p.group === group && p.name === name);
+  const send = (group, name, value) => localCompileParameter(profile, { parameterId: at(group, name).id, value }).hex;
+  assert.equal(send('Voice Element 2', 'Element Switch', 'on'), 'F0 43 10 7F 17 41 01 00 01 F7');
+  assert.equal(send('Performance Arpeggio Common', 'Tempo', 300), 'F0 43 10 7F 17 36 30 02 02 2C F7', 'two bytes, a high and a low 7 bits: 5 – 300');
+  assert.deepEqual([at('Performance Arpeggio Common', 'ARP Swing Offset').display.min, at('Performance Arpeggio Common', 'ARP Swing Offset').default], [-120, 128]);
+  assert.ok(at('Performance Part 16', 'Bank Select MSB'));
+  assert.equal(at('Drum Key C6', 'Element Switch').address, '47 48 00');
+  assert.deepEqual([profile.identity.familyCode, profile.identity.modelNumber], [['00', '41'], ['47', '06']]);
+  const common = profile.dumpDefinitions.find((d) => d.id === 'bulk400000');
+  assert.equal(common.matcher.prefix.join(' '), 'F0 43 00 7F 17 00 50 40 00 00', 'no model ID after the byte count');
+  assert.deepEqual([common.payload.offset, common.checksum.fromOffset, common.completion.expectedBytes], [10, 5, 92], 'the checksum adds up from the byte count');
+  assert.equal(profile.requests.find((r) => r.id === 'requestPerformance').template.join(' '), 'F0 43 20 7F 17 0E 5F 00 F7');
 });

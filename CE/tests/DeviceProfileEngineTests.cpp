@@ -4245,7 +4245,8 @@ int main (int argc, char** argv)
         root.getChildFile ("yamaha-reface-yc.ceditor-device.json"),
         root.getChildFile ("yamaha-modx.ceditor-device.json"),
         root.getChildFile ("yamaha-modx-plus.ceditor-device.json"),
-        root.getChildFile ("yamaha-moxf.ceditor-device.json")
+        root.getChildFile ("yamaha-moxf.ceditor-device.json"),
+        root.getChildFile ("yamaha-mx.ceditor-device.json")
     };
 
     auto failures = 0;

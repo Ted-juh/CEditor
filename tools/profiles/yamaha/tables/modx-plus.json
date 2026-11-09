@@ -2,7 +2,7 @@
   "sources": [
     {"title":"MODX6+/MODX7+/MODX8+ Data List (A0)","file":"modx_plus_en_dl_a0.pdf","sha256":"9a7525f58bca9ed8d2df37f7f07d37be88aec8acca50e7739e2d73a0dde6cc19","url":"https://usa.yamaha.com/files/download/other_assets/5/1583935/modx_plus_en_dl_a0.pdf"}
   ],
-  "format": {"modelId":"07","group":["7F","1C"]},
+  "format": {"modelId":"07","group":["7F","1C"],"header":["7F","1C","07"],"bulkHeader":["7F","1C","bb","bb","07"],"checksumFrom":"byteCount"},
   "tables": [
     {
       "title": "MIDI PARAMETER CHANGE TABLE (BULK CONTROL)",
