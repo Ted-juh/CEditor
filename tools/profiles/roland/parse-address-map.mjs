@@ -63,6 +63,11 @@ const isHeaderRow = (cells) => cells.length <= 2
  * not being a sentence.
  */
 function headingOf(line) {
+  // The XV-5050's owner's manual numbers its headings without the asterisk its siblings print:
+  // `1-2-1 System Common` where the XV-5080's is `*1-2-1 System Common`. Read the same way, so the
+  // two manuals' tables carry the same names.
+  const numbered = /^\s*(\d+(?:-\d+)+\s+[A-Z][\w ()/&+.'-]{2,58}?)\s*$/.exec(line);
+  if (numbered) return numbered[1];
   // `**Program Common` (JD-Xi), `* Patch` (GAIA), `❍Patch Common` (SH-201).
   const match = /^\s*(?:\*{1,2}|❍)\s*(.+?)\s*$/.exec(line);
   if (!match) return null;
@@ -215,10 +220,15 @@ export function parseAddressMap(text) {
     // ---- Offset tables: an address and a name.
     if (cells.length === 2) {
       const address = cells[0].trim();
-      const name = cells[1].trim();
+      let name = cells[1].trim();
       table.kind ??= 'offsets';
       // The newer documents end an entry with the table it points to — `Tone Partial 1
       // [Tone Partial]` — which is a link, not part of the name: kept apart as `table`.
+      // The XV owner's manuals end an entry with a cross-reference to the table that describes it —
+      // `Rhythm Tone (Key # 21)   *1-3-2-5`, the XV-88's without the asterisk. A reference, not part
+      // of the name: left in, its last number was read as the entry's own, and no run filled.
+      const marked = /^(.*?)\s+(?:\*\d+(?:-\d+)+|\d+(?:-\d+){2,})$/.exec(name);
+      if (marked) name = marked[1];
       const linked = /^(.*?)\s*\[([^\]]+)\]$/.exec(name);
       const entry = linked ? { name: linked[1].replace(/\s+/g, ' '), table: linked[2].trim() } : { name: name.replace(/\s+/g, ' ') };
       if (address === ':') table.entries.push({ gap: true });

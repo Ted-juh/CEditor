@@ -84,6 +84,19 @@ memories — is listed with its addresses in that profile's `coverage`.
 | `roland-sd-90` | SD-90 1.02 (Dec 2001) | 10,124 | 137 | none usable: p19 contradicts p7; p21 writes twelve values at once |
 | `roland-v-synth-gt` | V-Synth GT 1.00 (Apr 2007) | 11,196 | 197 | p20 |
 | `roland-vr-700` | VR-700 1.00 (Jan 2010) | 248 | 11 | p10 |
+| `roland-xv-5080` | XV-5080 owner's manual, MIDI chapter 1.00 (May 2000) | 10,233 | 234 | p303 |
+| `roland-xv-3080` | XV-3080 owner's manual, MIDI chapter 1.0 (Dec 1999) | 8,704 | 113 | p193 |
+| `roland-xv-5050` | XV-5050 owner's manual, MIDI chapter | 8,842 | 101 | p174 |
+| `roland-xv-2020` | XV-2020 owner's manual, MIDI chapter 1.00 (Jun 2002) | 8,726 | 98 | p159 |
+| `roland-xv-88` | XV-88 owner's manual, MIDI chapter 1.00 (Feb 2000) | 8,919 | 131 | p294 |
+| `roland-fantom-x` | Fantom-X6/X7/X8 owner's manual, MIDI chapter 1.00 (Feb 2004) | 10,926 | 158 | p329 |
+| `roland-fantom-xr` | Fantom-XR owner's manual, MIDI chapter 1.00 (Mar 2004) | 10,549 | 141 | p269 |
+| `roland-juno-g` | JUNO-G owner's manual, MIDI chapter 1.00 (Feb 2006) | 10,626 | 158 | p239 |
+| `roland-juno-stage` | JUNO-STAGE owner's manual, MIDI chapter 1.00 (May 2008) | 10,674 | 156 | p242 |
+| `roland-soniccell` | SonicCell owner's manual, MIDI chapter 1.00 (Jun 2007) | 11,269 | 118 | p275 |
+| `roland-v-synth` | V-Synth owner's manual, MIDI chapter 1.00 (Nov 2002) | 5,688 | 104 | p169 |
+| `roland-v-synth-xt` | V-Synth XT 1.00 (Mar 2005) | 5,971 | 107 | p19 |
+| `roland-sh-32` | SH-32 1.00 (Dec 2001) | 4,827 | 160 | p12 |
 
 Things the manuals got wrong, found while laying these out and recorded in each layout rather than
 corrected — the reason every profile is checked against the manual's own example, not trusted:
@@ -97,10 +110,17 @@ corrected — the reason every profile is checked against the manual's own examp
 - **Model IDs:** the JUPITER-X prints its last byte as 52H (the AX-Edge's) in two byte lists; the
   FA-06/07/08 names the INTEGRA-7's 64H once and uses 77H everywhere else; the Fantom-G's prose gives
   two bytes where its tables give three; the AX-Edge and JUPITER-X drop an H from the heading.
-- **Identity collision that is the instrument's, not the manual's:** the FANTOM EX answers with the
-  FANTOM-6/7/8's family code and number, told apart only by the last revision byte, which profiles do
-  not pin (a firmware update is not a different instrument). Choosing either profile for either
-  instrument is therefore not flagged as a mismatch.
+- **Identity collisions that are the instruments', not the manuals':** the FANTOM EX answers with
+  the FANTOM-6/7/8's family code and number, the Fantom-XR with the Fantom-X's, told apart only by a
+  revision byte, which profiles do not pin (a firmware update is not a different instrument); the
+  V-Synth and V-Synth XT print the same reply byte for byte, revision included; the XV-5080, XV-3080
+  and XV-88 all print family 10 01, number 00 00. Choosing any of these profiles for its sibling is
+  therefore not flagged as a mismatch. (JUNO-STAGE and SonicCell share a model ID but not a family
+  number, and are told apart.)
+- **Cross-reference marks:** the XV owner's manuals end every address-table entry with the number of
+  the table describing it (`*1-3-2-5`); read as part of the name, its last number stopped every
+  elided run from filling — the first XV profiles had rhythm sets with no keys until the reader was
+  taught to leave the mark out.
 
 ## The generator's rules, and why
 
@@ -131,10 +151,9 @@ Every product page on the global, US and UK sites was checked (1,104 of them). P
 
 | State | Models |
 |---|---|
-| **Profiles** | the twenty-eight above |
-| **MIDI Implementation reads cleanly; layout to write** | SH-32; the stage pianos RD-2000, RD-2000EX, RD-800, RD-300NX, RD-700NX |
+| **Profiles** | the forty-one above |
+| **MIDI Implementation reads cleanly; layout to write** | the stage pianos RD-2000, RD-2000EX, RD-800, RD-300NX, RD-700NX |
 | **Reads with a few issues** | the original FANTOM (2001), Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, RD-08, RD-88, RD-300GX/SX, RD-700GX |
-| **Address map inside the owner's manual, with text; reads cleanly since the gutter fix** | XV-5080, XV-3080, XV-5050, XV-2020, XV-88, FANTOM-X6/X7/X8, FANTOM-XR, JUNO-G, JUNO-STAGE, SonicCell, V-Synth, V-Synth XT (its own MIDI Implementation) |
 | **Address map in the owner's manual, still reading with issues** | XP-30, JV-1010 (no ModelID heading, appendix tables), VR-760, RD-700, RD-700SX |
 | **Scanned, no text** — OCR plus an independent transcription to check against | JV-1080, JV-2080, XP-10/50/60/80, JP-8000, MC-303, MC-505, MC-80, MC-50mkII |
 | **No address map published** | The Boutiques (JP-08, JU-06/06A, JX-03/08, JD-08, SE-02, SH-01A, …), SYSTEM-1/1m/8, SH-4d, the AIRA and TR lines, MC-101/707: CC tables only, a different and simpler source |

@@ -159,6 +159,37 @@ test('the newer documents\' grammar, and Roland\'s typesetting slips', () => {
   assert.deepEqual(checkTables(map.tables), [], 'a closing Reserved row stands for the bytes up to Total Size');
 });
 
+test('cross-reference marks are not entry names, and numbered headings name their tables', () => {
+  // The XV owner's manuals: every entry ends with the reference of the table that describes it
+  // (`*1-3-2-5`, or `1-3-2-5` on the XV-88), and the XV-5050 numbers its headings with no asterisk.
+  const XV = `
+XV-TEST (ModelID = 00H 10H)
++------------------------------------------------------------------------------+
+| Offset      |                                                                |
+|     Address |                  Description                                   |
+|-------------+----------------------------------------------------------------|
+|    00 10 00 | Rhythm Tone (Key # 21)                               *1-3-2-5 |
+|    00 12 00 | Rhythm Tone (Key # 22)                                        |
+|          : |                                                                |
+|    00 18 00 | Rhythm Tone (Key # 25)                                1-3-2-5 |
++------------------------------------------------------------------------------+
+
+1-3-2-5 Rhythm Tone
++------------------------------------------------------------------------------+
+| Offset      |                                                                |
+|     Address |                  Description                                   |
+|-------------+----------------------------------------------------------------|
+|       00 00 | 0aaa aaaa | Tone Level                               (0 - 127) |
+|-------------+----------------------------------------------------------------|
+| 00 00 00 01 | Total Size                                                     |
++------------------------------------------------------------------------------+
+`;
+  const map = parseAddressMap(XV);
+  const keys = map.tables[0].entries.map((e) => e.name);
+  assert.deepEqual(keys, [21, 22, 23, 24, 25].map((k) => `Rhythm Tone (Key # ${k})`), 'the mark is not the entry\'s number, so the run fills');
+  assert.ok(map.tables.some((t) => t.name === '1-3-2-5 Rhythm Tone' && t.kind === 'parameters'));
+});
+
 test('a display line becomes labels only when it counts out', () => {
   const row = (min, max, display, extra = {}) => ({ min, max, display, ...extra });
   assert.deepEqual(interpretRow(row(0, 2, 'LPF, HPF, BPF')).labels, ['LPF', 'HPF', 'BPF']);
