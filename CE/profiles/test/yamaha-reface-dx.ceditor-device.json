@@ -23,7 +23,7 @@
     "Parameter change: F0 43 1n 7F 1C 05 <address> <data> F7, n the device number (the deviceId variable is 1n, 10H for device number 1); bulk dumps are asked for with 2n and answered with 0n, both taken as device number 1.",
     "Identity: the reply the data list prints, F0 7E 7F 06 02 43 00 41 53 06 00 00 00 7F F7.",
     "The reface sends and receives control changes for its panel only with MIDI Control on (the system setting); this profile edits by parameter change, which the data list prints for every setting, and does not map the control changes.",
-    "Pull: Bulk dump request (SYSTEM Common); Bulk dump request (Voice Common, Operator OP1, Operator OP2, Operator OP3, Operator OP4). 135 of 135 parameters are read back."
+    "Pull: Bulk dump request (SYSTEM Common); Bulk dump request (Voice Common, Operator 1, Operator 2, Operator 3, Operator 4). 135 of 135 parameters are read back."
   ],
   "variables": {
     "channel": 1,
@@ -216,12 +216,12 @@
     {"name":"System: Master Tune = 100","parameter":"system.masterTune","value":100,"expectedHex":"F0 43 10 7F 1C 05 00 00 02 00 00 06 04 F7"},
     {"name":"System: Tempo = 100","parameter":"system.tempo","value":100,"expectedHex":"F0 43 10 7F 1C 05 00 00 08 00 64 F7"},
     {"name":"Bulk dump request (SYSTEM Common)","kind":"request","request":"requestSystemCommon","expectedHex":"F0 43 20 7F 1C 05 00 00 00 F7"},
-    {"name":"Bulk dump request (Voice Common, Operator OP1, Operator OP2, Operator OP3, Operator OP4)","kind":"request","request":"requestVoice","expectedHex":"F0 43 20 7F 1C 05 0E 0F 00 F7"},
-    {"name":"Operator OP1, read back","kind":"dumpParse","inputHex":"F0 43 00 7F 1C 00 20 05 31 00 00 01 7F 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 4A F7","expectedValues":{"op1.op1OnOffOp":"on","op1.op1EgRate1":127}}
+    {"name":"Bulk dump request (Voice Common, Operator 1, Operator 2, Operator 3, Operator 4)","kind":"request","request":"requestVoice","expectedHex":"F0 43 20 7F 1C 05 0E 0F 00 F7"},
+    {"name":"Operator 1, read back","kind":"dumpParse","inputHex":"F0 43 00 7F 1C 00 20 05 31 00 00 01 7F 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 4A F7","expectedValues":{"op1.op1OnOffOp":"on","op1.op1EgRate1":127}}
   ],
   "requests": [
     {"id":"requestSystemCommon","name":"Bulk dump request (SYSTEM Common)","kind":"sysex","template":["F0","43","20","7F","1C","05","00","00","00","F7"],"response":{"dump":"bulk000000"},"timeoutMs":3000,"retries":1},
-    {"id":"requestVoice","name":"Bulk dump request (Voice Common, Operator OP1, Operator OP2, Operator OP3, Operator OP4)","kind":"sysex","template":["F0","43","20","7F","1C","05","0E","0F","00","F7"],"response":{"kind":"bulkDump","collectionId":"voice"},"timeoutMs":3000,"retries":1}
+    {"id":"requestVoice","name":"Bulk dump request (Voice Common, Operator 1, Operator 2, Operator 3, Operator 4)","kind":"sysex","template":["F0","43","20","7F","1C","05","0E","0F","00","F7"],"response":{"kind":"bulkDump","collectionId":"voice"},"timeoutMs":3000,"retries":1}
   ],
   "dumpDefinitions": [
     {"id":"bulk000000","name":"SYSTEM Common","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","24","05","00","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":32},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":42,"byteOffset":43},"completion":{"expectedMessages":1,"expectedBytes":45},"mappings":[
@@ -265,7 +265,7 @@
       {"parameter":"voiceCommon.effect2Parameter1Note","offset":33},
       {"parameter":"voiceCommon.effect2Parameter2Note","offset":34}
     ]},
-    {"id":"bulk310000","name":"Operator OP1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310000","name":"Operator 1","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","00","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
       {"parameter":"op1.op1OnOffOp","offset":0},
       {"parameter":"op1.op1EgRate1","offset":1},
       {"parameter":"op1.op1EgRate2","offset":2},
@@ -292,7 +292,7 @@
       {"parameter":"op1.op1FreqFineRatioFreq","offset":23},
       {"parameter":"op1.op1FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk310100","name":"Operator OP2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","01","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310100","name":"Operator 2","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","01","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
       {"parameter":"op2.op2OnOffOp","offset":0},
       {"parameter":"op2.op2EgRate1","offset":1},
       {"parameter":"op2.op2EgRate2","offset":2},
@@ -319,7 +319,7 @@
       {"parameter":"op2.op2FreqFineRatioFreq","offset":23},
       {"parameter":"op2.op2FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk310200","name":"Operator OP3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","02","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310200","name":"Operator 3","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","02","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
       {"parameter":"op3.op3OnOffOp","offset":0},
       {"parameter":"op3.op3EgRate1","offset":1},
       {"parameter":"op3.op3EgRate2","offset":2},
@@ -346,7 +346,7 @@
       {"parameter":"op3.op3FreqFineRatioFreq","offset":23},
       {"parameter":"op3.op3FreqDetuneDtune","offset":24}
     ]},
-    {"id":"bulk310300","name":"Operator OP4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","03","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
+    {"id":"bulk310300","name":"Operator 4","kind":"sysex","matcher":{"prefix":["F0","43","00","7F","1C","00","20","05","31","03","00"],"suffix":["F7"]},"payload":{"offset":11,"size":28},"checksum":{"type":"roland-7bit","fromOffset":7,"toOffset":38,"byteOffset":39},"completion":{"expectedMessages":7,"expectedBytes":41,"collectionId":"voice"},"mappings":[
       {"parameter":"op4.op4OnOffOp","offset":0},
       {"parameter":"op4.op4EgRate1","offset":1},
       {"parameter":"op4.op4EgRate2","offset":2},

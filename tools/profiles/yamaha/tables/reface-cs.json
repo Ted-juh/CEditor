@@ -2,7 +2,7 @@
   "sources": [
     {"title":"reface Data List (B0)","file":"reface_en_dl_b0.pdf","sha256":"705182642a7be012570805c9686e1eac58bd2b9fa8584f91d33414929e1a85e9","url":"https://usa.yamaha.com/files/download/other_assets/7/794817/reface_en_dl_b0.pdf"}
   ],
-  "format": {"identityReply":["F0","7E","7F","06","02","43","00","41","51","06","00","00","00","7F","F7"],"modelId":"03","group":["7F","1C"]},
+  "format": {"identityReply":["F0","7E","7F","06","02","43","00","41","51","06","00","00","00","7F","F7"],"modelId":"03","group":["7F","1C"],"byteCount":"fromModelId"},
   "tables": [
     {
       "title": "MIDI PARAMETER CHANGE TABLE (SYSTEM)",

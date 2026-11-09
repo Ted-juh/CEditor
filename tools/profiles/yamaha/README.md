@@ -41,7 +41,13 @@ lists do that it copes with, each found on a real page:
   over a page; an address byte printed as a placeholder (`31 op 00`) with its meaning in a note under
   the title (`op = operator number`, `00 – 03 (hex)`, `OP1 – OP4`);
 - a value over several bytes, one data range a line (`00 – 00`, `00 – 07`, `00 – 0F`, `00 – 0F`
-  beside `1st bit 3-0 : bit 15-12` …).
+  beside `1st bit 3-0 : bit 15-12` …);
+- a name printed once beside the rows that share it (`MTC strat offset` beside `0 .. 23 (Hour)`,
+  `0 .. 59 (Minute)` …), each row taking it with the word its description ends on.
+
+The bulk dump block table is read the same way, a column of a page at a time where it is set in two
+(the MOXF's): each line ending in a byte count and an address, and a series printed first and last
+with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C6 48`).
 
 ## What the builder takes as settled
 
@@ -49,20 +55,26 @@ lists do that it copes with, each found on a real page:
   prints: `F0 43 1n 7F 1C <model ID> <address> <data> F7`, n the device number (the `deviceId`
   variable is 1n, 10H for device number 1). `reserved` rows are not.
 - **The description says what each value shows, in order.** A list of names exactly as long as the
-  range is a choice (`00 – 04` beside `OFF, AMP, FILTER, PITCH, OSC`); a range of numbers as long as
-  the data range is what the values show (`28 – 58` beside `-24 – +24 (semitones)`); a range in parts
-  is matched part for part (`00 – 0F, 7F` beside `1 – 16, off`). Anything else (`0: Poly, 1 – 127:
-  Mono with Portamento Time`) is a number, with the description said.
+  range is a choice (`00 – 04` beside `OFF, AMP, FILTER, PITCH, OSC`; `0: Voice, 1: Performance, …`
+  without the numbers); a range of numbers as long as the data range is what the values show (`28 –
+  58` beside `-24 – +24 (semitones)`, or `[semitones]` as the MOXF prints it); a range in parts is
+  matched part for part (`00 – 0F, 7F` beside `1 – 16, off`) or counted out over them in turn (`00 –
+  10, 7F` beside `1 – 16, omni, off`). Anything else (`0: Poly, 1 – 127: Mono with Portamento Time`)
+  is a number, with the description said.
 - **A value over several bytes** is split as its description says: `1st bit 3-0 : bit 15-12` is four
   nibbles, `1st bit 6-0 : bit 13-7` two 7-bit halves (Tempo, 30 - 300).
 - **A name printed a character a row** (`Voice Name1` … `Voice Name10`, `32 – 126 (ASCII)`) is one
   text parameter, read back but not written: a parameter change carries one parameter, and the data
   list does not say ten characters may go in one.
 - **Pull** asks for each block the Bulk Dump Block table lists: a block on its own at its address
-  (System), and a Bulk Header's blocks with one request at the header's address, read as one
-  collection (header, Common, the operators, footer). The checksum is the one the data format
-  prints, over the model ID, the address and the data. Requests go out as 2n and dumps come back as
-  0n, both taken as device number 1.
+  (System), when it holds a parameter laid out here, and a Bulk Header's blocks with one request at
+  the header's address, read as one collection (header, Common, the operators, footer). Where the
+  table prints the header `0E mm nn`, the layout picks the edit buffer from the Bulk Control table
+  (the MOXF's Normal Voice Edit Buffer, `0E 0F 00`). The byte count is what the data list says it
+  counts: `from Model ID onward` on the reface (the data and four bytes more), `the data size` on the
+  MOXF (a header's is 0). The checksum is the one the data format prints, over the model ID, the
+  address and the data. Requests go out as 2n and dumps come back as 0n, both taken as device
+  number 1.
 - **Identity** is the reply the data list prints (`F0 7E 7F 06 02 43 00 41 51 06 …`).
 
 ## The profiles
@@ -75,6 +87,7 @@ lists do that it copes with, each found on a real page:
 | `yamaha-reface-yc` | reface Data List (B0), pp. 15-19 | 27 | 11 | System, TG Common |
 | `yamaha-modx` | MODX6/MODX7/MODX8 Data List (D0), pp. 188, 193-222 | 4,521 | 858 | — |
 | `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 193-222 | 4,521 | 858 | — |
+| `yamaha-moxf` | MOXF6/MOXF8 Data List (A0), pp. 121, 124-146 | 4,573 | 1,216 | the five edit buffers, the System's blocks |
 
 The MODX's tables repeat for each of its 16 parts, at addresses a part apart, and a part's 8
 elements, 73 drum keys and 8 FM-X operators are laid out the same way (`41 ep 00`, `5p kk 00`, `49 op
@@ -95,6 +108,19 @@ What the MODX's data list leaves out or the reader does not take:
 - **Pull** is not mapped yet: the Performance's bulk dump is a header, a block per part and element,
   and a footer, as the reface's are, but larger.
 
+The MOXF's tables are laid out in full: the System with its six Quick Setups and their audio and
+MIDI configs, the Master's four zones, the Performance and its four parts, the Song/Pattern mixing
+and its sixteen parts, the Normal Voice and its eight elements, the Drum Voice and its 73 keys (C0 –
+C6, as the bulk dump table names them). The placeholders (`31 pp 00`, `41 ee 00`, `47 ee 00`, `32 nn
+00`, `00 5n 00`) are the Parameter Base Address table's, given in the layout. Pull asks for the
+Normal Voice, Drum Voice, Performance, Multi and Master edit buffers, whichever mode the instrument
+is in, and the System's blocks one at a time: 4,570 of the 4,573 parameters are read back (Mode
+Change, Master Number Select and Part Set Control are in no block). Left out, as on the MODX: the
+effect parameters (two bytes whose meaning depends on the effect type), the bit-packed rows (the
+Master zones' transmit switches), and the arpeggio Assign Types, whose two bytes are printed over
+four ranges. The identity reply is printed with its family as `dd dd` (4C 06 for the MOXF6, 4D 06
+for the MOXF8): no identity check.
+
 The reface's control changes (MIDI Control on) are not mapped: every setting they reach is a
 parameter change here too, and the panel's CCs would be a second parameter for each.
 
@@ -102,4 +128,4 @@ parameter change here too, and the panel's CCs would be a second parameter for e
 
 Data lists downloaded and read so far, for the work still to do: MODX M (B0, 261 pp.) and MONTAGE M
 (H0), model ID 0D, whose tables address a part with more bytes than the MODX's and read with empty
-addresses here; MOXF6/8 (A0, 148 pp.) and MX49/61/88 (C0, 69 pp.), the Motif-era format.
+addresses here; MX49/61/88 (C0, 69 pp.), the MOXF's format with a model ID of its own (`7F 17`).

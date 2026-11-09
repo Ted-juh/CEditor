@@ -19,8 +19,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
-import { pageParameterTables, readFormat } from '../../../tools/profiles/yamaha/read-yamaha-pdf.mjs';
-import { readHexRange, readPlaceholders, readShownRange, readValues, splitList } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
+import { pageBulkBlocks, pageParameterTables, readByteCount, readFormat } from '../../../tools/profiles/yamaha/read-yamaha-pdf.mjs';
+import { readHexRange, readPlaceholders, readShownRange, readValues, seriesNames, splitList } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/yamaha/make-profiles.mjs';
 import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
@@ -57,6 +57,33 @@ test('two tables side by side: titles over two lines, headings over two, rows se
     { identityReply: ['F0', '7E', '7F', '06', '02', '43', '00', '41', '51', '06', '00', '00', '00', '7F', 'F7'], modelId: '03', group: ['7F', '1C'] });
 });
 
+test('the bulk dump block table: two columns, a series printed first and last, a header printed `0E mm nn`', () => {
+  const xml = page(
+    // Left: prose above the table, whose `“Byte Count”` is not its heading.
+    say(40, 40, '“Byte Count” indicates the data size contained in each block'),
+    say(68, 80, 'Parameter Block'), say(130, 80, 'Description'), say(217, 80, 'Byte Count'), say(251, 80, 'Top Address'),
+    say(40, 100, 'PERFORMANCE'), say(132, 100, 'Bulk Header'), say(225, 100, '0'), say(236, 100, '00'), say(250, 100, '0E'), say(262, 100, 'mm'), say(276, 100, 'nn'),
+    say(108, 110, 'PART'), say(132, 110, 'Part 1'), say(222, 110, '62'), say(236, 110, '3E'), say(250, 110, '31'), say(262, 110, '00'), say(276, 110, '00'),
+    say(135, 120, ':'), say(264, 120, ':'),
+    say(132, 130, 'Part 4'), say(264, 130, '03'),
+    say(132, 140, 'Bulk Footer'), say(225, 140, '0'), say(236, 140, '00'), say(250, 140, '0F'), say(262, 140, 'mm'), say(276, 140, 'nn'),
+    // Right: another table, read on its own.
+    say(334, 40, 'Parameter Block'), say(399, 40, 'Description'), say(484, 40, 'Byte Count'), say(518, 40, 'Top Address'),
+    say(399, 60, 'Key C0'), say(490, 60, '46'), say(503, 60, '2E'), say(517, 60, '47'), say(529, 60, '00'), say(543, 60, '00'),
+    say(402, 70, ':'), say(531, 70, ':'), say(399, 80, 'Key C6'), say(529, 80, '48'),
+  );
+  assert.deepEqual(pageBulkBlocks(xml, { right: 300 }), [
+    { name: 'PERFORMANCE Bulk Header', bytes: 0, address: ['0E', 'mm', 'nn'] },
+    { name: 'PART Part 1', bytes: 62, address: ['31', '00', '00'], last: { name: 'Part 4', mid: '03' } },
+    { name: 'Bulk Footer', bytes: 0, address: ['0F', 'mm', 'nn'] },
+  ]);
+  assert.deepEqual(pageBulkBlocks(xml, { left: 300 }), [{ name: 'Key C0', bytes: 46, address: ['47', '00', '00'], last: { name: 'Key C6', mid: '48' } }]);
+  assert.deepEqual(seriesNames('Part 1', 'Part 4', 4), ['Part 1', 'Part 2', 'Part 3', 'Part 4']);
+  assert.deepEqual(seriesNames('Key C0', 'Key C6', 73).filter((n, i) => i % 12 === 1 || i === 72), ['Key C#0', 'Key C#1', 'Key C#2', 'Key C#3', 'Key C#4', 'Key C#5', 'Key C6']);
+  assert.equal(readByteCount('Byte Count shows the size of data in blocks from Model ID onward (up to but not\nincluding the checksum).'), 'fromModelId', 'the reface: four bytes more than the data');
+  assert.equal(readByteCount('“Byte Count” indicates the data size contained in each block designated by bulk dump'), 'data', 'the MOXF: the data alone');
+});
+
 /* ------------------------------------------------------------------ the builder's rules */
 
 test('the description says what each value shows: a list of names, a range of numbers, a range in parts', () => {
@@ -70,6 +97,11 @@ test('the description says what each value shows: a list of names, a range of nu
   assert.deepEqual([channels.length, channels[0], channels.at(-1)], [17, { value: 0, label: '1' }, { value: 127, label: 'off' }]);
   assert.deepEqual(readValues([[0, 127]], '0: Poly, 1 – 127: Mono with Portamento Time'), {}, 'two meanings across one range: a number');
   assert.deepEqual(readValues([[0, 4]], 'OFF, AMP, FILTER'), {}, 'three names for five values: a number');
+  assert.deepEqual(readValues([[0x28, 0x58]], '-24 – +24 [semitones]'), { shown: { min: -24, max: 24 }, unit: 'semitones' }, 'the MOXF brackets its units');
+  assert.deepEqual(readValues([[0x34, 0x4C]], '-12 – +12 [dB]'), { shown: { min: -12, max: 12 }, unit: 'dB' });
+  assert.deepEqual(readValues([[0, 4]], '0: Voice, 1: Performance, 2: Pattern (Multi), 3: Song (Multi), 4: Master').choices.map((c) => c.label), ['Voice', 'Performance', 'Pattern (Multi)', 'Song (Multi)', 'Master'], 'the value printed before each name is left off');
+  const omni = readValues([[0, 16], [127, 127]], '1 – 16, omni, off').choices;
+  assert.deepEqual([omni.length, omni[15], omni[16], omni[17]], [18, { value: 15, label: '16' }, { value: 16, label: 'omni' }, { value: 127, label: 'off' }], 'counted out over the parts in turn');
   assert.deepEqual(readPlaceholders(['op = operator number', '00 – 03 (hex)', 'OP1 – OP4']), { op: { what: 'operator number', values: [0, 1, 2, 3], labels: ['OP1', 'OP2', 'OP3', 'OP4'] } });
 });
 
@@ -147,4 +179,29 @@ test('the reface DX: four operators, each at its own address, and its voice read
   assert.equal(voice.length, 7, 'header, common, four operators, footer');
   assert.ok(voice.every((d) => d.completion.expectedMessages === 7));
   assert.deepEqual(profile.identity.modelNumber, ['53', '06']);
+});
+
+test('the MOXF: every part, element and drum key at its own address, and each edit buffer read back as one collection', { skip: !builtProfile('yamaha-moxf') }, () => {
+  const profile = builtProfile('yamaha-moxf');
+  const at = (group, name) => profile.parameters.find((p) => p.group === group && p.name === name);
+  const send = (group, name, value) => localCompileParameter(profile, { parameterId: at(group, name).id, value }).hex;
+  assert.equal(send('Voice Element 3', 'Element Switch', 'on'), 'F0 43 10 7F 1C 00 41 02 00 01 F7', 'element 3: 41 ee 00, ee = 02');
+  assert.equal(at('Drum Key C#1', 'Element Switch').address, '47 0D 00', 'C#1 is key 13 from C0');
+  assert.equal(at('Performance Part 4', 'Part Switch').address, '31 03 00');
+  assert.ok(at('Song/Pattern Part 16', 'Bank Select MSB'), 'the mixing\'s sixteen parts');
+  assert.equal(at('System', 'Basic Receive Channel').choices.at(-2).label, 'omni');
+  assert.equal(at('Mode', 'Mode Change').choices.at(-1).label, 'Master');
+  // The Normal Voice edit buffer: header, eight common blocks, eight elements twice over, footer.
+  const voice = profile.dumpDefinitions.filter((d) => d.completion.collectionId === 'normalVoice');
+  assert.equal(voice.length, 26);
+  assert.ok(voice.every((d) => d.completion.expectedMessages === 26));
+  assert.equal(hex(voice[0].matcher.prefix.map((b) => parseInt(b, 16))), 'F0 43 00 7F 1C 00 00 00 0E 0F 00', 'the header carries no data: byte count 0, at the edit buffer\'s address');
+  assert.equal(hex(voice[1].matcher.prefix.map((b) => parseInt(b, 16))), 'F0 43 00 7F 1C 00 50 00 40 00 00', 'Common: the byte count is its 80 bytes of data');
+  assert.equal(voice[1].completion.expectedBytes, 93);
+  assert.equal(voice.at(-1).matcher.prefix.slice(-3).join(' '), '0F 0F 00');
+  const request = (id) => profile.requests.find((r) => r.id === id).template.join(' ');
+  assert.equal(request('requestNormalVoice'), 'F0 43 20 7F 1C 00 0E 0F 00 F7');
+  assert.equal(request('requestDrumVoice'), 'F0 43 20 7F 1C 00 0E 2F 00 F7');
+  assert.equal(request('requestPerformance'), 'F0 43 20 7F 1C 00 0E 4F 00 F7');
+  assert.equal(profile.identity, undefined, 'the data list prints the family as dd dd: no identity check');
 });

@@ -35,7 +35,7 @@ const wordsIn = (line, x0, x1) => line.words.filter((w) => w.x0 >= x0 - 0.5 && w
  * The page's words as printed lines: poppler gives a cell's words a line of their own, so a row
  * across a table is its words at one height, put together here, left to right.
  */
-function visualLines(words) {
+export function visualLines(words) {
   const out = [];
   for (const w of [...words].sort((a, b) => a.y0 - b.y0 || a.x0 - b.x0)) {
     const line = out.find((l) => Math.abs(l.y0 - w.y0) < 2.5 && Math.abs(l.y1 - w.y1) < 3);
@@ -225,23 +225,48 @@ export function readFormat(text) {
 }
 
 /**
+ * What a bulk dump's byte count counts, as the data list words it: 'fromModelId' (`Byte Count shows
+ * the size of data in blocks from Model ID onward`, the reface) or 'data' (`“Byte Count” indicates the
+ * data size contained in each block`, the MODX and MOXF).
+ */
+export function readByteCount(text) {
+  const t = String(text).replace(/\s+/g, ' ');
+  if (/Byte Count shows the size of data in blocks from Model ID onward/i.test(t)) return 'fromModelId';
+  if (/Byte Count.? indicates the data size contained in each block/i.test(t)) return 'data';
+  return null;
+}
+
+/**
  * The Bulk Dump Block table: each line that ends in a byte count and an address (`Voice Common 42 2A
- * 30 00 00`, `Operator 1 32 20 31 00 00`, `Bulk Header 4 04 0E 0F 00`), with the names before them
- * and the block name carried from the line it was printed on. Lines between `Byte Count` and the
+ * 30 00 00`, `Operator 1 32 20 31 00 00`, `Bulk Header 4 04 0E 0F 00`, `Bulk Header 0 00 0E mm nn`),
+ * with the names before them and the block name carried from the line it was printed on. A series
+ * printed first and last with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`) is the first
+ * block with `last`: the last one's name and middle address byte. Lines between `Byte Count` and the
  * next heading, within the span the layout gives.
  */
-export function readBulkBlocks(pdf, page, { left = 0, right = Infinity } = {}) {
-  const lines = visualLines(pageWords(pageXml(pdf, page)).words);
+export function readBulkBlocks(pdf, page, span = {}) {
+  return pageBulkBlocks(pageXml(pdf, page), span);
+}
+
+/** readBulkBlocks on one page's `pdftotext -bbox-layout` XML. */
+export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}) {
+  const lines = visualLines(pageWords(xml).words);
   const inSide = (w) => w.x0 >= left && w.x0 < right;
   const head = lines.find((l) => l.words.some((w) => inSide(w) && w.text === 'Byte') && l.words.some((w) => inSide(w) && w.text === 'Count'));
   if (!head) return [];
   const out = [];
+  let series = false;
+  const BYTE = '([0-9A-F]{2}|[0-9a-z]{2})';
   for (const l of lines.filter((x) => x.y0 > head.y1 + 6).sort((a, b) => a.y0 - b.y0)) {
     const words = l.words.filter(inSide).map((w) => w.text);
     if (!words.length) continue;
     const text = words.join(' ');
-    const m = /^(.*?)\s*(\d+)\s+([0-9A-F]{2,4})\s+([0-9A-F]{2}|[0-9a-z]{2})\s+([0-9A-F]{2}|[0-9a-z]{2})\s+([0-9A-F]{2})$/.exec(text);
+    if (/^:(\s+:)*$/.test(text)) { series = out.length > 0; continue; }
+    const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,4})\\s+${BYTE}\\s+${BYTE}\\s+${BYTE}$`).exec(text);
+    const last = series && /^(.*?)\s+([0-9A-F]{2})$/.exec(text);
+    series = false;
     if (m) out.push({ name: m[1].trim(), bytes: Number(m[2]), address: [m[4], m[5], m[6]] });
+    else if (last) out.at(-1).last = { name: last[1].trim(), mid: last[2] };
     else if (/^(MIDI|Program|Control|Parameter)\b/.test(text) && out.length) break;
   }
   return out;

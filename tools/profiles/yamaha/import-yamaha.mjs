@@ -12,7 +12,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-import { pagesText, readBulkBlocks, readFormat, readParameterTables } from './read-yamaha-pdf.mjs';
+import { pagesText, readBulkBlocks, readByteCount, readFormat, readParameterTables } from './read-yamaha-pdf.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -31,8 +31,13 @@ export function importDocuments(layout, files) {
   const file = files[r.doc ?? 0];
   const format = readFormat(pagesText(file, r.formatPages));
   const tables = readParameterTables(file, r.tablePages);
-  const bulk = r.bulk ? readBulkBlocks(file, r.bulk.page, r.bulk) : [];
-  return { sources, format, tables, bulk };
+  // The bulk dump block table, in one or more spans (a column of a page each).
+  const spans = [r.bulk ?? []].flat();
+  const bulk = spans.flatMap((s) => readBulkBlocks(file, s.page, s));
+  // What a block's byte count counts, as the data list says: the reface's `the size of data in blocks
+  // from Model ID onward`, the MODX's and MOXF's `the data size contained in each block`.
+  const counted = readByteCount(pagesText(file, [...new Set([...r.formatPages, ...spans.map((s) => s.page)])]));
+  return { sources, format: { ...format, ...(counted ? { byteCount: counted } : {}) }, tables, bulk };
 }
 
 /** One row per line, so a re-import that changes one row changes one line. */
