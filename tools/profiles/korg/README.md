@@ -56,6 +56,9 @@ What the builder takes as settled, and what it does not:
 | `korg-kingkorg` | KingKORG MIDI Implementation 1.00 | 210 | 60 | — | 18H 01H |
 | `korg-microkorg2` | microKORG 2 MIDI Implementation 1.0 | 180 | 40 | — | 71H 01H |
 | `korg-microkorg` | micro KORG MIDI Implementation 1.4, with the Owner's Manual p. 56 | 77 | 21 | — | 58H 00H |
+| `korg-ps-3300` | PS-3300 MIDI Implementation 1.00 | 142 | 30 | 256 | 6EH 01H |
+| `korg-nts-1` | NTS-1 digital kit MIDI Implementation 1.00 | 29 | 8 | — | 57H 01H |
+| `korg-vox-continental` | VOX Continental MIDI Implementation 1.00 (Continental 61 and 73) | 18 | 4 | 16 | — |
 | `korg-kingkorg-neo` | KingKORG NEO MIDI Implementation 1.00 (same tables, same product ID) | 210 | 60 | — | 18H 01H |
 | `korg-minikorg-700sm` | miniKORG 700Sm MIDI Implementation 1.00 | 29 | 15 | 14 | 62H 01H |
 | `korg-volca-fm2` | volca fm2 MIDI Implementation 1.00 | 13 | 2 | — | 2FH 01H |
@@ -66,7 +69,26 @@ What the builder takes as settled, and what it does not:
 | `korg-volca-nubass` | volca nubass MIDI Implementation 1.00 | 11 | 0 | — | — |
 
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
-try to recognise them.
+try to recognise them. The VOX Continental prints its reply inline with two member codes, 05 for the
+61 and 0E for the 73; one profile serves both and does not check. Its footnotes are numbered afresh
+under each table (`*1` is Slow/Fast under the transmit table, OFF/ON under the receive one) and give
+values in hex (`*1 00:OFF, 7F:ON`): the importer keeps the receive table's, and a list of hex values
+and names is a choice.
+
+## Three units on one NRPN table (PS-3300)
+
+The PS-3300 is three PSU-3301 synthesizer units under a PSU-3302. In single channel mode the
+PSU-3302's switches and levels are control changes, and a unit's settings are NRPNs whose MSB picks
+the unit (`*2`: `vv : 0~2 = PSU-3301 RIGHT, PSU-3301 CENTER, PSU-3301 LEFT`) and whose LSB, from a
+table printing the LSB alone (`*3`, in sections headed `<<< SIGNAL GENERATORS >>>`), the setting:
+43 settings, so 129 NRPN parameters, named `PSU-3301 LEFT : SIGNAL GENERATORS : PWM INTENSITY`. A
+footnote prints both directions at once (`*3-1 : WAVE FORM / TRANSMIT 0,25,51,… = TRI, SAW, … /
+RECEIVE 0~21,22~42,… = TRI, SAW, …`), a choice when each value sent falls in its name's range.
+
+Its program dump places one table three times: TABLE 1 puts `PSU-3301 RIGHT PARAMTER  TABLE 2` at
+64~255, CENTER at 256~447 and LEFT at 448~639, so the importer keeps the tables a program table
+places, and Pull reads TABLE 2's fields at each block, named for it. Every 10-bit level (L then H) is
+read as the top seven bits, as its controller or NRPN sends it; 141 of 142 parameters are read back.
 
 ## SysEx parameter change (microKORG S)
 
@@ -171,6 +193,8 @@ name, through a `bitfields` codec both engines learned for these profiles:
   in byte 52);
 - a block printed once for several copies (the prologue's `TIMBRE 1 PARAMETERS`, `+0`, `+1`, … from
   byte 80), read for the copy the layout names (`dumpBlock`);
+- a table the program table places a block at a time (the PS-3300's TABLE 2, for each of its three
+  units), read at every block;
 - a value over two bytes marked H and L (minilogue xd, prologue, miniKORG 700Sm). The xd and prologue
   print H first, the 700Sm L first. The prologue's TEMPO settles which is which, 300~6000 printed as
   `H:0~7` then `L:0~4`, so the first byte is the low eight bits; the 700Sm, printing L first,
@@ -190,6 +214,7 @@ korgProfiles.test.js reads a minilogue dump packed by hand from the document.
 | `korg-prologue` | 44 of 57 | read from TIMBRE 1, taken to be the main timbre (the document numbers its two timbres and does not name them); RING-SYNC, DELAY/REVERB TYPE, MULTI TYPE and PITCH EG, whose dump names differ (`RING ON`, `OFF`, `USER`, `+`); MOD EFFECT TYPE, still a number; the sub types, which depend on a type |
 | `korg-nts-1-mk2` | 20 of 62 | the type selectors and the arpeggiator, which its dump does not hold; the OSC and FX edit parameters, 14-bit on NRPN and 10-bit in the dump; EG TYPE and FILTER TYPE, whose dump names differ (`ASR`, `Thru`) |
 | `korg-minikorg-700sm` | 27 of 29 | the joystick's Modulation1 and 2, not part of a program; its dump names the panel more fully (`EXPAND Switch`, `REVERB Level`), aliased in `dumpNames` |
+| `korg-ps-3300` | 141 of 142 | DAMPER, which is not part of a program. The dump's names for some unit settings differ from the NRPN table's (`VCO WAVE` for WAVE FORM), aliased in `dumpNames` |
 | `korg-minilogue-xd` | 79 of 101 | the performance controllers, which are not part of a program; SYNC and RING, still numbers; VOICE MODE TYPE, whose dump list prints 2 twice; PORTAMENTO, PROGRAM LEVEL and Program Transpose, whose dump ranges differ from their controllers' (0,1; 0~132; 0~25) |
 
 The request and the dump carry the global MIDI channel (`3g`); the profiles' `deviceId` variable is
@@ -213,6 +238,9 @@ Kept as printed and said where it applies:
 - **NTS-1 mkII**: DELAY TYPE's footnote prints `TAPE BPM DOUBLING` for two names, thirteen ranges
   for twelve; the profile reads the comma back in. EG TYPE is `AHR` in the controller footnote and
   `ASR` in the program dump; FILTER TYPE's last value is OFF in one and Thru in the other.
+- **PS-3300**: the multi channel table prints the decimal of 39H~3EH as `(56)`; the NRPN MSB numbers
+  the units RIGHT, CENTER, LEFT and the multi channel mode's channels LEFT, CENTER, RIGHT. Both
+  documents spell `ENVEPOLE MODIFIERS` and `PARAMTER`, kept as printed.
 - **The program tables**: the minilogue xd's VOICE MODE TYPE list prints `2 : CHORD` and `2 : UNISON`
   for a 1~4 value; its PORTAMENTO row prints the range `0,1` beside a description of `0~127`; its
   PROGRAM LEVEL is 0~132 in the dump and 0~120 on its NRPN, Program Transpose 0~25 and 1~25. The
@@ -224,8 +252,9 @@ Kept as printed and said where it applies:
 - **The NTS-1 mkII's fine controllers.** Its finer settings are pairs named alike, `EG ATTACK (MSB)`
   on 16 and `(LSB)` on 48, paired by name rather than by 32. The document does not say how many of
   the LSB's bits count, so the profile offers the coarse controller alone and leaves the fine one
-  out. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
-  reviewed.
+  out.
+- **The PS-3300 in multi channel mode**: the same unit settings as control changes on a channel per
+  unit; the profile sends the single channel mode's NRPNs.
 - **The microKORG's and microKORG S's Pull**: their program tables print offsets and bits in a form
   of their own (`+1 B6,7`), and lay the timbres or the vocoder over the same bytes by Voice Mode.
 - **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives, not yet read.

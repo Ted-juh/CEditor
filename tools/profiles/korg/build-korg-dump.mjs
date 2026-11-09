@@ -9,6 +9,8 @@
 //   - a whole byte, or bits of one (`52 | 4~5 | 0~3 | VCO 1 OCTAVE`), several settings to a byte;
 //   - a 10-bit value in two places, its top bits in one byte and its bottom bits in another, named
 //     by the bits each holds (`20 | 0~7 | VCO 1 PITCH (bit2~9)`, `52 | 0~1 | VCO 1 PITCH (bit0~1)`);
+//   - a table placed in the program table a block at a time (the PS-3300's TABLE 2, once for each of
+//     its three PSU-3301 units), its fields named for the block;
 //   - a value over two bytes marked H and L (the minilogue xd, the prologue, the miniKORG 700Sm).
 //     The xd and prologue print H first, the 700Sm L first; the prologue's own TEMPO settles which is
 //     which: 300~6000 printed `H:0~7` then `L:0~4`, and only the top bits of a 13-bit value fit in
@@ -23,7 +25,8 @@
 import { pack8to7 } from '../../../CE/dpd/codecs.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
-const key = (name) => String(name ?? '').toUpperCase().replace(/[^A-Z0-9+'()]/g, '');
+// `#` stays: the PS-3300's TEMPERAMENT ADJUST C and C# are two settings.
+const key = (name) => String(name ?? '').toUpperCase().replace(/[^A-Z0-9+'()#]/g, '');
 /** Two printings of one value's name: `2-POLE` and `2 POLE`, `ON/OFF` and `ON-OFF`. */
 const labelKey = (label) => String(label ?? '').toUpperCase().replace(/[\s\-_./]/g, '');
 
@@ -56,7 +59,7 @@ export function describeField(desc) {
 }
 
 /** The program table as fields: one per printed setting, in offset order, until the table restarts its offsets (a sub-structure follows). */
-export function programFields(rows, { block: wanted = null } = {}) {
+export function programFields(rows, { block: wanted = null, tables = {} } = {}) {
   const fields = [];
   let last = -1;
   // A block of settings printed once for several copies (the prologue's `80~205 | TIMBRE 1
@@ -69,6 +72,16 @@ export function programFields(rows, { block: wanted = null } = {}) {
     const title = /\b(TIMBRE\s*\d+)\s+PARAMETERS\b/i.exec(row.cells.slice(1).join(' '))?.[1]?.replace(/\s+/g, ' ').toUpperCase();
     if (span && title) {
       block = { base: Number(span[1]), read: !!wanted && title === wanted.toUpperCase() };
+      last = Number(span[2]);
+      continue;
+    }
+    // A table placed here (the PS-3300's `64~255 | … | PSU-3301 RIGHT PARAMTER  TABLE 2`): its fields,
+    // counted from this block's start and named for it, `PSU-3301 RIGHT : VCO WAVE`.
+    const placed = span ? /^(.*?)\s+PARAM\w*\s+TABLE\s+(\d+)\s*$/i.exec(row.cells.at(-1) ?? '') : null;
+    if (placed && tables[placed[2]]) {
+      for (const f of programFields(tables[placed[2]].rows)) {
+        fields.push({ ...f, offset: Number(span[1]) + f.offset, name: `${placed[1].trim()} : ${f.name}`, ...(f.high ? { high: { ...f.high, offset: Number(span[1]) + f.high.offset } } : {}) });
+      }
       last = Number(span[2]);
       continue;
     }
@@ -149,8 +162,8 @@ function headerTokens(rows) {
 /** Read a field into a parameter, or say why not. */
 function codecFor(setting, parameter, lists) {
   if (parameter.type === 'choice') {
-    const printed = setting.labels ?? setting.notes.map((n) => lists[n]).find((l) => l?.entries?.every((e) => e.from === e.to))?.entries.map((e) => ({ value: e.from, label: e.label }));
-    if (!printed) return { why: 'the dump prints no names for its values' };
+    const printed = setting.labels ?? setting.notes.map((n) => lists[n]).find((l) => l?.entries?.length && l.entries.every((e) => e.from === e.to))?.entries.map((e) => ({ value: e.from, label: e.label }));
+    if (!printed?.length) return { why: 'the dump prints no names for its values' };
     const twice = printed.find((e, i) => printed.findIndex((x) => x.value === e.value) !== i);
     if (twice) return { why: `the dump's list prints the value ${twice.value} twice` };
     const map = [];
@@ -189,7 +202,7 @@ export function addPull(profile, data, layout, notes) {
   const unmapped = [];
   const unread = [];
   const used = new Set();
-  for (const setting of settings(programFields(dump.table, { block: layout.dumpBlock }))) {
+  for (const setting of settings(programFields(dump.table, { block: layout.dumpBlock, tables: dump.tables }))) {
     const parameter = byName.get(setting.key);
     if (!parameter) { unread.push(setting.name); continue; }
     const { codec, why } = codecFor(setting, parameter, data.lists);

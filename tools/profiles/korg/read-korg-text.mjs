@@ -74,7 +74,7 @@ export function readTables(text) {
   return tables;
 }
 
-const MARK = /^\s*\*(\d+-\d+|\d+)\s*:\s?(.*)$/;          // *6-01 : text   /  *4 : text
+const MARK = /^\s*\*(\d+-\d+|\d+)(?:\s*:\s?|\s+(?=\S))(.*)$/;   // *6-01 : text  /  *4 : text  /  *1 00:Slow, 7F:Fast
 const LIST = /^\s*\*(\d+-\d+)\s*\((.+)\)\s*$/;            // *3-5 (VOICE MODE)
 const NOTE = /^\s*\*note\s+([A-Z]\d+)\b\s*(?:\((.*)\))?\s*$/i;   // *note P6 (SELECT NOISE)
 const TLIST = /^\s*\*([A-Z]\d*-\d+)\s*:\s*([^\d\s][^:]*?)?\s*$/;   // *T-1 :  /  *T01-1 : Category  (entries in columns below)
@@ -157,7 +157,10 @@ export function readFootnotes(text) {
       if (open?.kind === 'mark') close();
       continue;
     }
-    if (open && /^\s{2,}/.test(line)) {
+    // A list's entries may sit one space in (the PS-3300's `*note P1 (VCO WAVE)` / ` 0 : TRI`, the
+    // logue documents' last entry); a heading or prose one space in ends it.
+    const entryLine = /^\s(?:-?\d+\s*(?:~\s*-?\d+\s*)?:|\[[^\]]+\](?:,\s*\[[^\]]+\])*\s*$)/.test(line);
+    if (open && (/^\s{2,}/.test(line) || (open.kind === 'list' && entryLine))) {
       open.lines.push(line.trim());
       if (open.kind === 'mark') open.text = `${open.text} ${line.trim()}`.trim();
       continue;

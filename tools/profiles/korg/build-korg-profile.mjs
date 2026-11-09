@@ -46,7 +46,8 @@ const NOTE_MARK = /\*note\s+([A-Z]\d+)/gi;
 /** `AMP EG ATTACK (vv=0~127)  *5-2*5-4` -> name, the printed values, the explanation, the marks. */
 export function splitDescription(desc) {
   const marks = [...String(desc).matchAll(MARK)].map((m) => m[1]);
-  const text = String(desc).replace(NOTE_MARK, '').replace(MARK, '').replace(/\s+/g, ' ').trim();
+  // `Expression   ( CONTROL Pedal )` -> `Expression (CONTROL Pedal)`.
+  const text = String(desc).replace(NOTE_MARK, '').replace(MARK, '').replace(/\s+/g, ' ').replace(/\(\s+/g, '(').replace(/\s+\)/g, ')').trim();
   let m = /^(.*?)\s*\((?:([^()]*?),\s*)?v{1,2}=:?\s*([^()]*)\)\s*(.*)$/.exec(text);
   if (m) return { name: m[1].trim(), explanation: [m[2], m[4]].filter(Boolean).join('; ') || null, values: m[3].trim(), marks };
   m = /^(.*?)\s+v{1,2}=(\S+)\s*(.*)$/.exec(text);
@@ -121,11 +122,34 @@ export function transmittedLabels(text, rowValues) {
   return labels.map((label, i) => ({ value: values[i], label }));
 }
 
+/**
+ * A footnote that prints both directions (the PS-3300's `*1 : OFF-ON / TRANSMIT 0,127 = OFF, ON /
+ * RECEIVE 0~63,64~127 = OFF, ON`) -> the values sent and the ranges received, or null.
+ */
+export function transmitReceive(text) {
+  const m = /TRANSMIT\s+([\d,\s]+?)\s*=\s*(.+?)\s+RECEIVE\s+([\d~,\s]+?)\s*=\s*(.+?)\s*$/.exec(text ?? '');
+  if (!m) return null;
+  const names = (x) => x.split(',').map((l) => l.trim()).filter(Boolean);
+  const [sentValues, sentNames, ranges, receivedNames] = [m[1].split(',').map(Number), names(m[2]), m[3].split(',').map((r) => r.split('~').map(Number)), names(m[4])];
+  if (sentValues.length !== sentNames.length || ranges.length !== receivedNames.length) return null;
+  return {
+    sent: sentValues.map((value, i) => ({ value, label: sentNames[i] })),
+    received: ranges.map(([from, to = from], i) => ({ from, to, label: receivedNames[i] })),
+  };
+}
+
+/** `00:Slow, 7F:Fast`, `00:Organ, 01:Key/Layer, 02:EQ` (the VOX Continental) -> [{value, label}], hex values. */
+export function hexPairs(text) {
+  const parts = String(text ?? '').trim().split(/\s*,\s*(?=[0-9A-F]{2}\s*:)/i);
+  const out = parts.map((p) => /^([0-9A-F]{2})\s*:\s*(.+)$/i.exec(p)).map((m) => (m ? { value: Number.parseInt(m[1], 16), label: m[2].trim() } : null));
+  return out.length >= 2 && out.every(Boolean) ? out : null;
+}
+
 /** `0,1 = Off,On`, `0~4  *3-5`, `0~200 = -100%~+100% *3-2`, `ASCII *note P1` -> what an NRPN value cell says. */
 export function parseNrpnValue(cell) {
-  const marks = [...String(cell).matchAll(/\*(\d+-\d+)/g)].map((m) => m[1]);
+  const marks = [...String(cell).matchAll(/\*(\d+(?:-\d+)?)\b/g)].map((m) => m[1]);
   const notes = [...String(cell).matchAll(NOTE_MARK)].map((m) => m[1].toUpperCase());
-  const text = String(cell).replace(NOTE_MARK, '').replace(/\*(\d+-\d+)/g, '').trim();
+  const text = String(cell).replace(NOTE_MARK, '').replace(/\*(\d+(?:-\d+)?)\b/g, '').trim();
   const [spec, shown] = text.split('=').map((x) => x?.trim());
   return { values: parseValues(spec), ascii: /^ASCII\b/i.test(spec ?? ''), shown: shown ?? null, marks, notes };
 }
@@ -257,13 +281,17 @@ export function buildKorgProfile(data, layout) {
     // Its values: the receive footnote's labelled ranges, the transmit footnote's values.
     const rxMarks = rx ? splitDescription(rx.desc).marks.map((k) => layout.markFor?.[k] ?? k) : [];
     if (rxMarks.some((k) => lowBitsOf(marks[k]))) wideControllers.push(cc);
-    const rxMark = rxMarks.find((k) => !lowBitsOf(marks[k]) && (/^\s*vv\s*:/.test(marks[k] ?? '') || /\bWhen\b/.test(marks[k] ?? '') || Array.isArray(receivedLabels(marks[k]))));
-    const txMark = tx ? splitDescription(tx.desc).marks.find((k) => k.startsWith('2-')) : null;
-    const rxLabels = rxMark ? receivedLabels(marks[rxMark]) : null;
+    // One footnote for both directions (`TRANSMIT 0,127 = OFF, ON  RECEIVE 0~63,64~127 = OFF, ON`).
+    const pairedMark = rxMarks.find((k) => transmitReceive(marks[k]));
+    const rxMark = pairedMark ?? rxMarks.find((k) => !lowBitsOf(marks[k]) && (/^\s*vv\s*:/.test(marks[k] ?? '') || /\bWhen\b/.test(marks[k] ?? '') || Array.isArray(receivedLabels(marks[k]))));
+    const txMark = pairedMark ?? (tx ? splitDescription(tx.desc).marks.find((k) => k.startsWith('2-')) : null);
+    const rxLabels = pairedMark ? transmitReceive(marks[pairedMark]).received : rxMark ? receivedLabels(marks[rxMark]) : null;
     const txValues = tx ? parseValues(splitDescription(tx.desc).values ?? (tx.more.join('').match(/vv=:?([\d,\s]+)/)?.[1] ?? ''))?.list : null;
-    const txLabels = txMark ? transmittedLabels(marks[txMark], txValues) : null;
+    const txLabels = pairedMark ? transmitReceive(marks[pairedMark]).sent : txMark ? transmittedLabels(marks[txMark], txValues) : null;
     let choices = null;
-    if (Array.isArray(rxLabels) && txLabels) {
+    const pairs = rxMarks.map((k) => hexPairs(marks[k])).find(Boolean);
+    if (pairs) choices = choiceList(pairs);
+    else if (Array.isArray(rxLabels) && txLabels) {
       const agree = rxLabels.length === txLabels.length
         && rxLabels.every((r, i) => (layout.sameLabels?.[`cc${cc}`] || norm(r.label) === norm(txLabels[i].label)) && txLabels[i].value >= r.from && txLabels[i].value <= r.to);
       if (agree) choices = choiceList(txLabels.map((t, i) => ({ value: t.value, label: rxLabels[i].label })));
@@ -293,7 +321,7 @@ export function buildKorgProfile(data, layout) {
     // the usual "recognized when MIDI Rx CC is On".
     for (const k of rxMarks) {
       const said = marks[k];
-      if (!said || k === rxMark || lowBitsOf(said) || /^\s*vv\s*:/.test(said) || /^This message is (recognized|transmitted) when\b/i.test(said)) continue;
+      if (!said || k === rxMark || hexPairs(said) || lowBitsOf(said) || /^\s*vv\s*:/.test(said) || /^This message is (recognized|transmitted) when\b/i.test(said)) continue;
       describe.push(said);
     }
     if (choices && choices.some((c) => c.value > 127)) {
@@ -385,7 +413,17 @@ export function buildKorgProfile(data, layout) {
     if (synthValue === vocoderValue) return [{ name: synth.trim(), value: synthValue, extra: `In a vocoder program: ${printedName(rest.join('/'))}.` }];
     return [{ name: synth.trim(), value: synthValue, extra: `In a vocoder program this NRPN is ${vocoder} instead.` }, { name: vocoder, value: vocoderValue, extra: `In a synth program this NRPN is ${synth.trim()} instead.` }];
   };
-  for (const row of data.nrpn) {
+  // A table of LSBs whose MSB picks one of several units (the PS-3300's three PSU-3301s): every row
+  // once per unit, named `<unit> : <section> : <setting>`.
+  const nrpnRows = data.nrpnMsb && data.nrpn.every((r) => r.msb === null)
+    ? data.nrpn.length ? Array.from({ length: data.nrpnMsb.to - data.nrpnMsb.from + 1 }, (u, i) => data.nrpnMsb.from + i).flatMap((msb) => data.nrpn.map((row) => ({
+      ...row,
+      msb: hex(msb),
+      name: [data.nrpnMsb.labels[msb - data.nrpnMsb.from], row.section && !norm(row.name).startsWith(norm(row.section)) ? row.section : null, row.name].filter(Boolean).join(' : '),
+    }))) : []
+    : data.nrpn;
+  if (nrpnRows !== data.nrpn) notes.push(`The NRPN MSB picks the unit (${data.nrpnMsb.labels.map((l, i) => `${data.nrpnMsb.from + i} = ${l}`).join(', ')}) and the LSB its setting: ${data.nrpn.length} settings for each.`);
+  for (const row of nrpnRows) {
     const lsb = Number.parseInt(row.lsb, 16);
     const msb = row.msb === '--' ? 0 : Number.parseInt(row.msb, 16);
     if (row.msb === '--') msbDashes = true;
@@ -416,6 +454,11 @@ export function buildKorgProfile(data, layout) {
     const describe = [];
     // Its labels: printed after `=` one per value, or a list it points to naming every value.
     let choices = null;
+    const paired = value.marks.map((k) => transmitReceive(marks[k])).find(Boolean);
+    if (paired) {
+      const agree = paired.sent.length === paired.received.length && paired.sent.every((t, i) => norm(t.label) === norm(paired.received[i].label) && t.value >= paired.received[i].from && t.value <= paired.received[i].to);
+      if (agree) choices = choiceList(paired.sent);
+    }
     const shown = value.shown ? value.shown.split(',').map((s) => s.trim()).filter(Boolean) : [];
     if (shown.length === values.length && !shown.some((s) => /~/.test(s))) {
       choices = choiceList(values.map((v, i) => ({ value: v, label: shown[i] })));
@@ -423,6 +466,7 @@ export function buildKorgProfile(data, layout) {
       describe.push(`${value.values.list ? value.values.list.join(',') : `${min}~${max}`} = ${value.shown}`);
     }
     for (const key of [...value.notes, ...value.marks]) {
+      if (choices && transmitReceive(marks[key])) continue;
       const list = data.lists[key];
       if (list?.entries?.length && !choices) {
         const single = list.entries.every((e) => e.from === e.to);

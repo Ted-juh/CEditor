@@ -63,9 +63,28 @@ function controllerTable(tables) {
   return table.rows.filter((r) => /^Bn$/i.test(r.cells[0] ?? '')).map((r) => ({ line: r.line, cc: ccNumber(r.cells[1] ?? ''), name: r.cells[2] ?? '', value: r.cells[3] ?? '' })).filter((r) => r.cc !== null);
 }
 
-/** NRPN rows: `| --  10  | VOICE MODE TYPE | 0~4  *3-5 |`, or `| 00 | 02 ( 2) | Arpeggiator Off/On | 00,01:Off,On |`. */
+/**
+ * NRPN rows: `| --  10  | VOICE MODE TYPE | 0~4  *3-5 |`, or `| 00 | 02 ( 2) | Arpeggiator Off/On |
+ * 00,01:Off,On |`, or a table of LSBs alone (the PS-3300's, its MSB picking one of three units) with
+ * `<<< SIGNAL GENERATORS >>>` rows heading its sections: those rows' msb is null, their section kept.
+ */
 function nrpnRows(table) {
   const out = [];
+  if (lsbOnly(table)) {
+    let section = '';
+    const heading = (name) => /^<<<\s*(.+?)\s*>>>$/.exec(name ?? '')?.[1] ?? null;
+    for (const row of table.rows) {
+      for (const [i, cells] of [row.cells, ...row.more].entries()) {
+        const named = heading(cells[1]);
+        if (/^[0-9a-f]{2}$/i.test(cells[0] ?? '')) {
+          // `| 31 | <<< KBD VOLUME BALANCE >>> | 0~127 |`: a setting that heads its own section.
+          out.push({ line: row.line + i, msb: null, lsb: cells[0], name: named ?? cells[1] ?? '', value: cells[2] ?? '', section: named ? '' : section, more: [] });
+          if (named) section = named;
+        } else if (named) section = named;
+      }
+    }
+    return out;
+  }
   for (const row of table?.rows ?? []) {
     const split = /^([0-9a-f]{2})$/i.exec(row.cells[0] ?? '') && /^([0-9a-f]{2})\s*\(\s*\d+\s*\)$/i.exec(row.cells[1] ?? '');
     if (split) {
@@ -109,6 +128,20 @@ export function importOwnersManual(pdf, layout) {
   };
 }
 
+/** An NRPN table that prints the LSB alone: `| LSB | PSU-3301 Parameter | Data Entry Value |`. */
+const lsbOnly = (table) => !!table && table.header.some((h) => /^LSB$/i.test(h[0] ?? '')) && !table.header.some((h) => h.some((c) => /\bMSB\b/i.test(c)));
+
+/**
+ * What the NRPN MSB picks, where a document prints it as a list under its mark (the PS-3300's `*2 :
+ * Non Registered Parameter Number (NRPN) MSB` / ` vv : 0~2 = PSU-3301 RIGHT, PSU-3301 CENTER, …`).
+ */
+function nrpnMsb(text) {
+  const m = /\*\d+\s*:\s*Non Registered Parameter Number \(NRPN\) MSB\s*\n\s*vv\s*:\s*(\d+)\s*~\s*(\d+)\s*=\s*(.+)/i.exec(String(text).replace(/\r/g, ''));
+  if (!m) return null;
+  const labels = m[3].split(',').map((x) => x.trim()).filter(Boolean);
+  return labels.length === Number(m[2]) - Number(m[1]) + 1 ? { from: Number(m[1]), to: Number(m[2]), labels } : null;
+}
+
 /** The Device Inquiry reply: each byte and what it is. */
 function identityRows(tables) {
   const reply = tables.find((t) => /UNIVERSAL SYSTEM EXCLUSIVE/i.test(t.heading?.title ?? '') && t.rows.some((r) => /Identity Reply/i.test(r.cells.join(' '))));
@@ -128,7 +161,10 @@ function programDump(tables) {
   const request = titled(/^CURRENT PROGRAM DATA DUMP REQUEST$/i);
   const dump = titled(/^CURRENT PROGRAM DATA DUMP$/i);
   if (!table || !request || !dump) return null;
-  return { request: printedRows(request), dump: printedRows(dump), table: printedRows(table) };
+  // Tables the program table places, a block at a time (`64~255 | … | PSU-3301 RIGHT PARAMTER  TABLE 2`).
+  const placed = [...new Set(table.rows.map((r) => /\bTABLE\s+(\d+)\s*$/i.exec(r.cells.at(-1) ?? '')?.[1]).filter(Boolean))];
+  const placedTables = Object.fromEntries(placed.map((n) => [n, tables.find((t) => t.heading?.id === `TABLE ${n}`)]).filter(([, t]) => t).map(([n, t]) => [n, { title: t.heading.title, rows: printedRows(t) }]));
+  return { request: printedRows(request), dump: printedRows(dump), table: printedRows(table), ...(Object.keys(placedTables).length ? { tables: placedTables } : {}) };
 }
 
 /** How big the current program dump is: `448Bytes = 7*64 -> 8*64 => 512Bytes`, or `384Bytes (7bit) -> 336Bytes (8bit)`. */
@@ -157,6 +193,13 @@ function parameterChange(tables) {
   };
 }
 
+/** Of a mark printed more than once, the first printed after the receive table, else the first. */
+function receivedOccurrence(mark, received) {
+  if (!mark.again?.length || !received.length) return mark.text;
+  const after = Math.max(...received.map((r) => r.line));
+  return [mark, ...mark.again].find((m) => m.line > after)?.text ?? mark.text;
+}
+
 export function importText(file, layout) {
   const text = readFileSync(file, 'utf8');
   const tables = readTables(text);
@@ -164,7 +207,7 @@ export function importText(file, layout) {
   const titled = (id) => tables.find((t) => t.heading?.id === id && /CHANNEL MESSAGES/i.test(t.heading.title));
   const transmitted = controlChanges(titled(layout.tables?.transmitted ?? '1-1'));
   const received = controlChanges(titled(layout.tables?.received ?? '2-1'));
-  const nrpnTable = tables.find((t) => /\bNRPN\b|Non Registered/i.test(t.heading?.title ?? '') && t.rows.some((r) => /^(--|[0-9a-f]{1,2})\s+[0-9a-f]{1,2}$/i.test(r.cells[0] ?? '') || (/^[0-9a-f]{2}$/i.test(r.cells[0] ?? '') && /\(\s*\d+\s*\)$/.test(r.cells[1] ?? ''))));
+  const nrpnTable = tables.find((t) => /\bNRPN\b|Non Registered/i.test(t.heading?.title ?? '') && (lsbOnly(t) || t.rows.some((r) => /^(--|[0-9a-f]{1,2})\s+[0-9a-f]{1,2}$/i.test(r.cells[0] ?? '') || (/^[0-9a-f]{2}$/i.test(r.cells[0] ?? '') && /\(\s*\d+\s*\)$/.test(r.cells[1] ?? '')))));
   const title = documentTitle(text);
   return {
     source: {
@@ -182,11 +225,14 @@ export function importText(file, layout) {
     ...(controllerTable(tables) ? { controllerTable: controllerTable(tables) } : {}),
     ...(knobTable(tables) ? { knobs: knobTable(tables) } : {}),
     nrpn: nrpnRows(nrpnTable),
+    ...(nrpnMsb(text) ? { nrpnMsb: nrpnMsb(text) } : {}),
     identity: identityRows(tables),
     ...(identityValues(text).length ? { identityValues: identityValues(text) } : {}),
     programDump: programDump(tables) ? { ...programDump(tables), size: programDumpSize(text) } : null,
     parameterChange: parameterChange(tables),
-    marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, v.text])),
+    // A mark printed twice is numbered afresh under each table (the VOX Continental's *1 is Slow/Fast
+    // under the transmit table and OFF/ON under the receive one): the receive table's is the one kept.
+    marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, receivedOccurrence(v, received)])),
     lists: Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { title: v.title, entries: v.entries, lines: v.lines }])),
   };
 }
@@ -196,6 +242,7 @@ export function stringifyTranscription(data) {
   const out = ['{', `  "source": ${JSON.stringify(data.source)},`, `  "programChange": ${JSON.stringify(data.programChange)},`];
   if (data.ownersManual) out.push(`  "ownersManual": {`, `    "source": ${JSON.stringify(data.ownersManual.source)},`, '    "rows": [', ...data.ownersManual.rows.map((r, i) => `      ${JSON.stringify(r)}${i < data.ownersManual.rows.length - 1 ? ',' : ''}`), '    ]', '  },');
   if (data.identityValues) out.push(`  "identityValues": ${JSON.stringify(data.identityValues)},`);
+  if (data.nrpnMsb) out.push(`  "nrpnMsb": ${JSON.stringify(data.nrpnMsb)},`);
   for (const key of ['received', 'transmitted', ...(data.controllerTable ? ['controllerTable'] : []), ...(data.knobs ? ['knobs'] : []), 'nrpn', 'identity']) {
     out.push(`  "${key}": [`);
     data[key].forEach((row, i) => out.push(`    ${JSON.stringify(row)}${i < data[key].length - 1 ? ',' : ''}`));
@@ -207,7 +254,17 @@ export function stringifyTranscription(data) {
     for (const key of ['request', 'dump', 'table']) {
       out.push(`    "${key}": [`);
       data.programDump[key].forEach((row, i) => out.push(`      ${JSON.stringify(row)}${i < data.programDump[key].length - 1 ? ',' : ''}`));
-      out.push(`    ]${key === 'table' ? '' : ','}`);
+      out.push(`    ]${key === 'table' && !data.programDump.tables ? '' : ','}`);
+    }
+    if (data.programDump.tables) {
+      const placed = Object.entries(data.programDump.tables);
+      out.push('    "tables": {');
+      placed.forEach(([n, t], ti) => {
+        out.push(`      ${JSON.stringify(n)}: {"title":${JSON.stringify(t.title)},"rows":[`);
+        t.rows.forEach((row, i) => out.push(`        ${JSON.stringify(row)}${i < t.rows.length - 1 ? ',' : ''}`));
+        out.push(`      ]}${ti < placed.length - 1 ? ',' : ''}`);
+      });
+      out.push('    }');
     }
     out.push('  },');
   }

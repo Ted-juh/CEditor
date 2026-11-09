@@ -459,3 +459,61 @@ test('the microKORG: its knobs on the Owner\'s Manual\'s control changes, named 
   assert.equal(profile.sources.length, 2);
   assert.match(profile.sources[1].notes, /microKORG_OM_E2\.pdf \(sha256 [0-9a-f]{64}\)/);
 });
+
+test('the PS-3300: three PSU-3301 units by NRPN MSB, and its program dump placing TABLE 2 once for each', { skip: !builtProfile('korg-ps-3300') }, () => {
+  const profile = builtProfile('korg-ps-3300');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  const send = (name, value) => localCompileParameter(profile, { parameterId: by(name).id, value });
+  // *2: the MSB is the unit, 0~2 = RIGHT, CENTER, LEFT; *3: the LSB the setting.
+  assert.equal(send('PSU-3301 LEFT : SIGNAL GENERATORS : PWM INTENSITY', 100).hex, 'B0 63 02 B0 62 21 B0 06 64');
+  // *3-1 prints TRANSMIT and RECEIVE in one footnote: each value sent falls in its name's range.
+  assert.deepEqual(by('PSU-3301 RIGHT : SIGNAL GENERATORS : WAVE FORM').choices.map((c) => [c.value, c.label]), [[0, 'TRI'], [25, 'SAW'], [51, 'REC 1'], [76, 'REC 2'], [102, 'PUL'], [127, 'PWM']]);
+  assert.equal(send('PSU-3302 : SWITCH : SYNCHRO', 'on').hex, 'B0 10 7F');
+  assert.notEqual(by('PSU-3301 RIGHT : TEMPERAMENT ADJUST : C').id, by('PSU-3301 RIGHT : TEMPERAMENT ADJUST : C#').id);
+  // TABLE 1 places TABLE 2 at 64 (RIGHT), 256 (CENTER) and 448 (LEFT); its 10-bit values L then H.
+  // Packed by hand, NOTE 1: each group of seven behind a byte holding their top bits.
+  const data = new Array(640).fill(0);
+  data[48] = 0xff; data[49] = 0x03;               // PSU-3302 CH-1 VOLUME 1023
+  data[64 + 16] = 3;                              // RIGHT: VCO WAVE, *note P1 3 = REC 2
+  data[256 + 114] = 0x00; data[256 + 115] = 0x02; // CENTER: TEMPERAMENT ADJUST C# 512, *note P3's 0 cent
+  data[448 + 32] = 0x58; data[448 + 33] = 0x01;   // LEFT: PWM INTENSITY 344
+  const wire = [];
+  for (let g = 0; g < data.length; g += 7) {
+    const group = data.slice(g, g + 7);
+    wire.push(group.reduce((top, byte, k) => top | ((byte >> 7) << k), 0), ...group.map((byte) => byte & 0x7f));
+  }
+  assert.equal(wire.length, 732, '640 bytes (8bit) are 732 (7bit)');
+  const hexOf = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+  const parsed = localParseDumpMessage(profile, hexOf([0xf0, 0x42, 0x30, 0x00, 0x01, 0x6e, 0x41, ...wire, 0xf7]));
+  assert.ok(parsed.ok, parsed.error);
+  assert.equal(parsed.values[by('PSU-3302 : CHANNEL 1 VOLUME').id], 127);
+  assert.equal(parsed.values[by('PSU-3301 RIGHT : SIGNAL GENERATORS : WAVE FORM').id], by('PSU-3301 RIGHT : SIGNAL GENERATORS : WAVE FORM').choices.find((c) => c.label === 'REC 2').id);
+  assert.equal(parsed.values[by('PSU-3301 CENTER : TEMPERAMENT ADJUST : C#').id], 64);
+  assert.equal(parsed.values[by('PSU-3301 CENTER : TEMPERAMENT ADJUST : C').id], 0);
+  assert.equal(parsed.values[by('PSU-3301 LEFT : SIGNAL GENERATORS : PWM INTENSITY').id], 344 >> 3);
+  assert.equal(profile.presets.banks.length, 16);
+});
+
+test('footnotes printed without a colon, and a list whose entries sit one space in', () => {
+  const { marks, notes } = readFootnotes([
+    '*1 00:Slow, 7F:Fast',
+    '',
+    '*note P1 (VCO WAVE)',
+    ' 0 : TRI',
+    ' 1 : SAW',
+    'TABLE 2 : SOMETHING ELSE',
+  ].join('\n'));
+  assert.equal(marks['1'].text, '00:Slow, 7F:Fast');
+  assert.deepEqual(notes.P1.entries.map((e) => e.label), ['TRI', 'SAW']);
+});
+
+test('the VOX Continental: footnotes numbered afresh under each table, the receive table\'s read, values in hex', { skip: !builtProfile('korg-vox-continental') }, () => {
+  const profile = builtProfile('korg-vox-continental');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  // Under the receive table *1 is Sostenuto's OFF/ON; under the transmit table it is Slow/Fast.
+  assert.deepEqual(by('Sostenuto Off/On').choices.map((c) => [c.value, c.label]), [[0, 'OFF'], [0x7f, 'ON']]);
+  assert.deepEqual(by('Rotary Speed (ROTOR SPEED Pedal)').choices.map((c) => [c.value, c.label]), [[0, 'Slow'], [0x7f, 'Fast']]);
+  assert.equal(localCompileParameter(profile, { parameterId: by('CONTROL BUTTON').id, value: 'eq' }).hex, 'B0 6F 02');
+  assert.equal(profile.identity, undefined);
+  assert.equal(profile.presets.banks[0].slotCount, 16);
+});
