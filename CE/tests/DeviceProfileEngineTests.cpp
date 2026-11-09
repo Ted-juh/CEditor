@@ -4133,7 +4133,18 @@ int main (int argc, char** argv)
         root.getChildFile ("sequential-prophet-08.ceditor-device.json"),
         root.getChildFile ("oberheim-ob-6.ceditor-device.json"),
         root.getChildFile ("oberheim-ob-x8.ceditor-device.json"),
-        root.getChildFile ("oberheim-teo-5.ceditor-device.json")
+        root.getChildFile ("oberheim-teo-5.ceditor-device.json"),
+        root.getChildFile ("korg-minilogue.ceditor-device.json"),
+        root.getChildFile ("korg-minilogue-xd.ceditor-device.json"),
+        root.getChildFile ("korg-monologue.ceditor-device.json"),
+        root.getChildFile ("korg-prologue.ceditor-device.json"),
+        root.getChildFile ("korg-minikorg-700sm.ceditor-device.json"),
+        root.getChildFile ("korg-volca-bass.ceditor-device.json"),
+        root.getChildFile ("korg-volca-beats.ceditor-device.json"),
+        root.getChildFile ("korg-volca-keys.ceditor-device.json"),
+        root.getChildFile ("korg-volca-kick.ceditor-device.json"),
+        root.getChildFile ("korg-volca-nubass.ceditor-device.json"),
+        root.getChildFile ("korg-volca-fm2.ceditor-device.json")
     };
 
     auto failures = 0;

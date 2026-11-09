@@ -1,0 +1,28 @@
+{
+  "source": {"title":"volca kick MIDI Implementation","printedTitle":"KORG volca kick MIDI Implementation          Version 1.00 (2016.07.29)","revision":null,"date":null,"file":"volca_kick_MIDIimp.txt","sha256":"a5d8ec1dab253e6ea08eeec5734fd5151c9195d35eba010da92539105be68d3f","url":"https://www.korg.com/us/support/download/manual/0/726/3441/"},
+  "programChange": null,
+  "received": [
+    {"line":20,"cc":40,"third":"vv    (vv)","desc":"PULSE COLOUR                          *1","more":[]},
+    {"line":21,"cc":41,"third":"vv    (vv)","desc":"PULSE LEVEL                           *1","more":[]},
+    {"line":22,"cc":42,"third":"vv    (vv)","desc":"AMP ATTACK                            *1","more":[]},
+    {"line":23,"cc":43,"third":"vv    (vv)","desc":"AMP DECAY                             *1","more":[]},
+    {"line":24,"cc":44,"third":"vv    (vv)","desc":"DRIVE                                 *1","more":[]},
+    {"line":25,"cc":45,"third":"vv    (vv)","desc":"TONE                                  *1","more":[]},
+    {"line":26,"cc":46,"third":"vv    (vv)","desc":"RESONATOR PITCH                       *1","more":[]},
+    {"line":27,"cc":47,"third":"vv    (vv)","desc":"RESONATOR BEND                        *1","more":[]},
+    {"line":28,"cc":48,"third":"vv    (vv)","desc":"RESONATOR TIME                        *1","more":[]},
+    {"line":29,"cc":49,"third":"vv    (vv)","desc":"ACCENT                                *1","more":[]}
+  ],
+  "transmitted": [
+  ],
+  "nrpn": [
+  ],
+  "identity": [
+  ],
+  "marks": {
+    "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
+    "2": "This message is recognized when the \"MIDI Clock Src\" is set to \"Auto\"."
+  },
+  "lists": {
+  }
+}

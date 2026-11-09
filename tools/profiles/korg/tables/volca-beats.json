@@ -1,0 +1,38 @@
+{
+  "source": {"title":"volca beats MIDI Implementation","printedTitle":"KORG volca beats MIDI Implementation","revision":"0.01","date":"2013.06.23","file":"volca_beats_MIDIimp.txt","sha256":"ca13fc77023632ae70115f1399137e14c1d29dcac5259d1d8add5f1de27f9af1","url":"https://www.korg.com/us/support/download/manual/0/141/2738/"},
+  "programChange": null,
+  "received": [
+    {"line":20,"cc":40,"third":"vv    (vv)","desc":"PART LEVEL (KICK)                     *1","more":[]},
+    {"line":21,"cc":41,"third":"vv    (vv)","desc":"PART LEVEL (SNARE)                    *1","more":[]},
+    {"line":22,"cc":42,"third":"vv    (vv)","desc":"PART LEVEL (LO TOM)                   *1","more":[]},
+    {"line":23,"cc":43,"third":"vv    (vv)","desc":"PART LEVEL (HI TOM)                   *1","more":[]},
+    {"line":24,"cc":44,"third":"vv    (vv)","desc":"PART LEVEL (CL HAT)                   *1","more":[]},
+    {"line":25,"cc":45,"third":"vv    (vv)","desc":"PART LEVEL (OP HAT)                   *1","more":[]},
+    {"line":26,"cc":46,"third":"vv    (vv)","desc":"PART LEVEL (CLAP)                     *1","more":[]},
+    {"line":27,"cc":47,"third":"vv    (vv)","desc":"PART LEVEL (CLAVES)                   *1","more":[]},
+    {"line":28,"cc":48,"third":"vv    (vv)","desc":"PART LEVEL (AGOGO)                    *1","more":[]},
+    {"line":29,"cc":49,"third":"vv    (vv)","desc":"PART LEVEL (CRASH)                    *1","more":[]},
+    {"line":30,"cc":50,"third":"vv    (vv)","desc":"PCM SPEED (CLAP)                      *1","more":[]},
+    {"line":31,"cc":51,"third":"vv    (vv)","desc":"PCM SPEED (CLAVES)                    *1","more":[]},
+    {"line":32,"cc":52,"third":"vv    (vv)","desc":"PCM SPEED (AGOGO)                     *1","more":[]},
+    {"line":33,"cc":53,"third":"vv    (vv)","desc":"PCM SPEED (CRASH)                     *1","more":[]},
+    {"line":34,"cc":54,"third":"vv    (vv)","desc":"STUTTER TIME                          *1","more":[]},
+    {"line":35,"cc":55,"third":"vv    (vv)","desc":"STUTTER DEPTH                         *1","more":[]},
+    {"line":36,"cc":56,"third":"vv    (vv)","desc":"DECAY (TOM)                           *1","more":[]},
+    {"line":37,"cc":57,"third":"vv    (vv)","desc":"DECAY (CLOSED HAT)                    *1","more":[]},
+    {"line":38,"cc":58,"third":"vv    (vv)","desc":"DECAY (OPEN HAT)                      *1","more":[]},
+    {"line":39,"cc":59,"third":"vv    (vv)","desc":"HAT GRAIN                             *1","more":[]}
+  ],
+  "transmitted": [
+  ],
+  "nrpn": [
+  ],
+  "identity": [
+  ],
+  "marks": {
+    "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
+    "2": "This message is recognized when the \"MIDI Clock Src\" is set to \"Auto\"."
+  },
+  "lists": {
+  }
+}

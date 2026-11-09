@@ -17,6 +17,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | Folder | What it builds |
 |---|---|
 | [`roland/`](roland/README.md) | 52 profiles from Roland's Parameter Address Maps (SysEx), and 19 from the Control Change lists of the instruments that have no address map. |
+| [`korg/`](korg/README.md) | 11 profiles from Korg's plain-text MIDI Implementations: minilogue, minilogue xd, monologue, prologue, miniKORG 700Sm, and the volca bass, beats, keys, kick, nubass and fm2. |
 | [`sequential/`](sequential/README.md) | 17 profiles from the NRPN tables of Sequential's, Dave Smith Instruments' and Oberheim's manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, the three Mophos, and the OB-6, OB-X8 and TEO-5. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 

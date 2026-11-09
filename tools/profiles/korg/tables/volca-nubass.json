@@ -1,0 +1,30 @@
+{
+  "source": {"title":"volca nubass MIDI Implementation","printedTitle":"KORG volca nubass MIDI Implementation          Version 1.00 (2026.07.06)","revision":null,"date":null,"file":"volca_nubass_MIDIimp.txt","sha256":"5c953040f99c26318b08096da6bee6d02cc445e5a6a8e632f31d07477dceb376","url":"https://www.korg.com/us/support/download/manual/0/820/5700/"},
+  "programChange": null,
+  "received": [
+    {"line":20,"cc":40,"third":"vv    (vv)","desc":"VTO PITCH vv=0~127                 *2 *1","more":[]},
+    {"line":21,"cc":41,"third":"vv    (vv)","desc":"VTO SATURATION                        *1","more":[]},
+    {"line":22,"cc":42,"third":"vv    (vv)","desc":"VTO LEVEL                             *1","more":[]},
+    {"line":23,"cc":43,"third":"vv    (vv)","desc":"VCF CUTOFF                            *1","more":[]},
+    {"line":24,"cc":44,"third":"vv    (vv)","desc":"VCF PEAK                              *1","more":[]},
+    {"line":25,"cc":45,"third":"vv    (vv)","desc":"VCF ATTACK                            *1","more":[]},
+    {"line":26,"cc":46,"third":"vv    (vv)","desc":"VCF DECAY                             *1","more":[]},
+    {"line":27,"cc":47,"third":"vv    (vv)","desc":"VCF EG INT                            *1","more":[]},
+    {"line":28,"cc":48,"third":"vv    (vv)","desc":"VCF ACCENT                            *1","more":[]},
+    {"line":29,"cc":49,"third":"vv    (vv)","desc":"LFO RATE                              *1","more":[]},
+    {"line":30,"cc":50,"third":"vv    (vv)","desc":"LFO INT                               *1","more":[]}
+  ],
+  "transmitted": [
+  ],
+  "nrpn": [
+  ],
+  "identity": [
+  ],
+  "marks": {
+    "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
+    "2": "vv:0~64~127 = -12note~0~+12note",
+    "3": "This message is recognized when the \"MIDI Clock Src\" is set to \"Auto\"."
+  },
+  "lists": {
+  }
+}

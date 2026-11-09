@@ -1,0 +1,231 @@
+// korgProfiles.test.js — device profiles read out of Korg's own MIDI Implementation documents.
+//
+// tools/profiles/korg/ reads the plain-text MIDI Implementation Korg publishes for each instrument
+// (read-korg-text.mjs), commits what a profile needs as tables/<name>.json, and builds a profile
+// from that and a layout. Checked here against things that are not the builder's own arithmetic:
+//
+//   - the READER on fixtures in Korg's style: boxed tables, rows that continue the row above,
+//     footnote marks with text that runs on, lists of values under a mark or a note;
+//   - the BUILDER's rules: a controller is a choice only where the receive and transmit tables agree
+//     on its values; a value list that depends on another setting stays a number; an NRPN wider
+//     than 7 bits sends its low bits first on the controller the document names;
+//   - every PROFILE through the app's own engine: each parameter compiles to its controller or NRPN
+//     at both ends of its range, its declared vectors pass, its presets recall;
+//   - the committed profiles against the generator, so a layout edit cannot ship stale.
+//
+// What none of this checks is a real instrument (`verifiedOnHardware: false` in every profile).
+
+import test from 'node:test';
+import assert from 'node:assert/strict';
+
+import { readText } from './support/readText.mjs';
+import { cells, listEntries, readFootnotes, readTables } from '../../../tools/profiles/korg/read-korg-text.mjs';
+import {
+  buildKorgProfile, identityFrom, parseNrpnValue, receivedLabels, splitDescription, transmittedLabels,
+} from '../../../tools/profiles/korg/build-korg-profile.mjs';
+import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
+import {
+  localCompileParameter,
+  localCompilePresetRecall,
+  validateLocalProfileSource,
+} from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+
+/* ------------------------------------------------------------------ the reader */
+
+const FIXTURE = [
+  '\tKORG probe Implementation         Revision 1.00 (2024.1.1)',
+  '',
+  '2-1 CHANNEL MESSAGES            [H]:Hex,  [D]:Decimal',
+  '+--------+---------+-------------+--------------------------------------+',
+  '| Status | Second  |   Third     |           Description                |',
+  '| [Hex]  | [H] [D] | [H]   [D]   |                                      |',
+  '+--------+---------+-------------+--------------------------------------+',
+  '|   Bn   | 17 (23) | vv    (vv)  | EG TARGET (vv=0~127)      *6-01*5-2  |',
+  '|   Bn   | 60 (96) | vv    (vv)  | FX SUB TYPE               *6-02*5-2  |',
+  '|        |         |             | CHORUS(vv=0,64,127)                  |',
+  '+--------+---------+-------------+--------------------------------------+',
+  '',
+  ' *6-01 : vv:0~42,43~85,86~127 = EG TARGET:CUTOFF, PITCH2, PITCH',
+  ' *6-02 : When FX TYPE is CHORUS :',
+  '         vv:0~63,64~127 = STEREO, MONO',
+  '',
+  ' *3-5 (VOICE MODE)',
+  '    0 : ARP',
+  '    1 : POLY',
+].join('\n');
+
+test('a boxed table: its heading, its header rows, and a row that continues the one above', () => {
+  const [table] = readTables(FIXTURE);
+  assert.deepEqual(table.heading.id, '2-1');
+  assert.equal(table.header[0][3], 'Description');
+  assert.equal(table.rows.length, 2);
+  assert.deepEqual(table.rows[1].more.map((c) => c.at(-1)), ['CHORUS(vv=0,64,127)']);
+  assert.deepEqual(cells('| a | b |  c |'), ['a', 'b', 'c']);
+});
+
+test('footnotes: a mark whose text runs on, and a list of values under a mark', () => {
+  const { marks, notes } = readFootnotes(FIXTURE);
+  assert.match(marks['6-01'].text, /^vv:0~42,43~85,86~127 = EG TARGET:CUTOFF, PITCH2, PITCH$/);
+  assert.match(marks['6-02'].text, /When FX TYPE is CHORUS : vv:0~63,64~127 = STEREO, MONO/);
+  assert.deepEqual(notes['3-5'].entries.map((e) => [e.from, e.label]), [[0, 'ARP'], [1, 'POLY']]);
+  assert.deepEqual(listEntries(['0 ~ 255  : Poly', "48~57 : '0'~'9'", '[POLY]']).map((e) => [e.from, e.to]), [[0, 255], [48, 57]]);
+});
+
+/* ------------------------------------------------------------------ what a row means */
+
+test('a controller\'s description: name, values, explanation, marks', () => {
+  assert.deepEqual(splitDescription('AMP EG ATTACK (vv=0~127)  *5-2*5-4'), { name: 'AMP EG ATTACK', explanation: null, values: '0~127', marks: ['5-2', '5-4'] });
+  assert.deepEqual(splitDescription('Modulation1 (Joystick +Y, vv=0~127)   *5-2'), { name: 'Modulation1', explanation: 'Joystick +Y', values: '0~127', marks: ['5-2'] });
+  assert.equal(splitDescription('Bank Select (LSB) vv=0~4   *5-1').values, '0~4');
+  assert.equal(splitDescription('VOICE MODE DEPTH (vv=0~127) no display  *1-2').explanation, 'no display');
+});
+
+test('the receive and transmit footnotes: labelled ranges, the values sent, and a list that depends on another setting', () => {
+  assert.deepEqual(receivedLabels('vv:0~42,43~85,86~127 = EG TARGET:CUTOFF, PITCH2, PITCH').map((r) => [r.from, r.to, r.label]), [[0, 42, 'CUTOFF'], [43, 85, 'PITCH2'], [86, 127, 'PITCH']]);
+  assert.equal(receivedLabels('When FX TYPE is CHORUS : vv:0~63,64~127 = STEREO, MONO'), null);
+  assert.deepEqual(transmittedLabels('SYNC:OFF, ON = vv:0,127').map((t) => [t.value, t.label]), [[0, 'OFF'], [127, 'ON']]);
+  assert.deepEqual(transmittedLabels('MOD FX TYPE:CHORUS, ENSEMBLE', [0, 127]).map((t) => t.value), [0, 127]);
+});
+
+test('an NRPN value cell: range, labels, the marks and notes it points to', () => {
+  assert.deepEqual(parseNrpnValue('0,1 = Off,On').values, { list: [0, 1] });
+  assert.equal(parseNrpnValue('0,1 = Off,On').shown, 'Off,On');
+  assert.deepEqual(parseNrpnValue('0~4                 *3-5').marks, ['3-5']);
+  assert.deepEqual(parseNrpnValue('0~3             *note P6').notes, ['P6']);
+  assert.equal(parseNrpnValue('ASCII           *note P1').ascii, true);
+  assert.equal(parseNrpnValue('          *note P23 *3-2').values, null);
+});
+
+const PROBE = {
+  source: { title: 'probe', file: 'probe.txt', sha256: '00', url: 'https://example.invalid' },
+  programChange: null,
+  received: [
+    { cc: 23, desc: 'EG TARGET (vv=0~127)  *6-01*5-2', more: [] },
+    { cc: 80, desc: 'SYNC (vv=0~127)  *6-08*5-2', more: [] },
+    { cc: 96, desc: 'FX SUB TYPE  *6-02*5-2', more: [] },
+  ],
+  transmitted: [
+    { cc: 23, desc: 'EG TARGET (vv=0,64,127)  *2-01*1-2', more: [] },
+    { cc: 80, desc: 'SYNC (vv=0,127)  *2-08*1-2', more: [] },
+  ],
+  nrpn: [
+    { msb: '--', lsb: '10', name: 'VOICE MODE TYPE', value: '0~1  *3-5', more: [] },
+    { msb: '--', lsb: '14', name: 'SHAPE', value: '0~1023  *3-1', more: [] },
+    { msb: '--', lsb: '15', name: 'WIDE', value: '0~1023', more: [] },
+  ],
+  identity: [{ byte: '42', description: 'KORG ID ( Manufacturers ID )' }, { byte: '51', description: 'Family' }, { byte: '01', description: '' }, { byte: '00', description: '' }, { byte: '00', description: '' }],
+  marks: {
+    '6-01': 'vv:0~42,43~85,86~127 = EG TARGET:CUTOFF, PITCH2, PITCH',
+    '2-01': 'EG TARGET:CUTOFF, PITCH2, PITCH = vv:0,64,127',
+    '6-08': 'vv:0~63,64~127 = SYNC:ON, OFF',
+    '2-08': 'SYNC:OFF, ON = vv:0,127',
+    '6-02': 'When FX TYPE is CHORUS : vv:0~63,64~127 = STEREO, MONO',
+    '3-1': 'When a 10 bit value is received the lower 3 bits are first expected via a CC #63(0x3f) message (or assumed 0), then the upper 7 bits are expected via a CC #6(0x6) message.',
+  },
+  lists: { '3-5': { title: 'VOICE MODE', entries: [{ from: 0, to: 0, label: 'ARP' }, { from: 1, to: 1, label: 'POLY' }] } },
+};
+
+test('the builder: agreement makes a choice, disagreement a number, and a wide NRPN its low bits first', () => {
+  const profile = buildKorgProfile(PROBE, { id: 'probe', name: 'probe', family: 'probe', document: {} });
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  assert.deepEqual(by('EG TARGET').choices.map((c) => [c.value, c.label]), [[0, 'CUTOFF'], [64, 'PITCH2'], [127, 'PITCH']]);
+  assert.equal(by('SYNC').type, 'integer', 'ON at 0~63 received, OFF at 0 transmitted: not settled');
+  assert.match(by('SYNC').description, /Received: .*ON, OFF.*Transmitted: .*OFF, ON/);
+  assert.equal(by('FX SUB TYPE').type, 'integer');
+  assert.match(by('FX SUB TYPE').description, /When FX TYPE is CHORUS/);
+  assert.deepEqual(by('VOICE MODE TYPE').choices.map((c) => c.label), ['ARP', 'POLY']);
+  const shape = profile.messageRecipes.find((r) => r.id === by('SHAPE').messageRecipe);
+  assert.deepEqual([shape.lowBitsController, shape.lowBits, shape.parameterMsb, shape.parameterLsb], [63, 3, 0, 0x14]);
+  assert.equal(by('WIDE'), undefined, 'wider than 7 bits with no format printed: left out');
+  assert.ok(profile.authoringNotes.some((n) => /NRPN -- 15H \(WIDE\)/.test(n)));
+  assert.deepEqual(identityFrom(PROBE.identity), { familyCode: ['51', '01'], modelNumber: ['00', '00'] });
+});
+
+/* ------------------------------------------------------------------ the profiles */
+
+const ONLY = process.env.KORG_SYNTH ? process.env.KORG_SYNTH.split(',') : null;
+const BUILT = await Promise.all(SYNTHS.filter((name) => !ONLY || ONLY.includes(name)).map((name) => build(name)));
+const hex = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+
+for (const { name, profile, text, out, data } of BUILT) {
+  test(`${profile.id}: the committed profile is what the generator makes`, () => {
+    assert.equal(readText(out), text, `stale — run: node tools/profiles/korg/make-profiles.mjs ${name}`);
+  });
+
+  test(`${profile.id}: the app's own validator finds nothing wrong`, () => {
+    const errors = (validateLocalProfileSource(profile.id, text).validation ?? []).filter((v) => v.level === 'error');
+    assert.deepEqual(errors, []);
+  });
+
+  test(`${profile.id}: every parameter is its controller or NRPN, at both ends of its range`, () => {
+    const recipes = new Map(profile.messageRecipes.map((r) => [r.id, r]));
+    const ids = new Set();
+    for (const parameter of profile.parameters) {
+      assert.ok(!ids.has(parameter.id), `${parameter.id} twice`);
+      ids.add(parameter.id);
+      if (!parameter.access.canWrite) continue;
+      const recipe = recipes.get(parameter.messageRecipe);
+      const values = parameter.type === 'choice'
+        ? [parameter.choices[0], parameter.choices.at(-1)].map((c) => [c.id, c.value])
+        : [[parameter.range.min, parameter.range.min], [parameter.range.max, parameter.range.max]];
+      for (const [value, wire] of values) {
+        const compiled = localCompileParameter(profile, { parameterId: parameter.id, value });
+        assert.ok(compiled.ok, `${parameter.id}: ${compiled.error}`);
+        let bytes;
+        if (recipe.kind === 'cc') bytes = [0xb0, recipe.controller, wire];
+        else if (recipe.lowBits) bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, recipe.lowBitsController, wire & ((1 << recipe.lowBits) - 1), 0xb0, 0x06, wire >> recipe.lowBits];
+        else bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, 0x06, wire];
+        assert.equal(compiled.hex, hex(bytes), `${parameter.id} = ${value}`);
+      }
+    }
+  });
+
+  test(`${profile.id}: the profile's own test vectors pass`, () => {
+    const vectors = profile.tests.filter((t) => t.parameter);
+    assert.ok(vectors.length >= 2);
+    for (const vector of vectors) {
+      const compiled = localCompileParameter(profile, { parameterId: vector.parameter, value: vector.value });
+      assert.ok(compiled.ok, compiled.error);
+      const bytes = compiled.transaction.messages.flatMap((m) => m.bytes);
+      const lines = Array.from({ length: bytes.length / 3 }, (unused, i) => hex(bytes.slice(i * 3, i * 3 + 3)));
+      assert.equal(lines.join('\n'), vector.expectedHex, vector.name);
+    }
+  });
+
+  if (profile.presets) {
+    test(`${profile.id}: a preset is its bank select, then Program Change`, () => {
+      for (const bank of profile.presets.banks) {
+        const recalled = localCompilePresetRecall(profile, { slot: bank.startSlot + bank.slotCount - 1 });
+        assert.ok(recalled.ok, recalled.error);
+        const select = [...(bank.bankMsb !== undefined ? [0xb0, 0, bank.bankMsb] : []), ...(bank.bankLsb !== undefined ? [0xb0, 32, bank.bankLsb] : [])];
+        assert.equal(recalled.hex, hex([...select, 0xc0, bank.programBase + bank.slotCount - 1]));
+      }
+    });
+  }
+
+  test(`${profile.id}: the source is the document, Korg's identity, and nobody has tried it on an instrument`, () => {
+    assert.equal(profile.manufacturer, 'Korg');
+    assert.equal(profile.coverage.verifiedOnHardware, false);
+    assert.match(profile.sources[0].notes, new RegExp(`sha256 ${data.source.sha256}`));
+    if (profile.identity) assert.deepEqual(profile.identity.manufacturerId, ['42']);
+    else assert.ok(profile.authoringNotes.some((n) => /^No identity check: /.test(n)), 'a profile without an identity says why');
+  });
+}
+
+/* ------------------------------------------------------------------ per instrument */
+
+const builtProfile = (id) => BUILT.find((b) => b.profile.id === id)?.profile;
+
+test('the minilogue xd: its SYNC and RING tables disagree, its reverb list sits under a misprinted mark', { skip: !builtProfile('korg-minilogue-xd') }, () => {
+  const profile = builtProfile('korg-minilogue-xd');
+  const by = (name) => profile.parameters.filter((p) => p.name === name);
+  assert.deepEqual(profile.identity.familyCode, ['51', '01']);
+  for (const name of ['SYNC', 'RING']) assert.equal(by(name)[0].type, 'integer', name);
+  assert.equal(by('REVERB SUB TYPE')[0].choices.length, 18);
+  assert.equal(by('DELAY SUB TYPE')[0].choices.length, 20);
+  assert.equal(by('MOD FX SUB TYPE')[0].type, 'integer', 'it depends on MOD FX TYPE');
+  assert.deepEqual(by('VOICE MODE TYPE')[0].choices.map((c) => c.label), ['ARP LATCH', 'ARP', 'CHORD', 'UNISON', 'POLY']);
+  assert.equal(by('MULTI SHAPE NOISE')[0].range.max, 1023);
+  assert.equal(by('MASTER VOLUME')[0].range.max, 16383);
+  assert.equal(profile.presets.banks.length, 5);
+});

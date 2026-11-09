@@ -1,0 +1,31 @@
+{
+  "source": {"title":"volca bass MIDI Implementation","printedTitle":"KORG volca bass MIDI Implementation","revision":"0.01","date":"2013.06.23","file":"volca_bass_MIDIimp.txt","sha256":"45d01b374c11a12ea3f6ad5e00086837f661fadb8da9651b9dd48472bd0dfeaf","url":"https://www.korg.com/us/support/download/manual/0/140/2737/"},
+  "programChange": null,
+  "received": [
+    {"line":20,"cc":5,"third":"vv    (vv)","desc":"SLIDE TIME                            *1","more":[]},
+    {"line":21,"cc":11,"third":"vv    (vv)","desc":"EXPRESSION                            *1","more":[]},
+    {"line":22,"cc":40,"third":"vv    (vv)","desc":"OCTAVE                              *1*2","more":[]},
+    {"line":23,"cc":41,"third":"vv    (vv)","desc":"LFO RATE                              *1","more":[]},
+    {"line":24,"cc":42,"third":"vv    (vv)","desc":"LFO INT                               *1","more":[]},
+    {"line":25,"cc":43,"third":"vv    (vv)","desc":"VCO PITCH 1                           *1","more":[]},
+    {"line":26,"cc":44,"third":"vv    (vv)","desc":"VCO PITCH 2                           *1","more":[]},
+    {"line":27,"cc":45,"third":"vv    (vv)","desc":"VCO PITCH 3                           *1","more":[]},
+    {"line":28,"cc":46,"third":"vv    (vv)","desc":"EG ATTACK                             *1","more":[]},
+    {"line":29,"cc":47,"third":"vv    (vv)","desc":"EG DECAT/RELEASE                      *1","more":[]},
+    {"line":30,"cc":48,"third":"vv    (vv)","desc":"CUTOFF EG INT                         *1","more":[]},
+    {"line":31,"cc":49,"third":"vv    (vv)","desc":"GATE TIME                             *1","more":[]}
+  ],
+  "transmitted": [
+  ],
+  "nrpn": [
+  ],
+  "identity": [
+  ],
+  "marks": {
+    "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
+    "2": "OCTAVE [H] [D]   [H] [D] 00 (00) ~ 15 (21)  : oct 1 16 (22) ~ 2B (43)  : oct 2 2C (44) ~ 41 (65)  : oct 3 42 (66) ~ 57 (87)  : oct 4 58 (88) ~ 6D (109) : oct 5 6E (110)~ 7F (127) : oct 6",
+    "3": "This message is recognized when the \"MIDI Clock Src\" is set to \"Auto\"."
+  },
+  "lists": {
+  }
+}

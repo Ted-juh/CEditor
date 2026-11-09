@@ -1,0 +1,36 @@
+{
+  "source": {"title":"volca keys MIDI Implementation","printedTitle":"KORG volca keys MIDI Implementation","revision":"0.01","date":"2013.06.23","file":"volca_keys_MIDIimp.txt","sha256":"4b1622423f9f4b11e6b35e3f3d743b8c882b66507e354c126e07d5ea3a3eb67c","url":"https://www.korg.com/us/support/download/manual/0/138/2739/"},
+  "programChange": null,
+  "received": [
+    {"line":20,"cc":5,"third":"vv    (vv)","desc":"PORTAMENTO                            *1","more":[]},
+    {"line":21,"cc":11,"third":"vv    (vv)","desc":"EXPRESSION                            *1","more":[]},
+    {"line":22,"cc":40,"third":"vv    (vv)","desc":"VOICE                               *1*2","more":[]},
+    {"line":23,"cc":41,"third":"vv    (vv)","desc":"OCTAVE                              *1*3","more":[]},
+    {"line":24,"cc":42,"third":"vv    (vv)","desc":"DETUNE                                *1","more":[]},
+    {"line":25,"cc":43,"third":"vv    (vv)","desc":"VCO EG INT                            *1","more":[]},
+    {"line":26,"cc":44,"third":"vv    (vv)","desc":"CUTOFF                                *1","more":[]},
+    {"line":27,"cc":45,"third":"vv    (vv)","desc":"VCF EG INT                            *1","more":[]},
+    {"line":28,"cc":46,"third":"vv    (vv)","desc":"LFO RATE                              *1","more":[]},
+    {"line":29,"cc":47,"third":"vv    (vv)","desc":"LFO PITCH INT                         *1","more":[]},
+    {"line":30,"cc":48,"third":"vv    (vv)","desc":"LFO CUTOFF INT                        *1","more":[]},
+    {"line":31,"cc":49,"third":"vv    (vv)","desc":"EG ATTACK                             *1","more":[]},
+    {"line":32,"cc":50,"third":"vv    (vv)","desc":"EG DECAY/RELEASE                      *1","more":[]},
+    {"line":33,"cc":51,"third":"vv    (vv)","desc":"EG SUSTAIN                            *1","more":[]},
+    {"line":34,"cc":52,"third":"vv    (vv)","desc":"DELAY TIME                            *1","more":[]},
+    {"line":35,"cc":53,"third":"vv    (vv)","desc":"DELAY FEEDBACK                        *1","more":[]}
+  ],
+  "transmitted": [
+  ],
+  "nrpn": [
+  ],
+  "identity": [
+  ],
+  "marks": {
+    "1": "This message is recognized when the \"MIDI RX Short Message\" is set to \"On\".",
+    "2": "VOICE [H] [D]   [H] [D] 00 (00) ~ 0C (12)  : POLY 0D (13) ~ 25 (37)  : UNISON 26 (38) ~ 3E (62)  : OCTAVE 3F (63) ~ 57 (87)  : FIFTH 58 (88) ~ 70 (112) : UNISON RING 71 (113)~ 7F (127) : POLY RING",
+    "3": "OCTAVE [H] [D]   [H] [D] 00 (00) ~ 15 (21)  : 32' 16 (22) ~ 2B (43)  : 16' 2C (44) ~ 41 (65)  : 8' 42 (66) ~ 57 (87)  : 4' 58 (88) ~ 6D (109) : 2' 6E (110)~ 7F (127) : 1'",
+    "4": "This message is recognized when the \"MIDI Clock Src\" is set to \"Auto\"."
+  },
+  "lists": {
+  }
+}
