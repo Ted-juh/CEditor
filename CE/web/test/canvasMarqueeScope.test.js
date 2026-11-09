@@ -108,10 +108,52 @@ test('the canvas actually scopes its marquee, and can start one inside the conta
     join(here, '..', 'src', 'CE_Application', 'editor', 'EditorCanvas.svelte'), 'utf8',
   );
   assert.match(source, /marqueeScopeId\(canvasPanel\.controls, \$selectedComponentIds\)/);
-  assert.match(source, /findControlsInRect\(canvasPanel\.controls, rect, getSection, scopeId\)/);
+  assert.match(source, /findControlsInRect\(canvasPanel\.controls, rect, getSection, scopeId,/);
   // A container fills the space its children sit in, so a scoped marquee has to be able to begin
   // on the container's own body — otherwise the feature only works for containers small enough to
   // sweep past from outside.
   assert.match(source, /alsoStartsOn: \(target\) => isDrilledScopeBody\(target\)/);
   assert.match(source, /function isDrilledScopeBody\(target\)/);
+});
+
+// ---------------------------------------------------------------------------
+// Locked is not a target: the marquee leaves locked controls and locked/hidden layers alone
+// ---------------------------------------------------------------------------
+//
+// The bug as the owner met it: a background plate the size of the panel, locked so it stays put.
+// Any marquee across the knobs on it touched the plate too, so it joined the selection, and the
+// next drag of the knobs carried it off.
+
+function platePanel({ plateLocked = true, layer = 'Main' } = {}) {
+  const plate = leaf('PLATE', 0, 0, 600, 400);
+  plate._children.Core.locked = plateLocked;
+  const knobA = leaf('KNOB_A', 150, 150, 100, 100);
+  const knobB = leaf('KNOB_B', 330, 150, 100, 100);
+  knobB._children.Core.layer = layer;
+  return [plate, knobA, knobB];
+}
+
+test('a marquee across the knobs does not pick up the locked plate under them', () => {
+  const ids = findControlsInRect(platePanel(), { x: 120, y: 120, w: 340, h: 160 }, getSection);
+  assert.deepEqual([...ids].sort(), ['KNOB_A', 'KNOB_B']);
+});
+
+test('an unlocked plate is still swept up, as before', () => {
+  const ids = findControlsInRect(platePanel({ plateLocked: false }), { x: 120, y: 120, w: 340, h: 160 }, getSection);
+  assert.deepEqual([...ids].sort(), ['KNOB_A', 'KNOB_B', 'PLATE']);
+});
+
+test('a control on a locked or hidden layer is not swept up — the same rule a click uses', () => {
+  const rect = { x: 120, y: 120, w: 340, h: 160 };
+  const lockedLayer = [{ name: 'Main' }, { name: 'Scenery', locked: true }];
+  const hiddenLayer = [{ name: 'Main' }, { name: 'Scenery', visible: false }];
+  assert.deepEqual([...findControlsInRect(platePanel({ layer: 'Scenery' }), rect, getSection, null, lockedLayer)], ['KNOB_A']);
+  assert.deepEqual([...findControlsInRect(platePanel({ layer: 'Scenery' }), rect, getSection, null, hiddenLayer)], ['KNOB_A']);
+  // Without the layer list nothing is known about layers, and nothing is held back on their account.
+  assert.deepEqual([...findControlsInRect(platePanel({ layer: 'Scenery' }), rect, getSection)].sort(), ['KNOB_A', 'KNOB_B']);
+});
+
+test('the editor hands the marquee the panel\'s layers', () => {
+  const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../src/CE_Application/editor/EditorCanvas.svelte'), 'utf8');
+  assert.match(source, /findControlsInRect\(canvasPanel\.controls, rect, getSection, scopeId,\s*normalizePanelLayers\(canvasPanel\.layers, canvasPanel\.controls\)\)/);
 });

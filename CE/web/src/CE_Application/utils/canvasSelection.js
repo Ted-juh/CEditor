@@ -131,8 +131,17 @@ export function marqueeScopeId(controls, selectedIds) {
  * candidates, the distance labels) accounts for that either. Scoping is
  * skipped for one rather than being quietly wrong about where its children
  * are.
+ *
+ * LOCKED IS NOT A TARGET. A locked control, or one on a locked or hidden layer
+ * (`layers`, the panel's normalized layer list), is never swept up. The
+ * commonest locked thing is a background plate the size of the panel, so any
+ * marquee touched it: it joined the selection, and the next drag of the
+ * selection carried it off. A click already skips locked layers
+ * (findControlAtPoint) and a locked control is click-through on the canvas;
+ * the marquee was the one route that still picked them. A locked control can
+ * still be selected on purpose, from the Components tree.
  */
-export function findControlsInRect(controls, rect, getSection, scopeId = null) {
+export function findControlsInRect(controls, rect, getSection, scopeId = null, layers = null) {
   const ids = new Set();
   let list = controls;
   let scopedRect = rect;
@@ -147,12 +156,15 @@ export function findControlsInRect(controls, rect, getSection, scopeId = null) {
     scopedRect = { x: local.x, y: local.y, w: rect.w, h: rect.h };
   }
 
+  const blocked = unpickableLayers(layers);
   // On a big panel, only what the rect's footprint query returns can intersect it (controlSpatialIndex.js).
   const pool = worthIndexing(list) ? footprintCandidates(spatialIndexFor(list, getSection), scopedRect) : list;
   for (const ctrl of pool) {
     const t = getSection(ctrl, 'Transform');
     const c = getSection(ctrl, 'Core');
     if (!t || !c) continue;
+    if (c.locked === true) continue;
+    if (blocked.size && blocked.has(normalizeLayerName(c.layer))) continue;
     if (marqueeIntersects(t, t.rotation, scopedRect)) {
       ids.add(c.id);
     }
@@ -194,13 +206,19 @@ function hitTestPool(controls, layerNames, x, y) {
     .sort((a, b) => (rank.get(a) ?? 0) - (rank.get(b) ?? 0));
 }
 
+/** The names of the layers whose controls cannot be picked: locked ones and hidden ones. */
+function unpickableLayers(layers) {
+  return new Set((layers ?? [])
+    .filter((layer) => layer?.locked === true || layer?.visible === false)
+    .map((layer) => layer.name));
+}
+
 export function findControlAtPoint(controls, x, y, layers = null) {
   // A locked or hidden layer is not pickable. This is the point of locking scenery: you stop
   // grabbing the section box when you meant the knob drawn on top of it, and the fix has to be
-  // here rather than in the click handler, because every selection route comes through this.
-  const blocked = new Set((layers ?? [])
-    .filter((layer) => layer?.locked === true || layer?.visible === false)
-    .map((layer) => layer.name));
+  // here rather than in the click handler, because every click route comes through this. The
+  // marquee has its own copy of the rule, in findControlsInRect.
+  const blocked = unpickableLayers(layers);
 
   let hit = null;
   let localX = x;

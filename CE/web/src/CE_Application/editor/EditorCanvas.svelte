@@ -359,7 +359,10 @@
       // and only the top level when they have not — marqueeScopeId derives
       // which from the selection. Read BEFORE the selection is replaced.
       const scopeId = canvasPanel ? marqueeScopeId(canvasPanel.controls, $selectedComponentIds) : null;
-      const ids = canvasPanel ? findControlsInRect(canvasPanel.controls, rect, getSection, scopeId) : new Set();
+      const ids = canvasPanel
+        ? findControlsInRect(canvasPanel.controls, rect, getSection, scopeId,
+          normalizePanelLayers(canvasPanel.layers, canvasPanel.controls))
+        : new Set();
       // Shift extends: a selection can be built out of several passes.
       if (e?.shiftKey) {
         selectedComponentIds.update((current) => new Set([...current, ...ids]));

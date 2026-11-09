@@ -101,6 +101,10 @@ export function hasSelectedAncestor(parentChainIds, selectedIds) {
  *      itself carried by a selected ancestor — then the ancestor's patch already accounts for it
  *      and writing one here would double the move on commit exactly as the broadcast doubled it
  *      on screen.
+ *   3. A LOCKED root does not move. It can still be in the selection — the Components tree selects
+ *      it, and so does Ctrl+A — and a background plate locked so it stays put went wherever the
+ *      knobs on it were dragged. The arrow-key nudge already left locked controls alone; this is
+ *      the same rule for the mouse.
  */
 export function multiDragPatches({
   tree = [],
@@ -123,7 +127,9 @@ export function multiDragPatches({
     for (const rootId of selectionRoots(tree ?? [], ids)) {
       // The dragged control is handled below, from its snapped position rather than start+delta.
       if (rootId == null || rootId === draggedId) continue;
-      const transform = getSection(index.get(rootId)?.control, 'Transform');
+      const control = index.get(rootId)?.control;
+      if (getSection(control, 'Core')?.locked === true) continue;
+      const transform = getSection(control, 'Transform');
       if (!transform) continue;
       patches.set(rootId, {
         'Transform.x': (transform.x ?? 0) + dx,
