@@ -7,8 +7,9 @@ This page is about the profiles that come with CEditor: where they come from, wh
 trusted for, and what is known to be missing.
 
 Until November 2026 there were three real ones (the Roland GAIA SH-01 and SH-201, the Yamaha
-AN1x). There are now over seventy, most of them read out of the manufacturer's own MIDI
-documentation by tools in [`tools/profiles/`](../tools/profiles/README.md). The full list is the
+AN1x). There are now over ninety, from Roland, Sequential and Dave Smith Instruments, most of them
+read out of the manufacturer's own MIDI documentation by tools in
+[`tools/profiles/`](../tools/profiles/README.md). The full list is the
 [catalogue](#catalogue) at the end of this page, written from the profiles themselves.
 
 ## Where they live
@@ -23,7 +24,8 @@ authoring note names the tool that made it.
 
 - **Read from the manufacturer's own document.** Each profile's `sources` names the document, its
   version and date, the page, the file's SHA-256 and where it was downloaded. What is committed is
-  the transcription (`tools/profiles/roland/maps/` and `charts/`), not the PDF, which is the
+  the transcription (`tools/profiles/roland/maps/` and `charts/`, `tools/profiles/sequential/tables/`),
+  not the PDF, which is the
   manufacturer's copyright. Anyone with the same PDF can re-run the reader and compare.
 - **The manual's names, numbers and ranges, and nothing it does not say.** Where a manual is wrong
   (it happens: examples that contradict their own tables, a model ID misprinted, the same name
@@ -38,6 +40,11 @@ authoring note names the tool that made it.
 
 None of these checks depends on trusting the code that wrote the profile:
 
+- **The manual's own checks on itself.** A Roland address map's rows must add up to the block size
+  it prints; a Roland chart's list must name the numbers its chart counts; an older DSI table's dump
+  positions must not repeat, and its layer B numbers must sit one fixed offset above layer A's.
+  Where they do not, the reader has misread the page or the manual is wrong, and either way it is
+  reported.
 - **The manual's own example messages.** Roland prints worked SysEx examples in most MIDI
   Implementations. Each address-map profile carries its manual's example as a test vector, and
   both of CEditor's engines (the C++ one the program uses, and the JavaScript one behind previews)
@@ -58,10 +65,11 @@ None of these checks depends on trusting the code that wrote the profile:
   On eighteen instruments midi.guide put a controller on the wrong number four times.
 
 The tests are `CE/web/test/rolandManualProfiles.test.js`, `rolandCcProfiles.test.js`,
+`sequentialProfiles.test.js`,
 `profilesLoad.test.js` and `profileCatalogue.test.js`; the C++ engine runs every profile's test
 vectors in `CE/tests/DeviceProfileEngineTests.cpp`.
 
-## The two kinds of profile
+## The three kinds of profile
 
 ### SysEx address-map profiles
 
@@ -105,10 +113,30 @@ The JP-08 has two parts, Upper and Lower, and sends the Lower part's controllers
 the Upper's. Its profile has both, on the variables `channel` and `lowerChannel`, which must be set
 to match the instrument (and `lowerChannel` to 1 when `channel` is 16).
 
+### NRPN profiles (Sequential and Dave Smith Instruments)
+
+Every Sequential and DSI instrument since the Prophet '08 takes its parameters as NRPNs, and its
+manual prints them as a table of number, range and name, often with what each value means. A
+profile read from those tables:
+
+- has every program, global and control parameter, sent as the manual prints the format: NRPN on
+  CC 99/98, value on CC 6/38, most significant byte first;
+- is a choice where the manual labels every value of a range (`0 = Off`, `1 = Master`, …), and a
+  number otherwise;
+- has both layers of a layered instrument (Prophet Rev2, 12, X and '08, Tetra), as `A:` and `B:`;
+- knows the identity reply, and recalls presets by Bank Select (CC 32) and Program Change where the
+  manual's bank line is unambiguous;
+- **needs the instrument set to receive NRPNs** (Global: MIDI Param Receive = NRPN or All);
+- **cannot read the synth back yet.** The manuals describe the program dump, but which byte holds
+  which parameter is not mapped, so **Pull** does nothing. The program name is not editable either:
+  it is one character per NRPN, which CEditor cannot edit as text.
+
 ## Things to know before relying on one
 
 These are recorded in [known issues](known-issues.md#device-profiles) with what would close them.
 
+- **Sequential profiles assume NRPN.** The instrument's Global setting decides whether it listens to
+  NRPNs, CCs or neither; set to CC, it ignores everything these profiles send.
 - **Sibling instruments answer with the same identity.** Several pairs print the same identity
   reply, differing at most in a revision byte, which profiles deliberately do not compare (a
   firmware update is not a different instrument): FANTOM-6/7/8 and FANTOM EX; Fantom-X and
@@ -117,7 +145,7 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 - **The startup read stops at the first request that is not answered.** That is why a workstation's
   optional blocks are read on request, and why a synth set to a different device ID will appear to
   answer nothing after the identity request.
-- **The library is large.** The profiles total about 229 MB, the largest workstation profiles about
+- **The library is large.** The profiles total about 234 MB, the largest workstation profiles about
   9 MB each, and the program parses every one when it first needs a profile. How long that takes on
   a typical Windows machine has not been measured.
 - **The preview engine does not check ranges.** The JavaScript engine compiles a value outside a
@@ -133,9 +161,10 @@ These are recorded in [known issues](known-issues.md#device-profiles) with what 
 
 [`tools/profiles/README.md`](../tools/profiles/README.md) has the rules every profile here follows
 and the steps for a new brand. The Roland pipeline and its findings are in
-[`tools/profiles/roland/README.md`](../tools/profiles/roland/README.md), which also lists the Roland
-manuals that are still to read and why: tables that read with problems, scanned manuals with no text,
-and instruments for which no MIDI list was found.
+[`tools/profiles/roland/README.md`](../tools/profiles/roland/README.md) and the Sequential one and its
+findings in [`tools/profiles/sequential/README.md`](../tools/profiles/sequential/README.md). Both list
+what is still to read and why: tables that read with problems, scanned manuals with no text, and
+instruments for which no MIDI list was found.
 
 ## Catalogue
 
@@ -145,7 +174,17 @@ authoring note.
 
 <!-- catalogue:start (generated by tools/profiles/catalogue.mjs; do not edit by hand) -->
 
-77 profiles, 331,860 parameters between them; none yet checked on a real instrument.
+91 profiles, 338,514 parameters between them; none yet checked on a real instrument.
+
+### Dave Smith Instruments (5)
+
+| Profile | Instrument | Family | Talks in | Parameters | Read from | Made by |
+|---|---|---|---|---:|---|---|
+| `sequential-mopho` | DSI Mopho | Mopho | NRPN | 117 | Mopho Manual (version 1.2) | `sequential/make-profiles.mjs` |
+| `sequential-mopho-keyboard` | DSI Mopho Keyboard | Mopho | NRPN | 126 | Mopho Keyboard Manual (version 1.1) | `sequential/make-profiles.mjs` |
+| `sequential-mopho-x4` | DSI Mopho x4 | Mopho | NRPN | 127 | Mopho x4 Operation Manual (version 1.0) | `sequential/make-profiles.mjs` |
+| `sequential-prophet-08` | DSI Prophet '08 | Prophet | NRPN | 350 | Prophet '08 Manual (version 1.3) | `sequential/make-profiles.mjs` |
+| `sequential-tetra` | DSI Tetra | Tetra | NRPN | 370 | Tetra Manual (version 1.3) | `sequential/make-profiles.mjs` |
 
 ### Generic (1)
 
@@ -232,6 +271,20 @@ authoring note.
 | `roland-xv-5050` | Roland XV-5050 | XV | SysEx parameters and dumps | 8,842 | XV-5050 MIDI Implementation (version 1.00, October 4, 2001) | `roland/make-profiles.mjs` |
 | `roland-xv-5080` | Roland XV-5080 | XV | SysEx parameters and dumps | 10,233 | XV-5080 MIDI Implementation (version 1.00, May 20, 2000) | `roland/make-profiles.mjs` |
 | `roland-xv-88` | Roland XV-88 | XV | SysEx parameters and dumps | 8,919 | XV-88 MIDI Implementation (version 1.00, February 15, 2000) | `roland/make-profiles.mjs` |
+
+### Sequential (9)
+
+| Profile | Instrument | Family | Talks in | Parameters | Read from | Made by |
+|---|---|---|---|---:|---|---|
+| `sequential-fourm` | Sequential Fourm | Fourm | NRPN | 116 | Fourm MIDI Implementation Document (version 1.1) | `sequential/make-profiles.mjs` |
+| `sequential-pro-2` | Sequential Pro 2 | Pro | NRPN | 843 | Pro 2 Operation Manual (version 1.2) | `sequential/make-profiles.mjs` |
+| `sequential-prophet-12` | Sequential Prophet 12 | Prophet | NRPN | 474 | Prophet 12 Operation Manual (version 1.0) | `sequential/make-profiles.mjs` |
+| `sequential-prophet-rev2` | Sequential Prophet Rev2 | Prophet | NRPN | 1,961 | Prophet Rev2 User's Guide (version 1.2.4) | `sequential/make-profiles.mjs` |
+| `sequential-prophet-x` | Sequential Prophet X/XL | Prophet | NRPN | 503 | Prophet X User's Guide (version 1.3) | `sequential/make-profiles.mjs` |
+| `sequential-prophet-5` | Sequential Prophet-5/10 | Prophet | NRPN | 70 | Prophet-5 MIDI Implementation (version 1.4) | `sequential/make-profiles.mjs` |
+| `sequential-prophet-6` | Sequential Prophet-6 | Prophet | NRPN | 876 | Prophet-6 Operation Manual (version 2.1) | `sequential/make-profiles.mjs` |
+| `sequential-take-5` | Sequential Take 5 | Take | NRPN | 158 | Take 5 MIDI Implementation (version V2) | `sequential/make-profiles.mjs` |
+| `sequential-trigon-6` | Sequential Trigon-6 | Trigon | NRPN | 563 | Trigon-6 MIDI Implementation (version 1.1) | `sequential/make-profiles.mjs` |
 
 ### Yamaha (1)
 

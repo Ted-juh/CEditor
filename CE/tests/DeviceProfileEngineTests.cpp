@@ -4068,7 +4068,24 @@ int main (int argc, char** argv)
         root.getChildFile ("roland-tr-1000.ceditor-device.json"),
         root.getChildFile ("roland-mc-101.ceditor-device.json"),
         root.getChildFile ("roland-mc-707.ceditor-device.json"),
-        root.getChildFile ("roland-vt-4.ceditor-device.json")
+        root.getChildFile ("roland-vt-4.ceditor-device.json"),
+        // Sequential and Dave Smith Instruments, from the NRPN tables in their manuals, read by
+        // tools/profiles/sequential/. Each vector's bytes are worked out from the printed NRPN number
+        // and value, one CC per line, not by asking an engine.
+        root.getChildFile ("sequential-prophet-6.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-rev2.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-12.ceditor-device.json"),
+        root.getChildFile ("sequential-pro-2.ceditor-device.json"),
+        root.getChildFile ("sequential-trigon-6.ceditor-device.json"),
+        root.getChildFile ("sequential-take-5.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-5.ceditor-device.json"),
+        root.getChildFile ("sequential-fourm.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-x.ceditor-device.json"),
+        root.getChildFile ("sequential-tetra.ceditor-device.json"),
+        root.getChildFile ("sequential-mopho.ceditor-device.json"),
+        root.getChildFile ("sequential-mopho-keyboard.ceditor-device.json"),
+        root.getChildFile ("sequential-mopho-x4.ceditor-device.json"),
+        root.getChildFile ("sequential-prophet-08.ceditor-device.json")
     };
 
     auto failures = 0;

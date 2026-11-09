@@ -830,9 +830,10 @@ choices; the MIDI message that changes each one (CC, NRPN or SysEx); how the syn
 whole sound in one go (a **dump**); and its banks of presets. With a profile, you bind controls by
 choosing a parameter by name, and CEditor builds the right message.
 
-CEditor comes with over seventy profiles: a generic MIDI CC profile, the Yamaha AN1x, and Roland
-synths from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, most of them
-read out of Roland's own MIDI documentation. All of them are marked experimental, and none has been
+CEditor comes with over ninety profiles: a generic MIDI CC profile, the Yamaha AN1x, Roland synths
+from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, and Sequential and
+Dave Smith Instruments synths from the Mopho to the Prophet-6, most of them read out of the maker's
+own MIDI documentation. All of them are marked experimental, and none has been
 tried on a real instrument yet. [The device profile library](device-profile-library.md) lists them
 and says what each kind covers. **File → Import Device Profile...** loads a profile from a file.
 

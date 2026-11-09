@@ -7,14 +7,17 @@ page is for whoever adds to it.
 ```bash
 node tools/profiles/roland/make-profiles.mjs --check       # Roland address-map profiles are current
 node tools/profiles/roland/make-cc-profiles.mjs --check    # Roland Control Change profiles are current
+node tools/profiles/sequential/make-profiles.mjs --check   # Sequential/DSI NRPN profiles are current
 node tools/profiles/catalogue.mjs --check                  # the docs page's catalogue is current
 cd CE/web && node --import ./test/support/register-svelte.mjs --test \
-  test/rolandManualProfiles.test.js test/rolandCcProfiles.test.js test/profilesLoad.test.js test/profileCatalogue.test.js
+  test/rolandManualProfiles.test.js test/rolandCcProfiles.test.js test/sequentialProfiles.test.js \
+  test/profilesLoad.test.js test/profileCatalogue.test.js
 ```
 
 | Folder | What it builds |
 |---|---|
 | [`roland/`](roland/README.md) | 52 profiles from Roland's Parameter Address Maps (SysEx), and 19 from the Control Change lists of the instruments that have no address map. |
+| [`sequential/`](sequential/README.md) | 14 profiles from the NRPN tables of Sequential's and Dave Smith Instruments' manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, and the three Mophos. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |
 
 ## The rules every profile here follows
@@ -24,7 +27,8 @@ They exist because each one was broken once, and the breakage looked like a work
 1. **The manufacturer's document first.** A profile is read from the maker's own MIDI
    Implementation, data list or owner's manual. Community databases (midi.guide, other editors'
    files) are a cross-check, never a source: on the Roland CC lists, midi.guide put a controller on
-   the wrong number for four instruments out of eighteen.
+   the wrong number for four instruments out of eighteen, and on the Prophet Rev2's NRPNs it names
+   two numbers after their neighbours.
 2. **Read, do not retype.** A reader turns the document's tables into a transcription, which is
    committed with the document's file name, SHA-256, model, version, date, page and URL. The PDF is
    the maker's copyright and is not committed. Anyone with the same PDF can re-run the reader and

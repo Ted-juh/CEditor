@@ -412,6 +412,6 @@ something the program does with every profile, which the larger library makes ea
   `startup.sync` chain. Generated profiles work around it (blocks that may not answer are read on
   request), but one unanswered block still ends the read for every block after it.
 - **The program parses every profile it finds.** `loadInternalTestProfiles` reads every file in
-  `CE/profiles/test` when a profile is first needed: about 229 MB of JSON across 80 files, the
+  `CE/profiles/test` when a profile is first needed: about 234 MB of JSON across 94 files, the
   largest about 9 MB. Not measured on Windows. If it is slow, load a profile's header first and its
   parameters when it is chosen.
