@@ -173,7 +173,9 @@ test('the Open tray lists recent documents, off the same store the File menu use
 test('opening a saved component or profile is the shared action, and records the recent entry', () => {
   assert.match(script, /from '\.\.\/stores\/recentFileActions\.js'/);
   assert.match(script, /openComponentLibraryEntry\(componentLibraryEntries\[0\]\.entry\)/);
-  assert.match(script, /openDeviceProfileEntry\(deviceProfileEntries\[0\]\.entry\)/);
+  // A profile is chosen in the device profile picker now (stores/deviceProfilePicker.js, whose own
+  // test checks the tab bar opens it); what it picks still goes through the shared action.
+  assert.match(script, /onPick: \(id, profile\) => openDeviceProfileEntry\(\{ id, name: profile\?\.name \|\| id \}\)/);
   const actions = readFileSync(join(here, '..', 'src', 'CE_Application', 'stores', 'recentFileActions.js'), 'utf8');
   assert.match(actions, /rememberRecentFile\(\{ kind: 'component'/);
   assert.match(actions, /rememberRecentFile\(\{ kind: 'deviceProfile'/);
