@@ -51,6 +51,8 @@ What the builder takes as settled, and what it does not:
 | `korg-monologue` | monologue MIDI Implementation 1.00 | 24 | 10 | 100 | 44H 01H |
 | `korg-nts-1-mk2` | NTS-1 digital kit mkII MIDI Implementation 1.00 | 62 | 7 | — | 73H 01H |
 | `korg-microkorg-s` | microKORG S MIDI Implementation 1.01 | 205 | 78 | 128 | 40H 01H |
+| `korg-kingkorg` | KingKORG MIDI Implementation 1.00 | 210 | 60 | — | 18H 01H |
+| `korg-kingkorg-neo` | KingKORG NEO MIDI Implementation 1.00 (same tables, same product ID) | 210 | 60 | — | 18H 01H |
 | `korg-minikorg-700sm` | miniKORG 700Sm MIDI Implementation 1.00 | 29 | 15 | 14 | 62H 01H |
 | `korg-volca-fm2` | volca fm2 MIDI Implementation 1.00 | 13 | 2 | — | 2FH 01H |
 | `korg-volca-keys` | volca keys MIDI Implementation 0.01 | 16 | 2 | — | — |
@@ -83,6 +85,21 @@ TABLE 3 for the vocoder), with the section rows that head their parts:
 
 Its NRPNs reach settings the parameter change reaches in full, in an older notation, and are left
 out. No Pull yet: its program dump is printed differently from the logue family's.
+
+## SysEx parameter change with an ID and a sub-ID (KingKORG, KingKORG NEO)
+
+The KingKORG's message is `F0 42 3g 00 01 18 41 pp PP qq QQ vvl vvm vvh F7` (NOTE 4): an ID and a
+sub-ID of 14 bits and a value of 21, each low seven bits first, the value again called signed and
+sent here as two's complement (-48 as `50 7F 7F`; both engines learned `s21-lsb-msb`).
+`build-korg-sysex-id.mjs` follows its tables' nesting: TABLE 1 gives each block an ID
+(`TIMBRE A DATA ... (TABLE 2) | 02:00~`), a row inside is relative to it (`+0:04`), and a block
+inside that makes both relative (`OSC 2 DATA (TABLE 7) | +0:11~15`, then `+0:+1`); `same as V.PATCH
+1` reuses the block above's table. Its values print `:` where the microKORG S prints `=`. A list
+makes a choice only up to 32 names; longer ones are readouts (`0.01~100[kHz]`) and go in the
+description. Left out and said: the program name, the oscillators' CTRL1 and CTRL2 (their range
+depends on the oscillator type), and the vocoder's formant-hold bands printed `same as Band1`.
+The KingKORG NEO's document has the same tables and the same product ID, and the two answer with the
+same identity.
 
 ## Pull
 
@@ -153,8 +170,8 @@ Kept as printed and said where it applies:
   the LSB's bits count, so the profile offers the coarse controller alone and leaves the fine one
   out. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.
-- **microKORG, microKORG2, KingKORG, KingKORG NEO**: few controllers; they are edited by Korg's SysEx
-  parameter change, as the microKORG S is, from tables not yet read. **The microKORG S's Pull**: its
+- **microKORG, microKORG2**: few controllers and no parameter change; their documents edit by NRPN, in
+  an older notation. **The microKORG S's Pull**: its
   program tables print offsets and bits in a form of their own (`+1 B6,7`).
 - **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives, not yet read.
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document

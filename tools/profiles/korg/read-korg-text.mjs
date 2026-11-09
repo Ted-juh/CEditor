@@ -18,7 +18,8 @@ export function lines(text) {
   return String(text).replace(/^﻿/, '').replace(/\r\n?/g, '\n').replace(/\t/g, '    ').split('\n');
 }
 
-const BORDER = /^\s*\+[-+=]+\+\s*$/;
+// A border; the KingKORG leaves a gap in one where a cell spans two rows (`+-----+       +----+`).
+const BORDER = /^\s*\+[-=]+(?:\+[-=]*|\s+)*\+\s*$/;
 const ROW = /^\s*\|.*\|\s*$/;
 // A rule inside a row, between the bit fields that share a byte: `|    -------+-------+---+`.
 const INNER = /^\s*\|[\s-]*\+[-+]*\+?\s*$/;
@@ -76,7 +77,7 @@ export function readTables(text) {
 const MARK = /^\s*\*(\d+-\d+|\d+)\s*:\s?(.*)$/;          // *6-01 : text   /  *4 : text
 const LIST = /^\s*\*(\d+-\d+)\s*\((.+)\)\s*$/;            // *3-5 (VOICE MODE)
 const NOTE = /^\s*\*note\s+([A-Z]\d+)\b\s*(?:\((.*)\))?\s*$/i;   // *note P6 (SELECT NOISE)
-const TLIST = /^\s*\*([A-Z]-\d+)\s*:\s*$/;                         // *T-1 :   (entries in columns below)
+const TLIST = /^\s*\*([A-Z]\d*-\d+)\s*:\s*([^\d\s][^:]*?)?\s*$/;   // *T-1 :  /  *T01-1 : Category  (entries in columns below)
 
 /**
  * The footnotes: `{ '6-01': { text, line } }` for a mark with text, `{ '3-5': { title, entries } }`
@@ -94,7 +95,7 @@ export function readFootnotes(text) {
     if (BORDER.test(line) || ROW.test(line)) { close(); continue; }
     let m = TLIST.exec(line);
     if (m) {
-      open = { kind: 'list', key: m[1], title: '', lines: [], line: i + 1 };
+      open = { kind: 'list', key: m[1], title: (m[2] ?? '').trim(), lines: [], line: i + 1 };
       notes[open.key] = open;
       continue;
     }

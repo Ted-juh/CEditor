@@ -135,6 +135,7 @@ export function parameterValueWidth(parameter) {
     return length;
   }
   if (isU14(encoding)) return 2;
+  if (encoding === 's21-lsb-msb') return 3;
   if (encoding === 'nibbled') return nibbleCount(parameter).nibbles ?? 0;
   return 1;
 }
@@ -224,6 +225,10 @@ export function decodeParameterValue(parameter, bytes) {
     const raw = ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
     return raw >= 8192 ? raw - 16384 : raw;
   }
+  if (encoding === 's21-lsb-msb') {
+    const raw = ((list[2] & 0x7f) << 14) | ((list[1] & 0x7f) << 7) | (list[0] & 0x7f);
+    return raw >= 1048576 ? raw - 2097152 : raw;
+  }
   if (encoding === 'nibbled') {
     const { nibbles, error } = nibbleCount(parameter);
     if (error) return null;
@@ -276,6 +281,14 @@ export function encodeParameterValue(parameter, value) {
     // through to the u7 line and went out as one byte, clamped to 127.
     const number = clampInt(value, 0, 16383);
     return { bytes: [number & 0x7f, (number >> 7) & 0x7f], number, normalized: number / 16383, displayed: String(number) };
+  }
+  if (encoding === 's21-lsb-msb') {
+    // Signed over 21 bits, three bytes least significant first, as DeviceProfileEngine.cpp encodes it
+    // (the KingKORG's parameter change).
+    const number = Math.round(Number(value) || 0);
+    if (number < -1048576 || number > 1048575) return { error: `Encoded s21 value outside -1048576-1048575 for ${parameter?.id ?? ''}` };
+    const wire = number & 0x1fffff;
+    return { bytes: [wire & 0x7f, (wire >> 7) & 0x7f, (wire >> 14) & 0x7f], number, normalized: (number + 1048576) / 2097151, displayed: String(number) };
   }
   if (encoding === 's14-lsb-msb') {
     // Signed, two's complement over 14 bits, least significant byte first, as DeviceProfileEngine.cpp
@@ -661,6 +674,10 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     for (let index = 0; index < nibbles; index += 1) {
       numeric = (numeric << 4) | (bytes[offset + index] & 0x0f);
     }
+  } else if (encodingType === 's21-lsb-msb') {
+    if (offset + 2 >= bytes.length) return { ok: false, error: `21-bit dump value requires three bytes for ${parameter?.id ?? ''}` };
+    numeric = ((bytes[offset + 2] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+    if (numeric >= 1048576) numeric -= 2097152;
   } else if (encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb') {
     // Least significant byte first, as DeviceProfileEngine.cpp reads it. It came back as its first
     // byte alone: 12345 (39 60) as 57. s14 is the same bits read as two's complement.

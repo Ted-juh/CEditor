@@ -20,6 +20,7 @@
 // `(TIMBRE 2)`) makes one parameter per copy.
 
 import { camel } from '../roland/build-profile.mjs';
+import { addParameterChangeById } from './build-korg-sysex-id.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 const choiceSlug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
@@ -85,6 +86,8 @@ export function readValue(text, lists) {
 export function addParameterChange(profile, data, layout) {
   const pc = data.parameterChange;
   if (!pc || layout.parameterChange === false) return [];
+  // An ID and a sub-ID (the KingKORG): a builder of its own, since its tables nest.
+  if (pc.message.some((r) => /\((qq|QQ)\)/.test(r.cells[0] ?? ''))) return addParameterChangeById(profile, data, layout);
   const head = messageHead(pc.message);
   const notes = [];
   const skipped = new Map();
@@ -155,13 +158,15 @@ export function addParameterChange(profile, data, layout) {
 /** Test vectors for a few parameter change parameters, worked out from the ID and value here. */
 export function parameterChangeVectors(profile) {
   const pcs = profile.parameters.filter((p) => profile.messageRecipes.find((r) => r.id === p.messageRecipe)?.kind === 'sysex');
-  const picks = [pcs.find((p) => p.encoding.type === 'u14-lsb-msb'), pcs.find((p) => p.encoding.type === 's14-lsb-msb'), pcs.find((p) => p.type === 'choice'), pcs.at(-1)].filter(Boolean);
+  const picks = [pcs.find((p) => p.encoding.type === 'u14-lsb-msb'), pcs.find((p) => p.encoding.type === 's14-lsb-msb'), pcs.find((p) => p.encoding.type === 's21-lsb-msb' && p.range.min < 0), pcs.find((p) => p.type === 'choice'), pcs.at(-1)].filter(Boolean);
   return [...new Set(picks)].map((p) => {
     const recipe = profile.messageRecipes.find((r) => r.id === p.messageRecipe);
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
-    const value = choice ? choice.value : p.encoding.type === 's14-lsb-msb' ? p.range.min : p.range.max;
-    const wire = value & 0x3fff;
-    const bytes = recipe.template.flatMap((t) => (t === '$deviceId' ? ['30'] : t === '$encodedValue' ? (choice ? [hex(value)] : [hex(wire & 0x7f), hex(wire >> 7)]) : [t]));
+    const value = choice ? choice.value : p.range.min < 0 ? p.range.min : p.range.max;
+    const wide = p.encoding.type === 's21-lsb-msb';
+    const wire = value & (wide ? 0x1fffff : 0x3fff);
+    const encoded = choice ? [hex(value)] : wide ? [hex(wire & 0x7f), hex((wire >> 7) & 0x7f), hex(wire >> 14)] : [hex(wire & 0x7f), hex(wire >> 7)];
+    const bytes = recipe.template.flatMap((t) => (t === '$deviceId' ? ['30'] : t === '$encodedValue' ? encoded : [t]));
     return { name: `${p.name} = ${choice ? choice.label : value} (parameter change)`, parameter: p.id, value: choice ? choice.id : value, expectedHex: bytes.join(' ') };
   });
 }

@@ -176,7 +176,9 @@ for (const { name, profile, text, out, data } of BUILT) {
         let bytes;
         if (recipe.kind === 'sysex') {
           // Korg's parameter change: the value 14 bits, low seven first; a choice one byte and 00.
-          const value = parameter.type === 'choice' ? [wire] : [(wire & 0x3fff) & 0x7f, (wire & 0x3fff) >> 7];
+          const value = parameter.type === 'choice' ? [wire]
+            : parameter.encoding.type === 's21-lsb-msb' ? [wire & 0x7f, (wire >> 7) & 0x7f, (wire >> 14) & 0x7f]
+              : [(wire & 0x3fff) & 0x7f, (wire & 0x3fff) >> 7];
           bytes = recipe.template.flatMap((t) => (t === '$deviceId' ? [0x30] : t === '$encodedValue' ? value : [Number.parseInt(t, 16)]));
         } else if (recipe.kind === 'cc') bytes = [0xb0, recipe.controller, wire];
         else if (recipe.lowBits) bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, recipe.lowBitsController, wire & ((1 << recipe.lowBits) - 1), 0xb0, 0x06, wire >> recipe.lowBits];
@@ -334,4 +336,17 @@ test('the microKORG S: every setting by parameter change, a signed value as two\
   assert.deepEqual(profile.parameters.find((p) => p.name === 'Timbre 1: OSC 1 Wave').choices.map((c) => c.label),
     ['Saw', 'Pulse', 'Tri', 'Sin(Cross)', 'Vox Wave', 'DWGS', 'Noise', 'Audio In'], '*T-2, printed in two columns');
   assert.ok(profile.authoringNotes.some((n) => /signed value.*NOTE 5/.test(n)));
+});
+
+test('the KingKORG: an ID and a sub-ID through nested blocks, a 21-bit signed value', { skip: !builtProfile('korg-kingkorg') }, () => {
+  // NOTE 4: F0 42 3g 00 01 18 41 pp PP qq QQ vvl vvm vvh F7. TABLE 1 puts TIMBRE A at 02:00~ and
+  // TIMBRE B at 04:00~; TABLE 2: Transpose `-48~0~48[note]` at +0:04, OSC 2 DATA (TABLE 7) at
+  // +0:11~15, Cutoff at +0:1F; TABLE 7: Semitone at +0:+1, so Timbre A's OSC 2 Semitone is 02:12.
+  const profile = builtProfile('korg-kingkorg');
+  const send = (name, value) => localCompileParameter(profile, { parameterId: profile.parameters.find((p) => p.name === name).id, value });
+  assert.equal(send('Timbre A: Pitch Transpose', -48).hex, 'F0 42 30 00 01 18 41 02 00 04 00 50 7F 7F F7');
+  assert.equal(send('Timbre A: OSC 2 Semitone', 24).hex, 'F0 42 30 00 01 18 41 02 00 12 00 18 00 00 F7');
+  assert.equal(send('Timbre B: Filter Cutoff', 127).hex, 'F0 42 30 00 01 18 41 04 00 1F 00 7F 00 00 F7');
+  assert.equal(send('Effect: PreFX Type', 'tone').hex, 'F0 42 30 00 01 18 41 06 00 00 00 05 00 00 F7');
+  assert.ok(profile.parameters.some((p) => p.name === 'Timbre B V.Patch: V.Patch 6 Patch Intensity'), 'a block reached through `same as V.PATCH 1`');
 });

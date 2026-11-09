@@ -97,7 +97,7 @@ function programDumpSize(text) {
  */
 function parameterChange(tables) {
   const message = tables.find((t) => /^PARAMETER CHANGE$/i.test(t.heading?.title ?? ''));
-  const parameterTables = tables.filter((t) => t.header.some((h) => h.some((c) => /Param\s*ID/i.test(c))));
+  const parameterTables = tables.filter((t) => t.header.some((h) => h.some((c) => /Param\s*ID|ID\s*:\s*SubID/i.test(c))));
   if (!message || !parameterTables.length) return null;
   return {
     message: printedRows(message),

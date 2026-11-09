@@ -2358,6 +2358,14 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
             return juce::Result::fail ("14-bit dump value requires two bytes for " + propString (parameter, "id"));
         numeric = ((bytes[offset] & 0x7f) << 7) | (bytes[offset + 1] & 0x7f);
     }
+    else if (encodingType == "s21-lsb-msb")
+    {
+        if (offset + 2 >= bytes.size())
+            return juce::Result::fail ("21-bit dump value requires three bytes for " + propString (parameter, "id"));
+        numeric = ((bytes[offset + 2] & 0x7f) << 14) | ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
+        if (numeric >= 1048576)
+            numeric -= 2097152;
+    }
     else if (encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb")
     {
         // 14-bit, least-significant byte first (byteOrder lsb-first); s14 is the same bits read as
@@ -2573,6 +2581,20 @@ juce::Result DeviceProfileEngine::validateAndEncodeValue (const juce::DynamicObj
             const auto lsb = value & 0x7f;
             encodedBytes.add (encodingType == "u14-lsb-msb" ? lsb : msb);
             encodedBytes.add (encodingType == "u14-lsb-msb" ? msb : lsb);
+            return juce::Result::ok();
+        }
+
+        if (encodingType == "s21-lsb-msb")
+        {
+            // A signed value in 21 bits, two's complement, three 7-bit bytes least significant first:
+            // the KingKORG's parameter change ("vvh,vvm,vvl = signed value", sent vvl vvm vvh).
+            auto value = (int) std::round (numeric);
+            if (value < -1048576 || value > 1048575)
+                return juce::Result::fail ("Encoded s21 value outside -1048576-1048575 for " + propString (parameter, "id"));
+            const auto wire = value & 0x1fffff;
+            encodedBytes.add (wire & 0x7f);
+            encodedBytes.add ((wire >> 7) & 0x7f);
+            encodedBytes.add ((wire >> 14) & 0x7f);
             return juce::Result::ok();
         }
 
