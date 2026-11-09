@@ -4153,7 +4153,14 @@ int main (int argc, char** argv)
         root.getChildFile ("korg-microkorg.ceditor-device.json"),
         root.getChildFile ("korg-nts-1.ceditor-device.json"),
         root.getChildFile ("korg-ps-3300.ceditor-device.json"),
-        root.getChildFile ("korg-vox-continental.ceditor-device.json")
+        root.getChildFile ("korg-vox-continental.ceditor-device.json"),
+        root.getChildFile ("novation-peak.ceditor-device.json"),
+        root.getChildFile ("novation-summit.ceditor-device.json"),
+        root.getChildFile ("novation-bass-station-ii.ceditor-device.json"),
+        root.getChildFile ("novation-circuit-mono-station.ceditor-device.json"),
+        root.getChildFile ("novation-circuit-tracks.ceditor-device.json"),
+        root.getChildFile ("novation-circuit-rhythm.ceditor-device.json"),
+        root.getChildFile ("novation-mininova.ceditor-device.json")
     };
 
     auto failures = 0;

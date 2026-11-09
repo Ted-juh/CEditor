@@ -384,6 +384,7 @@ commands are in `tools/profiles/README.md`. Before pushing a change to a profile
 node tools/profiles/roland/make-profiles.mjs --check && node tools/profiles/roland/make-cc-profiles.mjs --check
 node tools/profiles/sequential/make-profiles.mjs --check
 node tools/profiles/korg/make-profiles.mjs --check
+node tools/profiles/novation/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 

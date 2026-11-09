@@ -17,6 +17,7 @@ cd CE/web && node --import ./test/support/register-svelte.mjs --test \
 | Folder | What it builds |
 |---|---|
 | [`roland/`](roland/README.md) | 52 profiles from Roland's Parameter Address Maps (SysEx), and 19 from the Control Change lists of the instruments that have no address map. |
+| [`novation/`](novation/README.md) | 7 profiles from the MIDI parameter tables in Novation's user guides and programmer's references: Peak, Summit, Bass Station II, Circuit Mono Station, Circuit Tracks, Circuit Rhythm and MiniNova, read from the PDFs' word positions. |
 | [`korg/`](korg/README.md) | 20 profiles from Korg's plain-text MIDI Implementations: minilogue, minilogue xd, monologue, prologue, PS-3300, NTS-1 and NTS-1 mkII, microKORG (2002, its knobs' control changes from the Owner's Manual), microKORG S, microKORG2, KingKORG, KingKORG NEO, miniKORG 700Sm, VOX Continental, and the volca bass, beats, keys, kick, nubass and fm2. |
 | [`sequential/`](sequential/README.md) | 17 profiles from the NRPN tables of Sequential's, Dave Smith Instruments' and Oberheim's manuals: Prophet-6, Rev2, 12, X, '08 and 5/10, Pro 2, Trigon-6, Take 5, Fourm, Tetra, the three Mophos, and the OB-6, OB-X8 and TEO-5. |
 | `catalogue.mjs` | The catalogue at the end of the docs page, written from the profiles themselves. |

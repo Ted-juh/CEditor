@@ -831,7 +831,7 @@ whole sound in one go (a **dump**); and its banks of presets. With a profile, yo
 choosing a parameter by name, and CEditor builds the right message.
 
 CEditor comes with over a hundred profiles: a generic MIDI CC profile, the Yamaha AN1x, Roland synths
-from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, Korg's minilogue,
+from the JD-Xi, INTEGRA-7 and FANTOM to the Boutiques and the TR drum machines, Novation's Peak, Summit, Bass Station II and Circuits, Korg's minilogue,
 prologue and volca families, Sequential and Dave Smith Instruments synths from the Mopho to the Prophet-6, and the Oberheim OB-6, OB-X8 and
 TEO-5, most of them read out of the maker's
 own MIDI documentation. All of them are marked experimental, and none has been
