@@ -385,6 +385,7 @@ node tools/profiles/roland/make-profiles.mjs --check && node tools/profiles/rola
 node tools/profiles/sequential/make-profiles.mjs --check
 node tools/profiles/korg/make-profiles.mjs --check
 node tools/profiles/novation/make-profiles.mjs --check
+node tools/profiles/moog/make-profiles.mjs --check
 node tools/profiles/catalogue.mjs --check     # docs/device-profile-library.md; if stale, also `npm run docs:help`
 ```
 

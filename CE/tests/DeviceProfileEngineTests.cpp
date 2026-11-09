@@ -4162,7 +4162,21 @@ int main (int argc, char** argv)
         root.getChildFile ("novation-circuit-rhythm.ceditor-device.json"),
         root.getChildFile ("novation-mininova.ceditor-device.json"),
         root.getChildFile ("novation-k-station.ceditor-device.json"),
-        root.getChildFile ("novation-ks-series.ceditor-device.json")
+        root.getChildFile ("novation-ks-series.ceditor-device.json"),
+        root.getChildFile ("moog-claravox-centennial.ceditor-device.json"),
+        root.getChildFile ("moog-grandmother.ceditor-device.json"),
+        root.getChildFile ("moog-little-phatty.ceditor-device.json"),
+        root.getChildFile ("moog-matriarch.ceditor-device.json"),
+        root.getChildFile ("moog-messenger.ceditor-device.json"),
+        root.getChildFile ("moog-minitaur.ceditor-device.json"),
+        root.getChildFile ("moog-muse.ceditor-device.json"),
+        root.getChildFile ("moog-sirin.ceditor-device.json"),
+        root.getChildFile ("moog-slim-phatty.ceditor-device.json"),
+        root.getChildFile ("moog-sub-37.ceditor-device.json"),
+        root.getChildFile ("moog-subharmonicon.ceditor-device.json"),
+        root.getChildFile ("moog-subsequent-25.ceditor-device.json"),
+        root.getChildFile ("moog-subsequent-37.ceditor-device.json"),
+        root.getChildFile ("moog-taurus-3.ceditor-device.json")
     };
 
     auto failures = 0;

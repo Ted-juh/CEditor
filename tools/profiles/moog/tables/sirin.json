@@ -1,0 +1,85 @@
+{
+  "sources": [
+    {"title":"Sirin User Manual v2.1","file":"Sirin_Manual_2_1.pdf","sha256":"8e5f625db4a4892e56a93269ee4e3d417bbae6df56bcc542e0fb3cdd8192cb9c","url":"https://cdn.inmusicbrands.com/Moog/Sirin/Sirin_Manual_2_1.pdf"}
+  ],
+  "tables": [
+    {
+      "doc": 0,
+      "kind": "cc",
+      "pages": [26,27],
+      "rows": [
+        {"doc":0,"page":26,"section":"MOD(MODULATION)","cc":"3(MSB) 35(LSB)","name":"LFO RATE","function":"Adjusts the LFO frequency","values":"0-127"},
+        {"doc":0,"page":26,"section":"MOD(MODULATION)","cc":"13(MSB) 45(LSB)","name":"LFO VCO AMOUNT","function":"Adjusts the modulation amount to the VCOs","values":"0-127"},
+        {"doc":0,"page":26,"section":"MOD(MODULATION)","cc":"12(MSB) 44(LSB)","name":"LFO VCF AMOUNT","function":"Adjusts the Modulation amount to the VCF","values":"0-127"},
+        {"doc":0,"page":26,"section":"MOD(MODULATION)","cc":"87","name":"LFO MIDI SYNC (M)","function":"Enables or disables ability of LFO to sync with MIDI CLOCK messages","values":"0-63(INT) 64-127(MIDI CLOCK)"},
+        {"doc":0,"page":26,"section":"MOD(MODULATION)","cc":"86","name":"LFO SYNC CLOCK DIV (M)","function":"Sets the LFO synchronization clock divider","values":"See table on page 24"},
+        {"doc":0,"page":26,"section":"MOD(MODULATION)","cc":"82","name":"LFO KEY TRIGGER (M)","function":"Re-triggers the LFO to the start of the cycle (Default is OFF)","values":"0-63(OFF) 64-127(ON)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"70","name":"VCO 1 WAVE","function":"Selects the waveform of VCO 1","values":"0-63(SAW) 64-127(SQR)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"71","name":"VCO 2 WAVE","function":"Selects the waveform of VCO 2","values":"0-63(SAW) 64-127(SQR)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"17(MSB) 49(LSB)","name":"VCO 2 FREQ","function":"Adjusts the frequency of VCO 2","values":"0-127 (64 is center)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"18(MSB) 50(LSB)","name":"VCO 2 BEAT (M)","function":"Adjusts the beat frequency of VCO 2 (Default is 64)","values":"0-127"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"81","name":"NOTE SYNC (M)","function":"Enables/disables Note Sync (Default is off)","values":"0-63(OFF) 64-127(ON)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"5(MSB)","name":"GLIDE RATE","function":"Adjusts the Glide (portamento) rate time","values":"0-127"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"65","name":"GLIDE SWITCH","function":"Sets the state of the GLIDE switch (Glide is enabled when LED is lit)","values":"0-63(OFF) 64-127(ON)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"92","name":"GLIDE TYPE (M)","function":"Selects the type of Glide; Linear Constant Rate, Linear Constant Time, or Exponential.","values":"0-42(LCR) 43-84(LCT) 85-127(EXP)"},
+        {"doc":0,"page":26,"section":"OSCILLATORS","cc":"83","name":"LEGATO GLIDE (M)","function":"Sets the state of the Legato Glide parameter when GLIDE is enabled (Default is OFF)","values":"0-63(Always Glide) 64-127(Glide on legato notes only)"},
+        {"doc":0,"page":26,"section":"MIXER","cc":"15(MSB) 47(LSB)","name":"VCO 1","function":"Adjusts the level of VCO 1","values":"0-127"},
+        {"doc":0,"page":26,"section":"MIXER","cc":"16(MSB) 48(LSB)","name":"VCO 2","function":"Adjusts the level of VC0 2","values":"0-127"},
+        {"doc":0,"page":26,"section":"MIXER","cc":"27(MSB) 59(LSB)","name":"EXTERNAL IN LEVEL (M)","function":"Adjusts the level of the External Audio Input (Default is 64 = 50% level)","values":"0-127"},
+        {"doc":0,"page":26,"section":"FILTER","cc":"19(MSB) 51(LSB)","name":"CUTOFF","function":"Adjusts the Filter Cutoff frequency","values":"0-127"},
+        {"doc":0,"page":26,"section":"FILTER","cc":"21(MSB) 53(LSB)","name":"RESONANCE","function":"Adjusts the Filter Resonance parameter","values":"0-127"},
+        {"doc":0,"page":26,"section":"FILTER","cc":"22(MSB) 50(LSB)","name":"EG AMOUNT","function":"Adjusts the EG amount affecting the cutoff","values":"0-127"},
+        {"doc":0,"page":26,"section":"FILTER","cc":"20(MSB) 54(LSB)","name":"FILTER KB TRACK (M)","function":"Sets the amount of keyboard tracking for the filter (Default is 32 - about 50%)","values":"0-127"},
+        {"doc":0,"page":26,"section":"FILTER","cc":"89","name":"FILTER VELOCITY SENSITIVITY (M)","function":"Sets the amount of filter velocity sensitivity (Default is 64 - 50%)","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"23(MSB) 55(LSB)","name":"VCF ATTACK","function":"Adjusts the filter envelope attack time.","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"24(MSB) 56(LSB)","name":"VCF DECAY/ RELEASE","function":"Adjusts the filter envelope decay and release time","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"25(MSB) 57(LSB)","name":"VCF SUSTAIN","function":"Adjusts the filter envelope sustain level","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"28(MSB) 60(LSB)","name":"VCA ATTACK","function":"Adjusts the volume envelope attack time","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"29(MSB) 61(LSB)","name":"VCA DECAY/ RELEASE","function":"Adjusts the volume envelope decay and release time","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"30(MSB) 62(LSB)","name":"VCA SUSTAIN","function":"Adjusts the volume envelope sustain level","values":"0-127"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"72","name":"RELEASE SWITCH","function":"Sets the state of the Release parameter (enabled when LED is lit)","values":"0-63(OFF) 64-127(ON)"},
+        {"doc":0,"page":27,"section":"ENVELOPES","cc":"73","name":"TRIGGER MODE (M)","function":"Sets the state of the envelope trigger (Default is Legato ON)","values":"0-42(LEGATO ON) 43-84(LEGATO OFF) 85-127(EG RESET)"},
+        {"doc":0,"page":27,"section":"VOLUME","cc":"7(MSB) 39(LSB)","name":"VCA (OUTPUT) LEVEL (M)","function":"Adjusts the audio ouput and headphone volume.","values":"0-127"},
+        {"doc":0,"page":27,"section":"VOLUME","cc":"90","name":"VOLUME VELOCITY SENSITIVITY(M)","function":"Sets the amount of volume velocity sensitivity (Default is 64 = 50%)","values":"0-127"},
+        {"doc":0,"page":27,"section":"KEYBD RESPONSE","cc":"91","name":"KEY PRIORITY(M)","function":"Sets the Note Priority (Default is last)","values":"0-42(LOW) 43-84(HIGH) 87-127(LAST)"},
+        {"doc":0,"page":27,"section":"MOD WHEEL RESPONSE","cc":"1(MSB) 33(LSB)","name":"MOD WHEEL(M)","function":"Modulation performance control","values":"-"},
+        {"doc":0,"page":27,"section":"PITCH WHEEL RESPONSE","cc":"107","name":"BEND UP AMOUNT (M)","function":"Pitch Wheel ‘UP’ performance control (Default = +3 semitones)","values":"0-15(OFF) 16-31(2 SEMITONES) 32-47(3 SEMITONES) 48-63(4 SEMITONES) 64-79(5 SEMITONES) 80-95(7 SEMITONES) 96-111(12 SEMITONES) 112-127(24 SEMITONES)"},
+        {"doc":0,"page":27,"section":"PITCH WHEEL RESPONSE","cc":"108","name":"BEND DOWN AMOUNT(M)","function":"Pitch Wheel ‘UP’ performance control (Default = -3 semitones)","values":"0-15(OFF) 16-31(2 SEMITONES) 32-47(3 SEMITONES) 48-63(4 SEMITONES) 64-79(5 SEMITONES) 80-95(7 SEMITONES) 96-111(12 SEMITONES) 112-127(24 SEMITONES)"},
+        {"doc":0,"page":27,"section":"CONTROL (SEE NOTE 1)","cc":"122","name":"LOCAL CONTROL OFF(M)","function":"Sets the state of the Local Control OFF parameter (Default is 127)","values":"0 = OFF 127 = ON"},
+        {"doc":0,"page":27,"section":"CONTROL (SEE NOTE 1)","cc":"120","name":"ALL SOUNDS OFF (M)","function":"MIDI Panic message (Shuts off hung MIDI notes)","values":"Any Value"},
+        {"doc":0,"page":27,"section":"CONTROL (SEE NOTE 1)","cc":"123","name":"ALL NOTES OFF (M)","function":"MIDI Panic message (Shuts off hung MIDI notes)","values":"Any Value"}
+      ]
+    }
+  ],
+  "valueTables": [
+    {
+      "doc": 0,
+      "title": "MIDI CC values for the LFO clock divider",
+      "for": [86],
+      "pages": [28],
+      "rows": [
+        {"doc":0,"page":28,"section":"","value":"122-127","label":"1/64 Note Triplet","division":"1/64 T"},
+        {"doc":0,"page":28,"section":"","value":"116-121","label":"1/32 Note Triplet","division":"1/32 T"},
+        {"doc":0,"page":28,"section":"","value":"110-115","label":"1/32 Note","division":"1/32"},
+        {"doc":0,"page":28,"section":"","value":"104-109","label":"1/16 Note Triplet","division":"1/16 T"},
+        {"doc":0,"page":28,"section":"","value":"98-103","label":"1/16 Note","division":"1/16"},
+        {"doc":0,"page":28,"section":"","value":"92-97","label":"1/8 Note Triplet","division":"1/8 T"},
+        {"doc":0,"page":28,"section":"","value":"86-91","label":"Dotted 1/16 Note","division":"1/16 DOT"},
+        {"doc":0,"page":28,"section":"","value":"80-85","label":"1/8 Note","division":"1/8"},
+        {"doc":0,"page":28,"section":"","value":"74-79","label":"1/4 Note Triplet","division":"1/4 T"},
+        {"doc":0,"page":28,"section":"","value":"68-73","label":"Dotted 1/8 Note","division":"1/8 DOT"},
+        {"doc":0,"page":28,"section":"","value":"61-67","label":"1/4 Note","division":"1/4"},
+        {"doc":0,"page":28,"section":"","value":"55-60","label":"1/2 Note Triplet","division":"1/2 T"},
+        {"doc":0,"page":28,"section":"","value":"49-54","label":"Dotted 1/4 Note Triplet","division":"1/4 DOT"},
+        {"doc":0,"page":28,"section":"","value":"43-48","label":"1/2 Note","division":"1/2"},
+        {"doc":0,"page":28,"section":"","value":"37-42","label":"Whole Note Triplet","division":"WH T"},
+        {"doc":0,"page":28,"section":"","value":"31-36","label":"Dotted 1/2 Note","division":"1/2 DOT"},
+        {"doc":0,"page":28,"section":"","value":"25-30","label":"Whole Note","division":"WH"},
+        {"doc":0,"page":28,"section":"","value":"19-24","label":"Whole Note + Half Note","division":"WH + 1/2"},
+        {"doc":0,"page":28,"section":"","value":"13-18","label":"2 Whole Notes","division":"2 Whole"},
+        {"doc":0,"page":28,"section":"","value":"7-12","label":"3 Whole Notes","division":"3 Whole"},
+        {"doc":0,"page":28,"section":"","value":"0-6","label":"4 Whole Notes","division":"4 Whole"}
+      ]
+    }
+  ]
+}

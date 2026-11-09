@@ -72,7 +72,7 @@ test('the brand row: most profiles first, Generic last, every offered profile co
   const brands = chips.slice(1);
   assert.equal(brands.at(-1).id, 'Generic');
   for (let i = 1; i < brands.length - 1; i++) assert.ok(brands[i - 1].count >= brands[i].count, `${brands[i - 1].id} before ${brands[i].id}`);
-  assert.deepEqual(brands.slice(0, 3).map((c) => c.id), ['Roland', 'Korg', 'Sequential']);
+  assert.deepEqual(brands.slice(0, 3).map((c) => c.id), ['Roland', 'Korg', 'Moog']);
   assert.equal(brands.reduce((n, c) => n + c.count, 0), chips[0].count);
   assert.equal(chips[0].count, filterCatalog(ENTRIES).length);
 });

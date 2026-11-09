@@ -1,0 +1,63 @@
+{
+  "sources": [
+    {"title":"Claravox Centennial User Guide","file":"Claravox_Centennial_Web_Manual.pdf","sha256":"5267c36907ac8d059cca8af84aba764ba3a07bbd7593f2454c724c0e9f234ebc","url":"https://cdn.inmusicbrands.com/Moog/BackOffice/Claravox_Centennial_Web_Manual.pdf"}
+  ],
+  "tables": [
+    {
+      "doc": 0,
+      "kind": "ccnrpn",
+      "pages": [56,57,58,59,60,61,62,63],
+      "rows": [
+        {"doc":0,"page":56,"section":"","cc":"12","name":"Volume Response","nrpn":"412","values":"0 – 16383","notes":"Bipolar (Center Value = 0) Adjusts the linearity of the Volume Antenna response (concave to convex)."},
+        {"doc":0,"page":56,"section":"","cc":"13","name":"Pitch Response","nrpn":"413","values":"0 – 16383","notes":"Bipolar (Center Value = 0) Adjusts the linearity of the Pitch Antenna response (concave to convex)."},
+        {"doc":0,"page":56,"section":"","cc":"16","name":"Quantize Amount","nrpn":"416","values":"0 – 16383","notes":"Determines the level of quantization."},
+        {"doc":0,"page":56,"section":"","cc":"85","name":"Quantize (ROOT)","nrpn":"485","values":"0 = C 11 = C (D ) 21 = D 32 = D (E ) 43 = E 53 = F 64 = F (G ) 75 = G 85 = G (A ) 96 = A 107 = A (B ) 117 = B","notes":"Selects the root note (key) of the scale used for quantization."},
+        {"doc":0,"page":57,"section":"","cc":"86","name":"Quantize Scale","nrpn":"486","values":"0 = Chromatic 6 = Ionian 12 = Minor Pentatonic 17 = Fifth 23 = Dorian 29 = Phrygian 35 = Lydian 41 = Mixolydian 47 = Aeolian 52 = Locrian 58 = Major Blues 64 = Minor Blues 70 = Diminished 76 = Major Pentatonic 81 = Spanish 87 = Roma 93 = Arabian 99 = Egyptian 105 = Ryukyu 111 = Wholetone 116 = Major Third 122 = Minor Third","notes":"Selects the scale used for quantization."},
+        {"doc":0,"page":57,"section":"","cc":"75","name":"Register","nrpn":"475","values":"0 = (-2) 32 = (-1) 64 = (0) 96 = (+1)","notes":"Octave Offset for the Pitch Antenna."},
+        {"doc":0,"page":57,"section":"","cc":"19","name":"Filter Cutoff","nrpn":"419","values":"0 – 16383","notes":"Analog VCF (Oscillator 1 only)"},
+        {"doc":0,"page":57,"section":"","cc":"17","name":"Brightness","nrpn":"417","values":"0 – 16383","notes":"Analog Harmonic Enhancement (Oscillator 1 only)"},
+        {"doc":0,"page":57,"section":"","cc":"18","name":"Wave","nrpn":"418","values":"0 – 16383","notes":"Analog Waveshaper (Oscillator 1 only)"},
+        {"doc":0,"page":57,"section":"","cc":"20","name":"Delay Time","nrpn":"420","values":"0 – 16383","notes":"Adjusts the Delay Time (70ms to 700ms)."},
+        {"doc":0,"page":57,"section":"","cc":"21","name":"Delay Mix","nrpn":"421","values":"0 – 16383","notes":"Adjusts the Delay Wet/Dry mix."},
+        {"doc":0,"page":57,"section":"","cc":"22","name":"Delay Feedback","nrpn":"422","values":"0 – 16383","notes":"Adjusts the Delay Feedback amount."},
+        {"doc":0,"page":58,"section":"","cc":"72","name":"Pitch Antenna Scan Freq Mod Amount","nrpn":"472","values":"0 – 127","notes":"Bipolar (Center Value = 0) This parameter controls the depth of the PITCH CV signal used to modulate the frequency at which the oscillators’ wavetable is scanned."},
+        {"doc":0,"page":58,"section":"","cc":"73","name":"Pitch Antenna Scan Pos Mod Amount","nrpn":"473","values":"0 – 127","notes":"Bipolar (Center Value = 0) This parameter controls the depth of the PITCH CV signal used to modulate the scan position of the oscillators’ wavetable."},
+        {"doc":0,"page":58,"section":"","cc":"81","name":"Oscillator 1 Mode","nrpn":"481","values":"0 = Sine 32 = Triangle 64 = Saw 96 = Wavetable","notes":"Selects the mode for Oscillator 1."},
+        {"doc":0,"page":58,"section":"","cc":"25","name":"Oscillator 1 Level","nrpn":"425","values":"0 – 16383","notes":"Selects the level for Oscillator 1."},
+        {"doc":0,"page":58,"section":"","cc":"83","name":"Oscillator 1 Wavetable","nrpn":"483","values":"0 = Wavetable 1 16 = Wavetable 2 32 = Wavetable 3 48 = Wavetable 4 64 = Wavetable 5 80 = Wavetable 6 96 = Wavetable 7 112 = Wavetable 8","notes":"Selects the Wavetable in use for Oscillator 1, when the Oscillator 1 MODE is set to Wavetable (102)."},
+        {"doc":0,"page":58,"section":"","cc":"87","name":"Oscillator 1 Scan Position (Center)","nrpn":"487","values":"0 – 127","notes":"Specifies the starting position for scanning back and forth through the selected Wavetable."},
+        {"doc":0,"page":58,"section":"","cc":"23","name":"Oscillator 1 Scan Frequency","nrpn":"423","values":"0 – 16383","notes":"Adjusts the rate for scanning back and forth through the selected Wavetable (0.1 Hz to 100 Hz)."},
+        {"doc":0,"page":59,"section":"","cc":"89","name":"Oscillator 1 Scan Amount (Width)","nrpn":"489","values":"0 – 127","notes":"Sets the width of the Wavetable scanning window (0 to full frame)."},
+        {"doc":0,"page":59,"section":"","cc":"28","name":"Oscillator 2 Beat Frequency","nrpn":"428","values":"0 – 127","notes":"Bipolar (Center Value = 0) Linear offset (-10Hz to +10Hz) for the secondary oscillator frequency relative to the primary."},
+        {"doc":0,"page":59,"section":"","cc":"27","name":"Oscillator 2 Semitone Offset","nrpn":"427","values":"0 – 127","notes":"Bipolar (Center Value = 0) Musical-pitch offset (-12 semitones to +12 semitones) for the secondary oscillator relative to the primary."},
+        {"doc":0,"page":59,"section":"","cc":"26","name":"Oscillator 2 Level","nrpn":"426","values":"0 – 16383","notes":"Specifies the level of Oscillator 2."},
+        {"doc":0,"page":59,"section":"","cc":"9","name":"Noise Level","nrpn":"409","values":"0 – 16383","notes":"Specifies the level of the Noise source sent to the Filter of Oscillator 2."},
+        {"doc":0,"page":59,"section":"","cc":"82","name":"Oscillator 2 Wavetable","nrpn":"482","values":"0 = Wavetable 1 16 = Wavetable 2 32 = Wavetable 3 48 = Wavetable 4 64 = Wavetable 5 80 = Wavetable 6 96 = Wavetable 7 112 = Wavetable 8","notes":"Selects the Wavetable in use for Oscillator 2, when the Oscillator 2 MODE is set to Wavetable (102)."},
+        {"doc":0,"page":59,"section":"","cc":"88","name":"Oscillator 2 Scan Position (Center)","nrpn":"488","values":"0 – 127","notes":"Specifies the starting position for scan-ning back and forth through the selected Wavetable."},
+        {"doc":0,"page":59,"section":"","cc":"24","name":"Oscillator 2 Scan Frequency","nrpn":"424","values":"0 – 16383","notes":"Adjusts the rate for scanning back and forth through the selected Wavetable (0.1 Hz to 100 Hz)."},
+        {"doc":0,"page":60,"section":"","cc":"90","name":"Oscillator 2 Scan Amount (Width)","nrpn":"490","values":"0 – 127","notes":"Sets the width of the Wavetable scan-ning window (0 to full frame)."},
+        {"doc":0,"page":60,"section":"","cc":"8","name":"Oscillator 2 Filter Offset","nrpn":"408","values":"0 – 16383","notes":"Sets the Cutoff Frequency of the two-pole State-Variable Filter (SVF) affecting Oscillator 2 and Noise."},
+        {"doc":0,"page":60,"section":"","cc":"91","name":"Oscillator 2 Filter Mode","nrpn":"491","values":"0 = Low Pass 32 = High Pass 64 = Band Pass 96 = Notch (Band Reject)","notes":"Sets the Filter mode of the two-pole State-Variable Filter (SVF) affecting Oscillator 2 and Noise."},
+        {"doc":0,"page":60,"section":"","cc":"10","name":"Oscillator 2 Filter Resonance (Q)","nrpn":"410","values":"0 – 16383","notes":"Sets the Resonance Amount of the two-pole State-Variable Filter (SVF) affecting Oscillator 2 and Noise."},
+        {"doc":0,"page":60,"section":"","cc":"103","name":"Oscillator 2 Filter Enable","nrpn":"503","values":"0 = Off 64 = On","notes":"Determines whether or not the Oscillator 2 Filter is applied to Oscillator 2 and the Noise Source."},
+        {"doc":0,"page":60,"section":"","cc":"2","name":"Oscillator 1 Pitch Filter Tracking Amount","nrpn":"402","values":"0 – 16383","notes":"Bipolar (Center Value/MSB 64 = 0) Determines how much the Pitch Antenna value changes the Cutoff Frequency of the Oscillator 1 Filter."},
+        {"doc":0,"page":60,"section":"","cc":"3","name":"Oscillator 2 Pitch Filter Tracking Amount","nrpn":"403","values":"0 – 16383","notes":"Bipolar (Center Value/MSB 64 = 0) Determines how much the Pitch Antenna value changes the Cutoff Frequency of the Oscillator 2 Filter."},
+        {"doc":0,"page":61,"section":"","cc":"4","name":"Oscillator 1 Volume Filter Tracking Amount","nrpn":"404","values":"0 – 16383","notes":"Bipolar (Center Value/ MSB 64 = 0) Determines how much the Volume Antenna value changes the Cut-off Frequency of the Oscillator 1 Filter."},
+        {"doc":0,"page":61,"section":"","cc":"5","name":"Oscillator 2 Filter Tracking Amount","nrpn":"405","values":"0 – 16383","notes":"Bipolar (Center Value/ MSB 64 = 0) Determines how much the Volume Antenna value changes the Cut-off Frequency of the Oscillator 2 Filter."},
+        {"doc":0,"page":61,"section":"","cc":"110","name":"Note Number Mode","nrpn":"510","values":"0 = Fixec 64 = Chromatic","notes":"Determines wheth-er MIDI pitch control messages will be sent via Fixed mode or Chromatic mode."},
+        {"doc":0,"page":61,"section":"","cc":"108","name":"MIDI Pitch Out Enable","nrpn":"508","values":"0 = Off 64 = On","notes":"Determines whether or not MIDI Pitch data corresponding with Volume and Pitch an-tenna CV will be sent."},
+        {"doc":0,"page":61,"section":"","cc":"109","name":"Fixed Mode MIDI Note Number","nrpn":"509","values":"0 – 127","notes":"Set the base Note Number that will be used for MIDI Note On when in Pitch Move mode."},
+        {"doc":0,"page":61,"section":"","cc":"30","name":"Volume CV Output Scale","nrpn":"430","values":"0 – 16383","notes":"Bipolar (Center Value = 0) Attenuates the max CV Output level available to the selected Volume CV Out Range. Negative values invert the output range."},
+        {"doc":0,"page":61,"section":"","cc":"104","name":"Volume CV Output Range","nrpn":"504","values":"0 = -5V to +5V 43 = 0V to +5V 86 = 0V to +10V","notes":"Sets the CV range found at the VOLUME OUT jack."},
+        {"doc":0,"page":62,"section":"","cc":"93","name":"Pitch CV Output Range","nrpn":"493","values":"0 = -5V to +5V 43 = 0V to +5V 86 = 0V to +10V","notes":"Sets the voltage range for the PITCH OUT CV jack."},
+        {"doc":0,"page":62,"section":"","cc":"95","name":"Pitch CV Out Quantize","nrpn":"495","values":"0 = Pre-Quantization 64 = Post-Quantization","notes":"Selects if the value of the PITCH OUT CV jack is determined before or after any quantization."},
+        {"doc":0,"page":62,"section":"","cc":"14","name":"CV In Scale","nrpn":"414","values":"0 – 16383","notes":"Scales the voltage of the CV IN jack plus/minus 100%; Center value = 0 out-put."},
+        {"doc":0,"page":62,"section":"","cc":"29","name":"CV In Offset","nrpn":"429","values":"0 – 16383","notes":"Bipolar (Center Value = 0) This parameter pro-vides an offset voltage that is added or sub-tracted from the CV Input Range."},
+        {"doc":0,"page":62,"section":"","cc":"92","name":"CV In Range","nrpn":"492","values":"0 = -5V to +5V 64 = 0V to +10V","notes":"Sets the expected voltage range of the CV IN jack."},
+        {"doc":0,"page":62,"section":"","cc":"107","name":"Mute Mode","nrpn":"507","values":"0 = Latching 64 = Momentary","notes":"Determines whether the panel MUTE jack toggles MUTE on/ off with successive presses (latching), or mutes on press/ unmutes on release (momentary)."},
+        {"doc":0,"page":63,"section":"","cc":"111","name":"MIDI Note On Thresh-old","nrpn":"511","values":"0 – 16383","notes":"Determines the Volume Antenna CV level at which a Note On/Off message will be sent. Note will remain On as long as Volume Antenna CV is above threshold, and will remain Off as long as Volume Antenna CV is below threshold."},
+        {"doc":0,"page":63,"section":"","cc":"113","name":"Volume Antenna Control Mode","nrpn":"513","values":"0 = Volume Antenna Enabled 43 = Enabled + Automute 86 = Volume Antenna Disabled","notes":"Determines whether the Volume Antenna is active, active with automute enabled, or disabled with external MIDI CC# 7 control of Volume enabled."}
+      ]
+    }
+  ]
+}
