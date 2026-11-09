@@ -25,7 +25,8 @@
 import { camel, stringifyProfile } from '../roland/build-profile.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
-const clean = (s) => String(s ?? '').replace(/[—−]/g, '–').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim();
+// The MODX prints an arrow from a private-use font between a byte's bits and the value's (`1st bit6-0  bit13-7`).
+const clean = (s) => String(s ?? '').replace(/[—−]/g, '–').replace(/[’‘]/g, "'").replace(/[\uf000-\uf8ff]/g, ':').replace(/\s+/g, ' ').trim();
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
 
 /** `00 – 7F` -> [[0, 127]]; `00 – 0F, 7F` -> [[0, 15], [127, 127]]; `00, 20 – 7E` -> [[0, 0], [32, 126]]. */
@@ -63,6 +64,12 @@ export function readShownRange(text) {
   const t = clean(text);
   const unit = /\((semitones?|cent|cents|dB|%|Hz|ms|octave)\)\s*$/i.exec(t)?.[1];
   const bare = t.replace(/\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+  // Pan: `L64 – C – R63`.
+  const pan = /^L(\d+)\s*–\s*C\s*–\s*R(\d+)$/.exec(bare);
+  if (pan) return { min: -Number(pan[1]), max: Number(pan[2]) };
+  // Through zero: `-64 – 0 – +63`.
+  const through = /^([+-]?\d+)\s*–\s*0\s*–\s*([+-]?\d+)$/.exec(bare);
+  if (through) return { min: Number(through[1]), max: Number(through[2]) };
   const m = /^(?:[A-Za-z.]+\s+)?([+-]?\d+)\s*(?:dB|%|cent|Hz|ms)?\s*–\s*([+-]?\d+)\s*(?:dB|%|cent|Hz|ms)?$/.exec(bare);
   if (!m) return null;
   return { min: Number(m[1]), max: Number(m[2]), ...(unit ? { unit: unit.toLowerCase() } : {}) };
@@ -83,6 +90,8 @@ export function readValues(parts, description) {
     }
     const named = items.length === width(parts[0]) && items.length >= 2 && items.every((x) => x && !/\d\s*–\s*[+-]?\d/.test(x));
     if (named) return { choices: items.map((label, i) => ({ value: from + i, label })) };
+    const listed = from === 0 ? readValueList(to, items) : null;
+    if (listed) return { choices: listed };
     return {};
   }
   // Part for part: `00 – 0F, 7F` beside `1 – 16, off`.
@@ -95,6 +104,37 @@ export function readValues(parts, description) {
     for (let v = from; v <= to; v++) choices.push({ value: v, label: String(shown.min + (v - from)) });
   }
   return { choices };
+}
+
+/**
+ * A list that counts out the range from 0, an item at a time: a name (one value), a range of
+ * numbers (`1 – 95`, one value each), `0 = Preset` (that value), `2 – 9 = Library1 – 8` (those values,
+ * named in turn). A range sharing one meaning (`1 – 127: Mono`) is not a list. Returns the choices,
+ * or null when the items do not count out exactly 0 to `to`.
+ */
+export function readValueList(to, items) {
+  const out = [];
+  for (const item of items) {
+    let m;
+    const next = out.length;
+    if ((m = /^(\d+)\s*–\s*(\d+)\s*[:=]\s*(.+)$/.exec(item))) {
+      const [a, b] = [Number(m[1]), Number(m[2])];
+      const named = /^(.*?)(\d+)\s*–\s*(\d+)$/.exec(m[3].trim());
+      if (a !== next || !named || Number(named[3]) - Number(named[2]) !== b - a) return null;
+      for (let v = a; v <= b; v++) out.push({ value: v, label: `${named[1]}${Number(named[2]) + v - a}` });
+    } else if ((m = /^(\d+)\s*[:=]\s*(.+)$/.exec(item))) {
+      if (Number(m[1]) !== next) return null;
+      out.push({ value: next, label: m[2].trim() });
+    } else if (/\d\s*–\s*[+-]?\d/.test(item)) {
+      const shown = readShownRange(item);
+      if (!shown) return null;
+      const prefix = /^([A-Za-z.]+)\s+[+-]?\d/.exec(item)?.[1];
+      for (let n = shown.min; n <= shown.max; n++) out.push({ value: out.length, label: prefix ? `${prefix} ${n}` : String(n) });
+    } else {
+      out.push({ value: next, label: item });
+    }
+  }
+  return out.length === to + 1 && out.length >= 2 ? out : null;
 }
 
 const titleOf = (title) => (/\(([^)]*)\)\s*$/.exec(title)?.[1] ?? title).trim();
@@ -131,25 +171,49 @@ export function buildYamahaProfile(data, layout) {
 
   for (const table of data.tables) {
     const title = titleOf(table.title);
-    const holders = { ...readPlaceholders(table.notes), ...(layout.placeholders?.[title] ?? {}) };
+    const holders = { ...readPlaceholders(table.notes), ...(layout.placeholders ?? {}), ...(layout.tables?.[title]?.placeholders ?? {}) };
     const own = layout.tables?.[title] ?? {};
     if (own.skip) { skip(own.skip, title); continue; }
-    // Rows once each, or once per value of a placeholder in their address.
-    const holderKey = table.rows.flatMap((r) => r.address).find((b) => holders[b]);
-    const instances = holderKey ? holders[holderKey].values.map((v, i) => ({ key: holderKey, value: v, label: holders[holderKey].labels[i] })) : [null];
-    for (const inst of instances) {
-      const groupName = inst ? inst.label : own.group ?? titleCase(title);
-      const rows = table.rows;
+    // An address byte is printed, or a placeholder: the whole byte (`op`, `kk`), or a nibble each
+    // (`ep`: element in the high nibble, part in the low; `5p`: 50H plus the part).
+    const varsOf = (byte) => (/^[0-9A-F]{2}$/.test(byte) ? [] : holders[byte] ? [byte] : byte.split('').filter((c) => !/[0-9A-F]/.test(c)));
+    const resolve = (byte, at) => {
+      if (/^[0-9A-F]{2}$/.test(byte)) return byte;
+      if (holders[byte]) return hex(at[byte]);
+      return hex(parseInt(byte.split('').map((c) => (/[0-9A-F]/.test(c) ? c : at[c].toString(16))).join(''), 16));
+    };
+    // Rows run by the placeholders in their own address: a run of rows with the same ones is laid
+    // out once per assignment of them (a Part row once per part, a Scene Part row once per scene and
+    // part), and a row with none once.
+    const runs = [];
+    for (const row of table.rows) {
+      const vars = [...new Set(row.address.flatMap(varsOf))];
+      const key = vars.join(',');
+      if (runs.length && runs.at(-1).key === key) runs.at(-1).rows.push(row); else runs.push({ key, vars, rows: [row] });
+    }
+    for (const run of runs) {
+      const unknown = run.vars.filter((v) => !holders[v]);
+      if (unknown.length) { skip('an address byte printed as a placeholder neither its table nor the layout explains', run.rows.map((r) => `${title}: ${r.name} (${r.address.join(' ')})`).join(', ')); continue; }
+      let instances = [{}];
+      for (const v of run.vars) instances = instances.flatMap((at) => holders[v].values.map((value, i) => ({ ...at, [v]: value, [`${v}:label`]: holders[v].labels[i] })));
+    for (const at of instances) {
+      const labels = run.vars.map((v) => at[`${v}:label`]);
+      const inst = labels.length ? { label: labels.join(' ') } : null;
+      const groupName = own.groupOf?.(at) ?? (inst ? (own.group ? `${own.group} ${inst.label}` : inst.label) : own.group ?? titleCase(title));
+      const rows = run.rows;
       for (let i = 0; i < rows.length; i++) {
         const row = rows[i];
-        const address = row.address.map((b) => (inst && b === inst.key ? hex(inst.value) : b));
-        if (address.some((b) => !/^[0-9A-F]{2}$/.test(b))) { skip('an address byte printed as a placeholder its table does not explain', `${title}: ${row.name} (${row.address.join(' ')})`); continue; }
+        const rowVars = run.vars;
+        const address = row.address.map((b) => resolve(b, at));
         let name = clean(row.name);
         const label = `${groupName}: ${name} (${address.join(' ')})`;
         if (/^reserved$/i.test(name) || !row.range.length) { continue; }
-        if (inst) name = /^OP\b/.test(name) && /^OP\d/.test(inst.label) ? name.replace(/^OP\b/, inst.label) : `${inst.label} ${name}`;
+        if (inst && rowVars.length && !own.groupOf && !own.group) name = /^OP\b/.test(name) && /^OP\d/.test(inst.label) ? name.replace(/^OP\b/, inst.label) : `${inst.label} ${name}`;
         const description = clean(row.description);
         const describe = [];
+        // Several switches in one byte (`bit 6: Off, On Assignable Knob 8 bit 5: …`): sending one means
+        // knowing the others.
+        if ((`${description} ${row.notes}`.match(/\bbit\s*\d+\s*:/g) ?? []).length >= 2) { skip('several settings packed in one byte, a bit each', label); continue; }
         // A name printed a character a row.
         const charRow = (r) => /^(.*?Name)\s*(\d+)$/.exec(clean(r.name)) && /ASCII/.test(r.description) && r.size === 1;
         if (charRow(row)) {
@@ -180,23 +244,28 @@ export function buildYamahaProfile(data, layout) {
         let encoding = { type: 'u7' };
         let width = 1;
         if (row.size === 1) {
-          const parts = readHexRange(row.range[0]);
+          // A one-byte range wrapped over two lines (`00 –` over `11, 7F`).
+          const parts = readHexRange(row.range.join(' '));
           if (!parts) { skip('a data range not read', `${label}: ${row.range.join('; ')}`); continue; }
           const values = readValues(parts, description);
-          if (values.choices) read = { choices: values.choices };
+          // A list longer than a menu (`Off, 1 – 95`, a controller number) is a number with its description.
+          if (values.choices && values.choices.length > 32 && parts.length === 1) read = { min: parts[0][0], max: parts[0][1] };
+          else if (values.choices) read = { choices: values.choices };
           else if (parts.length > 1) { skip('a data range in parts its description does not match', `${label}: ${row.range[0]} / ${description}`); continue; } else read = { min: parts[0][0], max: parts[0][1], ...values };
         } else {
           // Several bytes, split as the description says.
           const bounds = row.range.map((r) => readHexRange(r)?.[0]);
           if (bounds.length !== row.size || bounds.some((b) => !b)) { skip(`a value over ${row.size} bytes whose ranges are not printed one a byte`, label); continue; }
-          if (row.size === 4 && /bit 3-0\s*:\s*bit 15-?\s*12/.test(description)) {
+          if (row.size === 4 && /bit\s*3-0\s*:?\s*bit\s*15-?\s*12/.test(description)) {
             encoding = { type: 'nibbled', nibbles: 4 };
             read = { min: bounds.reduce((n, b) => (n << 4) | b[0], 0), max: bounds.reduce((n, b) => (n << 4) | b[1], 0) };
-          } else if (row.size === 2 && /bit 6-0\s*:\s*bit 13-7/.test(description)) {
+          } else if (row.size === 2 && /bit\s*6-0\s*:?\s*bit\s*13-7/.test(description)) {
             encoding = { type: 'u14-msb-lsb' };
             read = { min: (bounds[0][0] << 7) | bounds[1][0], max: (bounds[0][1] << 7) | bounds[1][1] };
-            const shown = readShownRange(description.replace(/1st bit.*$/, ''));
-            if (shown && shown.min >= read.min && shown.max <= read.max) read = { min: shown.min, max: shown.max };
+            // What it shows: as wide as the range (`-128 – +127` over 0 - 255), or the values themselves (Tempo 30 - 300).
+            const shown = readShownRange(description.replace(/\s*1st bit.*$/, ''));
+            if (shown && shown.max - shown.min === read.max - read.min && shown.min !== read.min) read = { ...read, shown: { min: shown.min, max: shown.max }, ...(shown.unit ? { unit: shown.unit } : {}) };
+            else if (shown && shown.min >= read.min && shown.max <= read.max) read = { min: shown.min, max: shown.max };
             name = name.replace(/^(.*?)\s+MSB\s+\1\s+LSB$/, '$1');
           } else { skip(`a value over ${row.size} bytes split in a way not read`, label); continue; }
           width = row.size;
@@ -213,11 +282,17 @@ export function buildYamahaProfile(data, layout) {
           access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
           messageRecipe: recipe.id,
         };
+        // The Default (HEX) column, where the data list prints one.
+        const printed = /^([0-9A-F]{2})(?:\s+([0-9A-F]{2}))?(?:\s+([0-9A-F]{2}))?(?:\s+([0-9A-F]{2}))?(?:\s*\([0-9A-F]+\))?$/.exec(clean(row.default ?? ''));
+        const defaultBytes = printed ? printed.slice(1).filter(Boolean).map((b) => parseInt(b, 16)) : null;
+        const printedDefault = defaultBytes && defaultBytes.length === width
+          ? (encoding.type === 'nibbled' ? defaultBytes.reduce((n, b) => (n << 4) | b, 0) : encoding.type === 'u14-msb-lsb' ? (defaultBytes[0] << 7) | defaultBytes[1] : defaultBytes[0])
+          : null;
         let p;
         if (read.choices) {
           const seen = new Set();
           const list = read.choices.map(({ value, label: l }) => { const s = slug(l); const id = seen.has(s) ? `${s}_${value}` : s; seen.add(id); return { id, label: l, value }; });
-          p = { ...base, ...(describe.length ? { description: describe.join(' ') } : {}), type: 'choice', default: list[0].id, choices: list, display: { mode: 'choice', shortLabel: camel(name) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'enum' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: list.length === 2 ? 'ToggleButton' : list.length <= 5 ? 'RadioButtonGroup' : 'Combobox' } };
+          p = { ...base, ...(describe.length ? { description: describe.join(' ') } : {}), type: 'choice', default: (list.find((c) => c.value === printedDefault) ?? list[0]).id, choices: list, display: { mode: 'choice', shortLabel: camel(name) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'enum' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: list.length === 2 ? 'ToggleButton' : list.length <= 5 ? 'RadioButtonGroup' : 'Combobox' } };
         } else {
           const same = readShownRange(description);
           if (row.size === 1 && description && !read.shown && !(same && same.min === read.min && same.max === read.max)) describe.push(`Printed: ${description}.`);
@@ -229,7 +304,7 @@ export function buildYamahaProfile(data, layout) {
             ...(describe.length ? { description: describe.join(' ') } : {}),
             type: bipolar ? 'bipolar' : 'integer',
             range: { min: read.min, max: read.max },
-            default: zero ?? read.min,
+            default: printedDefault !== null && printedDefault >= read.min && printedDefault <= read.max ? printedDefault : zero ?? read.min,
             display: { mode: 'number', unit: read.unit === 'semitones' ? 'st' : '', shortLabel: camel(name), ...(read.shown ? { min: read.shown.min, max: read.shown.max } : {}) },
             normalization: { mode: 'linear' },
             encoding,
@@ -240,6 +315,7 @@ export function buildYamahaProfile(data, layout) {
         parameters.push(p);
         placed.push({ parameter: p, address: address.map((b) => parseInt(b, 16)), width });
       }
+    }
     }
   }
 
@@ -355,7 +431,7 @@ export function buildYamahaProfile(data, layout) {
       'Generated by tools/profiles/yamaha/make-profiles.mjs; edit the layout in tools/profiles/yamaha/synths/, not this file.',
       'Every parameter is a row of the data list\'s MIDI parameter change tables, with its printed name. Nothing here has been sent to a real instrument yet.',
       `Parameter change: F0 43 1n ${group.join(' ')} ${model} <address> <data> F7, n the device number (the deviceId variable is 1n, 10H for device number 1); bulk dumps are asked for with 2n and answered with 0n, both taken as device number 1.`,
-      identity ? `Identity: the reply the data list prints, ${reply.join(' ')}.` : 'No identity check: the data list prints no identity reply.',
+      identity ? `Identity: the reply the data list prints, ${reply.join(' ')}.` : `No identity check: ${layout.noIdentity ?? 'the data list prints no identity reply'}.`,
       ...(layout.notes ?? []),
       ...notes,
     ],

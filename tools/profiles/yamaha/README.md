@@ -73,13 +73,33 @@ lists do that it copes with, each found on a real page:
 | `yamaha-reface-dx` | reface Data List (B0), pp. 6-10 | 135 | 39 | System, Voice Common and four operators |
 | `yamaha-reface-cp` | reface Data List (B0), pp. 11-14 | 22 | 11 | System, TG Common |
 | `yamaha-reface-yc` | reface Data List (B0), pp. 15-19 | 27 | 11 | System, TG Common |
+| `yamaha-modx` | MODX6/MODX7/MODX8 Data List (D0), pp. 188, 193-222 | 4,521 | 858 | — |
+| `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 193-222 | 4,521 | 858 | — |
+
+The MODX's tables repeat for each of its 16 parts, at addresses a part apart, and a part's 8
+elements, 73 drum keys and 8 FM-X operators are laid out the same way (`41 ep 00`, `5p kk 00`, `49 op
+00`: the part in a nibble, the element or operator in the other, or a key in a byte of its own). Laid
+out in full that is some 85,000 parameters; these profiles lay out the Performance and Part 1 with
+all of its elements, keys and operators, and say so. The placeholders' meanings are the Bulk Dump
+Block table's notes (`[p: Part No. (0...15), e: Element No. (0...7)]`), given in the layout.
+
+What the MODX's data list leaves out or the reader does not take:
+
+- **The identity reply** is printed with its family and model bytes as `dd dd`: no identity check.
+- **The model ID** is printed 07 in hex and 00000010 in binary; the hex is taken.
+- **Effect parameters** (Reverb, Variation, Insertion Parameter 1 - 32) print their two bytes with
+  `:` for a description, the meaning depending on the effect type: left out.
+- **Bit-packed rows** (`Receive Pitch Bend … Receive Control Change`, a bit each) are left out:
+  sending one means knowing the others.
+- **Micro tunings, curves and Live Sets** are user data, not part of a Performance: left out.
+- **Pull** is not mapped yet: the Performance's bulk dump is a header, a block per part and element,
+  and a footer, as the reface's are, but larger.
 
 The reface's control changes (MIDI Control on) are not mapped: every setting they reach is a
 parameter change here too, and the panel's CCs would be a second parameter for each.
 
 ## Survey: what else Yamaha publishes
 
-Data lists downloaded and read so far, for the work still to do: MODX (D0, 223 pp.), MODX+ (A0),
-MODX M (B0, 261 pp.), MONTAGE M (H0), MOXF6/8 (A0, 148 pp.), MX49/61/88 (C0, 69 pp.). Their parameter
-change tables are set in the same grammar at workstation scale (Performance, Part, Element, Drum Key,
-FM-X operator, with `cp`, `ep`, `kk` placeholders).
+Data lists downloaded and read so far, for the work still to do: MODX M (B0, 261 pp.) and MONTAGE M
+(H0), model ID 0D, whose tables address a part with more bytes than the MODX's and read with empty
+addresses here; MOXF6/8 (A0, 148 pp.) and MX49/61/88 (C0, 69 pp.), the Motif-era format.

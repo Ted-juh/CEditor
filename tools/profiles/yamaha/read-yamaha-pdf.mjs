@@ -73,15 +73,25 @@ function findHeads(lines, width) {
   }
   // A head's right-hand headings run to the next head on its band; its span ends there.
   for (const h of heads) {
-    const next = heads.filter((o) => o !== h && Math.abs(middle(o.name) - middle(h.name)) < 40 && o.address.x0 > h.name.x0).sort((a, b) => a.address.x0 - b.address.x0)[0];
+    // The page's columns are where its tables' `Address` headings stand, whatever their heights.
+    const next = heads.filter((o) => o !== h && o.address.x0 > h.name.x0).sort((a, b) => a.address.x0 - b.address.x0)[0];
     h.x1 = next ? next.address.x0 - 12 : width;
     h.x0 = h.address.x0 - 8;
+  }
+  // A title, or a row's first address byte, can start a little left of the `Address` heading (the
+  // MODX's titles do, by ten points), but not into the table beside it.
+  for (const h of heads) {
+    const prev = heads.filter((o) => o !== h && o.name.x1 < h.address.x0).sort((a, b) => b.address.x0 - a.address.x0)[0];
+    h.x0 = Math.max(h.address.x0 - 14, prev ? prev.x1 + 1 : 0);
+  }
+  for (const h of heads) {
     const band = (x) => Math.abs(middle(x) - middle(h.name)) <= 13 && x.x0 > h.name.x1 && x.x0 < h.x1;
     h.description = words.find((x) => band(x) && x.text === 'Description');
     h.defaultHead = words.find((x) => band(x) && x.text === 'Default');
     h.notes = words.find((x) => band(x) && x.text === 'Notes');
     // The headings' own lines: `(hex)`, `High Mid Low` below them.
-    const own = words.filter((x) => x.x0 >= h.x0 && x.x0 < h.x1 && x.y0 >= h.y0 - 14 && x.y0 <= middle(h.name) + 14
+    // (Close enough to the band that a first row printing `Name` in a parameter's name is not one.)
+    const own = words.filter((x) => x.x0 >= h.x0 && x.x0 < h.x1 && x.y0 >= h.y0 - 14 && x.y0 <= middle(h.name) + 9.5
       && /^(Address|\(hex\)|\(HEX\)|Size|Data|Range|Parameter|Name|Description|Default|Notes|High|Mid|Low)$/.test(x.text));
     h.bottom = Math.max(...own.map((x) => x.y1));
   }
@@ -118,7 +128,9 @@ export function pageParameterTables(xml) {
       if (rest[0] && /^\(/.test(text(rest[0])) && !/PARAMETER CHANGE TABLE \(/i.test(title)) title += ` ${text(rest.shift())}`;
       for (const l of rest) if (text(l)) notes.push(text(l));
     }
-    const body = lines.filter((l) => l.y0 > h.bottom + 0.5 && l.y0 < below - 1 && inSpan(l) && l.y0 < height - 40).sort((a, b) => a.y0 - b.y0);
+    // It also ends at its `Total Size`: the notes printed under it are not its columns.
+    const total = lines.filter((l) => l.y0 > h.bottom && /^Total Size/i.test(wordsIn(l, h.x0, h.x1).map((w) => w.text).join(' '))).map((l) => l.y0).sort((a, b) => a - b)[0] ?? Infinity;
+    const body = lines.filter((l) => l.y0 > h.bottom + 0.5 && l.y0 < Math.min(below, total) - 1 && inSpan(l) && l.y0 < height - 40).sort((a, b) => a.y0 - b.y0);
     // The columns. A heading is often centred over cells that start left of it (`Description`), so
     // each column starts in the widest gap the body's words leave between the heading before it and
     // its own: the x that the fewest words cover.
@@ -201,9 +213,10 @@ export function readParameterTables(pdf, pages) {
 export function readFormat(text) {
   const t = String(text);
   const identity = /IDENTITY REPLY[^\n]*\n[^\n]*?(F0H(?:\s+[0-9A-F]{2}H){8,16}\s+F7H?)/.exec(t)?.[1];
-  const model = /\b([0-9A-F]{2})H\s+Model ID/.exec(t)?.[1];
-  const groupHigh = /\b([0-9A-F]{2})H\s+Group Number High/.exec(t)?.[1];
-  const groupLow = /\b([0-9A-F]{2})H\s+Group Number Low/.exec(t)?.[1];
+  // `00000011 03H Model ID` (the reface), `00000010 07 Model ID` (the MODX: the hex column is read).
+  const model = /\b([0-9A-F]{2})H?\s+Model ID/.exec(t)?.[1];
+  const groupHigh = /\b([0-9A-F]{2})H?\s+Group (?:Number|ID) High/.exec(t)?.[1];
+  const groupLow = /\b([0-9A-F]{2})H?\s+Group (?:Number|ID) Low/.exec(t)?.[1];
   return {
     ...(identity ? { identityReply: identity.replace(/H/g, '').split(/\s+/).filter(Boolean) } : {}),
     ...(model ? { modelId: model } : {}),
