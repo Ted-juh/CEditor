@@ -239,7 +239,11 @@ export function buildProfile(map, synth) {
   for (const block of blocks) {
     if (blockIds.has(block.id)) throw new Error(`${synth.id}: two blocks are called ${block.id}`);
     blockIds.add(block.id);
-    const rows = block.table.rows.filter((r) => !r.gap && !r.reserved);
+    // A row with no range at all is not a control anyone could set safely: left out, and said so.
+    for (const r of block.table.rows) {
+      if (!r.gap && !r.reserved && r.min === undefined) notes.push(`${block.id}: "${r.name}" at ${r.offset} has no range in the manual and is not laid out`);
+    }
+    const rows = block.table.rows.filter((r) => !r.gap && !r.reserved && r.min !== undefined);
     const runs = nameRuns(rows);
     // An id leaves out what the name says about MIDI: `Part Level (CC# 7)` is part.<x>.level,
     // `Hold (CC#126/127)` is …hold, and the numbers stay in the name, where a person reads them.

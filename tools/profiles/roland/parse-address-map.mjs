@@ -304,6 +304,23 @@ export function parseAddressMap(text) {
         r.rangeFromDisplay = true;
         delete r.display;
       }
+      // The V-Synth GT's 32-bit sample offsets print their range in hexadecimal and nowhere else:
+      // `0000000h - FFFFFFFh`.
+      const hex = !r.reserved && r.min === undefined && /^([0-9A-F]+)h - ([0-9A-F]+)h$/i.exec(r.display ?? '');
+      if (hex) {
+        r.min = parseInt(hex[1], 16);
+        r.max = parseInt(hex[2], 16);
+        r.rangeFromDisplay = true;
+      }
+      // A switch printed with only its labels (the JUNO-Di's `Rhythm Pattern Sw … OFF, ON`) counts
+      // out from zero: two labels are 0 - 1. Only when every label is a word, so a list of numbers
+      // is never mistaken for a count.
+      const labels = (r.display ?? '').split(',').map((label) => label.trim()).filter(Boolean);
+      if (!r.reserved && r.min === undefined && r.name && labels.length >= 2 && labels.every((label) => /^[A-Za-z][\w\- /&+]*$/.test(label))) {
+        r.min = 0;
+        r.max = labels.length - 1;
+        r.rangeFromDisplay = true;
+      }
       // A row printed with no name and no range at all (the FA-06/07/08's Drum Kit Common, 00 0D
       // to 00 10) is a byte the manual does not describe: it occupies its address and is no control.
       if (r.name === null && r.min === undefined && !r.display) { r.reserved = true; r.undocumented = true; }
