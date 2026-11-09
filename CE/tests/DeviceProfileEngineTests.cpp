@@ -4024,7 +4024,10 @@ int main (int argc, char** argv)
         root.getChildFile ("roland-vr-700.ceditor-device.json"),
         root.getChildFile ("roland-v-synth-gt.ceditor-device.json"),
         root.getChildFile ("roland-fantom-x.ceditor-device.json"),
-        root.getChildFile ("roland-fantom-xr.ceditor-device.json")
+        root.getChildFile ("roland-fantom-xr.ceditor-device.json"),
+        root.getChildFile ("roland-v-synth.ceditor-device.json"),
+        root.getChildFile ("roland-v-synth-xt.ceditor-device.json"),
+        root.getChildFile ("roland-sh-32.ceditor-device.json")
     };
 
     auto failures = 0;
