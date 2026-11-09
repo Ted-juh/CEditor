@@ -9,6 +9,10 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+if (-not $env:CMAKE_BUILD_PARALLEL_LEVEL) {
+    $env:CMAKE_BUILD_PARALLEL_LEVEL = "24"
+}
+
 function Get-RepoRoot {
     return (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
 }
