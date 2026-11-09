@@ -3,11 +3,14 @@
 //
 // What the manuals say, and nothing they do not:
 //
-//   - every row of a CC table whose CC column prints a controller is a parameter on it, sent as that
-//     controller alone. Moog prints most knobs as an MSB and an LSB (`3 [MSB], 35 [LSB]`, `19(MSB)
-//     51(LSB)`, a column each), 0 - 16383 together; the manuals say to send the MSB by itself for
-//     7-bit control, "the value range is always 0-127" (the Minitaur's, the Sirin's), and CEditor's
-//     CC message carries one controller, so the parameter is the MSB, 0 - 127, and its LSB is said;
+//   - every row of a CC table whose CC column prints a controller is a parameter on it. Moog prints
+//     most knobs as an MSB and an LSB (`3 [MSB], 35 [LSB]`, `19(MSB) 51(LSB)`, a column each), 0 -
+//     16383 together: such a knob is a 14-bit pair, the MSB sent first and then the LSB. An LSB the
+//     table prints for two rows, or that is another row's controller, is a misprint the builder does
+//     not choose between: those knobs are their MSB alone, 0 - 127, which the manuals say the
+//     instrument takes by itself ("the value range is always 0-127", the Minitaur's, the Sirin's).
+//     A switch (a value list) is 7-bit whatever the table prints beside it. `4 (coarse) 36 (fine)`
+//     is two controllers in their own units (the Phattys' arpeggiator clock), not a pair;
 //   - a value list is a choice, the first value of each band sent: `0-63 = OFF, 64-127 = ON`,
 //     `0-24: TRIANGLE`, `0-63(SAW) 64-127(SQR)`, `0 = 16', 32 = 8'`, `0 (OFF), 64 (ON)`. A list whose
 //     bands run backwards or overlap (the Muse's `50-74: SQUARE` after `5-99`) is a misprint the
@@ -100,13 +103,14 @@ export function readValues(text, wide = 127) {
   return out;
 }
 
-/** The controller numbers a CC cell prints: `3 [MSB], 35 [LSB]`, `19(MSB) 51(LSB)`, `MSB 10 LSB 42`, `CC 1`, `4 (coarse) 36 (fine)`. */
+/** The controller numbers a CC cell prints: `3 [MSB], 35 [LSB]`, `19(MSB) 51(LSB)`, `MSB 10 LSB 42`, `CC 1`; `4 (coarse) 36 (fine)` is a fine controller, not an LSB. */
 export function readController(text) {
   const t = clean(text);
   const msb = /(?:^|\b)(?:CC\s*|MSB\s*)?(\d+)/i.exec(t);
   if (!msb) return null;
-  const lsb = /(\d+)\s*[[(]\s*(?:LSB|fine)|LSB\s*(\d+)/i.exec(t);
-  return { cc: Number(msb[1]), lsb: lsb ? Number(lsb[1] ?? lsb[2]) : null };
+  const lsb = /(\d+)\s*[[(]\s*LSB|LSB\s*(\d+)/i.exec(t);
+  const fine = /(\d+)\s*[[(]\s*fine/i.exec(t);
+  return { cc: Number(msb[1]), lsb: lsb ? Number(lsb[1] ?? lsb[2]) : null, ...(fine ? { fine: Number(fine[1]) } : {}) };
 }
 
 // Bank select is a program change's, not a setting. (CC 6 is the Little Phatty's modulation amount and
@@ -177,13 +181,24 @@ export function buildMoogProfile(data, layout) {
         if (MIDI_OWN.has(c.cc) || c.cc >= 120) { skip(`MIDI's own controller (${MIDI_OWN.get(c.cc) ?? 'a channel mode message'}), not a setting`, label); continue; }
         // The LSB: in the CC cell, in a column of its own, or in the values (`0-127 (or 0-16383 using CC1 & CC 33)`).
         const using = /using CC\s*\d+\s*&\s*CC\s*(\d+)/i.exec(row.values ?? '');
-        message = { kind: 'cc', cc: c.cc, lsb: c.lsb ?? (/^\d+$/.test(clean(row.lsb)) ? Number(clean(row.lsb)) : using ? Number(using[1]) : null) };
+        message = { kind: 'cc', cc: c.cc, lsb: c.lsb ?? (/^\d+$/.test(clean(row.lsb)) ? Number(clean(row.lsb)) : using ? Number(using[1]) : null), ...(c.fine != null ? { fine: c.fine } : {}) };
       }
       // A correction the manual's own addendum prints (the Minitaur's v2.1 addendum).
       const fix = message.kind === 'cc' ? layout.corrections?.[message.cc] : null;
       if (fix) corrected.push(`${label}: ${fix.why}`);
       entries.push({ row, name, label, message, table: ti, values: fix ? fix.values : row.values ?? '', count: row.count });
     }
+  }
+
+  // An LSB printed for two rows (the Sirin's and Minitaur's CC 50, for VCO 2 BEAT and EG AMOUNT), or
+  // that is another row's own controller, is a misprint: those knobs are their MSB alone.
+  const controllers = new Set(entries.filter((e) => e.message.kind === 'cc').map((e) => e.message.cc));
+  const claims = new Map();
+  for (const e of entries) if (e.message.kind === 'cc' && e.message.lsb != null) claims.set(e.message.lsb, [...(claims.get(e.message.lsb) ?? []), e]);
+  const unpaired = [];
+  for (const [lsb, list] of claims) {
+    if (list.length === 1 && !controllers.has(lsb) && lsb !== list[0].message.cc && lsb <= 127) continue;
+    for (const e of list) { unpaired.push(`${e.name} (CC ${e.message.cc}, LSB ${lsb})`); e.message.lsb = null; }
   }
 
   // Rows that share a controller: one choice where each prints one value of it (the Taurus 3's LFO waves).
@@ -203,7 +218,7 @@ export function buildMoogProfile(data, layout) {
     const channel = '$channel';
     const r = m.kind === 'nrpn'
       ? { id: `nrpn${hex(m.msb)}${hex(m.lsb)}`, kind: 'nrpn', channel, parameterMsb: m.msb, parameterLsb: m.lsb, valueResolution: 14, value: '$encodedValue', nullAfterSend: false }
-      : { id: `cc${m.cc}`, kind: 'cc', channel, controller: m.cc, value: '$encodedValue' };
+      : { id: `cc${m.cc}`, kind: 'cc', channel, controller: m.cc, ...(m.pair ? { lsbController: m.lsb } : {}), value: '$encodedValue' };
     recipes.set(r.id, r);
     return r;
   };
@@ -263,10 +278,18 @@ export function buildMoogProfile(data, layout) {
     }
     if (read.choices && read.choices.some((c) => c.value > wide)) { skip('a value wider than its message carries', e.label); continue; }
     if (read.bands) describe.push('Each name takes a band of values; the first value of it is sent.');
-    if (e.message.kind === 'cc' && e.message.lsb !== null && e.message.lsb !== undefined) {
-      describe.push(`The MSB alone, 0 - 127; CC ${e.message.lsb} is its LSB, 0 - 16383 together.`);
+    // A knob printed with an LSB is a 14-bit pair: 0 - 16383, whatever range the table prints for its
+    // MSB alone (`0-127`). A switch is 7-bit, and so is a range in units of its own (`0-24 SEMITONES`).
+    const pairable = e.message.kind === 'cc' && e.message.lsb != null && !read.choices && read.min === 0 && (read.max === 127 || read.max === 16383);
+    e.message.pair = pairable;
+    if (pairable) {
+      read = { ...read, max: 16383 };
+      describe.push(`14 bits: the MSB on CC ${e.message.cc}, then the LSB on CC ${e.message.lsb}.`);
       lsbs.push(`${e.name} (CC ${e.message.cc}, LSB ${e.message.lsb})`);
+    } else if (e.message.kind === 'cc' && e.message.lsb != null) {
+      describe.push(`The MSB alone; CC ${e.message.lsb} is printed as its LSB.`);
     }
+    if (e.message.fine != null) describe.push(`CC ${e.message.fine} is its fine controller, in units of its own.`);
     if (e.message.nrpn !== undefined && e.message.nrpn !== null && e.message.kind === 'cc') describe.push(`Also NRPN ${e.message.nrpn}.`);
     if (e.message.kind === 'nrpn' && e.message.cc !== undefined) describe.push(`Also CC ${e.message.cc}, the MSB of it, 0 - 127.`);
     if (/\(M\)/.test(e.row.name ?? '')) describe.push('Reached over MIDI only.');
@@ -302,7 +325,7 @@ export function buildMoogProfile(data, layout) {
         default: bipolar ? read.min + Math.ceil((read.max - read.min) / 2) : read.min,
         display: { mode: 'number', unit: read.unit === 'semitones' ? 'st' : '', shortLabel: camel(leaf), ...(shown ? { min: shown.min, max: shown.max } : {}) },
         normalization: { mode: 'linear' },
-        encoding: { type: nrpn ? 'u14-msb-lsb' : 'u7' },
+        encoding: { type: nrpn || e.message.pair ? 'u14-msb-lsb' : 'u7' },
         sendPolicy: read.max - read.min > 8 ? { mode: 'continuous', coalesce: true, minIntervalMs: 0, sendFinalOnRelease: true } : { mode: 'onCommit', coalesce: true },
         ui: { preferredComponent: /LEVEL|ATTACK|DECAY|SUSTAIN|RELEASE|TIME|DEPTH|AMOUNT|AMT/i.test(e.name) ? 'Slider' : 'Knob' },
       });
@@ -314,7 +337,8 @@ export function buildMoogProfile(data, layout) {
   const dumpDefinitions = [];
   if (layout.sysex) addSysex(data, layout, { parameters, recipes, requests, dumpDefinitions, unique, skip, notes });
 
-  if (lsbs.length) notes.push(`${lsbs.length} knob(s) are printed as an MSB and an LSB, 0 - 16383 together; CEditor sends the MSB alone, 0 - 127, which the manual says the instrument takes by itself: ${lsbs.join('; ')}.`);
+  if (lsbs.length) notes.push(`${lsbs.length} knob(s) are 14-bit, 0 - 16383: the MSB and the LSB the table prints, sent in that order: ${lsbs.join('; ')}.`);
+  if (unpaired.length) notes.push(`The MSB alone, 0 - 127, where the table prints an LSB for two rows or one that is another row's controller: ${unpaired.join('; ')}.`);
   if (corrected.length) notes.push(`Values as corrected after the manual: ${corrected.join('; ')}.`);
   for (const [why, list] of numbered) notes.push(`A number, not a choice, where ${why}: ${list.join(', ')}.`);
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
@@ -324,11 +348,14 @@ export function buildMoogProfile(data, layout) {
   const tests = [];
   const status = 0xb0 + variables.channel - 1;
   const of = (kind, choice) => parameters.find((p) => recipes.get(p.messageRecipe)?.kind === kind && (choice === undefined || (p.type === 'choice') === choice));
-  for (const p of [...new Set([of('cc', false), of('cc', true), of('nrpn', false), of('nrpn', true), [...parameters].reverse().find((x) => recipes.get(x.messageRecipe)?.kind === 'cc')].filter(Boolean))]) {
+  const pairOf = (wanted) => parameters.find((p) => recipes.get(p.messageRecipe)?.kind === 'cc' && p.type !== 'choice' && (recipes.get(p.messageRecipe).lsbController !== undefined) === wanted);
+  for (const p of [...new Set([pairOf(true), pairOf(false), of('cc', true), of('nrpn', false), of('nrpn', true), [...parameters].reverse().find((x) => recipes.get(x.messageRecipe)?.kind === 'cc')].filter(Boolean))]) {
     const r = recipes.get(p.messageRecipe);
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
-    const value = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, r.kind === 'nrpn' && p.range.max > 127 ? 1000 : 100));
-    const bytes = r.kind === 'cc' ? [[r.controller, value]] : [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, value >> 7], [0x26, value & 127]];
+    const value = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, p.range.max > 127 ? 1000 : 100));
+    const bytes = r.kind === 'cc'
+      ? (r.lsbController !== undefined ? [[r.controller, value >> 7], [r.lsbController, value & 127]] : [[r.controller, value]])
+      : [[0x63, r.parameterMsb], [0x62, r.parameterLsb], [0x06, value >> 7], [0x26, value & 127]];
     tests.push({
       name: `${p.name} = ${choice ? choice.label : value} (${r.kind === 'cc' ? `CC ${r.controller}` : `NRPN ${r.parameterMsb * 128 + r.parameterLsb}`})`,
       parameter: p.id,

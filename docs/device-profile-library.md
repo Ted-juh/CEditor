@@ -206,8 +206,9 @@ a column for the name, one for the controller (or the MSB and the LSB), one for 
 positions, the columns found by their printed headings. A Moog profile:
 
 - has every row of the table that prints a controller and the values it takes;
-- offers a knob printed as an MSB and an LSB (`19 [MSB], 51 [LSB]`, 0 - 16383 together) as its MSB
-  alone, 0 - 127, which the manuals say the instrument takes by itself, and says its LSB;
+- offers a knob printed as an MSB and an LSB (`19 [MSB], 51 [LSB]`) as one 14-bit parameter, 0 -
+  16383, sent as the MSB and then the LSB and followed on both when the instrument sends them; where
+  the table prints the same LSB for two rows, those knobs are their MSB alone, 0 - 127;
 - is a choice where the table names the values (`0-63 = OFF, 64-127 = ON`, `0 = 16', 32 = 8'`),
   the first value of each band sent, or where it points to a value table (the Grandmother's clock
   divisions, the Little Phatty's clock dividers); a list printed out of order stays a number;

@@ -51,10 +51,16 @@ that it copes with, each found on a real page:
 
 ## What the builder takes as settled
 
-- **A knob is its MSB.** Most knobs are printed as an MSB and an LSB, 0 - 16383 together. The manuals
-  say to send the MSB alone for 7-bit control ("Note that when MSB-only messages are issued, the
-  value range is always 0-127", the Minitaur's and the Sirin's), and CEditor's CC message carries
-  one controller, so the parameter is the MSB, 0 - 127, and its LSB is said.
+- **A knob is a 14-bit pair.** Most knobs are printed as an MSB and an LSB, 0 - 16383 together
+  (`3 [MSB], 35 [LSB]`, `19(MSB) 51(LSB)`, a column each, `0-127 (or 0-16383 using CC1 & CC 33)`).
+  The parameter is 0 - 16383 on a CC recipe with `lsbController`: the MSB is sent first, then the
+  LSB, and an instrument that sends only the MSB is still followed (see below). An LSB the table
+  prints for two rows (the Sirin's and Minitaur's CC 50, for VCO 2 BEAT and EG AMOUNT) or that is
+  another row's controller is a misprint: those knobs are their MSB alone, 0 - 127, which the
+  manuals say the instrument takes ("Note that when MSB-only messages are issued, the value range
+  is always 0-127", the Minitaur's and the Sirin's). A switch is 7-bit whatever is printed beside it,
+  and `4 (coarse) 36 (fine)` (the Phattys' arpeggiator clock, in BPM and tenths) is two controllers
+  in units of their own, not a pair.
 - **A value list is a choice**, the first value of each band sent: `0-63 = OFF, 64-127 = ON`,
   `0-24: TRIANGLE`, `0-63(SAW) 64-127(SQR)`, `0 = 16', 32 = 8'`, `0 (OFF), 64 (ON)`. A list whose
   bands run backwards or overlap is a misprint (the Muse's `5-99: SQUARE` after `50-74`, the
@@ -73,6 +79,15 @@ that it copes with, each found on a real page:
   (the Taurus 3's LFO waves on CC 68: 31, 63, 95, 127), which become one choice.
 
 None of these manuals prints a Device Inquiry reply, so no profile here checks identity.
+
+## 14-bit CC pairs, both ways
+
+A CC recipe with `lsbController` (`{ "kind": "cc", "controller": 19, "lsbController": 51 }`) sends
+two messages, the MSB on `controller` and then the LSB, in both engines; a value with a 7-bit encoder
+goes out as the MSB with an LSB of 0. On the way in, `inboundParameterIndex.js` indexes the pair on
+both controllers. The MSB is a value on its own (MIDI has a receiver reset the fine half when the
+coarse one arrives), so an instrument that sends 7 bits is followed at 7 bits; the LSB is put together
+with the value the parameter already has, and ignored when none is known.
 
 ## The Matriarch's global settings
 
@@ -121,8 +136,6 @@ and a request and a reply for each, so Pull reads them back one at a time.
 
 ## Not done
 
-- **14-bit CCs.** CEditor's CC message carries one controller, so a knob's LSB is said, not sent.
-  Sending both halves would take a CC pair in both engines, and reading one back.
 - **Sub Phatty**: its CC table pages are drawn as outlines, with no text to read.
 - **Moog One**: its CCs are mapped by the player (Learn MIDI CC); the manual prints no table.
 - **Mother-32**: four CCs, three of them for its assignable output; DFAM, Labyrinth, Model D,

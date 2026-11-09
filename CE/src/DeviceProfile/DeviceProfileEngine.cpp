@@ -2798,7 +2798,34 @@ CompileResult DeviceProfileEngine::compileCc (const juce::String& deviceRole,
     message.kind = "cc";
     message.bytes.add (0xb0 + (channel - 1));
     message.bytes.add (controller);
-    message.bytes.add (encodedBytes[0]);
+
+    // A 14-bit pair: the MSB on `controller`, then the LSB on `lsbController` (MIDI's coarse and fine,
+    // usually n and n + 32), as two messages. The MSB goes first because a receiver resets the fine
+    // half when the coarse one arrives. One byte (a value below 128 with a 7-bit encoder) is the
+    // coarse half alone, its fine half 0. deviceProfileLocalEngine.js builds the same bytes.
+    const auto lsbController = propInt (recipe, "lsbController", -1);
+    const auto hasLsb = recipe.hasProperty ("lsbController");
+    MidiMessageSpec fine;
+    if (hasLsb)
+    {
+        if (! isMidiDataByte (lsbController) || lsbController == controller)
+            return { false, "CC lsbController must be 0-127 and differ from controller", {} };
+
+        auto* encoding = asObject (parameter.getProperty ("encoding"));
+        const auto encodingType = encoding != nullptr ? propString (*encoding, "type") : juce::String();
+        const auto lsbFirst = encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb";
+        const auto msb = encodedBytes.size() > 1 ? encodedBytes[lsbFirst ? 1 : 0] : encodedBytes[0];
+        const auto lsb = encodedBytes.size() > 1 ? encodedBytes[lsbFirst ? 0 : 1] : 0;
+        message.bytes.add (msb & 0x7f);
+        fine.kind = "cc";
+        fine.bytes.add (0xb0 + (channel - 1));
+        fine.bytes.add (lsbController);
+        fine.bytes.add (lsb & 0x7f);
+    }
+    else
+    {
+        message.bytes.add (encodedBytes[0]);
+    }
 
     MidiTransaction transaction;
     transaction.transactionId = "dry_tx";
@@ -2806,6 +2833,8 @@ CompileResult DeviceProfileEngine::compileCc (const juce::String& deviceRole,
     transaction.parameterId = propString (parameter, "id");
     transaction.semanticValue = semanticValue;
     transaction.messages.add (message);
+    if (hasLsb)
+        transaction.messages.add (fine);
     transaction.displayedValue = displayedValue;
     transaction.normalizedValue = normalizedValue;
     transaction.encodedValueHex = bytesToHex (encodedBytes);

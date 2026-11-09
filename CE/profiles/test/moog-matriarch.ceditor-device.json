@@ -24,7 +24,7 @@
     "The SysEx messages go to Unit ID 7F, which the manual says addresses any Unit ID; set the unitId variable to address one Matriarch among several.",
     "A global setting is read back by asking for it alone: the Matriarch answers with its set message, the byte before the Unit ID set to 1 so that it is not taken for a command if echoed back.",
     "74 global setting(s) are read back one at a time: each request asks for one parameter, and the instrument answers with that parameter's set message, marked as a reply.",
-    "12 knob(s) are printed as an MSB and an LSB, 0 - 16383 together; CEditor sends the MSB alone, 0 - 127, which the manual says the instrument takes by itself: Mod Wheel (CC 1, LSB 33); Mod Rate (CC 3, LSB 35); Glide Time (CC 5, LSB 37); Arp Rate (CC 8, LSB 40); Noise Filter Cutoff (CC 9, LSB 41); Delay Time (CC 12, LSB 44); Delay Spacing (CC 13, LSB 45); Arp Swing (CC 14, LSB 46); Arp Gate Length (CC 15, LSB 47); Osc 2 Frequency (CC 16, LSB 48); Osc 3 Frequency (CC 17, LSB 49); Osc 4 Frequency (CC 18, LSB 50).",
+    "12 knob(s) are 14-bit, 0 - 16383: the MSB and the LSB the table prints, sent in that order: Mod Wheel (CC 1, LSB 33); Mod Rate (CC 3, LSB 35); Glide Time (CC 5, LSB 37); Arp Rate (CC 8, LSB 40); Noise Filter Cutoff (CC 9, LSB 41); Delay Time (CC 12, LSB 44); Delay Spacing (CC 13, LSB 45); Arp Swing (CC 14, LSB 46); Arp Gate Length (CC 15, LSB 47); Osc 2 Frequency (CC 16, LSB 48); Osc 3 Frequency (CC 17, LSB 49); Osc 4 Frequency (CC 18, LSB 50).",
     "Left out, a note number to tie to, not a setting: Portamento Control (CC 84).",
     "Left out, the Unit ID every one of these messages is addressed by: Unit ID (parameter 0)."
   ],
@@ -50,6 +50,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 1,
+      "lsbController": 33,
       "value": "$encodedValue"
     },
     {
@@ -57,6 +58,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 3,
+      "lsbController": 35,
       "value": "$encodedValue"
     },
     {
@@ -64,6 +66,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 5,
+      "lsbController": 37,
       "value": "$encodedValue"
     },
     {
@@ -71,6 +74,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 8,
+      "lsbController": 40,
       "value": "$encodedValue"
     },
     {
@@ -78,6 +82,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 9,
+      "lsbController": 41,
       "value": "$encodedValue"
     },
     {
@@ -85,6 +90,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 12,
+      "lsbController": 44,
       "value": "$encodedValue"
     },
     {
@@ -92,6 +98,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 13,
+      "lsbController": 45,
       "value": "$encodedValue"
     },
     {
@@ -99,6 +106,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 14,
+      "lsbController": 46,
       "value": "$encodedValue"
     },
     {
@@ -106,6 +114,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 15,
+      "lsbController": 47,
       "value": "$encodedValue"
     },
     {
@@ -113,6 +122,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 16,
+      "lsbController": 48,
       "value": "$encodedValue"
     },
     {
@@ -120,6 +130,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 17,
+      "lsbController": 49,
       "value": "$encodedValue"
     },
     {
@@ -127,6 +138,7 @@
       "kind": "cc",
       "channel": "$channel",
       "controller": 18,
+      "lsbController": 50,
       "value": "$encodedValue"
     },
     {
@@ -1998,18 +2010,18 @@
     }
   ],
   "parameters": [
-    {"id":"modulation.modWheel","name":"Mod Wheel","group":"Modulation","description":"The MSB alone, 0 - 127; CC 33 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc1","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modWheel"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"modulation.modRate","name":"Mod Rate","group":"Modulation","description":"The MSB alone, 0 - 127; CC 35 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc3","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modRate"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"glide.glideTime","name":"Glide Time","group":"Glide","description":"The MSB alone, 0 - 127; CC 37 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc5","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"glideTime"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
-    {"id":"arpeggiator.arpRate","name":"Arp Rate","group":"Arpeggiator","description":"The MSB alone, 0 - 127; CC 40 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc8","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"arpRate"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"oscillators.noiseFilterCutoff","name":"Noise Filter Cutoff","group":"Oscillators","description":"The MSB alone, 0 - 127; CC 41 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc9","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"noiseFilterCutoff"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"delay.delayTime","name":"Delay Time","group":"Delay","description":"The MSB alone, 0 - 127; CC 44 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc12","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"delayTime"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
-    {"id":"delay.delaySpacing","name":"Delay Spacing","group":"Delay","description":"The MSB alone, 0 - 127; CC 45 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc13","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"delaySpacing"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"arpeggiator.arpSwing","name":"Arp Swing","group":"Arpeggiator","description":"The MSB alone, 0 - 127; CC 46 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc14","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"arpSwing"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"arpeggiator.arpGateLength","name":"Arp Gate Length","group":"Arpeggiator","description":"The MSB alone, 0 - 127; CC 47 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc15","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"arpGateLength"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"oscillators.osc2Frequency","name":"Osc 2 Frequency","group":"Oscillators","description":"The MSB alone, 0 - 127; CC 48 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc16","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"osc2Frequency"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"oscillators.osc3Frequency","name":"Osc 3 Frequency","group":"Oscillators","description":"The MSB alone, 0 - 127; CC 49 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc17","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"osc3Frequency"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
-    {"id":"oscillators.osc4Frequency","name":"Osc 4 Frequency","group":"Oscillators","description":"The MSB alone, 0 - 127; CC 50 is its LSB, 0 - 16383 together.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc18","type":"integer","range":{"min":0,"max":127},"default":0,"display":{"mode":"number","unit":"","shortLabel":"osc4Frequency"},"normalization":{"mode":"linear"},"encoding":{"type":"u7"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"modulation.modWheel","name":"Mod Wheel","group":"Modulation","description":"14 bits: the MSB on CC 1, then the LSB on CC 33.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc1","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modWheel"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"modulation.modRate","name":"Mod Rate","group":"Modulation","description":"14 bits: the MSB on CC 3, then the LSB on CC 35.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc3","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"modRate"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"glide.glideTime","name":"Glide Time","group":"Glide","description":"14 bits: the MSB on CC 5, then the LSB on CC 37.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc5","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"glideTime"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
+    {"id":"arpeggiator.arpRate","name":"Arp Rate","group":"Arpeggiator","description":"14 bits: the MSB on CC 8, then the LSB on CC 40.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc8","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"arpRate"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"oscillators.noiseFilterCutoff","name":"Noise Filter Cutoff","group":"Oscillators","description":"14 bits: the MSB on CC 9, then the LSB on CC 41.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc9","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"noiseFilterCutoff"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"delay.delayTime","name":"Delay Time","group":"Delay","description":"14 bits: the MSB on CC 12, then the LSB on CC 44.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc12","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"delayTime"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Slider"}},
+    {"id":"delay.delaySpacing","name":"Delay Spacing","group":"Delay","description":"14 bits: the MSB on CC 13, then the LSB on CC 45.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc13","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"delaySpacing"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"arpeggiator.arpSwing","name":"Arp Swing","group":"Arpeggiator","description":"14 bits: the MSB on CC 14, then the LSB on CC 46.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc14","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"arpSwing"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"arpeggiator.arpGateLength","name":"Arp Gate Length","group":"Arpeggiator","description":"14 bits: the MSB on CC 15, then the LSB on CC 47.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc15","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"arpGateLength"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"oscillators.osc2Frequency","name":"Osc 2 Frequency","group":"Oscillators","description":"14 bits: the MSB on CC 16, then the LSB on CC 48.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc16","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"osc2Frequency"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"oscillators.osc3Frequency","name":"Osc 3 Frequency","group":"Oscillators","description":"14 bits: the MSB on CC 17, then the LSB on CC 49.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc17","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"osc3Frequency"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
+    {"id":"oscillators.osc4Frequency","name":"Osc 4 Frequency","group":"Oscillators","description":"14 bits: the MSB on CC 18, then the LSB on CC 50.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc18","type":"integer","range":{"min":0,"max":16383},"default":0,"display":{"mode":"number","unit":"","shortLabel":"osc4Frequency"},"normalization":{"mode":"linear"},"encoding":{"type":"u14-msb-lsb"},"sendPolicy":{"mode":"continuous","coalesce":true,"minIntervalMs":0,"sendFinalOnRelease":true},"ui":{"preferredComponent":"Knob"}},
     {"id":"program.sustainPedal","name":"Sustain Pedal","group":"Program","description":"Each name takes a band of values; the first value of it is sent.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc64","type":"choice","default":"off","choices":[{"id":"off","label":"OFF","value":0},{"id":"on","label":"ON","value":64}],"display":{"mode":"choice","shortLabel":"sustainPedal"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}},
     {"id":"glide.glideOn","name":"Glide On","group":"Glide","description":"Each name takes a band of values; the first value of it is sent.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc65","type":"choice","default":"off","choices":[{"id":"off","label":"OFF","value":0},{"id":"on","label":"ON","value":64}],"display":{"mode":"choice","shortLabel":"glideOn"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}},
     {"id":"arpeggiator.arpLatch","name":"Arp Latch","group":"Arpeggiator","description":"Each name takes a band of values; the first value of it is sent.","access":{"canRead":false,"canWrite":true,"realtimeSafe":true,"source":"singleParameter"},"messageRecipe":"cc69","type":"choice","default":"off","choices":[{"id":"off","label":"OFF","value":0},{"id":"on","label":"ON","value":64}],"display":{"mode":"choice","shortLabel":"arpLatch"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}},
@@ -2110,7 +2122,7 @@
     {"id":"global.kbCvOutMirrorsArpSeqCv","name":"KB CV OUT Mirrors ARP/SEQ CV","group":"Global","description":"Parameter 74, set by SysEx.","access":{"canRead":true,"canWrite":true,"realtimeSafe":false,"source":"sysexRequest"},"messageRecipe":"sysex4A","type":"choice","default":"off","choices":[{"id":"off","label":"Off","value":0},{"id":"on","label":"On","value":1}],"display":{"mode":"choice","shortLabel":"kbCvOutMirrorsArpSeqCv"},"normalization":{"mode":"choiceIndex"},"encoding":{"type":"enum"},"sendPolicy":{"mode":"onCommit","coalesce":true},"ui":{"preferredComponent":"ToggleButton"}}
   ],
   "tests": [
-    {"name":"Mod Wheel = 100 (CC 1)","parameter":"modulation.modWheel","value":100,"expectedHex":"B0 01 64"},
+    {"name":"Mod Wheel = 1000 (CC 1)","parameter":"modulation.modWheel","value":1000,"expectedHex":"B0 01 07\nB0 21 68"},
     {"name":"Sustain Pedal = ON (CC 64)","parameter":"program.sustainPedal","value":"on","expectedHex":"B0 40 40"},
     {"name":"KB Octave = +2 (CC 105)","parameter":"keyboard.kbOctave","value":"plus2","expectedHex":"B0 69 66"},
     {"name":"Knob Mode = Relative (SysEx)","parameter":"global.knobMode","value":"relative","expectedHex":"F0 04 17 23 02 00 02 00 00 00 00 00 00 00 00 7F F7"},

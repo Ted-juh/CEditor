@@ -1339,6 +1339,68 @@ int runLsbFirstEncodingTests (const juce::File& nrpnFile)
     return 0;
 }
 
+// A 14-bit CC pair: the MSB on `controller`, then the LSB on `lsbController`, as two messages; a 7-bit
+// encoder sends the coarse half with its fine half 0; an LSB on the MSB's own controller is refused.
+// deviceProfileLocalEngine.js builds the same bytes (inboundParameterIndex.test.js checks them).
+int runCcPairTests()
+{
+    const char* json = R"JSON({
+      "schemaVersion": 1, "id": "probe-ccpair", "name": "Probe", "manufacturer": "Probe",
+      "variables": { "channel": 1 },
+      "parameters": [
+        { "id": "cutoff", "name": "Cutoff", "messageRecipe": "cc19", "type": "integer",
+          "range": { "min": 0, "max": 16383 }, "encoding": { "type": "u14-msb-lsb" }, "access": { "canWrite": true } },
+        { "id": "volume", "name": "Volume", "messageRecipe": "cc7", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true } },
+        { "id": "bad", "name": "Bad", "messageRecipe": "cc8", "type": "integer",
+          "range": { "min": 0, "max": 127 }, "encoding": { "type": "u7" }, "access": { "canWrite": true } }
+      ],
+      "messageRecipes": [
+        { "id": "cc19", "kind": "cc", "channel": "$channel", "controller": 19, "lsbController": 51, "value": "$encodedValue" },
+        { "id": "cc7", "kind": "cc", "channel": "$channel", "controller": 7, "lsbController": 39, "value": "$encodedValue" },
+        { "id": "cc8", "kind": "cc", "channel": "$channel", "controller": 8, "lsbController": 8, "value": "$encodedValue" }
+      ],
+      "tests": [{ "name": "Cutoff 1000", "parameter": "cutoff", "value": 1000, "expectedHex": "B0 13 07\nB0 33 68" }]
+    })JSON";
+
+    ceditor::device::DeviceProfileEngine engine;
+    juce::String error;
+    if (! engine.loadFromJson (json, error))
+    {
+        std::cerr << "[FAIL] CC pair: probe profile load: " << error << "\n";
+        return 1;
+    }
+    auto failures = 0;
+    const auto hexOf = [] (const ceditor::device::CompileResult& result)
+    {
+        juce::StringArray parts;
+        for (const auto& message : result.transaction.messages)
+            parts.add (ceditor::device::DeviceProfileEngine::bytesToHex (message.bytes));
+        return parts.joinIntoString (" | ");
+    };
+    const auto expect = [&] (const char* id, int value, const juce::String& want, const char* what)
+    {
+        const auto result = engine.compileSetParameter ("mainSynth", id, value, true);
+        if (! result.ok || hexOf (result) != want)
+        {
+            std::cerr << "[FAIL] CC pair: " << what << ": got " << (result.ok ? hexOf (result) : result.error) << ", want " << want << "\n";
+            ++failures;
+        }
+    };
+    expect ("cutoff", 1000, "B0 13 07 | B0 33 68", "1000 as MSB 7 then LSB 104");
+    expect ("cutoff", 16383, "B0 13 7F | B0 33 7F", "the top of the range");
+    expect ("volume", 100, "B0 07 64 | B0 27 00", "a 7-bit encoder sends the coarse half, its fine half 0");
+    const auto refused = engine.compileSetParameter ("mainSynth", "bad", 1, true);
+    if (refused.ok || ! refused.error.contains ("lsbController"))
+    {
+        std::cerr << "[FAIL] CC pair: an LSB on the MSB's own controller should be refused\n";
+        ++failures;
+    }
+    if (failures == 0)
+        std::cout << "[PASS] CC pair :: MSB then LSB, a 7-bit value as its coarse half, a bad lsbController refused\n";
+    return failures;
+}
+
 int runDumpShapeAndCodecTests (const juce::File& file)
 {
     ceditor::device::DeviceProfileEngine engine;
@@ -4186,6 +4248,7 @@ int main (int argc, char** argv)
     failures += runPolicyTests (root.getChildFile ("test-cc-synth.ceditor-device.json"));
     failures += runNrpnTimingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
+    failures += runCcPairTests();
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
     failures += runCatalogSummaryTests (root);

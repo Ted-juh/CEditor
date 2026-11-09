@@ -95,16 +95,18 @@ test('reading a value cell: bands, points, a scale, a misprint, a 14-bit range',
   assert.match(readValues('RECEIVE ONLY: -12…+13 SEMITONES').skip, /value shown/);
   assert.deepEqual(readController('3 [MSB], 35 [LSB]'), { cc: 3, lsb: 35 });
   assert.deepEqual(readController('MSB 10 LSB 42'), { cc: 10, lsb: 42 });
-  assert.deepEqual(readController('4 (coarse) 36 (fine)'), { cc: 4, lsb: 36 });
+  assert.deepEqual(readController('4 (coarse) 36 (fine)'), { cc: 4, lsb: null, fine: 36 }, 'a fine controller in units of its own, not an LSB');
 });
 
-test('the builder: a knob is its MSB, a list is a choice, MIDI\'s own controllers are left out, an NRPN is 14 bits', () => {
+test('the builder: a knob is a 14-bit pair, a list is a choice, MIDI\'s own controllers are left out, an NRPN is 14 bits', () => {
   const data = {
     sources: [{ title: 'probe', file: 'probe.pdf', sha256: '00', url: 'https://example.invalid' }],
     tables: [
       { doc: 0, kind: 'cc', pages: [1], rows: [
         { doc: 0, page: 1, section: '', name: 'FILTER CUTOFF', cc: '19 [MSB], 51 [LSB]', values: '0-127 [MSB], 0-16383[MSB,LSB]' },
         { doc: 0, page: 1, section: '', name: 'GLIDE TYPE', cc: '85', values: '0 = LCR, 43 = LCT, 85 = EXP' },
+        { doc: 0, page: 1, section: '', name: 'MOD 1 FILTER AMT', cc: '11 [MSB], 50 [LSB]', values: '0-127 [MSB], 0-16383[MSB,LSB]' },
+        { doc: 0, page: 1, section: '', name: 'MOD 2 FILTER AMT', cc: '16 [MSB], 50 [LSB]', values: '0-127 [MSB], 0-16383[MSB,LSB]' },
         { doc: 0, page: 1, section: '', name: 'BANK SELECT', cc: '0', values: 'ALWAYS TRANSMITS 0' },
         { doc: 0, page: 1, section: '', name: 'LOCAL CONTROL ON/OFF', cc: '122', values: '0 = OFF / 127 = ON' },
         { doc: 0, page: 1, section: '', name: '<RESERVED - DATA ENTRY>', cc: '6 [MSB], 38 [LSB]', values: '' },
@@ -119,8 +121,9 @@ test('the builder: a knob is its MSB, a list is a choice, MIDI\'s own controller
   };
   const profile = buildMoogProfile(data, { id: 'probe', name: 'probe', family: 'probe', documents: [], joined: { cc68: 'LFO WAVE' } });
   const by = (name) => profile.parameters.find((p) => p.name === name);
-  assert.deepEqual(by('FILTER CUTOFF').range, { min: 0, max: 127 }, 'the MSB, its LSB said');
-  assert.match(by('FILTER CUTOFF').description, /CC 51 is its LSB/);
+  assert.deepEqual(by('FILTER CUTOFF').range, { min: 0, max: 16383 }, 'an MSB and its LSB');
+  assert.equal(localCompileParameter(profile, { parameterId: by('FILTER CUTOFF').id, value: 1000 }).hex, 'B0 13 07 B0 33 68', 'the MSB first, then the LSB');
+  assert.deepEqual(by('MOD 2 FILTER AMT').range, { min: 0, max: 127 }, 'an LSB printed for two rows: the MSB alone');
   assert.equal(localCompileParameter(profile, { parameterId: by('GLIDE TYPE').id, value: 'exp' }).hex, 'B0 55 55');
   assert.equal(by('BANK SELECT'), undefined);
   assert.equal(by('LOCAL CONTROL ON/OFF'), undefined, 'a channel mode message');
@@ -158,7 +161,9 @@ for (const { name, profile, text, out, data } of BUILT) {
         const compiled = localCompileParameter(profile, { parameterId: parameter.id, value });
         assert.ok(compiled.ok, `${parameter.id}: ${compiled.error}`);
         if (recipe.kind === 'sysex') continue;
-        const bytes = recipe.kind === 'cc' ? [0xb0, recipe.controller, wire] : [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, 0x06, wire >> 7, 0xb0, 0x26, wire & 127];
+        const bytes = recipe.kind === 'nrpn' ? [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, 0x06, wire >> 7, 0xb0, 0x26, wire & 127]
+          : recipe.lsbController !== undefined ? [0xb0, recipe.controller, wire >> 7, 0xb0, recipe.lsbController, wire & 127]
+          : [0xb0, recipe.controller, wire];
         assert.equal(compiled.hex, hex(bytes), `${parameter.id} = ${value}`);
       }
     }
@@ -206,7 +211,7 @@ const builtProfile = (id) => BUILT.find((b) => b.profile.id === id)?.profile;
 test('the Sub 37: its CCs and its NRPN chart, the chart\'s misprinted rows left out', { skip: !builtProfile('moog-sub-37') }, () => {
   const profile = builtProfile('moog-sub-37');
   const by = (name, nrpn) => profile.parameters.find((p) => p.name === name && p.group.endsWith('(NRPN)') === nrpn);
-  assert.equal(localCompileParameter(profile, { parameterId: by('FILTER CUTOFF', false).id, value: 100 }).hex, 'B0 13 64');
+  assert.equal(localCompileParameter(profile, { parameterId: by('FILTER CUTOFF', false).id, value: 12800 }).hex, 'B0 13 64 B0 33 00', 'CC 19 and its LSB, CC 51');
   assert.equal(localCompileParameter(profile, { parameterId: by('FILTER CUTOFF', true).id, value: 16383 }).hex, 'B0 63 03 B0 62 73 B0 06 7F B0 26 7F', 'NRPN 499');
   assert.equal(by('OSC 1 ON', true), undefined, 'printed with 21 values');
   assert.ok(profile.authoringNotes.some((n) => /out of step/.test(n)));

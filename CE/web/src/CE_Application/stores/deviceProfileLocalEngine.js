@@ -347,7 +347,25 @@ export function localCompileParameter(profile, request = {}) {
   let bytes = [];
 
   if (kind === 'cc') {
-    bytes = [status, clampInt(recipe.controller, 0, 127), encoded.bytes[0] ?? 0];
+    const controller = clampInt(recipe.controller, 0, 127);
+    if (recipe.lsbController === undefined) {
+      bytes = [status, controller, encoded.bytes[0] ?? 0];
+    } else {
+      // A 14-bit pair, as DeviceProfileEngine.cpp sends it: the MSB on `controller`, then the LSB on
+      // `lsbController` (MIDI's coarse and fine, usually n and n + 32). The MSB goes first because a
+      // receiver resets the fine half when the coarse one arrives. One byte (a value below 128 with a
+      // 7-bit encoder) is the coarse half alone, its fine half 0.
+      const lsbController = recipe.lsbController;
+      if (!Number.isInteger(lsbController) || lsbController < 0 || lsbController > 127 || lsbController === controller) {
+        return { ok: false, error: 'CC lsbController must be 0-127 and differ from controller' };
+      }
+      const encodingType = String(parameter?.encoding?.type ?? '');
+      const lsbFirst = encodingType === 'u14-lsb-msb' || encodingType === 's14-lsb-msb';
+      const [msb, lsb] = encoded.bytes.length > 1
+        ? (lsbFirst ? [encoded.bytes[1], encoded.bytes[0]] : [encoded.bytes[0], encoded.bytes[1]])
+        : [encoded.bytes[0] ?? 0, 0];
+      bytes = [status, controller, msb & 0x7f, status, lsbController, lsb & 0x7f];
+    }
   } else if (kind === 'nrpn' || kind === 'rpn') {
     // ONE builder for both, as in DeviceProfileEngine.cpp. They differ only in the controller pair
     // that selects the parameter number: 99/98 for an NRPN, 101/100 for an RPN. Writing the RPN case

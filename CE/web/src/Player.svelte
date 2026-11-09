@@ -333,9 +333,15 @@
   // Both paths, once the index is up: it recognises the message and decodes the value with the
   // parameter's own encoder, which is what makes a nibbled parameter read as its whole value rather
   // than as its top nibble. An unknown or ambiguous message returns null and is ignored.
+  //
+  // What arrived last for each parameter, so the fine half of a 14-bit CC pair can be put together
+  // with the coarse half the instrument sent just before it.
+  const inboundValues = {};
   function applyDecoded(hex) {
-    const hit = decodeInbound(inboundIndex, hex);
-    if (hit) queueControlValue(hit.parameterId, hit.value);
+    const hit = decodeInbound(inboundIndex, hex, inboundValues);
+    if (!hit) return;
+    inboundValues[hit.parameterId] = hit.value;
+    queueControlValue(hit.parameterId, hit.value);
   }
 
   // Raw MIDI bindings, which run alongside the index rather than instead of it: a controller the
