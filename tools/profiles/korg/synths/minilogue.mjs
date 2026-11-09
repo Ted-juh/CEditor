@@ -11,6 +11,8 @@ export default {
     file: 'minilogue_MIDIimp_rev.txt',
     url: 'https://www.korg.com/us/support/download/manual/0/544/2890/',
   },
+  // The program dump names VCO 2's cross modulation without the VCO.
+  dumpNames: { 'VCO 2 CROSS MOD DEPTH': 'CROSS MOD DEPTH' },
   groups: [
     ['Oscillator 1', /^VCO 1\s+/],
     ['Oscillator 2', /^VCO 2\s+/],

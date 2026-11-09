@@ -25,8 +25,10 @@ import {
 } from '../../../tools/profiles/korg/build-korg-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/korg/make-profiles.mjs';
 import {
+  localCompileDeviceRequest,
   localCompileParameter,
   localCompilePresetRecall,
+  localParseDumpMessage,
   validateLocalProfileSource,
 } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
@@ -203,6 +205,23 @@ for (const { name, profile, text, out, data } of BUILT) {
     });
   }
 
+  if (profile.dumpDefinitions) {
+    test(`${profile.id}: Pull asks for the current program and reads its declared dump back`, () => {
+      const request = profile.tests.find((t) => t.kind === 'request');
+      const compiled = localCompileDeviceRequest(profile, { request: request.request });
+      assert.ok(compiled.ok, compiled.error);
+      assert.equal(compiled.transaction?.encodedValueHex ?? compiled.hex, request.expectedHex);
+      for (const vector of profile.tests.filter((t) => t.kind === 'dumpParse')) {
+        const parsed = localParseDumpMessage(profile, vector.inputHex);
+        assert.ok(parsed.ok, parsed.error);
+        for (const [id, value] of Object.entries(vector.expectedValues)) assert.equal(parsed.values[id], value, `${vector.name}: ${id}`);
+      }
+      // Every parameter read from the dump is one the profile can also send.
+      const ids = new Set(profile.parameters.filter((p) => p.access.canRead).map((p) => p.id));
+      for (const m of profile.dumpDefinitions[0].mappings) assert.ok(ids.has(m.parameter), m.parameter);
+    });
+  }
+
   test(`${profile.id}: the source is the document, Korg's identity, and nobody has tried it on an instrument`, () => {
     assert.equal(profile.manufacturer, 'Korg');
     assert.equal(profile.coverage.verifiedOnHardware, false);
@@ -228,4 +247,40 @@ test('the minilogue xd: its SYNC and RING tables disagree, its reverb list sits 
   assert.equal(by('MULTI SHAPE NOISE')[0].range.max, 1023);
   assert.equal(by('MASTER VOLUME')[0].range.max, 16383);
   assert.equal(profile.presets.banks.length, 5);
+});
+
+test('the minilogue\'s program dump, placed by hand from its document, reads back as the controllers send it', { skip: !builtProfile('korg-minilogue') }, () => {
+  // TABLE 2: VCO 1 PITCH's bits 2~9 at byte 20 and its bits 0~1 in byte 52's bits 0~1; VCO 1 OCTAVE in
+  // byte 52's bits 4~5 (0~3 = 16', 8', 4', 2'); SYNC in byte 55's bit 0. NOTE 3: each group of seven
+  // bytes goes behind one that holds their top bits, byte k's in bit k. Packed here by hand, not by
+  // the code the profile was built with.
+  const profile = builtProfile('korg-minilogue');
+  const data = new Array(448).fill(0);
+  const pitch = 725;                              // 10 bits: 1011010101
+  data[20] = pitch >> 2;                          // 181, so this byte's top bit is set
+  data[52] = (pitch & 3) | (3 << 4);              // pitch bits 0~1, OCTAVE 2'
+  data[55] = 1;                                   // SYNC on
+  const wire = [];
+  for (let g = 0; g < data.length; g += 7) {
+    const group = data.slice(g, g + 7);
+    wire.push(group.reduce((top, byte, k) => top | ((byte >> 7) << k), 0), ...group.map((byte) => byte & 0x7f));
+  }
+  assert.equal(wire.length, 512, 'NOTE 1: 448 bytes become 512');
+  const hexOf = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+  const parsed = localParseDumpMessage(profile, hexOf([0xf0, 0x42, 0x30, 0x00, 0x01, 0x2c, 0x40, ...wire, 0xf7]));
+  assert.ok(parsed.ok, parsed.error);
+  const id = (name) => profile.parameters.find((p) => p.name === name).id;
+  assert.equal(parsed.values[id('VCO 1 PITCH')], 725 >> 3, 'the top seven of its ten bits, as CC 34 sends them');
+  assert.equal(parsed.values[id('VCO 1 OCTAVE')], profile.parameters.find((p) => p.name === 'VCO 1 OCTAVE').choices.find((c) => c.label === "2'").id);
+  assert.equal(parsed.values[id('SYNC')], 'on');
+  assert.equal(parsed.values[id('VCO 2 PITCH')], 0);
+});
+
+test('the minilogue xd reads a two-byte value low byte first, as the prologue\'s TEMPO settles', { skip: !builtProfile('korg-minilogue-xd') }, () => {
+  const profile = builtProfile('korg-minilogue-xd');
+  const mapping = profile.dumpDefinitions[0].mappings.find((m) => profile.parameters.find((p) => p.id === m.parameter).name === 'VCO 1 PITCH');
+  assert.equal(mapping.offset, 24);
+  assert.deepEqual(mapping.codec.parts, [{ at: 1, from: 0, bits: 8, shift: 8 }, { at: 0, from: 0, bits: 8, shift: 0 }]);
+  assert.equal(mapping.codec.shiftRight, 3);
+  assert.ok(profile.authoringNotes.some((n) => /TEMPO \(300~6000 as H:0~7 then L:0~4\)/.test(n)));
 });

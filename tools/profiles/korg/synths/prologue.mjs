@@ -15,6 +15,9 @@ export default {
   notes: [
     'MOD EFFECT SUB TYPE (CC 96), DELAY/REVERB SUB TYPE (CC 97) and MULTI SUB TYPE SELECT (CC 103) depend on the type chosen beside them, so they are numbers with their lists in the description.',
   ],
+  // Its program dump keeps two timbres, each with its own copy of the sound, which this reader does
+  // not yet place; a whole-program read would read one and call it the other.
+  pull: false,
   groups: [
     ['Oscillator 1', /^VCO 1\s+/],
     ['Oscillator 2', /^VCO 2\s+/],

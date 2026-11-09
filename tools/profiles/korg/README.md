@@ -22,6 +22,7 @@ heading above each, and footnotes after. The control changes an instrument recog
 | 2 | `import-korg.mjs` | Writes `tables/<name>.json`: the received and transmitted control changes, the NRPN table, the Device Inquiry reply, and every footnote and list, as printed, with the file's name, SHA-256 and download page. **This is what is committed. The text file is Korg's copyright and is not.** |
 | 3 | `synths/<name>.mjs` | The layout: the document, groups, corrections with their reasons, what to leave out. |
 | 4 | `build-korg-profile.mjs`, `make-profiles.mjs` | Transcription + layout → `CE/profiles/test/<id>.ceditor-device.json`. |
+| 5 | `build-korg-dump.mjs` | Pull: the program table → the dump request, the dump definition and its field mappings, and a packed test dump (see [Pull](#pull)). |
 
 What the builder takes as settled, and what it does not:
 
@@ -59,6 +60,38 @@ What the builder takes as settled, and what it does not:
 The first volcas have no MIDI Out, so they cannot answer a Device Inquiry and their profiles do not
 try to recognise them.
 
+## Pull
+
+`build-korg-dump.mjs` reads the program table (`TABLE 2 : PROGRAM PARAMETER`) into fields and asks
+for the current program with CURRENT PROGRAM DATA DUMP REQUEST. The dump comes back in Korg's 8-in-7
+packing (NOTE 1: each group of seven bytes behind one holding their top bits, byte k's in bit k),
+which both engines unpack before reading a field. A field is read into the parameter of the same
+name, through a `bitfields` codec both engines learned for these profiles:
+
+- a whole byte, or some of its bits (the minilogue keeps VCO 1 OCTAVE in bits 4~5 of byte 52, beside
+  three other settings);
+- a 10-bit value in two places, named by the bits each holds (`VCO 1 PITCH (bit2~9)` at byte 20, `(bit0~1)`
+  in byte 52);
+- a value over two bytes marked H and L (minilogue xd). The letters do not say which byte is which; the
+  prologue's TEMPO does, 300~6000 printed as `H:0~7` then `L:0~4`, so the first byte is the low eight
+  bits.
+
+A controller parameter (0 - 127) is read as the top seven bits of a 10-bit field, the value its
+controller sends; an NRPN parameter with the field's own range, as it is; a choice, by matching the
+field's printed names to the choice's, value for value. Where the document names a setting
+differently in the two places (the minilogue xd's dump calls MULTI SHAPE NOISE `SHAPE NOISE`), the
+layout says so in `dumpNames`. Every profile carries a packed test dump both engines read back, and
+korgProfiles.test.js reads a minilogue dump packed by hand from the document.
+
+| Profile | Read back | Not read back, and why |
+|---|---:|---|
+| `korg-minilogue` | 38 of 39 | DELAY OUTPUT ROUTING: the dump names its values PRE FILTER and POST FILTER where the controller has PRE HPF and POST HPF |
+| `korg-monologue` | 23 of 24 | EG TARGET: the dump's list prints `PICTH 2` |
+| `korg-minilogue-xd` | 79 of 101 | the performance controllers, which are not part of a program; SYNC and RING, still numbers; VOICE MODE TYPE, whose dump list prints 2 twice; PORTAMENTO, PROGRAM LEVEL and Program Transpose, whose dump ranges differ from their controllers' (0,1; 0~132; 0~25) |
+
+The request and the dump carry the global MIDI channel (`3g`); the profiles' `deviceId` variable is
+that byte, 30H for channel 1.
+
 ## What the documents print wrong
 
 Kept as printed and said where it applies:
@@ -74,12 +107,15 @@ Kept as printed and said where it applies:
 - **volca fm2**: ARP TYPE and ARP DIV print hex and decimal bounds that disagree (`40 (58)`,
   `74 (104)`, `22 (35)`); each value sent is one both readings give the same name.
 - **volca bass**: `EG DECAT/RELEASE`, which the volca keys prints as EG DECAY/RELEASE.
+- **The program tables**: the minilogue xd's VOICE MODE TYPE list prints `2 : CHORD` and `2 : UNISON`
+  for a 1~4 value; its PORTAMENTO row prints the range `0,1` beside a description of `0~127`; its
+  PROGRAM LEVEL is 0~132 in the dump and 0~120 on its NRPN, Program Transpose 0~25 and 1~25. The
+  monologue's EG TARGET list prints `PICTH 2`.
 
 ## Not done
 
-- **Pull.** Every document from the minilogue on prints the whole program dump, byte by byte
-  (`TABLE 2 : PROGRAM PARAMETER`), and the C++ engine already unpacks Korg's 8-in-7 SysEx; the
-  mapping is not written yet.
+- **Pull on the prologue**: its program dump keeps a main and a sub timbre, each with its own copy
+  of the sound, which `build-korg-dump.mjs` does not place yet; the volcas send no dump at all.
 - **NTS-1 mkII**: its finer controllers are MSB/LSB pairs (EG ATTACK on 16 and 48), which a CC
   recipe cannot send as one value yet. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.

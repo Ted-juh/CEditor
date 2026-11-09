@@ -656,6 +656,30 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
     numeric = ((bytes[offset + 1] & 0x7f) << 7) | (bytes[offset] & 0x7f);
   } else if (encodingType === 'u8') {
     numeric = bytes[offset] & 0xff;                // a full byte, as an unpacked payload holds one
+  } else if (encodingType === 'bitfields') {
+    // A value put together from bit fields of an unpacked payload, as DeviceProfileEngine.cpp reads
+    // it (that comment says why): parts, then a map or a shift and a ceiling.
+    const parts = Array.isArray(encoding?.parts) ? encoding.parts : [];
+    if (!parts.length) return { ok: false, error: `Bitfields dump codec requires parts for ${parameter?.id ?? ''}` };
+    numeric = 0;
+    for (const part of parts) {
+      const at = offset + Number(part?.at ?? 0);
+      const from = Number(part?.from ?? 0);
+      const bits = Number(part?.bits ?? 8);
+      const shift = Number(part?.shift ?? 0);
+      if (!Number.isInteger(at) || at < 0 || at >= bytes.length || from < 0 || bits < 1 || from + bits > 8 || shift < 0 || shift > 24) {
+        return { ok: false, error: `Bitfields dump codec part is outside the message for ${parameter?.id ?? ''}` };
+      }
+      numeric |= ((bytes[at] >> from) & ((1 << bits) - 1)) << shift;
+    }
+    if (Array.isArray(encoding?.map)) {
+      const pair = encoding.map.find((entry) => Array.isArray(entry) && entry.length === 2 && Number(entry[0]) === numeric);
+      if (!pair) return { ok: false, error: `Bitfields dump value ${numeric} is not in the map for ${parameter?.id ?? ''}` };
+      numeric = Number(pair[1]);
+    } else {
+      numeric >>= Math.max(0, Math.min(24, Number(encoding?.shiftRight ?? 0)));
+      if (encoding?.max !== undefined) numeric = Math.min(numeric, Number(encoding.max));
+    }
   } else if (encodingType === 's7') {
     // Signed 7-bit, the byte less its bias, as decodeParameterValue and DeviceProfileEngine.cpp read
     // it. A dump's s7 field came back as the raw byte here, so a pan of -10 read as 54.
@@ -674,6 +698,20 @@ function localDecodeDumpParameterValue(parameter, bytes = [], offset = 0, codecO
   }
 
   return { ok: true, value: numeric };
+}
+
+/** Korg-style 8-in-7 unpack, as dumpUnpack8to7 in DeviceProfileEngine.cpp: each group's first byte holds the others' top bits. */
+function localUnpack8to7(wire, order, groupSize) {
+  const out = [];
+  const highFirst = order !== 'msb-low-first';
+  for (let g = 0; g < wire.length; g += groupSize + 1) {
+    const msb = wire[g];
+    const count = Math.min(groupSize, wire.length - (g + 1));
+    for (let i = 0; i < count; i += 1) {
+      out.push((wire[g + 1 + i] & 0x7f) | (((msb >> (highFirst ? groupSize - 1 - i : i)) & 1) << 7));
+    }
+  }
+  return out;
 }
 
 function localParseDumpWithDefinition(profile, dump, bytes = []) {
@@ -790,6 +828,22 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
   const mappings = Array.isArray(dump?.mappings) ? dump.mappings : [];
   if (mappings.length === 0) return failMatched('invalidDefinition', `Dump definition has no mappings: ${dumpId}`, checksumStatus);
 
+  // A packed payload (Korg's 8-in-7) is unpacked first, so mapping offsets address the unpacked
+  // bytes, as DeviceProfileEngine.cpp does. This engine read the wire bytes in place: every field
+  // after the first group came back from the wrong byte, without its top bit.
+  let decodeBytes = bytes;
+  let decodeBase = payloadOffset;
+  const pack = dump?.payload?.pack;
+  if (pack?.type === 'packed8to7') {
+    const groupSize = Math.max(1, Number(pack.groupSize ?? 7));
+    const wireLength = payloadSize > 0 ? payloadSize + Math.ceil(payloadSize / groupSize) : 0;
+    if (wireLength <= 0 || payloadOffset + wireLength > bytes.length) {
+      return failMatched('partial', `Packed dump payload is outside message: ${dumpId}`, checksumStatus);
+    }
+    decodeBytes = localUnpack8to7(bytes.slice(payloadOffset, payloadOffset + wireLength), String(pack.packOrder ?? ''), groupSize);
+    decodeBase = 0;
+  }
+
   const values = {};
   for (const mapping of mappings) {
     const parameterId = String(mapping?.parameter ?? '');
@@ -798,8 +852,8 @@ function localParseDumpWithDefinition(profile, dump, bytes = []) {
 
     const decoded = localDecodeDumpParameterValue(
       parameter,
-      bytes,
-      payloadOffset + Number(mapping?.offset ?? 0),
+      decodeBytes,
+      decodeBase + Number(mapping?.offset ?? 0),
       mapping?.codec ?? mapping?.nameCodec ?? null
     );
     if (!decoded.ok) {

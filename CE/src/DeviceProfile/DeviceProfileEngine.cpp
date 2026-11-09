@@ -2386,6 +2386,57 @@ juce::Result DeviceProfileEngine::decodeDumpParameterValue (const juce::DynamicO
     {
         numeric = bytes[offset] & 0xff; // full 8-bit byte (e.g. recovered from an unpacked payload)
     }
+    else if (encodingType == "bitfields")
+    {
+        // A value put together from bit fields of an unpacked payload, as Korg's program dumps keep
+        // one: the minilogue's VCO 1 PITCH is byte 20 (its bits 2-9) and bits 0-1 of byte 52, which
+        // it shares with three other settings; the minilogue xd's is two bytes, low byte first.
+        // Each part is { at: bytes after the mapping's offset, from: first bit, bits: how many,
+        // shift: where they go }. Then either `map` ([[dump value, wire value], ...]: a setting kept
+        // as 0-3 in the dump and sent as 0, 42, 84, 127), or `shiftRight` and `max` (a 10-bit value
+        // read as the 7-bit controller that sends it, its top seven bits).
+        auto* parts = encoding != nullptr ? asArray (encoding->getProperty ("parts")) : nullptr;
+        if (parts == nullptr || parts->isEmpty())
+            return juce::Result::fail ("Bitfields dump codec requires parts for " + propString (parameter, "id"));
+
+        numeric = 0;
+        for (const auto& partValue : *parts)
+        {
+            auto* part = asObject (partValue);
+            if (part == nullptr)
+                return juce::Result::fail ("Bitfields dump codec part is not an object for " + propString (parameter, "id"));
+            const auto at = offset + propInt (*part, "at", 0);
+            const auto from = propInt (*part, "from", 0);
+            const auto bits = propInt (*part, "bits", 8);
+            const auto shift = propInt (*part, "shift", 0);
+            if (at < 0 || at >= bytes.size() || from < 0 || bits < 1 || from + bits > 8 || shift < 0 || shift > 24)
+                return juce::Result::fail ("Bitfields dump codec part is outside the message for " + propString (parameter, "id"));
+            numeric |= ((bytes[at] >> from) & ((1 << bits) - 1)) << shift;
+        }
+
+        if (auto* map = asArray (encoding->getProperty ("map")))
+        {
+            auto found = false;
+            for (const auto& pairValue : *map)
+            {
+                auto* pair = asArray (pairValue);
+                if (pair != nullptr && pair->size() == 2 && (int) pair->getReference (0) == numeric)
+                {
+                    numeric = (int) pair->getReference (1);
+                    found = true;
+                    break;
+                }
+            }
+            if (! found)
+                return juce::Result::fail ("Bitfields dump value " + juce::String (numeric) + " is not in the map for " + propString (parameter, "id"));
+        }
+        else
+        {
+            numeric >>= juce::jlimit (0, 24, propInt (*encoding, "shiftRight", 0));
+            if (encoding->hasProperty ("max"))
+                numeric = juce::jmin (numeric, propInt (*encoding, "max", numeric));
+        }
+    }
 
     if (type == "choice" || type == "enum")
     {

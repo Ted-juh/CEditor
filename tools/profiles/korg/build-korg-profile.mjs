@@ -20,6 +20,7 @@
 // each with its reason, which go into the profile's notes.
 
 import { camel } from '../roland/build-profile.mjs';
+import { addPull } from './build-korg-dump.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
@@ -383,7 +384,7 @@ export function buildKorgProfile(data, layout) {
 
   const source = data.source;
   const lowBitsCount = parameters.filter((p) => recipeOf(p).lowBits).length;
-  return {
+  const profile = {
     schemaVersion: 1,
     profileVersion: layout.profileVersion ?? '0.1.0',
     minCEditorVersion: '0.9.0',
@@ -430,6 +431,10 @@ export function buildKorgProfile(data, layout) {
     ...((layout.presets ?? presetsFrom(data)) ? { presets: layout.presets ?? presetsFrom(data) } : {}),
     tests,
   };
+  const pullNotes = [];
+  addPull(profile, data, layout, pullNotes);
+  profile.authoringNotes.push(...pullNotes);
+  return profile;
 }
 
 /** The Device Inquiry reply's family and member bytes: the two after KORG's ID, then the next two. */

@@ -18,6 +18,13 @@ export default {
   notes: [
     'MOD FX SUB TYPE (CC 96) depends on MOD FX TYPE, and MULTI SUB TYPE SELECT (CC 103) on MULTI TYPE, so both are numbers with their lists in the description. The document\'s transmitted values for the USER sub types end at 128, which is not a MIDI value.',
   ],
+  // The program dump lists the MULTI engine's settings under their own section, without the word.
+  dumpNames: {
+    'MULTI SELECT NOISE': 'SELECT NOISE', 'MULTI SELECT VPM': 'SELECT VPM', 'MULTI SELECT USER': 'SELECT USER',
+    'MULTI SHAPE NOISE': 'SHAPE NOISE', 'MULTI SHAPE VPM': 'SHAPE VPM', 'MULTI SHAPE USER': 'SHAPE USER',
+    'MULTI SHIFT SHAPE NOISE': 'SHIFT SHAPE NOISE', 'MULTI SHIFT SHAPE VPM': 'SHIFT SHAPE VPM', 'MULTI SHIFT SHAPE USER': 'SHIFT SHAPE USER',
+    'CUTOFF KEYTRACK': 'CUTOFF KEYBOARD TRACK',
+  },
   groups: [
     ['Oscillator 1', /^VCO 1\s+/],
     ['Oscillator 2', /^VCO 2\s+/],

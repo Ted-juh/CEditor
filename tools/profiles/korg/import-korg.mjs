@@ -61,6 +61,33 @@ function identityRows(tables) {
   return reply ? reply.rows.map((r) => ({ byte: r.cells[0], description: r.cells.slice(1).join(' ').replace(/\s+/g, ' ').trim() })) : [];
 }
 
+/** A boxed table's rows as printed: every cell, and the cells of the rows that continue it. */
+const printedRows = (table) => (table?.rows ?? []).map((r) => ({ line: r.line, cells: r.cells, ...(r.more.length ? { more: r.more } : {}) }));
+
+/**
+ * The program dump, where the document prints one: the request for the current program, the dump
+ * it answers with, and the program parameter table that says where each setting sits in it.
+ */
+function programDump(tables) {
+  const titled = (pattern) => tables.find((t) => pattern.test(t.heading?.title ?? ''));
+  const table = titled(/^PROGRAM PARAMETER$/i);
+  const request = titled(/^CURRENT PROGRAM DATA DUMP REQUEST$/i);
+  const dump = titled(/^CURRENT PROGRAM DATA DUMP$/i);
+  if (!table || !request || !dump) return null;
+  return { request: printedRows(request), dump: printedRows(dump), table: printedRows(table) };
+}
+
+/** How big the current program dump is: `448Bytes = 7*64 -> 8*64 => 512Bytes`, or `384Bytes (7bit) -> 336Bytes (8bit)`. */
+function programDumpSize(text) {
+  const flat = String(text).replace(/\r/g, '');
+  let m = /CURRENT PROGRAM DATA[^\n]*DUMP FORMAT[\s\S]{0,160}?\n\s*(\d+)\s*Bytes\s*=[^\n]*=>\s*(\d+)\s*Bytes/i.exec(flat);
+  if (m) return { unpacked: Number(m[1]), packed: Number(m[2]), printed: m[0].split('\n').at(-1).replace(/\s+/g, ' ').trim() };
+  const at = flat.search(/CURRENT PROGRAM DATA DUMP\s+R/i);
+  m = at >= 0 ? /(\d+)\s*Bytes\s*\(7bit\)\s*->\s*(\d+)\s*Bytes\s*\(8bit\)/i.exec(flat.slice(at)) : null;
+  if (m) return { unpacked: Number(m[2]), packed: Number(m[1]), printed: m[0].replace(/\s+/g, ' ') };
+  return null;
+}
+
 export function importText(file, layout) {
   const text = readFileSync(file, 'utf8');
   const tables = readTables(text);
@@ -85,6 +112,7 @@ export function importText(file, layout) {
     programChange: programChange(titled(layout.tables?.received ?? '2-1')),
     nrpn: nrpnRows(nrpnTable),
     identity: identityRows(tables),
+    programDump: programDump(tables) ? { ...programDump(tables), size: programDumpSize(text) } : null,
     marks: Object.fromEntries(Object.entries(marks).map(([k, v]) => [k, v.text])),
     lists: Object.fromEntries(Object.entries(notes).map(([k, v]) => [k, { title: v.title, entries: v.entries, lines: v.lines }])),
   };
@@ -97,6 +125,16 @@ export function stringifyTranscription(data) {
     out.push(`  "${key}": [`);
     data[key].forEach((row, i) => out.push(`    ${JSON.stringify(row)}${i < data[key].length - 1 ? ',' : ''}`));
     out.push('  ],');
+  }
+  out.push(`  "programDump": ${data.programDump ? '{' : 'null,'}`);
+  if (data.programDump) {
+    out.push(`    "size": ${JSON.stringify(data.programDump.size)},`);
+    for (const key of ['request', 'dump', 'table']) {
+      out.push(`    "${key}": [`);
+      data.programDump[key].forEach((row, i) => out.push(`      ${JSON.stringify(row)}${i < data.programDump[key].length - 1 ? ',' : ''}`));
+      out.push(`    ]${key === 'table' ? '' : ','}`);
+    }
+    out.push('  },');
   }
   out.push('  "marks": {');
   const marks = Object.entries(data.marks);

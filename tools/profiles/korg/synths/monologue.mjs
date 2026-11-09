@@ -11,6 +11,9 @@ export default {
     file: 'monologue_MIDIimp.txt',
     url: 'https://www.korg.com/us/support/download/manual/0/733/4231/',
   },
+  // The monologue has one envelope, whose attack and decay the controller list calls AMP EG and the
+  // program dump calls EG; and one LFO, whose wave the dump calls its type.
+  dumpNames: { 'AMP EG ATTACK': 'EG ATTACK', 'AMP EG DECAY': 'EG DECAY', 'LFO WAVE': 'LFO TYPE' },
   groups: [
     ['Oscillator 1', /^VCO 1\s+/],
     ['Oscillator 2', /^VCO 2\s+/],

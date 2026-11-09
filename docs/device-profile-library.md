@@ -159,13 +159,19 @@ Korg publishes each instrument's MIDI Implementation as a plain-text file, read 
 - sends a value wider than 7 bits as Korg prints the format, its low bits first on CC 63;
 - recalls presets by the document's own Bank Select and Program Change lines, and knows the identity
   reply, except on the first volcas, which have no MIDI Out;
-- **cannot read the synth back yet**: the documents print the whole program dump, byte by byte, but
-  it is not mapped.
+- **reads the current program back (Pull)** on the minilogue, minilogue xd and monologue: the
+  documents print the program dump byte by byte, and each setting found there under the parameter's
+  name is read from it, a controller as the top seven bits of its 10-bit field. The prologue keeps
+  two timbres in its dump and the volcas send none, so they cannot read back yet. The request
+  carries the instrument's global MIDI channel; the profiles assume channel 1.
 
 ## Things to know before relying on one
 
 These are recorded in [known issues](known-issues.md#device-profiles) with what would close them.
 
+- **Korg's Pull assumes global MIDI channel 1.** The dump request and the dump carry the global
+  channel in their header (`3g`); the profiles' `deviceId` variable is that byte, 30H. An instrument
+  set to another global channel ignores the request until the variable is changed to match.
 - **Sequential profiles assume NRPN.** The instrument's Global setting decides whether it listens to
   NRPNs, CCs or neither; set to CC, it ignores everything these profiles send.
 - **Sibling instruments answer with the same identity.** Several pairs print the same identity
