@@ -55,14 +55,34 @@ export function describeField(desc) {
 }
 
 /** The program table as fields: one per printed setting, in offset order, until the table restarts its offsets (a sub-structure follows). */
-export function programFields(rows) {
+export function programFields(rows, { block: wanted = null } = {}) {
   const fields = [];
   let last = -1;
+  // A block of settings printed once for several copies (the prologue's `80~205 | TIMBRE 1
+  // PARAMETERS`, then `+0`, `+1`, … from its start; `206~331 | TIMBRE 2 PARAMETERS (same as
+  // TIMBRE1)`). Only the block the layout names is read.
+  let block = null;
   for (const row of rows ?? []) {
-    const offset = /^\d+$/.test(row.cells[0] ?? '') ? Number(row.cells[0]) : null;
-    if (offset === null) { if (/^\d+\s*~\s*\d+$/.test(row.cells[0] ?? '')) last = Number(row.cells[0].split('~')[1]); continue; }
-    if (offset < last) break;
-    last = offset;
+    const first = row.cells[0] ?? '';
+    const span = /^(\d+)\s*~\s*(\d+)$/.exec(first);
+    const title = /\b(TIMBRE\s*\d+)\s+PARAMETERS\b/i.exec(row.cells.slice(1).join(' '))?.[1]?.replace(/\s+/g, ' ').toUpperCase();
+    if (span && title) {
+      block = { base: Number(span[1]), read: !!wanted && title === wanted.toUpperCase() };
+      last = Number(span[2]);
+      continue;
+    }
+    const relative = /^\+\s*(\d+)$/.exec(first);
+    let offset;
+    if (relative) {
+      if (!block?.read) continue;
+      offset = block.base + Number(relative[1]);
+    } else {
+      offset = /^\d+$/.test(first) ? Number(first) : null;
+      if (offset === null) { if (span) last = Number(span[2]); continue; }
+      if (offset < last) break;
+      last = offset;
+      block = null;
+    }
     for (const cells of [row.cells, ...(row.more ?? [])]) {
       const span = bitSpan(cells[1]);
       const described = describeField(cells[3] ?? '');
@@ -166,7 +186,7 @@ export function addPull(profile, data, layout, notes) {
   const unmapped = [];
   const unread = [];
   const used = new Set();
-  for (const setting of settings(programFields(dump.table))) {
+  for (const setting of settings(programFields(dump.table, { block: layout.dumpBlock }))) {
     const parameter = byName.get(setting.key);
     if (!parameter) { unread.push(setting.name); continue; }
     const { codec, why } = codecFor(setting, parameter, data.lists);

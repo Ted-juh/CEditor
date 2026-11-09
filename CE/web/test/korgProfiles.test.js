@@ -284,3 +284,13 @@ test('the minilogue xd reads a two-byte value low byte first, as the prologue\'s
   assert.equal(mapping.codec.shiftRight, 3);
   assert.ok(profile.authoringNotes.some((n) => /TEMPO \(300~6000 as H:0~7 then L:0~4\)/.test(n)));
 });
+
+test('the prologue reads TIMBRE 1, its settings counted from the block\'s start', { skip: !builtProfile('korg-prologue') }, () => {
+  // `80~205 | TIMBRE 1 PARAMETERS`, then `+12 | H:0~7 | VCO 1 PITCH`: byte 92 and 93, low byte first.
+  const profile = builtProfile('korg-prologue');
+  const at = (name) => profile.dumpDefinitions[0].mappings.find((m) => profile.parameters.find((p) => p.id === m.parameter).name === name);
+  assert.equal(at('VCO 1 PITCH').offset, 92);
+  assert.equal(at('LFO RATE').offset, 80 + 72);
+  assert.equal(at('MOD EFFECT ON-OFF').offset, 71, 'a program-wide setting keeps its own offset');
+  assert.ok(profile.authoringNotes.some((n) => /TIMBRE 1, taken to be the main timbre/.test(n)));
+});

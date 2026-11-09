@@ -72,7 +72,9 @@ name, through a `bitfields` codec both engines learned for these profiles:
   three other settings);
 - a 10-bit value in two places, named by the bits each holds (`VCO 1 PITCH (bit2~9)` at byte 20, `(bit0~1)`
   in byte 52);
-- a value over two bytes marked H and L (minilogue xd). The letters do not say which byte is which; the
+- a block printed once for several copies (the prologue's `TIMBRE 1 PARAMETERS`, `+0`, `+1`, … from
+  byte 80), read for the copy the layout names (`dumpBlock`);
+- a value over two bytes marked H and L (minilogue xd, prologue). The letters do not say which byte is which; the
   prologue's TEMPO does, 300~6000 printed as `H:0~7` then `L:0~4`, so the first byte is the low eight
   bits.
 
@@ -87,6 +89,7 @@ korgProfiles.test.js reads a minilogue dump packed by hand from the document.
 |---|---:|---|
 | `korg-minilogue` | 38 of 39 | DELAY OUTPUT ROUTING: the dump names its values PRE FILTER and POST FILTER where the controller has PRE HPF and POST HPF |
 | `korg-monologue` | 23 of 24 | EG TARGET: the dump's list prints `PICTH 2` |
+| `korg-prologue` | 44 of 57 | read from TIMBRE 1, taken to be the main timbre (the document numbers its two timbres and does not name them); RING-SYNC, DELAY/REVERB TYPE, MULTI TYPE and PITCH EG, whose dump names differ (`RING ON`, `OFF`, `USER`, `+`); MOD EFFECT TYPE, still a number; the sub types, which depend on a type |
 | `korg-minilogue-xd` | 79 of 101 | the performance controllers, which are not part of a program; SYNC and RING, still numbers; VOICE MODE TYPE, whose dump list prints 2 twice; PORTAMENTO, PROGRAM LEVEL and Program Transpose, whose dump ranges differ from their controllers' (0,1; 0~132; 0~25) |
 
 The request and the dump carry the global MIDI channel (`3g`); the profiles' `deviceId` variable is
@@ -114,8 +117,7 @@ Kept as printed and said where it applies:
 
 ## Not done
 
-- **Pull on the prologue**: its program dump keeps a main and a sub timbre, each with its own copy
-  of the sound, which `build-korg-dump.mjs` does not place yet; the volcas send no dump at all.
+- **The prologue's second timbre**: Pull reads TIMBRE 1 only. The volcas send no dump at all.
 - **NTS-1 mkII**: its finer controllers are MSB/LSB pairs (EG ATTACK on 16 and 48), which a CC
   recipe cannot send as one value yet. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.
