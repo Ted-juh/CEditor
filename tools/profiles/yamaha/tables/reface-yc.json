@@ -1,0 +1,78 @@
+{
+  "sources": [
+    {"title":"reface Data List (B0)","file":"reface_en_dl_b0.pdf","sha256":"705182642a7be012570805c9686e1eac58bd2b9fa8584f91d33414929e1a85e9","url":"https://usa.yamaha.com/files/download/other_assets/7/794817/reface_en_dl_b0.pdf"}
+  ],
+  "format": {"identityReply":["F0","7E","7F","06","02","43","00","41","54","06","00","00","00","7F","F7"],"modelId":"06","group":["7F","1C"]},
+  "tables": [
+    {
+      "title": "MIDI PARAMETER CHANGE TABLE (SYSTEM)",
+      "notes": [],
+      "page": 18,
+      "rows": [
+        {"page":18,"address":["00","00","00"],"size":1,"range":["00 – 0F, 7F"],"name":"MIDI transmit channel","description":"1 – 16, off","notes":""},
+        {"page":18,"address":["00","00","01"],"size":1,"range":["00 – 0F, 10"],"name":"MIDI receive channel","description":"1 – 16, All","notes":""},
+        {"page":18,"address":["00","00","02"],"size":4,"range":["00 – 00","00 – 07","00 – 0F","00 – 0F"],"name":"Master Tune","description":"-102.4 – +102.3 (cent) 1st bit 3-0 : bit 15- 12 2nd bit 3-0 : bit 11- 8 3rd bit 3-0 : bit 7- 4 4th bit 3-0 : bit 3- 0","notes":""},
+        {"page":18,"address":["00","00","06"],"size":1,"range":["00 – 01"],"name":"Local Control","description":"off, ON","notes":""},
+        {"page":18,"address":["00","00","07"],"size":1,"range":["34 – 4C"],"name":"Master Transpose","description":"-12 – +12 (semitones)","notes":""},
+        {"page":18,"address":["00","00","08"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","09"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","0A"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","0B"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","0C"],"size":1,"range":["00 – 01"],"name":"Auto Power-Off","description":"off, ON","notes":""},
+        {"page":18,"address":["00","00","0D"],"size":1,"range":["00 – 01"],"name":"Speaker Output","description":"off, ON","notes":""},
+        {"page":18,"address":["00","00","0E"],"size":1,"range":["00 – 01"],"name":"MIDI Control","description":"off, ON","notes":""},
+        {"page":18,"address":["00","00","0F"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","10"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","11"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","12"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","13"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","14"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","15"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","16"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","17"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","18"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","19"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","1A"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","1B"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","1C"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","1D"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","1E"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["00","00","1F"],"size":1,"range":[],"name":"reserved","description":"","notes":""}
+      ]
+    },
+    {
+      "title": "MIDI PARAMETER CHANGE TABLE (Tone Generator)",
+      "notes": [],
+      "page": 18,
+      "rows": [
+        {"page":18,"address":["30","00","00"],"size":1,"range":["00 – 7F"],"name":"Volume","description":"0 – 127","notes":"This parameter can be set only via MIDI."},
+        {"page":18,"address":["30","00","01"],"size":1,"range":[],"name":"reserved","description":"","notes":""},
+        {"page":18,"address":["30","00","02"],"size":1,"range":["00 – 04"],"name":"organ voice type (WAVE)","description":"H, V, F, A, Y","notes":""},
+        {"page":18,"address":["30","00","03"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 16'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","04"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 5 1/3'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","05"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 8'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","06"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 4'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","07"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 2 2/3'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","08"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 2'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","09"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 1 3/5'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","0A"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 1 1/3'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","0B"],"size":1,"range":["00 – 06"],"name":"FOOTAGE 1'","description":"0 (minimum: up) – 6 (maximum)","notes":""},
+        {"page":18,"address":["30","00","0C"],"size":1,"range":["00 – 01"],"name":"Vibrato/Chorus Select (VIBRATO/CHO- RUS SWITCH)","description":"VIBRATO, CHORUS","notes":""},
+        {"page":18,"address":["30","00","0D"],"size":1,"range":["00 – 04"],"name":"Vibrato/Chorus Depth (VIBRATO/CHO- RUS DEPTH)","description":"0 (no effect) – 4","notes":""},
+        {"page":18,"address":["30","00","0E"],"size":1,"range":["00 – 01"],"name":"Percussion ON/ OFF (PERCUS- SION ON/OFF SWITCH)","description":"OFF, ON","notes":""},
+        {"page":18,"address":["30","00","0F"],"size":1,"range":["00 – 01"],"name":"Percussion Type (PERCUSSION TYPE SWITCH)","description":"A, B","notes":""},
+        {"page":18,"address":["30","00","10"],"size":1,"range":["00 – 04"],"name":"Percussion Length (PER- CUSSION LENGTH)","description":"0 – 4","notes":""},
+        {"page":18,"address":["30","00","11"],"size":1,"range":["00 – 03"],"name":"Rotary Speaker Speed (ROTARY SPEED)","description":"OFF, STOP, SLOW, FAST","notes":""},
+        {"page":18,"address":["30","00","12"],"size":1,"range":["00 – 7F"],"name":"Distortion Drive (EFFECT DIST)","description":"0 – 127","notes":""},
+        {"page":18,"address":["30","00","13"],"size":1,"range":["00 – 7F"],"name":"Reverb Depth (EFFECT REVERB)","description":"0 – 127","notes":""},
+        {"page":18,"address":["30","00","14"],"size":2,"range":[],"name":"reserved","description":"","notes":""}
+      ]
+    }
+  ],
+  "bulk": [
+    {"name":"SYSTEM Common","bytes":36,"address":["00","00","00"]},
+    {"name":"TG Bulk Header","bytes":4,"address":["0E","0F","00"]},
+    {"name":"COMMON TG Common","bytes":26,"address":["30","00","00"]},
+    {"name":"Bulk","bytes":4,"address":["0F","0F","00"]}
+  ]
+}

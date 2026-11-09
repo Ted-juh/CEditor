@@ -404,7 +404,7 @@ export function buildMoogProfile(data, layout) {
     messageRecipes: [...recipes.values()].sort((a, b) => a.kind.localeCompare(b.kind) || (a.controller ?? a.parameterMsb * 128 + a.parameterLsb ?? 0) - (b.controller ?? b.parameterMsb * 128 + b.parameterLsb ?? 0) || a.id.localeCompare(b.id)),
     parameters,
     tests,
-    ...(requests.length ? { requests, dumpDefinitions } : {}),
+    ...(requests.length ? { requests, dumpDefinitions, startup: { policy: 'pull', syncDirection: 'pull', sync: requests.map((r) => ({ request: r.id })) } } : {}),
   };
   return profile;
 }

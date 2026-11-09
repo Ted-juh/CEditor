@@ -2429,5 +2429,233 @@
     {"id":"reply4A","name":"KB CV OUT Mirrors ARP/SEQ CV, as the instrument sends it","kind":"sysex","matcher":{"prefix":["F0","04","17","23","4A"],"suffix":["F7"]},"payload":{"offset":5,"size":2},"completion":{"expectedMessages":1,"expectedBytes":16},"mappings":[
       {"parameter":"global.kbCvOutMirrorsArpSeqCv","offset":0,"codec":{"type":"u14-msb-lsb"}}
     ]}
-  ]
+  ],
+  "startup": {
+    "policy": "pull",
+    "syncDirection": "pull",
+    "sync": [
+      {
+        "request": "request01"
+      },
+      {
+        "request": "request02"
+      },
+      {
+        "request": "request03"
+      },
+      {
+        "request": "request04"
+      },
+      {
+        "request": "request05"
+      },
+      {
+        "request": "request06"
+      },
+      {
+        "request": "request07"
+      },
+      {
+        "request": "request08"
+      },
+      {
+        "request": "request09"
+      },
+      {
+        "request": "request0A"
+      },
+      {
+        "request": "request0B"
+      },
+      {
+        "request": "request0C"
+      },
+      {
+        "request": "request0D"
+      },
+      {
+        "request": "request0E"
+      },
+      {
+        "request": "request0F"
+      },
+      {
+        "request": "request10"
+      },
+      {
+        "request": "request11"
+      },
+      {
+        "request": "request12"
+      },
+      {
+        "request": "request13"
+      },
+      {
+        "request": "request14"
+      },
+      {
+        "request": "request15"
+      },
+      {
+        "request": "request16"
+      },
+      {
+        "request": "request17"
+      },
+      {
+        "request": "request18"
+      },
+      {
+        "request": "request19"
+      },
+      {
+        "request": "request1A"
+      },
+      {
+        "request": "request1B"
+      },
+      {
+        "request": "request1C"
+      },
+      {
+        "request": "request1D"
+      },
+      {
+        "request": "request1E"
+      },
+      {
+        "request": "request1F"
+      },
+      {
+        "request": "request20"
+      },
+      {
+        "request": "request21"
+      },
+      {
+        "request": "request22"
+      },
+      {
+        "request": "request23"
+      },
+      {
+        "request": "request24"
+      },
+      {
+        "request": "request25"
+      },
+      {
+        "request": "request26"
+      },
+      {
+        "request": "request27"
+      },
+      {
+        "request": "request28"
+      },
+      {
+        "request": "request29"
+      },
+      {
+        "request": "request2A"
+      },
+      {
+        "request": "request2B"
+      },
+      {
+        "request": "request2C"
+      },
+      {
+        "request": "request2D"
+      },
+      {
+        "request": "request2E"
+      },
+      {
+        "request": "request2F"
+      },
+      {
+        "request": "request30"
+      },
+      {
+        "request": "request31"
+      },
+      {
+        "request": "request32"
+      },
+      {
+        "request": "request33"
+      },
+      {
+        "request": "request34"
+      },
+      {
+        "request": "request35"
+      },
+      {
+        "request": "request36"
+      },
+      {
+        "request": "request37"
+      },
+      {
+        "request": "request38"
+      },
+      {
+        "request": "request39"
+      },
+      {
+        "request": "request3A"
+      },
+      {
+        "request": "request3B"
+      },
+      {
+        "request": "request3C"
+      },
+      {
+        "request": "request3D"
+      },
+      {
+        "request": "request3E"
+      },
+      {
+        "request": "request3F"
+      },
+      {
+        "request": "request40"
+      },
+      {
+        "request": "request41"
+      },
+      {
+        "request": "request42"
+      },
+      {
+        "request": "request43"
+      },
+      {
+        "request": "request44"
+      },
+      {
+        "request": "request45"
+      },
+      {
+        "request": "request46"
+      },
+      {
+        "request": "request47"
+      },
+      {
+        "request": "request48"
+      },
+      {
+        "request": "request49"
+      },
+      {
+        "request": "request4A"
+      }
+    ]
+  }
 }

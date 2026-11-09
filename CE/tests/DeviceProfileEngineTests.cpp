@@ -4238,7 +4238,11 @@ int main (int argc, char** argv)
         root.getChildFile ("moog-subharmonicon.ceditor-device.json"),
         root.getChildFile ("moog-subsequent-25.ceditor-device.json"),
         root.getChildFile ("moog-subsequent-37.ceditor-device.json"),
-        root.getChildFile ("moog-taurus-3.ceditor-device.json")
+        root.getChildFile ("moog-taurus-3.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-cs.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-dx.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-cp.ceditor-device.json"),
+        root.getChildFile ("yamaha-reface-yc.ceditor-device.json")
     };
 
     auto failures = 0;
