@@ -1,5 +1,5 @@
 {
-  "source": {"model":"FA-06/07/08","date":"June 1, 2017","version":"1.01","file":"FA-06_07_08_MIDI_Imple_eng01_W.pdf","sha256":"590e55b3dfad1634eb2136516fe166c3eeb6a003dfceb4c008c8fb37b8c05007","pages":36,"url":"https://static.roland.com/assets/media/pdf/FA-06_07_08_MIDI_Imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"FA-06/07/08","date":"June 1, 2017","version":"1.01","file":"FA-06_07_08_MIDI_Imple_eng01_W.pdf","sha256":"590e55b3dfad1634eb2136516fe166c3eeb6a003dfceb4c008c8fb37b8c05007","pages":36,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/FA-06_07_08_MIDI_Imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 77",
   "issues": [],
   "tables": [

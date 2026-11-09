@@ -1,5 +1,5 @@
 {
-  "source": {"model":"JUPITER-X/Xm","date":"Apr 19, 2022","version":"1.06","file":"JUPITER-X_Xm_MIDI_imple_eng06_W.pdf","sha256":"426dedfcea5fd6957af38ecc9fb5b1813fdc124fb0d95d950ebc6ee342f6127b","pages":90,"url":"https://static.roland.com/assets/media/pdf/JUPITER-X_Xm_MIDI_imple_eng06_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"JUPITER-X/Xm","date":"Apr 19, 2022","version":"1.06","file":"JUPITER-X_Xm_MIDI_imple_eng06_W.pdf","sha256":"426dedfcea5fd6957af38ecc9fb5b1813fdc124fb0d95d950ebc6ee342f6127b","pages":90,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JUPITER-X_Xm_MIDI_imple_eng06_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 00 65",
   "issues": [],
   "tables": [

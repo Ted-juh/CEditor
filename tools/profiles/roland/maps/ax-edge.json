@@ -1,5 +1,5 @@
 {
-  "source": {"model":"AX-Edge","date":null,"version":"1.01","file":"AX-Edge_MIDI_Imple_eng02_W.pdf","sha256":"c728df8af34fdf4801314ead8a535069c4923de6dcf3c05a0f5d365e9fee075a","pages":21,"url":"https://static.roland.com/assets/media/pdf/AX-Edge_MIDI_Imple_eng02_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"AX-Edge","date":"Jul 1, 2020","version":"1.01","file":"AX-Edge_MIDI_Imple_eng02_W.pdf","sha256":"c728df8af34fdf4801314ead8a535069c4923de6dcf3c05a0f5d365e9fee075a","pages":21,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/AX-Edge_MIDI_Imple_eng02_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 00 52",
   "issues": [],
   "tables": [

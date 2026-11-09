@@ -135,4 +135,7 @@ export default {
     'The tone name (ToneCom, p8) is printed as sixteen rows all called "Name", so it comes out as sixteen one-character parameters (gaia2Tone.name, gaia2Tone.name_0801 … _080F) rather than one text field.',
     'Analog Model AMP MOD (p95) is printed with a wire range of (-100 - 100) on a two-nibble value; every neighbouring ±100 parameter is (28 - 228). Transcribed as printed, so analog.ampMod defaults to -100 and the engine refuses to send anything below 0.',
   ],
+
+  // Read on request, not at connect. A tone is either a GAIA-2 model or an Analog Synth model; the idle model area may not answer, and the startup read stops at the first request that is not.
+  noPull: [/^(lfo|osc|partial|gaia2Tone|analog|analogTone)$/],
 };

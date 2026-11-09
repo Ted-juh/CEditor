@@ -109,4 +109,7 @@ export default {
       + 'here are labelled one place off.',
     ...sharedNotes,
   ],
+
+  // Read on request, not at connect. Part 1 plays one kind of tone at a time; the instrument does not answer for the others, and the startup read stops at the first request that is not answered.
+  noPull: [/^(part1\.(zcore|analog|jupiterX)|rdPiano)(\.|$)/],
 };

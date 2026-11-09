@@ -274,4 +274,7 @@ export default {
       + 'system.value), TFX 00 02-00 05 (0-127 each, tfx.value and tfx.value_<address>), Studio Set Common 00 34 (0-15, studioSet.value) '
       + 'and Studio Set Controller 00 18 (0-15, controller.value).',
   ],
+
+  // Read on request, not at connect. Part 1 holds one of five tone types; the other four are not answered (p6), and the startup read stops at the first request that is not.
+  noPull: [/^part1\.(pcmSynth|snSynth|snAcoustic|snDrums|pcmDrums)(\.|$)/],
 };

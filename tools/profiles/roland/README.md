@@ -49,23 +49,68 @@ dash and its headings are marked `❍` rather than `**`.
 
 ## The profiles
 
-| Profile | Manual | Parameters | Blocks | Example messages reproduced |
+Each is the instrument's edit buffer (its temporary area), read from the manual named in its
+`sources`, and each carries the manual's printed example message as a test where the manual prints
+a usable one. What a profile leaves out — other parts' tones, the rest of a large drum kit, user
+memories — is listed with its addresses in that profile's `coverage`.
+
+| Profile | Manual | Parameters | Blocks | Example |
 |---|---|---|---|---|
-| `roland-jd-xi` | JD-Xi MIDI Implementation 1.00 (May 2015) | 6,199 | 67 (program, 4 parts, 2 SuperNATURAL tones, analog tone, drum kit with 37 keys) | 1 of 1 (p18) |
+| `roland-jd-xi` | JD-Xi 1.00 (May 2015) | 6,199 | 67 | p18 |
+| `roland-jd-xa` | JD-XA 1.00 (May 2015) | 3,683 | 171 | none usable: p20 contradicts p10 (`examplesUnavailable`) |
+| `roland-gaia-2` | GAIA2 1.00 (Sep 2023) | 497 | 19 | p102 |
+| `roland-fa-06` | FA-06/07/08 1.01 (Jun 2017) | 11,054 | 241 | p36 |
+| `roland-juno-x` | JUNO-X 1.10 (Apr 2022) | 2,668 | 80 | p91 |
+| `roland-jupiter-x` | JUPITER-X/Xm 1.06 (Apr 2022) | 2,773 | 81 | p90 |
+| `roland-fantom` | FANTOM-6/7/8 1.00 (Nov 2020) | 11,791 | 439 | p66 |
+| `roland-ax-edge` | AX-Edge 1.01 (Jul 2020) | 1,991 | 63 | p21 |
+| `roland-juno-ds` | JUNO-DS 1.01 (Feb 2018) | 11,918 | 143 | p64 |
+| `roland-xps-30` | XPS-30 1.01 (Feb 2018) | 11,918 | 143 | p64 |
+| `roland-xps-10` | XPS-10 1.00 (Apr 2014) | 11,899 | 141 | p27 |
+
+Things the manuals got wrong, found while laying these out and recorded in each layout rather than
+corrected: the JD-XA's only example writes Reverb Type to the Reverb Switch's address; the GAIA-2's
+identity table prints the JUPITER-X's family code beside a reply message that prints its own; the
+JUPITER-X prints its model ID's last byte as 52H (the AX-Edge's) in two byte lists; the FA-06/07/08
+names the INTEGRA-7's model ID (64H) in one sentence and uses 77H everywhere else; the JUNO-DS and
+XPS-30 print an identity message that disagrees with their own byte tables.
+
+## The generator's rules, and why
+
+- **A block bigger than one packet is requested in pieces.** "Data larger than 256 bytes will be
+  divided into packets of 256 bytes or less" (128 in a few). A reply in several DT1s cannot be
+  matched as one dump, so the request is cut — between parameters, never through one — into pieces
+  that each come back whole. The packet size is read from the manual into the map.
+- **`noPull` keeps a block out of the startup read.** A part holds one tone type at a time and the
+  instrument does not answer requests for the others; the engine's startup chain stops at the first
+  request that times out. Alternative tone types are therefore read when asked for, not on connect.
+- **A run of ASCII rows is one text parameter** — however the manual spells it: `Name 1 … 12`,
+  `NAME 1 … 16`, `Name` printed sixteen times, `Scene Memo 1 … 64`.
+- **A name printed more than once in a block is numbered** in printed order (`LFO1 Step 1 … 16`),
+  and `#` is spelled `Sharp` in ids, so ids can be templated across parts instead of carrying
+  address suffixes.
+- **A row with a range and no name** is named for its offset (`Unnamed (offset 00 11)`).
+- **A wire range below zero on an unsigned encoding** is a display range printed in the wrong
+  column; no byte can carry it, so the parameter is read-only and says why.
 
 ## Which Roland manuals can be read this way (surveyed November 2026)
 
-From `www.roland.com/<region>/support/by_product/<model>/owners_manuals/`, PDFs on
-`static.roland.com`. Older models are listed on the `us` and `uk` sites but not `global`.
+Every product page on the global, US and UK sites was checked (1,104 of them). PDFs are on
+`static.roland.com`; older models are listed on the `us` and `uk` sites only.
 
 | State | Models |
 |---|---|
-| **Parsed cleanly** | JD-Xi ✓ (0 issues), SH-01 GAIA (0), SH-201 (0), JUNO-DS (0), XPS-30 (0), XPS-10 (1) |
-| **Nearly** | JD-XA (4): its Analog Partial table closes at a page foot and reopens with no heading, so the reader sees an unnamed second table — the parser needs to join a headless table onto the open one; and two Keyboard Fade Width rows whose range is not in brackets |
-| **Newer table style — needs parser work** (hundreds of issues) | GAIA-2, JUNO-X, JUPITER-X/Xm, FANTOM-6/7/8, AX-Edge; FA-06/07/08 extracts almost nothing |
-| **Not yet tried** | SH-32, JUNO-D, JUNO-Di, JUNO-Gi, V-Synth GT, V-Synth XT (MIDI Implementations on the US site) |
-| **Scanned, no text** — needs OCR first | JV-1080, JV-2080, JV-1010, XV-5080/3080/5050/2020, XP-30/50/60/80, JP-8000, JP-8080 (MIDI Implementation is in the owner's manual) |
-| **No address map published** | The Boutiques (JP-08, JU-06/06A, JX-03, SE-02, SH-01A, …) and the AIRA/TR line: one-page MIDI charts only; their CCs are a different, simpler source |
+| **Profiles** | the eleven above |
+| **MIDI Implementation reads cleanly; layout to write** | INTEGRA-7, JUPITER-80, JUPITER-50, FANTOM-06/07/08, FANTOM EX, FANTOM-G, JUNO-Gi, JUNO-D6/D7/D8, JUNO-D, JUNO-Di, XPS-10X, XPS-60, MC-808, MC-909, SD-90, V-Synth GT, VR-700 |
+| **Reads with a few issues** | SH-32, the original FANTOM, Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, and the RD stage pianos (RD-2000, -800, -88, -08, -700NX/GX, -300NX/GX/SX) |
+| **Address map inside the owner's manual, with text** | XV-5080, XV-3080, XV-5050, XV-2020, XV-88, XP-30, JV-1010, V-Synth, FANTOM-X6/X7/X8, FANTOM-XR, JUNO-G, JUNO-STAGE, SonicCell, VR-760, RD-700, RD-700SX |
+| **Scanned, no text** — OCR plus an independent transcription to check against | JV-1080, JV-2080, XP-10/50/60/80, JP-8000, MC-303, MC-505, MC-80, MC-50mkII |
+| **No address map published** | The Boutiques (JP-08, JU-06/06A, JX-03/08, JD-08, SE-02, SH-01A, …), SYSTEM-1/1m/8, SH-4d, the AIRA and TR lines, MC-101/707: CC tables only, a different and simpler source |
+
+OCR was tried on the JV-1080's: at 300 dpi it reads the tables but misreads offsets (`00 2B` as
+`00 28`) and labels (`1600` as `2600`), and the 1994 table grammar differs. The address arithmetic
+can catch the offsets; nothing automatic can catch a label, so the scanned machines wait for a second
+source to check against.
 
 ## Adding a synth
 
@@ -77,5 +122,7 @@ From `www.roland.com/<region>/support/by_product/<model>/owners_manuals/`, PDFs 
    than one entry.
 3. Copy the manual's example messages (usually the last pages, "Examples of Exclusive Messages")
    into `examples`. They are the check that does not depend on any of this code.
-4. `make-profiles.mjs`, then add the profile to `runProfileTests`' list in
+4. If a part can hold alternative tone types, list them in `noPull`.
+5. `make-profiles.mjs`, then add the profile to `runProfileTests`' list in
    `CE/tests/DeviceProfileEngineTests.cpp` so the C++ engine checks the same bytes.
+6. `ROLAND_SYNTH=<name>` limits `rolandManualProfiles.test.js` to that layout while you work.

@@ -68,7 +68,10 @@ export function resolvePath(map, path) {
 
 /* ------------------------------------------------------------------ naming */
 
+// `#` is a sharp, not punctuation: dropping it made "Scale Tune for C#" the same id as "for C",
+// and the address suffix the collision then got differed from part to part.
 export const camel = (s) => s
+  .replace(/#/g, ' Sharp ')
   .replace(/[^A-Za-z0-9 ]/g, ' ')
   .trim()
   .split(/\s+/)
@@ -88,30 +91,61 @@ function preferredComponent(name, labels) {
 /* ------------------------------------------------------------------ parameters */
 
 /**
- * Consecutive `… Name 1` … `… Name N` ASCII rows are one name, not N numbers: collapsed to a single
- * `text` parameter at the first address, the way the GAIA's 12 Patch Name bytes are.
+ * A run of ASCII rows is one string, not N numbers: collapsed to a single `text` parameter at the
+ * first address, the way the GAIA's 12 Patch Name bytes are. Manuals spell the run three ways —
+ * `Patch Name 1 … 12` (GAIA, JD-Xi), `NAME 1 … 16` (AX-Edge), and `Name` printed sixteen times with
+ * no number at all (GAIA-2, FANTOM, JUNO-X) — and a `Scene Memo 1 … 64` is the same thing. A run
+ * must be 32 - 127 throughout, at consecutive addresses, and named for text (name, memo, comment,
+ * title), so a sixteen-step sequence that happens to share a name is never mistaken for one.
  */
 function nameRuns(rows) {
   const runs = new Map();
+  const TEXTY = /\b(name|memo|comment|title)\b/i;
+  const stemOf = (name) => {
+    const numbered = /^(.*?)\s*(\d+)$/.exec(name ?? '');
+    return numbered ? { stem: numbered[1], n: Number(numbered[2]) } : { stem: name ?? '', n: null };
+  };
   for (let i = 0; i < rows.length; i++) {
-    const match = /^(.*\bName) 1$/.exec(rows[i].name ?? '');
-    if (!match || rows[i].min !== 32) continue;
+    const first = rows[i];
+    if (first.min !== 32 || first.max !== 127 || !TEXTY.test(first.name ?? '')) continue;
+    const { stem, n } = stemOf(first.name);
+    if (n !== null && n !== 1) continue;
     let length = 1;
-    while (rows[i + length] && rows[i + length].name === `${match[1]} ${length + 1}`) length++;
-    if (length > 1) runs.set(i, { label: match[1], length });
+    for (;;) {
+      const next = rows[i + length];
+      if (!next || next.min !== 32 || next.max !== 127) break;
+      if (flat(next.offset) !== flat(first.offset) + length) break;
+      const s2 = stemOf(next.name);
+      const same = n === null ? next.name === first.name : s2.stem.toLowerCase() === stem.toLowerCase() && s2.n === length + 1;
+      if (!same) break;
+      length++;
+    }
+    if (length > 1) {
+      runs.set(i, { label: stem, length });
+      i += length - 1;
+    }
   }
   return runs;
 }
 
 function buildParameter(row, block, address, stripName) {
-  const leafName = stripName(row.name);
+  // A row the manual prints with a range and no name (the JD-XA's Analog Common 00 11, six in the
+  // FA-06/07/08) is still an address with a range; it is named for where it is, not left blank.
+  const unnamed = !String(row.name ?? '').trim();
+  const printedName = unnamed ? `Unnamed (offset ${row.offset})` : row.name;
+  const leafName = unnamed ? `offset ${row.offset.replace(/ /g, '')}` : stripName(row.name);
   const meaning = interpretRow(row);
+  // A wire range below zero on an unsigned encoding is a display range printed in the wrong
+  // column (the GAIA-2's and JUPITER-X's AMP MOD, -100 - 100 on two nibbles). No byte on the wire
+  // can carry it, so the parameter is read-only rather than a control that sends nonsense.
+  const impossible = row.min < 0;
   const base = {
     id: `${block.id}.${camel(leafName) || 'value'}`,
-    name: row.name,
+    name: printedName,
     group: block.group,
     address,
-    access: { canRead: true, canWrite: true, realtimeSafe: !block.system, source: 'singleParameter' },
+    ...(impossible ? { description: `The manual prints ${row.min} - ${row.max} as this value's wire range, which this encoding cannot carry; read-only until an instrument shows the real wire values.` } : {}),
+    access: { canRead: true, canWrite: !impossible, realtimeSafe: !block.system, source: 'singleParameter' },
     messageRecipe: 'dt1',
     ui: { preferredComponent: preferredComponent(row.name, meaning.labels) },
   };
@@ -143,7 +177,7 @@ function buildParameter(row, block, address, stripName) {
   return {
     ...base,
     type: bipolar ? 'bipolar' : 'integer',
-    ...(meaning.description ? { description: meaning.description } : {}),
+    ...(meaning.description && !impossible ? { description: meaning.description } : {}),
     range: { min: row.min, max: row.max },
     default: bipolar ? Math.round((row.min + row.max) / 2) : row.min,
     display: {
@@ -161,16 +195,16 @@ function buildParameter(row, block, address, stripName) {
   };
 }
 
-function textParameter(run, block, address) {
+function textParameter(run, block, address, stripName) {
   return {
-    id: `${block.id}.${camel(run.label.replace(/^.*\b(Name)$/, '$1'))}`,
+    id: `${block.id}.${camel(stripName(run.label)) || 'name'}`,
     name: run.label,
     group: block.group,
     type: 'text',
     address,
     length: run.length,
     default: 'INIT'.padEnd(run.length, ' '),
-    display: { mode: 'text', shortLabel: 'Name' },
+    display: { mode: 'text', shortLabel: /memo|comment/i.test(run.label) ? 'Memo' : 'Name' },
     encoding: { type: 'text-ascii', length: run.length, pad: 32 },
     access: { canRead: true, canWrite: true, realtimeSafe: false, source: 'singleParameter' },
     sendPolicy: { mode: 'onCommit', coalesce: false },
@@ -192,7 +226,10 @@ export function buildProfile(map, synth) {
   const blocks = synth.blocks.map((block) => {
     const table = tableByName.get(block.table);
     if (!table) throw new Error(`${synth.id}: block ${block.id} names table "${block.table}", which the map does not have`);
-    return { ...block, table, base: resolvePath(map, block.path), size: table.totalSize };
+    // `noPull` (a list of patterns over block ids) marks blocks the startup read leaves alone; a
+    // block's own `pull: false` says the same for one block.
+    const pull = block.pull ?? !(synth.noPull ?? []).some((pattern) => pattern.test(block.id));
+    return { ...block, pull, table, base: resolvePath(map, block.path), size: table.totalSize };
   });
 
   const parameters = [];
@@ -204,23 +241,37 @@ export function buildProfile(map, synth) {
     blockIds.add(block.id);
     const rows = block.table.rows.filter((r) => !r.gap && !r.reserved);
     const runs = nameRuns(rows);
-    // An id leaves out what the name says about MIDI: `Part Level (CC# 7)` is part.<x>.level, and
-    // the CC number stays in the name, where a person reads it.
+    // An id leaves out what the name says about MIDI: `Part Level (CC# 7)` is part.<x>.level,
+    // `Hold (CC#126/127)` is …hold, and the numbers stay in the name, where a person reads them.
     const strip = (name) => {
-      const bare = name.replace(/\s*\((?:CC|RPN|NRPN)#\s*\d+\)|\s*\(PC\)/g, '');
+      const bare = name.replace(/\s*\((?:CC|RPN|NRPN)#\s*[\d/, ]+\)|\s*\(PC\)/g, '');
       return (block.strip ? bare.replace(block.strip, '') : bare).trim() || bare;
     };
+    // A name the manual prints more than once in one block without a number — the two LFOs'
+    // sixteen `LFO1 Step` rows, a mix table's four `Partial Level` — is numbered in the order
+    // printed: `LFO1 Step 1 … 16`, rather than told apart by an address suffix nobody can template.
+    const consumed = new Set();
+    for (const [i, run] of runs) for (let k = 0; k < run.length; k++) consumed.add(i + k);
+    const counts = new Map();
+    rows.forEach((r, i) => { if (!consumed.has(i) && r.name) counts.set(r.name, (counts.get(r.name) ?? 0) + 1); });
+    const ordinal = new Map();
     for (let i = 0; i < rows.length; i++) {
       const address = addAddress(block.base, rows[i].offset);
       let parameter;
       if (runs.has(i)) {
-        parameter = textParameter(runs.get(i), block, address);
+        parameter = textParameter(runs.get(i), block, address, strip);
         i += runs.get(i).length - 1;
       } else {
-        parameter = buildParameter(rows[i], block, address, strip);
+        let row = rows[i];
+        if (row.name && counts.get(row.name) > 1) {
+          const n = (ordinal.get(row.name) ?? 0) + 1;
+          ordinal.set(row.name, n);
+          row = { ...row, name: `${row.name} ${n}` };
+        }
+        parameter = buildParameter(row, block, address, strip);
       }
-      // Two rows whose names camel-case alike (rare: a manual that prints the same label twice in
-      // one block) keep both, distinguished by address, rather than one silently replacing the other.
+      // Two rows whose names still camel-case alike keep both, told apart by address, rather than
+      // one silently replacing the other.
       if (seen.has(parameter.id)) {
         const renamed = `${parameter.id}_${address.split(' ').slice(-2).join('')}`;
         notes.push(`${parameter.id} occurs twice in ${block.table.name}; the second is ${renamed}`);
@@ -232,40 +283,69 @@ export function buildProfile(map, synth) {
     }
   }
 
-  /* ---- dumps: one per block, every parameter at its address's distance from the block base.
+  /* ---- dumps and requests: one per block, or per piece of a block bigger than one packet.
+   *
+   * "Data larger than 256 bytes will be divided into packets of 256 bytes or less" (128 in the
+   * MC-09's and VR-09's manuals). A reply in several DT1s, each with its own address, cannot be
+   * matched as one dump, so a bigger block is requested in pieces that each come back whole. The
+   * cuts fall between parameters, never through a multi-byte value or a name.
    *
    *   F0 41 dev <model id…> 12 <address…> <data…> sum F7
    *
    * so the payload starts after the header and the address, the checksum covers the address and
    * the data and never the header, and the whole message is payload + size + 2. */
-  const dumpDefinitions = blocks.map((block) => {
-    const payloadOffset = 3 + model.length + 1 + parseBytes(block.base).length;
+  const packet = map.source?.packetSize ?? 128;
+  const widthOf = (p) => p.length ?? p.encoding?.nibbles ?? 1;
+  const pieces = blocks.flatMap((block) => {
     const size = flat(block.size);
-    const mappings = parameters
-      .filter((p) => blockOf.get(p.id) === block.id)
-      .map((p) => ({ parameter: p.id, offset: flat(p.address) - flat(block.base) }));
-    for (const m of mappings) {
-      if (m.offset < 0 || m.offset >= size) throw new Error(`${m.parameter} lies outside block ${block.id} (size ${block.size})`);
+    const members = parameters.filter((p) => blockOf.get(p.id) === block.id)
+      .map((p) => ({ p, offset: flat(p.address) - flat(block.base) }))
+      .sort((a, b) => a.offset - b.offset);
+    for (const m of members) {
+      if (m.offset < 0 || m.offset >= size) throw new Error(`${m.p.id} lies outside block ${block.id} (size ${block.size})`);
     }
+    if (size <= packet) return [{ block, id: block.id, start: 0, size, members }];
+    const cuts = [0];
+    for (const m of members) {
+      if (m.offset + widthOf(m.p) - cuts.at(-1) > packet) cuts.push(m.offset);
+    }
+    while (size - cuts.at(-1) > packet) cuts.push(cuts.at(-1) + packet); // a reserved tail
+    return cuts.map((start, k) => {
+      const end = k + 1 < cuts.length ? cuts[k + 1] : size;
+      return {
+        block,
+        id: `${block.id}.part${k + 1}`,
+        start,
+        size: end - start,
+        members: members.filter((m) => m.offset >= start && m.offset < end),
+      };
+    }).filter((piece) => piece.members.length);
+  });
+  const sizeBytes = (n, length) => formatBytes(Array.from({ length }, (unused, i) => Math.floor(n / 128 ** (length - 1 - i)) % 128));
+
+  const dumpDefinitions = pieces.map((piece) => {
+    const base = addAddress(piece.block.base, sizeBytes(piece.start, 4));
+    const addressLength = parseBytes(base).length;
+    const payloadOffset = 3 + model.length + 1 + addressLength;
     return {
-      id: block.id,
-      name: block.group,
+      id: piece.id,
+      name: piece.id === piece.block.id ? piece.block.group : `${piece.block.group} (${piece.id.split('.').at(-1)})`,
       kind: 'sysex',
-      matcher: { prefix: [...header('12'), ...block.base.split(' ')], suffix: ['F7'] },
-      payload: { offset: payloadOffset, size },
+      matcher: { prefix: [...header('12'), ...base.split(' ')], suffix: ['F7'] },
+      payload: { offset: payloadOffset, size: piece.size },
       checksum: {
         type: 'roland-7bit',
-        fromOffset: payloadOffset - parseBytes(block.base).length,
-        toOffset: payloadOffset + size - 1,
-        byteOffset: payloadOffset + size,
+        fromOffset: payloadOffset - addressLength,
+        toOffset: payloadOffset + piece.size - 1,
+        byteOffset: payloadOffset + piece.size,
       },
-      completion: { expectedMessages: 1, expectedBytes: payloadOffset + size + 2 },
-      requestRecipe: requestIdFor(block.id),
-      mappings,
+      completion: { expectedMessages: 1, expectedBytes: payloadOffset + piece.size + 2 },
+      requestRecipe: requestIdFor(piece.id),
+      mappings: piece.members.map((m) => ({ parameter: m.p.id, offset: m.offset - piece.start })),
     };
   });
 
-  /* ---- requests: an identity request, then one RQ1 per block with its constant checksum baked in. */
+  /* ---- requests: an identity request, then one RQ1 per dump with its constant checksum baked in. */
   const rq1Template = (address, size) => {
     const body = [...parseBytes(address), ...parseBytes(size)];
     return [...header('11'), ...formatBytes(body).split(' '), formatBytes([rolandChecksum(body)]), 'F7'];
@@ -280,18 +360,28 @@ export function buildProfile(map, synth) {
       timeoutMs: 1000,
       retries: 0,
     },
-    ...blocks.map((block) => ({
-      id: requestIdFor(block.id),
-      name: `Request ${block.group}`,
-      kind: 'sysex',
-      template: rq1Template(block.base, block.size),
-      address: block.base,
-      size: block.size,
-      response: { kind: 'bulkDump', dump: block.id },
-      timeoutMs: 1000,
-      retries: 1,
-    })),
+    ...pieces.map((piece) => {
+      const address = addAddress(piece.block.base, sizeBytes(piece.start, 4));
+      const size = sizeBytes(piece.size, 4);
+      return {
+        id: requestIdFor(piece.id),
+        name: `Request ${piece.id === piece.block.id ? piece.block.group : `${piece.block.group} (${piece.id.split('.').at(-1)})`}`,
+        kind: 'sysex',
+        template: rq1Template(address, size),
+        address,
+        size,
+        response: { kind: 'bulkDump', dump: piece.id },
+        timeoutMs: 1000,
+        retries: 1,
+      };
+    }),
   ];
+
+  // What the startup read pulls. A block marked `pull: false` is one the instrument may not answer —
+  // a tone type the part is not playing gets no reply (FA-06/07/08 p6), and the engine's startup
+  // chain stops at the first request that times out — so it is read when asked for, not on connect.
+  const pulled = pieces.filter((piece) => piece.block.pull !== false && (!piece.block.system || synth.pullSystem));
+  const notPulled = [...new Set(pieces.filter((piece) => piece.block.pull === false).map((piece) => piece.block.id))];
 
   /* ---- tests: the manual's own messages first; they are the ones that do not trust our code. */
   const byId = new Map(parameters.map((p) => [p.id, p]));
@@ -334,6 +424,8 @@ export function buildProfile(map, synth) {
       'Generated by tools/profiles/roland/make-profiles.mjs; edit the layout in tools/profiles/roland/synths/, not this file.',
       'Every parameter is the manual\'s, at the manual\'s address, with the manual\'s name. Nothing here has been sent to a real instrument yet.',
       ...(synth.notes ?? []),
+      ...(synth.examplesUnavailable ? [`No example message is checked: ${synth.examplesUnavailable}`] : []),
+      ...(notPulled.length ? [`Not read at startup (read on request, since the instrument may not answer them): ${notPulled.join(', ')}.`] : []),
       ...notes,
     ],
     variables: { deviceId: synth.deviceId, channel: 1 },
@@ -377,7 +469,7 @@ export function buildProfile(map, synth) {
     startup: {
       policy: 'pull',
       syncDirection: 'pull',
-      sync: [{ request: 'identityRequest' }, ...blocks.filter((b) => !b.system || synth.pullSystem).map((b) => ({ request: requestIdFor(b.id) }))],
+      sync: [{ request: 'identityRequest' }, ...pulled.map((piece) => ({ request: requestIdFor(piece.id) }))],
     },
     parameters,
     tests,

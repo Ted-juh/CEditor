@@ -83,4 +83,7 @@ export default {
       + 'XPS-30 manual prints over its own byte table\'s 03 00, while the XPS-10 manual reads 01 00 in both places. The byte table is used here; '
       + 'if the instrument answers 00 00, the status line was right and this profile will not recognise it.',
   ],
+
+  // Read on request, not at connect. The patch-mode part holds a patch or a drum kit, not both; the one it does not hold is not answered, and the startup read stops at the first request that is not.
+  noPull: [/^(patch|drum)(\.|$)/],
 };

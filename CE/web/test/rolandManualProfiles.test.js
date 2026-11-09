@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { readText } from './support/readText.mjs';
 import { checkTables, flat, parseAddressMap } from '../../../tools/profiles/roland/parse-address-map.mjs';
 import { interpretRow } from '../../../tools/profiles/roland/interpret.mjs';
-import { addAddress, rolandChecksum } from '../../../tools/profiles/roland/build-profile.mjs';
+import { addAddress, buildProfile, camel, rolandChecksum } from '../../../tools/profiles/roland/build-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/roland/make-profiles.mjs';
 import { localCompileParameter, localParseDumpMessage } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
@@ -181,6 +181,66 @@ test('addresses add in 7-bit digits, with carry', () => {
   assert.equal(flat('00 00 01 43'), 195);
 });
 
+/* ------------------------------------------------------------------ the generator's rules */
+
+// A small synthetic synth, built by hand, that meets every rule the six real layouts asked for.
+const row = (offset, name, min, max, extra = {}) => ({ offset, bits: ['0aaa aaaa'], name, display: undefined, min, max, ...extra });
+const SYNTHETIC_MAP = {
+  source: { model: 'TEST-1', packetSize: 4 },
+  modelId: '00 00 7A',
+  tables: [
+    { name: 'TEST-1 (ModelID = 00H 00H 7AH)', kind: 'offsets', entries: [{ address: '10 00 00 00', name: 'Temporary Tone' }], rows: [] },
+    {
+      name: 'Tone', kind: 'parameters', totalSize: '00 00 00 0C', entries: [],
+      rows: [
+        ...[0, 1, 2, 3].map((i) => row(`00 0${i}`, 'Name', 32, 127)),   // "Name" printed four times
+        row('00 04', 'LFO Step', 0, 127), row('00 05', 'LFO Step', 0, 127), // a repeat with no number
+        row('00 06', 'Scale Tune for C', 0, 127), row('00 07', 'Scale Tune for C#', 0, 127),
+        row('00 08', '', 0, 31),                                           // printed with no name
+        row('00 09', 'Amp Mod', -100, 100),                                // a display range in the wire column
+        row('00 0A', 'Level', 0, 127), row('00 0B', 'Pan', 0, 127),
+      ],
+    },
+  ],
+};
+const SYNTHETIC = {
+  id: 'test-1', name: 'Test 1', family: 'T', deviceId: 0x10,
+  identity: { familyCode: ['7A', '00'], modelNumber: ['00', '00'] },
+  blocks: [{ id: 'tone', table: 'Tone', path: ['Temporary Tone'], group: 'Tone' }],
+};
+
+test('the generator: names, repeats, sharps, unnamed rows, impossible ranges', () => {
+  const profile = buildProfile(SYNTHETIC_MAP, SYNTHETIC);
+  const byId = new Map(profile.parameters.map((p) => [p.id, p]));
+  const name = byId.get('tone.name');
+  assert.deepEqual([name?.type, name?.length], ['text', 4], '"Name" printed four times is one four-letter name');
+  assert.ok(byId.has('tone.lfoStep1') && byId.has('tone.lfoStep2'), 'a repeated name is numbered in the order printed');
+  assert.ok(byId.has('tone.scaleTuneForC') && byId.has('tone.scaleTuneForCSharp'), '# is a sharp, not a collision');
+  const unnamed = byId.get('tone.offset0008');
+  assert.equal(unnamed?.name, 'Unnamed (offset 00 08)');
+  const amp = byId.get('tone.ampMod');
+  assert.equal(amp.access.canWrite, false, 'a negative wire range cannot be sent, so it is read-only');
+  assert.match(amp.description, /wire range/);
+  assert.equal(camel('Scale Tune for C#'), 'scaleTuneForCSharp');
+});
+
+test('the generator: a block bigger than one packet is requested in pieces cut between parameters', () => {
+  const profile = buildProfile(SYNTHETIC_MAP, SYNTHETIC);
+  // 12 bytes at a packet size of 4: the 4-byte name, then 4 single bytes, then 4 more.
+  assert.deepEqual(profile.dumpDefinitions.map((d) => [d.id, d.payload.size]), [['tone.part1', 4], ['tone.part2', 4], ['tone.part3', 4]]);
+  assert.deepEqual(profile.requests.slice(1).map((r) => [r.address, r.size]),
+    [['10 00 00 00', '00 00 00 04'], ['10 00 00 04', '00 00 00 04'], ['10 00 00 08', '00 00 00 04']]);
+  const mapped = profile.dumpDefinitions.flatMap((d) => d.mappings.map((m) => m.parameter));
+  assert.equal(mapped.length, profile.parameters.length, 'every parameter is in exactly one piece');
+});
+
+test('the generator: a block marked noPull is not read at startup', () => {
+  const profile = buildProfile(SYNTHETIC_MAP, { ...SYNTHETIC, noPull: [/^tone$/] });
+  assert.deepEqual(profile.startup.sync, [{ request: 'identityRequest' }]);
+  assert.ok(profile.requests.some((r) => r.id === 'requestTonePart1'), 'still requestable on demand');
+  assert.ok(profile.authoringNotes.some((n) => /Not read at startup/.test(n)));
+});
+
 /* ------------------------------------------------------------------ the profiles */
 
 // ROLAND_SYNTH=jd-xa,juno-ds checks just those layouts — for working on one while another is open.
@@ -289,6 +349,13 @@ for (const { synth, profile, text, out } of BUILT) {
         : data[m.offset];
       assert.equal(parsed.values[m.parameter], expected, `${m.parameter} at offset ${m.offset}`);
     }
+  });
+
+  test(`${synth.id}: no reply is bigger than one packet`, () => {
+    // A bigger block comes back as several DT1s, which no single dump definition can match.
+    const map = JSON.parse(readFileSync(new URL(`../../../tools/profiles/roland/maps/${synth.map}.json`, import.meta.url), 'utf8'));
+    const packet = map.source.packetSize ?? 128;
+    for (const dump of profile.dumpDefinitions) assert.ok(dump.payload.size <= packet, `${dump.id} is ${dump.payload.size} bytes`);
   });
 
   test(`${synth.id}: says it is unverified on hardware, and where it came from`, () => {

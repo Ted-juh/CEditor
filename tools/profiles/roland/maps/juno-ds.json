@@ -1,5 +1,5 @@
 {
-  "source": {"model":"JUNO-DS61/DS88","date":"Feb 15, 2018","version":"1.01","file":"JUNO-DS_MIDI_Imple_eng02_W.pdf","sha256":"7d9943e48497708a51570c51ab1dd097c1fafa2a2b8c6b818f47bb07158ba3c0","pages":67,"url":"https://static.roland.com/assets/media/pdf/JUNO-DS_MIDI_Imple_eng02_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"JUNO-DS61/DS88","date":"Feb 15, 2018","version":"1.01","file":"JUNO-DS_MIDI_Imple_eng02_W.pdf","sha256":"7d9943e48497708a51570c51ab1dd097c1fafa2a2b8c6b818f47bb07158ba3c0","pages":67,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JUNO-DS_MIDI_Imple_eng02_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 3A",
   "issues": [],
   "tables": [

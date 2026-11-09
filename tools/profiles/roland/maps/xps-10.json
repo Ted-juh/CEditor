@@ -1,5 +1,5 @@
 {
-  "source": {"model":"XPS-10","date":"April 1, 2014","version":"1.00","file":"XPS-10_MIDI_Imple_e01.pdf","sha256":"36dcb409cb66ac4bc877345781215a6a9513e8f8b70976b535d06ca85cb14cac","pages":29,"url":"https://static.roland.com/assets/media/pdf/XPS-10_MIDI_Imple_e01.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"XPS-10","date":"April 1, 2014","version":"1.00","file":"XPS-10_MIDI_Imple_e01.pdf","sha256":"36dcb409cb66ac4bc877345781215a6a9513e8f8b70976b535d06ca85cb14cac","pages":29,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/XPS-10_MIDI_Imple_e01.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 3A",
   "issues": [],
   "tables": [

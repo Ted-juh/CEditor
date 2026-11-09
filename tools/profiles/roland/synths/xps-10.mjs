@@ -81,4 +81,7 @@ export default {
     'Presets list the Patches and Rhythm Sets (Bank Select MSB 87 and 86, p1), recalled on the profile\'s channel, which is the Kbd Patch Rx/Tx Channel in Patch mode. '
       + 'Performances (MSB 85: User 000, Preset 064) are selected on the Performance Control Channel instead and are not listed; nor are the GM banks (MSB 120/121).',
   ],
+
+  // Read on request, not at connect. The patch-mode part holds a patch or a rhythm set, not both; the one it does not hold is not answered, and the startup read stops at the first request that is not.
+  noPull: [/^(patch|rhythm)(\.|$)/],
 };

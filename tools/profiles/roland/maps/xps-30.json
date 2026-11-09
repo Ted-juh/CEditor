@@ -1,5 +1,5 @@
 {
-  "source": {"model":"XPS-30","date":"Feb 15, 2018","version":"1.01","file":"XPS-30_MIDI_Imple_eng02_W.pdf","sha256":"b119c90192e8646371801ad73e0ac6c9e9f230afcb54d12a88bbd5e9c6710196","pages":67,"url":"https://static.roland.com/assets/media/pdf/XPS-30_MIDI_Imple_eng02_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"XPS-30","date":"Feb 15, 2018","version":"1.01","file":"XPS-30_MIDI_Imple_eng02_W.pdf","sha256":"b119c90192e8646371801ad73e0ac6c9e9f230afcb54d12a88bbd5e9c6710196","pages":67,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/XPS-30_MIDI_Imple_eng02_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 3A",
   "issues": [],
   "tables": [

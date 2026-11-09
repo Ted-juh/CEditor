@@ -20,8 +20,10 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 /** `Model: JD-Xi` / `Date: May 1, 2015` / `Version: 1.00`, from the document's own header. */
 export function documentHeader(text) {
   const firstPage = text.split('\f')[0];
-  const field = (label) => new RegExp(`^\\s*${label}\\s*:?\\s+(.+?)(?:\\s{3,}|$)`, 'mi').exec(firstPage)?.[1]?.trim() ?? null;
-  return { model: field('Model'), date: field('Date'), version: field('Version') };
+  // The colon may be a full-width one (the FANTOM's `Date： Nov 1, 2020`), and the AX-Edge's cover
+  // misprints Date as `Data:`.
+  const field = (label) => new RegExp(`^\\s*${label}\\s*[:：]?\\s*(.+?)(?:\\s{3,}|$)`, 'mi').exec(firstPage)?.[1]?.trim() ?? null;
+  return { model: field('Model'), date: field('Dat[ea]'), version: field('Version') };
 }
 
 /**

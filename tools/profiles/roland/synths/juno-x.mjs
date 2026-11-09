@@ -91,4 +91,7 @@ export default {
       + 'A part plays one kind at a time; Scene Part Tone Bank Select / Program Change say which.',
     ...sharedNotes,
   ],
+
+  // Read on request, not at connect. Part 1 plays one kind of tone at a time; the instrument does not answer for the others, and the startup read stops at the first request that is not answered.
+  noPull: [/^(part1\.(zcore|analog|junoX)|rdPiano)(\.|$)/],
 };

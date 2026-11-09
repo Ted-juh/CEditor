@@ -1,5 +1,5 @@
 {
-  "source": {"model":"JUNO-X","date":"April 26, 2022","version":"1.10","file":"JUNO-X_MIDI_imple_eng01_W.pdf","sha256":"a8f761d1578163f8fca03c0d3208571d0ba9a2ab56271fc31f45d21ce4c14c61","pages":92,"url":"https://static.roland.com/assets/media/pdf/JUNO-X_MIDI_imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"JUNO-X","date":"April 26, 2022","version":"1.10","file":"JUNO-X_MIDI_imple_eng01_W.pdf","sha256":"a8f761d1578163f8fca03c0d3208571d0ba9a2ab56271fc31f45d21ce4c14c61","pages":92,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JUNO-X_MIDI_imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 00 00 12",
   "issues": ["appendix 1 (p92): no Total Size row"],
   "tables": [

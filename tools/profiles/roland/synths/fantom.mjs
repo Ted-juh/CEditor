@@ -177,4 +177,7 @@ export default {
     'The EXSN tones (05 00 00 00 + zone) are missing: the manual prints them below the closing border of the top table on p14, and the map stops at that border.',
     'Many rows are printed without a number where they repeat: Name (16 bytes, as 16 rows), the two LFOs of a Partial LFO block, the 16 LFO steps, the four partials of a PMT, the four matrix controls of a partial, the four waves of a drum instrument. Their ids carry the address after the first.',
   ],
+
+  // Read on request, not at connect. Zone 1 plays one kind of tone at a time; the instrument does not answer for the others, and the startup read stops at the first request that is not answered.
+  noPull: [/^(zcore1|sna1|kit1|vpiano)(\.|$)/],
 };

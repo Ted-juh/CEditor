@@ -1,5 +1,5 @@
 {
-  "source": {"model":"FANTOM-6/7/8","date":null,"version":null,"file":"FANTOM-6_7_8_MIDI_Imple_eng01_W.pdf","sha256":"8b16ed3b916637e5255664171e4da9ad639cd7f4db2c9154b85854c9ffa2d6fd","pages":67,"url":"https://static.roland.com/assets/media/pdf/FANTOM-6_7_8_MIDI_Imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"FANTOM-6/7/8","date":"Nov 1, 2020","version":"1.00","file":"FANTOM-6_7_8_MIDI_Imple_eng01_W.pdf","sha256":"8b16ed3b916637e5255664171e4da9ad639cd7f4db2c9154b85854c9ffa2d6fd","pages":67,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/FANTOM-6_7_8_MIDI_Imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 00 5B",
   "issues": [],
   "tables": [

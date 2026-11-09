@@ -1,5 +1,5 @@
 {
-  "source": {"model":"GAIA2","date":"Sep. 1, 2023","version":"1.00","file":"GAIA-2_MIDI_imple_eng01_W.pdf","sha256":"9c454300c235d4d6b288736b0fb61c8cb62bbca5a295340299fed8390e5dcc20","pages":102,"url":"https://static.roland.com/assets/media/pdf/GAIA-2_MIDI_imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
+  "source": {"model":"GAIA2","date":"Sep. 1, 2023","version":"1.00","file":"GAIA-2_MIDI_imple_eng01_W.pdf","sha256":"9c454300c235d4d6b288736b0fb61c8cb62bbca5a295340299fed8390e5dcc20","pages":102,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/GAIA-2_MIDI_imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "01 05 06",
   "issues": [],
   "tables": [
