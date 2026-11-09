@@ -760,9 +760,12 @@
 
   // During multi-drag, non-dragged selected components offset by the shared delta, and so do the
   // Labels attached to what is dragged (utils/attachedLabels.js), selected or not.
+  // A locked control does not follow: the commit leaves it where it is (canvasDragFrame.js
+  // multiDragPatches, rule 3), and following on screen would only make it jump back on release.
   let followsDrag = $derived($multiDragDelta.active && !!$multiDragDelta.followers?.has(core?.id));
-  let multiDragOffsetX = $derived(!isDragging && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active ? $multiDragDelta.x : 0);
-  let multiDragOffsetY = $derived(!isDragging && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active ? $multiDragDelta.y : 0);
+  let followsMultiDrag = $derived(!isDragging && !isLocked && ((isSelected && !carriedByAncestor) || followsDrag) && $multiDragDelta.active);
+  let multiDragOffsetX = $derived(followsMultiDrag ? $multiDragDelta.x : 0);
+  let multiDragOffsetY = $derived(followsMultiDrag ? $multiDragDelta.y : 0);
   // ...and when the pointer has hold of the carried child itself, its own transient position is
   // the same double from the other end: the ancestor is already moving it. Falling back to the
   // stored Transform lets the container's translation be the only thing that moves it on screen,
@@ -1461,6 +1464,8 @@
       const entries = [];
       for (const rootId of roots) {
         if (rootId == null) continue;
+        // A locked control stays where it is, here as in multiDragPatches (its rule 3).
+        if (rootId !== core?.id && findControlById(panelControls, rootId)?._children?.Core?.locked === true) continue;
         let panelX, panelY;
         if (rootId === core?.id) {
           panelX = transientX + parentOffset.x;

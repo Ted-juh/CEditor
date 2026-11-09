@@ -175,6 +175,21 @@ test('top-level multi-drag still moves every selected control by the delta', () 
   assert.equal(patches.has('c'), false);
 });
 
+test('a locked control in the selection stays put while the rest of the selection moves', () => {
+  // The owner's case: a locked background plate selected along with the knobs on it (a marquee
+  // used to do that; Ctrl+A and the Components tree still can) went wherever the knobs were dragged.
+  const plate = ctrl('plate', 0, 0, 600, 400);
+  plate._children.Core.locked = true;
+  const tree = [plate, ctrl('a', 150, 150), ctrl('b', 330, 150)];
+  const patches = multiDragPatches({
+    tree, selectedIds: new Set(['plate', 'a', 'b']), draggedId: 'a', draggedAncestorIds: [],
+    dx: 50, dy: 30, draggedX: 200, draggedY: 180, multi: true, getSection,
+  });
+  assert.deepEqual([...patches.keys()].sort(), ['a', 'b']);
+  assert.deepEqual(patches.get('b'), { 'Transform.x': 380, 'Transform.y': 180 });
+  assert.equal(patches.has('plate'), false);
+});
+
 test('A5(3): a co-selected sibling INSIDE a container is patched — it used to snap back', () => {
   const kidA = ctrl('kidA', 10, 10);
   const kidB = ctrl('kidB', 80, 10);
@@ -295,10 +310,14 @@ test('the broadcast delta is refused by a control an ancestor is already carryin
     /carriedByAncestor = \$derived\(isSelected && hasSelectedAncestor\(parentChainIds, \$selectedComponentIds\)\)/);
   // A knob's attached Labels follow too (followsDrag); utils/attachedLabels.js never names one that
   // sits inside something moving, so they are never carried as well.
+  // A locked control does not follow at all: the commit leaves it in place (multiDragPatches).
+  assert.match(canvasControl,
+    /followsMultiDrag = \$derived\(!isDragging && !isLocked && \(\(isSelected && !carriedByAncestor\) \|\| followsDrag\)/,
+    'the multi-drag follow applies to a carried child again — Ctrl+A then drag double-moves it — or to a locked control');
   for (const axis of ['X', 'Y']) {
     assert.match(canvasControl,
-      new RegExp(`multiDragOffset${axis} = \\$derived\\(!isDragging && \\(\\(isSelected && !carriedByAncestor\\) \\|\\| followsDrag\\)`),
-      `multiDragOffset${axis} applies to a carried child again — Ctrl+A then drag double-moves it`);
+      new RegExp(`multiDragOffset${axis} = \\$derived\\(followsMultiDrag \\? \\$multiDragDelta\\.${axis.toLowerCase()} : 0\\)`),
+      `multiDragOffset${axis} no longer goes through followsMultiDrag`);
   }
 });
 
