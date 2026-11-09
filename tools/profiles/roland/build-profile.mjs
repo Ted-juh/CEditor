@@ -247,7 +247,16 @@ export function buildProfile(map, synth) {
     for (const r of block.table.rows) {
       if (!r.gap && !r.reserved && r.min === undefined) notes.push(`${block.id}: "${r.name}" at ${r.offset} has no range in the manual and is not laid out`);
     }
-    const rows = block.table.rows.filter((r) => !r.gap && !r.reserved && r.min !== undefined);
+    // Two rows printed at one offset (the RD-700GX's Favorite SETUP7 and SETUP8 both at 00 1B) is a
+    // misprint; which is right is not knowable from the page, so the first is kept, the second left
+    // out, and the note says so — never two controls writing the same byte.
+    const taken = new Set();
+    const rows = block.table.rows.filter((r) => !r.gap && !r.reserved && r.min !== undefined).filter((r) => {
+      const at = flat(r.offset);
+      if (taken.has(at)) { notes.push(`${block.id}: the manual prints "${r.name}" at ${r.offset}, which another row already holds; left out`); return false; }
+      taken.add(at);
+      return true;
+    });
     const runs = nameRuns(rows);
     // An id leaves out what the name says about MIDI: `Part Level (CC# 7)` is part.<x>.level,
     // `Hold (CC#126/127)` is …hold, and the numbers stay in the name, where a person reads them.

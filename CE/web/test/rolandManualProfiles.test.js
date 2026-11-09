@@ -190,6 +190,57 @@ XV-TEST (ModelID = 00H 10H)
   assert.ok(map.tables.some((t) => t.name === '1-3-2-5 Rhythm Tone' && t.kind === 'parameters'));
 });
 
+test('the stage pianos\' ways of printing a table', () => {
+  // A run in three lines (RD-300GX/700GX), a row edged with `+`, full addresses where offsets go
+  // (RD-700SX), and a value list with no range (RD-88's Rev HF Damp). Invented numbers.
+  const RD = `
+**Chorus
++------------------------------------------------------------------------------+
+| Offset      |                                                                |
+|     Address |                  Description                                   |
+|-------------+----------------------------------------------------------------|
+|       00 00 | 0000 aaaa | Chorus Type                                (0 - 3) |
+|#      00 01 | 0000 aaaa |                                                    +
+|          : |     :     | Chorus Parameter 1-3              (12768 - 52768) |
+|#      00 09 | 0000 aaaa |                                   -20000 - +20000 |
+|       00 0D | 00aa aaaa | Rev HF Damp                                        |
+|             |           |                       200, 400, 800, 1600, BYPASS |
+|-------------+----------------------------------------------------------------|
+| 00 00 00 0E | Total Size                                                     |
++------------------------------------------------------------------------------+
+
+**System
++------------------------------------------------------------------------------+
+| Address     |                  Description                                   |
+|-------------+----------------------------------------------------------------|
+| 01 00 02 00 | 0aaa aaaa | Low Gain                                   (0 - 30) |
+| 01 00 02 01 | 0aaa aaaa | High Gain                                  (0 - 30) |
+|-------------+----------------------------------------------------------------|
+| 00 00 00 02 | Total Size                                                     |
++------------------------------------------------------------------------------+
+`;
+  const map = parseAddressMap(RD);
+  const chorus = map.tables.find((t) => t.name === 'Chorus');
+  const params = chorus.rows.filter((r) => /Chorus Parameter/.test(r.name ?? ''));
+  assert.deepEqual(params.map((r) => [r.offset, r.name, r.nibbles]),
+    [['00 01', 'Chorus Parameter 1', 4], ['00 05', 'Chorus Parameter 2', 4], ['00 09', 'Chorus Parameter 3', 4]]);
+  assert.equal(params[0].display, '-20000 - +20000');
+  const damp = chorus.rows.find((r) => r.name === 'Rev HF Damp');
+  assert.deepEqual([damp.min, damp.max], [0, 4], 'five values printed, no range: 0 - 4');
+  const system = map.tables.find((t) => t.name === 'System');
+  assert.equal(system.absoluteBase, '01 00 02 00');
+  assert.deepEqual(system.rows.map((r) => r.offset), ['00 00', '00 01'], 'full addresses become offsets in the block');
+  assert.deepEqual(checkTables(map.tables), []);
+});
+
+test('the generator keeps one control per address when a manual prints two', () => {
+  const twice = structuredClone(SYNTHETIC_MAP);
+  twice.tables[1].rows.splice(11, 0, row('00 0A', 'Level Again', 0, 127));
+  const profile = buildProfile(twice, SYNTHETIC);
+  assert.equal(profile.parameters.filter((p) => p.address === '10 00 00 0A').length, 1);
+  assert.ok(profile.authoringNotes.some((n) => /Level Again.*already holds/.test(n)));
+});
+
 test('a display line becomes labels only when it counts out', () => {
   const row = (min, max, display, extra = {}) => ({ min, max, display, ...extra });
   assert.deepEqual(interpretRow(row(0, 2, 'LPF, HPF, BPF')).labels, ['LPF', 'HPF', 'BPF']);

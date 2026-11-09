@@ -39,7 +39,9 @@ const HEX_BYTES = /^(?:[0-9A-F]{2})(?: [0-9A-F]{2})*$/;
 
 /** `|  00 11 | 0000 aaaa | Name  (0 - 1) |` -> ['  00 11 ', ' 0000 aaaa ', ' Name  (0 - 1) '] */
 function cellsOf(line) {
-  const trimmed = line.trim();
+  // A row's right edge is sometimes drawn with the corner character (the RD-700GX's `MicroTune`
+  // run starts on `|# 00 0B | 0000 aaaa |   +`); it closes the row all the same.
+  const trimmed = line.trim().replace(/\+$/, '|');
   if (!trimmed.startsWith('|')) return null;
   const parts = trimmed.split('|');
   // A row ends in '|', so split leaves an empty string at each end. Anything after the last '|' is
@@ -247,7 +249,13 @@ export function parseAddressMap(text) {
 
       if (offsetCell.replace('#', '').trim() === ':') {
         closeRow();
-        table.rows.push({ gap: true });
+        // The RD-300GX and RD-700GX print a run in three lines instead of listing it: the first
+        // offset, then `: | Chorus Parameter 1-20 (12768 - 52768)`, then the last offset. The `:`
+        // row carries the name, the numbering and the range of the whole run.
+        const run = /^(.*?)\s*(\d+)\s*-\s*(\d+)\s*\(\s*([-+]?\d+)\s*-\s*([-+]?\d+)\s*\)$/.exec(desc);
+        table.rows.push(run
+          ? { gap: true, run: { stem: run[1], from: Number(run[2]), to: Number(run[3]), min: Number(run[4]), max: Number(run[5]) } }
+          : { gap: true });
         continue;
       }
 
@@ -315,6 +323,8 @@ export function parseAddressMap(text) {
   }
 
   for (const t of tables) {
+    t.rows = expandPrintedRuns(t.rows);
+    relativeToBlock(t);
     for (const r of t.rows) {
       if (r.gap) continue;
       // `(reserve) <*>` in the JD-Xi, `(reserved)` in the GAIA, `Reserved (0 - 0)` in the JUNO-X.
@@ -343,8 +353,10 @@ export function parseAddressMap(text) {
       // A switch printed with only its labels (the JUNO-Di's `Rhythm Pattern Sw … OFF, ON`) counts
       // out from zero: two labels are 0 - 1. Only when every label is a word, so a list of numbers
       // is never mistaken for a count.
+      // The RD-88's `Rev HF Damp` prints only its values, 16, 20, 25 … BYPASS: the same reading — a
+      // list with no range in it counts out from zero, one wire value per printed entry.
       const labels = (r.display ?? '').split(',').map((label) => label.trim()).filter(Boolean);
-      if (!r.reserved && r.min === undefined && r.name && labels.length >= 2 && labels.every((label) => /^[A-Za-z][\w\- /&+]*$/.test(label))) {
+      if (!r.reserved && r.min === undefined && r.name && labels.length >= 2 && labels.every((label) => !/\s-\s/.test(label))) {
         r.min = 0;
         r.max = labels.length - 1;
         r.rangeFromDisplay = true;
@@ -446,6 +458,61 @@ function fillBetween(twoBefore, before, after, addressOf, withAddress) {
     rows.push({ ...withAddress(before, formatAddress(start + (k - first) * stride, length)), name, series: true });
   }
   return rows;
+}
+
+/**
+ * The RD-300GX's and RD-700GX's three-line run: an unnamed first row, a `:` row naming the run
+ * (`Chorus Parameter 1-20 (12768 - 52768)`), an unnamed last row holding the display line. Written
+ * out, one row per member, at the stride the two printed offsets give — and only when that stride is
+ * a whole number of bytes, so a run that does not close is left as printed.
+ */
+function expandPrintedRuns(rows) {
+  const out = [];
+  for (let i = 0; i < rows.length; i++) {
+    const gap = rows[i];
+    const before = out.at(-1);
+    const after = rows[i + 1];
+    if (!(gap.gap && gap.run && before && !before.gap && before.name === null && after && !after.gap)) {
+      out.push(gap);
+      continue;
+    }
+    const { stem, from, to, min, max } = gap.run;
+    const span = flat(after.offset) - flat(before.offset);
+    const stride = to > from ? span / (to - from) : 0;
+    if (!Number.isInteger(stride) || stride <= 0) { out.push(gap); continue; }
+    out.pop();
+    // The last row's only text is the display line, which the reader took for a name.
+    const display = [...(after.min === undefined && after.name ? [after.name] : []), ...after.display];
+    const length = before.offset.split(' ').length;
+    for (let k = from; k <= to; k++) {
+      out.push({
+        offset: formatAddress(flat(before.offset) + (k - from) * stride, length),
+        bits: before.bits,
+        name: `${stem} ${k}`,
+        min,
+        max,
+        display: [...display],
+        ...(before.packets ? { packets: true, nibbles: stride } : {}),
+        series: true,
+      });
+    }
+    i++; // the last row is the run's last member, written above
+  }
+  return out;
+}
+
+/**
+ * The RD-700SX's and RD-300SX's parameter tables print full addresses (`01 00 00 04`) where every
+ * other manual prints offsets in the block (`00 04`). Made relative to the block's first address, so
+ * the layout reaches the block the usual way, and `absoluteBase` says where it was.
+ */
+function relativeToBlock(table) {
+  const rows = table.rows.filter((r) => !r.gap);
+  if (table.kind !== 'parameters' || !rows.length || !rows.every((r) => r.offset.split(' ').length === 4)) return;
+  const base = flat(rows[0].offset);
+  if (base === 0) return;
+  table.absoluteBase = rows[0].offset;
+  for (const r of rows) r.offset = formatAddress(flat(r.offset) - base, 2);
 }
 
 /**
