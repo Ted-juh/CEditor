@@ -19,6 +19,40 @@
      "rows": [
      ]
     },
+    {"name":"Program","page":9,"kind":"offsets","totalSize":null,
+     "entries": [
+      {"address":"00 00 00","name":"Program Common"},
+      {"address":"00 02 00","name":"Program Song/Rhythm"},
+      {"address":"00 04 00","name":"Program Delay"},
+      {"address":"00 06 00","name":"Program Reverb"},
+      {"address":"00 10 00","name":"Program Modulation FX (Zone 1)"},
+      {"address":"00 12 00","name":"Program Tremolo/Amp Simulator (Zone 1)"},
+      {"address":"00 14 00","name":"Program Modulation FX (Zone 2)"},
+      {"address":"00 16 00","name":"Program Tremolo/Amp Simulator (Zone 2)"},
+      {"address":"00 18 00","name":"Program Modulation FX (Zone 3)"},
+      {"address":"00 1A 00","name":"Program Tremolo/Amp Simulator (Zone 3)"},
+      {"address":"00 1C 00","name":"Program Modulation FX (Zone 4)"},
+      {"address":"00 1E 00","name":"Program Tremolo/Amp Simulator (Zone 4)"},
+      {"address":"00 20 00","name":"Program Internal Zone (Zone 1)"},
+      {"address":"00 28 00","name":"Program Internal Zone (Zone 2)"},
+      {"address":"00 30 00","name":"Program Internal Zone (Zone 3)"},
+      {"address":"00 38 00","name":"Program Internal Zone (Zone 4)"},
+      {"address":"00 40 00","name":"Program External Zone (Zone 1)"},
+      {"address":"00 42 00","name":"Program External Zone (Zone 2)"},
+      {"address":"00 44 00","name":"Program External Zone (Zone 3)"},
+      {"address":"00 46 00","name":"Program External Zone (Zone 4)"},
+      {"address":"00 50 00","name":"Program Internal Zone (Zone 5)"},
+      {"address":"00 58 00","name":"Program Internal Zone (Zone 6)"},
+      {"address":"00 60 00","name":"Program Internal Zone (Zone 7)"},
+      {"address":"00 68 00","name":"Program Internal Zone (Zone 8)"},
+      {"address":"00 70 00","name":"Program External Zone (Zone 5)"},
+      {"address":"00 72 00","name":"Program External Zone (Zone 6)"},
+      {"address":"00 74 00","name":"Program External Zone (Zone 7)"},
+      {"address":"00 76 00","name":"Program External Zone (Zone 8)"}
+     ],
+     "rows": [
+     ]
+    },
     {"name":"System Common","page":9,"kind":"parameters","totalSize":"00 00 00 20",
      "entries": [
      ],

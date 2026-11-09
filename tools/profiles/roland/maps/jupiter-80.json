@@ -1,7 +1,7 @@
 {
   "source": {"model":"JUPITER-80","date":"June 30, 2011","version":"1.00","file":"JUPITER-80_MI.pdf","sha256":"d64c6564b30adcab71dff6109fcad539c099a8961b97c30251ee5e4229870bc1","pages":26,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JUPITER-80_MI.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 55",
-  "issues": [],
+  "issues": ["TPQN: Ticks Per Quarter Note (p26): no Total Size row"],
   "tables": [
     {"name":"JUPITER-80 (ModelID = 00H 00H 55H)","page":11,"kind":"offsets","totalSize":null,
      "entries": [
@@ -1372,6 +1372,59 @@
       {"offset":"00 3A","bits":["0aaa aaaa"],"name":"Super Saw Detune","min":0,"max":127},
       {"offset":"00 3B","bits":["0aaa aaaa"],"name":"Modulation LFO Rate Control","display":"-63 - +63","min":1,"max":127},
       {"offset":"00 3C","bits":["000a aaaa"],"name":"AMP Level Keyfollow","display":"-100 - +100","min":54,"max":74}
+     ]
+    },
+    {"name":"TPQN: Ticks Per Quarter Note","page":26,"kind":"parameters","totalSize":null,
+     "entries": [
+     ],
+     "rows": [
+      {"offset":"0106","bits":["APS Bassoon","Tone Name"],"name":"89     | 80      | 71","display":"Bank Select | Program | | 0107 | APS Clarinet | 89 | 80 | 72 MSB | LSB | Number | | 0108 | APS Piccolo | 89 | 80 | 73","nibbles":2},
+      {"offset":"0001","bits":["Concert Grand"],"name":"90     | 67      | 1          |                      | 0110     | APS Pan Flute    | 89     | 80      | 76"},
+      {"offset":"0002","bits":["Grand Piano1"],"name":"90     | 67      | 2          |                      | 0111     | APS Shakuhachi | 89       | 80      | 78"},
+      {"offset":"0003","bits":["Grand Piano2"],"name":"90     | 67      | 3          |                      | 0112     | APS Ryuteki      | 89     | 81      | 78"},
+      {"offset":"0004","bits":["Grand Piano3"],"name":"90     | 67      | 4          |                      | 0113     | APS Sitar        | 89     | 80      | 105"},
+      {"offset":"0005","bits":["Mellow Piano"],"name":"90     | 67      | 5          |                      | 0114     | APS UilleannPipe | 89     | 80      | 110"},
+      {"offset":"0006","bits":["Bright Piano"],"name":"90     | 67      | 6          |                      | 0115     | APS Erhu         | 89     | 81      | 111"},
+      {"offset":"0007","bits":["Upright Piano"],"name":"90     | 67      | 7          |                      | 0116     | APS Sarangi      | 89     | 82      | 111"},
+      {"offset":"0008","bits":["Concert Mono"],"name":"90     | 67      | 8          |                      | 0117     | APS Steel Drums | 89      | 80      | 115"},
+      {"offset":"0009","bits":["Honky-tonk"],"name":"90     | 67      | 9          |                      +----------+------------------+--------+---------+------------"},
+      {"offset":"0010","bits":["Pure Vintage EP1"],"name":"89     | 64      | 5"},
+      {"offset":"0011","bits":["Pure Vintage EP2"],"name":"89     | 65      | 5"},
+      {"offset":"0012","bits":["Pure Wurly"],"name":"89     | 66      | 5"},
+      {"offset":"0013","bits":["Pure Vintage EP3"],"name":"89     | 67      | 5"},
+      {"offset":"0014","bits":["Tined EP1"],"name":"89     | 68      | 5"},
+      {"offset":"0015","bits":["Tined EP2"],"name":"89     | 69      | 5"},
+      {"offset":"0016","bits":["Old Hammer EP"],"name":"89     | 70      | 5"},
+      {"offset":"0017","bits":["Dyno Piano"],"name":"89     | 71      | 5"},
+      {"offset":"0018","bits":["Clav CB Flat"],"name":"89     | 64      | 8"},
+      {"offset":"0019","bits":["Clav CA Flat"],"name":"89     | 65      | 8"},
+      {"offset":"0020","bits":["Clav CB Medium"],"name":"89       | 66      | 8"},
+      {"offset":"0021","bits":["Clav CA Medium"],"name":"89       | 67      | 8"},
+      {"offset":"0022","bits":["Clav CB Brillia"],"name":"89      | 68      | 8"},
+      {"offset":"0023","bits":["Clav CA Brillia"],"name":"89      | 69      | 8"},
+      {"offset":"0024","bits":["Clav CB Combo"],"name":"89     | 70      | 8"},
+      {"offset":"0025","bits":["Clav CA Combo"],"name":"89     | 71      | 8"},
+      {"offset":"0026","bits":["Vibraphone"],"name":"89     | 64      | 12"},
+      {"offset":"0027","bits":["Marimba"],"name":"89     | 64      | 13"},
+      {"offset":"0029","bits":["French Accordion"],"name":"89     | 64      | 22"},
+      {"offset":"0030","bits":["ItalianAccordion"],"name":"89     | 65      | 22"},
+      {"offset":"0031","bits":["Harmonica"],"name":"89     | 64      | 23"},
+      {"offset":"0032","bits":["Bandoneon"],"name":"89     | 64      | 24"},
+      {"offset":"0033","bits":["Nylon Guitar"],"name":"89     | 64      | 25"},
+      {"offset":"0034","bits":["Flamenco Guitar"],"name":"89      | 65      | 25"},
+      {"offset":"0035","bits":["SteelStr Guitar"],"name":"89      | 64      | 26"},
+      {"offset":"0036","bits":["Acoustic Bass"],"name":"89     | 64      | 33"},
+      {"offset":"0037","bits":["Fingered Bass"],"name":"89     | 64      | 34"},
+      {"offset":"0038","bits":["Fingered Bass 2"],"name":"89      | 65      | 34"},
+      {"offset":"0039","bits":["Picked Bass"],"name":"89     | 64      | 35"},
+      {"offset":"0040","bits":["Picked Bass 2"],"name":"89     | 65      | 35"},
+      {"offset":"0041","bits":["Fretless Bass"],"name":"89     | 64      | 36"},
+      {"offset":"0042","bits":["Violin"],"name":"89     | 64      | 41"},
+      {"offset":"0043","bits":["Violin 2"],"name":"89     | 65      | 41"},
+      {"offset":"0044","bits":["Viola"],"name":"89     | 64      | 42"},
+      {"offset":"0045","bits":["Cello"],"name":"89     | 64      | 43"},
+      {"offset":"0046","bits":["Cello 2"],"name":"89     | 65      | 43"},
+      {"offset":"0047","bits":["Contrabass"],"name":"89     | 64      | 44"}
      ]
     }
   ]

@@ -52,7 +52,10 @@ function cellsOf(line) {
   return cells.length ? cells : null;
 }
 
-const isBorder = (line) => /^\+-{20,}\+?$/.test(line.trim()) || /^\+-{20,}/.test(line.trim());
+// A table's top or bottom border. Usually one run of dashes; the RD-2000's Program table opens on a
+// border with a column joint and no header row (`+-------------+----…|`). A first run of at least
+// eight dashes keeps the decimal/hex conversion charts (`+------+------++`) from counting.
+const isBorder = (line) => /^\+-{20,}/.test(line.trim()) || /^\+-{8,}\+[-+]{10,}[+|]?$/.test(line.trim());
 const isSeparator = (line) => /^\|-{3,}/.test(line.trim());
 const isHeaderRow = (cells) => cells.length <= 2
   && /^(Offset|Start|Address|Description)?$/.test(cells[0].trim())

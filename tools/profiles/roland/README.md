@@ -97,6 +97,17 @@ memories — is listed with its addresses in that profile's `coverage`.
 | `roland-v-synth` | V-Synth owner's manual, MIDI chapter 1.00 (Nov 2002) | 5,688 | 104 | p169 |
 | `roland-v-synth-xt` | V-Synth XT 1.00 (Mar 2005) | 5,971 | 107 | p19 |
 | `roland-sh-32` | SH-32 1.00 (Dec 2001) | 4,827 | 160 | p12 |
+| `roland-rd-2000` | RD-2000 1.01 (Jan 2018) | 4,873 | 54 | p16 |
+| `roland-rd-2000ex` | RD-2000EX 1.00 (Jan 2024) | 4,873 | 54 | p16 |
+| `roland-rd-800` | RD-800 1.00 (Jan 2014) | 2,581 | 36 | p15 |
+| `roland-rd-88` | RD-88 1.12 (Jul 2020) | 717 | 26 | p23 |
+| `roland-rd-88ex` | RD-88EX 1.00 (Jan 2024) | 717 | 26 | p23 |
+| `roland-rd-08` | RD-08 1.00 (Mar 2024) | 698 | 26 | p22 |
+| `roland-rd-700nx` | RD-700NX 1.00 (Oct 2010) | 1,577 | 50 | p13 |
+| `roland-rd-300nx` | RD-300NX 1.00 (Dec 2010) | 926 | 28 | p14 |
+| `roland-rd-700gx` | RD-700GX 1.00 (Feb 2008) | 3,782 | 116 | p14 |
+| `roland-rd-300gx` | RD-300GX 1.00 (Feb 2008) | 977 | 45 | p11 |
+| `roland-rd-700` | RD-700 owner's manual, MIDI chapter 1.00 (Mar 2001) | 973 | 55 | p160 |
 
 Things the manuals got wrong, found while laying these out and recorded in each layout rather than
 corrected — the reason every profile is checked against the manual's own example, not trusted:
@@ -114,7 +125,8 @@ corrected — the reason every profile is checked against the manual's own examp
   the FANTOM-6/7/8's family code and number, the Fantom-XR with the Fantom-X's, told apart only by a
   revision byte, which profiles do not pin (a firmware update is not a different instrument); the
   V-Synth and V-Synth XT print the same reply byte for byte, revision included; the XV-5080, XV-3080
-  and XV-88 all print family 10 01, number 00 00. Choosing any of these profiles for its sibling is
+  and XV-88 all print family 10 01, number 00 00; the RD-2000 and RD-2000EX, and the RD-88, RD-88EX
+  and RD-08, differ only by revision. Choosing any of these profiles for its sibling is
   therefore not flagged as a mismatch. (JUNO-STAGE and SonicCell share a model ID but not a family
   number, and are told apart.)
 - **Cross-reference marks:** the XV owner's manuals end every address-table entry with the number of
@@ -151,10 +163,9 @@ Every product page on the global, US and UK sites was checked (1,104 of them). P
 
 | State | Models |
 |---|---|
-| **Profiles** | the forty-one above |
-| **MIDI Implementation reads cleanly; layout to write** | the stage pianos RD-2000, RD-2000EX, RD-800, RD-300NX, RD-700NX |
-| **Reads with a few issues** | the original FANTOM (2001), Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, RD-08, RD-88, RD-300GX/SX, RD-700GX |
-| **Address map in the owner's manual, still reading with issues** | XP-30, JV-1010 (no ModelID heading, appendix tables), VR-760, RD-700, RD-700SX |
+| **Profiles** | the fifty-two above |
+| **Reads with a few issues** | the original FANTOM (2001), Fantom-VS, VariOS, MC-09, TB-3, VR-09/730, V-STAGE, RD-700SX and RD-300SX (tables mixing full addresses with offsets) |
+| **Address map in the owner's manual, still reading with issues** | XP-30, JV-1010 (no ModelID heading, appendix tables), VR-760 |
 | **Scanned, no text** — OCR plus an independent transcription to check against | JV-1080, JV-2080, XP-10/50/60/80, JP-8000, MC-303, MC-505, MC-80, MC-50mkII |
 | **No address map published** | The Boutiques (JP-08, JU-06/06A, JX-03/08, JD-08, SE-02, SH-01A, …), SYSTEM-1/1m/8, SH-4d, the AIRA and TR lines, MC-101/707: CC tables only, a different and simpler source |
 

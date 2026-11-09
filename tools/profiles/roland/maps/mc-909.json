@@ -1,7 +1,7 @@
 {
   "source": {"model":"MC-909 (sampling groovebox)","date":"Sep. 20, 2002","version":"1.00","file":"MC-909_MI.pdf","sha256":"a5bfd8996a4d4d80d96d72c06f6c63773a14c01960ba6407d6ee2d3c43d4364b","pages":17,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/MC-909_MI.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 59",
-  "issues": [],
+  "issues": ["Quick SysEx Patch (p15): no Total Size row","Quick SysEx Rhythm (p15): no Total Size row","Quick SysEx Sequencer (p16): no Total Size row"],
   "tables": [
     {"name":"■1. MC-909 (Model ID = 00H 59H)","page":7,"kind":"offsets","totalSize":null,
      "entries": [
@@ -1083,6 +1083,96 @@
       {"offset":"00 7D","bits":["0000 000a"],"name":"Chord Note126","display":"OFF, ON","min":0,"max":1},
       {"offset":"00 7E","bits":["0000 000a"],"name":"Chord Note127","display":"OFF, ON","min":0,"max":1},
       {"offset":"00 7F","bits":["0000 000a"],"name":"Chord Note128","display":"OFF, ON","min":0,"max":1}
+     ]
+    },
+    {"name":"Quick SysEx Sequencer Part","page":15,"kind":"offsets","totalSize":null,
+     "entries": [
+      {"address":"00 00","name":"Quick SysEx Sequencer Part 1"},
+      {"address":"01 00","name":"Quick SysEx Sequencer Part 2"},
+      {"address":"02 00","name":"Quick SysEx Sequencer Part 3","series":true},
+      {"address":"03 00","name":"Quick SysEx Sequencer Part 4","series":true},
+      {"address":"04 00","name":"Quick SysEx Sequencer Part 5","series":true},
+      {"address":"05 00","name":"Quick SysEx Sequencer Part 6","series":true},
+      {"address":"06 00","name":"Quick SysEx Sequencer Part 7","series":true},
+      {"address":"07 00","name":"Quick SysEx Sequencer Part 8","series":true},
+      {"address":"08 00","name":"Quick SysEx Sequencer Part 9","series":true},
+      {"address":"09 00","name":"Quick SysEx Sequencer Part 10","series":true},
+      {"address":"0A 00","name":"Quick SysEx Sequencer Part 11","series":true},
+      {"address":"0B 00","name":"Quick SysEx Sequencer Part 12","series":true},
+      {"address":"0C 00","name":"Quick SysEx Sequencer Part 13","series":true},
+      {"address":"0D 00","name":"Quick SysEx Sequencer Part 14","series":true},
+      {"address":"0E 00","name":"Quick SysEx Sequencer Part 15"},
+      {"address":"0F 00","name":"Quick SysEx Sequencer Part 16"}
+     ],
+     "rows": [
+     ]
+    },
+    {"name":"Quick SysEx Patch","page":15,"kind":"parameters","totalSize":null,
+     "entries": [
+     ],
+     "rows": [
+      {"offset":"00","bits":["0aaa aaaa 0000 aaaa"],"name":"(Reserved)                    (Level(OLD))"},
+      {"offset":"01","bits":["0aaa aaaa 0000 aaaa"],"name":"Pan","display":"L64 - 63R","min":0,"max":127},
+      {"offset":"02","bits":["0aaa aaaa 0000 aaaa"],"name":"Random Pan Depth","min":0,"max":63},
+      {"offset":"03","bits":["0aaa aaaa 0000 aaaa"],"name":"(Reserved)              (Coarse Tune(OLD))"},
+      {"offset":"04","bits":["0aaa aaaa 0000 aaaa"],"name":"(Reserved)                (Fine Tune(OLD))"},
+      {"offset":"05","bits":["0aaa aaaa 0000 aaaa"],"name":"Pitch Envelope Depth","display":"-12 - +12","min":52,"max":76},
+      {"offset":"06","bits":["0aaa aaaa 0000 aaaa"],"name":"Pitch Envelope Time1","min":0,"max":127},
+      {"offset":"07","bits":["0aaa aaaa 0000 aaaa"],"name":"Pitch Envelope Time3","min":0,"max":127},
+      {"offset":"08","bits":["0aaa aaaa 0000 aaaa"],"name":"Pitch Envelope Level3","display":"-63 - +63","min":1,"max":127},
+      {"offset":"09","bits":["0aaa aaaa 0000 aaaa"],"name":"Pitch Envelope Time4","min":0,"max":127},
+      {"offset":"0A","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Filter Type","min":0,"max":6},
+      {"offset":"0B","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Cutoff","min":0,"max":127},
+      {"offset":"0C","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Resonance","min":0,"max":127},
+      {"offset":"0D","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Envelope Depth","display":"-63 - +63","min":1,"max":127},
+      {"offset":"0E","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Envelope Time1","min":0,"max":127},
+      {"offset":"0F","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Envelope Time3","min":0,"max":127},
+      {"offset":"10","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Envelope Level3","min":0,"max":127},
+      {"offset":"11","bits":["0aaa aaaa 0000 aaaa"],"name":"TVF Envelope Time4","min":0,"max":127},
+      {"offset":"12","bits":["0aaa aaaa 0000 aaaa"],"name":"TVA Envelope Time1","min":0,"max":127},
+      {"offset":"13","bits":["0aaa aaaa 0000 aaaa"],"name":"TVA Envelope Time3","min":0,"max":127},
+      {"offset":"14","bits":["0aaa aaaa 0000 aaaa"],"name":"TVA Envelope Level3","min":0,"max":127},
+      {"offset":"15","bits":["0aaa aaaa 0000 aaaa"],"name":"TVA Envelope Time4","min":0,"max":127},
+      {"offset":"16","bits":["0aaa aaaa 0000 aaaa"],"name":"LFO1 Wave Form               (0 - 127)(*2)"},
+      {"offset":"17","bits":["0aaa aaaa 0000 aaaa"],"name":"LFO1 Rate","min":0,"max":127},
+      {"offset":"18","bits":["0aaa aaaa 0000 aaaa"],"name":"LFO1 Pitch Depth","display":"-63 - +63","min":1,"max":127},
+      {"offset":"19","bits":["0aaa aaaa 0000 aaaa"],"name":"LFO1 TVF Depth","display":"-63 - +63","min":1,"max":127},
+      {"offset":"1A","bits":["0aaa aaaa 0000 aaaa"],"name":"LFO1 TVA Depth","display":"-63 - +63","min":1,"max":127}
+     ]
+    },
+    {"name":"Quick SysEx Rhythm","page":15,"kind":"parameters","totalSize":null,
+     "entries": [
+     ],
+     "rows": [
+      {"offset":"00","bits":["0aaa aaaa 0111 1111"],"name":"(Reserved)                    (Level(OLD))"},
+      {"offset":"01","bits":["0aaa aaaa 0111 1111"],"name":"Pan","display":"L64 - 63R","min":0,"max":127},
+      {"offset":"02","bits":["0aaa aaaa 0111 1111"],"name":"Random Pan Depth","min":0,"max":63},
+      {"offset":"03","bits":["0aaa aaaa 0111 1111"],"name":"(Reserved)","reserved":true},
+      {"offset":"04","bits":["0aaa aaaa 0111 1111"],"name":"(Reserved)","reserved":true},
+      {"offset":"05","bits":["0aaa aaaa 0111 1111"],"name":"Pitch Envelope Depth","display":"-12 - +12","min":52,"max":76},
+      {"offset":"06","bits":["0aaa aaaa 0111 1111"],"name":"Pitch Envelope Time1","min":0,"max":127},
+      {"offset":"07","bits":["0aaa aaaa 0111 1111"],"name":"Pitch Envelope Time3","min":0,"max":127},
+      {"offset":"08","bits":["0aaa aaaa 0111 1111"],"name":"Pitch Envelope Level3","display":"-63 - +63","min":1,"max":127},
+      {"offset":"09","bits":["0aaa aaaa 0111 1111"],"name":"Pitch Envelope Time4","min":0,"max":127},
+      {"offset":"0A","bits":["0aaa aaaa 0111 1111"],"name":"TVF Filter Type","min":0,"max":6},
+      {"offset":"0B","bits":["0aaa aaaa 0111 1111"],"name":"TVF Cutoff","min":0,"max":127},
+      {"offset":"0C","bits":["0aaa aaaa 0111 1111"],"name":"TVF Resonance","min":0,"max":127},
+      {"offset":"0D","bits":["0aaa aaaa 0111 1111"],"name":"TVF Envelope Depth","display":"-63 - +63","min":1,"max":127},
+      {"offset":"0E","bits":["0aaa aaaa 0111 1111"],"name":"TVF Envelope Time1","min":0,"max":127},
+      {"offset":"0F","bits":["0aaa aaaa 0111 1111"],"name":"TVF Envelope Time3","min":0,"max":127},
+      {"offset":"10","bits":["0aaa aaaa 0111 1111"],"name":"TVF Envelope Level3","min":0,"max":127},
+      {"offset":"11","bits":["0aaa aaaa 0111 1111"],"name":"TVF Envelope Time4","min":0,"max":127},
+      {"offset":"12","bits":["0aaa aaaa 0111 1111"],"name":"TVA Envelope Time1","min":0,"max":127},
+      {"offset":"13","bits":["0aaa aaaa 0111 1111"],"name":"TVA Envelope Time3","min":0,"max":127},
+      {"offset":"14","bits":["0aaa aaaa 0111 1111"],"name":"TVA Envelope Level3","min":0,"max":127},
+      {"offset":"15","bits":["0aaa aaaa 0111 1111"],"name":"TVA Envelope Time4","min":0,"max":127}
+     ]
+    },
+    {"name":"Quick SysEx Sequencer","page":16,"kind":"parameters","totalSize":null,
+     "entries": [
+     ],
+     "rows": [
+      {"offset":"00","bits":["0000 000a 0000 0000"],"name":"Mute switch","display":"MUTE, PLAY","min":0,"max":1}
      ]
     }
   ]

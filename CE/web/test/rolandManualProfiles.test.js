@@ -233,6 +233,19 @@ test('the stage pianos\' ways of printing a table', () => {
   assert.deepEqual(checkTables(map.tables), []);
 });
 
+test('a table that opens on a border with a column joint and no header row is still a table', () => {
+  // The RD-2000's `* Program` offset table (p9): straight from the heading to `+------+----|`.
+  const map = parseAddressMap(`
+* Program
++-------------+----------------------------------------------------------------|
+|    00 00 00 | Program Common                                                 |
+|    00 02 00 | Program Song/Rhythm                                            |
++------------------------------------------------------------------------------+
+`);
+  const program = map.tables.find((t) => t.name === 'Program');
+  assert.deepEqual(program?.entries.map((e) => e.name), ['Program Common', 'Program Song/Rhythm']);
+});
+
 test('the generator keeps one control per address when a manual prints two', () => {
   const twice = structuredClone(SYNTHETIC_MAP);
   twice.tables[1].rows.splice(11, 0, row('00 0A', 'Level Again', 0, 127));

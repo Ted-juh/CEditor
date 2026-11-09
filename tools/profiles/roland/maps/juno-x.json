@@ -1,7 +1,7 @@
 {
   "source": {"model":"JUNO-X","date":"April 26, 2022","version":"1.10","file":"JUNO-X_MIDI_imple_eng01_W.pdf","sha256":"a8f761d1578163f8fca03c0d3208571d0ba9a2ab56271fc31f45d21ce4c14c61","pages":92,"packetSize":256,"url":"https://static.roland.com/assets/media/pdf/JUNO-X_MIDI_imple_eng01_W.pdf","reader":"tools/profiles/roland/parse-address-map.mjs"},
   "modelId": "00 00 00 00 12",
-  "issues": ["appendix 1 (p92): no Total Size row"],
+  "issues": ["appendix 1 (p89): no Total Size row","Model JUNO-X                   MIDI Implementation Chart (p92): no Total Size row"],
   "tables": [
     {"name":"JUNO-X (ModelID = 00H 00H 00H 00H 12H)","page":10,"kind":"offsets","totalSize":null,
      "entries": [
@@ -3162,7 +3162,13 @@
       {"offset":"00 50","bits":["0000 aaaa","0000 bbbb","0000 cccc","0000 dddd"],"name":"Chorus Parameter 20","display":"-20000 - 20000","packets":true,"min":12768,"max":52768,"nibbles":4}
      ]
     },
-    {"name":"appendix 1","page":92,"kind":"parameters","totalSize":null,
+    {"name":"appendix 1","page":89,"kind":"parameters","totalSize":null,
+     "entries": [
+     ],
+     "rows": [
+     ]
+    },
+    {"name":"Model JUNO-X                   MIDI Implementation Chart","page":92,"kind":"parameters","totalSize":null,
      "entries": [
      ],
      "rows": [
