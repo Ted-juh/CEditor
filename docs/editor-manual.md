@@ -738,7 +738,7 @@ on the panel names the device it belongs to. A new panel uses **mainSynth**.
 Set up the ports in either of two places:
 
 - **Settings → MIDI** has a card for each device: **Send To** (the MIDI output), **Listen To** (the MIDI
-  input) and **Device Profile**. **Test** asks the instrument to say who it is, and reports **Instrument
+  input) and **Device Profile** (see [Choosing a profile](#choosing-a-profile)). **Test** asks the instrument to say who it is, and reports **Instrument
   answered**, **Wrong instrument** or **No answer**. **Add A Device** adds another one, for a panel that
   controls several synths. Ports are read when the page opens; if you plug something in later, press
   **Rescan**.
@@ -836,6 +836,22 @@ Dave Smith Instruments synths from the Mopho to the Prophet-6, most of them read
 own MIDI documentation. All of them are marked experimental, and none has been
 tried on a real instrument yet. [The device profile library](device-profile-library.md) lists them
 and says what each kind covers. **File → Import Device Profile...** loads a profile from a file.
+
+### Choosing a profile
+
+Wherever you choose a profile (a device's card in **Settings → MIDI**, the top of the **Device** tool,
+**File → Open Device Profile** and **File → New Panel from Device Profile**), the same window opens.
+Type any part of the model, the brand or the family in the search box (**rd 88**, **prophet**), or
+click a brand in the row beneath it; the busiest brands come first. The list starts with the profile
+the panel was made for (**This panel**) and the ones you chose recently, then every profile by brand
+and family. The pane on the right says what the one you are on can do: how many parameters, which
+kind of message it sends, whether it can read the synth's sound back, recall presets, and recognise
+the synth when it is connected, and which document it was read from. The arrow keys move through the
+list, **Enter** chooses, **Esc** closes.
+
+Older versions of a profile, and the profiles the test suite uses, are not listed: the first two
+GAIA SH-01 profiles (15 and 40 parameters) gave way to the full one. A panel that still uses one shows
+it as **This panel**, and **Show older and internal profiles** lists them all.
 
 ### The Device tool
 

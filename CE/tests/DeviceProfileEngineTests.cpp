@@ -1548,6 +1548,51 @@ int runDumpShapeAndCodecTests (const juce::File& file)
  * reload back, fifty messages cost fifty cold loads. The budget is one cold load for all fifty, so a
  * regression fails by ~50x — far outside anything a slow or loaded machine could account for.
  */
+// The device profile picker lists, groups and describes profiles from this summary alone, so what
+// it says has to be what the profile says: a CC-only Boutique cannot claim to read the synth back,
+// and an address-map workstation must not lose its preset recall on the way to the list.
+int runCatalogSummaryTests (const juce::File& root)
+{
+    struct Expected { const char* file; const char* manufacturer; int parameters; const char* kind; bool readsBack; bool presets; bool identifies; };
+    const Expected cases[] {
+        { "roland-jd-xi.ceditor-device.json", "Roland", 6199, "sysex", true, true, true },
+        { "roland-jp-08.ceditor-device.json", "Roland", 85, "cc", false, true, false },
+        { "sequential-prophet-6.ceditor-device.json", "Sequential", 876, "nrpn", false, true, true },
+        { "sequential-prophet-rev2.ceditor-device.json", "Sequential", 1961, "nrpn", false, false, true },
+    };
+
+    auto failures = 0;
+    for (const auto& expected : cases)
+    {
+        ceditor::device::DeviceProfileEngine engine;
+        juce::String error;
+        if (! engine.loadFromFile (root.getChildFile (expected.file), error))
+        {
+            std::cerr << "[FAIL] catalog summary: cannot load " << expected.file << ": " << error << "\n";
+            ++failures;
+            continue;
+        }
+        const auto summary = engine.getCatalogSummary();
+        const auto* kinds = summary["messageKinds"].getArray();
+        const bool ok = summary["manufacturer"].toString() == expected.manufacturer
+                     && (int) summary["parameterCount"] == expected.parameters
+                     && kinds != nullptr && kinds->size() == 1 && (*kinds)[0].toString() == expected.kind
+                     && (bool) summary["readsBack"] == expected.readsBack
+                     && (bool) summary["presetRecall"] == expected.presets
+                     && (bool) summary["identifies"] == expected.identifies
+                     && ! (bool) summary["verifiedOnHardware"]
+                     && summary["source"].toString().isNotEmpty();
+        if (! ok)
+        {
+            std::cerr << "[FAIL] catalog summary of " << expected.file << ": " << juce::JSON::toString (summary, true) << "\n";
+            ++failures;
+            continue;
+        }
+        std::cout << "[PASS] catalog summary :: " << expected.file << "\n";
+    }
+    return failures;
+}
+
 int runProfileCacheTests()
 {
     // The cold load: a fresh service reads and compiles every shipped profile once. This is the unit
@@ -4097,6 +4142,7 @@ int main (int argc, char** argv)
     failures += runLsbFirstEncodingTests (root.getChildFile ("test-nrpn-synth.ceditor-device.json"));
     failures += runDumpShapeAndCodecTests (root.getChildFile ("test-sysex-synth.ceditor-device.json"));
     failures += runProfileCacheTests();
+    failures += runCatalogSummaryTests (root);
     failures += runMonitorClearTests();
     failures += runRealtimeMonitorTests();
     failures += runRequestRetryTests();

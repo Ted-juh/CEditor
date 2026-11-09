@@ -22,6 +22,10 @@
   import { createScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile } from '../stores/scriptWorkspace.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles, selectedDeviceProfileId } from '../stores/deviceProfiles.js';
+  import { openProfilePicker, recentDeviceProfiles, recordProfileUse } from '../stores/deviceProfilePicker.js';
+  import { catalogEntry } from '../utils/profileCatalog.js';
+  import { requiredProfileFor } from '../utils/deviceRoles.js';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { buildInfo } from '../buildInfo.js';
   import { createPerfDebugTimer } from '../utils/perfDebug.js';
   import { isTextEntryTarget } from '../utils/textEntry.js';
@@ -115,31 +119,52 @@
     if (document?.id) setActiveEditorTab({ type: 'script', id: document.id });
   }
 
+  const panelProfileId = () => requiredProfileFor([get(activePanel)].filter(Boolean), DEFAULT_DEVICE_ROLE);
+
+  // The picker, with the profile the device is on already chosen. There are ninety-odd profiles;
+  // opening "the selected one, else the first" opened whichever sorted first by id.
   function openDeviceProfile() {
     refreshDeviceProfiles();
-    const profiles = get(deviceProfiles) ?? [];
-    const selectedId = get(selectedDeviceProfileId);
-    const profile = profiles.find((item) => item.id === selectedId) ?? profiles[0];
-    if (profile?.id) {
-      openDeviceProfileEntry(profile);
-      return;
-    }
-    importDeviceProfile();
+    openProfilePicker({
+      title: 'Open Device Profile',
+      actionLabel: 'Open in Designer',
+      selectedId: get(selectedDeviceProfileId),
+      panelProfileIds: [panelProfileId()],
+      onPick: (id, profile) => openDeviceProfileEntry({ id, name: profile?.name || id }),
+    });
   }
 
-  // One row per profile, rather than a dialog or a silent pick. Generating a panel is a big,
-  // visible action — 793 parameters is 1624 controls — so the menu should say which device it is
-  // about to do it for before it does it.
+  function makePanelFromProfile() {
+    refreshDeviceProfiles();
+    openProfilePicker({
+      title: 'New Panel from Device Profile',
+      actionLabel: 'Make a panel',
+      selectedId: get(selectedDeviceProfileId),
+      panelProfileIds: [panelProfileId()],
+      onPick: (id) => generatePanelFromProfile(id),
+    });
+  }
+
+  // The panel's own profile and the recent ones by name, everything else through the picker.
+  // Generating a panel is a big, visible action (793 parameters is 1624 controls), so the menu
+  // still says which device it is about to do it for; it no longer says it for all ninety.
   function generateFromProfileItems() {
     refreshDeviceProfiles();
     const profiles = get(deviceProfiles) ?? [];
     if (profiles.length === 0) {
       return [{ label: 'No device profiles', enabled: () => false, action: () => {} }];
     }
-    return profiles.map((profile) => ({
-      label: profile.name || profile.id,
-      action: () => generatePanelFromProfile(profile.id),
-    }));
+    const byId = new Map(profiles.map((profile) => [profile.id, profile]));
+    const item = (profile) => ({ label: profile.name || profile.id, action: () => { recordProfileUse(profile.id); generatePanelFromProfile(profile.id); } });
+    const own = byId.get(panelProfileId());
+    const recent = (get(recentDeviceProfiles) ?? []).filter((id) => id !== own?.id).map((id) => byId.get(id)).filter(Boolean).slice(0, 3);
+    const rows = [];
+    if (own) rows.push({ type: 'header', label: "This panel's" }, item(own));
+    if (recent.length) rows.push({ type: 'header', label: 'Recent' }, ...recent.map(item));
+    if (rows.length) rows.push({ type: 'separator' });
+    const listed = profiles.filter((profile) => !catalogEntry(profile).hidden).length;
+    rows.push({ label: `Choose from all ${listed} profiles…`, action: makePanelFromProfile });
+    return rows;
   }
 
   /** The Open Recent submenu, rebuilt each time it opens — the list moves under it constantly. */

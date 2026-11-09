@@ -386,6 +386,54 @@ juce::String DeviceProfileEngine::getProfileName() const
     return {};
 }
 
+juce::var DeviceProfileEngine::getCatalogSummary() const
+{
+    auto* summary = new juce::DynamicObject();
+    auto* root = profileObject();
+    if (root == nullptr)
+        return juce::var (summary);
+
+    const auto count = [] (const juce::var& value) { auto* list = asArray (value); return list != nullptr ? list->size() : 0; };
+
+    summary->setProperty ("manufacturer", propString (*root, "manufacturer"));
+    summary->setProperty ("family", propString (*root, "family"));
+    summary->setProperty ("status", propString (*root, "status"));
+    summary->setProperty ("parameterCount", count (root->getProperty ("parameters")));
+
+    // The kinds of message its parameters are sent as, in the order the recipes first name them.
+    juce::StringArray kinds;
+    if (auto* recipes = asArray (root->getProperty ("messageRecipes")))
+        for (const auto& recipe : *recipes)
+            if (auto* object = asObject (recipe))
+                kinds.addIfNotAlreadyThere (propString (*object, "kind"));
+    kinds.removeEmptyStrings();
+    juce::Array<juce::var> kindList;
+    for (const auto& kind : kinds)
+        kindList.add (kind);
+    summary->setProperty ("messageKinds", kindList);
+
+    // Reads back: it declares a dump to parse AND a request that asks for one. A dump nobody can
+    // ask for (the DPD's AN1x bulk receive) only reads what the synth sends of its own accord.
+    summary->setProperty ("readsBack", count (root->getProperty ("dumpDefinitions")) > 0 && count (root->getProperty ("requests")) > 0);
+
+    auto* presets = asObject (root->getProperty ("presets"));
+    summary->setProperty ("presetRecall", presets != nullptr && count (presets->getProperty ("banks")) > 0
+                                              && asObject (presets->getProperty ("recall")) != nullptr);
+
+    auto* identity = asObject (root->getProperty ("identity"));
+    summary->setProperty ("identifies", identity != nullptr && count (identity->getProperty ("familyCode")) > 0);
+
+    juce::String source;
+    if (auto* sources = asArray (root->getProperty ("sources")); sources != nullptr && ! sources->isEmpty())
+        if (auto* first = asObject (sources->getReference (0)))
+            source = propString (*first, "title");
+    summary->setProperty ("source", source);
+
+    auto* coverage = asObject (root->getProperty ("coverage"));
+    summary->setProperty ("verifiedOnHardware", coverage != nullptr && (bool) coverage->getProperty ("verifiedOnHardware"));
+    return juce::var (summary);
+}
+
 juce::String DeviceProfileEngine::getDefaultSyncDirection() const
 {
     auto* root = profileObject();

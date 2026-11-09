@@ -114,11 +114,15 @@ juce::var DeviceProfileService::listProfiles()
     juce::Array<juce::var> items;
     for (const auto& [profileId, loaded] : profiles)
     {
-        auto* object = new juce::DynamicObject();
+        // The picker groups and describes profiles from this summary, so it never has to fetch a
+        // profile's parameters just to list it.
+        juce::var summary = loaded.engine->getCatalogSummary();
+        auto* object = summary.getDynamicObject();
+        jassert (object != nullptr);
         object->setProperty ("id", profileId);
         object->setProperty ("name", loaded.engine->getProfileName());
         object->setProperty ("filePath", loaded.file.getFullPathName());
-        items.add (juce::var (object));
+        items.add (summary);
     }
 
     return items;

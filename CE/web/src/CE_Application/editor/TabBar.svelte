@@ -3,12 +3,15 @@
   import { editorTabs, activeEditorTab, activePanel, activePanelDesignerSplit, closePanel, panels, setActiveEditorTab, closeSettingsTab, closeInstrumentHostTab, closeDocumentationTab, closeDeviceProfileTab, closeScreenTab, openPanelFromFile, openStandaloneDeviceProfileTab, openTabToSide, swapEditorSplit, toggleEditorSplitOrientation } from '../stores/panels.js';
   import { closeComponentDocument, createComponentDocument } from '../stores/componentWorkspace.js';
   import { closeScriptWorkspaceDocument, getOrCreateScriptDocForPanel, openScriptWorkspaceFromFile, scriptDocuments } from '../stores/scriptWorkspace.js';
-  import { createDeviceProfileDraft, deviceProfiles, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
+  import { createDeviceProfileDraft, importDeviceProfile, refreshDeviceProfiles } from '../stores/deviceProfiles.js';
   import { customComponentLibrary } from '../stores/customComponentLibrary.js';
   import { openNewPanelDialog } from '../stores/newPanelDialog.js';
   import { recentFiles, recentFileLabel, recentKindLabel, RECENT_MENU_LIMIT } from '../stores/recentFiles.js';
   import { openComponentLibraryEntry, openDeviceProfileEntry, openRecentFile } from '../stores/recentFileActions.js';
-  import { componentPickerEntries, deviceProfilePickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
+  import { componentPickerEntries, shouldOpenDirectly } from '../utils/workspacePickerEntries.js';
+  import { openProfilePicker } from '../stores/deviceProfilePicker.js';
+  import { requiredProfileFor } from '../utils/deviceRoles.js';
+  import { DEFAULT_DEVICE_ROLE } from '../stores/deviceConstants.js';
   import { applyTabOrder, moveTabKey, pruneTabOrder, seedTabOrder, tabContextAvailability, tabKey, tabOverflowState, tabsToClose } from '../utils/tabStrip.js';
   import { floating } from '../utils/floatingUi.js';
   import { readStoredJson, writeStoredJson } from '../utils/localStorageState.js';
@@ -25,7 +28,6 @@
   let splitOrientationLabel = $derived($activePanelDesignerSplit?.orientation === 'horizontal' ? 'Side by Side' : 'Top / Bottom');
 
   let componentLibraryEntries = $derived(componentPickerEntries($customComponentLibrary ?? []));
-  let deviceProfileEntries = $derived(deviceProfilePickerEntries($deviceProfiles ?? []));
   let recentEntries = $derived(($recentFiles ?? []).slice(0, RECENT_MENU_LIMIT));
 
   /**
@@ -234,14 +236,19 @@
     picker = 'component';
   }
 
+  // The device profile picker, not a list of every profile: it groups them by brand and family
+  // and has the import button the old list had.
+  const getPanelRequiredProfileId = () => requiredProfileFor([$activePanel].filter(Boolean), DEFAULT_DEVICE_ROLE);
+
   function openSavedDeviceProfile() {
     tray = '';
     refreshDeviceProfiles();
-    if (shouldOpenDirectly(deviceProfileEntries)) {
-      openDeviceProfileEntry(deviceProfileEntries[0].entry);
-      return;
-    }
-    picker = 'device';
+    openProfilePicker({
+      title: 'Open Device Profile',
+      actionLabel: 'Open in Designer',
+      panelProfileIds: [getPanelRequiredProfileId()],
+      onPick: (id, profile) => openDeviceProfileEntry({ id, name: profile?.name || id }),
+    });
   }
 
   function handleImportDeviceProfile() {
@@ -484,16 +491,6 @@
         emptyText="No saved component packages yet."
         onPick={(row) => { picker = ''; openComponentLibraryEntry(row.entry); }}
         onClose={() => { picker = ''; }}
-      />
-    {:else if picker === 'device'}
-      <WorkspacePicker
-        title="Open Device"
-        entries={deviceProfileEntries}
-        emptyText="No loaded device profiles."
-        footerLabel="Import Profile"
-        onPick={(row) => { picker = ''; openDeviceProfileEntry(row.entry); }}
-        onClose={() => { picker = ''; }}
-        onFooter={handleImportDeviceProfile}
       />
     {/if}
   </div>

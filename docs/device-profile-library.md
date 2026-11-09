@@ -20,6 +20,20 @@ every profile in that folder, so all of them are available in the Device tool an
 Generated profiles are rebuilt from committed sources, never edited by hand: each one's first
 authoring note names the tool that made it.
 
+## How the program lists them
+
+Ninety-odd profiles do not fit a dropdown, so every place that chooses one opens the same picker
+(the manual's [Choosing a profile](editor-manual.md#choosing-a-profile) shows it): brands in a row,
+most profiles first; a search across model, brand and family; the list grouped by brand and family;
+and a pane that says what the chosen profile can do. That pane reads a summary the program makes of
+each profile when it lists them (`DeviceProfileEngine::getCatalogSummary`), so choosing does not
+open ninety profiles' parameters.
+
+Two profiles are kept but not offered: `roland-gaia` (15 parameters, made by hand) and
+`roland-gaia-dpd` (the Device Profile Designer's 40), both earlier versions of `roland-gaia-sh01`,
+which covers the whole SH-01 and is now named plainly **Roland GAIA SH-01**. Panels that name the
+older two still load them. The internal test profiles are not offered either.
+
 ## What every generated profile is
 
 - **Read from the manufacturer's own document.** Each profile's `sources` names the document, its
@@ -248,9 +262,9 @@ authoring note.
 | `roland-rd-88` | Roland RD-88 | RD | SysEx parameters and dumps | 717 | RD-88 MIDI Implementation (version 1.12, Jul. 22, 2020) | `roland/make-profiles.mjs` |
 | `roland-rd-88ex` | Roland RD-88EX | RD | SysEx parameters and dumps | 717 | RD-88EX MIDI Implementation (version 1.00, Jan. 1, 2024) | `roland/make-profiles.mjs` |
 | `roland-sd-90` | Roland SD-90 | SD | SysEx parameters and dumps | 10,124 | SD-90 MIDI Implementation (version 1.02, December 12, 2001) | `roland/make-profiles.mjs` |
+| `roland-gaia-sh01` | Roland GAIA SH-01 | SH | SysEx parameters and dumps | 882 | Roland SH-01 GAIA MIDI Implementation (v1.01, Sep 2010) | before these tools |
 | `roland-gaia` | Roland GAIA SH-01 | SH | SysEx parameters | 15 | Roland SH-01 GAIA MIDI Implementation (v1.01, Sep 2010) | before these tools |
 | `roland-gaia-dpd` | Roland GAIA SH-01 (from DPD) | SH | SysEx parameters | 40 | — | Device Profile Designer |
-| `roland-gaia-sh01` | Roland GAIA SH-01 (full) | SH | SysEx parameters and dumps | 882 | Roland SH-01 GAIA MIDI Implementation (v1.01, Sep 2010) | before these tools |
 | `roland-sh-201` | Roland SH-201 | SH | SysEx parameters and dumps | 766 | Roland SH-201 MIDI Implementation | before these tools |
 | `roland-sh-32` | Roland SH-32 | SH | SysEx parameters and dumps | 4,827 | SH-32 MIDI Implementation (version 1.00, Dec. 12, 2001) | `roland/make-profiles.mjs` |
 | `roland-sh-4d` | Roland SH-4d | SH | Control changes | 32 | SH-4d Owner's Manual, MIDI implementation chart (version 2.00) | `roland/make-cc-profiles.mjs` |

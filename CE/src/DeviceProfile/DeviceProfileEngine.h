@@ -161,6 +161,15 @@ public:
 
     [[nodiscard]] juce::String getProfileId() const;
     [[nodiscard]] juce::String getProfileName() const;
+
+    /**
+     * What a picker needs to show this profile without loading its parameters into the UI: maker,
+     * family, how many parameters, what kind of messages it sends, whether it can read the synth
+     * back, recall presets and recognise the synth, the document it was read from, and whether it
+     * has been checked on a real instrument. Every value is read from the profile as it is; nothing
+     * is inferred. Sent with each entry of listProfiles.
+     */
+    [[nodiscard]] juce::var getCatalogSummary() const;
     [[nodiscard]] juce::String getDefaultSyncDirection() const;
     [[nodiscard]] const juce::Array<ValidationMessage>& getValidationMessages() const { return validationMessages; }
     [[nodiscard]] bool hasErrors() const;

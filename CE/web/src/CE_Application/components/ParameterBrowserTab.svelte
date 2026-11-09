@@ -4,6 +4,7 @@
   import { activePanel, openDeviceProfileTab, syncOpenDeviceProfileDesigner, updatePanel } from '../stores/panels.js';
   import { selectedControl, updateControlProperty } from '../stores/controls.js';
   import { adoptParameterMetadata } from '../utils/parameterAdoption.js';
+  import DeviceProfileTrigger from './DeviceProfileTrigger.svelte';
   import {
     deviceProfiles,
     deviceDiagnostics,
@@ -986,11 +987,15 @@
       being unable to tell which is which is most of why people conclude the app has no MIDI at all.
       The direction toggle beside them was already labelled; these now are too.
     -->
-    <select aria-label="Device profile" title="Device profile" value={selectedProfileId} onchange={(e) => handleProfileChange(e.target.value)}>
-      {#each $deviceProfiles as profile (profile.id)}
-        <option value={profile.id}>{profile.name || profile.id}</option>
-      {/each}
-    </select>
+    <div class="profile-pick">
+      <DeviceProfileTrigger
+        compact
+        profileId={selectedProfileId}
+        role={DEFAULT_DEVICE_ROLE}
+        panelProfileIds={[panelRequiredProfileId]}
+        onChange={handleProfileChange}
+      />
+    </div>
     <select aria-label="MIDI output" title="MIDI output — where control values are sent" value={selectedDestinationId} onchange={(e) => handleDestinationChange(e.target.value)}>
       {#each $midiDestinations as destination (destination.id)}
         <option value={destination.id}>{destination.name || destination.id}</option>
@@ -1295,6 +1300,11 @@
     background: #1E1E1E;
     color: #DDD;
     font-size: 11px;
+  }
+
+  .profile-pick {
+    display: flex;
+    min-width: 0;
   }
 
   .toolbar {

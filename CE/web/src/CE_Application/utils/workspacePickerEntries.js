@@ -9,6 +9,9 @@
  * `shouldOpenDirectly` is the tab strip's existing behaviour, kept: with exactly one saved
  * package a picker is a dialog whose only purpose is to be dismissed. With none, it must still
  * open — the empty state is the only thing that explains why nothing happened.
+ *
+ * Device profiles used to be listed here too; there are ninety-odd now, and they have a picker of
+ * their own (layout/DeviceProfilePicker.svelte).
  */
 
 export function componentPickerEntries(library) {
@@ -17,15 +20,6 @@ export function componentPickerEntries(library) {
     title: entry.name || entry.id,
     subtitle: `${entry.version ?? '1.0.0'} · ${entry.category || 'custom'}`,
     entry,
-  }));
-}
-
-export function deviceProfilePickerEntries(profiles) {
-  return (Array.isArray(profiles) ? profiles : []).map((profile) => ({
-    key: profile.id,
-    title: profile.name || profile.id,
-    subtitle: `${profile.manufacturer || 'device'} · ${profile.status || 'profile'}`,
-    entry: profile,
   }));
 }
 
