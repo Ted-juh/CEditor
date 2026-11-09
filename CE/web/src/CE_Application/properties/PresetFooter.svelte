@@ -30,6 +30,15 @@
   let selectedScopeIds = $state([]);
   let lastDomain = $state('');
 
+  // Both footer sections arrive collapsed on every visit, on purpose. This footer sits outside
+  // SectionRenderer, so a PropertySection here gets no collapse scope and would fall back to
+  // throwaway local state that starts OPEN — and the footer is re-created on every tab switch
+  // (TabContentArea keys it on the tab), so a section you shut came back open. The owner's call
+  // is that they always start shut, not that they remember: so the state is owned here, starts
+  // at true, and dies with the footer.
+  let presetsCollapsed = $state(true);
+  let descriptionCollapsed = $state(true);
+
   let selectedPreset = $derived.by(() =>
     domainPresets.find((preset) => preset.id === selectedPresetId) ?? null
   );
@@ -292,7 +301,7 @@
 </script>
 
 {#if domain}
-  <PropertySection title="Presets">
+  <PropertySection title="Presets" bind:collapsed={presetsCollapsed}>
     <PropertyCell label="Preset" span={4} hint="Saved presets for this card only.">
       <select class="preset-select" value={selectedPresetId} onchange={(event) => loadPresetDraft(domainPresets.find((preset) => preset.id === event.target.value) ?? null)}>
         <option value="">New preset...</option>
@@ -339,7 +348,7 @@
     </PropertyCell>
   </PropertySection>
 
-  <PropertySection title="Description">
+  <PropertySection title="Description" bind:collapsed={descriptionCollapsed}>
     <PropertyCell label="Notes" span={4} hint="Optional description or tips shown when this preset is selected.">
       <textarea
         class="preset-description"
