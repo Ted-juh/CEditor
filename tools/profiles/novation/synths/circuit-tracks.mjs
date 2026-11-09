@@ -8,7 +8,7 @@ export default {
   family: 'Circuit',
   description: 'Novation Circuit Tracks, both synths, the drums and the project, by the control changes and NRPNs of its programmer\'s reference.',
   documents: [
-    { title: 'Circuit Tracks Programmer\'s Reference Guide v3', file: 'circuit_tracks_programmer_s_reference_guide_v3.pdf', url: 'https://downloads.novationmusic.com/novation/circuit/circuit-tracks', pages: '3-12' },
+    { title: 'Circuit Tracks Programmer\'s Reference Guide v3', file: 'circuit_tracks_programmer_s_reference_guide_v3.pdf', url: 'https://downloads.novationmusic.com/novation/circuit/circuit-tracks', pages: '3-12', valuePages: '9-10' },
   ],
   parts: [
     { pages: [3, 4, 5, 6, 7, 8], parts: [{ name: 'Synth 1', channel: 'channel', default: 1 }, { name: 'Synth 2', channel: 'synth2Channel', default: 2 }], why: '"Send messages on MIDI Channel 1 for Synth 1 and Channel 2 for Synth" 2' },

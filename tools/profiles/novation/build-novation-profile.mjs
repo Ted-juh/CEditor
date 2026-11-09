@@ -12,7 +12,9 @@
 //   - a range printed with what it shows (`63-66 (-1 to +2)`, `0 – 127 (-64 – 63)`, the MiniNova's
 //     Mapped Range) is the values sent, shown as printed;
 //   - a parameter is a choice only where its values are named with their numbers: `0=Mono, 1=Mono
-//     AG, …` in the notes, `16’,8’,4’,2’ (MIDI val of 63, 64, 65, 66)`. Names without numbers
+//     AG, …` in the notes, `16’,8’,4’,2’ (MIDI val of 63, 64, 65, 66)`, or a value table the row
+//     points to (`See Osc Waveform Table`, the Mono Station's `(see table)` beside a table titled for
+//     it) that numbers every value of its range, no more and no fewer. Names without numbers
 //     (`sine, tri, saw, pulse`) are said in the notes, not guessed at;
 //   - several switches on one NRPN, each with values of its own (the MiniNova's 0:122: `42=FreqLink
 //     Off, 43=FreqLink On`, `0=Single, 1=Multi`), are a choice each on that NRPN, and the message is
@@ -53,6 +55,32 @@ export function listedValues(text) {
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 
+const words = (text) => String(text ?? '').toLowerCase().replace(/[^a-z0-9 ]+/g, ' ').split(/\s+/).filter((w) => w && w !== 'table' && w !== 'see');
+
+/**
+ * The value table a row points to, and the list in it for this parameter: by the title its notes
+ * name (`See Mod Matrix Table`, `See Table 3: Sync`), or, for the Mono Station's `(see table)`, the
+ * table whose title is in the parameter's own name (`Oscillator Waveform Table` for `Oscillator 1
+ * Waveform Type`). A table of several lists gives the one named in the parameter (`Drive Type`,
+ * `Source`), or all of them together (the Circuit Tracks' Waveforms then Wavetables).
+ */
+export function valueListFor(row, tables) {
+  if (!tables?.length || !/see .*table|\(see table\)|see table/i.test(row.notes ?? '')) return null;
+  const said = /\(see table\)/i.test(row.notes) ? words(`${row.section} ${row.parameter}`).filter((w) => !/^\d+$/.test(w)) : words(row.notes);
+  const numbered = /table\s+(\d+)\s*:/i.exec(row.notes)?.[1];
+  const scored = tables.filter((t) => (t.doc ?? 0) === (row.doc ?? 0)).map((t) => {
+    if (numbered) return { t, score: new RegExp(`^Table ${numbered}:`).test(t.title) ? 100 : 0 };
+    const title = words(t.title.replace(/^Table \d+:\s*/, ''));
+    return { t, score: title.length && title.every((w) => said.includes(w)) ? title.length : 0 };
+  }).filter((x) => x.score).sort((a, b) => b.score - a.score);
+  const table = scored[0]?.t;
+  if (!table) return null;
+  if (table.lists.length === 1) return { table, entries: table.lists[0].entries };
+  const own = words(row.parameter);
+  const named = table.lists.filter((l) => l.name && words(l.name).every((w) => own.includes(w))).sort((a, b) => words(b.name).length - words(a.name).length)[0];
+  return { table, entries: named ? named.entries : table.lists.flatMap((l) => l.entries), list: named?.name ?? null };
+}
+
 /** `14,46`, `16:48`, `23.55` -> [14, 46]; `65` -> [65]; `0:27` (an NRPN) -> [0, 27]. */
 const numbers = (text) => String(text ?? '').trim().split(/\s*[,:.]\s*/).filter(Boolean).map(Number);
 
@@ -64,6 +92,7 @@ export function buildNovationProfile(data, layout) {
   const skipped = new Map();
   const skip = (why, what) => skipped.set(why, [...(skipped.get(why) ?? []), what]);
   const pairs = [];
+  const tableMisses = new Map();
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
   const seen = new Map();   // recipe id -> the values its parameters take (null: all of them)
   const shared = new Set();
@@ -104,7 +133,14 @@ export function buildNovationProfile(data, layout) {
     // Its values.
     const range = readRange(row.range);
     const mapped = row.mapped ? readRange(row.mapped) : null;
-    const choices = listedValues(row.range) ?? namedValues(row.notes);
+    // A value table the row points to, when it numbers every value of the range.
+    const tabled = valueListFor(row, data.valueTables);
+    const covers = tabled && range && tabled.entries.length === range.max - range.min + 1 && tabled.entries.every((e, i) => e.value === range.min + i && e.label);
+    if (tabled && !covers) {
+      const why = `${tabled.table.title}${tabled.list ? ` (${tabled.list})` : ''} numbers ${tabled.entries.map((e) => e.value).join(', ')} for a range of ${range ? `${range.min} - ${range.max}` : row.range}`;
+      tableMisses.set(why, [...(tableMisses.get(why) ?? []), fullName]);
+    }
+    const choices = listedValues(row.range) ?? namedValues(row.notes) ?? (covers ? tabled.entries.map(({ value, label: l }) => ({ value, label: l })) : null);
     const describe = [];
     let read = null;
     const pair = /^\(\s*(\d+)\s*,\s*(\d+)\s*\)$/.exec(String(row.range).trim());
@@ -186,6 +222,8 @@ export function buildNovationProfile(data, layout) {
   if (shared.size) notes.push(`Messages that carry several switches, each with values of its own, a choice each: ${[...new Set([...shared].map((id) => { const r = recipes.get(id); return r.kind === 'nrpn' ? `NRPN ${r.parameterMsb}:${r.parameterLsb}` : `CC ${r.controller}`; }))].join(', ')}. CEditor does not attribute one of these to a parameter when the instrument sends it.`);
   if (pairs.length) notes.push(`${pairs.length} CC pair(s) are the coarse controller alone, 0 - 127: each pair is a controller and its partner 32 above, MIDI's coarse and fine, and the Circuit Mono Station's guide says the second "is used to create an 8-bit message for a 0-255 value range" without saying which bit it carries. ${pairs.join('; ')}.`);
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
+  if (data.valueTables?.length) notes.push(`${parameters.filter((p) => p.type === 'choice').length} choice(s), their names from the value tables the rows point to (${[...new Set(data.valueTables.map((t) => t.title))].join(', ')}) where a table numbers every value of the range, or from the rows' own notes.`);
+  for (const [why, names] of tableMisses) notes.push(`A number, not a choice, where the value table it points to does not number its whole range: ${why}: ${names.join(', ')}.`);
 
   const variables = { channel: 1, ...Object.fromEntries((layout.parts ?? []).flatMap((b) => b.parts).map((p) => [p.channel, p.default ?? 1])), ...(layout.variables ?? {}) };
   for (const block of layout.parts ?? []) notes.push(`Pages ${block.pages[0]}-${block.pages.at(-1)}: ${block.parts.map((p) => `${p.name} on the ${p.channel} variable (channel ${variables[p.channel]})`).join(', ')}${block.why ? `; ${block.why}` : ''}.`);

@@ -8,7 +8,7 @@ export default {
   family: 'Circuit',
   description: 'Novation Circuit Mono Station, every control change in its MIDI parameters document.',
   documents: [
-    { title: 'Circuit Mono Station MIDI Parameters v1', file: 'circuit-mono-station-midi-parameters-v1.pdf', url: 'https://downloads.novationmusic.com/novation/circuit/circuit-monostation', pages: '1-3' },
+    { title: 'Circuit Mono Station MIDI Parameters v1', file: 'circuit-mono-station-midi-parameters-v1.pdf', url: 'https://downloads.novationmusic.com/novation/circuit/circuit-monostation', pages: '1-3', valuePages: '2-3' },
   ],
   prefixSection: true,
 };

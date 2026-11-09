@@ -8,7 +8,7 @@ export default {
   family: 'Nova',
   description: 'Novation MiniNova, every control change and NRPN in its Extended CC & NRPN Map.',
   documents: [
-    { title: 'MiniNova Extended CC & NRPN Map, Version 0002', file: 'mininova-cc-nprn-chart.pdf', url: 'https://downloads.novationmusic.com/novation/synthesisers/mininova', pages: '1-9' },
+    { title: 'MiniNova Extended CC & NRPN Map, Version 0002', file: 'mininova-cc-nprn-chart.pdf', url: 'https://downloads.novationmusic.com/novation/synthesisers/mininova', pages: '1-9', valuePages: '8-9' },
   ],
   prefixSection: true,
 };

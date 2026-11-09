@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { readTables } from './read-novation-pdf.mjs';
+import { readValueTables } from './read-novation-values.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 
@@ -29,19 +30,24 @@ const pageList = (spec) => (Array.isArray(spec) ? spec : [spec]).flatMap((p) => 
 export function importDocuments(layout, files) {
   const sources = [];
   const rows = [];
+  const valueTables = [];
   layout.documents.forEach((doc, index) => {
     const file = files[index];
     const pages = pageList(doc.pages);
     sources.push({ title: doc.title, file: path.basename(file), sha256: createHash('sha256').update(readFileSync(file)).digest('hex'), url: doc.url, pages: doc.pages });
     for (const row of readTables(file, pages, { columnStarts: doc.columnStarts ?? null })) rows.push({ doc: index, ...row });
+    // The value tables the rows point to (`See Osc Waveform Table`), where the layout names their pages.
+    if (doc.valuePages) for (const t of readValueTables(file, pageList(doc.valuePages))) valueTables.push({ doc: index, ...t });
   });
-  return { sources, rows };
+  return { sources, rows, ...(valueTables.length ? { valueTables } : {}) };
 }
 
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   return `${['{', '  "sources": [', ...data.sources.map((s, i) => `    ${JSON.stringify(s)}${i < data.sources.length - 1 ? ',' : ''}`), '  ],', '  "rows": [',
-    ...data.rows.map((r, i) => `    ${JSON.stringify(r)}${i < data.rows.length - 1 ? ',' : ''}`), '  ]', '}'].join('\n')}\n`;
+    ...data.rows.map((r, i) => `    ${JSON.stringify(r)}${i < data.rows.length - 1 ? ',' : ''}`),
+    ...(data.valueTables ? ['  ],', '  "valueTables": [', ...data.valueTables.map((t, i) => `    ${JSON.stringify(t)}${i < data.valueTables.length - 1 ? ',' : ''}`)] : []),
+    '  ]', '}'].join('\n')}\n`;
 }
 
 async function main() {

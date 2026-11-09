@@ -20,6 +20,7 @@ import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
 import { pageBlocks, pageTables } from '../../../tools/profiles/novation/read-novation-pdf.mjs';
+import { pagePhrases, pageValueTables } from '../../../tools/profiles/novation/read-novation-values.mjs';
 import { buildNovationProfile, listedValues, namedValues, readRange } from '../../../tools/profiles/novation/build-novation-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/novation/make-profiles.mjs';
 import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
@@ -82,6 +83,27 @@ test('the builder: a CC pair is its coarse half, a shown range is not the value 
   assert.equal(localCompileParameter(profile, { parameterId: by('ResLink').id, value: 'on' }).hex, 'B0 63 00 B0 62 7A B0 06 2D');
   assert.equal(localCompileParameter(profile, { parameterId: by('Synth 2 cutoff').id, value: 100 }).hex, 'B1 4A 64', 'Synth 2 on its own channel');
   assert.ok(profile.authoringNotes.some((n) => /value shown, not the value sent: Mod Env depth/.test(n)));
+});
+
+// Value tables as the Circuit Tracks sets them: a title, `Value` and `Type`, a sub-list heading in the
+// number column, a name wrapped onto the next line, two names set a line below their numbers, and a
+// second table beside the first.
+const word = (x0, y0, text) => `<word xMin="${x0}" yMin="${y0}" xMax="${x0 + text.length * 4}" yMax="${y0 + 8}">${text}</word>`;
+const VALUES = [
+  word(41, 30, 'Filter'), word(66, 30, 'Table'), word(309, 30, 'Osc'), word(325, 30, 'Waveform'), word(363, 30, 'Table'),
+  word(115, 60, 'Value'), word(156, 60, 'Type'), word(393, 60, 'Value'), word(422, 60, 'Type'),
+  word(110, 70, 'Drive'), word(132, 70, 'Type'), word(387, 70, 'Waveforms'),
+  word(120, 80, '0'), word(161, 80, 'diode'), word(398, 80, '0'), word(427, 80, 'sine'),
+  word(120, 90, '1'), word(161, 90, 'cross-over'), word(398, 90, '1'), word(427, 90, 'triangle'),
+  word(161, 100, 'reducer'),
+  word(398, 100, '2'), word(398, 110, '3'), word(427, 105, 'analogue'), word(463, 105, 'pulse'), word(427, 115, 'analogue'), word(463, 115, 'sync'),
+].join('\n');
+
+test('value tables: a list per heading, a wrapped name, names a line below their numbers, a table beside another', () => {
+  const tables = pageValueTables(pagePhrases(VALUES));
+  assert.deepEqual(tables.map((t) => t.title), ['Filter Table', 'Osc Waveform Table']);
+  assert.deepEqual(tables[0].lists, [{ name: 'Drive Type', entries: [{ value: 0, label: 'diode' }, { value: 1, label: 'cross-over reducer' }] }]);
+  assert.deepEqual(tables[1].lists[0].entries.map((e) => e.label), ['sine', 'triangle', 'analogue pulse', 'analogue sync']);
 });
 
 /* ------------------------------------------------------------------ the profiles */
@@ -157,4 +179,21 @@ test('the Circuit Tracks: each synth on its own channel, the drums on 10 and the
   assert.equal(localCompileParameter(profile, { parameterId: by('Synth 2 Polyphony Mode').id, value: 2 }).hex, 'B1 03 02');
   assert.equal(localCompileParameter(profile, { parameterId: by('Drums drum 1 level').id, value: 100 }).hex, 'B9 0C 64');
   assert.ok(profile.authoringNotes.some((n) => /audio table on p\. 9, for which the guide prints no channel/.test(n)));
+});
+
+test('choices from the value tables the rows point to, and none where a table does not number the whole range', () => {
+  const tracks = builtProfile('novation-circuit-tracks');
+  const mono = builtProfile('novation-circuit-mono-station');
+  const mini = builtProfile('novation-mininova');
+  const by = (profile, name) => profile.parameters.find((p) => p.name === name);
+  // `See Osc Waveform Table`: its Waveforms (0-13) and Wavetables (14-29) together.
+  assert.deepEqual([by(tracks, 'Synth 1 osc 1 wave').choices.length, by(tracks, 'Synth 1 osc 1 wave').choices[15].label], [30, 'analogue pulse']);
+  assert.equal(by(tracks, 'Synth 1 drive type').choices[6].label, 'rate reducer', 'the Filter Table\'s Drive Type list');
+  // The Mod Matrix Table prints no sources 1 - 3: a number, and said.
+  assert.equal(by(tracks, 'Synth 1 Mod matrix 1 source 1').type, 'integer');
+  assert.ok(tracks.authoringNotes.some((n) => /Mod Matrix Table \(Source\) numbers 0, 4, 5/.test(n)));
+  // `(see table)`: the table titled for the parameter.
+  assert.deepEqual(by(mono, 'LFO Sync Rate').choices.slice(0, 2).map((c) => c.label), ['64 beats', '48 beats']);
+  assert.equal(by(mono, 'Filter Slope').type, 'integer', 'its table reprints the shape table\'s three names for 0 - 1');
+  assert.deepEqual([by(mini, 'Osc1 Wave').choices.length, by(mini, 'Osc1 Wave').choices[71].label], [72, 'AudioInR']);
 });
