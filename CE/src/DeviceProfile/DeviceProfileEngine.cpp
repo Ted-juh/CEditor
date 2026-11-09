@@ -2912,7 +2912,8 @@ CompileResult DeviceProfileEngine::compileParameterNumber (const juce::String& d
             // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps
             // its two bytes in elsewhere.
             auto* encoding = asObject (parameter.getProperty ("encoding"));
-            const auto lsbFirst = encoding != nullptr && propString (*encoding, "type") == "u14-lsb-msb";
+            const auto encodingType = encoding != nullptr ? propString (*encoding, "type") : juce::String();
+            const auto lsbFirst = encodingType == "u14-lsb-msb" || encodingType == "s14-lsb-msb";
             addCc (transaction.messages, 6, encodedBytes[lsbFirst ? 1 : 0]);
             addCc (transaction.messages, 38, encodedBytes[lsbFirst ? 0 : 1]);
         }

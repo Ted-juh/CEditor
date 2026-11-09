@@ -52,6 +52,7 @@ What the builder takes as settled, and what it does not:
 | `korg-nts-1-mk2` | NTS-1 digital kit mkII MIDI Implementation 1.00 | 62 | 7 | — | 73H 01H |
 | `korg-microkorg-s` | microKORG S MIDI Implementation 1.01 | 205 | 78 | 128 | 40H 01H |
 | `korg-kingkorg` | KingKORG MIDI Implementation 1.00 | 210 | 60 | — | 18H 01H |
+| `korg-microkorg2` | microKORG 2 MIDI Implementation 1.0 | 180 | 40 | — | 71H 01H |
 | `korg-kingkorg-neo` | KingKORG NEO MIDI Implementation 1.00 (same tables, same product ID) | 210 | 60 | — | 18H 01H |
 | `korg-minikorg-700sm` | miniKORG 700Sm MIDI Implementation 1.00 | 29 | 15 | 14 | 62H 01H |
 | `korg-volca-fm2` | volca fm2 MIDI Implementation 1.00 | 13 | 2 | — | 2FH 01H |
@@ -100,6 +101,18 @@ description. Left out and said: the program name, the oscillators' CTRL1 and CTR
 depends on the oscillator type), and the vocoder's formant-hold bands printed `same as Band1`.
 The KingKORG NEO's document has the same tables and the same product ID, and the two answer with the
 same identity.
+
+## Hex notation (microKORG2)
+
+The microKORG2 lists its panel's control changes as a footnote table (`*3 : Parameter Edit`) and its
+NRPNs in another (`*4`), every value in hex with what it means after a colon: `00~7F:0~127`,
+`00,01:Off,On`, `00~3F/40~7F:Fingered/Always`, `00~7F:Saw~OneShot *3-1` with the list
+`00~15 : Saw  16~2A : Square …`. `build-korg-hex.mjs` reads that notation: a name per range is a
+choice sending the first value of its range; a value printed over two bytes (`7F 41~7F,00 00,00
+01~3F:-63~0~63`) is 14 bits on CC 6 and 38, two's complement below zero, so -63 goes out `7F 41`
+as the document prints it. Its footnotes are printed side by side, two or three to a line
+(`*3-1 : 00~15 : Saw      *3-2 : 00~1F : LPF`); the reader takes them apart by column. Left out:
+Vocoder E.F.Sens (`00~7E,7F:0~126,Hold`).
 
 ## Pull
 
@@ -170,8 +183,8 @@ Kept as printed and said where it applies:
   the LSB's bits count, so the profile offers the coarse controller alone and leaves the fine one
   out. **NTS-1**, **PS-3300**, **VOX Continental**: read, not yet
   reviewed.
-- **microKORG, microKORG2**: few controllers and no parameter change; their documents edit by NRPN, in
-  an older notation. **The microKORG S's Pull**: its
+- **microKORG (2002)**: its knobs' control changes are assignable, and the document names the 42
+  slots without their default numbers, which are in the Owner's Manual (p. 62). **The microKORG S's Pull**: its
   program tables print offsets and bits in a form of their own (`+1 B6,7`).
 - **KRONOS, NAUTILUS**: their MIDI Implementations are ZIP archives, not yet read.
 - **opsix, wavestate, modwave, multi/poly**: Korg publishes a MIDI 2.0 Property Exchange document

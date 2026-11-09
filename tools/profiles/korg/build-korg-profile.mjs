@@ -22,6 +22,7 @@
 import { camel } from '../roland/build-profile.mjs';
 import { addPull } from './build-korg-dump.mjs';
 import { addParameterChange, parameterChangeVectors } from './build-korg-sysex.mjs';
+import { readHexValue } from './build-korg-hex.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
@@ -159,7 +160,8 @@ export function buildKorgProfile(data, layout) {
   }
   const omitFor = (cc, name) => layout.omit?.[cc] ?? PLUMBING.find(([pattern]) => pattern.test(name))?.[1] ?? null;
   const unique = (id, suffix) => {
-    const out = ids.has(id) ? `${id}${suffix}` : id;
+    let out = ids.has(id) ? `${id}${suffix}` : id;
+    for (let n = 2; ids.has(out); n++) out = `${id}${suffix}_${n}`;   // NRPN 04 20H and 05 20H both end in 20
     ids.add(out);
     return out;
   };
@@ -303,9 +305,32 @@ export function buildKorgProfile(data, layout) {
     notes.push(`CC ${wideControllers.join(', ')} take a 10-bit value when its low 3 bits come first on CC 63, as the document says; CEditor sends them as 7-bit controllers, 0 - 127, which the instrument also takes.`);
   }
 
+  const profile_ccs = new Set([...recipes.values()].filter((r) => r.kind === 'cc').map((r) => r.controller));
   // ------------------------------------------------------------ NRPNs
   const skipped = new Map();
   const skip = (why, at) => skipped.set(why, [...(skipped.get(why) ?? []), at]);
+  // A setting in the microKORG documents' hex notation (build-korg-hex.mjs), as a parameter.
+  const hexParameter = (name, read, recipeId, suffix) => {
+    const { group, leaf } = groupOf(name, layout.groups);
+    const base = {
+      id: unique(`${camel(group)}.${camel(leaf) || recipeId}`, suffix),
+      name, group,
+      ...(read.shown || read.note || read.unit ? { description: [read.shown, read.note, read.unit && !read.shown ? `In ${read.unit}.` : null].filter(Boolean).join(' ') } : {}),
+      access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
+      messageRecipe: recipeId, shortLabel: camel(leaf),
+    };
+    push(read.choices ? choiceParameter(base, choiceList(read.choices)) : numberParameter(base, read.min, read.max, read.wide ? (read.signed ? 's14-lsb-msb' : 'u14-lsb-msb') : 'u7'));
+  };
+  if (layout.hexValues && data.controllerTable) {
+    for (const row of data.controllerTable) {
+      if (profile_ccs.has(row.cc)) continue;
+      const read = readHexValue(row.value, marks, data.lists);
+      if (read.why) { skip(read.why, `CC ${row.cc} (${row.name})`); continue; }
+      const recipeId = `cc${row.cc}`;
+      recipes.set(recipeId, { id: recipeId, kind: 'cc', channel: '$channel', controller: row.cc, value: '$encodedValue' });
+      hexParameter(row.name.replace(/\s+/g, ' ').trim(), read, recipeId, `Cc${row.cc}`);
+    }
+  }
   let msbDashes = false;
   for (const row of data.nrpn) {
     const lsb = Number.parseInt(row.lsb, 16);
@@ -314,9 +339,18 @@ export function buildKorgProfile(data, layout) {
     const number = `${row.msb === '--' ? '--' : hex(msb)} ${hex(lsb)}H`;
     const fix = layout.names?.[`nrpn${hex(msb)}${hex(lsb)}`];
     const name = fix?.name ?? row.name.replace(/\s+/g, ' ').trim();
-    const value = parseNrpnValue(row.value);
     const own = (layout.skip ?? []).find(([pattern]) => pattern.test(name));
     if (own) { skip(own[1], number); continue; }
+    if (layout.hexValues) {
+      const read = readHexValue(row.value, marks, data.lists);
+      if (read.why) { skip(read.why, `${number} (${name})`); continue; }
+      if (!read.wide && ((read.max ?? 0) > 127 || read.choices?.some((c) => c.value > 127))) { skip('wider than 7 bits', `${number} (${name})`); continue; }
+      const recipeId = `nrpn${hex(msb)}${hex(lsb)}`;
+      recipes.set(recipeId, { id: recipeId, kind: 'nrpn', channel: '$channel', parameterMsb: msb, parameterLsb: lsb, valueResolution: read.wide ? 14 : 7, value: '$encodedValue', nullAfterSend: false });
+      hexParameter(name, read, recipeId, `Nrpn${hex(lsb)}`);
+      continue;
+    }
+    const value = parseNrpnValue(row.value);
     if (value.ascii) { skip('the program name, one character per NRPN; CEditor cannot edit text over NRPN yet', number); continue; }
     if (!value.values) { skip('printed without a range', `${number} (${name})`); continue; }
     const values = value.values.list ?? Array.from({ length: value.values.max - value.values.min + 1 }, (unused, i) => value.values.min + i);
@@ -380,14 +414,16 @@ export function buildKorgProfile(data, layout) {
     writable.find((p) => recipeOf(p).kind === 'cc' && p.type === 'choice'),
     writable.find((p) => recipeOf(p).kind === 'nrpn' && p.type === 'choice'),
     writable.find((p) => recipeOf(p).kind === 'nrpn' && recipeOf(p).lowBits),
+    writable.find((p) => recipeOf(p).kind === 'nrpn' && recipeOf(p).valueResolution === 14 && p.range?.min < 0),
     [...writable].reverse().find((p) => recipeOf(p).kind === 'cc'),
   ].filter(Boolean);
   const vectorOf = (parameter) => {
     const recipe = recipeOf(parameter);
     const choice = parameter.type === 'choice' ? parameter.choices.at(-1) : null;
-    const value = choice ? choice.value : Math.min(parameter.range.max, Math.max(parameter.range.min, recipe.lowBits ? 1001 : 100));
+    const value = choice ? choice.value : recipe.valueResolution === 14 && parameter.range.min < 0 ? parameter.range.min : Math.min(parameter.range.max, Math.max(parameter.range.min, recipe.lowBits ? 1001 : 100));
     let bytes;
     if (recipe.kind === 'cc') bytes = [[recipe.controller, value]];
+    else if (recipe.valueResolution === 14) bytes = [[0x63, recipe.parameterMsb], [0x62, recipe.parameterLsb], [0x06, (value & 0x3fff) >> 7], [0x26, value & 0x7f]];
     else if (recipe.lowBits) bytes = [[0x63, recipe.parameterMsb], [0x62, recipe.parameterLsb], [recipe.lowBitsController, value & ((1 << recipe.lowBits) - 1)], [0x06, value >> recipe.lowBits]];
     else bytes = [[0x63, recipe.parameterMsb], [0x62, recipe.parameterLsb], [0x06, value]];
     return {

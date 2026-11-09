@@ -182,6 +182,7 @@ for (const { name, profile, text, out, data } of BUILT) {
           bytes = recipe.template.flatMap((t) => (t === '$deviceId' ? [0x30] : t === '$encodedValue' ? value : [Number.parseInt(t, 16)]));
         } else if (recipe.kind === 'cc') bytes = [0xb0, recipe.controller, wire];
         else if (recipe.lowBits) bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, recipe.lowBitsController, wire & ((1 << recipe.lowBits) - 1), 0xb0, 0x06, wire >> recipe.lowBits];
+        else if (recipe.valueResolution === 14) bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, 0x06, (wire & 0x3fff) >> 7, 0xb0, 0x26, wire & 0x7f];
         else bytes = [0xb0, 0x63, recipe.parameterMsb, 0xb0, 0x62, recipe.parameterLsb, 0xb0, 0x06, wire];
         assert.equal(compiled.hex, hex(bytes), `${parameter.id} = ${value}`);
       }
@@ -349,4 +350,16 @@ test('the KingKORG: an ID and a sub-ID through nested blocks, a 21-bit signed va
   assert.equal(send('Timbre B: Filter Cutoff', 127).hex, 'F0 42 30 00 01 18 41 04 00 1F 00 7F 00 00 F7');
   assert.equal(send('Effect: PreFX Type', 'tone').hex, 'F0 42 30 00 01 18 41 06 00 00 00 05 00 00 F7');
   assert.ok(profile.parameters.some((p) => p.name === 'Timbre B V.Patch: V.Patch 6 Patch Intensity'), 'a block reached through `same as V.PATCH 1`');
+});
+
+test('the microKORG2: its hex notation, a choice per range, and a signed value over two bytes', { skip: !builtProfile('korg-microkorg2') }, () => {
+  // *3: `OSC1 Wave | 00~7F:Saw~OneShot *3-1`, and *3-1: `00~15 : Saw  16~2A : Square …  6B~7F : OneShot`.
+  // *4: `Vocoder Band 1 Pan | 7F 41~7F,00 00,00 01~3F:L63~Cnt~R63` — -63 is 7F 41.
+  const profile = builtProfile('korg-microkorg2');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  assert.deepEqual(by('OSC1 Wave').choices.map((c) => [c.value, c.label]), [[0, 'Saw'], [0x16, 'Square'], [0x2b, 'Triangle'], [0x40, 'Sine'], [0x56, 'DWGS'], [0x6b, 'OneShot']]);
+  assert.deepEqual(by('Portamento Mode').choices.map((c) => [c.value, c.label]), [[0, 'Fingered'], [0x40, 'Always']]);
+  const pan = localCompileParameter(profile, { parameterId: by('Vocoder Band 1 Pan').id, value: -63 });
+  assert.equal(pan.hex, 'B0 63 05 B0 62 20 B0 06 7F B0 26 41');
+  assert.deepEqual(by('Arpeggiator Swing').range, { min: -100, max: 100 });
 });

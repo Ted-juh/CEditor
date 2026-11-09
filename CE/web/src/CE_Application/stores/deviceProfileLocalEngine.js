@@ -385,10 +385,14 @@ export function localCompileParameter(profile, request = {}) {
     } else if (resolution === 14) {
       // Data entry is the MSB on CC 6 and the LSB on CC 38, whichever order the parameter keeps its
       // two bytes in elsewhere.
-      const lsbFirst = String(parameter?.encoding?.type ?? '') === 'u14-lsb-msb';
-      const value14 = encoded.bytes.length > 1 && !lsbFirst
-        ? encoded
-        : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
+      const encodingType = String(parameter?.encoding?.type ?? '');
+      const lsbFirst = encodingType === 'u14-lsb-msb';
+      // A signed value keeps its two's complement bytes, low first: MSB on 6, LSB on 38 all the same.
+      const value14 = encodingType === 's14-lsb-msb'
+        ? { bytes: [encoded.bytes[1], encoded.bytes[0]] }
+        : encoded.bytes.length > 1 && !lsbFirst
+          ? encoded
+          : encodeParameterValue({ encoding: { type: 'u14' } }, encoded.number);
       bytes.push(status, 6, value14.bytes[0] ?? 0);
       bytes.push(status, 38, value14.bytes[1] ?? 0);
     } else {

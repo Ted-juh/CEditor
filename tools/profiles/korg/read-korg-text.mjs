@@ -84,8 +84,39 @@ const TLIST = /^\s*\*([A-Z]\d*-\d+)\s*:\s*([^\d\s][^:]*?)?\s*$/;   // *T-1 :  / 
  * and `{ P6: { title, entries } }` for a list. A list entry is `0 : ARP LATCH`, `0 ~ 255 : Poly` or
  * a heading inside the list (`[POLY]`), kept as printed in `lines`.
  */
+/**
+ * Footnotes printed side by side (the microKORG2's `*3-1 : 00~15 : Saw      *3-2 : 00~1F : LPF`):
+ * the right-hand one, and the lines under it from its column on, are moved after the left-hand one,
+ * so each reads as if printed alone.
+ */
+export function unfoldSideBySide(all) {
+  const out = [];
+  for (let i = 0; i < all.length; i++) {
+    const m = /^(\s*\*\S+\s*:.*?\S)\s{2,}(\*[\w-]+\s*:.*)$/.exec(all[i]);
+    if (!m || BORDER.test(all[i]) || ROW.test(all[i])) { out.push(all[i]); continue; }
+    const column = all[i].length - m[2].length;
+    const left = [m[1]];
+    const right = [' '.repeat(column) + m[2]];
+    let j = i + 1;
+    for (; j < all.length && all[j].trim(); j++) {
+      left.push(all[j].slice(0, column).replace(/\s+$/, ''));
+      // Kept at their own columns, so a third footnote beside the second splits the same way next pass.
+      if (all[j].length > column) right.push(' '.repeat(column) + all[j].slice(column));
+    }
+    out.push(...left, '', ...right);
+    i = j - 1;
+  }
+  return out;
+}
+
 export function readFootnotes(text) {
-  const all = lines(text);
+  // Three side by side (the microKORG S's *4-1, *4-3, *4-4) take more than one pass.
+  let all = lines(text);
+  for (let pass = 0; pass < 4; pass++) {
+    const next = unfoldSideBySide(all);
+    if (next.length === all.length && next.every((l, i) => l === all[i])) break;
+    all = next;
+  }
   const marks = {};
   const notes = {};
   let open = null;

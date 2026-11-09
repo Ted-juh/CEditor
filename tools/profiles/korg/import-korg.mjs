@@ -43,13 +43,28 @@ function controlChanges(table) {
 /** The Program Change row: `Cn | pp (pp) | -- (--) | Program Change (pp=0~99)`. */
 function programChange(table) {
   const row = (table?.rows ?? []).find((r) => /^Cn$/i.test(r.cells[0] ?? ''));
-  return row ? { line: row.line, desc: row.cells.at(-1) } : null;
+  return row ? { line: row.line, desc: row.cells[3] ?? row.cells.at(-1) } : null;
 }
 
-/** NRPN rows: `| --  10  | VOICE MODE TYPE | 0~4  *3-5 |`. */
+/**
+ * A controller table printed as a footnote, with the parameter and its values in columns of their
+ * own (the microKORG2's `*3 : Parameter Edit`: `| Bn | 05 ( 5) | Portamento Time | 00~7F:0~127 |`).
+ */
+function controllerTable(tables) {
+  const table = tables.find((t) => t.header.some((h) => /^Status$/i.test(h[0] ?? '') && h.some((c) => /^Parameter$/i.test(c)) && h.some((c) => /^Value$/i.test(c))));
+  if (!table) return null;
+  return table.rows.filter((r) => /^Bn$/i.test(r.cells[0] ?? '')).map((r) => ({ line: r.line, cc: ccNumber(r.cells[1] ?? ''), name: r.cells[2] ?? '', value: r.cells[3] ?? '' })).filter((r) => r.cc !== null);
+}
+
+/** NRPN rows: `| --  10  | VOICE MODE TYPE | 0~4  *3-5 |`, or `| 00 | 02 ( 2) | Arpeggiator Off/On | 00,01:Off,On |`. */
 function nrpnRows(table) {
   const out = [];
   for (const row of table?.rows ?? []) {
+    const split = /^([0-9a-f]{2})$/i.exec(row.cells[0] ?? '') && /^([0-9a-f]{2})\s*\(\s*\d+\s*\)$/i.exec(row.cells[1] ?? '');
+    if (split) {
+      out.push({ line: row.line, msb: row.cells[0], lsb: split[1], name: row.cells[2] ?? '', value: row.cells[3] ?? '', more: [] });
+      continue;
+    }
     const m = /^(--|[0-9a-f]{1,2})\s+([0-9a-f]{1,2})$/i.exec(row.cells[0] ?? '');
     if (!m) continue;
     out.push({ line: row.line, msb: m[1], lsb: m[2], name: row.cells[1] ?? '', value: row.cells[2] ?? '', more: row.more.map((c) => c.slice(1).join(' ').trim()).filter(Boolean) });
@@ -112,7 +127,7 @@ export function importText(file, layout) {
   const titled = (id) => tables.find((t) => t.heading?.id === id && /CHANNEL MESSAGES/i.test(t.heading.title));
   const transmitted = controlChanges(titled(layout.tables?.transmitted ?? '1-1'));
   const received = controlChanges(titled(layout.tables?.received ?? '2-1'));
-  const nrpnTable = tables.find((t) => /\bNRPN\b|Non Registered/i.test(t.heading?.title ?? '') && t.rows.some((r) => /^(--|[0-9a-f]{1,2})\s+[0-9a-f]{1,2}$/i.test(r.cells[0] ?? '')));
+  const nrpnTable = tables.find((t) => /\bNRPN\b|Non Registered/i.test(t.heading?.title ?? '') && t.rows.some((r) => /^(--|[0-9a-f]{1,2})\s+[0-9a-f]{1,2}$/i.test(r.cells[0] ?? '') || (/^[0-9a-f]{2}$/i.test(r.cells[0] ?? '') && /\(\s*\d+\s*\)$/.test(r.cells[1] ?? ''))));
   const title = documentTitle(text);
   return {
     source: {
@@ -127,6 +142,7 @@ export function importText(file, layout) {
     received,
     transmitted,
     programChange: programChange(titled(layout.tables?.received ?? '2-1')),
+    ...(controllerTable(tables) ? { controllerTable: controllerTable(tables) } : {}),
     nrpn: nrpnRows(nrpnTable),
     identity: identityRows(tables),
     programDump: programDump(tables) ? { ...programDump(tables), size: programDumpSize(text) } : null,
@@ -139,7 +155,7 @@ export function importText(file, layout) {
 /** One row per line, so a re-import that changes one row changes one line. */
 export function stringifyTranscription(data) {
   const out = ['{', `  "source": ${JSON.stringify(data.source)},`, `  "programChange": ${JSON.stringify(data.programChange)},`];
-  for (const key of ['received', 'transmitted', 'nrpn', 'identity']) {
+  for (const key of ['received', 'transmitted', ...(data.controllerTable ? ['controllerTable'] : []), 'nrpn', 'identity']) {
     out.push(`  "${key}": [`);
     data[key].forEach((row, i) => out.push(`    ${JSON.stringify(row)}${i < data[key].length - 1 ? ',' : ''}`));
     out.push('  ],');
