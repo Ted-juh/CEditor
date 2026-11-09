@@ -31,7 +31,8 @@ import { camel, stringifyProfile } from '../roland/build-profile.mjs';
 
 const hex = (n) => n.toString(16).toUpperCase().padStart(2, '0');
 // The MODX prints an arrow from a private-use font between a byte's bits and the value's (`1st bit6-0  bit13-7`).
-const clean = (s) => String(s ?? '').replace(/[—−]/g, '–').replace(/[’‘]/g, "'").replace(/[\uf000-\uf8ff]/g, ':').replace(/\s+/g, ' ').trim();
+// U+2212 is a minus sign (the MODX M's `−24 – +24`), not a dash.
+const clean = (s) => String(s ?? '').replace(/—/g, '–').replace(/−/g, '-').replace(/[’‘]/g, "'").replace(/[\uf000-\uf8ff]/g, ':').replace(/\s+/g, ' ').trim();
 const slug = (label) => label.toLowerCase().replace(/[^a-z0-9+-]+/g, '').replace(/\+/g, 'plus').replace(/-/g, 'minus') || 'v';
 
 /** `00 – 7F` -> [[0, 127]]; `00 – 0F, 7F` -> [[0, 15], [127, 127]]; `00, 20 – 7E` -> [[0, 0], [32, 126]]. */
@@ -51,6 +52,24 @@ export function readHexRange(text) {
   return out;
 }
 
+/**
+ * A range printed two 7-bit bytes a value (the MODX M's `Data Range MSB/LSB`): `00 00 – 00 7F` ->
+ * [[0, 127]]; `00 00 – 00 11, 00 7F` -> [[0, 17], [127, 127]]; `07 7F` is 1023.
+ */
+export function readPairRange(text) {
+  const parts = clean(text).split(/\s*,\s*/).filter(Boolean);
+  const out = [];
+  for (const p of parts) {
+    const m = /^([0-9A-F]{2}) ([0-9A-F]{2})(?:\s*–\s*([0-9A-F]{2}) ([0-9A-F]{2}))?$/.exec(p);
+    if (!m || m.slice(1).filter(Boolean).some((b) => parseInt(b, 16) > 127)) return null;
+    const from = (parseInt(m[1], 16) << 7) | parseInt(m[2], 16);
+    const to = m[3] ? (parseInt(m[3], 16) << 7) | parseInt(m[4], 16) : from;
+    if (to < from) return null;
+    out.push([from, to]);
+  }
+  return out.length ? out : null;
+}
+
 /** A description split at its commas, leaving those inside brackets alone. */
 export function splitList(text) {
   const out = [];
@@ -68,8 +87,9 @@ export function splitList(text) {
 /** `-24 – +24 (semitones)`, `-24 – +24 [semitones]` (the MOXF), `ALGO 1 – 12`, `-48 (-4 octave) – +48 (+4 octave)` -> { min, max, unit }. */
 export function readShownRange(text) {
   const t = clean(text);
-  const unit = /[([](semitones?|cent|cents|dB|%|Hz|ms|octave)[)\]]\s*$/i.exec(t)?.[1];
-  const bare = t.replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+  // `(semitones)`, `[semitones]`, or bare after the range: the MODX M's `-24 – +24 semi`.
+  const unit = /[([](semitones?|cent|cents|dB|%|Hz|ms|octave)[)\]]\s*$/i.exec(t)?.[1] ?? (/\d\s+semi$/.test(t) ? 'semitones' : undefined);
+  const bare = t.replace(/\([^)]*\)|\[[^\]]*\]/g, '').replace(/\s+semi$/, '').replace(/\s+/g, ' ').trim();
   // Pan: `L64 – C – R63`.
   const pan = /^L(\d+)\s*–\s*C\s*–\s*R(\d+)$/.exec(bare);
   if (pan) return { min: -Number(pan[1]), max: Number(pan[2]) };
@@ -106,7 +126,7 @@ export function readValues(parts, description) {
   // Counted out over the parts in turn: `00 – 10, 7F` beside `1 – 16, omni, off`.
   if (items.length !== parts.length) {
     const values = parts.flatMap(([from, to]) => Array.from({ length: to - from + 1 }, (u, i) => from + i));
-    const listed = readValueList(values.length - 1, items);
+    const listed = readValueList(values.length - 1, items, values);
     return listed ? { choices: listed.map((c, i) => ({ value: values[i], label: c.label })) } : {};
   }
   // Part for part: `00 – 0F, 7F` beside `1 – 16, off`.
@@ -126,20 +146,23 @@ export function readValues(parts, description) {
  * named in turn). A range sharing one meaning (`1 – 127: Mono`) is not a list. Returns the choices,
  * or null when the items do not count out exactly 0 to `to`.
  */
-export function readValueList(to, items) {
+export function readValueList(to, items, values = null) {
   const out = [];
+  // Over a range in parts the numbers printed are the values themselves (`127: Off` after `17:
+  // Master` beside `00 – 11, 7F`); over one range from 0, the values are the count.
+  const valueAt = (i) => (values ? values[i] : i);
   for (const item of items) {
     let m;
-    const next = out.length;
+    const next = valueAt(out.length);
     if ((m = /^(\d+)\s*[:=]\s*(\D*?)(\d+)\s*–\s*(\d+)\s*[:=]\s*\2(\d+)$/.exec(item))) {
       // `2 = Library1 … 9 = Library8`: the values between, named in turn.
       const [a, b, first] = [Number(m[1]), Number(m[4]), Number(m[3])];
-      if (a !== next || b - a !== Number(m[5]) - first) return null;
+      if (a !== next || b - a !== Number(m[5]) - first || valueAt(out.length + b - a) !== b) return null;
       for (let v = a; v <= b; v++) out.push({ value: v, label: `${m[2]}${first + v - a}` });
     } else if ((m = /^(\d+)\s*–\s*(\d+)\s*[:=]\s*(.+)$/.exec(item))) {
       const [a, b] = [Number(m[1]), Number(m[2])];
       const named = /^(.*?)(\d+)\s*–\s*(\d+)$/.exec(m[3].trim());
-      if (a !== next || !named || Number(named[3]) - Number(named[2]) !== b - a) return null;
+      if (a !== next || !named || Number(named[3]) - Number(named[2]) !== b - a || valueAt(out.length + b - a) !== b) return null;
       for (let v = a; v <= b; v++) out.push({ value: v, label: `${named[1]}${Number(named[2]) + v - a}` });
     } else if ((m = /^(\d+)\s*[:=]\s*(.+)$/.exec(item))) {
       if (Number(m[1]) !== next) return null;
@@ -148,12 +171,12 @@ export function readValueList(to, items) {
       const shown = readShownRange(item);
       if (!shown) return null;
       const prefix = /^([A-Za-z.]+)\s+[+-]?\d/.exec(item)?.[1];
-      for (let n = shown.min; n <= shown.max; n++) out.push({ value: out.length, label: prefix ? `${prefix} ${n}` : String(n) });
+      for (let n = shown.min; n <= shown.max; n++) out.push({ value: valueAt(out.length), label: prefix ? `${prefix} ${n}` : String(n) });
     } else {
       out.push({ value: next, label: item });
     }
   }
-  return out.length === to + 1 && out.length >= 2 ? out : null;
+  return out.length === (values ? values.length : to + 1) && out.length >= 2 ? out : null;
 }
 
 const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -214,6 +237,7 @@ export function buildYamahaProfile(data, layout) {
   const parameters = [];
   const ids = new Set();
   const skipped = new Map();
+  const corrected = [];
   const skip = (why, what) => { const list = skipped.get(why) ?? []; if (!list.includes(what)) skipped.set(why, [...list, what]); };
   const unique = (id) => { let out = id; for (let n = 2; ids.has(out); n++) out = `${id}${n}`; ids.add(out); return out; };
   // The bytes between the device number and the address, as the data format prints them: the group
@@ -224,7 +248,14 @@ export function buildYamahaProfile(data, layout) {
   const head = data.format.header ?? [...group, model];
   const bulkHead = data.format.bulkHeader ?? [...group, 'bb', 'bb', model];
   const recipe = { id: 'parameterChange', kind: 'sysex', template: ['F0', '43', '$deviceId', ...head, '$address', '$encodedValue', 'F7'] };
-  const placed = [];   // { parameter, address: [H, M, L], width }
+  // A choice where every value is two bytes (the MODX M): its high byte 00, then the choice.
+  const choiceRecipe = { id: 'parameterChangeChoice', kind: 'sysex', template: ['F0', '43', '$deviceId', ...head, '$address', '00', '$encodedValue', 'F7'] };
+  let pairChoices = 0;
+  const addressBytes = data.format.addressBytes ?? 3;
+  const placed = [];   // { parameter, address: [H, M, L] (or four bytes), width, valueAt }
+  // Whether an address falls in a block of `size` bytes at `at`: the same bytes but the last, and the
+  // last within the block.
+  const inBlock = (address, at, size, length = 1) => address.length === at.length && at.slice(0, -1).every((x, i) => address[i] === x) && address.at(-1) >= at.at(-1) && address.at(-1) + length <= at.at(-1) + size;
 
   // The bulk dump blocks, each where it starts and how many bytes of data it holds. The byte count is
   // printed as the data list says: from the model ID onward (the reface: the data and four bytes
@@ -242,12 +273,14 @@ export function buildYamahaProfile(data, layout) {
     // A block printed with placeholders (the MODX's `41 ep 00 [p: Part No. (0...15), e: Element No.
     // (0...7)]`): one for each value the layout gives them (its laid-out part's elements). A Bulk
     // Header's or Footer's `mm nn` is the edit buffer's, from the layout.
+    // The layout may give a block's placeholders by its address (the MODX M's `o` is an FM-X
+    // operator at 3p and an AN-X oscillator at 4p).
+    const blockHolders = { ...(layout.placeholders ?? {}), ...(typeof layout.bulkPlaceholders === 'function' ? layout.bulkPlaceholders(b.address) : layout.bulkPlaceholders ?? {}) };
     const vars = b.frame ? [] : [...new Set(b.address.flatMap((x) => placeholderVars(x, blockHolders)))];
     if (vars.some((v) => !blockHolders[v])) { skip('bulk dump blocks printed with a placeholder the layout does not give, not read (their messages are let pass)', `${blockName(b.name)} (${b.address.join(' ')})`); return []; }
-    if (vars.length) return assignments(vars, blockHolders).map((at) => ({ ...b, name: `${blockName(b.name)} ${vars.map((v) => at[`${v}:label`]).join(' ')}`, at: b.address.map((x) => parseInt(resolveByte(x, at, blockHolders), 16)) }));
-    return [{ ...b, at: [H, M, L] }];
+    if (vars.length) return assignments(vars, blockHolders).map((at) => ({ ...b, base: blockName(b.name), name: `${blockName(b.name)} ${vars.map((v) => at[`${v}:label`]).join(' ')}`, at: b.address.map((x) => parseInt(resolveByte(x, at, blockHolders), 16)) }));
+    return [{ ...b, at: b.address.map((x) => parseInt(x, 16)) }];
   };
-  const blockHolders = { ...(layout.placeholders ?? {}), ...(layout.bulkPlaceholders ?? {}) };
   // The block column and the description run together: `COMMON TG Common`, `AUDIO IN PART Audio Part
   // (A/D)`, `QUICK SETUP CONFIG MIDI Config 1`. The label's words are left off up to the last the
   // description repeats (`TG Common`, `Audio Part (A/D)`, `MIDI Config 1`); `SYSTEM Common` keeps it.
@@ -257,14 +290,16 @@ export function buildYamahaProfile(data, layout) {
       const last = words.findLastIndex((w) => new RegExp(`\\b${w.replace(/[^A-Z0-9]/g, '')}\\b`).test(rest.toUpperCase()));
       return last < 0 ? m : [...words.slice(last + 1), rest].join(' ');
     })
-    .replace(/\b(\w+)\s+\1\b/g, '$1');
+    .replace(/\b(\w+)\s+\1\b/g, '$1')
+    // `Live Set Page Name [p: Page No.`: the placeholder's note is not the name.
+    .replace(/\s*\[.*$/, '');
   // A Bulk Header is at 0E, a Bulk Footer at 0F (the Bulk Control table's addresses), whatever the
   // row is called: the reface YC's data list prints its footer `Bulk`.
-  const frameOf = (b) => (b.address[0] === '0E' || /Bulk Header/i.test(b.name) ? 'header' : b.address[0] === '0F' || /Bulk Footer/i.test(b.name) ? 'footer' : null);
+  const frameOf = (b) => (/Bulk Header/i.test(b.name) || (addressBytes === 3 && b.address[0] === '0E') ? 'header' : /Bulk Footer/i.test(b.name) || (addressBytes === 3 && b.address[0] === '0F') ? 'footer' : null);
   const blocks = data.bulk.map((b) => ({ ...b, frame: frameOf(b), label: clean(b.name).replace(/\s*Bulk (Header|Footer)?$/i, ''), name: frameOf(b) === 'footer' ? 'Bulk Footer' : blockName(b.name), size: Math.max(0, b.bytes - overhead) }))
     .flatMap(expandBlock)
     .map((b) => ({ ...b, name: layout.blockName?.(b.name, b.at) ?? b.name }));
-  const blockAt = (address) => blocks.find((b) => b.at[0] === address[0] && b.at[1] === address[1] && address[2] >= b.at[2] && address[2] < b.at[2] + b.size);
+  const blockAt = (address) => blocks.find((b) => inBlock(address, b.at, b.size));
 
   for (const table of data.tables) {
     const title = titleOf(table.title);
@@ -279,6 +314,21 @@ export function buildYamahaProfile(data, layout) {
     // A name printed once beside the rows that share it (`MTC strat offset` beside Hour, Minute, Second
     // and Frame): each takes it, with the word its description ends on.
     const tableRows = table.rows.map((r) => ({ ...r }));
+    // A low byte misprinted, that the rows either side pin down: the MODX M prints Key Controller
+    // Set 2 Switch `00` between Set 1 Ratio at 0E (two bytes) and Set 2 Destination at 12; it is 10.
+    for (let i = 1; i + 1 < tableRows.length; i++) {
+      const [a, b, c] = [tableRows[i - 1], tableRows[i], tableRows[i + 1]];
+      const same = (x, y) => x.address.slice(0, -1).join(' ') === y.address.slice(0, -1).join(' ');
+      if (!same(a, b) || !same(b, c) || !/^[0-9A-F]{2}$/.test(b.address.at(-1))) continue;
+      const [la, lb, lc] = [a, b, c].map((r) => parseInt(r.address.at(-1), 16));
+      const expected = la + (a.size || 1);
+      if (lb !== expected && lc === expected + (b.size || 1)) {
+        b.address = [...b.address.slice(0, -1), hex(expected)];
+        corrected.push(`${title}: ${clean(b.name)} printed ${hex(lb)}, taken as ${hex(expected)}`);
+      }
+    }
+    // `〃`: as the row above (the MODX M's effect parameters and arpeggio offsets).
+    tableRows.forEach((r, i) => { if (clean(r.description) === '〃' && i > 0) r.description = tableRows[i - 1].description; });
     const endWord = (r) => /\(([A-Za-z]+)\)\s*$/.exec(clean(r.description))?.[1];
     for (let i = 1; i < tableRows.length; i++) {
       if (clean(tableRows[i].name) || !tableRows[i].range.length || !endWord(tableRows[i])) continue;
@@ -291,6 +341,7 @@ export function buildYamahaProfile(data, layout) {
     }
     const runs = [];
     for (const row of tableRows) {
+      if (row.address.some((x) => x == null)) { skip('an address not printed in full', `${title}: ${clean(row.name)}`); continue; }
       const vars = [...new Set(row.address.flatMap(varsOf))];
       // `00 5n 00` and `00 6n 00` are different things numbered alike (a Quick Setup, an audio config).
       const key = row.address.filter((b) => varsOf(b).length).join(' ');
@@ -350,7 +401,17 @@ export function buildYamahaProfile(data, layout) {
         let read;
         let encoding = { type: 'u7' };
         let width = 1;
-        if (row.size === 1) {
+        let pairChoice = false;
+        const pairs = row.size === 2 ? readPairRange(row.range.join(' ')) : null;
+        if (pairs) {
+          // Two 7-bit bytes a value, every value (the MODX M): read as one range.
+          const values = readValues(pairs, description);
+          width = 2;
+          encoding = { type: 'u14-msb-lsb' };
+          if (values.choices && values.choices.length <= 32 && values.choices.every((c) => c.value < 128)) { read = { choices: values.choices }; pairChoice = true; }
+          else if (values.choices && pairs.length === 1) read = { min: pairs[0][0], max: pairs[0][1] };
+          else if (pairs.length > 1) { skip('a data range in parts its description does not match', `${label}: ${row.range.join(' ')} / ${description}`); continue; } else read = { min: pairs[0][0], max: pairs[0][1], ...values };
+        } else if (row.size === 1) {
           // A one-byte range wrapped over two lines (`00 –` over `11, 7F`).
           const parts = readHexRange(row.range.join(' '));
           if (!parts) { skip('a data range not read', `${label}: ${row.range.join('; ')}`); continue; }
@@ -397,8 +458,9 @@ export function buildYamahaProfile(data, layout) {
           access: { canRead: false, canWrite: true, realtimeSafe: true, source: 'singleParameter' },
           messageRecipe: recipe.id,
         };
-        // The Default (HEX) column, where the data list prints one.
-        const printed = /^([0-9A-F]{2})(?:\s+([0-9A-F]{2}))?(?:\s+([0-9A-F]{2}))?(?:\s+([0-9A-F]{2}))?(?:\s*\([0-9A-F]+\))?$/.exec(clean(row.default ?? ''));
+        // The Default (HEX) column, where the data list prints one: bytes, and a one-word label of the
+        // value after them (`00 10 (NoAsg)`); `01 (EL1 only)` is a condition, not a default for all.
+        const printed = /^([0-9A-F]{2})(?:\s+([0-9A-F]{2}))?(?:\s+([0-9A-F]{2}))?(?:\s+([0-9A-F]{2}))?(?:\s*\([^)\s]*\))?$/.exec(clean(row.default ?? ''));
         const defaultBytes = printed ? printed.slice(1).filter(Boolean).map((b) => parseInt(b, 16)) : null;
         const printedDefault = defaultBytes && defaultBytes.length === width
           ? (encoding.type === 'nibbled' ? defaultBytes.reduce((n, b) => (n << 4) | b, 0) : encoding.type === 'u14-msb-lsb' ? (defaultBytes[0] << 7) | defaultBytes[1] : defaultBytes[0])
@@ -407,10 +469,11 @@ export function buildYamahaProfile(data, layout) {
         if (read.choices) {
           const seen = new Set();
           const list = read.choices.map(({ value, label: l }) => { const s = slug(l); const id = seen.has(s) ? `${s}_${value}` : s; seen.add(id); return { id, label: l, value }; });
+          if (pairChoice) { base.messageRecipe = choiceRecipe.id; pairChoices++; }
           p = { ...base, ...(describe.length ? { description: describe.join(' ') } : {}), type: 'choice', default: (list.find((c) => c.value === printedDefault) ?? list[0]).id, choices: list, display: { mode: 'choice', shortLabel: camel(name) }, normalization: { mode: 'choiceIndex' }, encoding: { type: 'enum' }, sendPolicy: { mode: 'onCommit', coalesce: true }, ui: { preferredComponent: list.length === 2 ? 'ToggleButton' : list.length <= 5 ? 'RadioButtonGroup' : 'Combobox' } };
         } else {
           const same = readShownRange(description);
-          if (row.size === 1 && description && !read.shown && !(same && same.min === read.min && same.max === read.max)) describe.push(`Printed: ${asPrinted}.`);
+          if ((row.size === 1 || pairs) && description && !read.shown && !(same && same.min === read.min && same.max === read.max)) describe.push(`Printed: ${asPrinted}.`);
           if (read.unit) describe.push(`In ${read.unit}.`);
           const bipolar = read.shown && read.shown.min < 0 && read.shown.max > 0;
           const zero = bipolar ? read.min - read.shown.min : null;
@@ -428,7 +491,8 @@ export function buildYamahaProfile(data, layout) {
           };
         }
         parameters.push(p);
-        placed.push({ parameter: p, address: address.map((b) => parseInt(b, 16)), width });
+        // A two-byte choice is read from its low byte.
+        placed.push({ parameter: p, address: address.map((b) => parseInt(b, 16)), width, ...(pairChoice ? { valueAt: 1 } : {}) });
       }
     }
     }
@@ -442,11 +506,11 @@ export function buildYamahaProfile(data, layout) {
   const dumpFor = (b, collection) => {
     const size = b.size;
     const id = `bulk${b.at.map(hex).join('')}`;
-    const mappings = size > 0 ? placed.filter((x) => x.address[0] === b.at[0] && x.address[1] === b.at[1] && x.address[2] >= b.at[2] && x.address[2] + x.width <= b.at[2] + size)
-      .map((x) => ({ parameter: x.parameter, offset: x.address[2] - b.at[2], ...(x.parameter.encoding.type !== 'u7' && x.parameter.type !== 'choice' && x.parameter.type !== 'text' ? { codec: { type: x.parameter.encoding.type === 'nibbled' ? 'nibbled' : x.parameter.encoding.type, ...(x.parameter.encoding.nibbles ? { nibbles: x.parameter.encoding.nibbles } : {}) } } : {}) })) : [];
+    const mappings = size > 0 ? placed.filter((x) => inBlock(x.address, b.at, size, x.width))
+      .map((x) => ({ parameter: x.parameter, offset: x.address.at(-1) - b.at.at(-1) + (x.valueAt ?? 0), ...(x.parameter.encoding.type !== 'u7' && x.parameter.type !== 'choice' && x.parameter.type !== 'text' ? { codec: { type: x.parameter.encoding.type === 'nibbled' ? 'nibbled' : x.parameter.encoding.type, ...(x.parameter.encoding.nibbles ? { nibbles: x.parameter.encoding.nibbles } : {}) } } : {}) })) : [];
     const bc = b.bytes;
     const counted = bulkHead.indexOf('bb');
-    const at = 3 + bulkHead.length + 3;   // F0 43 0n, the header, the address
+    const at = 3 + bulkHead.length + addressBytes;   // F0 43 0n, the header, the address
     // The checksum adds up from the model ID (the reface, the MOXF) or from the byte count (the MX).
     const from = 3 + counted + (data.format.checksumFrom === 'byteCount' ? 0 : 2);
     return {
@@ -469,12 +533,14 @@ export function buildYamahaProfile(data, layout) {
     if (b.frame === 'header') {
       let j = i;
       while (j < blocks.length && blocks[j].frame !== 'footer') j++;
-      const pull = layout.pull?.[b.label];
+      // The layout picks a collection by its label, or, where two share one (the MODX M's
+      // PERFORMANCE headers), by its header as printed (`04 04 01 nn`).
+      const pull = layout.pull?.[b.address.join(' ')] ?? layout.pull?.[b.label];
       // The header's address as printed (the reface's 0E 0F 00), or, printed `0E mm nn`, the one the
       // layout picks from the Bulk Control table (the MOXF's Normal Voice Edit Buffer, 0E 0F 00).
       const header = pull?.header?.map((x) => parseInt(x, 16)) ?? (b.address.every(isHex) ? b.at : null);
       if (!header) { skip('a bulk dump whose header the data list prints as `0E mm nn` and the layout does not pick', b.label); i = j; continue; }
-      const members = blocks.slice(i, j + 1).map((m) => (m.frame && !m.address.every(isHex) ? { ...m, at: [m.at[0], header[1], header[2]] } : m));
+      const members = blocks.slice(i, j + 1).map((m) => (m.frame && !m.address.every(isHex) ? { ...m, at: [m.at[0], ...header.slice(1)] } : m));
       const id = pull?.id ?? layout.pullName ?? 'editBuffer';
       // Complete at its Bulk Footer: the data list says the blocks between may come in any order and
       // not all of them, and a MODX part sends element, key or operator blocks as its type has.
@@ -497,18 +563,19 @@ export function buildYamahaProfile(data, layout) {
   for (const p of read) { p.access.canRead = true; if (p.access.source !== 'bulkDump') p.access.source = 'singleParameter'; }
   const unread = parameters.filter((p) => !read.has(p));
 
+  if (corrected.length) notes.push(`Addresses misprinted in the data list, taken from the rows either side: ${corrected.join(', ')}.`);
   for (const [why, list] of skipped) notes.push(`Left out, ${why}: ${list.join(', ')}.`);
   const unreadGroups = [...new Set(unread.map((p) => p.group))];
   if (requests.length) notes.push(`Pull: ${requests.map((r) => r.name).join('; ')}. ${read.size} of ${parameters.length} parameters are read back${unread.length ? `; not in any block: ${unread.length > 12 ? `${unread.length} parameters, in ${unreadGroups.join(', ')}` : unread.map((p) => p.name).join(', ')}` : ''}.`);
 
   const variables = { channel: 1, deviceId: 16, ...(layout.variables ?? {}) };
   const tests = [];
-  const pick = [parameters.find((p) => p.type === 'choice'), parameters.find((p) => p.type === 'integer' && p.range.max > 1), parameters.find((p) => p.encoding.type === 'u14-msb-lsb' && p.type !== 'choice')].filter(Boolean);
+  const pick = [...new Set([parameters.find((p) => p.type === 'choice'), parameters.find((p) => p.type === 'integer' && p.range.max > 1), parameters.find((p) => p.encoding.type === 'u14-msb-lsb' && p.type !== 'choice')].filter(Boolean))];
   const valueBytes = (p, v) => (p.encoding.type === 'u14-msb-lsb' ? [v >> 7, v & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((s) => (v >> (s * 4)) & 15) : [v]);
   for (const p of pick) {
     const choice = p.type === 'choice' ? p.choices.at(-1) : null;
     const v = choice ? choice.value : Math.min(p.range.max, Math.max(p.range.min, 100));
-    tests.push({ name: `${p.group}: ${p.name} = ${choice ? choice.label : v}`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['F0', '43', hex(variables.deviceId), ...head, p.address, ...valueBytes(p, v).map(hex), 'F7'].join(' ') });
+    tests.push({ name: `${p.group}: ${p.name} = ${choice ? choice.label : v}`, parameter: p.id, value: choice ? choice.id : v, expectedHex: ['F0', '43', hex(variables.deviceId), ...head, p.address, ...(p.messageRecipe === choiceRecipe.id ? [0, v] : valueBytes(p, v)).map(hex), 'F7'].join(' ') });
   }
   for (const r of requests) tests.push({ name: r.name, kind: 'request', request: r.id, expectedHex: r.template.join(' ') });
   // A dump made by hand from the block's own layout, its checksum worked out: every mapped value at
@@ -574,7 +641,7 @@ export function buildYamahaProfile(data, layout) {
       ...(layout.coverage ?? {}),
     },
     timing: { minDelayBetweenMessagesMs: layout.delayMs ?? 0 },
-    messageRecipes: [recipe],
+    messageRecipes: [recipe, ...(pairChoices ? [choiceRecipe] : [])],
     parameters,
     tests,
     ...(requests.length ? { requests, dumpDefinitions, startup: { policy: 'pull', syncDirection: 'pull', sync: requests.map((r) => ({ request: r.id })) } } : {}),

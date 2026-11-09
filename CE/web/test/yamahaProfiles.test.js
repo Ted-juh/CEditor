@@ -20,7 +20,7 @@ import assert from 'node:assert/strict';
 
 import { readText } from './support/readText.mjs';
 import { pageBulkBlocks, pageParameterTables, readByteCount, readFormat } from '../../../tools/profiles/yamaha/read-yamaha-pdf.mjs';
-import { readHexRange, readPlaceholders, readShownRange, readValues, seriesNames, splitList } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
+import { readHexRange, readPairRange, readPlaceholders, readShownRange, readValues, seriesNames, splitList } from '../../../tools/profiles/yamaha/build-yamaha-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/yamaha/make-profiles.mjs';
 import { localCollectDumpMessages, localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
@@ -104,6 +104,24 @@ test('the data format: the bytes before the address, a byte count among them, an
   assert.equal(readFormat('IDENTITY REPLY (Transmit only)\n F0H 7EH 7FH 06H 02H 43H 00H 41H ddH ddH mmH 00H 00H 7FH F7H\n dd: Device family number\n MOXF6: 4CH 06H\n MOXF8: 4DH 06H\n').identityReply, undefined);
 });
 
+test('the MODX M: an address of four bytes, the leading ones carried, and a value printed two bytes a line', () => {
+  const xml = page(
+    say(43, 40, 'MIDI PARAMETER CHANGE TABLE'), say(43, 52, '(PERFORMANCE COMMON) Group Number =7F 1C, Model ID = 0D'),
+    say(104, 64, 'Data'), say(104, 70, 'Range'), say(104, 76, 'MSB/'), say(106, 82, 'LSB'), say(104, 88, '(HEX)'),
+    say(56, 76, 'Address'), say(90, 76, 'Size'), say(150, 76, 'Parameter Name'), say(250, 76, 'Description'), say(330, 70, 'Default'),
+    say(42, 100, '06 00 02 06'), say(94, 100, '2'), say(104, 100, '00 00 –'), say(150, 100, 'Performance Volume'), say(250, 100, '0 – 127'), say(330, 100, '00 7F'),
+    say(104, 106, '00 7F'),
+    say(79, 116, '08'), say(94, 116, '2'), say(104, 116, '00 01 –'), say(150, 116, 'Performance Pan'), say(250, 116, 'L63 – C – R63'), say(330, 116, '00 40'),
+    say(104, 122, '00 7F'),
+  );
+  const [table] = pageParameterTables(xml, 4);
+  assert.equal(table.title, 'MIDI PARAMETER CHANGE TABLE (PERFORMANCE COMMON)', 'the group and model ID set beside the title are not part of it');
+  assert.deepEqual(table.rows.map((r) => [r.address.join(' '), r.size, r.range.join(' '), r.name, r.default]), [
+    ['06 00 02 06', 2, '00 00 – 00 7F', 'Performance Volume', '00 7F'],
+    ['08', 2, '00 01 – 00 7F', 'Performance Pan', '00 40'],
+  ], 'the second row prints its low byte alone');
+});
+
 /* ------------------------------------------------------------------ the builder's rules */
 
 test('the description says what each value shows: a list of names, a range of numbers, a range in parts', () => {
@@ -122,6 +140,13 @@ test('the description says what each value shows: a list of names, a range of nu
   assert.deepEqual(readValues([[0, 4]], '0: Voice, 1: Performance, 2: Pattern (Multi), 3: Song (Multi), 4: Master').choices.map((c) => c.label), ['Voice', 'Performance', 'Pattern (Multi)', 'Song (Multi)', 'Master'], 'the value printed before each name is left off');
   assert.deepEqual(readValues([[0, 9]], '0 = Preset, 1 = User, 2 = Library1 – 9 = Library8').choices.map((c) => c.label).slice(1, 4), ['User', 'Library1', 'Library2']);
   assert.deepEqual(readHexRange('0 – 2'), [[0, 2]], 'the MX prints a byte with one digit');
+  // The MODX M prints every value two 7-bit bytes, high first, and its minus signs as U+2212.
+  assert.deepEqual(readPairRange('00 00 – 00 7F'), [[0, 127]]);
+  assert.deepEqual(readPairRange('00 00 – 0F 7F'), [[0, 2047]]);
+  assert.deepEqual(readPairRange('00 00 – 00 11, 00 7F'), [[0, 17], [127, 127]]);
+  assert.equal(readPairRange('00 2E – 00 B6'), null, 'B6 is no 7-bit byte');
+  assert.deepEqual(readValues([[0x10, 0x70]], '\u221248 – +48 semi'), { shown: { min: -48, max: 48 }, unit: 'semitones' });
+  assert.deepEqual(readValues([[0, 17], [127, 127]], '0: Part 1, 1: Part 2 – 15: Part 16, 16: A/D, 17: Master, 127: Off').choices.slice(-4).map((c) => `${c.value} ${c.label}`), ['15 Part 16', '16 A/D', '17 Master', '127 Off'], 'the numbers printed are the values');
   const omni = readValues([[0, 16], [127, 127]], '1 – 16, omni, off').choices;
   assert.deepEqual([omni.length, omni[15], omni[16], omni[17]], [18, { value: 15, label: '16' }, { value: 16, label: 'omni' }, { value: 127, label: 'off' }], 'counted out over the parts in turn');
   assert.deepEqual(readPlaceholders(['op = operator number', '00 – 03 (hex)', 'OP1 – OP4']), { op: { what: 'operator number', values: [0, 1, 2, 3], labels: ['OP1', 'OP2', 'OP3', 'OP4'] } });
@@ -173,7 +198,8 @@ for (const { name, profile, text, out, data } of BUILT) {
       for (const [value, wire] of values) {
         const compiled = localCompileParameter(profile, { parameterId: p.id, value });
         assert.ok(compiled.ok, `${p.id}: ${compiled.error}`);
-        const bytes = p.encoding.type === 'u14-msb-lsb' ? [wire >> 7, wire & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((s) => (wire >> (s * 4)) & 15) : [wire];
+        // A two-byte choice (the MODX M's) goes out as 00 and the choice.
+        const bytes = p.messageRecipe === 'parameterChangeChoice' ? [0, wire] : p.encoding.type === 'u14-msb-lsb' ? [wire >> 7, wire & 127] : p.encoding.type === 'nibbled' ? [3, 2, 1, 0].map((s) => (wire >> (s * 4)) & 15) : [wire];
         assert.equal(compiled.hex, `F0 43 10 ${head} ${p.address} ${hex(bytes)} F7`, `${p.id} = ${value}`);
       }
     }
@@ -300,4 +326,31 @@ test('the MODX: Pull asks for the Performance Common and Part 1, and Part 1 is c
   const performancePart = part1.find((d) => d.matcher.prefix.slice(-3).join(' ') === '31 00 00');
   assert.equal(localParseDumpMessage(profile, handMade(profile, performancePart, {}, [0x31, 0x01, 0x00])).ok, false);
   assert.equal(profile.dumpDefinitions.find((d) => d.id === 'bulk304000').completion.collectionId, 'performanceCommon');
+});
+
+test('the MODX M and MONTAGE M: four-byte addresses, two-byte values and choices, and Part 1 read back at its footer', { skip: !builtProfile('yamaha-modx-m') }, () => {
+  for (const id of ['yamaha-modx-m', 'yamaha-montage-m']) {
+    const profile = builtProfile(id);
+    const at = (group, name) => profile.parameters.find((p) => p.group === group && p.name === name);
+    const send = (group, name, value) => localCompileParameter(profile, { parameterId: at(group, name).id, value }).hex;
+    assert.equal(send('Performance Common', 'Performance Pan', 127), 'F0 43 10 7F 1C 0D 06 00 02 08 00 7F F7', `${id}: four address bytes, then the value's two`);
+    assert.equal(send('System', 'Keyboard Velocity Curve', 'wide'), 'F0 43 10 7F 1C 0D 00 00 00 14 00 05 F7', 'a two-byte choice: 00, then the choice');
+    assert.deepEqual([at('Part 1 Pitch/Effect', 'Note Shift').display.min, at('Part 1 Pitch/Effect', 'Note Shift').display.max], [-48, 48], 'U+2212 is a minus');
+    assert.equal(at('Part 1 Element 3', 'Element Switch').address, '20 00 02 00', 'element 3: 2p 00 ee 00, ee = 02');
+    const request = (rid) => profile.requests.find((r) => r.id === rid).template.join(' ');
+    assert.equal(request('requestPart1'), 'F0 43 20 7F 1C 0D 04 04 01 00 F7', 'the Bulk Control table\'s Performance Edit Buffer Part nn, nn = 0');
+    assert.equal(request('requestPerformanceCommon'), 'F0 43 20 7F 1C 0D 04 04 02 00 F7');
+    // An AWM2 part answers with its part blocks and its elements' (8 laid out here), no keys, no
+    // FM-X or AN-X blocks; a two-byte choice is read from its low byte.
+    const part1 = profile.dumpDefinitions.filter((d) => d.completion.collectionId === 'part1');
+    const awm2 = part1.filter((d) => !/^(30|40|70)$/.test(d.matcher.prefix.at(-4)) && !(d.matcher.prefix.at(-4) === '20' && d.matcher.prefix.at(-3) === '10'));
+    const choice = profile.parameters.find((p) => p.messageRecipe === 'parameterChangeChoice' && p.choices.length > 2 && awm2.some((d) => d.mappings.some((m) => m.parameter === p.id)));
+    const element3 = at('Part 1 Element 3', 'Element Switch');
+    const values = { [choice.id]: choice.choices.at(-1).value, [element3.id]: 1 };
+    const collected = localCollectDumpMessages(profile, awm2.map((d) => handMade(profile, d, Object.fromEntries(Object.entries(values).filter(([k]) => d.mappings.some((m) => m.parameter === k))))));
+    assert.ok(collected.complete, `${id}: ${collected.error}`);
+    assert.equal(collected.values[choice.id], choice.choices.at(-1).id);
+    assert.equal(collected.values[element3.id], 'on');
+    assert.equal(profile.identity, undefined, 'a code for each model: no identity check');
+  }
 });

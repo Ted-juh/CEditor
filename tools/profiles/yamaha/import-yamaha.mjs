@@ -33,7 +33,7 @@ export function importDocuments(layout, files) {
   const tables = readParameterTables(file, r.tablePages, format.addressBytes ?? 3);
   // The bulk dump block table, in one or more spans (a column of a page each).
   const spans = [r.bulk ?? []].flat();
-  const bulk = spans.flatMap((s) => readBulkBlocks(file, s.page, s));
+  const bulk = spans.flatMap((s) => readBulkBlocks(file, s.page, s, format.addressBytes ?? 3));
   // What a block's byte count counts, as the data list says: the reface's `the size of data in blocks
   // from Model ID onward`, the MODX's and MOXF's `the data size contained in each block`.
   const counted = readByteCount(pagesText(file, [...new Set([...r.formatPages, ...spans.map((s) => s.page)])]));

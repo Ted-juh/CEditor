@@ -25,7 +25,7 @@ export function pagesText(pdf, pages) {
 
 const middle = (box) => (box.y0 + box.y1) / 2;
 /** A byte of an address as printed: hex, or a placeholder for a part, element, operator (`op`, `ep`, `5p`, `kk`). */
-const ADDRESS_BYTE = /^([0-9A-F]{2}|[0-9a-z]{2})$/;
+const ADDRESS_BYTE = /^([0-9A-F]{2}|[0-9a-zA-Z]{2})$/;   // a placeholder may be capital: the MODX M's `L0`, `Lm`
 const HEX_BYTE = /^[0-9A-F]{2}$/;
 
 /** Words of one line from x0 to x1. */
@@ -75,14 +75,15 @@ function findHeads(lines, width) {
   for (const h of heads) {
     // The page's columns are where its tables' `Address` headings stand, whatever their heights.
     const next = heads.filter((o) => o !== h && o.address.x0 > h.name.x0).sort((a, b) => a.address.x0 - b.address.x0)[0];
-    h.x1 = next ? next.address.x0 - 12 : width;
+    h.x1 = next ? next.address.x0 - 15 : width;
     h.x0 = h.address.x0 - 8;
   }
   // A title, or a row's first address byte, can start a little left of the `Address` heading (the
-  // MODX's titles do, by ten points), but not into the table beside it.
+  // MODX's titles do, by ten points, the MODX M's by thirteen and a half), but not into the table
+  // beside it.
   for (const h of heads) {
     const prev = heads.filter((o) => o !== h && o.name.x1 < h.address.x0).sort((a, b) => b.address.x0 - a.address.x0)[0];
-    h.x0 = Math.max(h.address.x0 - 14, prev ? prev.x1 + 1 : 0);
+    h.x0 = Math.max(h.address.x0 - 15, prev ? prev.x1 : 0);
   }
   for (const h of heads) {
     const band = (x) => Math.abs(middle(x) - middle(h.name)) <= 13 && x.x0 > h.name.x1 && x.x0 < h.x1;
@@ -153,7 +154,11 @@ export function pageParameterTables(xml, addressBytes = 3) {
     const cols = [['address', h.x0]];
     headings.forEach(([kind, w], i) => {
       const previous = i === 0 ? h.address : headings[i - 1][1];
-      cols.push([kind, gapAt(Math.max(Math.min(previous.x1, w.x0 - 1) - (i === 0 ? 0 : 4), w.x0 - 25), w.x0 + 1)]);
+      const start = gapAt(Math.max(Math.min(previous.x1, w.x0 - 1) - (i === 0 ? 0 : 4), w.x0 - 25), w.x0 + 1);
+      // A size is one digit set under its heading. Where every row of a table prints its address's
+      // low byte alone, set under the right of `Address` (a table run on from the page before), the
+      // widest gap is left of those bytes: the size column does not start that far left.
+      cols.push([kind, kind === 'size' ? Math.max(start, w.x0 - 8) : start]);
     });
     if (process.env.YAMAHA_DEBUG) console.error(title, JSON.stringify(cols.map(([k, x]) => [k, Math.round(x)])));
     const columnOf = (w) => { let k = null; for (const [kind, x] of cols) if (w.x0 >= x - 0.5) k = kind; return w.x0 < h.x1 ? k : null; };
@@ -249,7 +254,7 @@ export function readFormat(text) {
   const groupLow = /\b([0-9A-F]{2})H?\s+Group (?:Number|ID) Low/.exec(t)?.[1];
   const header = readHeader(lines, '0001');
   const bulkHeader = readHeader(lines, '0000');
-  const sum = /Check sum is the value[^\n]*?when the (Model ID|Byte Count)\b/i.exec(t)?.[1];
+  const sum = /Check[- ]?sum is the value[^\n]*?when the (Model ID|Byte Count)\b/i.exec(t)?.[1];
   // `Address High`, `Mid`, `Low`; the MODX M's `Address 1st` … `4th`.
   const start = lines.findIndex((l) => /\b0001nnnn\s+\w{2}H?\s+Device Number/i.test(l));
   const addressLines = start < 0 ? [] : lines.slice(start, start + 20).filter((l) => /\b0a{7}\s+a{7}\s+Address (High|Mid|Low|1st|2nd|3rd|4th)\b/i.test(l));
@@ -285,30 +290,30 @@ export function readByteCount(text) {
  * block with `last`: the last one's name and middle address byte. Lines between `Byte Count` and the
  * next heading, within the span the layout gives.
  */
-export function readBulkBlocks(pdf, page, span = {}) {
-  return pageBulkBlocks(pageXml(pdf, page), span);
+export function readBulkBlocks(pdf, page, span = {}, addressBytes = 3) {
+  return pageBulkBlocks(pageXml(pdf, page), span, addressBytes);
 }
 
 /** readBulkBlocks on one page's `pdftotext -bbox-layout` XML. */
-export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}) {
+export function pageBulkBlocks(xml, { left = 0, right = Infinity } = {}, addressBytes = 3) {
   const lines = visualLines(pageWords(xml).words);
   const inSide = (w) => w.x0 >= left && w.x0 < right;
   const head = lines.find((l) => l.words.some((w) => inSide(w) && w.text === 'Byte') && l.words.some((w) => inSide(w) && w.text === 'Count'));
   if (!head) return [];
   const out = [];
   let series = false;
-  const BYTE = '([0-9A-F]{2}|[0-9a-z]{2})';
+  const BYTE = '([0-9A-F]{2}|[0-9a-zA-Z]{2})';
   for (const l of lines.filter((x) => x.y0 > head.y1 + 6).sort((a, b) => a.y0 - b.y0)) {
     const words = l.words.filter(inSide).map((w) => w.text);
     if (!words.length) continue;
     const text = words.join(' ');
     if (/^:(\s+:)*$/.test(text)) { series = out.length > 0; continue; }
-    const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,5})\\s+${BYTE}\\s+${BYTE}\\s+${BYTE}$`).exec(text);
+    const m = new RegExp(`^(.*?)\\s*(\\d+)\\s+([0-9A-F]{2,5})${`\\s+${BYTE}`.repeat(addressBytes)}$`).exec(text);
     const last = series && /^(.*?)\s+([0-9A-F]{2})$/.exec(text);
     series = false;
     // A side note set beside the rows (the MODX's `Only the Part No. p same as the Part number
     // specified in "nn" is available.`) shares their lines: its lowercase words before the name are not it.
-    if (m) out.push({ name: m[1].trim().replace(/^(?:[a-z“"]\S*\s+)+(?=[A-Z])/, ''), bytes: Number(m[2]), address: [m[4], m[5], m[6]] });
+    if (m) out.push({ name: m[1].trim().replace(/^(?:[a-z“"]\S*\s+)+(?=[A-Z])/, ''), bytes: Number(m[2]), address: m.slice(4, 4 + addressBytes) });
     else if (last) out.at(-1).last = { name: last[1].trim(), mid: last[2] };
     else if (/^(MIDI|Program|Control|Parameter)\b/.test(text) && out.length) break;
   }

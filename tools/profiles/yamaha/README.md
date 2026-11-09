@@ -44,7 +44,13 @@ lists do that it copes with, each found on a real page:
 - a value over several bytes, one data range a line (`00 – 00`, `00 – 07`, `00 – 0F`, `00 – 0F`
   beside `1st bit 3-0 : bit 15-12` …); a byte printed with one digit (the MX's `0 – 2`);
 - a name printed once beside the rows that share it (`MTC strat offset` beside `0 .. 23 (Hour)`,
-  `0 .. 59 (Minute)` …), each row taking it with the word its description ends on.
+  `0 .. 59 (Minute)` …), each row taking it with the word its description ends on;
+- an address of four bytes where the data format prints `Address 1st` … `4th` (the MODX M's `06 00
+  02 06`), its leading bytes carried down as a three-byte one's are, a placeholder byte with a capital
+  (`L0`, `Lm`), and a title with `Group Number =7F 1C, Model ID = 0D` set beside it;
+- a table run on from the page before whose every row prints its address's low byte alone, under
+  the right of `Address`: the size column, a digit under its heading, does not start left of them;
+- `〃` for a description, as the row above.
 
 The bulk dump block table is read the same way, a column of a page at a time where it is set in two
 (the MOXF's): each line ending in a byte count and an address, and a series printed first and last
@@ -65,6 +71,15 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
   10, 7F` beside `1 – 16, omni, off`; `0 = Preset, 1 = User, 2 = Library1...9 = Library8`). A range
   may be printed with dots (`1..16`, `5 ... 300`, `-120 … +120`). Anything else (`0: Poly, 1 – 127:
   Mono with Portamento Time`) is a number, with the description said.
+- **A value printed two 7-bit bytes a line** (the MODX M's `Data Range MSB/LSB`: `00 00 – 00 7F`,
+  `00 00 – 00 11, 00 7F`) is one value over both, read as a one-byte row's is: a choice, or a number
+  showing what its description says. A choice goes out as `00` and the choice, by a second recipe, and
+  is read back from the second byte; one with a value over 127 is a number. U+2212 is a minus sign,
+  and `semi` a semitone (`−24 – +24 semi`). Over a range in parts the numbers a list prints are the
+  values (`0: Part 1, 1: Part 2 – 15: Part 16, 16: A/D, 17: Master, 127: Off`).
+- **An address the data list misprints** and the rows either side pin down is taken from them, and the
+  profile's notes say so: the MODX M prints Key Controller Set 2 Switch `00` between Set 1 Ratio at
+  `0E` (two bytes) and Set 2 Destination at `12`; it is `10`.
 - **A value over several bytes** is split as its description says: `1st bit 3-0 : bit 15-12` is four
   nibbles, `1st bit 6-0 : bit 13-7` two 7-bit halves (Tempo, 30 - 300). Two bytes printed as a high
   and a low range with no such words are two 7-bit halves when the description counts out exactly
@@ -101,8 +116,10 @@ with `:` between (`Part 1 62 3E 31 00 00`, `:`, `Part 4 03`; `Key C0` … `Key C
 | `yamaha-reface-dx` | reface Data List (B0), pp. 6-10 | 135 | 39 | System, Voice Common and four operators |
 | `yamaha-reface-cp` | reface Data List (B0), pp. 11-14 | 22 | 11 | System, TG Common |
 | `yamaha-reface-yc` | reface Data List (B0), pp. 15-19 | 27 | 11 | System, TG Common |
-| `yamaha-modx` | MODX6/MODX7/MODX8 Data List (D0), pp. 188, 192-222 | 4,521 | 884 | System, Performance Common, Part 1 |
-| `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 192-222 | 4,521 | 884 | System, Performance Common, Part 1 |
+| `yamaha-modx` | MODX6/MODX7/MODX8 Data List (D0), pp. 188, 192-222 | 4,527 | 890 | System, Performance Common, Part 1 |
+| `yamaha-modx-plus` | MODX6+/MODX7+/MODX8+ Data List (A0), pp. 188, 192-222 | 4,527 | 890 | System, Performance Common, Part 1 |
+| `yamaha-modx-m` | MODX M6/M7/M8 Data List (B0), pp. 214-215, 220-256 | 6,773 | 1,916 | System, Performance Common, Part 1 |
+| `yamaha-montage-m` | MONTAGE M6/M7/M8x Data List (H0), pp. 214-215, 220-256 | 6,781 | 1,918 | System, Performance Common, Part 1 |
 | `yamaha-moxf` | MOXF6/MOXF8 Data List (A0), pp. 121, 124-146 | 5,317 | 1,216 | the five edit buffers, the System's blocks |
 | `yamaha-mx` | MX49/MX61/MX88 Data List (C0), pp. 55, 57-66 | 3,880 | 736 | the three edit buffers, the System's blocks |
 
@@ -129,8 +146,22 @@ Pull asks for the Performance Edit Buffer Common (`0E 53 00`) and the Performanc
 (`0E 52 00`), the two halves these profiles lay out, rather than the whole Performance (`0E 25 00`),
 which would send all 16 parts. Part 1 answers with its part blocks and the blocks of its type: a
 Normal part's elements, a Drum part's keys or an FM-X part's operators, which is why the collection
-is complete at its footer and not at a count. Every one of the 4,521 parameters falls in a block
+is complete at its footer and not at a count. Every one of the 4,527 parameters falls in a block
 asked for.
+
+The MODX M and MONTAGE M are the next generation of the same format, read with the same reader and
+laid out the same way: model ID `0D`, every address four bytes (`2p 01 ee 00`: the part in the first
+byte's low nibble, the element in the third), every value of a 2-byte table two 7-bit bytes, and AN-X
+parts beside the AWM2 and FM-X ones. The profiles lay out the Performance Common and Part 1 with its
+first 8 elements of an AWM2 part's 128 (laid out in full a part would be some 18,000 parameters), its
+73 drum keys, 8 FM-X operators, and 3 AN-X oscillators and 2 filters. Pull asks for the Performance
+Edit Buffer Common (`04 04 02 00`) and Part 1 (`04 04 01 00`); the blocks of elements 9 to 128 are let
+pass. 6,656 of the MODX M's 6,773 parameters are read back. The rest are in no block the data list
+prints: the Temporary Setup, the parameters the base address table calls Bulk Unsupported (`7p`),
+and the rows a block's printed size leaves out (an element's 1byte block is printed 36 bytes, its
+table runs to `2A`; a common controller box 16, its Ratio at `10`). The two data lists differ in a
+few settings each (the MONTAGE M's knob functions, the MODX M's knob mode), as the instruments do.
+The identity reply prints a family code for each model, so neither checks identity.
 
 The MOXF's tables are laid out in full: the System with its six Quick Setups and their audio and
 MIDI configs, the Master's four zones, the Performance and its four parts, the Song/Pattern mixing
@@ -159,6 +190,5 @@ parameter change here too, and the panel's CCs would be a second parameter for e
 
 ## Survey: what else Yamaha publishes
 
-Data lists downloaded and read so far, for the work still to do: MODX M (B0, 261 pp.) and MONTAGE M
-(H0), model ID 0D, whose tables address a part with more bytes than the MODX's and read with empty
-addresses here.
+Every data list downloaded so far is read. Not yet looked for: the original MONTAGE (2016), the
+Motif XF/XS, S90XS/S70XS, MO6/8 and CP/YC stage keyboards.
