@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { readTables } from './read-novation-pdf.mjs';
+import { pagesText, readMessage, readPatchFormat } from './read-novation-sysex.mjs';
 import { readValueTables } from './read-novation-values.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +32,7 @@ export function importDocuments(layout, files) {
   const sources = [];
   const rows = [];
   const valueTables = [];
+  let patch = null;
   layout.documents.forEach((doc, index) => {
     const file = files[index];
     const pages = pageList(doc.pages);
@@ -38,8 +40,20 @@ export function importDocuments(layout, files) {
     for (const row of readTables(file, pages, { columnStarts: doc.columnStarts ?? null })) rows.push({ doc: index, ...row });
     // The value tables the rows point to (`See Osc Waveform Table`), where the layout names their pages.
     if (doc.valuePages) for (const t of readValueTables(file, pageList(doc.valuePages))) valueTables.push({ doc: index, ...t });
+    // The patch dump, where the layout names the pages of its messages and its format.
+    if (doc.patch) {
+      const messages = pagesText(file, pageList(doc.patch.messagePages));
+      patch = {
+        doc: index,
+        requestTitle: doc.patch.request,
+        replyTitle: doc.patch.reply,
+        request: readMessage(messages, doc.patch.request),
+        reply: readMessage(messages, doc.patch.reply),
+        format: readPatchFormat(pagesText(file, pageList(doc.patch.formatPages))),
+      };
+    }
   });
-  return { sources, rows, ...(valueTables.length ? { valueTables } : {}) };
+  return { sources, rows, ...(valueTables.length ? { valueTables } : {}), ...(patch ? { patch } : {}) };
 }
 
 /** One row per line, so a re-import that changes one row changes one line. */
@@ -47,7 +61,10 @@ export function stringifyTranscription(data) {
   return `${['{', '  "sources": [', ...data.sources.map((s, i) => `    ${JSON.stringify(s)}${i < data.sources.length - 1 ? ',' : ''}`), '  ],', '  "rows": [',
     ...data.rows.map((r, i) => `    ${JSON.stringify(r)}${i < data.rows.length - 1 ? ',' : ''}`),
     ...(data.valueTables ? ['  ],', '  "valueTables": [', ...data.valueTables.map((t, i) => `    ${JSON.stringify(t)}${i < data.valueTables.length - 1 ? ',' : ''}`)] : []),
-    '  ]', '}'].join('\n')}\n`;
+    ...(data.patch ? ['  ],', '  "patch": {',
+      ...['doc', 'requestTitle', 'replyTitle', 'request', 'reply'].map((k) => `    ${JSON.stringify(k)}: ${JSON.stringify(data.patch[k])},`),
+      '    "format": [', ...data.patch.format.map((r, i) => `      ${JSON.stringify(r)}${i < data.patch.format.length - 1 ? ',' : ''}`), '    ]', '  }'] : ['  ]']),
+    '}'].join('\n')}\n`;
 }
 
 async function main() {

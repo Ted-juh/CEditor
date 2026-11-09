@@ -23,7 +23,7 @@ import { pageBlocks, pageTables } from '../../../tools/profiles/novation/read-no
 import { pagePhrases, pageValueTables } from '../../../tools/profiles/novation/read-novation-values.mjs';
 import { buildNovationProfile, listedValues, namedValues, readRange } from '../../../tools/profiles/novation/build-novation-profile.mjs';
 import { SYNTHS, build } from '../../../tools/profiles/novation/make-profiles.mjs';
-import { localCompileParameter, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
+import { localCompileDeviceRequest, localCompileParameter, localParseDumpMessage, validateLocalProfileSource } from '../src/CE_Application/stores/deviceProfileLocalEngine.js';
 
 /* ------------------------------------------------------------------ the reader */
 
@@ -152,6 +152,23 @@ for (const { name, profile, text, out, data } of BUILT) {
     }
   });
 
+  if (profile.dumpDefinitions) {
+    test(`${profile.id}: Pull asks each synth for its current patch and reads its declared dumps back`, () => {
+      for (const request of profile.tests.filter((t) => t.kind === 'request')) {
+        const compiled = localCompileDeviceRequest(profile, { request: request.request });
+        assert.ok(compiled.ok, compiled.error);
+        assert.equal(compiled.transaction?.encodedValueHex ?? compiled.hex, request.expectedHex);
+      }
+      for (const vector of profile.tests.filter((t) => t.kind === 'dumpParse')) {
+        const parsed = localParseDumpMessage(profile, vector.inputHex);
+        assert.ok(parsed.ok, parsed.error);
+        for (const [id, value] of Object.entries(vector.expectedValues)) assert.equal(parsed.values[id], value, `${vector.name}: ${id}`);
+      }
+      const ids = new Set(profile.parameters.filter((p) => p.access.canRead).map((p) => p.id));
+      for (const d of profile.dumpDefinitions) for (const m of d.mappings) assert.ok(ids.has(m.parameter), m.parameter);
+    });
+  }
+
   test(`${profile.id}: the source is the guide, and nobody has tried it on an instrument`, () => {
     assert.equal(profile.manufacturer, 'Novation');
     assert.equal(profile.coverage.verifiedOnHardware, false);
@@ -196,4 +213,26 @@ test('choices from the value tables the rows point to, and none where a table do
   assert.deepEqual(by(mono, 'LFO Sync Rate').choices.slice(0, 2).map((c) => c.label), ['64 beats', '48 beats']);
   assert.equal(by(mono, 'Filter Slope').type, 'integer', 'its table reprints the shape table\'s three names for 0 - 1');
   assert.deepEqual([by(mini, 'Osc1 Wave').choices.length, by(mini, 'Osc1 Wave').choices[71].label], [72, 'AudioInR']);
+});
+
+test('the Circuit Tracks\' patch dump, placed by hand from its patch format, reads back into Synth 2', { skip: !builtProfile('novation-circuit-tracks') }, () => {
+  // Replace Current Patch: F0 00 20 29 01 64 00, location 01 (Synth 2), 00, 340 bytes, F7. Each byte
+  // at its default from the format's own column, then: 33 Voice_PortamentoRate 90; 32
+  // Voice_PolyphonyMode 2; 91 holding LFO1_KeySync (bit 1) on and LFO1_FadeMode (bits 4-5) 1.
+  const { profile, data } = BUILT.find((b) => b.profile.id === 'novation-circuit-tracks');
+  const by = (name) => profile.parameters.find((p) => p.name === name);
+  const payload = new Array(340).fill(0);
+  for (const row of data.patch.format) payload[row.address] = row.default;
+  payload[33] = 90;
+  payload[32] = 2;
+  payload[91] = (1 << 1) | (1 << 4);
+  const hexOf = (bytes) => bytes.map((b) => b.toString(16).toUpperCase().padStart(2, '0')).join(' ');
+  const parsed = localParseDumpMessage(profile, hexOf([0xf0, 0x00, 0x20, 0x29, 0x01, 0x64, 0x00, 0x01, 0x00, ...payload, 0xf7]));
+  assert.ok(parsed.ok, parsed.error);
+  assert.equal(parsed.values[by('Synth 2 Portamento Rate').id], 90);
+  assert.equal(parsed.values[by('Synth 2 Polyphony Mode').id], by('Synth 2 Polyphony Mode').choices.find((c) => c.value === 2).id);
+  assert.equal(parsed.values[by('Synth 2 lfo 1 key sync').id], by('Synth 2 lfo 1 key sync').choices[1].id, 'bit 1 set: the second of its two values');
+  assert.equal(parsed.values[by('Synth 2 Lfo 1 fade mode').id], by('Synth 2 Lfo 1 fade mode').choices[1].id, 'bits 4-5 = 1');
+  assert.equal(parsed.values[by('Synth 1 Portamento Rate').id], undefined, 'location 01 is Synth 2\'s');
+  assert.equal(localCompileDeviceRequest(profile, { request: 'requestPatchSynth2' }).hex ?? localCompileDeviceRequest(profile, { request: 'requestPatchSynth2' }).transaction?.encodedValueHex, 'F0 00 20 29 01 64 40 01 F7');
 });

@@ -23,6 +23,7 @@
 //     synths) makes a parameter per part, on that part's channel variable (layout `parts`).
 
 import { camel, stringifyProfile } from '../roland/build-profile.mjs';
+import { addPull } from './build-novation-dump.mjs';
 
 const DASH = /\s*(?:-|–|to)\s*/;
 const num = (s) => Number(String(s).replace(/[–−]/g, '-').replace(/^\+/, ''));
@@ -255,7 +256,7 @@ export function buildNovationProfile(data, layout) {
     });
   }
 
-  return {
+  const profile = {
     schemaVersion: 1,
     profileVersion: layout.profileVersion ?? '0.1.0',
     minCEditorVersion: '0.9.0',
@@ -296,6 +297,10 @@ export function buildNovationProfile(data, layout) {
     ...(layout.presets ? { presets: layout.presets } : {}),
     tests,
   };
+  const pullNotes = [];
+  addPull(profile, data, layout, pullNotes);
+  profile.authoringNotes.push(...pullNotes);
+  return profile;
 }
 
 export { stringifyProfile };
